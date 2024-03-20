@@ -5,9 +5,10 @@ export module posting_writer;
 import stl;
 import memory_pool;
 import file_writer;
+import file_reader;
 import doc_list_encoder;
 import inmem_posting_decoder;
-import pos_list_encoder;
+import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
@@ -33,7 +34,9 @@ public:
 
     tf_t GetCurrentTF() const;
 
-    void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
+    void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta, bool spill = false);
+
+    void Load(const SharedPtr<FileReader> &file_reader);
 
     u32 GetDumpLength();
 

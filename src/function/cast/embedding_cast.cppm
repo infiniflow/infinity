@@ -54,7 +54,6 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
         RecoverableError(Status::DataTypeMismatch(source.ToString(), target.ToString()));
-        //        UnrecoverableError(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
     }
     switch (source_info->Type()) {
         case EmbeddingDataType::kElemInt8: {

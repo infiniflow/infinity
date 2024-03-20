@@ -1,19 +1,20 @@
 module;
 
+module doc_list_encoder;
 import stl;
 import memory_pool;
 import file_writer;
+import file_reader;
 import buffered_byte_slice;
 import buffered_skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
 import position_bitmap_writer;
-import inmem_pair_value_skiplist_reader;
-import inmem_tri_value_skiplist_reader;
+import inmem_position_list_skiplist_reader;
+import inmem_doc_list_skiplist_reader;
 import index_defines;
 import skiplist_reader;
 import vbyte_compressor;
-module doc_list_encoder;
 
 namespace infinity {
 
@@ -33,6 +34,7 @@ DocListEncoder::DocListEncoder(const DocListFormatOption &format_option,
     if (format_option_.HasTfBitmap()) {
         tf_bitmap_writer_ = new PositionBitmapWriter(byte_slice_pool_);
     }
+    CreateDocSkipListWriter();
 }
 
 DocListEncoder::~DocListEncoder() {
@@ -93,26 +95,45 @@ void DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t 
     }
 }
 
-void DocListEncoder::Dump(const SharedPtr<FileWriter> &file) {
-    Flush();
-    u32 doc_skiplist_size = 0;
-    if (doc_skiplist_writer_) {
-        doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
+void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+    if (spill) {
+        file->WriteVInt(last_doc_id_);
+        file->WriteVInt(last_doc_payload_);
+        file->WriteVInt(current_tf_);
+        file->WriteVInt(total_tf_);
+        file->WriteVInt(df_);
+    } else {
+        Flush();
+        u32 doc_skiplist_size = 0;
+        if (doc_skiplist_writer_) {
+            doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
+        }
+
+        u32 doc_list_size = doc_list_buffer_.EstimateDumpSize();
+
+        file->WriteVInt(doc_skiplist_size);
+        file->WriteVInt(doc_list_size);
     }
 
-    u32 doc_list_size = doc_list_buffer_.EstimateDumpSize();
-
-    file->WriteVInt(doc_skiplist_size);
-    file->WriteVInt(doc_list_size);
-
     if (doc_skiplist_writer_) {
-        doc_skiplist_writer_->Dump(file);
+        doc_skiplist_writer_->Dump(file, spill);
     }
 
-    doc_list_buffer_.Dump(file);
+    doc_list_buffer_.Dump(file, spill);
     if (tf_bitmap_writer_) {
         tf_bitmap_writer_->Dump(file, total_tf_);
     }
+}
+
+void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
+    last_doc_id_ = file->ReadVInt();
+    last_doc_payload_ = file->ReadVInt();
+    current_tf_ = file->ReadVInt();
+    total_tf_ = file->ReadVInt();
+    df_ = file->ReadVInt();
+
+    doc_skiplist_writer_->Load(file);
+    doc_list_buffer_.Load(file);
 }
 
 u32 DocListEncoder::GetDumpLength() {
@@ -159,21 +180,20 @@ void DocListEncoder::AddSkipListItem(u32 item_size) {
 
 InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_pool) const {
     df_t df = df_;
-    // TODO memory problem
     SkipListReader *skiplist_reader = nullptr;
     if (doc_skiplist_writer_) {
         const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
 
         if (skiplist_format->HasTfList()) {
-            InMemTriValueSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemTriValueSkipListReader)))
-                                                                                     InMemTriValueSkipListReader(session_pool)
-                                                                               : new InMemTriValueSkipListReader(session_pool);
+            InMemDocListSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListSkipListReader)))
+                                                                                    InMemDocListSkipListReader(session_pool)
+                                                                              : new InMemDocListSkipListReader(session_pool);
             in_mem_skiplist_reader->Load(doc_skiplist_writer_);
             skiplist_reader = in_mem_skiplist_reader;
         } else {
-            InMemPairValueSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPairValueSkipListReader)))
-                                                                                      InMemPairValueSkipListReader(session_pool)
-                                                                                : new InMemPairValueSkipListReader(session_pool);
+            InMemPositionListSkipListReader *in_mem_skiplist_reader =
+                session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListSkipListReader))) InMemPositionListSkipListReader(session_pool)
+                             : new InMemPositionListSkipListReader(session_pool);
             in_mem_skiplist_reader->Load(doc_skiplist_writer_);
             skiplist_reader = in_mem_skiplist_reader;
         }

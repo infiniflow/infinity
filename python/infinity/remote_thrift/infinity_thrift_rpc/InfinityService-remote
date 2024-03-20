@@ -40,13 +40,15 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  ListDatabaseResponse ListDatabase(ListDatabaseRequest request)')
     print('  ListTableResponse ListTable(ListTableRequest request)')
     print('  SelectResponse ShowVariable(ShowVariableRequest request)')
-    print('  SelectResponse DescribeTable(DescribeTableRequest request)')
-    print('  SelectResponse DescribeDatabase(DescribeDatabaseRequest request)')
+    print('  ShowTableResponse ShowTable(ShowTableRequest request)')
+    print('  SelectResponse ShowColumns(ShowColumnsRequest request)')
+    print('  ShowDatabaseResponse ShowDatabase(ShowDatabaseRequest request)')
     print('  SelectResponse ShowTables(ShowTablesRequest request)')
     print('  CommonResponse GetDatabase(GetDatabaseRequest request)')
     print('  CommonResponse GetTable(GetTableRequest request)')
     print('  CommonResponse CreateIndex(CreateIndexRequest request)')
     print('  CommonResponse DropIndex(DropIndexRequest request)')
+    print('  ShowIndexResponse ShowIndex(ShowIndexRequest request)')
     print('')
     sys.exit(0)
 
@@ -222,17 +224,23 @@ elif cmd == 'ShowVariable':
         sys.exit(1)
     pp.pprint(client.ShowVariable(eval(args[0]),))
 
-elif cmd == 'DescribeTable':
+elif cmd == 'ShowTable':
     if len(args) != 1:
-        print('DescribeTable requires 1 args')
+        print('ShowTable requires 1 args')
         sys.exit(1)
-    pp.pprint(client.DescribeTable(eval(args[0]),))
+    pp.pprint(client.ShowTable(eval(args[0]),))
 
-elif cmd == 'DescribeDatabase':
+elif cmd == 'ShowColumns':
     if len(args) != 1:
-        print('DescribeDatabase requires 1 args')
+        print('ShowColumns requires 1 args')
         sys.exit(1)
-    pp.pprint(client.DescribeDatabase(eval(args[0]),))
+    pp.pprint(client.ShowColumns(eval(args[0]),))
+
+elif cmd == 'ShowDatabase':
+    if len(args) != 1:
+        print('ShowDatabase requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowDatabase(eval(args[0]),))
 
 elif cmd == 'ShowTables':
     if len(args) != 1:
@@ -263,6 +271,12 @@ elif cmd == 'DropIndex':
         print('DropIndex requires 1 args')
         sys.exit(1)
     pp.pprint(client.DropIndex(eval(args[0]),))
+
+elif cmd == 'ShowIndex':
+    if len(args) != 1:
+        print('ShowIndex requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowIndex(eval(args[0]),))
 
 else:
     print('Unrecognized method %s' % cmd)

@@ -1,24 +1,26 @@
 module;
 
+module buffered_byte_slice;
 import stl;
 import memory_pool;
-import posting_value;
+import posting_field;
 import flush_info;
-module buffered_byte_slice;
+import file_writer;
+import file_reader;
 
 namespace infinity {
 
 BufferedByteSlice::BufferedByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool) : buffer_(byte_slice_pool), posting_writer_(buffer_pool) {}
 
-void BufferedByteSlice::Init(const PostingValues *value) { buffer_.Init(value); }
+void BufferedByteSlice::Init(const PostingFields *value) { buffer_.Init(value); }
 
 SizeT BufferedByteSlice::DoFlush() {
     u32 flush_size = 0;
-    const PostingValues *posting_values = buffer_.GetPostingValues();
-    for (SizeT i = 0; i < posting_values->GetSize(); ++i) {
-        PostingValue *posting_value = posting_values->GetValue(i);
-        u8 *buffer = buffer_.GetRow(posting_value->location_);
-        flush_size += posting_value->Encode(posting_writer_, buffer, buffer_.Size() * posting_value->GetSize());
+    const PostingFields *posting_fields = buffer_.GetPostingValues();
+    for (SizeT i = 0; i < posting_fields->GetSize(); ++i) {
+        PostingField *posting_field = posting_fields->GetValue(i);
+        u8 *buffer = buffer_.GetRow(posting_field->location_);
+        flush_size += posting_field->Encode(posting_writer_, buffer, buffer_.Size() * posting_field->GetSize());
     }
     return flush_size;
 }
@@ -36,6 +38,27 @@ SizeT BufferedByteSlice::Flush() {
 
     buffer_.Clear();
     return flush_size;
+}
+
+void BufferedByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+    if (spill) {
+        buffer_.Dump(file);
+        file->WriteVLong(flush_info_.flush_info_);
+        u32 byte_slice_size = posting_writer_.GetSize();
+        file->WriteVInt(byte_slice_size);
+        if (byte_slice_size == 0)
+            return;
+    }
+    posting_writer_.Dump(file);
+}
+
+void BufferedByteSlice::Load(const SharedPtr<FileReader> &file) {
+    buffer_.Load(file);
+    flush_info_.flush_info_ = file->ReadVLong();
+    u32 byte_slice_size = file->ReadVInt();
+    if (byte_slice_size == 0)
+        return;
+    posting_writer_.Load(file, byte_slice_size);
 }
 
 void BufferedByteSlice::SnapShot(BufferedByteSlice *buffer) const {

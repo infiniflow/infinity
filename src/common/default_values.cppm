@@ -97,6 +97,7 @@ export {
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
 
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
+    constexpr bool DEFAULT_ENABLE_COMPACTION = true;
 
     constexpr std::string_view SYSTEM_DB_NAME = "system";
     constexpr std::string_view DEFAULT_DB_NAME = "default";
@@ -115,6 +116,9 @@ export {
     constexpr SizeT DBT_COMPACTION_M = 4;
     constexpr SizeT DBT_COMPACTION_C = 4;
     constexpr SizeT DBT_COMPACTION_S = DEFAULT_BLOCK_CAPACITY;
+
+    // default query option parameter
+    constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 100;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

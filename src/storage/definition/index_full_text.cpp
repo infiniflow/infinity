@@ -100,7 +100,7 @@ nlohmann::json IndexFullText::Serialize() const {
 }
 
 SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 

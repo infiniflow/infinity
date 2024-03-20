@@ -1,10 +1,12 @@
 [general]
-version                 = "0.1.0"
-timezone                = "utc-8"
+version = "0.1.0"
+timezone = "utc-8"
 
 [resource]
 # close auto cleanup task
-cleanup_interval = 0 
+cleanup_interval = 0
+# close auto compaction
+enable_compaction = false
 
 [wal]
 #short checkpoint interval to allow quick cleanup

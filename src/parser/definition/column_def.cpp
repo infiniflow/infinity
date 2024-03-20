@@ -40,6 +40,21 @@ ColumnDef::ColumnDef(int64_t id, std::shared_ptr<DataType> column_type, std::str
 ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr)
     : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)) {}
 
+bool ColumnDef::operator==(const ColumnDef &other) const {
+    bool res = type_ == other.type_ && id_ == other.id_ && name_ == other.name_ && column_type_ != nullptr && other.column_type_ != nullptr &&
+               *column_type_ == *other.column_type_ && constraints_.size() == other.constraints_.size() &&
+               build_bloom_filter_ == other.build_bloom_filter_;
+    if (!res) {
+        return false;
+    }
+    for (auto &con : constraints_) {
+        if (!other.constraints_.contains(con)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::string ColumnDef::ToString() const {
     std::stringstream ss;
     ss << name_ << " " << column_type_->ToString();
@@ -47,6 +62,33 @@ std::string ColumnDef::ToString() const {
         ss << " " << ConstrainTypeToString(constraint);
     }
     return ss.str();
+}
+
+ConstraintType ColumnDef::StringToConstraintType(std::string type) {
+    std::map<std::string, int> string_to_constraint_type = {
+        {"primarykey", 1},
+        {"unique", 2},
+        {"null", 3},
+        {"not null", 4},
+        {"invalid", 5},
+    };
+    if(string_to_constraint_type.find(type) != string_to_constraint_type.end()){
+        int num = string_to_constraint_type.find(type)->second;
+        switch (num) {
+            case 1:
+                return ConstraintType::kPrimaryKey;
+            case 2:
+                return ConstraintType::kUnique;
+            case 3:
+                return ConstraintType::kNull;
+            case 4:
+                return ConstraintType::kNotNull;
+            case 5:
+                return ConstraintType::kInvalid;
+        }  
+    }
+    ParserError("Unexpected error.");
+    return ConstraintType::kInvalid;
 }
 
 } // namespace infinity

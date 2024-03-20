@@ -1,23 +1,48 @@
 module;
 #include <cassert>
 
+module position_list_encoder;
 import stl;
 import byte_slice_writer;
 import memory_pool;
 import file_writer;
+import file_reader;
 import vbyte_compressor;
 import index_defines;
 import buffered_byte_slice;
 import buffered_skiplist_writer;
-import pos_list_format_option;
-import inmem_pos_list_decoder;
-import inmem_pair_value_skiplist_reader;
+import position_list_format_option;
+import inmem_position_list_decoder;
+import inmem_position_list_skiplist_reader;
 import short_list_optimize_util;
 import position_bitmap_reader;
 
-module pos_list_encoder;
-
 namespace infinity {
+PositionListEncoder::PositionListEncoder(const PositionListFormatOption &position_list_format_option,
+                                         MemoryPool *byte_slice_pool,
+                                         MemoryPool *buffer_pool,
+                                         const PositionListFormat *pos_list_format)
+    : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0),
+      pos_list_format_option_(position_list_format_option), is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format),
+      byte_slice_pool_(byte_slice_pool) {
+    if (!pos_list_format) {
+        pos_list_format_ = new PositionListFormat(position_list_format_option);
+        is_own_format_ = true;
+    }
+    pos_list_buffer_.Init(pos_list_format_);
+    CreatePosSkipListWriter();
+}
+
+PositionListEncoder::~PositionListEncoder() {
+    if (pos_skiplist_writer_) {
+        pos_skiplist_writer_->~BufferedSkipListWriter();
+        pos_skiplist_writer_ = nullptr;
+    }
+    if (is_own_format_) {
+        delete pos_list_format_;
+        pos_list_format_ = nullptr;
+    }
+}
 
 void PositionListEncoder::AddPosition(pos_t pos) {
     pos_list_buffer_.PushBack(0, pos - last_pos_in_cur_doc_);
@@ -40,20 +65,32 @@ void PositionListEncoder::Flush() {
     }
 }
 
-void PositionListEncoder::Dump(const SharedPtr<FileWriter> &file) {
-    Flush();
-    u32 pos_list_size = pos_list_buffer_.EstimateDumpSize();
-    u32 pos_skiplist_size = 0;
-    if (pos_skiplist_writer_) {
-        pos_skiplist_size = pos_skiplist_writer_->EstimateDumpSize();
-    }
+void PositionListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+    if (spill) {
+        file->WriteVInt(last_pos_in_cur_doc_);
+        file->WriteVInt(total_pos_count_);
+    } else {
+        Flush();
+        u32 pos_list_size = pos_list_buffer_.EstimateDumpSize();
+        u32 pos_skiplist_size = 0;
+        if (pos_skiplist_writer_) {
+            pos_skiplist_size = pos_skiplist_writer_->EstimateDumpSize();
+        }
 
-    file->WriteVInt(pos_skiplist_size);
-    file->WriteVInt(pos_list_size);
-    if (pos_skiplist_writer_) {
-        pos_skiplist_writer_->Dump(file);
+        file->WriteVInt(pos_skiplist_size);
+        file->WriteVInt(pos_list_size);
     }
-    pos_list_buffer_.Dump(file);
+    if (pos_skiplist_writer_) {
+        pos_skiplist_writer_->Dump(file, spill);
+    }
+    pos_list_buffer_.Dump(file, spill);
+}
+
+void PositionListEncoder::Load(const SharedPtr<FileReader> &file) {
+    last_pos_in_cur_doc_ = file->ReadVInt();
+    total_pos_count_ = file->ReadVInt();
+    pos_skiplist_writer_->Load(file);
+    pos_list_buffer_.Load(file);
 }
 
 u32 PositionListEncoder::GetDumpLength() const {
@@ -105,12 +142,12 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder(Memor
     // doclist -> ttf -> pos skiplist -> poslist
     ttf_t ttf = total_pos_count_;
 
-    InMemPairValueSkipListReader *in_mem_skiplist_reader = nullptr;
+    InMemPositionListSkipListReader *in_mem_skiplist_reader = nullptr;
     if (pos_skiplist_writer_) {
         // not support tf bitmap in realtime segment
-        in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPairValueSkipListReader)))
-                                                    InMemPairValueSkipListReader(session_pool)
-                                              : new InMemPairValueSkipListReader(session_pool);
+        in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListSkipListReader)))
+                                                    InMemPositionListSkipListReader(session_pool)
+                                              : new InMemPositionListSkipListReader(session_pool);
         in_mem_skiplist_reader->Load(pos_skiplist_writer_);
     }
     BufferedByteSlice *posting_buffer = new (session_pool->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(session_pool, session_pool);

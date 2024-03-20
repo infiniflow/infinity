@@ -362,14 +362,14 @@ class TestDatabase:
 
         assert res.error_code == ErrorCode.OK
 
-    def test_describe_db(self):
+    def test_show_db(self):
         """
-        target: describe db
+        target: show db
         method:
-        1. describe non-existent db
-        2. describe existent db
-        3. describe dropped db
-        4. describe invalid name db
+        1. show non-existent db
+        2. show existent db
+        3. show dropped db
+        4. show invalid name db
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -413,7 +413,7 @@ class TestDatabase:
 
     def test_db_ops_after_disconnection(self):
         """
-        target: describe db
+        target: show db
         method:
         1. connect and disconnect db
         2. create db

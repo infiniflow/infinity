@@ -120,8 +120,9 @@ public:
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
-    // write wal
     Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
+
+    Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
@@ -146,7 +147,7 @@ public:
     Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
 
     // Getter
-    BufferManager *buffer_manager() const { return buffer_mgr_; }
+    BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
     Catalog *GetCatalog() { return catalog_; }
 
@@ -166,8 +167,6 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    void AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation);
-
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
@@ -176,34 +175,19 @@ public:
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
-private:
-    void AddDBStore(DBEntry *db_entry);
-
-    void DropDBStore(DBEntry *dropped_db_entry);
-
-    void AddTableStore(TableEntry *table_entry);
-
-    void DropTableStore(TableEntry *dropped_table_entry);
-
     // Create txn store if not exists
-    TxnTableStore *GetTxnTableStore(const String &table_name);
-
-public:
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
 private:
+    TxnTableStore *GetTxnTableStore(const String &table_name);
+
     void CheckTxnStatus();
 
     void CheckTxn(const String &db_name);
 
 private:
-    // Txn store
-    Set<DBEntry *> txn_dbs_{};
-    Set<TableEntry *> txn_tables_{};
-    // Key: table name Value: TxnTableStore
-    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
+    TxnStore txn_store_;
 
-private:
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal
     BufferManager *buffer_mgr_{};
@@ -220,6 +204,7 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
 
+    // TODO: remove this
     UniquePtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
 
     // WalManager notify the  commit bottom half is done

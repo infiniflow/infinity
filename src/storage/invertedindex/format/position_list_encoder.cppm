@@ -5,46 +5,30 @@ import byte_slice;
 import byte_slice_writer;
 import memory_pool;
 import file_writer;
+import file_reader;
 import index_defines;
 import buffered_byte_slice;
 import buffered_skiplist_writer;
-import pos_list_format_option;
-import inmem_pos_list_decoder;
-export module pos_list_encoder;
+import position_list_format_option;
+import inmem_position_list_decoder;
+export module position_list_encoder;
 
 namespace infinity {
 
 export class PositionListEncoder {
 public:
-    PositionListEncoder(const PositionListFormatOption &pos_list_format_option,
+    PositionListEncoder(const PositionListFormatOption &position_list_format_option,
                         MemoryPool *byte_slice_pool,
                         MemoryPool *buffer_pool,
-                        const PositionListFormat *pos_list_format = nullptr)
-        : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0),
-          pos_list_format_option_(pos_list_format_option), is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format),
-          byte_slice_pool_(byte_slice_pool) {
-        if (!pos_list_format) {
-            pos_list_format_ = new PositionListFormat(pos_list_format_option);
-            is_own_format_ = true;
-        }
-        pos_list_buffer_.Init(pos_list_format_);
-    }
+                        const PositionListFormat *pos_list_format = nullptr);
 
-    ~PositionListEncoder() {
-        if (pos_skiplist_writer_) {
-            pos_skiplist_writer_->~BufferedSkipListWriter();
-            pos_skiplist_writer_ = nullptr;
-        }
-        if (is_own_format_) {
-            delete pos_list_format_;
-            pos_list_format_ = nullptr;
-        }
-    }
+    ~PositionListEncoder();
 
     void AddPosition(pos_t pos);
     void EndDocument();
     void Flush();
-    void Dump(const SharedPtr<FileWriter> &file);
+    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
+    void Load(const SharedPtr<FileReader> &file);
     u32 GetDumpLength() const;
 
     InMemPositionListDecoder *GetInMemPositionListDecoder(MemoryPool *session_pool) const;

@@ -10,7 +10,8 @@ slug: /html_api_reference
 Creates a new database.
 
 #### Request
-```http request
+
+```
 curl --request POST \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
@@ -24,14 +25,16 @@ curl --request POST \
 #### Response
 
 - 200 Success
-```json
+
+```
 {
     "error_code": 0
 }
 ```
 
 - 500 Internal Service Error
-```json
+
+```
 {
     "error_code": 3016,
     "error_message": "Duplicate database: {database_name}."
@@ -43,7 +46,8 @@ curl --request POST \
 Drops a database.
 
 #### Request
-```http request
+
+```
 curl --request DELETE \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
@@ -57,26 +61,29 @@ curl --request DELETE \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0
 }
 ```
 
 - 500 Internal Service Error
-```json
+
+```
 {
     "error_code": 3021,
     "error_message": "{database_name} doesn't exist."
 }
 ```
 
-## Retrieve a database
+## Show database
 
-Retrieves a database.
+Show database detailed information.
 
 #### Request
-```http request
+
+```
 curl --request GET \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json'
@@ -85,15 +92,19 @@ curl --request GET \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0,
     "database_name": "default"
+    "store_dir": "/tmp/infinity/data/nIHniKeHIB_db_default"
+    "table_count": 0
 }
 ```
 
 - 500 Internal Service Error
-```json
+
+```
 {
     "error_code": 3021,
     "error_message": "{database_name} doesn't exist."
@@ -105,7 +116,8 @@ curl --request GET \
 Retrieves all databases of the system.
 
 #### Request
-```http request
+
+```
 curl --request GET \
      --url localhost:23820/databases \
      --header 'accept: application/json'
@@ -114,7 +126,8 @@ curl --request GET \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0,
     "databases": [
@@ -129,7 +142,8 @@ curl --request GET \
 creates a new table.
 
 #### Request
-```http request
+
+```
 curl --request POST \
      --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
@@ -170,14 +184,16 @@ curl --request POST \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3017,
     "error_message": "Duplicate table: {table_name} in {database_name}."
@@ -189,7 +205,8 @@ curl --request POST \
 Drops a table.
 
 #### Request
-```http request
+
+```
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
@@ -203,14 +220,16 @@ curl --request DELETE \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3022,
     "error_message": "Table {table_name} doesn't exist in {database_name}."
@@ -222,7 +241,8 @@ curl --request DELETE \
 Lists tables of the database.
 
 #### Request
-```http request
+
+```
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables \
      --header 'accept: application/json'
@@ -231,7 +251,8 @@ curl --request GET \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0,
     "tables": 
@@ -258,12 +279,13 @@ curl --request GET \
 }
 ```
 
-## Retrieve a table
+## Show table
 
-Retrieves a table from a database.
+Show a table detailed information from a database.
 
 #### Request
-```http request
+
+```
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json'
@@ -272,7 +294,45 @@ curl --request GET \
 #### Response
 
 - 200 success
-```json
+
+```
+{
+    "error_code": 0,
+    "database_name": "default",
+    "table_name": "my_table",
+    "store_dir": "/tmp/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table",
+    "column_count" : 3,
+    "segment_count" : 1,
+    "row_count" : 5
+}
+```
+
+- 500 Internal Service Error
+
+```
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
+}
+```
+
+## Show table columns
+
+Show a table columns information from a database.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/columns \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
 {
     "error_code": 0,
     "columns": [
@@ -295,8 +355,9 @@ curl --request GET \
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3022,
     "error_message": "Table {table_name} doesn't exist in {database_name}."
@@ -308,7 +369,8 @@ curl --request GET \
 Creates an index on the table.
 
 #### Request
-```http request
+
+```
 curl --request POST \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
@@ -334,14 +396,16 @@ curl --request POST \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3018,
     "error_message": "Duplicate index: {index} in {table_name}."
@@ -353,7 +417,8 @@ curl --request POST \
 Drops an index.
 
 #### Request
-```http request
+
+```
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json'
@@ -362,31 +427,108 @@ curl --request DELETE \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3018,
-    "error_message": "Index {index_name} doesn't exist in {database_name}."
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
 }
 ```
+
+## Show Index
+
+Show a index detailed information from a table.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "error_code": 0,
+    "index_name": "idx1",
+    "column_names": "col1"
+    "index segments": "0/0"
+    "index_name": "my_index",
+    "index_type": "IVFFlat",
+    "other_parameters": "metric = l2, centroids_count = 128",
+    "store_dir": "/tmp/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table/eVINACIkLj_index_idx1",
+}
+```
+
+- 500 Error
+
+```
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
+## List indexes
+
+Lists indexes of the table.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "error_code": 0,
+    "tables": 
+    [
+        {
+            "name": "index1",
+            "index_type": "HNSW",
+            "columns": "column1"
+        },
+        {
+            "name": "index2",
+            "index_type": "HNSW",
+            "columns": "column2"
+        }
+    ]
+}
+```
+
 
 ## Insert
 
 Inserts data into a specified table.
 
 #### Request
-```http request
+
+```
 curl --request POST \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
-    --header 'content-type: application/json' \
-    --data ' \
+     --header 'content-type: application/json' \
+     --data ' \
 {
     [    
         {
@@ -406,14 +548,16 @@ curl --request POST \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
@@ -425,7 +569,8 @@ curl --request POST \
 Deletes data from a specified table.
 
 #### Request
-```http request
+
+```
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
@@ -439,15 +584,17 @@ curl --request DELETE \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0,
     "delete_row_count": 10
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
@@ -459,7 +606,8 @@ curl --request DELETE \
 Updates data in a specified table.
 
 #### Request
-```http request
+
+```
 curl --request PUT \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
@@ -477,15 +625,17 @@ curl --request PUT \
 #### Response
 
 - 200 success
-```json
+
+```
 {
     "error_code": 0,
-    "delete_row_count": 10
+    "update_row_count": 10
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
@@ -497,7 +647,8 @@ curl --request PUT \
 Selects data from a specified table.
 
 #### Request
-```http request
+
+```
 curl --request GET \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
@@ -549,7 +700,7 @@ curl --request GET \
 
 - 200 success
 
-```json
+```
 {
     "error_code": 0,
     "output": [
@@ -561,21 +712,22 @@ curl --request GET \
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3005,
     "error_message": "Column {column_name} doesn't exist in {table_name}."
 }
 ```
 
-
 ## Show variables
 
 Gets variables.
 
 #### Request
-```http request
+
+```
 curl --request GET \
      --url localhost:23820/variables/{variable_name} \
      --header 'accept: application/json'
@@ -584,14 +736,17 @@ curl --request GET \
 #### Response
 
 - 200 success
-```json
+
+```
 {
-    "error_code": 0
+    "error_code": 0,
+    "time_zone": "UTC-8"
 }
 ```
 
-- 501 Error
-```json
+- 500 Error
+
+```
 {
     "error_code": 3027,
     "error_message": "No variable {variable_name}."

@@ -105,6 +105,7 @@ export enum class ErrorCode : long {
     kInvalidFilterExpression = 3063,
     kMultipleFunctionMatched = 3064,
     kInsertWithoutValues = 3065,
+    kInvalidConflictType = 3066,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -137,8 +138,9 @@ export enum class ErrorCode : long {
 
     // 8. meta error
     kInvalidEntry = 8001,
-    kNotFoundEntry = 8002,
-    kEmptyEntryList = 8003,
+    kDuplicateEntry = 8002,
+    kNotFoundEntry = 8003,
+    kEmptyEntryList = 8004,
 };
 
 export class Status {
@@ -223,9 +225,10 @@ public:
     static Status InvalidIndexType();
     static Status InvalidIndexParam(const String &param_name);
     static Status LackIndexParam();
-    static Status InvalidFilterExpression(const String& expr);
-    static Status MultipleFunctionMatched(const String& function, const String& matched_functions);
+    static Status InvalidFilterExpression(const String &expr);
+    static Status MultipleFunctionMatched(const String &function, const String &matched_functions);
     static Status InsertWithoutValues();
+    static Status InvalidConflictType();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -259,6 +262,7 @@ public:
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
+    static Status DuplicateEntry();
     static Status EmptyEntryList();
 
 public:

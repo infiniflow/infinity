@@ -3,11 +3,12 @@ module;
 import stl;
 import memory_pool;
 import file_writer;
+import file_reader;
 import doc_list_encoder;
 import inmem_posting_decoder;
-import inmem_pos_list_decoder;
+import inmem_position_list_decoder;
 import inmem_doc_list_decoder;
-import pos_list_encoder;
+import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
@@ -55,13 +56,20 @@ tf_t PostingWriter::GetCurrentTF() const { return doc_list_encoder_->GetCurrentT
 
 void PostingWriter::SetCurrentTF(tf_t tf) { doc_list_encoder_->SetCurrentTF(tf); }
 
-void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta) {
+void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta, bool spill) {
     term_meta.doc_start_ = file_writer->TotalWrittenBytes();
-    doc_list_encoder_->Dump(file_writer);
+    doc_list_encoder_->Dump(file_writer, spill);
     if (position_list_encoder_) {
         term_meta.pos_start_ = file_writer->TotalWrittenBytes();
-        position_list_encoder_->Dump(file_writer);
+        position_list_encoder_->Dump(file_writer, spill);
         term_meta.pos_end_ = file_writer->TotalWrittenBytes();
+    }
+}
+
+void PostingWriter::Load(const SharedPtr<FileReader> &file_reader) {
+    doc_list_encoder_->Load(file_reader);
+    if (position_list_encoder_) {
+        position_list_encoder_->Load(file_reader);
     }
 }
 

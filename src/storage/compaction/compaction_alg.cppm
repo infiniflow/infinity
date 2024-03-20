@@ -55,7 +55,7 @@ public:
 
     // After finish compaction, call this to add the compacted segment.
     // TODO: when compacting, some row may be deleted and triggered compaction condition again, ignroe it now
-    virtual void CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) = 0;
+    virtual void CommitCompact(TransactionID commit_txn_id) = 0;
 
     // Rollback the compaction
     virtual void RollbackCompact(TransactionID rollback_txn_id) = 0;

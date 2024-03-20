@@ -161,13 +161,13 @@ bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implemented");
+                    RecoverableError(Status::NotSupport("Not implemented"));
                 }
             }
             break;
         }
         default: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
     return true;
@@ -404,7 +404,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             break;
                         }
                         default: {
-                            UnrecoverableError("Not implemented");
+                            RecoverableError(Status::NotSupport("Not implemented"));
                         }
                     }
                 };
@@ -507,7 +507,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 break;
                             }
                             default: {
-                                UnrecoverableError("Not implemented");
+                                RecoverableError(Status::NotSupport("Not implemented"));
                             }
                         }
                         break;
@@ -531,19 +531,19 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 break;
                             }
                             default: {
-                                UnrecoverableError("Not implemented");
+                                RecoverableError(Status::NotSupport("Not implemented"));
                             }
                         }
                         break;
                     }
                     default: {
-                        UnrecoverableError("Not implemented");
+                        RecoverableError(Status::NotSupport("Not implemented"));
                     }
                 }
                 break;
             }
             default: {
-                UnrecoverableError("Not implemented");
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
         }
         }

@@ -6,17 +6,17 @@ import byte_slice_reader;
 import byte_slice_writer;
 import no_compress_encoder;
 
-export module posting_value;
+export module posting_field;
 
 namespace infinity {
 
-export struct PostingValue {
+export struct PostingField {
     enum ValueType {
         UNKNOWN,
         U16,
         U32,
     };
-    virtual ~PostingValue() {}
+    virtual ~PostingField() {}
 
     virtual SizeT GetSize() const = 0;
 
@@ -30,15 +30,15 @@ export struct PostingValue {
 
 template <typename T>
 struct ValueTypeTraits {
-    static const PostingValue::ValueType TYPE = PostingValue::UNKNOWN;
+    static const PostingField::ValueType TYPE = PostingField::UNKNOWN;
 };
 template <>
 struct ValueTypeTraits<u16> {
-    static const PostingValue::ValueType TYPE = PostingValue::U16;
+    static const PostingField::ValueType TYPE = PostingField::U16;
 };
 template <>
 struct ValueTypeTraits<u32> {
-    static const PostingValue::ValueType TYPE = PostingValue::U32;
+    static const PostingField::ValueType TYPE = PostingField::U32;
 };
 
 export typedef IntEncoder<u32, NewPForDeltaCompressor> Int32Encoder;
@@ -70,7 +70,7 @@ export const Int32Encoder *GetSkipListEncoder();
 export const Int32Encoder *GetPosListEncoder();
 
 export template <typename T>
-struct TypedPostingValue : public PostingValue {
+struct TypedPostingField : public PostingField {
     typedef typename EncoderTypeTraits<T>::Encoder Encoder;
 
     SizeT GetSize() const override { return sizeof(T); }
@@ -87,7 +87,7 @@ struct TypedPostingValue : public PostingValue {
 };
 
 export template <typename T>
-struct NoCompressPostingValue : public PostingValue {
+struct NoCompressPostingField : public PostingField {
 
     SizeT GetSize() const override { return sizeof(T); }
 
@@ -102,22 +102,22 @@ struct NoCompressPostingValue : public PostingValue {
     const NoCompressEncoder *encoder_;
 };
 
-export struct PostingValues {
-    ~PostingValues() {
+export struct PostingFields {
+    ~PostingFields() {
         for (SizeT i = 0; i < values_.size(); ++i) {
             delete values_[i];
         }
     }
 
-    PostingValue *GetValue(SizeT index) const { return values_[index]; }
+    PostingField *GetValue(SizeT index) const { return values_[index]; }
 
     SizeT GetSize() const { return values_.size(); }
 
     SizeT GetTotalSize() const { return values_.size() * values_[0]->GetSize(); }
 
-    void AddValue(PostingValue *value) { values_.push_back(value); }
+    void AddValue(PostingField *value) { values_.push_back(value); }
 
-    Vector<PostingValue *> values_;
+    Vector<PostingField *> values_;
 };
 
 } // namespace infinity

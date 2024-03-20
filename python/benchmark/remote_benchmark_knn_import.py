@@ -25,15 +25,15 @@ def import_sift_1m(path):
 
     db_obj = infinity_obj.get_database("default")
     assert db_obj
-    db_obj.drop_table("sift_benchmark", True)
-    db_obj.create_table("sift_benchmark", {"col1": "vector,128,float"}, None)
+    db_obj.drop_table("sift_benchmark")
+    db_obj.create_table("sift_benchmark", {"col1": "vector,128,float"})
     table_obj = db_obj.get_table("sift_benchmark")
     assert table_obj
 
     assert os.path.exists(path)
 
     start = time.time()
-    res = table_obj.import_data(path, None)
+    res = table_obj.import_data(path, {'file_type': 'fvecs'})
     end = time.time()
     dur = end - start
     print(f"Import sift_1m cost time: {dur} s")
@@ -53,15 +53,15 @@ def import_gist_1m(path):
 
     db_obj = infinity_obj.get_database("default")
     assert db_obj
-    db_obj.drop_table("gist_benchmark", True)
-    db_obj.create_table("gist_benchmark", {"col1": "vector,960,float"}, None)
+    db_obj.drop_table("gist_benchmark")
+    db_obj.create_table("gist_benchmark", {"col1": "vector,960,float"})
     table_obj = db_obj.get_table("gist_benchmark")
     assert table_obj
 
     assert os.path.exists(path)
 
     start = time.time()
-    res = table_obj.import_data(path, None)
+    res = table_obj.import_data(path, {'file_type': 'fvecs'})
     end = time.time()
     dur = end - start
     print(f"Import gist_1m cost time: {dur} s")
@@ -87,7 +87,7 @@ def create_index(table_name):
                                                   index.InitParameter("ef", "200"),
                                                   index.InitParameter("metric", "l2"),
                                                   index.InitParameter("encode", "lvq")
-                                              ])], None)
+                                              ])])
 
     assert res.error_code == ErrorCode.OK
 

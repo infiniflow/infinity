@@ -4,7 +4,9 @@ module;
 
 import stl;
 import memory_pool;
-import posting_value;
+import posting_field;
+import file_writer;
+import file_reader;
 export module short_buffer;
 
 namespace infinity {
@@ -22,7 +24,7 @@ public:
     ~ShortBuffer();
 
 public:
-    void Init(const PostingValues *values) {
+    void Init(const PostingFields *values) {
         posting_values_ = values;
         for (SizeT i = 0; i < values->GetSize(); ++i) {
             offset_[i] = values->GetValue(i)->offset_;
@@ -59,9 +61,13 @@ public:
 
     MemoryPool *GetPool() const { return pool_; }
 
-    const PostingValues *GetPostingValues() const { return posting_values_; }
+    const PostingFields *GetPostingValues() const { return posting_values_; }
 
     static u8 AllocatePlan(u8 curCapacity);
+
+    void Dump(const SharedPtr<FileWriter> &file);
+
+    void Load(const SharedPtr<FileReader> &file);
 
 private:
     void *Allocate(SizeT size) { return pool_->Allocate(size); }
@@ -69,11 +75,11 @@ private:
 
     bool Reallocate();
 
-    static void BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingValues *posting_values, u8 srcSize);
+    static void BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingFields *posting_fields, u8 srcSize);
 
     bool IsFull() const { return size_ >= capacity_; }
 
-    static u8 *GetRow(u8 *buffer, u8 capacity, const PostingValue *value);
+    static u8 *GetRow(u8 *buffer, u8 capacity, const PostingField *value);
 
     void ReleaseBuffer(u8 *buffer, u8 capacity);
 
@@ -82,13 +88,13 @@ private:
 private:
     u8 *volatile buffer_;
     u8 offset_[8];
-    u8 volatile capacity_; // numnber of rows
+    u8 volatile capacity_; // capacity of columns
     u8 volatile size_;     // number of columns (maximum of 128)
 
     bool volatile is_buffer_valid_;
     bool has_pool_;
     MemoryPool *pool_;
-    const PostingValues *posting_values_;
+    const PostingFields *posting_values_;
 };
 
 //////////////////////////////////////////////////////////
@@ -125,11 +131,11 @@ inline const T *ShortBuffer::GetRowTyped(u8 n) const {
 }
 
 inline u8 *ShortBuffer::GetRow(u8 n) {
-    PostingValue *value = posting_values_->GetValue(n);
+    PostingField *value = posting_values_->GetValue(n);
     return GetRow((u8 *)buffer_, capacity_, value);
 }
 
-inline u8 *ShortBuffer::GetRow(u8 *buffer, u8 capacity, const PostingValue *value) {
+inline u8 *ShortBuffer::GetRow(u8 *buffer, u8 capacity, const PostingField *value) {
     u32 offset = value->offset_;
     if (!offset) {
         return buffer;

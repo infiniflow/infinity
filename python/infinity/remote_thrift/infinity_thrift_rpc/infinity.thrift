@@ -18,17 +18,29 @@ Embedding,
 Invalid
 }
 
-enum ConflictType {
-Invalid,
+enum CreateConflict {
 Ignore,
 Error,
 Replace,
 }
 
-struct Option {}
+enum DropConflict {
+Ignore,
+Error,
+}
 
-struct DropTableOptions {
-1:  ConflictType conflict_type,
+struct Property {
+1:  string key,
+2:  string value
+}
+
+struct CreateOption {
+1:  CreateConflict conflict_type,
+2:  list<Property> properties = [],
+}
+
+struct DropOption {
+1:  DropConflict conflict_type,
 }
 
 struct NumberType {}
@@ -263,31 +275,40 @@ struct ListTableResponse {
 3: list<string> table_names = [],
 }
 
-struct DescribeDatabaseRequest {
+struct ShowDatabaseRequest {
 1: string db_name,
 2: i64 session_id,
 }
 
-struct DescribeDatabaseResponse {
+struct ShowDatabaseResponse {
 1: i64 error_code,
 2: string error_msg,
-3: i64 num_segments,
-4: i64 num_rows,
-5: i64 num_blocks,
+3: string database_name,
+4: string store_dir,
+5: i64 table_count,
 }
 
-struct DescribeTableRequest {
+struct ShowTableRequest {
 1: string db_name,
 2: string table_name,
 3: i64 session_id,
 }
 
-struct DescribeTableResponse {
+struct ShowTableResponse {
 1: i64 error_code,
 2: string error_msg,
-3: i64 num_segments,
-4: i64 num_rows,
-5: i64 num_blocks,
+3: string database_name,
+4: string table_name,
+5: string store_dir,
+6: i64 column_count,
+7: i64 segment_count,
+8: i64 row_count,
+}
+
+struct ShowColumnsRequest {
+1: string db_name,
+2: string table_name,
+3: i64 session_id,
 }
 
 struct GetTableRequest {
@@ -315,7 +336,7 @@ struct CreateIndexRequest {
 3: string index_name,
 5: list<IndexInfo> index_info_list = [],
 6: i64 session_id,
-7: optional Option option,
+7: CreateOption create_option,
 }
 
 struct DropIndexRequest {
@@ -323,6 +344,21 @@ struct DropIndexRequest {
 2: string table_name,
 3: string index_name,
 4: i64 session_id,
+5: DropOption drop_option,
+}
+
+struct ShowIndexRequest {
+1: string db_name,
+2: string table_name,
+3: string index_name,
+4: i64 session_id,
+}
+
+struct ShowIndexResponse {
+1: string db_name,
+2: string table_name,
+3: string index_name,
+4: string store_dir,
 }
 
 struct GetDatabaseRequest {
@@ -333,13 +369,13 @@ struct GetDatabaseRequest {
 struct CreateDatabaseRequest {
 1:  string db_name,
 2:  i64 session_id,
-3:  Option option,
+3:  CreateOption create_option,
 }
 
 struct DropDatabaseRequest {
 1:  string db_name,
 2:  i64 session_id,
-3:  Option option,
+3:  DropOption drop_option,
 }
 
 struct CreateTableRequest {
@@ -347,14 +383,14 @@ struct CreateTableRequest {
 2:  string table_name,
 3:  list<ColumnDef> column_defs = [],
 6:  i64 session_id,
-7:  Option option,
+7:  CreateOption create_option,
 }
 
 struct DropTableRequest {
 1:  string db_name,
 2:  string table_name,
 3:  i64 session_id,
-4:  DropTableOptions options,
+4:  DropOption drop_option,
 }
 
 struct InsertRequest {
@@ -484,8 +520,9 @@ ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),
 
 SelectResponse ShowVariable(1:ShowVariableRequest request),
-SelectResponse DescribeTable(1:DescribeTableRequest request),
-SelectResponse DescribeDatabase(1:DescribeDatabaseRequest request),
+ShowTableResponse ShowTable(1:ShowTableRequest request),
+SelectResponse ShowColumns(1:ShowColumnsRequest request),
+ShowDatabaseResponse ShowDatabase(1:ShowDatabaseRequest request),
 SelectResponse ShowTables(1:ShowTablesRequest request),
 
 CommonResponse GetDatabase(1:GetDatabaseRequest request),
@@ -493,4 +530,6 @@ CommonResponse GetTable(1:GetTableRequest request),
 
 CommonResponse CreateIndex(1:CreateIndexRequest request),
 CommonResponse DropIndex(1:DropIndexRequest request),
+ShowIndexResponse ShowIndex(1:ShowIndexRequest request),
+
 }

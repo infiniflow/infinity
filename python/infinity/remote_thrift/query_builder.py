@@ -66,7 +66,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._offset = None
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int) -> InfinityThriftQueryBuilder:
+            topn: int, knn_params: {} = None) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
         if self._search.knn_exprs is None:
@@ -113,8 +113,14 @@ class InfinityThriftQueryBuilder(ABC):
             dist_type = KnnDistanceType.InnerProduct
         elif distance_type == 'hamming':
             dist_type = KnnDistanceType.Hamming
+
+        knn_opt_params = []
+        if knn_params != None:
+            for k, v in knn_params.items():
+                knn_opt_params.append(InitParameter(k, v))
+
         knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
-                           distance_type=dist_type, topn=topn)
+                           distance_type=dist_type, topn=topn, opt_params = knn_opt_params)
         # print(knn_expr)
         self._search.knn_exprs.append(knn_expr)
         return self

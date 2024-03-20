@@ -73,7 +73,7 @@ void IndexIVFFlat::WriteAdv(char *&ptr) const {
 }
 
 SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&, int32_t) {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 
@@ -91,7 +91,7 @@ nlohmann::json IndexIVFFlat::Serialize() const {
 }
 
 SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const nlohmann::json &) {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 

@@ -29,7 +29,7 @@ public:
     void SetFlushCount(u32 flush_count) { SET_BIT_VALUE(MASK_FLUSH_COUNT, OFFSET_FLUSH_COUNT, flush_count); }
     void Reset() { flush_info_ = 0; }
 
-private:
+public:
     static const u64 OFFSET_IS_VALID = 0;
     static const u64 OFFSET_FLUSH_LENGTH = 1;
     static const u64 OFFSET_FLUSH_COUNT = 32;

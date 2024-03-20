@@ -83,7 +83,7 @@ public:
 
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) override;
 
-    virtual void CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) override;
+    virtual void CommitCompact(TransactionID commit_txn_id) override;
 
     virtual void RollbackCompact(TransactionID rollback_txn_id) override;
 

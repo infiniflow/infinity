@@ -44,7 +44,9 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mut
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr,
                                                 ConflictType conflict_type) {
-    auto init_db_entry = [&]() { return DBEntry::NewDBEntry(this, false, this->data_dir_, this->db_name_, txn_id, begin_ts); };
+    auto init_db_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return DBEntry::NewDBEntry(this, false, this->data_dir_, this->db_name_, txn_id, begin_ts);
+    };
     return db_entry_list_.AddEntry(std::move(r_lock), std::move(init_db_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
@@ -53,11 +55,46 @@ Tuple<SharedPtr<DBEntry>, Status> DBMeta::DropNewEntry(std::shared_lock<std::sha
                                                        TxnTimeStamp begin_ts,
                                                        TxnManager *txn_mgr,
                                                        ConflictType conflict_type) {
-    auto init_drop_entry = [&]() { return DBEntry::NewDBEntry(this, true, this->data_dir_, this->db_name_, txn_id, begin_ts); };
+    auto init_drop_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return DBEntry::NewDBEntry(this, true, this->data_dir_, this->db_name_, txn_id, begin_ts);
+    };
     return db_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 void DBMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = db_entry_list_.DeleteEntry(txn_id); }
+
+void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                               TransactionID txn_id,
+                               TxnTimeStamp begin_ts) {
+    auto [entry, status] =
+        db_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, db_name_, txn_id, begin_ts); },
+                                      [&](DBEntry *) { UnrecoverableError("DBEntry is not updatable now"); },
+                                      txn_id,
+                                      begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
+void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                             TransactionID txn_id,
+                             TxnTimeStamp begin_ts) {
+    auto [entry, status] =
+        db_entry_list_.DropEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, db_name_, txn_id, begin_ts); },
+                                       txn_id,
+                                       begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
+DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [entry, status] = db_entry_list_.GetEntryReplay(txn_id, begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return entry;
+}
 
 Tuple<SharedPtr<DatabaseInfo>, Status> DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();

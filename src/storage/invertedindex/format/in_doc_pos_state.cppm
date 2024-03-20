@@ -3,7 +3,7 @@ module;
 export module in_doc_pos_state;
 
 import stl;
-import pos_list_format_option;
+import position_list_format_option;
 import index_defines;
 import internal_types;
 

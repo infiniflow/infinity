@@ -955,7 +955,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 }
 
 /**
- * @brief Execute Show table details statement (i.e. describe t1)
+ * @brief Execute Show table details statement (i.e. show t1)
  * @param query_context
  * @param input_state
  * @param output_state
@@ -1101,7 +1101,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
             auto block_entry_iter = BlockEntryIter(segment_entry.get());
             for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                auto dir_path = block_entry->DirPath();
+                const auto &dir_path = *block_entry->base_dir();
 
                 chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
             }
@@ -1161,7 +1161,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
         auto block_entry_iter = BlockEntryIter(segment_entry.get());
         for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-            auto dir_path = block_entry->DirPath();
+            const auto& dir_path = *block_entry->base_dir();
 
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
         }
@@ -1171,7 +1171,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
-// Execute describe system table
+// Execute show system table
 void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
