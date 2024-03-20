@@ -41,6 +41,15 @@ std::string ConstrainTypeToString(ConstraintType type) {
     ParserError("Unexpected error.");
 }
 
+ConstraintType StringToConstraintType(const std::string &type) {
+    auto iter = string_to_constraint_type.find(type);
+    if(iter != string_to_constraint_type.end()) {
+        return iter->second;
+    } else {
+        return ConstraintType::kInvalid;
+    }
+}
+
 ColumnDef::ColumnDef(int64_t id, std::shared_ptr<DataType> column_type, std::string column_name, std::unordered_set<ConstraintType> constraints)
     : TableElement(TableElementType::kColumn), id_(id), column_type_(std::move(column_type)), name_(std::move(column_name)),
       constraints_(std::move(constraints)) {}
@@ -70,15 +79,6 @@ std::string ColumnDef::ToString() const {
         ss << " " << ConstrainTypeToString(constraint);
     }
     return ss.str();
-}
-
-ConstraintType ColumnDef::StringToConstraintType(std::string &type) {
-    auto iter = string_to_constraint_type.find(type);
-    if(iter != string_to_constraint_type.end()) {
-        return iter->second;
-    } else {
-        return ConstraintType::kInvalid;
-    }
 }
 
 } // namespace infinity

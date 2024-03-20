@@ -186,10 +186,12 @@ static int64_t type_size[] = {
 const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
 
 LogicalType Str2LogicalType(const std::string &str) {
-    if(name2type.find(str) != name2type.end()){
-        return name2type.find(str)->second;   
+    auto iter = name2type.find(str);
+    if(iter != name2type.end()){
+        return iter->second;
+    } else {
+        return LogicalType::kInvalid;
     }
-    return LogicalType::kInvalid; 
 }
 
 int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[logical_type]; }

@@ -310,26 +310,22 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
 
 std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_type_string) {
     const LogicalType logical_type = Str2LogicalType(data_type_string);
-    std::shared_ptr<TypeInfo> type_info{nullptr};
+
     switch (logical_type) {
-            case LogicalType::kArray: {
-                return nullptr;
-            }
-            case LogicalType::kDecimal: {
-                return nullptr;
-            }
+            case LogicalType::kArray:
+            case LogicalType::kDecimal:
             case LogicalType::kEmbedding: {
                 return nullptr;
             }
             case LogicalType::kInvalid: {
-             
-                return nullptr;
+                ParserError("Invalid data type");
             }
-            default:
+            default: {
                 // There's no type_info for other types
                 break;
+            }
     }
-    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, nullptr);
     return data_type;
 }
 
