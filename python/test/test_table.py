@@ -405,7 +405,6 @@ class TestTable:
         assert res.error_code == ErrorCode.OK
 
     # create/drop table with different invalid options
-    @pytest.mark.skip(reason="teardown error")
     @pytest.mark.parametrize("invalid_option_array", [
         pytest.param([], marks=pytest.mark.xfail),
         pytest.param((), marks=pytest.mark.xfail),
@@ -429,7 +428,10 @@ class TestTable:
         """
         db_obj = get_infinity_db
         db_obj.drop_table("test_table_with_different_invalid_options", ConflictType.Ignore)
-        db_obj.create_table("test_table_with_different_invalid_options", {"c1": "int"}, invalid_option_array)
+
+        with pytest.raises(Exception, match="ERROR:3066, Invalid conflict type"):
+            db_obj.create_table("test_table_with_different_invalid_options", {"c1": "int"}, invalid_option_array)
+
 
     # create/drop/show/get 1000 tables with 10000 columns with various column types.
     @pytest.mark.slow
