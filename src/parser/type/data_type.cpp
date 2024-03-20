@@ -20,6 +20,7 @@
 #include "type/info/embedding_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
+#include <iostream>
 #include <charconv>
 
 namespace infinity {
@@ -486,7 +487,11 @@ TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     }
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse TinyInt error"); // TODO: throw error here
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse tiny integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -497,7 +502,11 @@ SmallIntT DataType::StringToValue<SmallIntT>(const std::string_view &str) {
     }
     SmallIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse SmallInt error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse small integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -508,7 +517,11 @@ IntegerT DataType::StringToValue<IntegerT>(const std::string_view &str) {
     }
     IntegerT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse Integer error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -519,7 +532,11 @@ BigIntT DataType::StringToValue<BigIntT>(const std::string_view &str) {
     }
     BigIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse BigInt error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse big integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -531,10 +548,14 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
     FloatT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%a", &value);
-    ParserAssert(ret == str.size(), "Parse Float error");
+    ParserAssert(ret == str.size(), "Error: parse float error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse Float error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
 #endif
     return value;
 }
@@ -547,10 +568,14 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     DoubleT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%la", &value);
-    ParserAssert(ret == str.size(), "Parse Double error");
+    ParserAssert(ret == str.size(), "Error: parse double error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse Double error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
 #endif
     return value;
 }
