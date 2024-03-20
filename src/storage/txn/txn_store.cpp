@@ -315,6 +315,7 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
                                bool enable_compaction,
                                BGTaskProcessor *bg_task_processor,
                                TxnManager *txn_mgr) const {
+    LOG_INFO(fmt::format("AddDeltaOp for table: {} {}", *table_entry_->GetTableName(), txn_->TxnID(), table_entry_->commit_ts_));
     local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_));
 
     for (auto *table_index_entry : txn_indexes_) {

@@ -526,6 +526,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 if (!is_delete) {
+                    LOG_INFO(fmt::format("Add TableEntry: {} {},", *table_name, unsealed_id));
                     db_entry->CreateTableReplay(
                         table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -548,6 +549,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                         txn_id,
                         begin_ts);
                 } else {
+                    LOG_INFO(fmt::format("Drop TableEntry: {} {},", *table_name, unsealed_id));
                     db_entry->DropTableReplay(
                         *table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {

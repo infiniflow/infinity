@@ -126,6 +126,7 @@ void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta 
 void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                                 TransactionID txn_id,
                                 TxnTimeStamp begin_ts) {
+    // LOG_INFO(fmt::format("Drop table entry replay: table name: {}, txn_id:{}, begin_ts:{}", *table_name_, txn_id, begin_ts));
     auto [entry, status] = table_entry_list_.DropEntryReplay(
         [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, table_name_, txn_id, begin_ts); },
         txn_id,
@@ -194,6 +195,7 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     if (table_meta_json.contains("table_entries")) {
         for (const auto &table_entry_json : table_meta_json["table_entries"]) {
             UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
+            LOG_INFO(fmt::format("load table entry {} {}", *table_entry->GetTableName(), table_entry->Deleted()));
             res->table_entry_list().emplace_back(std::move(table_entry));
         }
     }

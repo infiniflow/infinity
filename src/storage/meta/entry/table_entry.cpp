@@ -575,6 +575,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 
         segment_candidates.reserve(this->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : this->segment_map_) {
+            LOG_INFO(fmt::format("{} Serialize segment: {}", *table_name_, segment_id));
             segment_candidates.emplace_back(segment_entry.get());
         }
 
@@ -591,6 +592,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts, is_full_checkpoint));
     }
     json_res["unsealed_id"] = unsealed_id_;
+    LOG_INFO(fmt::format("{} Serialize unsealed_id: {}", *table_name_, unsealed_id_));
 
     // Serialize indexes
     SizeT table_index_count = table_index_meta_candidates.size();
@@ -647,7 +649,9 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
+            LOG_INFO(fmt::format("{} emplace_id: {}", *table_entry->GetTableName(), segment_entry->segment_id()));
         }
+        LOG_INFO(fmt::format("{} unsealed_id: {}", *table_entry->GetTableName(), unsealed_id));
         // here the unsealed_segment_ may be nullptr
         if (table_entry->segment_map_.find(unsealed_id) != table_entry->segment_map_.end()) {
             table_entry->unsealed_segment_ = table_entry->segment_map_.at(unsealed_id);
