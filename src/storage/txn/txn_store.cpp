@@ -388,11 +388,11 @@ TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
 }
 
 void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const {
-    LOG_INFO(fmt::format("AddDeltaOp for table: {} {} {}", *table_entry_->GetTableName(), txn_->TxnID(), table_entry_->commit_ts_));
     for (auto *db_entry : txn_dbs_) {
         local_delta_ops->AddOperation(MakeUnique<AddDBEntryOp>(db_entry));
     }
     for (auto *table_entry : txn_tables_) {
+        LOG_INFO(fmt::format("AddDeltaOp for table: {} {} {}", *table_entry->GetTableName(), txn_->TxnID(), table_entry->commit_ts_));
         local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry));
     }
     bool enable_compaction = txn_->txn_mgr()->enable_compaction();
