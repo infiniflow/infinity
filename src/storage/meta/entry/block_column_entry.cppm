@@ -49,6 +49,8 @@ public:
 
     static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
 
+    void CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts);
+
 public:
     // Getter
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }

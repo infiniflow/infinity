@@ -126,7 +126,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto local_catalog_delta_entry = std::make_unique<CatalogDeltaEntry>();
-    local_catalog_delta_entry->set_txn_id(1);
+    local_catalog_delta_entry->set_txn_ids({1});
     local_catalog_delta_entry->set_commit_ts(1);
 
     auto db_name = MakeShared<String>("db_test");

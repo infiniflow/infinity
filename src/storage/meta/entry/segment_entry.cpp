@@ -331,6 +331,7 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
+        this->txn_id_ = txn_id;
         this->Commit(commit_ts);
     }
 }

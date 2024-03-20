@@ -605,21 +605,11 @@ void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
 
 void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { segment_index_entry_->Flush(max_commit_ts); }
 
-void CatalogDeltaEntryHeader::WriteAdv(char *&buf) const {
-    std::memcpy(buf, this, sizeof(CatalogDeltaEntryHeader));
-    buf += sizeof(CatalogDeltaEntryHeader);
-}
-
-CatalogDeltaEntryHeader CatalogDeltaEntryHeader::ReadAdv(char *&ptr) {
-    CatalogDeltaEntryHeader header;
-    std::memcpy(&header, ptr, sizeof(CatalogDeltaEntryHeader));
-    ptr += sizeof(CatalogDeltaEntryHeader);
-    return header;
-}
-
 /// class CatalogDeltaEntry
 i32 CatalogDeltaEntry::GetSizeInBytes() const {
-    i32 size = sizeof(CatalogDeltaEntryHeader) + sizeof(i32);
+    i32 size = CatalogDeltaEntryHeader::GetSizeInBytes();
+
+    size += sizeof(i32); // number of operations
     SizeT operations_size = operations_.size();
     for (SizeT idx = 0; idx < operations_size; ++idx) {
         const auto &operation = operations_[idx];
@@ -635,17 +625,23 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     if (max_bytes <= 0) {
         UnrecoverableError("ptr goes out of range when reading WalEntry");
     }
+    CatalogDeltaEntryHeader header;
+    header.size_ = ReadBufAdv<i32>(ptr);
+    header.checksum_ = ReadBufAdv<u32>(ptr);
     auto entry = MakeShared<CatalogDeltaEntry>();
-    entry->header_ = CatalogDeltaEntryHeader::ReadAdv(ptr);
-    auto *header = (CatalogDeltaEntryHeader *)ptr_start;
-    i32 size2 = *(i32 *)(ptr_start + header->size_ - sizeof(i32));
-    if (header->size_ != size2) {
+    i32 size2 = *(i32 *)(ptr_start + header.size_ - sizeof(i32));
+    if (header.size_ != size2) {
         return nullptr;
     }
-    header->checksum_ = 0;
-    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr_start), header->size_);
-    if (entry->header_.checksum_ != checksum2) {
-        return nullptr;
+    {
+        ptr = ptr_start;
+        WriteBufAdv(ptr, header.size_);
+        u32 init_checksum = 0;
+        WriteBufAdv(ptr, init_checksum);
+        u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr_start), header.size_);
+        if (header.checksum_ != checksum2) {
+            UnrecoverableError(fmt::format("checksum failed, checksum: {}, checksum2: {}", header.checksum_, checksum2));
+        }
     }
     i32 cnt = ReadBufAdv<i32>(ptr);
     for (i32 i = 0; i < cnt; i++) {
@@ -680,7 +676,7 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
 // called by bg_task
 void CatalogDeltaEntry::WriteAdv(char *&ptr) {
     char *const saved_ptr = ptr;
-    header_.WriteAdv(ptr);
+    ptr += CatalogDeltaEntryHeader::GetSizeInBytes();
 
     SizeT operation_count = operations_.size();
     WriteBufAdv(ptr, static_cast<i32>(operation_count));
@@ -697,25 +693,27 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) {
     }
     i32 size = ptr - saved_ptr + sizeof(i32);
     WriteBufAdv(ptr, size);
-    auto *header = (CatalogDeltaEntryHeader *)saved_ptr;
-    header_.size_ = header->size_ = size;
-    header->checksum_ = 0;
-    // CRC32IEEE is equivalent to boost::crc_32_type on
-    // little-endian machine.
-    u32 crc = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
-    header_.checksum_ = header->checksum_ = crc;
+
+    { // write head
+        char *ptr1 = saved_ptr;
+        WriteBufAdv(ptr1, size);
+        char *ptr2 = ptr1;
+        u32 init_checksum = 0;
+        WriteBufAdv(ptr1, init_checksum);
+        // CRC32IEEE is equivalent to boost::crc_32_type on little-endian machine.
+        u32 crc = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
+        WriteBufAdv(ptr2, crc);
+    }
 }
 
 // called by wal thread
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
     LOG_TRACE(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
-    this->header_.commit_ts_ = commit_ts;
-    this->header_.txn_id_ = txn_id;
-    for (auto &operation : operations_) {
-        LOG_TRACE(fmt::format("SaveState operation {}", operation->GetTypeStr()));
-        operation->txn_id_ = txn_id;
-        operation->commit_ts_ = commit_ts;
+    if (max_commit_ts_ != UNCOMMIT_TS || !txn_ids_.empty()) {
+        UnrecoverableError(fmt::format("CatalogDeltaEntry SaveState failed, max_commit_ts_ {} txn_ids_ size {}", max_commit_ts_, txn_ids_.size()));
     }
+    max_commit_ts_ = commit_ts;
+    txn_ids_ = {txn_id};
 }
 
 String CatalogDeltaEntry::ToString() const {
@@ -729,33 +727,49 @@ String CatalogDeltaEntry::ToString() const {
 void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
     std::unique_lock w_lock(mtx_);
     for (auto &delta_entry : delta_entries) {
+        SizeT idx = delta_entry_infos_.size();
         for (auto &op : delta_entry->operations()) {
             String encode = op->EncodeIndex();
             auto iter = delta_ops_.find(encode);
             if (iter != delta_ops_.end()) {
-                iter->second->Merge(std::move(op));
+                auto &[delta_op, info_idxs] = iter->second;
+                delta_op->Merge(std::move(op));
+                info_idxs.push_back(idx);
             } else {
-                delta_ops_[encode] = std::move(op);
+                delta_ops_[encode] = {std::move(op), Vector<SizeT>{idx}};
             }
         }
+        delta_entry_infos_.emplace_back(delta_entry->txn_ids()[0], delta_entry->commit_ts());
     }
 }
 
 UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
+    HashSet<TransactionID> txn_ids;
+    TxnTimeStamp flush_max_ts = 0;
     {
         std::unique_lock w_lock(mtx_);
 
-        // all delta op in global delta entry has been flushed in wal
-        for (auto &[_, op] : delta_ops_) {
-            if (op->commit_ts() > max_commit_ts) {
-                UnrecoverableError(fmt::format("commit_ts {} > max_commit_ts {}", op->commit_ts(), max_commit_ts));
+        for (auto &[_, op_pair] : delta_ops_) {
+            auto &[delta_op, info_idxs] = op_pair;
+            for (SizeT idx : info_idxs) {
+                const auto &[txn_id, commit_ts] = delta_entry_infos_[idx];
+                flush_max_ts = std::max(flush_max_ts, delta_op->commit_ts());
+                txn_ids.insert(txn_id);
             }
-            flush_delta_entry->AddOperation(std::move(op));
+            flush_delta_entry->AddOperation(std::move(delta_op));
         }
         delta_ops_.clear();
+        delta_entry_infos_.clear();
     }
+    if (flush_max_ts > max_commit_ts) {
+        // all delta op in global delta entry should have been flushed in wal
+        UnrecoverableError(fmt::format("flush_max_ts {} > max_commit_ts {}", flush_max_ts, max_commit_ts));
+    }
+    flush_delta_entry->set_commit_ts(flush_max_ts);
+    flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
+
     // write delta op from top to bottom.
     std::sort(flush_delta_entry->operations().begin(), flush_delta_entry->operations().end(), [](const auto &lhs, const auto &rhs) {
         return lhs->type_ < rhs->type_;

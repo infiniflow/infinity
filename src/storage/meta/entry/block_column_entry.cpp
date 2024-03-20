@@ -214,6 +214,13 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
     return block_column_entry;
 }
 
+void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    if (!this->Committed()) {
+        this->txn_id_ = txn_id;
+        this->Commit(commit_ts);
+    }
+}
+
 Vector<String> BlockColumnEntry::OutlinePaths() const {
     Vector<String> outline_paths;
     SizeT outline_file_count = 0;

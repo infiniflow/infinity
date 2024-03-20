@@ -36,6 +36,7 @@ import table_entry_type;
 import index_base;
 import column_def;
 import base_entry;
+import default_values;
 
 namespace infinity {
 
@@ -721,12 +722,8 @@ export struct CatalogDeltaEntryHeader {
     // the same value to assist backward iterating.
     u32 checksum_{}; // crc32 of the entry, including the header and the
     // payload. User shall populate it before writing to wal.
-    TransactionID txn_id_{};   // txn id of the entry
-    TxnTimeStamp commit_ts_{}; // commit timestamp of the txn
 
-    void WriteAdv(char *&ptr) const;
-
-    static CatalogDeltaEntryHeader ReadAdv(char *&ptr);
+    static i32 GetSizeInBytes() { return sizeof(size_) + sizeof(checksum_); }
 };
 
 /// class CatalogDeltaEntry
@@ -743,10 +740,10 @@ public:
 
     void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    TransactionID txn_id() const { return header_.txn_id_; }
-    void set_txn_id(TransactionID txn_id) { header_.txn_id_ = txn_id; }
-    TxnTimeStamp commit_ts() const { return header_.commit_ts_; }
-    void set_commit_ts(TransactionID commit_ts) { header_.commit_ts_ = commit_ts; }
+    const Vector<TransactionID> &txn_ids() const { return txn_ids_; }
+    void set_txn_ids(Vector<TransactionID> &&txn_ids) { txn_ids_ = std::move(txn_ids); }
+    TxnTimeStamp commit_ts() const { return max_commit_ts_; }
+    void set_commit_ts(TransactionID commit_ts) { max_commit_ts_ = commit_ts; }
 
     void AddOperation(UniquePtr<CatalogDeltaOperation> operation) { operations_.emplace_back(std::move(operation)); }
 
@@ -754,9 +751,10 @@ public:
     // Attention: only use in unit test or thread safe context
     Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
-protected:
+private:
     std::mutex mtx_{};
-    CatalogDeltaEntryHeader header_;
+    Vector<TransactionID> txn_ids_{};         // txn id of the entry
+    TxnTimeStamp max_commit_ts_{UNCOMMIT_TS}; // commit timestamp of the txn
 
     Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
@@ -775,7 +773,8 @@ public:
 private:
     std::mutex mtx_{};
 
-    HashMap<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
+    HashMap<String, Pair<UniquePtr<CatalogDeltaOperation>, Vector<SizeT>>> delta_ops_;
+    Vector<Pair<TransactionID, TxnTimeStamp>> delta_entry_infos_;
 };
 
 } // namespace infinity

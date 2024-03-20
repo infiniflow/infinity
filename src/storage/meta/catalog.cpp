@@ -853,10 +853,7 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
         LOG_INFO("Save delta catalog ops is empty. Skip flush.");
         return true;
     }
-    HashSet<TransactionID> flushed_unique_txn_ids;
     for (auto &op : flush_delta_entry->operations()) {
-        flushed_unique_txn_ids.insert(op->txn_id());
-
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
                 auto *block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
@@ -900,7 +897,7 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     // }
     LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
-    txn_mgr_->RemoveWaitFlushTxns(Vector<TransactionID>(flushed_unique_txn_ids.begin(), flushed_unique_txn_ids.end()));
+    txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids());
 
     return false;
 }

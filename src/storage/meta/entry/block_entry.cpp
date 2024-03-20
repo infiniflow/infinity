@@ -221,12 +221,16 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
+        txn_id_ = txn_id;
         this->Commit(commit_ts);
     }
 
     auto &block_version = this->block_version_;
     if (block_version->created_.empty() || block_version->created_.back().create_ts_ != commit_ts) {
         block_version->created_.emplace_back(commit_ts, i32(this->row_count_));
+    }
+    for (auto &column : columns_) {
+        column->CommitColumn(txn_id, commit_ts);
     }
 }
 
