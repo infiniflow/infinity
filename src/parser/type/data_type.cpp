@@ -488,7 +488,7 @@ TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        std::string error_message = fmt::format("Parse tiny integer: {} to {}", str, value);
+        std::string error_message = fmt::format("Error: parse tiny integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
     }
@@ -503,7 +503,7 @@ SmallIntT DataType::StringToValue<SmallIntT>(const std::string_view &str) {
     SmallIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        std::string error_message = fmt::format("Parse small integer: {} to {}", str, value);
+        std::string error_message = fmt::format("Error: parse small integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
     }
@@ -518,7 +518,7 @@ IntegerT DataType::StringToValue<IntegerT>(const std::string_view &str) {
     IntegerT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        std::string error_message = fmt::format("Parse integer: {} to {}", str, value);
+        std::string error_message = fmt::format("Error: parse integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
     }
@@ -533,7 +533,7 @@ BigIntT DataType::StringToValue<BigIntT>(const std::string_view &str) {
     BigIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        std::string error_message = fmt::format("Parse big integer: {} to {}", str, value);
+        std::string error_message = fmt::format("Error: parse big integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
     }
@@ -548,11 +548,11 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
     FloatT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%a", &value);
-    ParserAssert(ret == str.size(), "Parse Float error");
+    ParserAssert(ret == str.size(), "Error: parse float error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        std::string error_message = fmt::format("Parse float: {} to {}", str, value);
+        std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
     }
@@ -568,11 +568,11 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     DoubleT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%la", &value);
-    ParserAssert(ret == str.size(), "Parse Double error");
+    ParserAssert(ret == str.size(), "Error: parse double error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        std::string error_message = fmt::format("Parse double: {} to {}", str, value);
+        std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
     }
