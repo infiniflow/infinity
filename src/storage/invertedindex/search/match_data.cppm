@@ -47,6 +47,8 @@ public:
 
     void LoadColumnLength(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    void UpdateTargetSegment(SegmentID segment_id) { column_length_reader_->UpdateTargetSegment(segment_id); }
+
     float Score(RowID doc_id);
 
 private:
