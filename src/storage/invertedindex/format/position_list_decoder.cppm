@@ -10,7 +10,6 @@ import position_list_skiplist_reader;
 import position_list_format_option;
 import posting_field;
 import index_defines;
-import position_bitmap_reader;
 
 namespace infinity {
 
@@ -36,32 +35,15 @@ public:
 
     i32 GetOffsetInRecord() const { return offset_in_record_; }
 
-    PositionBitmapReader *GetPositionBitmapReader() const { return pos_bitmap_reader_; }
-
 private:
-    void InitPositionBitmapReader(ByteSlice *pos_list, u32 &pos_list_cursor, InDocPositionState *state);
-
-    void InitPositionBitmapReader(const ByteSliceList *pos_list, u32 &pos_list_cursor, InDocPositionState *state);
-
-    void InitPositionBitmapBlockBuffer(ByteSliceReader &pos_list_reader,
-                                       tf_t total_tf,
-                                       u32 pos_skiplist_start,
-                                       u32 pos_skiplist_len,
-                                       InDocPositionState *state);
-
     void InitPositionSkipList(const ByteSliceList *pos_list, tf_t total_tf, u32 pos_skiplist_start, u32 pos_skiplist_len, InDocPositionState *state);
 
     void InitPositionSkipList(ByteSlice *pos_list, tf_t total_tf, u32 pos_skiplist_start, u32 pos_skiplist_len, InDocPositionState *state);
-
-    void CalculateRecordOffsetByPosBitmap(const InDocPositionState *state, u32 &tf, u32 &record_offset, i32 &offset_in_record);
 
 protected:
     PositionListSkipListReader *pos_skiplist_reader_;
     MemoryPool *session_pool_;
     const Int32Encoder *pos_encoder_;
-    PositionBitmapReader *pos_bitmap_reader_;
-    u32 *pos_bitmap_block_buffer_;
-    u32 pos_bitmap_block_count_;
     u32 total_tf_;
 
     u32 decoded_pos_count_;
@@ -72,7 +54,6 @@ protected:
     u32 pos_list_begin_;
     u32 last_decode_offset_;
     PositionListFormatOption option_;
-    bool own_pos_bitmap_block_buffer_;
     bool need_reopen_;
 
     ByteSlice *pos_single_slice_;

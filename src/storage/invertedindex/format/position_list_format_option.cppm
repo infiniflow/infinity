@@ -14,26 +14,16 @@ public:
 
     inline void Init(optionflag_t option_flag) {
         has_position_list_ = option_flag & of_position_list ? 1 : 0;
-        if ((option_flag & of_term_frequency) && (option_flag & of_tf_bitmap)) {
-            has_tf_bitmap_ = 1;
-        } else {
-            has_tf_bitmap_ = 0;
-        }
         unused_ = 0;
     }
 
     bool HasPositionList() const { return has_position_list_ == 1; }
 
-    bool HasTfBitmap() const { return has_tf_bitmap_ == 1; }
-
-    bool operator==(const PositionListFormatOption &right) const {
-        return has_position_list_ == right.has_position_list_ && has_tf_bitmap_ == right.has_tf_bitmap_;
-    }
+    bool operator==(const PositionListFormatOption &right) const { return has_position_list_ == right.has_position_list_; }
 
 private:
     u8 has_position_list_ : 1;
-    u8 has_tf_bitmap_ : 1;
-    u8 unused_ : 6;
+    u8 unused_ : 7;
 };
 
 export class PositionSkipListFormat : public PostingFields {
@@ -45,7 +35,7 @@ public:
     void Init(const PositionListFormatOption &option) {
         u8 row_count = 0;
         u32 offset = 0;
-        if (!option.HasTfBitmap()) {
+        {
             TypedPostingField<u32> *total_pos_value = new TypedPostingField<u32>;
             total_pos_value->location_ = row_count++;
             total_pos_value->offset_ = offset;

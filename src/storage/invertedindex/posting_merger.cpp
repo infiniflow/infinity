@@ -94,9 +94,6 @@ tf_t DocMerger::MergePosition(docid_t doc_id, PostingWriter *posting_writer) {
         if (format_option_.HasTfList() && tf >= tf_list_buf_[last_doc_buf_cursor_]) {
             break;
         }
-        if (format_option_.HasTfBitmap() && posting_decoder_->IsDocEnd(pos_index_)) {
-            break;
-        }
     }
     return tf;
 }

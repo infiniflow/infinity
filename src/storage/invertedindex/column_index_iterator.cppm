@@ -9,7 +9,6 @@ import byte_slice_reader;
 import file_reader;
 import posting_decoder;
 import posting_list_format;
-import bitmap;
 import index_defines;
 import term_meta;
 import dict_reader;
@@ -27,8 +26,6 @@ public:
 private:
     void DecodeDocList();
 
-    void DecodeTfBitmap();
-
     void DecodePosList();
 
     SharedPtr<DictionaryReader> dict_reader_;
@@ -38,7 +35,6 @@ private:
 
     SharedPtr<ByteSliceReader> doc_list_reader_;
     SharedPtr<ByteSliceReader> pos_list_reader_;
-    SharedPtr<Bitmap> tf_bitmap_;
 
     TermMeta term_meta_;
 

@@ -15,7 +15,6 @@ import position_list_format_option;
 import inmem_position_list_decoder;
 import inmem_position_list_skiplist_reader;
 import short_list_optimize_util;
-import position_bitmap_reader;
 
 namespace infinity {
 PositionListEncoder::PositionListEncoder(const PositionListFormatOption &position_list_format_option,
@@ -116,13 +115,7 @@ void PositionListEncoder::CreatePosSkipListWriter() {
 }
 
 void PositionListEncoder::AddPosSkipListItem(u32 total_pos_count, u32 compressed_pos_size, bool need_flush) {
-    if (pos_list_format_option_.HasTfBitmap()) {
-        if (need_flush) {
-            pos_skiplist_writer_->AddItem(compressed_pos_size);
-        }
-    } else {
-        pos_skiplist_writer_->AddItem(total_pos_count, compressed_pos_size);
-    }
+    pos_skiplist_writer_->AddItem(total_pos_count, compressed_pos_size);
 }
 
 void PositionListEncoder::FlushPositionBuffer() {
