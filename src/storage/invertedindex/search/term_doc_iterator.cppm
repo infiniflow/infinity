@@ -37,7 +37,7 @@ public:
 
     u32 GetDF() const override { return iter_->GetTermMeta()->GetDocFreq(); }
 
-    bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) override {
+    bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) {
         if (doc_id == doc_id_) {
             match_data.doc_id_ = doc_id_;
             iter_->GetTermMatchData(match_data);

@@ -52,8 +52,6 @@ public:
 
     virtual u32 GetDF() const = 0;
 
-    virtual bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) { return false; }
-
 protected:
     RowID doc_id_{INVALID_ROWID};
 };
