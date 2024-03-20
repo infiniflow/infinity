@@ -32,8 +32,12 @@ import column_vector;
 import infinity_context;
 import query_context;
 import column_def;
+<<<<<<< HEAD
 import internal_types;
 
+=======
+import data_type;
+>>>>>>> upstream/main
 
 namespace {
 
@@ -55,9 +59,9 @@ public:
         auto result = infinity->ListDatabases();
         nlohmann::json json_response;
         HTTPStatus http_status;
-        if(result.IsOk()) {
+        if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id){
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
                 SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
                 auto row_count = data_block->row_count();
                 for (int i = 0; i < row_count; ++i) {
@@ -97,7 +101,7 @@ public:
 
         HTTPStatus http_status;
         nlohmann::json json_response;
-        if(result.IsOk()) {
+        if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
@@ -124,11 +128,11 @@ public:
         String option = body_info_json["drop_option"];
         DropDatabaseOptions drop_option;
 
-        auto result = infinity->DropDatabase(database_name,drop_option);
+        auto result = infinity->DropDatabase(database_name, drop_option);
 
         nlohmann::json json_response;
         HTTPStatus http_status;
-         if(result.IsOk()) {
+        if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
@@ -152,16 +156,17 @@ public:
         nlohmann::json json_response;
         nlohmann::json json_res;
         HTTPStatus http_status;
-         if(result.IsOk()) {
+
+        if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id){
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
                 SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
 
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_database;
-                    for (SizeT col = 0; col < column_cnt; ++col){
+                    for (SizeT col = 0; col < column_cnt; ++col) {
                         Value value = data_block->GetValue(col, row);
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         const String &column_value = value.ToString();
@@ -169,10 +174,13 @@ public:
                     }
                     json_res["res"].push_back(json_database);
                 }
-                for (auto &element : json_res["res"]) {;
+                for (auto &element : json_res["res"]) {
+                    ;
                     json_response[element["name"]] = element["value"];
                 }
             }
+
+            json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
@@ -205,7 +213,7 @@ public:
         i64 id = 0;
 
         for (auto &field : fields) {
-            for (auto& field_element : field.items()){
+            for (auto &field_element : field.items()) {
                 String column_name = field_element.key();
                 auto values = field_element.value();
                 String value_type = values["type"];
@@ -213,15 +221,14 @@ public:
                 SharedPtr<DataType> column_type = DataType::StringDeserialize(value_type);
                 if (column_type) {
                     HashSet<ConstraintType> constraints;
-                    for (auto &constraint_json : values["constraints"]){
+                    for (auto &constraint_json : values["constraints"]) {
                         String constraint = constraint_json;
                         ToLower(constraint);
                         constraints.insert(StringToConstraintType(constraint));
                     }
-                    ColumnDef *col_def = new ColumnDef(id ++, column_type, column_name, constraints);
+                    ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints);
                     column_definitions.emplace_back(col_def);
-                }
-                else {
+                } else {
                     infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", values["type"]));
                     json_response["error_code"] = status.code();
                     json_response["error_message"] = status.message();
@@ -236,7 +243,7 @@ public:
 
         auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, create_table_opts);
 
-        if(result.IsOk()) {
+        if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
@@ -262,7 +269,7 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
         nlohmann::json json_response;
-        if(result.IsOk()) {
+        if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
@@ -284,15 +291,15 @@ public:
         auto result = infinity->ShowTables(database_name);
         nlohmann::json json_response;
         HTTPStatus http_status;
-        if(result.IsOk()) {
+        if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id){
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
                 SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_table;
-                    for (SizeT col = 1; col < column_cnt; ++col){
+                    for (SizeT col = 1; col < column_cnt; ++col) {
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         Value value = data_block->GetValue(col, row);
                         const String &column_value = value.ToString();
@@ -301,7 +308,7 @@ public:
                     json_response["tables"].push_back(json_table);
                 }
             }
-            
+
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
         } else {
@@ -310,9 +317,7 @@ public:
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
-
     }
-
 };
 
 class ShowTableHandler final : public HttpRequestHandler {
@@ -323,20 +328,20 @@ public:
 
         String database_name = request->getPathVariable("database_name");
         String table_name = request->getPathVariable("table_name");
-        
+
         auto result = infinity->ShowTable(database_name, table_name);
         nlohmann::json json_response;
         nlohmann::json json_res;
         HTTPStatus http_status;
-        if(result.IsOk()) {
+        if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id){
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
                 SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_table;
-                    for (SizeT col = 0; col < column_cnt; ++col){
+                    for (SizeT col = 0; col < column_cnt; ++col) {
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         Value value = data_block->GetValue(col, row);
                         const String &column_value = value.ToString();
@@ -356,9 +361,7 @@ public:
             http_status = HTTPStatus::CODE_500;
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
-
     }
-
 };
 
 class ListTableIndexesHandler final : public HttpRequestHandler {
@@ -367,30 +370,44 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto db_name = request->getPathVariable("db_name");
+        auto database_name = request->getPathVariable("database_name");
         auto table_name = request->getPathVariable("table_name");
-        auto result = infinity->ListTableIndexes(db_name, table_name);
+        auto result = infinity->ListTableIndexes(database_name, table_name);
 
         HTTPStatus http_status;
         nlohmann::json json_response;
-        json_response["db_name"] = db_name;
-        json_response["table_name"] = table_name;
 
-        if(result.IsOk()) {
+        if (result.IsOk()) {
+
             SizeT block_rows = result.result_table_->DataBlockCount();
-            for (SizeT block_id = 0; block_id < block_rows; ++block_id){
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
                 SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
                 auto row_count = data_block->row_count();
-                auto column_cnt = result.result_table_->ColumnCount();
 
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_index;
-                    for (SizeT col = 0; col < column_cnt; ++col){
-                        const String &column_name = result.result_table_->GetColumnNameById(col);
-                        Value value = data_block->GetValue(col, row);
+
+                    {
+                        // index name
+                        Value value = data_block->GetValue(0, row);
                         const String &column_value = value.ToString();
-                        json_index[column_name] = column_value;
+                        json_index["index_name"] = column_value;
                     }
+
+                    {
+                        // index type
+                        Value value = data_block->GetValue(1, row);
+                        const String &column_value = value.ToString();
+                        json_index["index_type"] = column_value;
+                    }
+
+                    {
+                        // columns
+                        Value value = data_block->GetValue(3, row);
+                        const String &column_value = value.ToString();
+                        json_index["columns"] = column_value;
+                    }
+                    
                     json_response["indexes"].push_back(json_index);
                 }
             }
@@ -417,12 +434,12 @@ public:
         nlohmann::json json_response;
         HTTPStatus http_status;
 
-         if(result.IsOk()) {
+        if (result.IsOk()) {
             json_response["error_code"] = 0;
             json_response["variable_name"] = variable_name;
             SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
             Value value = data_block->GetValue(0, 0);
-            const String& variable_value = value.ToString();
+            const String &variable_value = value.ToString();
             json_response["variable_value"] = variable_value;
 
             http_status = HTTPStatus::CODE_200;
@@ -435,7 +452,7 @@ public:
     }
 };
 
-}
+} // namespace
 
 namespace infinity {
 
@@ -457,29 +474,26 @@ void HTTPServer::Start(u16 port) {
     router->route("POST", "/databases/{database_name}/tables/{table_name}", MakeShared<CreateTableHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}", MakeShared<DropTableHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}", MakeShared<ShowTableHandler>());
-    
 
     // index
-    router->route("GET", "/indexes/{db_name}/{table_name}", MakeShared<ListTableIndexesHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
 
     router->route("GET", "/variables/{variable_name}", MakeShared<ShowVariableHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"localhost", port, WebAddress::IP_4});
-    SharedPtr<HttpConnectionHandler> connection_handler =  HttpConnectionHandler::createShared(router);
+    SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
 
     server_ = MakeShared<WebServer>(connection_provider, connection_handler);
 
     fmt::print("HTTP server listen on port: {}\n", port);
 
     server_->run();
-
 }
 
 void HTTPServer::Shutdown() {
 
     server_->stop();
     WebEnvironment::destroy();
-
 }
 
 } // namespace infinity
