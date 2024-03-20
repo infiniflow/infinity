@@ -33,7 +33,7 @@ def import_sift_1m(path):
     assert os.path.exists(path)
 
     start = time.time()
-    res = table_obj.import_data(path, None)
+    res = table_obj.import_data(path, {'file_type': 'fvecs'})
     end = time.time()
     dur = end - start
     print(f"Import sift_1m cost time: {dur} s")
@@ -61,7 +61,7 @@ def import_gist_1m(path):
     assert os.path.exists(path)
 
     start = time.time()
-    res = table_obj.import_data(path, None)
+    res = table_obj.import_data(path, {'file_type': 'fvecs'})
     end = time.time()
     dur = end - start
     print(f"Import gist_1m cost time: {dur} s")
