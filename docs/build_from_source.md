@@ -39,9 +39,9 @@ This section provides instructions on building Infinity from source on Ubuntu 22
 
 ```shell
 sudo apt update && sudo apt install git wget unzip software-properties-common
-wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz
-tar zxvf cmake-3.28.1-linux-x86_64.tar.gz
-sudo cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.1-linux-x86_64
+wget https://cmake.org/files/v3.28/cmake-3.28.3-linux-x86_64.tar.gz
+tar zxvf cmake-3.28.3-linux-x86_64.tar.gz
+sudo cp -rf cmake-3.28.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.3-linux-x86_64
 wget https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip
 unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
 echo 'deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main' | sudo tee /etc/apt/sources.list.d/llvm17.list
@@ -84,9 +84,9 @@ This section provides instructions on building Infinity from source on Ubuntu 23
 
 ```shell
 sudo apt update && sudo apt install -y git wget
-wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz
-tar zxvf cmake-3.28.1-linux-x86_64.tar.gz
-sudo cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.1-linux-x86_64
+wget https://cmake.org/files/v3.28/cmake-3.28.3-linux-x86_64.tar.gz
+tar zxvf cmake-3.28.3-linux-x86_64.tar.gz
+sudo cp -rf cmake-3.28.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.3-linux-x86_64
 sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev
 ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
 ```
