@@ -185,16 +185,12 @@ TableIndexEntry *TableEntry::CreateIndexReplay(
     return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
 }
 
-void TableEntry::DropIndexReplay(
-    const String &index_name,
-    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    TransactionID txn_id,
-    TxnTimeStamp begin_ts) {
+void TableEntry::DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+    index_meta->DropEntryReplay(txn_id, begin_ts);
 }
 
 TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -207,6 +203,15 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
 
 void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
     SharedPtr<SegmentEntry> new_segment = init_segment();
+    if (new_segment->status() == SegmentStatus::kDeprecated) {
+        auto iter = segment_map_.find(segment_id);
+        if (iter == segment_map_.end()) {
+            UnrecoverableError(fmt::format("Segment {} is not found.", segment_id));
+        }
+        iter->second->Cleanup();
+        segment_map_.erase(iter);
+        return;
+    }
     segment_map_[segment_id] = new_segment;
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);

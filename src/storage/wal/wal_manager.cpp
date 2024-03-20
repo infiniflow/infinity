@@ -309,6 +309,10 @@ void WalManager::Checkpoint() {
         return;
     }
 
+    if (is_full_checkpoint) {
+        return;
+    }
+
     try {
         TxnManager *txn_mgr = storage_->txn_manager();
         Txn *txn = txn_mgr->CreateTxn();

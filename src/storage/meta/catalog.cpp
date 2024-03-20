@@ -125,15 +125,12 @@ void Catalog::CreateDatabaseReplay(const SharedPtr<String> &db_name,
     db_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
 }
 
-void Catalog::DropDatabaseReplay(const String &db_name,
-                                 std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                 TransactionID txn_id,
-                                 TxnTimeStamp begin_ts) {
+void Catalog::DropDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [db_meta, status] = db_meta_map_.GetExistMetaNoLock(db_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    db_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+    db_meta->DropEntryReplay(txn_id, begin_ts);
 }
 
 DBEntry *Catalog::GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -508,13 +505,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                         txn_id,
                         begin_ts);
                 } else {
-                    catalog->DropDatabaseReplay(
-                        *db_name,
-                        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, db_entry_dir, db_name, txn_id, begin_ts, commit_ts, true);
-                        },
-                        txn_id,
-                        begin_ts);
+                    catalog->DropDatabaseReplay(*db_name, txn_id, begin_ts);
                 }
                 break;
             }
@@ -552,23 +543,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                         txn_id,
                         begin_ts);
                 } else {
-                    db_entry->DropTableReplay(
-                        *table_name,
-                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableEntry::ReplayTableEntry(table_meta,
-                                                                table_entry_dir,
-                                                                table_name,
-                                                                column_defs,
-                                                                entry_type,
-                                                                txn_id,
-                                                                begin_ts,
-                                                                commit_ts,
-                                                                true,
-                                                                row_count,
-                                                                unsealed_id);
-                        },
-                        txn_id,
-                        begin_ts);
+                    db_entry->DropTableReplay(*table_name, txn_id, begin_ts);
                 }
                 break;
             }
@@ -688,13 +663,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                         txn_id,
                         begin_ts);
                 } else {
-                    table_entry->DropIndexReplay(
-                        *index_name,
-                        [&](TableIndexMeta *index_meta, const SharedPtr<String> &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, true);
-                        },
-                        txn_id,
-                        begin_ts);
+                    table_entry->DropIndexReplay(*index_name, txn_id, begin_ts);
                 }
                 break;
             }
@@ -837,6 +806,7 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
 
     if (flush_delta_entry->operations().empty()) {
         LOG_INFO("Save delta catalog ops is empty. Skip flush.");
+        txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids());
         return true;
     }
     for (auto &op : flush_delta_entry->operations()) {
@@ -873,15 +843,15 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 
-    // {
-    //     std::stringstream ss;
-    //     ss << "Save delta catalog ops: ";
-    //     for (auto &op : flush_delta_entry->operations()) {
-    //         ss << op->ToString() << ". txn id: " << op->txn_id() << "\n";
-    //     }
-    //     LOG_INFO(ss.str());
-    // }
-    LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    {
+        std::stringstream ss;
+        ss << "Save delta catalog ops: ";
+        for (auto &op : flush_delta_entry->operations()) {
+            ss << op->ToString() << ". txn id: " << op->txn_id() << "\n";
+        }
+        LOG_INFO(ss.str());
+    }
+    // LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids());
 

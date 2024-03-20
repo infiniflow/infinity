@@ -101,7 +101,7 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name
     return table_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String& table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     LOG_TRACE(fmt::format("Get a table entry {}", table_name));
     auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
     if (table_meta == nullptr) {
@@ -130,15 +130,12 @@ void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
     table_meta->CreateEntryReplay(std::move(init_entry), std::move(update_entry), txn_id, begin_ts);
 }
 
-void DBEntry::DropTableReplay(const String &table_name,
-                              std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                              TransactionID txn_id,
-                              TxnTimeStamp begin_ts) {
+void DBEntry::DropTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    table_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+    table_meta->DropEntryReplay(txn_id, begin_ts);
 }
 
 TableEntry *DBEntry::GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {

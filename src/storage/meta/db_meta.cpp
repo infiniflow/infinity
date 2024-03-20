@@ -76,16 +76,12 @@ void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, Shared
     }
 }
 
-void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                             TransactionID txn_id,
-                             TxnTimeStamp begin_ts) {
-    auto [entry, status] =
-        db_entry_list_.DropEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, db_name_, txn_id, begin_ts); },
-                                       txn_id,
-                                       begin_ts);
+void DBMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_entry, status] = db_entry_list_.DropEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    db_entry->Cleanup();
 }
 
 DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -96,7 +92,8 @@ DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     return entry;
 }
 
-Tuple<SharedPtr<DatabaseInfo>, Status> DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<DatabaseInfo>, Status>
+DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
     auto [db_entry, status] = db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
     if (!status.ok()) {

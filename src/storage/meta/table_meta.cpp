@@ -123,17 +123,12 @@ void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta 
     }
 }
 
-void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                TransactionID txn_id,
-                                TxnTimeStamp begin_ts) {
-    // LOG_INFO(fmt::format("Drop table entry replay: table name: {}, txn_id:{}, begin_ts:{}", *table_name_, txn_id, begin_ts));
-    auto [entry, status] = table_entry_list_.DropEntryReplay(
-        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, table_name_, txn_id, begin_ts); },
-        txn_id,
-        begin_ts);
+void TableMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, status] = table_entry_list_.DropEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    table_entry->Cleanup();
 }
 
 TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {

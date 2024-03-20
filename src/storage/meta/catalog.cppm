@@ -131,10 +131,7 @@ public:
                               TransactionID txn_id,
                               TxnTimeStamp begin_ts);
 
-    void DropDatabaseReplay(const String &db_name,
-                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                            TransactionID txn_id,
-                            TxnTimeStamp begin_ts);
+    void DropDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 

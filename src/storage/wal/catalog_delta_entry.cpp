@@ -704,57 +704,57 @@ String CatalogDeltaEntry::ToString() const {
 
 void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
     std::unique_lock w_lock(mtx_);
-    TxnTimeStamp last_commit_ts = 0;
     for (auto &delta_entry : delta_entries) {
-        if (delta_entry->commit_ts() < last_commit_ts) {
-            UnrecoverableError(fmt::format("delta_entry->commit_ts() {} < last_commit_ts {}", delta_entry->commit_ts(), last_commit_ts));
-        }
-        last_commit_ts = delta_entry->commit_ts();
+        TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
 
-        SizeT idx = delta_entry_infos_.size();
+        if (delta_entry->commit_ts() < max_commit_ts_) {
+            UnrecoverableError(fmt::format("delta_entry->commit_ts() {} < max_commit_ts_ {}. DeltaOp should add in global in sequence of commit_ts",
+                                           delta_entry->commit_ts(),
+                                           max_commit_ts_));
+        }
+        max_commit_ts_ = delta_entry->commit_ts();
+
         for (auto &op : delta_entry->operations()) {
+            bool prune = PruneDeltaOp(op.get(), current_commit_ts);
+
             String encode = op->EncodeIndex();
             auto iter = delta_ops_.find(encode);
             if (iter != delta_ops_.end()) {
-                auto &[delta_op, info_idxs] = iter->second;
-
-                PruneDeltaOp(delta_op.get());
-                delta_op->Merge(std::move(op));
-                info_idxs.push_back(idx);
+                auto &delta_op = iter->second;
+                if (!prune) {
+                    delta_op->Merge(std::move(op));
+                } else {
+                    delta_ops_.erase(iter);
+                }
             } else {
-                delta_ops_[encode] = {std::move(op), Vector<SizeT>{idx}};
+                delta_ops_[encode] = std::move(op);
             }
         }
-        delta_entry_infos_.emplace_back(delta_entry->txn_ids()[0], delta_entry->commit_ts());
+        txn_ids_.insert(delta_entry->txn_ids()[0]);
     }
 }
 
-UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
+UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp flush_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
-    HashSet<TransactionID> txn_ids;
-    TxnTimeStamp flush_max_ts = 0;
     {
         std::unique_lock w_lock(mtx_);
 
-        for (auto &[_, op_pair] : delta_ops_) {
-            auto &[delta_op, info_idxs] = op_pair;
-            for (SizeT idx : info_idxs) {
-                const auto &[txn_id, commit_ts] = delta_entry_infos_[idx];
-                flush_max_ts = std::max(flush_max_ts, delta_op->commit_ts());
-                txn_ids.insert(txn_id);
-            }
+        for (auto &[_, delta_op] : delta_ops_) {
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
+
+        if (max_commit_ts_ > flush_ts) {
+            // all delta op in global delta entry should have been flushed in wal
+            UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {}", max_commit_ts_, flush_ts));
+        }
+        flush_delta_entry->set_commit_ts(flush_ts);
+        flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids_.begin(), txn_ids_.end()));
+
+        max_commit_ts_ = 0;
+        txn_ids_.clear();
         delta_ops_.clear();
-        delta_entry_infos_.clear();
     }
-    if (flush_max_ts > max_commit_ts) {
-        // all delta op in global delta entry should have been flushed in wal
-        UnrecoverableError(fmt::format("flush_max_ts {} > max_commit_ts {}", flush_max_ts, max_commit_ts));
-    }
-    flush_delta_entry->set_commit_ts(flush_max_ts);
-    flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
 
     // write delta op from top to bottom.
     std::sort(flush_delta_entry->operations().begin(), flush_delta_entry->operations().end(), [](const auto &lhs, const auto &rhs) {
@@ -763,8 +763,66 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     return flush_delta_entry;
 }
 
-void GlobalCatalogDeltaEntry::PruneDeltaOp(CatalogDeltaOperation *delta_op) {
-    //
+bool GlobalCatalogDeltaEntry::PruneDeltaOp(CatalogDeltaOperation *delta_op, TxnTimeStamp current_commit_ts) {
+    bool prune = false;
+    switch (delta_op->type_) {
+        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
+            auto *op = static_cast<AddDBEntryOp *>(delta_op);
+            if (op->is_delete_) {
+                prune = true;
+                String encode = op->EncodeIndex();
+                PruneOpWithSamePrefix(encode, current_commit_ts);
+            }
+            break;
+        }
+        case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
+            auto *op = static_cast<AddTableEntryOp *>(delta_op);
+            if (op->is_delete_) {
+                prune = true;
+                String encode = op->EncodeIndex();
+                PruneOpWithSamePrefix(encode, current_commit_ts);
+            }
+            break;
+        }
+        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
+            auto *op = static_cast<AddTableIndexEntryOp *>(delta_op);
+            if (op->is_delete_) {
+                prune = true;
+                String encode = op->EncodeIndex();
+                PruneOpWithSamePrefix(encode, current_commit_ts);
+            }
+            break;
+        }
+        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
+            // auto *op = static_cast<AddSegmentEntryOp *>(delta_op);
+            // skip, TODO: add prune logic
+            break;
+        }
+        default: {
+            // skip
+        }
+    }
+    return prune;
+}
+
+void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1, TxnTimeStamp current_commit_ts) {
+    auto iter = delta_ops_.lower_bound(encode1);
+    while (iter != delta_ops_.end()) {
+        const auto &[encode2, delta_op2] = *iter;
+        auto [iter1, iter2] = std::mismatch(encode1.begin(), encode1.end(), encode2.begin());
+        if (iter1 != encode1.end()) {
+            break;
+        }
+        if (iter2 == encode2.end()) { // encode == encode1
+            ++iter;
+            continue;
+        }
+        if (*iter2 != '#') {
+            ++iter;
+            continue;
+        }
+        iter = delta_ops_.erase(iter);
+    }
 }
 
 } // namespace infinity

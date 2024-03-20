@@ -144,9 +144,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}", static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_), *db_name_));
-    }
+    const String EncodeIndex() const final { return String(fmt::format("#{}", *db_name_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
@@ -207,9 +205,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}", static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_), *db_name_, *table_name_));
-    }
+    const String EncodeIndex() const final { return String(fmt::format("#{}#{}", *db_name_, *table_name_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
@@ -283,13 +279,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}",
-                                  static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_),
-                                  *this->db_name_,
-                                  *this->table_name_,
-                                  this->segment_id_));
-    }
+    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}", *this->db_name_, *this->table_name_, this->segment_id_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
@@ -374,14 +364,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}",
-                                  static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_),
-                                  *db_name_,
-                                  *table_name_,
-                                  segment_id_,
-                                  block_id_));
-    }
+    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}#{}", *db_name_, *table_name_, segment_id_, block_id_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
@@ -453,13 +436,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}#{}",
-                                  static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_),
-                                  *db_name_,
-                                  *table_name_,
-                                  segment_id_,
-                                  block_id_,
-                                  column_id_));
+        return String(fmt::format("#{}#{}#{}#{}#{}", *db_name_, *table_name_, segment_id_, block_id_, column_id_));
     }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
@@ -519,10 +496,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(
-            fmt::format("{}#{}#{}#{}", static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_), *db_name_, *table_name_, *index_name_));
-    }
+    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}", *db_name_, *table_name_, *index_name_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
@@ -571,10 +545,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(
-            fmt::format("{}#{}#{}#{}", static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_), *db_name_, *table_name_, *index_name_));
-    }
+    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}", *db_name_, *table_name_, *index_name_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
@@ -624,14 +595,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}",
-                                  static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_),
-                                  *db_name_,
-                                  *table_name_,
-                                  *index_name_,
-                                  segment_id_));
-    }
+    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}#{}", *db_name_, *table_name_, *index_name_, segment_id_)); }
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
@@ -709,19 +673,22 @@ public:
 
     void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
 
-    // Pick and remove all operations that are committed before `max_commit_ts`
-    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
+    // Pick and remove all operations that are committed before `flush_ts`
+    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp flush_ts);
 
     SizeT OpSize() const { return delta_ops_.size(); }
 
 private:
-    void PruneDeltaOp(CatalogDeltaOperation *delta_op);
+    bool PruneDeltaOp(CatalogDeltaOperation *delta_op, TxnTimeStamp current_commit_ts);
+
+    void PruneOpWithSamePrefix(const String &prefix, TxnTimeStamp current_commit_ts);
 
 private:
     std::mutex mtx_{};
 
-    HashMap<String, Pair<UniquePtr<CatalogDeltaOperation>, Vector<SizeT>>> delta_ops_;
-    Vector<Pair<TransactionID, TxnTimeStamp>> delta_entry_infos_;
+    Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
+    HashSet<TransactionID> txn_ids_;
+    TransactionID max_commit_ts_{0};
 };
 
 } // namespace infinity

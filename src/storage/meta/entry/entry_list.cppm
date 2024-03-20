@@ -74,8 +74,7 @@ public:
                                           TransactionID txn_id,
                                           TxnTimeStamp begin_ts);
 
-    Tuple<SharedPtr<Entry>, Status>
-    DropEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Pair<SharedPtr<Entry>, Status> DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<Entry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -168,7 +167,7 @@ FindResult EntryList<Entry>::FindEntryReplay(TransactionID txn_id, TxnTimeStamp 
     FindResult find_res = FindResult::kNotFound;
     if (!entry_list_.empty()) {
         auto *entry = entry_list_.front().get();
-        if (begin_ts >= entry->commit_ts_ || txn_id == entry->txn_id_) {
+        if (true || begin_ts >= entry->commit_ts_ || txn_id == entry->txn_id_) {
             if (!entry->deleted_) {
                 find_res = FindResult::kFound;
             }
@@ -383,17 +382,15 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<
 }
 
 template <EntryConcept Entry>
-Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,
-                                                                  TransactionID txn_id,
-                                                                  TxnTimeStamp begin_ts) {
+Pair<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
     switch (find_res) {
         case FindResult::kNotFound: {
             return {nullptr, Status::NotFoundEntry()};
         }
         case FindResult::kFound: {
-            SharedPtr<Entry> drop_entry = init_func(txn_id, begin_ts);
-            entry_list_.front().swap(drop_entry);
+            SharedPtr<Entry> drop_entry = std::move(entry_list_.front());
+            entry_list_.pop_front();
             return {drop_entry, Status::OK()};
         }
         default: {
@@ -406,7 +403,7 @@ template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     if (!entry_list_.empty()) {
         auto *entry = entry_list_.front().get();
-        if ((begin_ts >= entry->commit_ts_ || txn_id == entry->txn_id_) && !entry->deleted_) {
+        if ((true || (begin_ts >= entry->commit_ts_ || txn_id == entry->txn_id_)) && !entry->deleted_) {
             return {entry, Status::OK()};
         }
     }

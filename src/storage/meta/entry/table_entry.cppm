@@ -112,10 +112,7 @@ public:
                       TransactionID txn_id,
                       TxnTimeStamp begin_ts);
 
-    void DropIndexReplay(const String &index_name,
-                         std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                         TransactionID txn_id,
-                         TxnTimeStamp begin_ts);
+    void DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
