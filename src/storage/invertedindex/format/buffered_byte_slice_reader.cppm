@@ -7,7 +7,7 @@ import byte_slice;
 import byte_slice_reader;
 import buffered_byte_slice;
 import flush_info;
-import posting_value;
+import posting_field;
 import short_buffer;
 export module buffered_byte_slice_reader;
 
@@ -56,7 +56,7 @@ private:
     u8 short_buffer_cursor_;
     ByteSliceReader byte_slice_reader_;
     const BufferedByteSlice *buffered_byte_slice_{nullptr};
-    const PostingValues *posting_values_{nullptr};
+    const PostingFields *posting_values_{nullptr};
 
     friend class BufferedByteSliceReaderTest;
 };
@@ -73,7 +73,7 @@ bool BufferedByteSliceReader::Decode(T *buffer, SizeT count, SizeT &decode_count
         return false;
     }
 
-    PostingValue *current_value = posting_values_->GetValue(location_cursor_);
+    PostingField *current_value = posting_values_->GetValue(location_cursor_);
 
     if (byte_slice_reader_.Tell() >= byte_slice_size) {
         SizeT buffer_size = buffered_byte_slice_->GetBufferSize();

@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import posting_value;
+import posting_field;
 import index_defines;
 export module pos_list_format_option;
 
@@ -36,7 +36,7 @@ private:
     u8 unused_ : 6;
 };
 
-export class PositionSkipListFormat : public PostingValues {
+export class PositionSkipListFormat : public PostingFields {
 public:
     PositionSkipListFormat() = default;
 
@@ -46,7 +46,7 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         if (!option.HasTfBitmap()) {
-            TypedPostingValue<u32> *total_pos_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *total_pos_value = new TypedPostingField<u32>;
             total_pos_value->location_ = row_count++;
             total_pos_value->offset_ = offset;
             total_pos_value->encoder_ = GetPosListEncoder();
@@ -54,7 +54,7 @@ public:
             offset += sizeof(u32);
         }
         {
-            TypedPostingValue<u32> *offset_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *offset_value = new TypedPostingField<u32>;
             offset_value->location_ = row_count++;
             offset_value->offset_ = offset;
             offset_value->encoder_ = GetPosListEncoder();
@@ -65,7 +65,7 @@ public:
     bool HasTfList() const { return GetSize() > 1; }
 };
 
-export class PositionListFormat : public PostingValues {
+export class PositionListFormat : public PostingFields {
 public:
     PositionListFormat(const PositionListFormatOption &option) : skiplist_format_(nullptr) { Init(option); }
     PositionListFormat() : skiplist_format_(nullptr) {}
@@ -81,7 +81,7 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         {
-            TypedPostingValue<u32> *pos_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *pos_value = new TypedPostingField<u32>;
             pos_value->location_ = row_count++;
             pos_value->offset_ = offset;
             pos_value->encoder_ = GetPosListEncoder();

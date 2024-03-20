@@ -9,7 +9,7 @@ import memory_pool;
 import in_doc_pos_state;
 import pair_value_skiplist_reader;
 import pos_list_format_option;
-import posting_value;
+import posting_field;
 import short_list_optimize_util;
 import index_defines;
 import position_bitmap_reader;

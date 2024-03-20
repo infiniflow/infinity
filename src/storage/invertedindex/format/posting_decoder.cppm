@@ -6,7 +6,7 @@ import posting_list_format;
 import bitmap;
 import term_meta;
 import index_defines;
-import posting_value;
+import posting_field;
 import doc_list_format_option;
 import pos_list_format_option;
 export module posting_decoder;

@@ -180,7 +180,6 @@ void DocListEncoder::AddSkipListItem(u32 item_size) {
 
 InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_pool) const {
     df_t df = df_;
-    // TODO memory problem
     SkipListReader *skiplist_reader = nullptr;
     if (doc_skiplist_writer_) {
         const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();

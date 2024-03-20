@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import posting_value;
+import posting_field;
 import index_defines;
 
 export module doc_list_format_option;
@@ -54,7 +54,7 @@ private:
     u8 unused_ : 3;
 };
 
-export class DocSkipListFormat : public PostingValues {
+export class DocSkipListFormat : public PostingFields {
 public:
     DocSkipListFormat() = default;
 
@@ -65,21 +65,21 @@ public:
         u32 offset = 0;
         {
             // NoCompressPostingValue<u32> *doc_id_value = new NoCompressPostingValue<u32>;
-            TypedPostingValue<u32> *doc_id_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *doc_id_value = new TypedPostingField<u32>;
             doc_id_value->location_ = row_count++;
             doc_id_value->offset_ = offset;
             values_.push_back(doc_id_value);
             offset += sizeof(u32);
         }
         if (option.HasTfList()) {
-            TypedPostingValue<u32> *tf_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *tf_value = new TypedPostingField<u32>;
             tf_value->location_ = row_count++;
             tf_value->offset_ = offset;
             values_.push_back(tf_value);
             offset += sizeof(u32);
         }
         {
-            TypedPostingValue<u32> *offset_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *offset_value = new TypedPostingField<u32>;
             offset_value->location_ = row_count++;
             offset_value->offset_ = offset;
             values_.push_back(offset_value);
@@ -89,7 +89,7 @@ public:
     bool HasTfList() const { return GetSize() > 2; }
 };
 
-export class DocListFormat : public PostingValues {
+export class DocListFormat : public PostingFields {
 public:
     DocListFormat(const DocListFormatOption &option) : skiplist_format_(nullptr) { Init(option); }
     DocListFormat() : skiplist_format_(nullptr) {}
@@ -105,7 +105,7 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         {
-            TypedPostingValue<u32> *doc_id_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *doc_id_value = new TypedPostingField<u32>;
             doc_id_value->location_ = row_count++;
             doc_id_value->offset_ = offset;
             doc_id_value->encoder_ = GetDocIDEncoder();
@@ -113,7 +113,7 @@ public:
             offset += sizeof(u32);
         }
         if (option.HasTfList()) {
-            TypedPostingValue<u32> *tf_value = new TypedPostingValue<u32>;
+            TypedPostingField<u32> *tf_value = new TypedPostingField<u32>;
             tf_value->location_ = row_count++;
             tf_value->offset_ = offset;
             tf_value->encoder_ = GetTFEncoder();
@@ -121,7 +121,7 @@ public:
             offset += sizeof(u32);
         }
         if (option.HasDocPayload()) {
-            PostingValue *doc_payload_value = new TypedPostingValue<u16>;
+            PostingField *doc_payload_value = new TypedPostingField<u16>;
             doc_payload_value->location_ = row_count++;
             doc_payload_value->offset_ = offset;
             values_.push_back(doc_payload_value);

@@ -6,7 +6,7 @@ import byte_slice;
 import byte_slice_reader;
 import skiplist_reader;
 import index_defines;
-import posting_value;
+import posting_field;
 module tri_value_skiplist_reader;
 
 namespace infinity {

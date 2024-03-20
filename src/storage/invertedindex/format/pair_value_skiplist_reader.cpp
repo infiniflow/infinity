@@ -7,7 +7,7 @@ import byte_slice_reader;
 import infinity_exception;
 import skiplist_reader;
 import index_defines;
-import posting_value;
+import posting_field;
 
 module pair_value_skiplist_reader;
 
