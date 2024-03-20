@@ -4,19 +4,19 @@ import stl;
 import memory_pool;
 import buffered_byte_slice;
 import buffered_byte_slice_reader;
-import pair_value_skiplist_reader;
+import position_list_skiplist_reader;
 
-export module inmem_pair_value_skiplist_reader;
+export module inmem_position_list_skiplist_reader;
 
 namespace infinity {
 
-export class InMemPairValueSkipListReader : public PairValueSkipListReader {
+export class InMemPositionListSkipListReader : public PositionListSkipListReader {
 public:
-    InMemPairValueSkipListReader(MemoryPool *session_pool);
+    InMemPositionListSkipListReader(MemoryPool *session_pool);
 
-    ~InMemPairValueSkipListReader();
+    ~InMemPositionListSkipListReader();
 
-    InMemPairValueSkipListReader(const InMemPairValueSkipListReader &other) = delete;
+    InMemPositionListSkipListReader(const InMemPositionListSkipListReader &other) = delete;
 
     void Load(BufferedByteSlice *posting_buffer);
 

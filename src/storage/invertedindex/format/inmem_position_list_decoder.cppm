@@ -2,14 +2,14 @@ module;
 
 import stl;
 import memory_pool;
-import pos_list_decoder;
+import position_list_decoder;
 import buffered_byte_slice_reader;
 import in_doc_pos_state;
-import pair_value_skiplist_reader;
-import pos_list_format_option;
+import position_list_skiplist_reader;
+import position_list_format_option;
 import index_defines;
 
-export module inmem_pos_list_decoder;
+export module inmem_position_list_decoder;
 
 namespace infinity {
 
@@ -21,7 +21,7 @@ public:
 
     ~InMemPositionListDecoder();
 
-    void Init(ttf_t total_tf, PairValueSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer);
+    void Init(ttf_t total_tf, PositionListSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer);
 
     bool SkipTo(ttf_t current_ttf, InDocPositionState *state);
 

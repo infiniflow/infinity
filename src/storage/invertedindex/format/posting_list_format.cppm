@@ -4,8 +4,8 @@ export module posting_list_format;
 
 import stl;
 import doc_list_format_option;
-import pos_list_format_option;
-import posting_value;
+import position_list_format_option;
+import posting_field;
 import index_defines;
 
 namespace infinity {

@@ -6,7 +6,7 @@ import memory_pool;
 import byte_slice_reader;
 import posting_decoder;
 import index_defines;
-import posting_value;
+import posting_field;
 
 export module index_decoder;
 
