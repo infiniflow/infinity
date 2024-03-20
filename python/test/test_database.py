@@ -90,8 +90,6 @@ class TestDatabase:
         for db in res.db_names:
             assert db == 'default'
 
-        infinity_obj.drop_database("my_database")
-
         # disconnect
         res = infinity_obj.disconnect()
 

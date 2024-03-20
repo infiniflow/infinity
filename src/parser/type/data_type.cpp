@@ -313,19 +313,17 @@ std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_ty
     std::shared_ptr<TypeInfo> type_info{nullptr};
     switch (logical_type) {
             case LogicalType::kArray: {
-                ParserError("Array isn't implemented here.");
-                type_info = nullptr;
-                break;
+                return nullptr;
             }
             case LogicalType::kDecimal: {
-                // type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
-                ParserError("Decimal isn't implemented http api service.");
-                break;
+                return nullptr;
             }
             case LogicalType::kEmbedding: {
-                // type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
-                ParserError("Embedding isn't implemented http api service.");
-                break;
+                return nullptr;
+            }
+            case LogicalType::kInvalid: {
+             
+                return nullptr;
             }
             default:
                 // There's no type_info for other types

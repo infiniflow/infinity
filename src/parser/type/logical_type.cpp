@@ -16,7 +16,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-
+ 
 namespace infinity {
 
 static const char *type2name[] = {
@@ -186,12 +186,8 @@ static int64_t type_size[] = {
 const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
 
 LogicalType Str2LogicalType(const std::string &str) {
-    std::string str_lower;
-    for (char ch : str) {
-        str_lower.push_back(std::tolower(ch));
-    }
-    if(name2type.find(str_lower) != name2type.end()){
-        return name2type.find(str_lower)->second;   
+    if(name2type.find(str) != name2type.end()){
+        return name2type.find(str)->second;   
     }
     return LogicalType::kInvalid; 
 }

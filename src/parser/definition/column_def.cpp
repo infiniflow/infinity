@@ -73,12 +73,8 @@ std::string ColumnDef::ToString() const {
 }
 
 ConstraintType ColumnDef::StringToConstraintType(std::string &type) {
-    std::string str_lower;
-    for (char ch : type) {
-        str_lower.push_back(std::tolower(ch));
-    }
-    if(string_to_constraint_type.find(str_lower) != string_to_constraint_type.end()){
-        ConstraintType constraint_type = string_to_constraint_type.find(str_lower)->second;
+    if(string_to_constraint_type.find(type) != string_to_constraint_type.end()){
+        ConstraintType constraint_type = string_to_constraint_type.find(type)->second;
         return constraint_type;
     }
     return ConstraintType::kInvalid;
