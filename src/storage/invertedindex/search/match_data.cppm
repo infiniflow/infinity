@@ -30,12 +30,6 @@ export struct TermColumnMatchData {
     docpayload_t doc_payload_;
 };
 
-export struct MatchData {
-    Vector<TermColumnMatchData> term_columns_;
-
-    TermColumnMatchData *ResolveTermColumn(u32 column_sequence) { return &term_columns_[column_sequence]; }
-};
-
 class TermDocIterator;
 export class Scorer {
 public:
@@ -65,7 +59,6 @@ private:
     Vector<Vector<TermDocIterator *>> iterators_;
     Vector<float> avg_column_length_;
     UniquePtr<ColumnLengthReader> column_length_reader_;
-    MatchData match_data_;
 
 public:
     using ColumnIndexMapType = decltype(column_index_map_);
