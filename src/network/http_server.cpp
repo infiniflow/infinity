@@ -32,7 +32,7 @@ import column_vector;
 import infinity_context;
 import query_context;
 import column_def;
-
+import internal_types;
 
 
 namespace {
@@ -161,7 +161,7 @@ public:
 
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_database;
-                    for (infinity::SizeT col = 0; col < column_cnt; ++col){
+                    for (SizeT col = 0; col < column_cnt; ++col){
                         Value value = data_block->GetValue(col, row);
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         const String &column_value = value.ToString();
@@ -202,7 +202,7 @@ public:
         HTTPStatus http_status;
 
         Vector<ColumnDef *> column_definitions;
-        int id = 0;
+        i64 id = 0;
 
         for (auto &field : fields) {
             for (auto& field_element : field.items()){
@@ -292,7 +292,7 @@ public:
                 auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_table;
-                    for (infinity::SizeT col = 1; col < column_cnt; ++col){
+                    for (SizeT col = 1; col < column_cnt; ++col){
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         Value value = data_block->GetValue(col, row);
                         const String &column_value = value.ToString();
@@ -336,7 +336,7 @@ public:
                 auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_table;
-                    for (infinity::SizeT col = 0; col < column_cnt; ++col){
+                    for (SizeT col = 0; col < column_cnt; ++col){
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         Value value = data_block->GetValue(col, row);
                         const String &column_value = value.ToString();
@@ -385,7 +385,7 @@ public:
 
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_index;
-                    for (infinity::SizeT col = 0; col < column_cnt; ++col){
+                    for (SizeT col = 0; col < column_cnt; ++col){
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         Value value = data_block->GetValue(col, row);
                         const String &column_value = value.ToString();
