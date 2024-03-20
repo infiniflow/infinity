@@ -216,7 +216,7 @@ public:
                     for (auto &constraint_json : values["constraints"]){
                         String constraint = constraint_json;
                         ToLower(constraint);
-                        constraints.insert(ColumnDef::StringToConstraintType(constraint));
+                        constraints.insert(StringToConstraintType(constraint));
                     }
                     ColumnDef *col_def = new ColumnDef(id ++, column_type, column_name, constraints);
                     column_definitions.emplace_back(col_def);
