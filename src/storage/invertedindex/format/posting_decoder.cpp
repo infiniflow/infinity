@@ -23,12 +23,10 @@ PostingDecoder::PostingDecoder(const PostingFormatOption &posting_format_option)
 void PostingDecoder::Init(TermMeta *term_meta,
                           const SharedPtr<ByteSliceReader> &posting_list_reader,
                           const SharedPtr<ByteSliceReader> &position_list_reader,
-                          const SharedPtr<Bitmap> &tf_bitmap,
                           SizeT posting_data_len) {
     term_meta_ = term_meta;
     posting_list_reader_ = posting_list_reader;
     position_list_reader_ = position_list_reader;
-    tf_bitmap_ = tf_bitmap;
     decoded_doc_count_ = 0;
     decoded_pos_count_ = 0;
 
@@ -46,7 +44,6 @@ void PostingDecoder::Init(TermMeta *term_meta, bool is_doc_list, bool df_first) 
     term_meta_ = term_meta;
     posting_list_reader_.reset();
     position_list_reader_.reset();
-    tf_bitmap_.reset();
     decoded_doc_count_ = 0;
     decoded_pos_count_ = 0;
 
@@ -104,10 +101,6 @@ void PostingDecoder::InitDocListEncoder(const DocListFormatOption &doc_list_form
 
     if (doc_list_format_option.HasDocPayload()) {
         doc_payload_encoder_ = GetDocPayloadEncoder();
-    }
-
-    if (doc_list_format_option.HasTfBitmap() && tf_bitmap_.get() == nullptr) {
-        UnrecoverableError("PositionBitmap is Null when HasTfBitmap ");
     }
 }
 

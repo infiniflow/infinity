@@ -21,8 +21,6 @@ public:
         pos_list_format_option_.Init(flag);
     }
 
-    bool HasTfBitmap() const { return doc_list_format_option_.HasTfBitmap(); }
-
     bool HasTfList() const { return doc_list_format_option_.HasTfList(); }
 
     bool HasDocPayload() const { return doc_list_format_option_.HasDocPayload(); }
@@ -43,7 +41,8 @@ public:
 
     bool operator==(const PostingFormatOption &right) const;
 
-    bool IsOnlyTermPayLoad() const { return HasTermPayload() && !HasTfBitmap() && !HasPositionList(); }
+    bool IsOnlyTermPayLoad() const { return HasTermPayload() && !HasPositionList(); }
+
 private:
     bool has_term_payload_;
     DocListFormatOption doc_list_format_option_;

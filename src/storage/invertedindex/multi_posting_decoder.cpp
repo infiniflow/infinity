@@ -176,7 +176,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     u32 doc_skiplist_start = doc_list_reader.Tell();
     u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
     index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, posting_list, term_meta.GetDocFreq());
-    if (cur_segment_format_option_.HasPositionList() || cur_segment_format_option_.HasTfBitmap()) {
+    if (cur_segment_format_option_.HasPositionList()) {
         u32 pos_list_begin = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
 
         in_doc_state_keeper_.MoveToSegment(posting_list,
