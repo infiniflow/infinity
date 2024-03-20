@@ -32,12 +32,7 @@ import column_vector;
 import infinity_context;
 import query_context;
 import column_def;
-<<<<<<< HEAD
 import internal_types;
-
-=======
-import data_type;
->>>>>>> upstream/main
 
 namespace {
 
@@ -407,7 +402,7 @@ public:
                         const String &column_value = value.ToString();
                         json_index["columns"] = column_value;
                     }
-                    
+
                     json_response["indexes"].push_back(json_index);
                 }
             }
