@@ -19,7 +19,6 @@ export module term_doc_iterator;
 import stl;
 import memory_pool;
 import posting_iterator;
-import bitmap;
 import index_defines;
 import term_meta;
 import doc_iterator;
