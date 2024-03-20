@@ -467,27 +467,15 @@ void SegmentEntry::Cleanup() {
 
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
 
-Vector<Pair<BlockID, String>> SegmentEntry::GetBlockFilterBinaryDataVector() const {
-    Vector<Pair<BlockID, String>> block_filter_binary_data_vector;
-    block_filter_binary_data_vector.reserve(block_entries_.size());
-    for (const auto &block_entry : block_entries_) {
-        block_filter_binary_data_vector.emplace_back(block_entry->block_id(), block_entry->GetFastRoughFilter()->SerializeToString());
-    }
-    return block_filter_binary_data_vector;
-}
-
 // used in:
 // 1. record minmax filter and optional bloom filter created for sealed segment created by append, import and compact
 // 2. record optional bloom filter created by requirement when the properties of the table is changed ? (maybe will support it in the future)
-void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data) {
+void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data) {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kUnsealed) {
         UnrecoverableError("should not call LoadFilterBinaryData from Unsealed segment");
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
-    for (const auto &[block_id, block_filter] : block_filter_data) {
-        block_entries_[block_id]->GetFastRoughFilter()->DeserializeFromString(block_filter);
-    }
 }
 
 } // namespace infinity

@@ -123,9 +123,7 @@ public:
 
     const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
 
-    Vector<Pair<BlockID, String>> GetBlockFilterBinaryDataVector() const;
-
-    void LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data);
+    void LoadFilterBinaryData(const String &segment_filter_data);
 
 public:
     // Const getter

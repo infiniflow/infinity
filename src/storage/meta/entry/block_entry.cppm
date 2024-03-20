@@ -87,6 +87,8 @@ public:
 
     void FlushForImport(TxnTimeStamp checkpoint_ts);
 
+    void LoadFilterBinaryData(const String &block_filter_data);
+
 protected:
     u16
     AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);

@@ -582,8 +582,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                                   txn_id);
                         if (set_sealed) {
                             auto const &segment_filter_binary = add_segment_entry_op->segment_filter_binary_data();
-                            auto const &block_filter_binary = add_segment_entry_op->block_filter_binary_data();
-                            segment->LoadFilterBinaryData(segment_filter_binary, block_filter_binary);
+                            segment->LoadFilterBinaryData(segment_filter_binary);
                         }
                         return segment;
                     },
@@ -602,6 +601,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto max_row_ts = add_block_entry_op->max_row_ts();
                 auto check_point_ts = add_block_entry_op->checkpoint_ts();
                 auto check_point_row_count = add_block_entry_op->checkpoint_row_count();
+                bool set_sealed = add_block_entry_op->set_sealed();
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
@@ -609,15 +609,20 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto segment_entry = table_entry->segment_map_.at(segment_id).get();
                 segment_entry->AddBlockReplay(
                     [&]() {
-                        return BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
-                                                                      block_id,
-                                                                      row_count,
-                                                                      row_capacity,
-                                                                      min_row_ts,
-                                                                      max_row_ts,
-                                                                      check_point_ts,
-                                                                      check_point_row_count,
-                                                                      buffer_mgr);
+                        auto block = BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
+                                                                            block_id,
+                                                                            row_count,
+                                                                            row_capacity,
+                                                                            min_row_ts,
+                                                                            max_row_ts,
+                                                                            check_point_ts,
+                                                                            check_point_row_count,
+                                                                            buffer_mgr);
+                        if (set_sealed) {
+                            auto const &block_filter_binary = add_block_entry_op->block_filter_binary_data();
+                            block->LoadFilterBinaryData(block_filter_binary);
+                        }
+                        return block;
                     },
                     block_id);
                 break;

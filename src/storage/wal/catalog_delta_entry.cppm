@@ -244,9 +244,7 @@ public:
           deprecate_ts_(segment_entry->deprecate_ts()), set_sealed_(set_sealed) {
         if (set_sealed) {
             String segment_filter_binary_data = segment_entry->GetFastRoughFilter()->SerializeToString();
-            Vector<Pair<BlockID, String>> block_filter_binary_data = segment_entry->GetBlockFilterBinaryDataVector();
             this->segment_filter_binary_data_ = std::move(segment_filter_binary_data);
-            this->block_filter_binary_data_ = std::move(block_filter_binary_data);
         }
     }
 
@@ -267,13 +265,6 @@ public:
         total_size += sizeof(bool);
         if (set_sealed_) {
             total_size += sizeof(i32) + this->segment_filter_binary_data_.size();
-            i32 block_filter_count = block_filter_binary_data_.size();
-            total_size += sizeof(block_filter_count);
-            for (i32 i = 0; i < block_filter_count; ++i) {
-                auto const &block_filter = block_filter_binary_data_[i];
-                total_size += sizeof(block_filter.first);
-                total_size += sizeof(i32) + block_filter.second.size();
-            }
         }
         return total_size;
     }
@@ -297,7 +288,6 @@ public:
     TxnTimeStamp deprecate_ts() const { return deprecate_ts_; }
     bool set_sealed() const { return set_sealed_; }
     const String &segment_filter_binary_data() const { return segment_filter_binary_data_; }
-    const Vector<Pair<BlockID, String>> &block_filter_binary_data() const { return block_filter_binary_data_; }
 
 private:
     SharedPtr<String> db_name_{};
@@ -318,38 +308,27 @@ private:
     // following data include: 1. minmax filter for all valid columns 2. bloom filter for selected columns
     bool set_sealed_{false};
     String segment_filter_binary_data_{};
-    Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 };
 
 /// class AddBlockEntryOp
 export class AddBlockEntryOp : public CatalogDeltaOperation {
 public:
-    // For update
-    explicit AddBlockEntryOp(TxnTimeStamp begin_ts,
-                             bool is_delete,
-                             TransactionID txn_id,
-                             TxnTimeStamp commit_ts,
-                             SharedPtr<String> db_name,
-                             SharedPtr<String> table_name,
-                             SegmentID segment_id,
-                             BlockID block_id,
-                             u16 row_count,
-                             u16 row_capacity,
-                             TxnTimeStamp min_row_ts,
-                             TxnTimeStamp max_row_ts,
-                             TxnTimeStamp checkpoint_ts,
-                             u16 checkpoint_row_count)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
-          table_name_(std::move(table_name)), segment_id_(segment_id), block_id_(block_id), row_capacity_(row_capacity), row_count_(row_count),
-          min_row_ts_(min_row_ts), max_row_ts_(max_row_ts), checkpoint_ts_(checkpoint_ts), checkpoint_row_count_(checkpoint_row_count) {}
+    static UniquePtr<AddBlockEntryOp> ReadAdv(char *&ptr);
 
-    explicit AddBlockEntryOp(BlockEntry *block_entry)
+    AddBlockEntryOp() = default;
+
+    explicit AddBlockEntryOp(BlockEntry *block_entry, bool set_sealed = false)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry), block_entry_(block_entry),
           db_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetDBName()),
           table_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetTableName()), segment_id_(block_entry->GetSegmentEntry()->segment_id()),
           block_id_(block_entry->block_id()), row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()),
           min_row_ts_(block_entry->min_row_ts()), max_row_ts_(block_entry->max_row_ts()), checkpoint_ts_(block_entry->checkpoint_ts()),
-          checkpoint_row_count_(block_entry->checkpoint_row_count()) {}
+          checkpoint_row_count_(block_entry->checkpoint_row_count()), set_sealed_(set_sealed) {
+        if (set_sealed) {
+            String block_filter_binary_data = block_entry->GetFastRoughFilter()->SerializeToString();
+            this->block_filter_binary_data_ = std::move(block_filter_binary_data);
+        }
+    }
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_BLOCK_ENTRY; }
     String GetTypeStr() const final { return "ADD_BLOCK_ENTRY"; }
@@ -360,6 +339,10 @@ public:
         total_size += sizeof(SegmentID) + sizeof(BlockID);
         total_size += sizeof(u16) + sizeof(u16) + sizeof(TxnTimeStamp) * 2;
         total_size += sizeof(TxnTimeStamp) + sizeof(u16);
+        total_size += sizeof(bool);
+        if (set_sealed_) {
+            total_size += sizeof(i32) + this->block_filter_binary_data_.size();
+        }
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -384,6 +367,8 @@ public:
     TxnTimeStamp max_row_ts() const { return max_row_ts_; }
     TxnTimeStamp checkpoint_ts() const { return checkpoint_ts_; }
     u16 checkpoint_row_count() const { return checkpoint_row_count_; }
+    bool set_sealed() const { return set_sealed_; }
+    const String &block_filter_binary_data() const { return block_filter_binary_data_; }
 
 private:
     SharedPtr<String> db_name_{};
@@ -399,6 +384,9 @@ private:
     TxnTimeStamp max_row_ts_{0};
     TxnTimeStamp checkpoint_ts_{0};
     u16 checkpoint_row_count_{0};
+
+    bool set_sealed_{false};
+    String block_filter_binary_data_{};
 };
 
 /// class AddColumnEntryOp

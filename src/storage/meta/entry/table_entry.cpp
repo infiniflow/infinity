@@ -206,7 +206,7 @@ void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&ini
     if (new_segment->status() == SegmentStatus::kDeprecated) {
         auto iter = segment_map_.find(segment_id);
         if (iter == segment_map_.end()) {
-            UnrecoverableError(fmt::format("Segment {} is not found.", segment_id));
+            return;
         }
         iter->second->Cleanup();
         segment_map_.erase(iter);
