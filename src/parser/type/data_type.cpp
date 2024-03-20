@@ -20,6 +20,7 @@
 #include "type/info/embedding_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
+#include <iostream>
 #include <charconv>
 
 namespace infinity {
@@ -487,7 +488,9 @@ TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse tiny integer: {} to {}", str, value));
+        std::string error_message = fmt::format("Parse tiny integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
     }
     return value;
 }
@@ -500,7 +503,9 @@ SmallIntT DataType::StringToValue<SmallIntT>(const std::string_view &str) {
     SmallIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse small integer: {} to {}", str, value));
+        std::string error_message = fmt::format("Parse small integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
     }
     return value;
 }
@@ -513,7 +518,9 @@ IntegerT DataType::StringToValue<IntegerT>(const std::string_view &str) {
     IntegerT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse integer: {} to {}", str, value));
+        std::string error_message = fmt::format("Parse integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
     }
     return value;
 }
@@ -526,7 +533,9 @@ BigIntT DataType::StringToValue<BigIntT>(const std::string_view &str) {
     BigIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse big integer: {} to {}", str, value));
+        std::string error_message = fmt::format("Parse big integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
     }
     return value;
 }
@@ -543,7 +552,9 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse float: {} to {}", str, value));
+        std::string error_message = fmt::format("Parse float: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
     }
 #endif
     return value;
@@ -561,7 +572,9 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse double: {} to {}", str, value));
+        std::string error_message = fmt::format("Parse double: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
     }
 #endif
     return value;
