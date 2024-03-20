@@ -487,7 +487,7 @@ TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse tiny integer error: {}", str));
+        ParserError(fmt::format("Parse tiny integer: {} to {}", str, value));
     }
     return value;
 }
@@ -500,7 +500,7 @@ SmallIntT DataType::StringToValue<SmallIntT>(const std::string_view &str) {
     SmallIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse small integer error: {}", str));
+        ParserError(fmt::format("Parse small integer: {} to {}", str, value));
     }
     return value;
 }
@@ -513,7 +513,7 @@ IntegerT DataType::StringToValue<IntegerT>(const std::string_view &str) {
     IntegerT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse integer error: {}", str));
+        ParserError(fmt::format("Parse integer: {} to {}", str, value));
     }
     return value;
 }
@@ -526,7 +526,7 @@ BigIntT DataType::StringToValue<BigIntT>(const std::string_view &str) {
     BigIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse big integer error: {}", str));
+        ParserError(fmt::format("Parse big integer: {} to {}", str, value));
     }
     return value;
 }
@@ -543,7 +543,7 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse float error: {}", str));
+        ParserError(fmt::format("Parse float: {} to {}", str, value));
     }
 #endif
     return value;
@@ -561,7 +561,7 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
     if(res.ptr != str.data() + str.size()) {
-        ParserError(fmt::format("Parse double error: {}", str));
+        ParserError(fmt::format("Parse double: {} to {}", str, value));
     }
 #endif
     return value;
