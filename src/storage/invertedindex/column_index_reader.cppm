@@ -39,7 +39,7 @@ public:
               optionflag_t flag,
               MemoryIndexer *memory_indexer);
 
-    PostingIterator *Lookup(const String &term, MemoryPool *session_pool);
+    UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
 
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
 
