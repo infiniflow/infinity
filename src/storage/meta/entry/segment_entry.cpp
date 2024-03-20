@@ -411,7 +411,9 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
             LOG_TRACE(fmt::format("SegmentEntry::Serialize: End try to save FastRoughFilter to json file"));
         }
         for (auto &block_entry : this->block_entries_) {
-            json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
+            if (block_entry->commit_ts_ <= max_commit_ts) {
+                json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
+            }
         }
     }
     return json_res;

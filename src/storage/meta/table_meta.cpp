@@ -162,7 +162,7 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_che
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
         table_candidates.reserve(this->table_entry_list().size());
         for (auto &table_entry : this->table_entry_list()) {
-            if (table_entry->entry_type_ == EntryType::kTable) {
+            if (table_entry->entry_type_ == EntryType::kTable && table_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
                 table_candidates.push_back((TableEntry *)table_entry.get());
             }
