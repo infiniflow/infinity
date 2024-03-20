@@ -4,17 +4,17 @@
 import stl;
 import memory_pool;
 import index_defines;
-import posting_value;
+import posting_field;
 import short_buffer;
 
 namespace infinity {
 
 template <typename T>
-class SimpleFormat : public PostingValues {
+class SimpleFormat : public PostingFields {
 public:
     SimpleFormat(SizeT count) {
         for (SizeT i = 0; i < count; ++i) {
-            PostingValue *value = new TypedPostingValue<T>();
+            PostingField *value = new TypedPostingField<T>();
             value->location_ = i;
             value->offset_ = i * sizeof(T);
             values_.push_back(value);
@@ -36,11 +36,11 @@ protected:
 void ShortBufferTest::CheckShortBuffer(u32 *expect_short_buffer, SizeT row_num, SizeT col_num, ShortBuffer *short_buffer, u8 *capacity) {
     using namespace infinity;
     UniquePtr<ShortBuffer> short_buffer_ptr;
-    SimpleFormat<u32> posting_values(row_num);
+    SimpleFormat<u32> posting_fields(row_num);
     if (!short_buffer) {
         short_buffer = new ShortBuffer;
         short_buffer_ptr.reset(short_buffer);
-        short_buffer_ptr->Init(&posting_values);
+        short_buffer_ptr->Init(&posting_fields);
     }
     u8 cur_capacity = capacity == nullptr ? 0 : *capacity;
     ASSERT_EQ(cur_capacity, short_buffer->Capacity());
@@ -76,9 +76,9 @@ void ShortBufferTest::CheckEqual(u32 *expect_short_buffer, SizeT row_num, SizeT 
 
 TEST_F(ShortBufferTest, test1) {
     using namespace infinity;
-    SimpleFormat<u32> posting_values(1);
+    SimpleFormat<u32> posting_fields(1);
     ShortBuffer short_buffer;
-    short_buffer.Init(&posting_values);
+    short_buffer.Init(&posting_fields);
 
     ASSERT_EQ((u8)0, short_buffer.Capacity());
     ASSERT_EQ((u8)0, short_buffer.Size());
@@ -98,8 +98,8 @@ TEST_F(ShortBufferTest, test2) {
 TEST_F(ShortBufferTest, test3) {
     using namespace infinity;
     ShortBuffer short_buffer;
-    SimpleFormat<u32> posting_values(8);
-    short_buffer.Init(&posting_values);
+    SimpleFormat<u32> posting_fields(8);
+    short_buffer.Init(&posting_fields);
 
     u32 expect_short_buffer[128 * 8];
     for (SizeT c = 0; c < 128; ++c) {
@@ -120,8 +120,8 @@ TEST_F(ShortBufferTest, test4) {
     {
         // push same row repeatedly
         ShortBuffer short_buffer;
-        SimpleFormat<u32> posting_values(2);
-        short_buffer.Init(&posting_values);
+        SimpleFormat<u32> posting_fields(2);
+        short_buffer.Init(&posting_fields);
 
         ASSERT_TRUE(short_buffer.PushBack<u32>(0, 100));
         short_buffer.EndPushBack();
@@ -130,8 +130,8 @@ TEST_F(ShortBufferTest, test4) {
     {
         // push when short_buffer is full and hit max capacity
         ShortBuffer short_buffer;
-        SimpleFormat<u32> posting_values(1);
-        short_buffer.Init(&posting_values);
+        SimpleFormat<u32> posting_fields(1);
+        short_buffer.Init(&posting_fields);
 
         for (SizeT col = 0; col < 128; ++col) {
             ASSERT_TRUE(short_buffer.PushBack<u32>(0, col));
@@ -144,8 +144,8 @@ TEST_F(ShortBufferTest, test4) {
 TEST_F(ShortBufferTest, test5) {
     using namespace infinity;
     ShortBuffer short_buffer;
-    SimpleFormat<u32> posting_values(2);
-    short_buffer.Init(&posting_values);
+    SimpleFormat<u32> posting_fields(2);
+    short_buffer.Init(&posting_fields);
 
     ASSERT_TRUE(short_buffer.PushBack<u32>(0, 100));
     ASSERT_EQ((u8)0, short_buffer.Size());
@@ -158,8 +158,8 @@ TEST_F(ShortBufferTest, test5) {
 TEST_F(ShortBufferTest, test6) {
     using namespace infinity;
     ShortBuffer short_buffer;
-    SimpleFormat<u32> posting_values(3);
-    short_buffer.Init(&posting_values);
+    SimpleFormat<u32> posting_fields(3);
+    short_buffer.Init(&posting_fields);
 
     ASSERT_EQ((u8)0, short_buffer.Capacity());
     ASSERT_EQ((u8)0, short_buffer.Size());
@@ -183,8 +183,8 @@ TEST_F(ShortBufferTest, test6) {
 TEST_F(ShortBufferTest, test7) {
     using namespace infinity;
     ShortBuffer short_buffer;
-    SimpleFormat<u32> posting_values(1);
-    short_buffer.Init(&posting_values);
+    SimpleFormat<u32> posting_fields(1);
+    short_buffer.Init(&posting_fields);
 
     short_buffer.PushBack<u32>(0, 100);
     short_buffer.EndPushBack();
@@ -206,23 +206,23 @@ TEST_F(ShortBufferTest, test8) {
     macro(uint16_t);                                                                                                                                 \
     macro(uint16_t);
 
-    PostingValues posting_values;
+    PostingFields posting_fields;
     SizeT offset = 0;
     SizeT pos = 0;
 
 #define ADD_VALUE_HELPER_FOR_TEST(type)                                                                                                              \
     {                                                                                                                                                \
-        PostingValue *value = new TypedPostingValue<type>();                                                                                         \
+        PostingField *value = new TypedPostingField<type>();                                                                                         \
         value->location_ = pos++;                                                                                                                    \
         value->offset_ = offset;                                                                                                                     \
         offset += sizeof(type);                                                                                                                      \
-        posting_values.AddValue(value);                                                                                                              \
+        posting_fields.AddValue(value);                                                                                                              \
     }
 
     NUMBER_TYPE_HELPER_FOR_TEST(ADD_VALUE_HELPER_FOR_TEST);
 
     ShortBuffer short_buffer;
-    short_buffer.Init(&posting_values);
+    short_buffer.Init(&posting_fields);
 
     ASSERT_EQ((u8)0, short_buffer.Capacity());
     ASSERT_EQ((u8)0, short_buffer.Size());

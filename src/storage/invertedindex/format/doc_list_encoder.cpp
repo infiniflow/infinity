@@ -10,8 +10,8 @@ import buffered_skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
 import position_bitmap_writer;
-import inmem_pair_value_skiplist_reader;
-import inmem_tri_value_skiplist_reader;
+import inmem_position_list_skiplist_reader;
+import inmem_doc_list_skiplist_reader;
 import index_defines;
 import skiplist_reader;
 import vbyte_compressor;
@@ -180,21 +180,20 @@ void DocListEncoder::AddSkipListItem(u32 item_size) {
 
 InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_pool) const {
     df_t df = df_;
-    // TODO memory problem
     SkipListReader *skiplist_reader = nullptr;
     if (doc_skiplist_writer_) {
         const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
 
         if (skiplist_format->HasTfList()) {
-            InMemTriValueSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemTriValueSkipListReader)))
-                                                                                     InMemTriValueSkipListReader(session_pool)
-                                                                               : new InMemTriValueSkipListReader(session_pool);
+            InMemDocListSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListSkipListReader)))
+                                                                                    InMemDocListSkipListReader(session_pool)
+                                                                              : new InMemDocListSkipListReader(session_pool);
             in_mem_skiplist_reader->Load(doc_skiplist_writer_);
             skiplist_reader = in_mem_skiplist_reader;
         } else {
-            InMemPairValueSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPairValueSkipListReader)))
-                                                                                      InMemPairValueSkipListReader(session_pool)
-                                                                                : new InMemPairValueSkipListReader(session_pool);
+            InMemPositionListSkipListReader *in_mem_skiplist_reader =
+                session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListSkipListReader))) InMemPositionListSkipListReader(session_pool)
+                             : new InMemPositionListSkipListReader(session_pool);
             in_mem_skiplist_reader->Load(doc_skiplist_writer_);
             skiplist_reader = in_mem_skiplist_reader;
         }

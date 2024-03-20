@@ -4,7 +4,7 @@ module short_buffer;
 import stl;
 import memory_pool;
 import index_defines;
-import posting_value;
+import posting_field;
 import file_writer;
 import file_reader;
 
@@ -64,12 +64,12 @@ void ShortBuffer::ReleaseBuffer(u8 *buffer, u8 capacity) {
     Deallocate((void *)buffer, bufferSize);
 }
 
-void ShortBuffer::BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingValues *posting_values, u8 src_size) {
+void ShortBuffer::BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingFields *posting_fields, u8 src_size) {
     if (src == nullptr || src_size == 0) {
         return;
     }
-    for (u8 i = 0; i < posting_values->GetSize(); ++i) {
-        const PostingValue *value = posting_values->GetValue(i);
+    for (u8 i = 0; i < posting_fields->GetSize(); ++i) {
+        const PostingField *value = posting_fields->GetValue(i);
         std::memcpy(GetRow(dst, dst_col_count, value), GetRow(src, src_col_count, value), src_size * value->GetSize());
     }
 }
@@ -79,7 +79,7 @@ void ShortBuffer::Dump(const SharedPtr<FileWriter> &file) {
     file->WriteVInt(capacity_);
     if (size_ > 0) {
         for (u8 i = 0; i < posting_values_->GetSize(); ++i) {
-            const PostingValue *value = posting_values_->GetValue(i);
+            const PostingField *value = posting_values_->GetValue(i);
             u8 *buffer = GetRow(i);
             file->Write((char *)buffer, (u32)size_ * value->GetSize());
         }
@@ -92,7 +92,7 @@ void ShortBuffer::Load(const SharedPtr<FileReader> &file) {
     if (size_ > 0) {
         Reserve(capacity_);
         for (u8 i = 0; i < posting_values_->GetSize(); ++i) {
-            const PostingValue *value = posting_values_->GetValue(i);
+            const PostingField *value = posting_values_->GetValue(i);
             u8 *buffer = GetRow(i);
             file->Read((char *)buffer, (u32)size_ * value->GetSize());
         }

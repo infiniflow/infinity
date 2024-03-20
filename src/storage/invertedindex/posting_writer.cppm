@@ -8,7 +8,7 @@ import file_writer;
 import file_reader;
 import doc_list_encoder;
 import inmem_posting_decoder;
-import pos_list_encoder;
+import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import term_meta;

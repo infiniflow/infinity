@@ -6,8 +6,8 @@ import posting_list_format;
 import bitmap;
 import term_meta;
 import index_defines;
-import posting_value;
-import pos_list_format_option;
+import posting_field;
+import position_list_format_option;
 import doc_list_format_option;
 
 import infinity_exception;
@@ -111,8 +111,8 @@ void PostingDecoder::InitDocListEncoder(const DocListFormatOption &doc_list_form
     }
 }
 
-void PostingDecoder::InitPosListEncoder(const PositionListFormatOption &pos_list_format_option, ttf_t total_tf) {
-    if (!pos_list_format_option.HasPositionList()) {
+void PostingDecoder::InitPosListEncoder(const PositionListFormatOption &position_list_format_option, ttf_t total_tf) {
+    if (!position_list_format_option.HasPositionList()) {
         return;
     }
     position_encoder_ = GetPosListEncoder();

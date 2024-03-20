@@ -4,15 +4,15 @@ import stl;
 import memory_pool;
 import buffered_byte_slice;
 import buffered_byte_slice_reader;
-import tri_value_skiplist_reader;
-export module inmem_tri_value_skiplist_reader;
+import doc_list_skiplist_reader;
+export module inmem_doc_list_skiplist_reader;
 
 namespace infinity {
 
-export class InMemTriValueSkipListReader : public TriValueSkipListReader {
+export class InMemDocListSkipListReader : public DocListSkipListReader {
 public:
-    InMemTriValueSkipListReader(MemoryPool *session_pool = nullptr) : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
-    ~InMemTriValueSkipListReader() {
+    InMemDocListSkipListReader(MemoryPool *session_pool = nullptr) : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
+    ~InMemDocListSkipListReader() {
         if (session_pool_) {
             skiplist_buffer_->~BufferedByteSlice();
             session_pool_->Deallocate((void *)skiplist_buffer_, sizeof(BufferedByteSlice));

@@ -4,7 +4,7 @@ import stl;
 import int_encoder;
 import no_compress_encoder;
 
-module posting_value;
+module posting_field;
 
 namespace infinity {
 
