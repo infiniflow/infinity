@@ -315,7 +315,7 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
                                bool enable_compaction,
                                BGTaskProcessor *bg_task_processor,
                                TxnManager *txn_mgr) const {
-    LOG_INFO(fmt::format("AddDeltaOp for table: {} {}", *table_entry_->GetTableName(), txn_->TxnID(), table_entry_->commit_ts_));
+    LOG_INFO(fmt::format("AddDeltaOp for table: {} {} {}", *table_entry_->GetTableName(), txn_->TxnID(), table_entry_->commit_ts_));
     local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_));
 
     for (auto *table_index_entry : txn_indexes_) {
@@ -388,6 +388,7 @@ TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
 }
 
 void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const {
+    LOG_INFO(fmt::format("AddDeltaOp for table: {} {} {}", *table_entry_->GetTableName(), txn_->TxnID(), table_entry_->commit_ts_));
     for (auto *db_entry : txn_dbs_) {
         local_delta_ops->AddOperation(MakeUnique<AddDBEntryOp>(db_entry));
     }
