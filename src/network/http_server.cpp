@@ -12,28 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module;
-#include "type/data_type.h"
-#include "definition/column_def.h"
+#include <bits/stl_algo.h>
 module http_server;
 
 import infinity;
+import stl;
 import third_party;
 import defer_op;
 import data_block;
 import data_table;
+import data_type;
 import value;
-import stl;
 import infinity_exception;
 import logger;
 import query_result;
 import query_options;
 import column_vector;
 import infinity_context;
-import session;
-import session_manager;
 import query_context;
-import parsed_expr;
-import search_expr;
 import column_def;
 
 namespace {
@@ -140,26 +136,46 @@ public:
     }
 };
 
-class RetrieveDatabaseHandler final : public HttpRequestHandler {
+class ShowDatabaseHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto db_name = request->getPathVariable("database_name");
-        auto result = infinity->GetDatabase(db_name);
+        auto database_name = request->getPathVariable("database_name");
+        auto result = infinity->ShowDatabase(database_name);
 
         nlohmann::json json_response;
+        nlohmann::json json_res;
         HTTPStatus http_status;
          if(result.IsOk()) {
-            json_response["error_code"] = 0;
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            auto column_cnt = result.result_table_->ColumnCount();
+
+            for (int row = 0; row < row_count; ++row) {
+                nlohmann::json json_database;
+                for (infinity::SizeT col = 0; col < column_cnt; ++col){
+                    Value value = data_block->GetValue(col, row);
+                    const String &column_name = result.result_table_->GetColumnNameById(col);
+                    const String &column_value = value.ToString();
+                    json_database[column_name] = column_value;
+                }
+                json_res["res"].push_back(json_database);
+            }
+            for (auto &element : json_res["res"]) {
+                String name = element["name"].dump();
+                std::replace(name.begin(), name.end(), ' ', '_');
+                nlohmann::json json_name = nlohmann::json::parse(name);
+                json_response[json_name] = element["value"];
+            }
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
             json_response["error_message"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(http_status, json_response.dump());
+        return ResponseFactory::createResponse(http_status, json_res.dump());
     }
 };
 
@@ -178,27 +194,28 @@ public:
         auto fields = body_info_json["fields"];
         auto properties = body_info_json["properties"];
 
-        Vector<ColumnDef *> new_column_defs;
+        Vector<ColumnDef *> column_definitions;
         int id = 0;
         nlohmann::json json_response;
 
         for (auto &field : fields) {
-            for (auto& el : field.items()){
-                String column_name = el.key();
-                auto values = el.value();
+            for (auto& filed_element : field.items()){
+                String column_name = filed_element.key();
+                auto values = filed_element.value();
                 SharedPtr<DataType> column_type = DataType::StringDeserialize(values["type"]);
                 HashSet<ConstraintType> constraints;
-                for (auto &constraint : values["constraints"]){
+                for (auto &constraint_json : values["constraints"]){
+                    String constraint = constraint_json;
                     constraints.insert(ColumnDef::StringToConstraintType(constraint));
                 }
                 ColumnDef *col_def = new ColumnDef(id ++, column_type, column_name, constraints);
-                new_column_defs.emplace_back(col_def);
+                column_definitions.emplace_back(col_def);
             }
         }
         Vector<TableConstraint *> table_constraint;
         CreateTableOptions create_table_opts;
 
-        auto result = infinity->CreateTable(database_name, table_name, new_column_defs, table_constraint, create_table_opts);
+        auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, create_table_opts);
 
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
@@ -239,6 +256,93 @@ public:
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
+};
+
+class ListTableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String database_name = request->getPathVariable("database_name");
+        auto result = infinity->ShowTables(database_name);
+        // Map<String, String, int, int, int, int, >
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        if(result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            auto column_cnt = result.result_table_->ColumnCount();
+            for (int row = 0; row < row_count; ++row) {
+                nlohmann::json json_table;
+                for (infinity::SizeT col = 0; col < column_cnt; ++col){
+                    const String &column_name = result.result_table_->GetColumnNameById(col);
+                    Value value = data_block->GetValue(col, row);
+                    const String &column_value = value.ToString();
+                    json_table[column_name] = column_value;
+                }
+                json_table.erase("database");
+                json_response["tables"].push_back(json_table);
+            }
+
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+
+    }
+
+};
+
+class ShowTableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String database_name = request->getPathVariable("database_name");
+        String table_name = request->getPathVariable("table_name");
+        
+        auto result = infinity->ShowTable(database_name, table_name);
+        nlohmann::json json_response;
+        nlohmann::json json_res;
+        HTTPStatus http_status;
+        if(result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            auto column_cnt = result.result_table_->ColumnCount();
+            for (int row = 0; row < row_count; ++row) {
+                nlohmann::json json_table;
+                for (infinity::SizeT col = 0; col < column_cnt; ++col){
+                    const String &column_name = result.result_table_->GetColumnNameById(col);
+                    Value value = data_block->GetValue(col, row);
+                    const String &column_value = value.ToString();
+                    json_table[column_name] = column_value;
+                }
+                // json_table.erase("database");
+                json_res["tables"].push_back(json_table);
+            }
+            for (auto &element : json_res["tables"]) {
+                String name = element["name"].dump();
+                std::replace(name.begin(), name.end(), ' ', '_');
+                nlohmann::json json_name = nlohmann::json::parse(name);
+                json_response[json_name] = element["value"];
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+
+    }
+
 };
 
 class ListTableIndexesHandler final : public HttpRequestHandler {
@@ -293,15 +397,19 @@ void HTTPServer::Start(u16 port) {
 
     SharedPtr<HttpRouter> router = HttpRouter::createShared();
     router->route("GET", "/hello", MakeShared<HttpHandler>());
+
     // database
     router->route("GET", "/databases", MakeShared<ListDatabaseHandler>());
     router->route("POST", "/databases/{database_name}", MakeShared<CreateDatabaseHandler>());
     router->route("DELETE", "/databases/{database_name}", MakeShared<DropDatabaseHandler>());
-    router->route("GET", "/databases/{database_name}", MakeShared<RetrieveDatabaseHandler>());
+    router->route("GET", "/databases/{database_name}", MakeShared<ShowDatabaseHandler>());
 
     // tables
+    router->route("GET", "/databases/{database_name}/tables", MakeShared<ListTableHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}", MakeShared<CreateTableHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}", MakeShared<DropTableHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}", MakeShared<ShowTableHandler>());
+    
 
     // index
     router->route("GET", "/indexes/{db_name}/{table_name}", MakeShared<ListTableIndexesHandler>());

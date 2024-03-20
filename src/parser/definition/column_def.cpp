@@ -17,6 +17,14 @@
 
 namespace infinity {
 
+std::unordered_map<std::string, ConstraintType> string_to_constraint_type = {
+    {"primary key", ConstraintType::kPrimaryKey},
+    {"unique", ConstraintType::kUnique},
+    {"null", ConstraintType::kNull},
+    {"not null", ConstraintType::kNotNull},
+    {"invalid", ConstraintType::kInvalid},
+};
+
 std::string ConstrainTypeToString(ConstraintType type) {
     switch (type) {
         case ConstraintType::kPrimaryKey:
@@ -64,30 +72,15 @@ std::string ColumnDef::ToString() const {
     return ss.str();
 }
 
-ConstraintType ColumnDef::StringToConstraintType(std::string type) {
-    std::map<std::string, int> string_to_constraint_type = {
-        {"primarykey", 1},
-        {"unique", 2},
-        {"null", 3},
-        {"not null", 4},
-        {"invalid", 5},
-    };
-    if(string_to_constraint_type.find(type) != string_to_constraint_type.end()){
-        int num = string_to_constraint_type.find(type)->second;
-        switch (num) {
-            case 1:
-                return ConstraintType::kPrimaryKey;
-            case 2:
-                return ConstraintType::kUnique;
-            case 3:
-                return ConstraintType::kNull;
-            case 4:
-                return ConstraintType::kNotNull;
-            case 5:
-                return ConstraintType::kInvalid;
-        }  
+ConstraintType ColumnDef::StringToConstraintType(std::string &type) {
+    std::string str_lower;
+    for (char ch : type) {
+        str_lower.push_back(std::tolower(ch));
     }
-    ParserError("Unexpected error.");
+    if(string_to_constraint_type.find(str_lower) != string_to_constraint_type.end()){
+        ConstraintType constraint_type = string_to_constraint_type.find(str_lower)->second;
+        return constraint_type;
+    }
     return ConstraintType::kInvalid;
 }
 

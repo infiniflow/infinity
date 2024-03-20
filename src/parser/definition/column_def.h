@@ -42,8 +42,6 @@ enum class ConstraintType : char {
 
 std::string ConstrainTypeToString(ConstraintType type);
 
-ConstraintType StringToConstraintType(std::string string);
-
 class TableElement {
 public:
     explicit TableElement(TableElementType type) : type_(type) {}
@@ -80,7 +78,7 @@ public:
 
     ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr);
     
-    static ConstraintType StringToConstraintType(std::string type);
+    static ConstraintType StringToConstraintType(std::string &type);
 
     inline ~ColumnDef() override = default;
 

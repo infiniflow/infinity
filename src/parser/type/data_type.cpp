@@ -82,10 +82,6 @@ std::string DataType::ToString() const {
     return LogicalType2Str(type_);
 }
 
-LogicalType DataType::ToLogicalType() const {
-    return Str2LogicalType(str_type_);
-}
-
 bool DataType::operator==(const DataType &other) const {
     if (this == &other)
         return true;
@@ -315,6 +311,26 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
 std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_type_string) {
     const LogicalType logical_type = Str2LogicalType(data_type_string);
     std::shared_ptr<TypeInfo> type_info{nullptr};
+    switch (logical_type) {
+            case LogicalType::kArray: {
+                ParserError("Array isn't implemented here.");
+                type_info = nullptr;
+                break;
+            }
+            case LogicalType::kDecimal: {
+                // type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
+                ParserError("Decimal isn't implemented http api service.");
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                // type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
+                ParserError("Embedding isn't implemented http api service.");
+                break;
+            }
+            default:
+                // There's no type_info for other types
+                break;
+    }
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
     return data_type;
 }

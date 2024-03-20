@@ -90,6 +90,8 @@ class TestDatabase:
         for db in res.db_names:
             assert db == 'default'
 
+        infinity_obj.drop_database("my_database")
+
         # disconnect
         res = infinity_obj.disconnect()
 
@@ -362,9 +364,9 @@ class TestDatabase:
 
         assert res.error_code == ErrorCode.OK
 
-    def test_show_db(self):
+    def test_get_db(self):
         """
-        target: show db
+        target: get db
         method:
         1. show non-existent db
         2. show existent db
@@ -532,6 +534,19 @@ class TestDatabase:
         # drop
         infinity_obj.drop_database("test_create_same_db_in_different_threads")
 
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.skip(reason="Attempt to access an invalid index of column vector")
+    def test_show_database(self):
+        # create db
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj.create_database("test_show_database")
+
+        infinity_obj.show_database("test_show_database")
+
+        infinity_obj.drop_database("test_show_database")
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
