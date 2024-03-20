@@ -108,6 +108,7 @@ private:
 
     // WalManager state
     Atomic<bool> running_{};
+    Atomic<bool> checkpoint_running_{};
     Thread flush_thread_{};
     Thread checkpoint_thread_{};
     Thread apply_delta_entries_thread_{};

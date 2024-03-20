@@ -56,10 +56,12 @@ WalManager::WalManager(Storage *storage,
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_full_checkpoint_interval_sec_(full_checkpoint_interval_sec),
       cfg_delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec),
       cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_path_(std::move(wal_path)), storage_(storage),
-      running_(false), flush_option_(flush_option) {}
+      running_(false), checkpoint_running_(false), flush_option_(flush_option) {}
 
 WalManager::~WalManager() {
-    Stop();
+    if (running_.load()) {
+        Stop();
+    }
     que_.clear();
     que2_.clear();
 }
@@ -70,6 +72,7 @@ void WalManager::Start() {
     bool changed = running_.compare_exchange_strong(expected, true);
     if (!changed)
         return;
+    checkpoint_running_.store(true);
     Path wal_dir = Path(wal_path_).parent_path();
     LocalFileSystem fs;
     if (!fs.Exists(wal_dir)) {
@@ -93,6 +96,17 @@ void WalManager::Start() {
 
 void WalManager::Stop() {
     LOG_INFO("WAL manager is stopping...");
+
+    checkpoint_running_.store(false);
+
+    // Wait for checkpoint thread to stop.
+    LOG_TRACE("WalManager::Stop checkpoint thread join");
+    checkpoint_thread_.join();
+
+    // Wait for add delta entries thread to stop.
+    LOG_TRACE("WalManager::Stop add delta entries thread join");
+    apply_delta_entries_thread_.join();
+
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
     if (!changed) {
@@ -114,14 +128,6 @@ void WalManager::Stop() {
         }
     }
     que_.clear();
-
-    // Wait for add delta entries thread to stop.
-    LOG_TRACE("WalManager::Stop add delta entries thread join");
-    apply_delta_entries_thread_.join();
-
-    // Wait for checkpoint thread to stop.
-    LOG_TRACE("WalManager::Stop checkpoint thread join");
-    checkpoint_thread_.join();
 
     // Wait for flush thread to stop
     LOG_TRACE("WalManager::Stop flush thread join");
@@ -247,8 +253,9 @@ void WalManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
 }
 
 void WalManager::ApplyDeltaEntries() {
+    LOG_TRACE("WalManager::ApplyDeltaEntries mainloop begin");
     Catalog *catalog = storage_->catalog();
-    while (running_.load()) {
+    while (checkpoint_running_.load()) {
         auto [max_commit_ts, wal_size] = GetWalState();
         mutex3_.lock();
         if (delta_entries_.empty() || delta_entries_.front()->commit_ts() > max_commit_ts) {
@@ -266,6 +273,7 @@ void WalManager::ApplyDeltaEntries() {
 
         catalog->AddDeltaEntries(std::move(flushed_entries));
     }
+    LOG_INFO("WalManager::ApplyDeltaEntries mainloop end");
 }
 
 /*****************************************************************************
@@ -274,10 +282,11 @@ void WalManager::ApplyDeltaEntries() {
 
 void WalManager::CheckpointTimer() {
     LOG_TRACE("WalManager::Checkpoint mainloop begin");
-    while (running_.load()) {
+    while (checkpoint_running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         Checkpoint();
     }
+    LOG_INFO("WalManager::Checkpoint mainloop end");
 }
 
 // Do checkpoint for transactions which lsn no larger than the given one.
