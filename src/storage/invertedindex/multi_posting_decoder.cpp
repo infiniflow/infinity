@@ -18,7 +18,7 @@ import posting_writer;
 import term_meta;
 import posting_list_format;
 import inmem_posting_decoder;
-import inmem_pos_list_decoder;
+import inmem_position_list_decoder;
 import pair_value_skiplist_reader;
 import tri_value_skiplist_reader;
 import internal_types;

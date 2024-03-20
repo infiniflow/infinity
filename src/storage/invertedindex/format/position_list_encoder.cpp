@@ -1,7 +1,7 @@
 module;
 #include <cassert>
 
-module pos_list_encoder;
+module position_list_encoder;
 import stl;
 import byte_slice_writer;
 import memory_pool;
@@ -11,21 +11,22 @@ import vbyte_compressor;
 import index_defines;
 import buffered_byte_slice;
 import buffered_skiplist_writer;
-import pos_list_format_option;
-import inmem_pos_list_decoder;
+import position_list_format_option;
+import inmem_position_list_decoder;
 import inmem_pair_value_skiplist_reader;
 import short_list_optimize_util;
 import position_bitmap_reader;
 
 namespace infinity {
-PositionListEncoder::PositionListEncoder(const PositionListFormatOption &pos_list_format_option,
+PositionListEncoder::PositionListEncoder(const PositionListFormatOption &position_list_format_option,
                                          MemoryPool *byte_slice_pool,
                                          MemoryPool *buffer_pool,
                                          const PositionListFormat *pos_list_format)
-    : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0), pos_list_format_option_(pos_list_format_option),
-      is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format), byte_slice_pool_(byte_slice_pool) {
+    : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0),
+      pos_list_format_option_(position_list_format_option), is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format),
+      byte_slice_pool_(byte_slice_pool) {
     if (!pos_list_format) {
-        pos_list_format_ = new PositionListFormat(pos_list_format_option);
+        pos_list_format_ = new PositionListFormat(position_list_format_option);
         is_own_format_ = true;
     }
     pos_list_buffer_.Init(pos_list_format_);

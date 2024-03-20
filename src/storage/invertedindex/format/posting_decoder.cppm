@@ -8,7 +8,7 @@ import term_meta;
 import index_defines;
 import posting_field;
 import doc_list_format_option;
-import pos_list_format_option;
+import position_list_format_option;
 export module posting_decoder;
 
 namespace infinity {
@@ -39,7 +39,7 @@ public:
 
 private:
     void InitDocListEncoder(const DocListFormatOption &doc_list_format_option, df_t df);
-    void InitPosListEncoder(const PositionListFormatOption &pos_list_format_option, ttf_t total_tf);
+    void InitPosListEncoder(const PositionListFormatOption &position_list_format_option, ttf_t total_tf);
 
     TermMeta *term_meta_;
 

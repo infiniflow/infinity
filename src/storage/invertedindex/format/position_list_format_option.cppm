@@ -3,7 +3,7 @@ module;
 import stl;
 import posting_field;
 import index_defines;
-export module pos_list_format_option;
+export module position_list_format_option;
 
 namespace infinity {
 

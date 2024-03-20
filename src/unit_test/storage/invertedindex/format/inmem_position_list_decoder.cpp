@@ -4,12 +4,12 @@ import stl;
 import memory_pool;
 import index_defines;
 import buffered_byte_slice;
-import inmem_pos_list_decoder;
+import inmem_position_list_decoder;
 import doc_list_format_option;
 import pair_value_skiplist_reader;
-import pos_list_encoder;
+import position_list_encoder;
 import in_doc_pos_state;
-import pos_list_format_option;
+import position_list_format_option;
 
 using namespace infinity;
 
@@ -24,24 +24,24 @@ protected:
     void TestDecodeWithOptionFlag(const optionflag_t flag, tf_t tf, pos_t *pos_list, bool need_flush) {
         PositionListFormatOption option(flag);
 
-        PositionListEncoder pos_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
+        PositionListEncoder position_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
         for (SizeT i = 0; i < (SizeT)tf; ++i) {
-            pos_list_encoder.AddPosition(pos_list[i]);
+            position_list_encoder.AddPosition(pos_list[i]);
         }
-        pos_list_encoder.EndDocument();
+        position_list_encoder.EndDocument();
         if (need_flush) {
-            pos_list_encoder.Flush();
+            position_list_encoder.Flush();
         }
 
-        InMemPositionListDecoder *pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
-        ASSERT_TRUE(pos_list_decoder);
+        InMemPositionListDecoder *position_list_decoder(position_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
+        ASSERT_TRUE(position_list_decoder);
 
         // compress mode is useless in decoder
         InDocPositionState state(option);
-        ASSERT_TRUE(pos_list_decoder->SkipTo(0, &state));
+        ASSERT_TRUE(position_list_decoder->SkipTo(0, &state));
 
         u32 temp_tf = 0;
-        ASSERT_TRUE(pos_list_decoder->LocateRecord(&state, temp_tf));
+        ASSERT_TRUE(position_list_decoder->LocateRecord(&state, temp_tf));
         ASSERT_EQ((i32)0, state.GetRecordOffset());
         ASSERT_EQ((i32)0, state.GetOffsetInRecord());
 
@@ -50,7 +50,7 @@ protected:
         SizeT pos_idx = 0;
         pos_t last_pos = 0;
         for (SizeT i = 0; i < tf / MAX_POS_PER_RECORD; ++i) {
-            u32 decode_count = pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
+            u32 decode_count = position_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
             ASSERT_EQ((u32)MAX_POS_PER_RECORD, decode_count);
             for (SizeT j = 0; j < MAX_POS_PER_RECORD; ++j) {
                 ASSERT_EQ(pos_list[pos_idx], last_pos + pos_buffer[j]);
@@ -59,7 +59,7 @@ protected:
             }
         }
         if (tf % MAX_POS_PER_RECORD != 0) {
-            u32 decode_count = pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
+            u32 decode_count = position_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
             ASSERT_EQ((u32)(tf % MAX_POS_PER_RECORD), decode_count);
             for (SizeT j = 0; j < decode_count; ++j) {
                 ASSERT_EQ(pos_list[pos_idx], last_pos + pos_buffer[j]);
@@ -85,19 +85,19 @@ protected:
     void InnerTestSkipAndLocateAndDecode(optionflag_t flag, ttf_t ttf, bool need_flush) {
         PositionListFormatOption option(flag);
 
-        PositionListEncoder pos_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
+        PositionListEncoder position_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
         pos_t sum = 0;
         for (SizeT i = 0; i < (SizeT)ttf; ++i) {
             sum += i;
-            pos_list_encoder.AddPosition(sum);
+            position_list_encoder.AddPosition(sum);
         }
-        pos_list_encoder.EndDocument();
+        position_list_encoder.EndDocument();
         if (need_flush) {
-            pos_list_encoder.Flush();
+            position_list_encoder.Flush();
         }
 
-        InMemPositionListDecoder *pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
-        ASSERT_TRUE(pos_list_decoder);
+        InMemPositionListDecoder *position_list_decoder(position_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
+        ASSERT_TRUE(position_list_decoder);
 
         InDocPositionState state(option);
 
@@ -105,19 +105,19 @@ protected:
         u32 temp_tf = 0;
         pos_t pos_buffer[MAX_POS_PER_RECORD];
         for (SizeT i = 0; i < (SizeT)ttf; ++i) {
-            ASSERT_TRUE(pos_list_decoder->SkipTo(i, &state));
+            ASSERT_TRUE(position_list_decoder->SkipTo(i, &state));
             if (i % MAX_POS_PER_RECORD == 0) {
-                ASSERT_TRUE(pos_list_decoder->LocateRecord(&state, temp_tf));
+                ASSERT_TRUE(position_list_decoder->LocateRecord(&state, temp_tf));
                 record_offset = state.GetRecordOffset();
                 // check decode buffer
-                u32 decode_count = pos_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
+                u32 decode_count = position_list_decoder->DecodeRecord(pos_buffer, MAX_POS_PER_RECORD);
                 u32 expectDecodeCount = std::min(u32(ttf - i), MAX_POS_PER_RECORD);
                 ASSERT_EQ(expectDecodeCount, decode_count);
                 for (SizeT j = 0; j < (SizeT)decode_count; ++j) {
                     ASSERT_EQ(i + j, pos_buffer[j]);
                 }
             } else {
-                ASSERT_FALSE(pos_list_decoder->LocateRecord(&state, temp_tf));
+                ASSERT_FALSE(position_list_decoder->LocateRecord(&state, temp_tf));
                 ASSERT_EQ(record_offset, state.GetRecordOffset());
             }
             ASSERT_EQ((i32)(i % MAX_POS_PER_RECORD), state.GetOffsetInRecord());
@@ -132,23 +132,23 @@ TEST_F(InMemPositionListDecoderTest, test1) {
     constexpr optionflag_t NO_PAYLOAD = of_position_list | of_term_frequency;
     PositionListFormatOption option(NO_PAYLOAD);
 
-    PositionListEncoder pos_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
-    pos_list_encoder.AddPosition(3);
-    pos_list_encoder.EndDocument();
+    PositionListEncoder position_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
+    position_list_encoder.AddPosition(3);
+    position_list_encoder.EndDocument();
 
-    InMemPositionListDecoder *pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
-    ASSERT_TRUE(pos_list_decoder);
+    InMemPositionListDecoder *position_list_decoder(position_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
+    ASSERT_TRUE(position_list_decoder);
 
     InDocPositionState state(option);
-    ASSERT_TRUE(pos_list_decoder->SkipTo(0, &state));
+    ASSERT_TRUE(position_list_decoder->SkipTo(0, &state));
 
     u32 tf = 0;
-    ASSERT_TRUE(pos_list_decoder->LocateRecord(&state, tf));
+    ASSERT_TRUE(position_list_decoder->LocateRecord(&state, tf));
     ASSERT_EQ((i32)0, state.GetRecordOffset());
     ASSERT_EQ((i32)0, state.GetOffsetInRecord());
 
     pos_t posBuffer[MAX_POS_PER_RECORD];
-    ASSERT_EQ((u32)1, pos_list_decoder->DecodeRecord(posBuffer, MAX_POS_PER_RECORD));
+    ASSERT_EQ((u32)1, position_list_decoder->DecodeRecord(posBuffer, MAX_POS_PER_RECORD));
     ASSERT_EQ((pos_t)3, posBuffer[0]);
 }
 

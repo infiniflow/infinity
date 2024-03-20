@@ -1,13 +1,13 @@
 module;
 
-export module pos_list_decoder;
+export module position_list_decoder;
 
 import stl;
 import byte_slice;
 import byte_slice_reader;
 import memory_pool;
 import pair_value_skiplist_reader;
-import pos_list_format_option;
+import position_list_format_option;
 import posting_field;
 import index_defines;
 import position_bitmap_reader;
