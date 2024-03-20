@@ -5,14 +5,14 @@ import byte_slice;
 import byte_slice_reader;
 import skiplist_reader;
 import index_defines;
-export module tri_value_skiplist_reader;
+export module doc_list_skiplist_reader;
 
 namespace infinity {
-export class TriValueSkipListReader : public SkipListReader {
+export class DocListSkipListReader : public SkipListReader {
 public:
-    TriValueSkipListReader();
+    DocListSkipListReader();
 
-    TriValueSkipListReader(const TriValueSkipListReader &other) noexcept;
+    DocListSkipListReader(const DocListSkipListReader &other) noexcept;
 
 public:
     void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count);

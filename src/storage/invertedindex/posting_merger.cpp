@@ -7,7 +7,7 @@ import memory_pool;
 import file_writer;
 import doc_list_encoder;
 import inmem_posting_decoder;
-import pos_list_encoder;
+import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import posting_writer;

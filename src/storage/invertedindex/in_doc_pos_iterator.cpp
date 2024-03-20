@@ -5,8 +5,8 @@ module in_doc_pos_iterator;
 import stl;
 import index_defines;
 import in_doc_pos_state;
-import pos_list_format_option;
-import pos_list_decoder;
+import position_list_format_option;
+import position_list_decoder;
 
 namespace infinity {
 InDocPositionIterator::InDocPositionIterator(PositionListFormatOption option)

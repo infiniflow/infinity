@@ -3,14 +3,14 @@ module;
 
 import stl;
 import memory_pool;
-import pos_list_decoder;
+import position_list_decoder;
 import buffered_byte_slice_reader;
 import in_doc_pos_state;
 import short_list_optimize_util;
-import pos_list_format_option;
-import pair_value_skiplist_reader;
+import position_list_format_option;
+import position_list_skiplist_reader;
 import index_defines;
-module inmem_pos_list_decoder;
+module inmem_position_list_decoder;
 
 namespace infinity {
 
@@ -27,7 +27,7 @@ InMemPositionListDecoder::~InMemPositionListDecoder() {
     }
 }
 
-void InMemPositionListDecoder::Init(ttf_t total_tf, PairValueSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer) {
+void InMemPositionListDecoder::Init(ttf_t total_tf, PositionListSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer) {
     total_tf_ = total_tf;
     pos_skiplist_reader_ = skip_list_reader;
     pos_list_buffer_ = pos_list_buffer;

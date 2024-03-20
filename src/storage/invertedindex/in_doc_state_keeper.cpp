@@ -6,12 +6,12 @@ import stl;
 import memory_pool;
 import byte_slice;
 import in_doc_pos_state;
-import pos_list_decoder;
+import position_list_decoder;
 import posting_decoder;
 import inmem_posting_decoder;
-import inmem_pos_list_decoder;
+import inmem_position_list_decoder;
 import index_defines;
-import pos_list_format_option;
+import position_list_format_option;
 
 namespace infinity {
 InDocStateKeeper::InDocStateKeeper(InDocPositionState *state, MemoryPool *session_pool) : state_(state), session_pool_(session_pool) {}
