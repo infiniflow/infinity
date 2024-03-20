@@ -75,7 +75,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
         auto op2 = MakeUnique<AddSegmentEntryOp>();
         catalog_delta_entry1->operations().push_back(std::move(op2));
 
-        auto op3 = MakeUnique<AddBlockEntryOp>(3, false, 0, 0, db_name, table_name, segment_id, block_id, 0, 0, 0, 0, 0, 0);
+        auto op3 = MakeUnique<AddBlockEntryOp>();
         catalog_delta_entry1->operations().push_back(std::move(op3));
 
         auto op4 = MakeUnique<AddColumnEntryOp>(4, false, 0, 0, db_name, table_name, segment_id, block_id, column_id, 0);
@@ -153,8 +153,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op7_same_name));
 
     // block entry
-    auto op9 = MakeUnique<AddBlockEntryOp>(8, false, 0, 0, db_name, table_name, segment_id, block_id, 0, 0, 0, 0, 0, 0);
-    auto op9_same_name = MakeUnique<AddBlockEntryOp>(8, false, 0, 0, db_name, table_name, segment_id, block_id, 0, 0, 0, 0, 0, 0);
+    auto op9 = MakeUnique<AddBlockEntryOp>();
+    auto op9_same_name = MakeUnique<AddBlockEntryOp>();
     local_catalog_delta_entry->operations().push_back(std::move(op9));
     local_catalog_delta_entry->operations().push_back(std::move(op9_same_name));
 

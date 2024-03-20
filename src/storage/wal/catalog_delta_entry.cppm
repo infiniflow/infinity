@@ -533,7 +533,7 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}", *db_name_, *table_name_, *index_name_)); }
+    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}#FTX", *db_name_, *table_name_, *index_name_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
