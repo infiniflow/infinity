@@ -30,7 +30,7 @@ protected:
 };
 
 TEST_F(PositionListEncoderTest, test1) {
-    optionflag_t option_flag = of_position_list | of_term_frequency | of_tf_bitmap;
+    optionflag_t option_flag = of_position_list | of_term_frequency;
     PositionListFormatOption format_option(option_flag);
     PositionListEncoder position_encoder(format_option, &byte_slice_pool_, &buffer_pool_);
 
@@ -46,7 +46,7 @@ TEST_F(PositionListEncoderTest, test1) {
 }
 
 TEST_F(PositionListEncoderTest, test2) {
-    optionflag_t option_flag = of_position_list | of_term_frequency | of_tf_bitmap;
+    optionflag_t option_flag = of_position_list | of_term_frequency;
     PositionListFormatOption format_option(option_flag);
     PositionListEncoder position_encoder(format_option, &byte_slice_pool_, &buffer_pool_);
 

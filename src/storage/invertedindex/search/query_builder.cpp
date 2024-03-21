@@ -71,13 +71,14 @@ QueryBuilder::QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPt
             MemoryIndexer *memory_indexer = nullptr;
             for (auto &[segment_id, segment_index_entry] : index_by_segment) {
                 Vector<String> &base_names_v = segment_index_entry->GetFulltextBaseNames();
+                base_names.insert(base_names.end(), base_names_v.begin(), base_names_v.end());
                 Vector<u64> &base_row_ids_v = segment_index_entry->GetFulltextBaseRowIDs();
-                memory_indexer = segment_index_entry->GetMemoryIndexer();
-                for (auto &name : base_names_v)
-                    base_names.push_back(name);
                 for (auto base_row_id : base_row_ids_v) {
                     RowID row_id(base_row_id);
                     base_row_ids.push_back(row_id);
+                }
+                if (!memory_indexer) {
+                    memory_indexer = segment_index_entry->GetMemoryIndexer();
                 }
             }
             optionflag_t flag = reinterpret_cast<IndexFullText *>(index_def.get())->flag_;

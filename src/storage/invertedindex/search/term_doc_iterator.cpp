@@ -19,14 +19,14 @@ module term_doc_iterator;
 import stl;
 import memory_pool;
 import posting_iterator;
-import bitmap;
 import index_defines;
 import term_meta;
 import doc_iterator;
 import internal_types;
 
 namespace infinity {
-TermDocIterator::TermDocIterator(PostingIterator *iter, u64 column_id, float weight) : column_id_(column_id), iter_(iter), weight_(weight) {
+TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight)
+    : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
     DoSeek(0);
 }
 

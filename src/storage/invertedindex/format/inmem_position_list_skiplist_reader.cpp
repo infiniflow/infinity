@@ -7,6 +7,7 @@ import buffered_byte_slice_reader;
 import position_list_skiplist_reader;
 import index_defines;
 import logger;
+import flush_info;
 import third_party;
 
 module inmem_position_list_skiplist_reader;
@@ -44,7 +45,14 @@ void InMemPositionListSkipListReader::Load(BufferedByteSlice *posting_buffer) {
 
 Pair<int, bool> InMemPositionListSkipListReader::LoadBuffer() {
     SizeT key_num = 0;
+    SizeT flush_count = skiplist_buffer_->GetTotalCount();
+    FlushInfo flushInfo = skiplist_buffer_->GetFlushInfo();
+
     SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
+    if (flushInfo.IsValidShortBuffer() == false) {
+        decode_count = flush_count;
+    }
+
     if (!skiplist_reader_.Decode(key_buffer_, decode_count, key_num)) {
         return MakePair(0, false);
     }

@@ -57,7 +57,6 @@ public:
     bool operator!=(const DataType &other) const;
 
     [[nodiscard]] std::string ToString() const;
-    [[nodiscard]] LogicalType ToLogicalType() const;
 
     [[nodiscard]] size_t Size() const;
 
@@ -176,7 +175,6 @@ private:
     LogicalType type_{LogicalType::kInvalid};
     bool plain_type_{false};
     std::shared_ptr<TypeInfo> type_info_{nullptr};
-    std::string str_type_ {"invalid"};
     // Static method
 public:
     template <typename T>

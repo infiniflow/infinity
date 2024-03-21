@@ -70,7 +70,6 @@ bool InMemPositionListDecoder::SkipTo(ttf_t current_ttf, InDocPositionState *sta
 }
 
 bool InMemPositionListDecoder::LocateRecord(const InDocPositionState *state, u32 &tf) {
-    assert(!option_.HasTfBitmap());
     record_offset_ = state->GetRecordOffset();
     offset_in_record_ = state->GetOffsetInRecord();
     tf = state->tf_;

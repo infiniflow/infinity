@@ -18,17 +18,10 @@ public:
         has_doc_payload_ = option_flag & of_doc_payload ? 1 : 0;
         if (option_flag & of_term_frequency) {
             has_tf_ = 1;
-            if (option_flag & of_tf_bitmap) {
-                has_tf_bitmap_ = 1;
-                has_tf_list_ = 0;
-            } else {
-                has_tf_bitmap_ = 0;
-                has_tf_list_ = 1;
-            }
+            has_tf_list_ = 1;
         } else {
             has_tf_ = 0;
             has_tf_list_ = 0;
-            has_tf_bitmap_ = 0;
         }
         short_list_vbyte_compress_ = 0;
         unused_ = 0;
@@ -36,11 +29,10 @@ public:
 
     bool HasTF() const { return has_tf_ == 1; }
     bool HasTfList() const { return has_tf_list_ == 1; }
-    bool HasTfBitmap() const { return has_tf_bitmap_ == 1; }
     bool HasDocPayload() const { return has_doc_payload_ == 1; }
     bool operator==(const DocListFormatOption &right) const {
-        return has_tf_ == right.has_tf_ && has_tf_list_ == right.has_tf_list_ && has_tf_bitmap_ == right.has_tf_bitmap_ &&
-               has_doc_payload_ == right.has_doc_payload_ && short_list_vbyte_compress_ == right.short_list_vbyte_compress_;
+        return has_tf_ == right.has_tf_ && has_tf_list_ == right.has_tf_list_ && has_doc_payload_ == right.has_doc_payload_ &&
+               short_list_vbyte_compress_ == right.short_list_vbyte_compress_;
     }
     bool IsShortListVbyteCompress() const { return short_list_vbyte_compress_ == 1; }
     void SetShortListVbyteCompress(bool flag) { short_list_vbyte_compress_ = flag ? 1 : 0; }
@@ -48,10 +40,9 @@ public:
 private:
     u8 has_tf_ : 1;
     u8 has_tf_list_ : 1;
-    u8 has_tf_bitmap_ : 1;
     u8 has_doc_payload_ : 1;
     u8 short_list_vbyte_compress_ : 1;
-    u8 unused_ : 3;
+    u8 unused_ : 4;
 };
 
 export class DocSkipListFormat : public PostingFields {

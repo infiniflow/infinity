@@ -26,7 +26,7 @@ public:
 
     void Reset();
 
-    TermMeta *GetTermMeta() const { return const_cast<TermMeta *>(&term_meta_); }
+    u32 GetDocFreq() const { return doc_freq_; }
 
     RowID SeekDoc(RowID docId);
 
@@ -101,7 +101,7 @@ private:
     SharedPtr<Vector<SegmentPosting>> segment_postings_;
     PostingFormatOption posting_option_;
     MemoryPool *session_pool_;
-    TermMeta term_meta_;
+    u32 doc_freq_ = 0;
     RowID last_doc_id_in_buffer_;
     RowID current_row_id_;
     docid_t *doc_buffer_cursor_;

@@ -26,9 +26,6 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
     posting_file_ = MakeShared<FileReader>(fs_, posting_file, 1024);
 
     doc_list_reader_ = MakeShared<ByteSliceReader>();
-    if (format_option.HasTfBitmap()) {
-        tf_bitmap_ = MakeShared<Bitmap>();
-    }
     if (format_option.HasPositionList()) {
         pos_list_reader_ = MakeShared<ByteSliceReader>();
     }
@@ -43,10 +40,9 @@ bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {
         return false;
     u32 total_len = 0;
     DecodeDocList();
-    DecodeTfBitmap();
     DecodePosList();
 
-    posting_decoder_->Init(&term_meta_, doc_list_reader_, pos_list_reader_, tf_bitmap_, total_len);
+    posting_decoder_->Init(&term_meta_, doc_list_reader_, pos_list_reader_, total_len);
     decoder = posting_decoder_.get();
     return true;
 }
@@ -61,20 +57,6 @@ void ColumnIndexIterator::DecodeDocList() {
     posting_file_->Seek(cursor);
     posting_file_->Read((char *)doc_list_slice_->data_, doc_list_slice_->size_);
     doc_list_reader_->Open(doc_list_slice_);
-}
-
-void ColumnIndexIterator::DecodeTfBitmap() {
-    u32 block_count = posting_file_->ReadVInt();
-    u32 pos_count = posting_file_->ReadVInt();
-
-    i64 cursor = posting_file_->GetFilePointer();
-    cursor += block_count * sizeof(u32);
-    u32 size_in_byte = Bitmap::GetDumpSize(pos_count);
-    u8 *data = new u8[size_in_byte];
-    posting_file_->Seek(cursor);
-    posting_file_->Read((char *)data, size_in_byte);
-    tf_bitmap_ = MakeShared<Bitmap>();
-    tf_bitmap_->MountWithoutRefreshSetCount(pos_count, (u32 *)data, false);
 }
 
 void ColumnIndexIterator::DecodePosList() {

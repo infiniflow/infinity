@@ -8,7 +8,6 @@ import buffered_byte_slice;
 import buffered_skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
-import position_bitmap_writer;
 import index_defines;
 
 export module doc_list_encoder;
@@ -76,7 +75,6 @@ private:
     tf_t total_tf_;
     df_t df_;
 
-    PositionBitmapWriter *tf_bitmap_writer_{nullptr};
     BufferedSkipListWriter *doc_skiplist_writer_{nullptr};
     MemoryPool *byte_slice_pool_{nullptr};
     friend class InMemDocListDecoderTest;
