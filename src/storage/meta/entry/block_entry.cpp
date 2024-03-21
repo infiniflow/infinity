@@ -221,12 +221,16 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
+        txn_id_ = txn_id;
         this->Commit(commit_ts);
     }
 
     auto &block_version = this->block_version_;
     if (block_version->created_.empty() || block_version->created_.back().create_ts_ != commit_ts) {
         block_version->created_.emplace_back(commit_ts, i32(this->row_count_));
+    }
+    for (auto &column : columns_) {
+        column->CommitColumn(txn_id, commit_ts);
     }
 }
 
@@ -300,6 +304,8 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts, bool check_commit) {
 }
 
 void BlockEntry::FlushForImport(TxnTimeStamp checkpoint_ts) { this->Flush(checkpoint_ts, false); }
+
+void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_.DeserializeFromString(block_filter_data); }
 
 void BlockEntry::Cleanup() {
     for (auto &block_column_entry : columns_) {
@@ -396,25 +402,11 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
     return base_dir;
 }
 
-void BlockEntry::UpdateBlockInfo(SizeT row_count, TxnTimeStamp max_row_ts, TxnTimeStamp check_point_ts, SizeT check_point_row_count) {
-    this->row_count_ = row_count;
-    this->max_row_ts_ = max_row_ts;
-    this->checkpoint_ts_ = check_point_ts;
-    this->checkpoint_row_count_ = check_point_row_count;
-}
-
-void BlockEntry::AddColumnReplay(std::function<UniquePtr<BlockColumnEntry>()> init_column,
-                                 std::function<void(BlockColumnEntry *)> update_column,
-                                 ColumnID column_id) {
-    if (columns_.size() == column_id) {
-        columns_.emplace_back(init_column());
-    } else {
-        if (columns_.size() < column_id) {
-            UnrecoverableError(fmt::format("BlockEntry::SetColumnReplay: column_id {} is out of range", column_id));
-        }
-        auto *column = columns_[column_id].get();
-        update_column(column);
+void BlockEntry::AddColumnReplay(std::function<UniquePtr<BlockColumnEntry>()> init_column, ColumnID column_id) {
+    if (column_id >= columns_.size()) {
+        columns_.resize(column_id + 1);
     }
+    columns_[column_id] = init_column();
 }
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {

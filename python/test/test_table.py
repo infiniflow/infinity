@@ -432,7 +432,6 @@ class TestTable:
         with pytest.raises(Exception, match="ERROR:3066, Invalid conflict type"):
             db_obj.create_table("test_table_with_different_invalid_options", {"c1": "int"}, invalid_option_array)
 
-
     # create/drop/show/get 1000 tables with 10000 columns with various column types.
     @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
@@ -670,7 +669,8 @@ class TestTable:
         # create table
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
             # commit task into processpool
-            futures = [executor.submit(db_obj.create_table("my_table", {"c1": "int"}, ConflictType.Error), i) for i in range(16)]
+            futures = [executor.submit(db_obj.create_table("my_table", {"c1": "int"}, ConflictType.Error), i) for i in
+                       range(16)]
             # wait all processes finished
             concurrent.futures.wait(futures)
 
@@ -798,3 +798,61 @@ class TestTable:
 
         values = {"c" + str(i): types for i in range(pow(2, 63) - 1)}
         db_obj.create_table("test_column_numbers", values, ConflictType.Error)
+
+    @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
+                                               ConflictType.Ignore,
+                                               ConflictType.Replace,
+                                               0,
+                                               1,
+                                               2,
+                                               pytest.param(1.1, marks=pytest.mark.xfail),
+                                               pytest.param("#@$@!%string", marks=pytest.mark.xfail),
+                                               pytest.param([], marks=pytest.mark.xfail),
+                                               pytest.param({}, marks=pytest.mark.xfail),
+                                               pytest.param((), marks=pytest.mark.xfail),
+                                               ])
+    def test_various_table_create_option(self, get_infinity_db, conflict_type):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_various_table_create_option", ConflictType.Ignore)
+        db_obj.create_table("test_various_table_create_option", {"c1": "int"}, conflict_type)
+
+    @pytest.mark.parametrize("conflict_type",
+                             [ConflictType.Error,
+                              ConflictType.Ignore,
+                              pytest.param(ConflictType.Replace,marks=pytest.mark.xfail(reason="ERROR:3066, Invalid conflict type")),
+                              0,
+                              1,
+                              pytest.param(2,marks=pytest.mark.xfail(reason="ERROR:3066, Invalid conflict type")),
+                              pytest.param(1.1, marks=pytest.mark.xfail(reason="ERROR:3066, Invalid conflict type")),
+                              pytest.param("#@$@!%string", marks=pytest.mark.xfail),
+                              pytest.param([], marks=pytest.mark.xfail),
+                              pytest.param({}, marks=pytest.mark.xfail),
+                              pytest.param((), marks=pytest.mark.xfail),
+                              ])
+    def test_various_table_drop_option(self, get_infinity_db, conflict_type):
+        db_obj = get_infinity_db
+        db_obj.create_table("test_various_table_drop_option", {"c1": "int"}, ConflictType.Ignore)
+        db_obj.drop_table("test_various_table_drop_option", conflict_type)
+
+    def test_create_duplicated_table_with_ignore_option(self, get_infinity_db):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_create_duplicated_table_with_ignore_option", ConflictType.Ignore)
+
+        for i in range(100):
+            db_obj.create_table("test_create_duplicated_table_with_ignore_option", {"c1": "int"}, ConflictType.Ignore)
+
+    def test_create_duplicated_table_with_error_option(self, get_infinity_db):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_create_duplicated_table_with_error_option", ConflictType.Ignore)
+
+        with pytest.raises(Exception, match="ERROR:3017*"):
+            for i in range(100):
+                db_obj.create_table("test_create_duplicated_table_with_error_option", {"c1": "int"}, ConflictType.Error)
+
+    def test_create_duplicated_table_with_replace_option(self, get_infinity_db):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_create_duplicated_table_with_replace_option", ConflictType.Ignore)
+
+        with pytest.raises(Exception, match="ERROR:3017*"):
+            for i in range(100):
+                db_obj.create_table("test_create_duplicated_table_with_replace_option", {"c" + str(i): "int"}, ConflictType.Replace)
