@@ -37,6 +37,7 @@ class InfinityServiceIf {
   virtual void UploadFileChunk(UploadResponse& _return, const FileChunk& request) = 0;
   virtual void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) = 0;
   virtual void ListTable(ListTableResponse& _return, const ListTableRequest& request) = 0;
+  virtual void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) = 0;
   virtual void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) = 0;
   virtual void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) = 0;
   virtual void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) = 0;
@@ -119,6 +120,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void ListTable(ListTableResponse& /* _return */, const ListTableRequest& /* request */) override {
+    return;
+  }
+  void ListIndex(ListIndexResponse& /* _return */, const ListIndexRequest& /* request */) override {
     return;
   }
   void ShowVariable(SelectResponse& /* _return */, const ShowVariableRequest& /* request */) override {
@@ -1701,6 +1705,110 @@ class InfinityService_ListTable_presult {
 
 };
 
+typedef struct _InfinityService_ListIndex_args__isset {
+  _InfinityService_ListIndex_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_ListIndex_args__isset;
+
+class InfinityService_ListIndex_args {
+ public:
+
+  InfinityService_ListIndex_args(const InfinityService_ListIndex_args&);
+  InfinityService_ListIndex_args& operator=(const InfinityService_ListIndex_args&);
+  InfinityService_ListIndex_args() noexcept {
+  }
+
+  virtual ~InfinityService_ListIndex_args() noexcept;
+  ListIndexRequest request;
+
+  _InfinityService_ListIndex_args__isset __isset;
+
+  void __set_request(const ListIndexRequest& val);
+
+  bool operator == (const InfinityService_ListIndex_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ListIndex_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ListIndex_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_ListIndex_pargs {
+ public:
+
+
+  virtual ~InfinityService_ListIndex_pargs() noexcept;
+  const ListIndexRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ListIndex_result__isset {
+  _InfinityService_ListIndex_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ListIndex_result__isset;
+
+class InfinityService_ListIndex_result {
+ public:
+
+  InfinityService_ListIndex_result(const InfinityService_ListIndex_result&);
+  InfinityService_ListIndex_result& operator=(const InfinityService_ListIndex_result&);
+  InfinityService_ListIndex_result() noexcept {
+  }
+
+  virtual ~InfinityService_ListIndex_result() noexcept;
+  ListIndexResponse success;
+
+  _InfinityService_ListIndex_result__isset __isset;
+
+  void __set_success(const ListIndexResponse& val);
+
+  bool operator == (const InfinityService_ListIndex_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ListIndex_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ListIndex_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ListIndex_presult__isset {
+  _InfinityService_ListIndex_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ListIndex_presult__isset;
+
+class InfinityService_ListIndex_presult {
+ public:
+
+
+  virtual ~InfinityService_ListIndex_presult() noexcept;
+  ListIndexResponse* success;
+
+  _InfinityService_ListIndex_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _InfinityService_ShowVariable_args__isset {
   _InfinityService_ShowVariable_args__isset() : request(false) {}
   bool request :1;
@@ -2811,6 +2919,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void ListTable(ListTableResponse& _return, const ListTableRequest& request) override;
   void send_ListTable(const ListTableRequest& request);
   void recv_ListTable(ListTableResponse& _return);
+  void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override;
+  void send_ListIndex(const ListIndexRequest& request);
+  void recv_ListIndex(ListIndexResponse& _return);
   void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
   void send_ShowVariable(const ShowVariableRequest& request);
   void recv_ShowVariable(SelectResponse& _return);
@@ -2871,6 +2982,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_UploadFileChunk(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ListIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowVariable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -2899,6 +3011,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["UploadFileChunk"] = &InfinityServiceProcessor::process_UploadFileChunk;
     processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
     processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
+    processMap_["ListIndex"] = &InfinityServiceProcessor::process_ListIndex;
     processMap_["ShowVariable"] = &InfinityServiceProcessor::process_ShowVariable;
     processMap_["ShowTable"] = &InfinityServiceProcessor::process_ShowTable;
     processMap_["ShowColumns"] = &InfinityServiceProcessor::process_ShowColumns;
@@ -3087,6 +3200,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
+  void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->ListIndex(_return, request);
+    }
+    ifaces_[i]->ListIndex(_return, request);
+    return;
+  }
+
   void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
@@ -3264,6 +3387,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void ListTable(ListTableResponse& _return, const ListTableRequest& request) override;
   int32_t send_ListTable(const ListTableRequest& request);
   void recv_ListTable(ListTableResponse& _return, const int32_t seqid);
+  void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override;
+  int32_t send_ListIndex(const ListIndexRequest& request);
+  void recv_ListIndex(ListIndexResponse& _return, const int32_t seqid);
   void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
   int32_t send_ShowVariable(const ShowVariableRequest& request);
   void recv_ShowVariable(SelectResponse& _return, const int32_t seqid);
