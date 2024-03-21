@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// #include "parser/statement/extra/create_index_info.h"
-// #include "parser/statement/extra/extra_ddl_info.h"
-
-// #include "parser/statement/statement_common.h"
-// #include "parser/type/complex/row_id.h"
 #include "unit_test/base_test.h"
 
 import statement_common;
@@ -509,7 +504,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
 
 TEST_F(CatalogDeltaReplayTest, replay_index) {
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-    const String config_idx_path = std::string(test_data_path()) + "/config/test_catalog_delta.toml";
+    const String config_idx_path = std::string(test_data_path()) + "/config/test_catalog_delta_idx.toml";
     auto db_name = std::make_shared<std::string>("default");
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -539,10 +534,6 @@ TEST_F(CatalogDeltaReplayTest, replay_index) {
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-
-            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-            EXPECT_TRUE(status.ok());
-
             // insert data
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -550,15 +541,18 @@ TEST_F(CatalogDeltaReplayTest, replay_index) {
                 column_vectors.push_back(MakeShared<ColumnVector>(data_type));
                 column_vectors.back()->Initialize();
             }
-            int v1 = 1;
-            column_vectors[0]->AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
-            std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-            column_vectors[1]->AppendByStringView(v2, ',');
-
+            {
+                int v1 = 1;
+                column_vectors[0]->AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
+            }
+            {
+                std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
+                column_vectors[1]->AppendByStringView(v2, ',');
+            }
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
             // append datas
-            status = txn->Append(*db_name, *table_name, data_block);
+            auto status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
@@ -567,16 +561,69 @@ TEST_F(CatalogDeltaReplayTest, replay_index) {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
 
-            auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
-            EXPECT_TRUE(status1.ok());
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
 
-            InitParameter initparamter{"", ""};
-            IndexFullText ift(std::make_shared<String>("fulltext_test_idx"), config_idx_path, Vector<String>{"1"}, nullptr, true);
+            Vector<String> idx_cols{"col1"};
+            String analyse{};
+
+            IndexFullText ift(std::make_shared<String>("ft_idx"), config_idx_path, idx_cols, analyse, true);
             auto [table_idx_entry, status2] = txn->CreateIndexDef(table_entry, std::make_shared<IndexBase>(ift), infinity::ConflictType::kError);
             EXPECT_TRUE(status2.ok());
+
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
+
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
+    }
+}
+
+TEST_F(CatalogDeltaReplayTest, replay_compact_rollback) {
+    auto table_name = std::make_shared<std::string>("tb1");
+    std::shared_ptr<std::string> config_path = nullptr;
+    infinity::InfinityContext::instance().Init(config_path);
+
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    BufferManager *buffer_manager = storage->buffer_manager();
+    TxnManager *txn_mgr = storage->txn_manager();
+
+    Vector<SharedPtr<ColumnDef>> columns;
+    {
+        i64 column_id = 0;
+        {
+            HashSet<ConstraintType> constraints;
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+            columns.emplace_back(column_def_ptr);
+        }
+    }
+    {
+        // create table
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+
+        Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+
+        txn_mgr->CommitTxn(txn);
+    }
+    Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
+    this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
+
+    {
+        // begin compact
+        auto txn4 = txn_mgr->CreateTxn();
+        txn4->Begin();
+
+        auto [table_entry, status] = txn4->GetTableByName("default", table_name);
+        EXPECT_NE(table_entry, nullptr);
+
+        {
+            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
+            compact_task->Execute();
+        }
+        txn_mgr->CommitTxn(txn4);
     }
 }

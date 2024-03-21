@@ -135,6 +135,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             }
             txn_mgr->CommitTxn(txn4);
         }
+
         {
             auto txn5 = txn_mgr->CreateTxn();
             txn5->Begin();
