@@ -109,6 +109,17 @@ class ThriftInfinityClient:
                                                       index_name=index_name,
                                                       drop_option=DropOption(conflict_type=conflict_type)))
 
+    def show_index(self, db_name: str, table_name: str, index_name: str):
+        return self.client.ShowIndex(ShowIndexRequest(session_id=self.session_id,
+                                                      db_name=db_name,
+                                                      table_name=table_name,
+                                                      index_name=index_name))
+
+    def list_indexes(self, db_name: str, table_name: str):
+        return self.client.ListIndex(ListIndexRequest(session_id=self.session_id,
+                                                      db_name=db_name,
+                                                      table_name=table_name))
+
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
         return self.client.Insert(InsertRequest(session_id=self.session_id,
                                                 db_name=db_name,

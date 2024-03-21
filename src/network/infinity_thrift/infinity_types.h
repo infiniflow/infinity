@@ -273,6 +273,10 @@ class ListTableRequest;
 
 class ListTableResponse;
 
+class ListIndexRequest;
+
+class ListIndexResponse;
+
 class ShowDatabaseRequest;
 
 class ShowDatabaseResponse;
@@ -2194,6 +2198,120 @@ void swap(ListTableResponse &a, ListTableResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const ListTableResponse& obj);
 
+typedef struct _ListIndexRequest__isset {
+  _ListIndexRequest__isset() : db_name(false), table_name(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool session_id :1;
+} _ListIndexRequest__isset;
+
+class ListIndexRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ListIndexRequest(const ListIndexRequest&);
+  ListIndexRequest& operator=(const ListIndexRequest&);
+  ListIndexRequest() noexcept
+                   : db_name(),
+                     table_name(),
+                     session_id(0) {
+  }
+
+  virtual ~ListIndexRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  int64_t session_id;
+
+  _ListIndexRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const ListIndexRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ListIndexRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ListIndexRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ListIndexRequest &a, ListIndexRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ListIndexRequest& obj);
+
+typedef struct _ListIndexResponse__isset {
+  _ListIndexResponse__isset() : error_code(false), error_msg(false), index_names(true) {}
+  bool error_code :1;
+  bool error_msg :1;
+  bool index_names :1;
+} _ListIndexResponse__isset;
+
+class ListIndexResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ListIndexResponse(const ListIndexResponse&);
+  ListIndexResponse& operator=(const ListIndexResponse&);
+  ListIndexResponse() noexcept
+                    : error_code(0),
+                      error_msg() {
+
+  }
+
+  virtual ~ListIndexResponse() noexcept;
+  int64_t error_code;
+  std::string error_msg;
+  std::vector<std::string>  index_names;
+
+  _ListIndexResponse__isset __isset;
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_index_names(const std::vector<std::string> & val);
+
+  bool operator == (const ListIndexResponse & rhs) const
+  {
+    if (!(error_code == rhs.error_code))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(index_names == rhs.index_names))
+      return false;
+    return true;
+  }
+  bool operator != (const ListIndexResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ListIndexResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ListIndexResponse &a, ListIndexResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ListIndexResponse& obj);
+
 typedef struct _ShowDatabaseRequest__isset {
   _ShowDatabaseRequest__isset() : db_name(false), session_id(false) {}
   bool db_name :1;
@@ -2851,11 +2969,14 @@ void swap(ShowIndexRequest &a, ShowIndexRequest &b);
 std::ostream& operator<<(std::ostream& out, const ShowIndexRequest& obj);
 
 typedef struct _ShowIndexResponse__isset {
-  _ShowIndexResponse__isset() : db_name(false), table_name(false), index_name(false), store_dir(false) {}
+  _ShowIndexResponse__isset() : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), store_dir(false), index_info(false) {}
+  bool error_code :1;
+  bool error_msg :1;
   bool db_name :1;
   bool table_name :1;
   bool index_name :1;
   bool store_dir :1;
+  bool index_info :1;
 } _ShowIndexResponse__isset;
 
 class ShowIndexResponse : public virtual ::apache::thrift::TBase {
@@ -2864,19 +2985,29 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
   ShowIndexResponse(const ShowIndexResponse&);
   ShowIndexResponse& operator=(const ShowIndexResponse&);
   ShowIndexResponse() noexcept
-                    : db_name(),
+                    : error_code(0),
+                      error_msg(),
+                      db_name(),
                       table_name(),
                       index_name(),
-                      store_dir() {
+                      store_dir(),
+                      index_info() {
   }
 
   virtual ~ShowIndexResponse() noexcept;
+  int64_t error_code;
+  std::string error_msg;
   std::string db_name;
   std::string table_name;
   std::string index_name;
   std::string store_dir;
+  std::string index_info;
 
   _ShowIndexResponse__isset __isset;
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
 
   void __set_db_name(const std::string& val);
 
@@ -2886,8 +3017,14 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
 
   void __set_store_dir(const std::string& val);
 
+  void __set_index_info(const std::string& val);
+
   bool operator == (const ShowIndexResponse & rhs) const
   {
+    if (!(error_code == rhs.error_code))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
     if (!(db_name == rhs.db_name))
       return false;
     if (!(table_name == rhs.table_name))
@@ -2895,6 +3032,8 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
     if (!(index_name == rhs.index_name))
       return false;
     if (!(store_dir == rhs.store_dir))
+      return false;
+    if (!(index_info == rhs.index_info))
       return false;
     return true;
   }
