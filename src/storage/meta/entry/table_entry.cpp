@@ -648,7 +648,10 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
         }
-        table_entry->unsealed_segment_ = table_entry->segment_map_.at(unsealed_id);
+        // here the unsealed_segment_ may be nullptr
+        if (table_entry->segment_map_.find(unsealed_id) != table_entry->segment_map_.end()) {
+            table_entry->unsealed_segment_ = table_entry->segment_map_.at(unsealed_id);
+        }
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
