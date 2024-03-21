@@ -78,7 +78,7 @@ jobs:
 
       - name: Check infinity recovery after pysdk test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug_restart.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Check infinity recovery after sqllogictest
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug_restart.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
@@ -110,6 +110,10 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat debug.log 2>/dev/null || true
+
+      - name: Collect infinity debug restart output
+        if: ${{ !cancelled() }}
+        run: cat debug_restart.log 2>/dev/null || true
 
   release_tests:
     name: release_tests and benchmark
@@ -171,7 +175,7 @@ jobs:
 
       - name: Check infinity recovery after pysdk test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/infinity > release.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/infinity > release_restart.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
@@ -192,7 +196,7 @@ jobs:
 
       - name: Check infinity recovery after sqllogictest
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/infinity > release.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/infinity > release_restart.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
@@ -202,6 +206,10 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat release.log 2>/dev/null || true
+
+      - name: Collect infinity release restart output
+        if: ${{ !cancelled() }}
+        run: cat release_restart.log 2>/dev/null || true
 
       - name: Prepare sift dataset
         if: ${{ !cancelled() && !failure() }}
