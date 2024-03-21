@@ -12,9 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "parser/type/complex/row_id.h"
+// #include "parser/statement/extra/create_index_info.h"
+// #include "parser/statement/extra/extra_ddl_info.h"
+
+// #include "parser/statement/statement_common.h"
+// #include "parser/type/complex/row_id.h"
 #include "unit_test/base_test.h"
 
+import statement_common;
+import internal_types;
 import stl;
 import infinity_context;
 import storage;
@@ -43,6 +49,9 @@ import index_secondary;
 import data_block;
 import query_context;
 import txn;
+import index_base;
+import index_full_text;
+import fulltext_index_entry;
 
 using namespace infinity;
 
@@ -92,11 +101,12 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
+            // test rollback db
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-
+            // create table3
             txn->CreateDatabase(*db_name3, ConflictType::kError);
-
+            // ctx rollback,db3 deleted
             txn_mgr->RollBackTxn(txn);
         }
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
@@ -176,7 +186,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
             txn->Begin();
 
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
-
+            // txn rollback,tb3 deleted
             txn_mgr->RollBackTxn(txn);
         }
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
@@ -492,6 +502,80 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             EXPECT_TRUE(status.ok());
         }
 
+        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        infinity::InfinityContext::instance().UnInit();
+    }
+}
+
+TEST_F(CatalogDeltaReplayTest, replay_index) {
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
+    const String config_idx_path = std::string(test_data_path()) + "/config/test_catalog_delta.toml";
+    auto db_name = std::make_shared<std::string>("default");
+    auto column_def1 =
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+    auto column_def2 =
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+
+    std::shared_ptr<std::string> table_entry_dir1;
+    {
+        // create table
+        InfinityContext::instance().Init(config_path);
+        Storage *storage = InfinityContext::instance().storage();
+
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp last_commit_ts = 0;
+        {
+            // create table txn start
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            // create table
+            txn->CreateTable(*db_name, table_def, ConflictType::kError);
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            // insert data
+            Vector<SharedPtr<ColumnVector>> column_vectors;
+            for (SizeT i = 0; i < table_def->columns().size(); ++i) {
+                SharedPtr<DataType> data_type = table_def->columns()[i]->type();
+                column_vectors.push_back(MakeShared<ColumnVector>(data_type));
+                column_vectors.back()->Initialize();
+            }
+            int v1 = 1;
+            column_vectors[0]->AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
+            std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
+            column_vectors[1]->AppendByStringView(v2, ',');
+
+            auto data_block = DataBlock::Make();
+            data_block->Init(column_vectors);
+            // append datas
+            status = txn->Append(*db_name, *table_name, data_block);
+            ASSERT_TRUE(status.ok());
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+        {
+            // create table index
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status1.ok());
+
+            InitParameter initparamter{"", ""};
+            IndexFullText ift(std::make_shared<String>("fulltext_test_idx"), config_idx_path, Vector<String>{"1"}, nullptr, true);
+            auto [table_idx_entry, status2] = txn->CreateIndexDef(table_entry, std::make_shared<IndexBase>(ift), infinity::ConflictType::kError);
+            EXPECT_TRUE(status2.ok());
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
