@@ -66,7 +66,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug1.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
       - name: pysdk debug version
         if: ${{ !cancelled() && !failure() }}
@@ -78,7 +78,7 @@ jobs:
 
       - name: Check infinity recovery after pysdk test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug2.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
@@ -88,7 +88,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug1.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
       - name: sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Check infinity recovery after sqllogictest
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug2.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
@@ -109,7 +109,7 @@ jobs:
       - name: Collect infinity debug output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: cat debug1.log 2>/dev/null || true && cat debug2.log 2>/dev/null || true
+        run: cat debug.log 2>/dev/null || true
 
   release_tests:
     name: release_tests and benchmark
