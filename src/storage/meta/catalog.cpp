@@ -405,6 +405,7 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["current_dir"] = *this->current_dir_;
         json_res["next_txn_id"] = this->next_txn_id_;
+        json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
         json_res["catalog_version"] = this->catalog_version_;
         databases.reserve(this->db_meta_map().size());
         for (auto &db_meta : this->db_meta_map()) {
@@ -482,7 +483,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
         auto txn_id = op->txn_id();
         auto begin_ts = op->begin_ts();
         auto is_delete = op->is_delete();
-        if (txn_id < catalog->next_txn_id_) {
+        if (op->commit_ts_ < catalog->full_ckp_commit_ts_) {
             // Ignore the old txn
             continue;
         }
@@ -795,6 +796,7 @@ void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buf
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
     catalog = MakeUnique<Catalog>(current_dir);
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
+    catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     catalog->catalog_version_ = catalog_json["catalog_version"];
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
@@ -809,6 +811,7 @@ UniquePtr<String> Catalog::SaveFullCatalog(const String &catalog_dir, TxnTimeSta
     String catalog_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.json", catalog_dir, max_commit_ts));
 
     // Serialize catalog to string
+    full_ckp_commit_ts_ = max_commit_ts;
     nlohmann::json catalog_json = Serialize(max_commit_ts, true);
     String catalog_str = catalog_json.dump();
 

@@ -265,6 +265,7 @@ public:
     MetaMap<DBMeta> db_meta_map_{};
 
     TransactionID next_txn_id_{};
+    TxnTimeStamp full_ckp_commit_ts_{};
     u64 catalog_version_{}; // TODO seems useless
 
     // Currently, these function or function set can't be changed and also will not be persistent.
