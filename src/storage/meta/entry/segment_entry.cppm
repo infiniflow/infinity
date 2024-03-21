@@ -83,18 +83,7 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    // replay
-    //  Used in catalog delta operation replay, we may need to update the info of segment
-    void UpdateSegmentInfo(SegmentStatus status,
-                           SizeT row_count,
-                           TxnTimeStamp min_row_ts,
-                           TxnTimeStamp max_row_ts,
-                           TxnTimeStamp commit_ts,
-                           TxnTimeStamp begin_ts,
-                           TransactionID txn_id);
-
-    void AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, std::function<void(BlockEntry *)> &&update_block, BlockID block_id);
-    //
+    void AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, BlockID block_id);
 
     void SetSealed();
 
@@ -134,9 +123,7 @@ public:
 
     const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
 
-    Vector<Pair<BlockID, String>> GetBlockFilterBinaryDataVector() const;
-
-    void LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data);
+    void LoadFilterBinaryData(const String &segment_filter_data);
 
 public:
     // Const getter

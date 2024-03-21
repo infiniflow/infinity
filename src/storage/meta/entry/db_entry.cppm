@@ -87,22 +87,18 @@ private:
     DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
-    
-    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String& table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
     // replay
     void CreateTableReplay(const SharedPtr<String> &table_name,
                            std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                           std::function<void(TableEntry *)> &&update_entry,
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts);
 
-    void DropTableReplay(const String &table_name,
-                         std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                         TransactionID txn_id,
-                         TxnTimeStamp begin_ts);
+    void DropTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
     //
@@ -110,7 +106,6 @@ private:
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
-
 
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));

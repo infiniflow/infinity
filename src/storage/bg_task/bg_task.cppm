@@ -25,10 +25,8 @@ export module bg_task;
 namespace infinity {
 
 export enum class BGTaskType {
-    kTryCheckpoint,   // Periodically triggered by timer
     kForceCheckpoint, // Manually triggered by PhysicalFlush
     kStopProcessor,
-    kCatalogDeltaOpsMerge, // Merge
     kCompactSegments,
     kCleanup,
     kUpdateSegmentBloomFilterData,
@@ -75,14 +73,6 @@ export struct StopProcessorTask final : public BGTask {
     String ToString() const final { return "Stop Task"; }
 };
 
-export struct TryCheckpointTask final : public BGTask {
-    explicit TryCheckpointTask(bool async) : BGTask(BGTaskType::kTryCheckpoint, async) {}
-
-    ~TryCheckpointTask() = default;
-
-    String ToString() const final { return "Checkpoint Task"; }
-};
-
 export struct ForceCheckpointTask final : public BGTask {
     explicit ForceCheckpointTask(Txn *txn) : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn) {}
     explicit ForceCheckpointTask(Txn *txn, bool is_full_checkpoint)
@@ -94,19 +84,6 @@ export struct ForceCheckpointTask final : public BGTask {
 
     Txn *txn_{};
     bool is_full_checkpoint_{true};
-};
-
-export struct CatalogDeltaOpsMergeTask final : public BGTask {
-
-    explicit CatalogDeltaOpsMergeTask(UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry, Catalog *catalog)
-        : BGTask(BGTaskType::kCatalogDeltaOpsMerge, true), local_catalog_delta_entry_(std::move(local_catalog_delta_entry)), catalog_(catalog) {}
-
-    ~CatalogDeltaOpsMergeTask() = default;
-
-    String ToString() const final { return "Catalog delta operation merge task"; }
-
-    UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry_{};
-    Catalog *catalog_{};
 };
 
 } // namespace infinity
