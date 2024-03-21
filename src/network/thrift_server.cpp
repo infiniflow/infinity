@@ -1097,7 +1097,74 @@ public:
         ProcessQueryResult(response, result);
     }
 
-    void ShowIndex(infinity_thrift_rpc::ShowIndexResponse &_return, const infinity_thrift_rpc::ShowIndexRequest &request) final {}
+    void ListIndex(infinity_thrift_rpc::ListIndexResponse &response, const infinity_thrift_rpc::ListIndexRequest &request) final {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto result = infinity->ListTableIndexes(request.db_name, request.table_name);
+        if (result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            for (int i = 0; i < row_count; ++i) {
+                Value value = data_block->GetValue(0, i);
+                const String &index_name = value.GetVarchar();
+                response.index_names.emplace_back(index_name);
+            }
+            response.__set_error_code((i64)(result.ErrorCode()));
+        } else {
+            ProcessQueryResult(response, result);
+        }
+    }
+
+    void ShowIndex(infinity_thrift_rpc::ShowIndexResponse &response, const infinity_thrift_rpc::ShowIndexRequest &request) final {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto result = infinity->ShowIndex(request.db_name, request.table_name, request.index_name);
+
+        if (result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            if (row_count != 6) {
+                UnrecoverableError("ShowIndex: query result is invalid.");
+            }
+
+            {
+                Value value = data_block->GetValue(1, 0);
+                response.db_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 1);
+                response.table_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 2);
+                response.index_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 3);
+                response.index_info = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 4);
+                response.store_dir = value.GetVarchar();
+            }
+
+            response.__set_error_code((i64)(result.ErrorCode()));
+        } else {
+            ProcessQueryResult(response, result);
+        }
+    }
 
 private:
     std::mutex infinity_session_map_mutex_{};
@@ -1769,6 +1836,14 @@ private:
         }
     }
 
+    static void ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
     static void ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(status.code()));
         if (!status.ok()) {
@@ -1787,6 +1862,14 @@ private:
     }
 
     static void ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
+    static void ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(status.code()));
         if (!status.ok()) {
             response.__set_error_msg(status.message());
@@ -1831,6 +1914,15 @@ private:
     }
 
     static void
+    ProcessQueryResult(infinity_thrift_rpc::ListIndexResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
     ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(result.ErrorCode()));
         if (!result.IsOk()) {
@@ -1841,6 +1933,15 @@ private:
 
     static void
     ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowIndexResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(result.ErrorCode()));
         if (!result.IsOk()) {
             response.__set_error_msg(result.ErrorStr());
