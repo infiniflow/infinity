@@ -709,7 +709,6 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
 
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
-    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(segment_entry.get(), storage_->buffer_manager(), commit_ts);
 
     table_entry->WalReplaySegment(segment_entry);
 }
