@@ -111,15 +111,9 @@ void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
     }
 }
 
-void ColumnInverter::GetTermListLength(ColumnLengthPopulater populater) const {
-    if (populater) {
-        u32 row_count = terms_per_doc_.size();
-        Vector<u32> lens(row_count);
-        for (SizeT i = 0; i < row_count; i++) {
-            const Pair<u32, UniquePtr<TermList>> &doc_termlist = terms_per_doc_[i];
-            lens[i] = doc_termlist.second->size();
-        }
-        populater(begin_doc_id_, lens);
+void ColumnInverter::GetTermListLength(u32 *term_list_length_ptr) const {
+    for (const auto &[_, term_list] : terms_per_doc_) {
+        *(term_list_length_ptr++) = term_list->size();
     }
 }
 

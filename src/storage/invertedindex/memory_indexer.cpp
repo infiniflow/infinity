@@ -51,6 +51,7 @@ import fst;
 import posting_list_format;
 import dict_reader;
 import file_reader;
+import column_length_io;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -81,7 +82,12 @@ MemoryIndexer::~MemoryIndexer() {
     Reset();
 }
 
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, ColumnLengthPopulater populater, bool offline) {
+void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
+                           u32 row_offset,
+                           u32 row_count,
+                           SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
+                           RowID job_start_row_id,
+                           bool offline) {
     if (is_spilled_)
         Load();
 
@@ -94,25 +100,29 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         doc_count = doc_count_;
         doc_count_ += row_count;
     }
+    u32 offset_in_index = job_start_row_id - base_row_id_;
+    auto update_length_job = MakeShared<FullTextColumnLengthUpdateJob>(std::move(fulltext_length_handler), row_count, offset_in_index);
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     if (offline) {
-        auto func = [this, task, provider, populater](int id) {
+        auto func = [this, task, provider, length_handler = std::move(update_length_job)](int id) {
             auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            inverter->GetTermListLength(populater);
+            inverter->GetTermListLength(length_handler->GetColumnLengthArray());
+            length_handler->DumpToFile();
             inverter->SortForOfflineDump();
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
-        thread_pool_.push(func);
+        thread_pool_.push(std::move(func));
     } else {
-        auto func = [this, task, provider, populater](int id) {
+        auto func = [this, task, provider, length_handler = std::move(update_length_job)](int id) {
             auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            inverter->GetTermListLength(populater);
+            inverter->GetTermListLength(length_handler->GetColumnLengthArray());
+            length_handler->DumpToFile();
             this->ring_inverted_.Put(task->task_seq_, inverter);
         };
-        thread_pool_.push(func);
+        thread_pool_.push(std::move(func));
     }
 }
 

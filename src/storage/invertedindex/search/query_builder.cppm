@@ -42,23 +42,16 @@ public:
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
-    void LoadScorerColumnLength() { scorer_->LoadColumnLength(table_entry_, txn_id_, begin_ts_); }
+    void LoadScorerColumnLength(RowID first_doc_id) { scorer_.LoadColumnLength(first_doc_id, index_reader_); }
 
-    float Score(RowID doc_id) {
-        if (SegmentID segment_id = doc_id.segment_id_; segment_id != target_segment_id_) {
-            target_segment_id_ = segment_id;
-            scorer_->UpdateTargetSegment(segment_id);
-        }
-        return scorer_->Score(doc_id);
-    }
+    inline float Score(RowID doc_id) { return scorer_.Score(doc_id); }
 
 private:
     TransactionID txn_id_{};
     TxnTimeStamp begin_ts_{};
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
-    UniquePtr<Scorer> scorer_;
-    SegmentID target_segment_id_ = INVALID_SEGMENT_ID;
+    Scorer scorer_;
     Map<String, String> column2analyzer_;
 };
 } // namespace infinity
