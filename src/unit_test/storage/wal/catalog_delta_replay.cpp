@@ -437,18 +437,15 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
 
     std::shared_ptr<std::string> table_entry_dir1;
     {
-        // init storage & txn manager
         InfinityContext::instance().Init(config_path);
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
         {
-            // txn start
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
 
-            // create table
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
@@ -463,7 +460,6 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
-            // insert data
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
                 SharedPtr<DataType> data_type = table_def->columns()[i]->type();
@@ -477,7 +473,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
 
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
-            // append datas
+
             status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
@@ -488,7 +484,6 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
-            // test: delete last row
             auto del_row = infinity::RowID(uint64_t(table_def->columns().size() - 1));
 
             Vector<infinity::RowID> del_row_ids{};
@@ -501,3 +496,4 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
         infinity::InfinityContext::instance().UnInit();
     }
 }
+
