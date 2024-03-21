@@ -80,7 +80,6 @@ TableIndexEntry *TableIndexMeta::CreateEntryReplay(
     TxnTimeStamp begin_ts) {
     auto [entry, status] =
         index_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, index_name_, txn_id, begin_ts); },
-                                         [](TableIndexEntry *) { UnrecoverableError("TableIndexEntry is not updatable now"); },
                                          txn_id,
                                          begin_ts);
     if (!status.ok()) {

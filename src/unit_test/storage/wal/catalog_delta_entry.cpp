@@ -58,7 +58,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     auto index_dir = MakeShared<String>("data/db_test/table_test/0/0/index_test");
     auto index_base = IndexSecondary::Make(index_name, "file_name", Vector<String>{"col1", "col2"});
     String segment_filter_binary_data = "abcde";
-    auto block_filter_binary_data = Vector<Pair<BlockID, String>>{{0, "abcde"}, {1, "fghij"}};
+    String block_filter_binary_data = "abcde";
 
     UniquePtr<char[]> buffer;
     i32 buffer_size = 0;
@@ -66,42 +66,93 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     {
         catalog_delta_entry1 = std::make_unique<CatalogDeltaEntry>();
 
-        auto op0 = MakeUnique<AddDBEntryOp>(0, false, 0, 0, db_name, db_dir);
-        catalog_delta_entry1->operations().push_back(std::move(op0));
-
-        auto op1 = MakeUnique<AddTableEntryOp>(1, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0, 0);
-        catalog_delta_entry1->operations().push_back(std::move(op1));
-
-        auto op2 = MakeUnique<AddSegmentEntryOp>();
-        op2->db_name_ = db_name;
-        op2->table_name_ = table_name;
-        op2->segment_id_ = segment_id;
-        op2->status_ = SegmentStatus::kUnsealed;
-        op2->column_count_ = op2->row_count_ = op2->actual_row_count_ = op2->row_capacity_ = 0;
-        op2->min_row_ts_ = op2->max_row_ts_ = op2->deprecate_ts_ = 0;
-        op2->set_sealed_ = false;
-        catalog_delta_entry1->operations().push_back(std::move(op2));
-
-        auto op3 = MakeUnique<AddBlockEntryOp>();
-        op3->db_name_ = db_name;
-        op3->table_name_ = table_name;
-        op3->segment_id_ = segment_id;
-        op3->block_id_ = block_id;
-        op3->row_capacity_ = op3->row_count_ = op3->min_row_ts_ = op3->max_row_ts_ = op3->checkpoint_ts_ = op3->checkpoint_row_count_ = 0;
-        op3->set_sealed_ = false;
-        catalog_delta_entry1->operations().push_back(std::move(op3));
-
-        auto op4 = MakeUnique<AddColumnEntryOp>(4, false, 0, 0, db_name, table_name, segment_id, block_id, column_id, 0);
-        catalog_delta_entry1->operations().push_back(std::move(op4));
-
-        auto op5 = MakeUnique<AddTableIndexEntryOp>(5, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
-        catalog_delta_entry1->operations().push_back(std::move(op5));
-
-        auto op6 = MakeUnique<AddFulltextIndexEntryOp>(6, false, 0, 0, db_name, table_name, index_name);
-        catalog_delta_entry1->operations().push_back(std::move(op6));
-
-        auto op7 = MakeUnique<AddSegmentIndexEntryOp>(7, false, 0, 0, db_name, table_name, index_name, segment_id, 0, 14);
-        catalog_delta_entry1->operations().push_back(std::move(op7));
+        {
+            auto op = MakeUnique<AddDBEntryOp>();
+            op->db_name_ = db_name;
+            op->db_entry_dir_ = db_dir;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddTableEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->table_entry_dir_ = table_entry_dir;
+            op->column_defs_ = column_defs;
+            op->row_count_ = 0;
+            op->unsealed_id_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddSegmentEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->segment_id_ = segment_id;
+            op->status_ = SegmentStatus::kUnsealed;
+            op->column_count_ = op->row_count_ = op->actual_row_count_ = op->row_capacity_ = 0;
+            op->min_row_ts_ = op->max_row_ts_ = op->deprecate_ts_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddBlockEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->segment_id_ = segment_id;
+            op->block_id_ = block_id;
+            op->row_capacity_ = op->row_count_ = op->min_row_ts_ = op->max_row_ts_ = op->checkpoint_ts_ = op->checkpoint_row_count_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddColumnEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->segment_id_ = segment_id;
+            op->block_id_ = block_id;
+            op->column_id_ = column_id;
+            op->next_outline_idx_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddTableIndexEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->index_name_ = index_name;
+            op->index_dir_ = index_dir;
+            op->index_base_ = index_base;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddFulltextIndexEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->index_name_ = index_name;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddSegmentIndexEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->index_name_ = index_name;
+            op->segment_id_ = segment_id;
+            op->min_ts_ = op->max_ts_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<SetSegmentStatusSealedOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->segment_id_ = segment_id;
+            op->segment_filter_binary_data_ = segment_filter_binary_data;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<SetBlockStatusSealedOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->segment_id_ = segment_id;
+            op->block_id_ = block_id;
+            op->block_filter_binary_data_ = block_filter_binary_data;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
 
         buffer_size = catalog_delta_entry1->GetSizeInBytes();
         buffer = MakeUnique<char[]>(buffer_size);
@@ -143,90 +194,190 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     Vector<SharedPtr<ColumnDef>> column_defs{};
     SharedPtr<IndexBase> index_base{nullptr};
 
-    // db entry
-    auto op1 = MakeUnique<AddDBEntryOp>(2, false, 0, 0, db_name, db_dir);
-    auto op2 = MakeUnique<AddDBEntryOp>(3, true, 0, 0, db_name, db_dir);
-    auto op1_same_name = MakeUnique<AddDBEntryOp>(2, false, 0, 0, db_name, db_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op1));
-    local_catalog_delta_entry->operations().push_back(std::move(op2));
-    local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    {
+        auto op1 = MakeUnique<AddDBEntryOp>();
+        auto op2 = MakeUnique<AddDBEntryOp>();
+        auto op1_same_name = MakeUnique<AddDBEntryOp>();
 
-    // table entry
-    auto op4 = MakeUnique<AddTableEntryOp>(5, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0, 0);
-    auto op5 = MakeUnique<AddTableEntryOp>(6, true, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0, 0);
-    auto op4_same_name = MakeUnique<AddTableEntryOp>(5, 0, 0, false, db_name, table_name, table_entry_dir, column_defs, 0, 0);
-    local_catalog_delta_entry->operations().push_back(std::move(op4));
-    local_catalog_delta_entry->operations().push_back(std::move(op5));
-    local_catalog_delta_entry->operations().push_back(std::move(op4_same_name));
+        op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
 
-    // segment entry
-    auto op7 = MakeUnique<AddSegmentEntryOp>();
-    auto op7_same_name = MakeUnique<AddSegmentEntryOp>();
+        op2->is_delete_ = true;
 
-    op7_same_name->db_name_ = op7->db_name_ = db_name;
-    op7_same_name->table_name_ = op7->table_name_ = table_name;
-    op7_same_name->segment_id_ = op7->segment_id_ = segment_id;
+        op1_same_name->db_entry_dir_ = op2->db_entry_dir_ = op1->db_entry_dir_ = db_dir;
 
-    op7->status_ = SegmentStatus::kUnsealed;
-    op7->column_count_ = op7->row_count_ = op7->actual_row_count_ = op7->row_capacity_ = 0;
-    op7->min_row_ts_ = op7->max_row_ts_ = op7->deprecate_ts_ = 0;
-    op7->set_sealed_ = false;
-    op7_same_name->status_ = SegmentStatus::kUnsealed;
-    op7_same_name->column_count_ = op7_same_name->row_count_ = op7_same_name->actual_row_count_ = op7_same_name->row_capacity_ = 0;
-    op7_same_name->min_row_ts_ = op7_same_name->max_row_ts_ = op7_same_name->deprecate_ts_ = 0;
-    op7_same_name->set_sealed_ = false;
+        auto op1_copy = MakeUnique<AddDBEntryOp>(*op1);
 
-    local_catalog_delta_entry->operations().push_back(std::move(op7));
-    local_catalog_delta_entry->operations().push_back(std::move(op7_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddTableEntryOp>();
+        auto op2 = MakeUnique<AddTableEntryOp>();
+        auto op1_same_name = MakeUnique<AddTableEntryOp>();
 
-    // block entry
-    auto op9 = MakeUnique<AddBlockEntryOp>();
-    auto op9_same_name = MakeUnique<AddBlockEntryOp>();
+        op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
+        op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
 
-    op9_same_name->db_name_ = op9->db_name_ = db_name;
-    op9_same_name->table_name_ = op9->table_name_ = table_name;
-    op9_same_name->segment_id_ = op9->segment_id_ = segment_id;
-    op9_same_name->block_id_ = op9->block_id_ = block_id;
+        op2->is_delete_ = true;
 
-    op9->row_capacity_ = op9->row_count_ = op9->min_row_ts_ = op9->max_row_ts_ = op9->checkpoint_ts_ = op9->checkpoint_row_count_ = 0;
-    op9->set_sealed_ = false;
+        op1_same_name->table_entry_dir_ = op2->table_entry_dir_ = op1->table_entry_dir_ = table_entry_dir;
+        op1_same_name->column_defs_ = op2->column_defs_ = op1->column_defs_ = column_defs;
 
-    op9_same_name->row_capacity_ = op9_same_name->row_count_ = op9_same_name->min_row_ts_ = op9_same_name->max_row_ts_ =
-        op9_same_name->checkpoint_ts_ = op9_same_name->checkpoint_row_count_ = 0;
-    op9_same_name->set_sealed_ = false;
+        auto op1_copy = MakeUnique<AddTableEntryOp>(*op1);
 
-    local_catalog_delta_entry->operations().push_back(std::move(op9));
-    local_catalog_delta_entry->operations().push_back(std::move(op9_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddSegmentEntryOp>();
+        auto op2 = MakeUnique<AddSegmentEntryOp>();
+        auto op1_same_name = MakeUnique<AddSegmentEntryOp>();
 
-    // column entry
-    auto op11 = MakeUnique<AddColumnEntryOp>(9, false, 0, 0, db_name, table_name, segment_id, block_id, column_id, 0);
-    auto op11_same_name = MakeUnique<AddColumnEntryOp>(9, false, 0, 0, db_name, table_name, segment_id, block_id, column_id, 0);
-    local_catalog_delta_entry->operations().push_back(std::move(op11));
-    local_catalog_delta_entry->operations().push_back(std::move(op11_same_name));
+        op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
+        op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
+        op1_same_name->segment_id_ = op2->segment_id_ = op1->segment_id_ = segment_id;
 
-    // table index entry
-    auto op13 = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
-    auto op13_same_name = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
-    local_catalog_delta_entry->operations().push_back(std::move(op13));
-    local_catalog_delta_entry->operations().push_back(std::move(op13_same_name));
+        op1->status_ = SegmentStatus::kSealed;
+        op1->column_count_ = op1->row_count_ = op1->actual_row_count_ = op1->row_capacity_ = 0;
+        op1->min_row_ts_ = op1->max_row_ts_ = op1->deprecate_ts_ = 0;
 
-    // irs index entry
-    auto op15 = MakeUnique<AddFulltextIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name);
-    auto op15_same_name = MakeUnique<AddFulltextIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name);
-    local_catalog_delta_entry->operations().push_back(std::move(op15));
-    local_catalog_delta_entry->operations().push_back(std::move(op15_same_name));
+        op1_same_name->status_ = SegmentStatus::kSealed;
+        op1_same_name->column_count_ = op1_same_name->row_count_ = op1_same_name->actual_row_count_ = op1_same_name->row_capacity_ = 0;
+        op1_same_name->min_row_ts_ = op1_same_name->max_row_ts_ = op1_same_name->deprecate_ts_ = 0;
 
-    // segment index entry
-    auto op17 = MakeUnique<AddSegmentIndexEntryOp>(14, false, 0, 0, db_name, table_name, index_name, segment_id, 0, 14);
-    auto op17_same_name = MakeUnique<AddSegmentIndexEntryOp>(14, false, 0, 0, db_name, table_name, index_name, segment_id, 1, 14);
-    local_catalog_delta_entry->operations().push_back(std::move(op17));
-    local_catalog_delta_entry->operations().push_back(std::move(op17_same_name));
+        op2->status_ = SegmentStatus::kDeprecated;
+        op2->column_count_ = op2->row_count_ = op2->actual_row_count_ = op2->row_capacity_ = 0;
+        op2->min_row_ts_ = op2->max_row_ts_ = op2->deprecate_ts_ = 0;
 
-    EXPECT_EQ(local_catalog_delta_entry->operations().size(), 18u);
+        auto op1_copy = MakeUnique<AddSegmentEntryOp>(*op1);
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddBlockEntryOp>();
+        auto op1_same_name = MakeUnique<AddBlockEntryOp>();
+
+        op1_same_name->db_name_ = op1->db_name_ = db_name;
+        op1_same_name->table_name_ = op1->table_name_ = table_name;
+        op1_same_name->segment_id_ = op1->segment_id_ = segment_id;
+        op1_same_name->block_id_ = op1->block_id_ = block_id;
+
+        op1->row_capacity_ = op1->row_count_ = op1->min_row_ts_ = op1->max_row_ts_ = op1->checkpoint_ts_ = op1->checkpoint_row_count_ = 0;
+
+        op1_same_name->row_capacity_ = op1_same_name->row_count_ = op1_same_name->min_row_ts_ = op1_same_name->max_row_ts_ =
+            op1_same_name->checkpoint_ts_ = op1_same_name->checkpoint_row_count_ = 0;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    }
+    {
+        auto op1 = MakeUnique<AddColumnEntryOp>();
+        auto op1_same_name = MakeUnique<AddColumnEntryOp>();
+
+        op1_same_name->db_name_ = op1->db_name_ = db_name;
+        op1_same_name->table_name_ = op1->table_name_ = table_name;
+        op1_same_name->segment_id_ = op1->segment_id_ = segment_id;
+        op1_same_name->block_id_ = op1->block_id_ = block_id;
+        op1_same_name->column_id_ = op1->column_id_ = column_id;
+
+        op1_same_name->next_outline_idx_ = op1->next_outline_idx_ = 0;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    }
+    {
+        auto op1 = MakeUnique<AddTableIndexEntryOp>();
+        auto op2 = MakeUnique<AddTableIndexEntryOp>();
+        auto op1_same_name = MakeUnique<AddTableIndexEntryOp>();
+
+        op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
+        op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
+        op1_same_name->index_name_ = op2->index_name_ = op1->index_name_ = index_name;
+
+        op2->is_delete_ = true;
+
+        op1_same_name->index_dir_ = op2->index_dir_ = op1->index_dir_ = index_dir;
+        op1_same_name->index_base_ = op2->index_base_ = op1->index_base_ = index_base;
+
+        auto op1_copy = MakeUnique<AddTableIndexEntryOp>(*op1);
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddFulltextIndexEntryOp>();
+        auto op1_same_name = MakeUnique<AddFulltextIndexEntryOp>();
+
+        op1_same_name->db_name_ = op1->db_name_ = db_name;
+        op1_same_name->table_name_ = op1->table_name_ = table_name;
+        op1_same_name->index_name_ = op1->index_name_ = index_name;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    }
+    {
+        auto op1 = MakeUnique<AddSegmentIndexEntryOp>();
+        auto op1_same_name = MakeUnique<AddSegmentIndexEntryOp>();
+
+        op1_same_name->db_name_ = op1->db_name_ = db_name;
+        op1_same_name->table_name_ = op1->table_name_ = table_name;
+        op1_same_name->index_name_ = op1->index_name_ = index_name;
+        op1_same_name->segment_id_ = op1->segment_id_ = segment_id;
+
+        op1->min_ts_ = op1->max_ts_ = 0;
+        op1_same_name->min_ts_ = op1_same_name->max_ts_ = 0;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    }
+    {
+        auto op1 = MakeUnique<SetSegmentStatusSealedOp>();
+
+        op1->db_name_ = db_name;
+        op1->table_name_ = table_name;
+        op1->segment_id_ = segment_id;
+        op1->segment_filter_binary_data_ = "abcde";
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+    }
+    {
+        auto op1 = MakeUnique<SetBlockStatusSealedOp>();
+
+        op1->db_name_ = db_name;
+        op1->table_name_ = table_name;
+        op1->segment_id_ = segment_id;
+        op1->block_id_ = block_id;
+        op1->block_filter_binary_data_ = "abcde";
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+    }
+    {
+        auto op = MakeUnique<AddSegmentEntryOp>();
+
+        op->db_name_ = db_name;
+        op->table_name_ = table_name;
+        op->segment_id_ = segment_id;
+
+        op->status_ = SegmentStatus::kDeprecated;
+        op->column_count_ = op->row_count_ = op->actual_row_count_ = op->row_capacity_ = 0;
+        op->min_row_ts_ = op->max_row_ts_ = op->deprecate_ts_ = 0;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op));
+    }
+
     // merge
     Vector<UniquePtr<CatalogDeltaEntry>> delta_entries;
     delta_entries.push_back(std::move(local_catalog_delta_entry));
     global_catalog_delta_entry->AddDeltaEntries(std::move(delta_entries));
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 8u);
+    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 9u);
 }
