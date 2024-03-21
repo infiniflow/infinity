@@ -106,6 +106,7 @@ export enum class ErrorCode : long {
     kMultipleFunctionMatched = 3064,
     kInsertWithoutValues = 3065,
     kInvalidConflictType = 3066,
+    kInvalidJsonFormat = 3067,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -229,6 +230,7 @@ public:
     static Status MultipleFunctionMatched(const String &function, const String &matched_functions);
     static Status InsertWithoutValues();
     static Status InvalidConflictType();
+    static Status InvalidJsonFormat(const String& invalid_json);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
