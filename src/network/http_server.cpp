@@ -38,13 +38,6 @@ namespace {
 
 using namespace infinity;
 
-class HttpHandler : public HttpRequestHandler {
-public:
-    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) override {
-        return ResponseFactory::createResponse(Status::CODE_200, "Hello World!");
-    }
-};
-
 class ListDatabaseHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -359,6 +352,46 @@ public:
     }
 };
 
+class ShowTableColumnsHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String database_name = request->getPathVariable("database_name");
+        String table_name = request->getPathVariable("table_name");
+
+        auto result = infinity->ShowColumns(database_name, table_name);
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_response["columns"].push_back(json_table);
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class ListTableIndexesHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -456,7 +489,6 @@ void HTTPServer::Start(u16 port) {
     WebEnvironment::init();
 
     SharedPtr<HttpRouter> router = HttpRouter::createShared();
-    router->route("GET", "/hello", MakeShared<HttpHandler>());
 
     // database
     router->route("GET", "/databases", MakeShared<ListDatabaseHandler>());
@@ -469,6 +501,7 @@ void HTTPServer::Start(u16 port) {
     router->route("POST", "/databases/{database_name}/tables/{table_name}", MakeShared<CreateTableHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}", MakeShared<DropTableHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}", MakeShared<ShowTableHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<ShowTableColumnsHandler>());
 
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
