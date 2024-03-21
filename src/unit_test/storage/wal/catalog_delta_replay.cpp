@@ -42,16 +42,13 @@ import third_party;
 import base_table_ref;
 import index_secondary;
 import data_block;
-<<<<<<< HEAD
 import query_context;
 import txn;
 import index_base;
 import index_full_text;
 import fulltext_index_entry;
-=======
 import bg_task;
 import logger;
->>>>>>> upstream/main
 
 using namespace infinity;
 
@@ -101,12 +98,9 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            // test rollback db
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-            // create table3
             txn->CreateDatabase(*db_name3, ConflictType::kError);
-            // ctx rollback,db3 deleted
             txn_mgr->RollBackTxn(txn);
         }
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
@@ -186,7 +180,6 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
             txn->Begin();
 
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
-            // txn rollback,tb3 deleted
             txn_mgr->RollBackTxn(txn);
         }
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
@@ -393,8 +386,6 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
     {
         InfinityContext::instance().Init(config_path);
         Storage *storage = InfinityContext::instance().storage();
-
-        // TxnManager *txn_mgr = storage->replay_table_entryteTxn();
 
         TxnManager *txn_mgr = storage->txn_manager();
 
@@ -681,3 +672,4 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         infinity::InfinityContext::instance().UnInit();
     }
 }
+
