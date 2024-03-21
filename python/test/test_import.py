@@ -21,6 +21,7 @@ from infinity.common import ConflictType
 
 from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs
 
+
 class TestImport:
 
     def test_version(self):
@@ -159,43 +160,18 @@ class TestImport:
         res = table_obj.output(["*"]).to_df()
         print(res)
 
-    @pytest.mark.skip(reason="Parser error, core dumped.")
-    @pytest.mark.parametrize("types", [
-        "int", "int8", "int16", "int32", "int64", "integer",
-        "float", "float32", "double", "float64",
-        "varchar", "bool",
-        # "vector, 3, float"
-    ])
-    def test_with_blank_space_delimiter_data(self, get_infinity_db, types):
-        db_obj = get_infinity_db
-        db_obj.drop_table("test_with_blank_space_delimiter_data")
-        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, ConflictType.Error)
-        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_blankspace.csv")
-
-        res = table_obj.output(["*"]).to_df()
-        print(res)
-
-    @pytest.mark.skip(reason="Parser error, core dumped.")
-    @pytest.mark.parametrize("types", [
-        "int", "int8", "int16", "int32", "int64", "integer",
-        "float", "float32", "double", "float64",
-        "varchar", "bool", "vector, 3, float"
-    ])
-    def test_with_semicolons_delimiter_data(self, get_infinity_db, types):
-        db_obj = get_infinity_db
-        db_obj.drop_table("test_with_blank_space_delimiter_data")
-        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, ConflictType.Error)
-        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_semicolons.csv")
-
-        res = table_obj.output(["*"]).to_df()
-        print(res)
-
     # import csv with different delimiter
-    @pytest.mark.parametrize("delimiter", [pytest.param("blankspace", marks=pytest.mark.skip(reason="not support")),
-                                           "commas",
-                                           pytest.param("semicolons", marks=pytest.mark.skip(reason="not support")),
-                                           pytest.param("tabular", marks=pytest.mark.skip(reason="not support")),
+    @pytest.mark.parametrize("delimiter", [["blankspace", " "],
+                                           ["commas", ","],
+                                           ["semicolons", ";"],
+                                           pytest.param(["tabular", "\t"], marks=pytest.mark.skip(reason="Not supported yet."))
                                            ])
+    @pytest.mark.parametrize("types", [
+        "int", "int8", "int16", "int32", "int64", "integer",
+        "float", "float32", "double", "float64",
+        "varchar",
+        pytest.param("bool",marks=pytest.mark.skip(reason="Core dumped."))
+    ])
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
                                              "data_dir": common_values.TEST_TMP_DIR},
                                             {"file_name": "pysdk_test_commas.csv",
@@ -204,19 +180,22 @@ class TestImport:
                                              "data_dir": common_values.TEST_TMP_DIR},
                                             {"file_name": "pysdk_test_tabular.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_csv_with_different_delimiter(self, get_infinity_db, check_data, delimiter):
+    def test_csv_with_different_delimiter(self, get_infinity_db, check_data, delimiter, types):
         if not check_data:
-            copy_data("pysdk_test_" + delimiter + ".csv")
+            copy_data("pysdk_test_" + delimiter[0] + ".csv")
         db_obj = get_infinity_db
         db_obj.drop_table("test_csv_with_different_delimiter")
-        table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": "int", "c2": "int"}, ConflictType.Error)
-        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_" + delimiter + ".csv")
+        table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": types, "c2": types},
+                                        ConflictType.Error)
+        table_obj.import_data(common_values.TEST_TMP_DIR + "/pysdk_test_" + delimiter[0] + ".csv",
+                              import_options={
+                                  "delimiter": delimiter[1]
+                              })
 
         res = table_obj.output(["*"]).to_df()
         print(res)
 
     # import csv with delimiter more than one character
-    @pytest.mark.skip(reason="Not support yet.")
     @pytest.mark.parametrize("delimiter", ["blankspace"])
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -226,17 +205,29 @@ class TestImport:
         db_obj = get_infinity_db
         db_obj.drop_table("test_csv_with_different_delimiter_more_than_one_character")
         table_obj = db_obj.create_table("test_csv_with_different_delimiter_more_than_one_character",
-                                        {"c1": "int", "c2": "int"}, None)
+                                        {"c1": "int", "c2": "int"}, ConflictType.Error)
         table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_" + delimiter + ".csv",
-                              options={"delimiter": " "})
+                              import_options={"delimiter": " "})
 
         res = table_obj.output(["*"]).to_df()
         print(res)
 
-    # TODO import csv with headers
-    # TODO import csv without headers
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("has_header", [True, False])
+    def test_import_csv_with_headers(self, get_infinity_db, check_data, has_header):
+        if not check_data:
+            copy_data("pysdk_test_commas.csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_csv_with_headers", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_import_csv_with_headers", {"c1": "int", "c2": "int"}, ConflictType.Error)
+        table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_commas.csv",
+                              import_options={"header": has_header})
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
 
     # import fvecs, when table with more columns
+    @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_fvecs_table_with_more_columns(self, get_infinity_db, check_data):
@@ -352,7 +343,7 @@ class TestImport:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_exceeding_rows(self, get_infinity_db, check_data):
         if not check_data:
-            generate_big_rows_csv(1024*8192, "pysdk_test_big_varchar_rows.csv")
+            generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")
             copy_data("pysdk_test_big_varchar_rows.csv")
 
         db_obj = get_infinity_db

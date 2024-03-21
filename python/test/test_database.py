@@ -17,7 +17,7 @@ import infinity
 from common import common_values
 import pytest
 from infinity.errors import ErrorCode
-from utils import trace_expected_exceptions
+from infinity.common import ConflictType
 
 
 class TestDatabase:
@@ -545,6 +545,53 @@ class TestDatabase:
         infinity_obj.show_database("test_show_database")
 
         infinity_obj.drop_database("test_show_database")
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
+                                               ConflictType.Ignore,
+                                               ConflictType.Replace,
+                                               0,
+                                               1,
+                                               2,
+                                               pytest.param(1.1, marks=pytest.mark.xfail),
+                                               pytest.param("#@$@!%string", marks=pytest.mark.xfail),
+                                               pytest.param([], marks=pytest.mark.xfail),
+                                               pytest.param({}, marks=pytest.mark.xfail),
+                                               pytest.param((), marks=pytest.mark.xfail),
+                                               ])
+    def test_create_option(self, conflict_type):
+        # create db
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj.create_database("test_create_option", conflict_type)
+
+        infinity_obj.drop_database("test_create_option")
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
+                                               ConflictType.Ignore,
+                                               0,
+                                               1,
+                                               pytest.param(ConflictType.Replace, marks=pytest.mark.xfail),
+                                               pytest.param(2,marks=pytest.mark.xfail),
+                                               pytest.param(1.1, marks=pytest.mark.xfail),
+                                               pytest.param("#@$@!%string", marks=pytest.mark.xfail),
+                                               pytest.param([], marks=pytest.mark.xfail),
+                                               pytest.param({}, marks=pytest.mark.xfail),
+                                               pytest.param((), marks=pytest.mark.xfail),
+                                               ])
+    def test_drop_option(self, conflict_type):
+        # create db
+
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj.create_database("test_drop_option")
+
+        infinity_obj.drop_database("test_drop_option", conflict_type)
+
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK

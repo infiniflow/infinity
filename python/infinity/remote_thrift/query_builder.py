@@ -120,7 +120,7 @@ class InfinityThriftQueryBuilder(ABC):
                 knn_opt_params.append(InitParameter(k, v))
 
         knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
-                           distance_type=dist_type, topn=topn, opt_params = knn_opt_params)
+                           distance_type=dist_type, topn=topn, opt_params=knn_opt_params)
         # print(knn_expr)
         self._search.knn_exprs.append(knn_expr)
         return self
