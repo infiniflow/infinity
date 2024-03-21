@@ -546,6 +546,7 @@ class TestDatabase:
         res = infinity_obj.show_database("test_show_database")
         assert res.database_name=="test_show_database"
 
+        infinity_obj.drop_database("test_show_database", ConflictType.Ignore)
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
