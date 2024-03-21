@@ -880,12 +880,12 @@ public:
             }
 
             {
-                Value value = data_block->GetValue(1, 2);
+                Value value = data_block->GetValue(1, 1);
                 response.store_dir = value.GetVarchar();
             }
 
             {
-                Value value = data_block->GetValue(1, 3);
+                Value value = data_block->GetValue(1, 2);
                 response.table_count = value.value_.big_int;
             }
 
