@@ -47,7 +47,9 @@ using namespace infinity;
 class CompactTaskTest : public BaseTest {
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override { system("tree  /tmp/infinity"); }
+    void TearDown() override {
+        //  system("tree  /tmp/infinity");
+    }
 
 protected:
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {

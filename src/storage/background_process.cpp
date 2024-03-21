@@ -50,10 +50,6 @@ void BGTaskProcessor::Process() {
         SharedPtr<BGTask> bg_task = task_queue_.DequeueReturn();
 
         switch (bg_task->type_) {
-            case BGTaskType::kTryCheckpoint: {
-                wal_manager_->Checkpoint();
-                break;
-            }
             case BGTaskType::kForceCheckpoint: {
                 ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
                 wal_manager_->Checkpoint(force_ckp_task);
@@ -61,13 +57,6 @@ void BGTaskProcessor::Process() {
             }
             case BGTaskType::kStopProcessor: {
                 running = false;
-                break;
-            }
-            case BGTaskType::kCatalogDeltaOpsMerge: {
-                CatalogDeltaOpsMergeTask *task = static_cast<CatalogDeltaOpsMergeTask *>(bg_task.get());
-                auto &local_catalog_ops = task->local_catalog_delta_entry_;
-                auto *catalog = task->catalog_;
-                catalog->global_catalog_delta_entry_->Merge(std::move(local_catalog_ops));
                 break;
             }
             case BGTaskType::kCompactSegments: {
