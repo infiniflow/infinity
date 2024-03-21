@@ -127,7 +127,7 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkp
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
         db_candidates.reserve(this->db_entry_list().size());
         for (auto &db_entry : this->db_entry_list()) {
-            if (db_entry->entry_type_ == EntryType::kDatabase) {
+            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
                 db_candidates.push_back((DBEntry *)db_entry.get());
             }
