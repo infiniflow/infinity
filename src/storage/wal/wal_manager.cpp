@@ -318,10 +318,6 @@ void WalManager::Checkpoint() {
         return;
     }
 
-    if (is_full_checkpoint) {
-        return;
-    }
-
     try {
         TxnManager *txn_mgr = storage_->txn_manager();
         Txn *txn = txn_mgr->CreateTxn();
@@ -676,7 +672,9 @@ void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, Tra
     db_entry->Commit(commit_ts);
 }
 void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-
+    if (*cmd.table_def_->table_name() == "test_create_drop_different_fulltext_index_invalid_options") {
+        LOG_INFO("AA");
+    }
     auto [table_entry, table_status] =
         storage_->catalog()->CreateTable(cmd.db_name_, txn_id, commit_ts, cmd.table_def_, ConflictType::kIgnore, storage_->txn_manager());
 
