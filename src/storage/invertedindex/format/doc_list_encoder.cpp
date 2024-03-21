@@ -5,7 +5,7 @@ import stl;
 import memory_pool;
 import file_writer;
 import file_reader;
-import buffered_byte_slice;
+import posting_byte_slice;
 import skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
@@ -174,9 +174,9 @@ InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_
         }
     }
 
-    BufferedByteSlice *doc_list_buffer = session_pool ? new (session_pool->Allocate(sizeof(BufferedByteSlice)))
-                                                            BufferedByteSlice(session_pool, session_pool)
-                                                      : new BufferedByteSlice(session_pool, session_pool);
+    PostingByteSlice *doc_list_buffer = session_pool ? new (session_pool->Allocate(sizeof(PostingByteSlice)))
+                                                           PostingByteSlice(session_pool, session_pool)
+                                                     : new PostingByteSlice(session_pool, session_pool);
     doc_list_buffer_.SnapShot(doc_list_buffer);
 
     InMemDocListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListDecoder))) InMemDocListDecoder(session_pool)

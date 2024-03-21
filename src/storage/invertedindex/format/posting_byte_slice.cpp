@@ -1,6 +1,6 @@
 module;
 
-module buffered_byte_slice;
+module posting_byte_slice;
 import stl;
 import memory_pool;
 import posting_field;
@@ -10,11 +10,11 @@ import file_reader;
 
 namespace infinity {
 
-BufferedByteSlice::BufferedByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool) : buffer_(byte_slice_pool), posting_writer_(buffer_pool) {}
+PostingByteSlice::PostingByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool) : buffer_(byte_slice_pool), posting_writer_(buffer_pool) {}
 
-void BufferedByteSlice::Init(const PostingFields *value) { buffer_.Init(value); }
+void PostingByteSlice::Init(const PostingFields *value) { buffer_.Init(value); }
 
-SizeT BufferedByteSlice::DoFlush() {
+SizeT PostingByteSlice::DoFlush() {
     u32 flush_size = 0;
     const PostingFields *posting_fields = buffer_.GetPostingFields();
     for (SizeT i = 0; i < posting_fields->GetSize(); ++i) {
@@ -25,7 +25,7 @@ SizeT BufferedByteSlice::DoFlush() {
     return flush_size;
 }
 
-SizeT BufferedByteSlice::Flush() {
+SizeT PostingByteSlice::Flush() {
     if (buffer_.Size() == 0) {
         return 0;
     }
@@ -40,7 +40,7 @@ SizeT BufferedByteSlice::Flush() {
     return flush_size;
 }
 
-void BufferedByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+void PostingByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     if (spill) {
         buffer_.Dump(file);
         file->WriteVLong(flush_info_.flush_info_);
@@ -52,7 +52,7 @@ void BufferedByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     posting_writer_.Dump(file);
 }
 
-void BufferedByteSlice::Load(const SharedPtr<FileReader> &file) {
+void PostingByteSlice::Load(const SharedPtr<FileReader> &file) {
     buffer_.Load(file);
     flush_info_.flush_info_ = file->ReadVLong();
     u32 byte_slice_size = file->ReadVInt();
@@ -61,7 +61,7 @@ void BufferedByteSlice::Load(const SharedPtr<FileReader> &file) {
     posting_writer_.Load(file, byte_slice_size);
 }
 
-void BufferedByteSlice::SnapShot(BufferedByteSlice *buffer) const {
+void PostingByteSlice::SnapShot(PostingByteSlice *buffer) const {
     buffer->Init(GetPostingFields());
     buffer->flush_info_ = flush_info_;
     posting_writer_.SnapShot(buffer->posting_writer_);

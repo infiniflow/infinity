@@ -2,8 +2,8 @@ module;
 
 import stl;
 import memory_pool;
-import buffered_byte_slice;
-import buffered_byte_slice_reader;
+import posting_byte_slice;
+import posting_byte_slice_reader;
 import position_list_skiplist_reader;
 import index_defines;
 import logger;
@@ -17,15 +17,15 @@ InMemPositionListSkipListReader::InMemPositionListSkipListReader(MemoryPool *ses
 
 InMemPositionListSkipListReader::~InMemPositionListSkipListReader() {
     if (session_pool_) {
-        skiplist_buffer_->~BufferedByteSlice();
-        session_pool_->Deallocate((void *)skiplist_buffer_, sizeof(BufferedByteSlice));
+        skiplist_buffer_->~PostingByteSlice();
+        session_pool_->Deallocate((void *)skiplist_buffer_, sizeof(PostingByteSlice));
     } else {
         delete skiplist_buffer_;
         skiplist_buffer_ = nullptr;
     }
 }
 
-void InMemPositionListSkipListReader::Load(BufferedByteSlice *posting_buffer) {
+void InMemPositionListSkipListReader::Load(PostingByteSlice *posting_buffer) {
     skipped_item_count_ = -1;
     current_key_ = 0;
     current_value_ = 0;
@@ -34,9 +34,9 @@ void InMemPositionListSkipListReader::Load(BufferedByteSlice *posting_buffer) {
     current_cursor_ = 0;
     num_in_buffer_ = 0;
 
-    BufferedByteSlice *skiplist_buffer = session_pool_ ? new (session_pool_->Allocate(sizeof(BufferedByteSlice)))
-                                                             BufferedByteSlice(session_pool_, session_pool_)
-                                                       : new BufferedByteSlice(session_pool_, session_pool_);
+    PostingByteSlice *skiplist_buffer = session_pool_ ? new (session_pool_->Allocate(sizeof(PostingByteSlice)))
+                                                            PostingByteSlice(session_pool_, session_pool_)
+                                                      : new PostingByteSlice(session_pool_, session_pool_);
     posting_buffer->SnapShot(skiplist_buffer);
 
     skiplist_buffer_ = skiplist_buffer;
@@ -46,10 +46,10 @@ void InMemPositionListSkipListReader::Load(BufferedByteSlice *posting_buffer) {
 Pair<int, bool> InMemPositionListSkipListReader::LoadBuffer() {
     SizeT key_num = 0;
     SizeT flush_count = skiplist_buffer_->GetTotalCount();
-    FlushInfo flushInfo = skiplist_buffer_->GetFlushInfo();
+    FlushInfo flush_info = skiplist_buffer_->GetFlushInfo();
 
     SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
-    if (flushInfo.IsValidPostingBuffer() == false) {
+    if (flush_info.IsValidPostingBuffer() == false) {
         decode_count = flush_count;
     }
 

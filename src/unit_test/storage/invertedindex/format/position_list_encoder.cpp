@@ -4,11 +4,11 @@
 import stl;
 import memory_pool;
 import index_defines;
-import buffered_byte_slice;
+import posting_byte_slice;
 import position_list_format_option;
 import position_list_encoder;
 import skiplist_writer;
-import buffered_byte_slice_reader;
+import posting_byte_slice_reader;
 import file_writer;
 import file_reader;
 import local_file_system;
@@ -54,7 +54,7 @@ TEST_F(PositionListEncoderTest, test2) {
         position_encoder.AddPosition(i);
     }
     position_encoder.EndDocument();
-    BufferedByteSliceReader reader;
+    PostingByteSliceReader reader;
     reader.Open(position_encoder.GetBufferedByteSlice());
 
     pos_t pos_buffer[MAX_POS_PER_RECORD];

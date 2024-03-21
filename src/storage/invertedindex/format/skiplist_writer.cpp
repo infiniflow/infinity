@@ -9,13 +9,13 @@ import file_writer;
 import file_reader;
 import index_defines;
 import posting_field;
-import buffered_byte_slice;
+import posting_byte_slice;
 import short_list_optimize_util;
 
 namespace infinity {
 
 SkipListWriter::SkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool)
-    : BufferedByteSlice(byte_slice_pool, buffer_pool), last_key_(-1), last_value1_(-1) {}
+    : PostingByteSlice(byte_slice_pool, buffer_pool), last_key_(-1), last_value1_(-1) {}
 
 void SkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
     assert(static_cast<u32>(-1) == last_key_ || key > last_key_);

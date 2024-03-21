@@ -3,8 +3,8 @@
 import stl;
 import memory_pool;
 import skiplist_writer;
-import buffered_byte_slice_reader;
-import buffered_byte_slice;
+import posting_byte_slice_reader;
+import posting_byte_slice;
 import index_defines;
 import posting_field;
 import file_writer;
@@ -65,7 +65,7 @@ TEST_F(SkipListWriterTest, test1) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<BufferedByteSliceReader>();
+    auto reader = MakeShared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 val_buffer[BUFFER_SIZE_];
@@ -127,7 +127,7 @@ TEST_F(SkipListWriterTest, test2) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<BufferedByteSliceReader>();
+    auto reader = MakeShared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];
@@ -207,7 +207,7 @@ TEST_F(SkipListWriterTest, test3) {
 
     skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<BufferedByteSliceReader>();
+    auto reader = MakeShared<PostingByteSliceReader>();
     reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];

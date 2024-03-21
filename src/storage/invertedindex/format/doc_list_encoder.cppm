@@ -4,7 +4,7 @@ import stl;
 import memory_pool;
 import file_writer;
 import file_reader;
-import buffered_byte_slice;
+import posting_byte_slice;
 import skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
@@ -52,7 +52,7 @@ public:
 
     InMemDocListDecoder *GetInMemDocListDecoder(MemoryPool *session_pool) const;
 
-    BufferedByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
+    PostingByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
 
 private:
     void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf);
@@ -64,7 +64,7 @@ private:
     void AddSkipListItem(u32 item_size);
 
 private:
-    BufferedByteSlice doc_list_buffer_;
+    PostingByteSlice doc_list_buffer_;
     bool own_doc_list_format_;
     DocListFormatOption format_option_;
     DocListFormat *doc_list_format_;

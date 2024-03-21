@@ -7,7 +7,7 @@ import memory_pool;
 import file_writer;
 import file_reader;
 import index_defines;
-import buffered_byte_slice;
+import posting_byte_slice;
 import skiplist_writer;
 import position_list_format_option;
 import inmem_position_list_decoder;
@@ -35,7 +35,7 @@ public:
 
     const ByteSliceList *GetPositionList() const { return pos_list_buffer_.GetByteSliceList(); }
 
-    const BufferedByteSlice *GetBufferedByteSlice() const { return &pos_list_buffer_; }
+    const PostingByteSlice *GetBufferedByteSlice() const { return &pos_list_buffer_; }
 
     void SetDocSkipListWriter(SkipListWriter *writer) { pos_skiplist_writer_ = writer; }
 
@@ -49,7 +49,7 @@ private:
     void FlushPositionBuffer();
 
 private:
-    BufferedByteSlice pos_list_buffer_;
+    PostingByteSlice pos_list_buffer_;
     pos_t last_pos_in_cur_doc_;                       // 4byte
     u32 total_pos_count_;                             // 4byte
     PositionListFormatOption pos_list_format_option_; // 1byte

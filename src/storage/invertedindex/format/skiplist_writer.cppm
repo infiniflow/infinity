@@ -3,14 +3,14 @@ module;
 import stl;
 import file_writer;
 import file_reader;
-import buffered_byte_slice;
+import posting_byte_slice;
 import short_list_optimize_util;
 import memory_pool;
 export module skiplist_writer;
 
 namespace infinity {
 
-export class SkipListWriter : public BufferedByteSlice {
+export class SkipListWriter : public PostingByteSlice {
 public:
     SkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
     virtual ~SkipListWriter() = default;

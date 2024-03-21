@@ -9,7 +9,7 @@ import file_writer;
 import file_reader;
 import vbyte_compressor;
 import index_defines;
-import buffered_byte_slice;
+import posting_byte_slice;
 import skiplist_writer;
 import position_list_format_option;
 import inmem_position_list_decoder;
@@ -143,7 +143,7 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder(Memor
                                               : new InMemPositionListSkipListReader(session_pool);
         in_mem_skiplist_reader->Load(pos_skiplist_writer_);
     }
-    BufferedByteSlice *posting_buffer = new (session_pool->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(session_pool, session_pool);
+    PostingByteSlice *posting_buffer = new (session_pool->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(session_pool, session_pool);
     pos_list_buffer_.SnapShot(posting_buffer);
 
     InMemPositionListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListDecoder)))

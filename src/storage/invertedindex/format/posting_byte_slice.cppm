@@ -11,15 +11,15 @@ import posting_field;
 import index_defines;
 import posting_buffer;
 
-export module buffered_byte_slice;
+export module posting_byte_slice;
 
 namespace infinity {
 
-export class BufferedByteSlice {
+export class PostingByteSlice {
 public:
-    BufferedByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
+    PostingByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
 
-    virtual ~BufferedByteSlice() = default;
+    virtual ~PostingByteSlice() = default;
 
     void Init(const PostingFields *value);
 
@@ -39,7 +39,7 @@ public:
 
     const PostingFields *GetPostingFields() const { return buffer_.GetPostingFields(); }
 
-    void SnapShot(BufferedByteSlice *buffer) const;
+    void SnapShot(PostingByteSlice *buffer) const;
 
     bool IsPostingBufferValid() const { return flush_info_.IsValidPostingBuffer(); }
 
@@ -69,7 +69,7 @@ protected:
 };
 
 template <typename T>
-inline void BufferedByteSlice::PushBack(u8 row, T value) {
+inline void PostingByteSlice::PushBack(u8 row, T value) {
     buffer_.PushBack(row, value);
 }
 

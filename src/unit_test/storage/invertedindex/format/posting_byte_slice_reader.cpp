@@ -3,20 +3,20 @@
 
 import stl;
 import memory_pool;
-import buffered_byte_slice;
-import buffered_byte_slice_reader;
+import posting_byte_slice;
+import posting_byte_slice_reader;
 import doc_list_format_option;
 import index_defines;
 
 using namespace infinity;
 
-class BufferedByteSliceReaderTest : public BaseTest {
+class PostingByteSliceReaderTest : public BaseTest {
 public:
-    BufferedByteSliceReaderTest() {
+    PostingByteSliceReaderTest() {
         byte_slice_pool_ = new MemoryPool(1024);
         buffer_pool_ = new RecyclePool(1024);
     }
-    ~BufferedByteSliceReaderTest() {
+    ~PostingByteSliceReaderTest() {
         delete byte_slice_pool_;
         delete buffer_pool_;
     }
@@ -25,16 +25,16 @@ public:
         DocListFormatOption option(NO_TERM_FREQUENCY);
         doc_list_format_.reset(new DocListFormat());
         doc_list_format_->Init(option);
-        buffered_byte_slice_.reset(new BufferedByteSlice(byte_slice_pool_, buffer_pool_));
-        buffered_byte_slice_->Init(doc_list_format_.get());
+        posting_byte_slice_.reset(new PostingByteSlice(byte_slice_pool_, buffer_pool_));
+        posting_byte_slice_->Init(doc_list_format_.get());
     }
     void TearDown() override {
-        buffered_byte_slice_.reset();
+        posting_byte_slice_.reset();
         doc_list_format_.reset();
     }
 
 protected:
-    void CheckDecode(u32 doc_count, u32 flush_count, SharedPtr<BufferedByteSliceReader> &reader) {
+    void CheckDecode(u32 doc_count, u32 flush_count, SharedPtr<PostingByteSliceReader> &reader) {
         Vector<u32> doc_id(doc_count);
         Vector<uint16_t> payload(doc_count);
 
@@ -70,33 +70,33 @@ protected:
         }
     }
 
-    SharedPtr<BufferedByteSliceReader> CreateReader(u32 doc_id[], uint16_t doc_payload[], u32 doc_count, u32 flush_count) {
-        buffered_byte_slice_.reset(new BufferedByteSlice(byte_slice_pool_, buffer_pool_));
-        buffered_byte_slice_->Init(doc_list_format_.get());
+    SharedPtr<PostingByteSliceReader> CreateReader(u32 doc_id[], uint16_t doc_payload[], u32 doc_count, u32 flush_count) {
+        posting_byte_slice_.reset(new PostingByteSlice(byte_slice_pool_, buffer_pool_));
+        posting_byte_slice_->Init(doc_list_format_.get());
 
-        assert(buffered_byte_slice_);
+        assert(posting_byte_slice_);
         for (size_t i = 0; i < doc_count; ++i) {
-            buffered_byte_slice_->PushBack(0, doc_id[i]);
-            buffered_byte_slice_->PushBack(1, doc_payload[i]);
-            buffered_byte_slice_->EndPushBack();
-            if (buffered_byte_slice_->NeedFlush(flush_count)) {
-                buffered_byte_slice_->Flush();
+            posting_byte_slice_->PushBack(0, doc_id[i]);
+            posting_byte_slice_->PushBack(1, doc_payload[i]);
+            posting_byte_slice_->EndPushBack();
+            if (posting_byte_slice_->NeedFlush(flush_count)) {
+                posting_byte_slice_->Flush();
             }
         }
-        SharedPtr<BufferedByteSliceReader> reader(new BufferedByteSliceReader);
-        reader->Open(buffered_byte_slice_.get());
+        SharedPtr<PostingByteSliceReader> reader(new PostingByteSliceReader);
+        reader->Open(posting_byte_slice_.get());
         return reader;
     }
 
     void TestCheck(const u32 doc_count, u32 flush_count) {
-        SharedPtr<BufferedByteSliceReader> reader = CreateReader(doc_count, flush_count);
+        SharedPtr<PostingByteSliceReader> reader = CreateReader(doc_count, flush_count);
         CheckDecode(doc_count, flush_count, reader);
 
-        reader->Open(buffered_byte_slice_.get());
+        reader->Open(posting_byte_slice_.get());
         CheckDecode(doc_count, flush_count, reader);
     }
 
-    SharedPtr<BufferedByteSliceReader> CreateReader(u32 doc_count, u32 flush_count) {
+    SharedPtr<PostingByteSliceReader> CreateReader(u32 doc_count, u32 flush_count) {
         Vector<u32> doc_id(doc_count);
         Vector<uint16_t> payload(doc_count);
 
@@ -110,21 +110,21 @@ protected:
 
     MemoryPool *byte_slice_pool_;
     RecyclePool *buffer_pool_;
-    SharedPtr<BufferedByteSlice> buffered_byte_slice_;
+    SharedPtr<PostingByteSlice> posting_byte_slice_;
     SharedPtr<DocListFormat> doc_list_format_;
 };
 
-TEST_F(BufferedByteSliceReaderTest, test1) {
+TEST_F(PostingByteSliceReaderTest, test1) {
     using namespace infinity;
     DocListFormatOption option(of_none);
     DocListFormat doc_list_format;
     doc_list_format.Init(option);
     {
         // empty posting buffer
-        BufferedByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
         posting_buffer.Init(&doc_list_format);
 
-        BufferedByteSliceReader reader;
+        PostingByteSliceReader reader;
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
@@ -133,13 +133,13 @@ TEST_F(BufferedByteSliceReaderTest, test1) {
     }
     {
         // only has short buffer
-        BufferedByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
         posting_buffer.Init(&doc_list_format);
 
         posting_buffer.PushBack(0, (u32)1);
         posting_buffer.EndPushBack();
 
-        BufferedByteSliceReader reader;
+        PostingByteSliceReader reader;
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
@@ -148,7 +148,7 @@ TEST_F(BufferedByteSliceReaderTest, test1) {
     }
     {
         // only has flushed byte slice
-        BufferedByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
         posting_buffer.Init(&doc_list_format);
 
         posting_buffer.PushBack(0, (u32)1);
@@ -156,7 +156,7 @@ TEST_F(BufferedByteSliceReaderTest, test1) {
 
         posting_buffer.Flush();
 
-        BufferedByteSliceReader reader;
+        PostingByteSliceReader reader;
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
@@ -165,7 +165,7 @@ TEST_F(BufferedByteSliceReaderTest, test1) {
     }
     {
         // has short buffer and flushed byte slice
-        BufferedByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
         posting_buffer.Init(&doc_list_format);
 
         posting_buffer.PushBack(0, (u32)1);
@@ -176,7 +176,7 @@ TEST_F(BufferedByteSliceReaderTest, test1) {
         posting_buffer.PushBack(0, (u32)1);
         posting_buffer.EndPushBack();
 
-        BufferedByteSliceReader reader;
+        PostingByteSliceReader reader;
         reader.Open(&posting_buffer);
 
         u32 doc_id_buffer[MAX_DOC_PER_RECORD];
@@ -185,10 +185,10 @@ TEST_F(BufferedByteSliceReaderTest, test1) {
     }
 }
 
-TEST_F(BufferedByteSliceReaderTest, test2) {
+TEST_F(PostingByteSliceReaderTest, test2) {
     using namespace infinity;
     size_t flush_size = 5;
-    SharedPtr<BufferedByteSliceReader> reader = CreateReader(33, flush_size);
+    SharedPtr<PostingByteSliceReader> reader = CreateReader(33, flush_size);
 
     docid_t doc_id_buffer[MAX_DOC_PER_RECORD];
     docpayload_t doc_payload_buffer[MAX_DOC_PER_RECORD];
@@ -244,7 +244,7 @@ TEST_F(BufferedByteSliceReaderTest, test2) {
     ASSERT_EQ((u32)64, doc_payload_buffer[2]);
 }
 
-TEST_F(BufferedByteSliceReaderTest, test3) {
+TEST_F(PostingByteSliceReaderTest, test3) {
     using namespace infinity;
     TestCheck(10, 5);
     TestCheck(513, 128);
