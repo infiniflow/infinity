@@ -1,7 +1,7 @@
 module;
 #include <cassert>
 
-module buffered_skiplist_writer;
+module skiplist_writer;
 import stl;
 import byte_slice;
 import memory_pool;
@@ -9,15 +9,15 @@ import file_writer;
 import file_reader;
 import index_defines;
 import posting_field;
-import buffered_byte_slice;
+import posting_byte_slice;
 import short_list_optimize_util;
 
 namespace infinity {
 
-BufferedSkipListWriter::BufferedSkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool)
-    : BufferedByteSlice(byte_slice_pool, buffer_pool), last_key_(-1), last_value1_(-1) {}
+SkipListWriter::SkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool)
+    : PostingByteSlice(byte_slice_pool, buffer_pool), last_key_(-1), last_value1_(-1) {}
 
-void BufferedSkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
+void SkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
     assert(static_cast<u32>(-1) == last_key_ || key > last_key_);
     assert(static_cast<u32>(-1) == last_value1_ || value1 > last_value1_);
     last_key_ = static_cast<u32>(-1) == last_key_ ? 0 : last_key_;
@@ -33,7 +33,7 @@ void BufferedSkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
     }
 }
 
-void BufferedSkipListWriter::AddItem(u32 key, u32 value1) {
+void SkipListWriter::AddItem(u32 key, u32 value1) {
     assert(static_cast<u32>(-1) == last_key_ || key > last_key_);
     last_key_ = static_cast<u32>(-1) == last_key_ ? 0 : last_key_;
     PushBack(0, key - last_key_);
@@ -47,7 +47,7 @@ void BufferedSkipListWriter::AddItem(u32 key, u32 value1) {
     }
 }
 
-void BufferedSkipListWriter::AddItem(u32 value_delta) {
+void SkipListWriter::AddItem(u32 value_delta) {
     last_value1_ = static_cast<u32>(-1) == last_value1_ ? 0 : last_value1_;
     last_value1_ += value_delta;
     PushBack(0, last_value1_);
@@ -58,7 +58,7 @@ void BufferedSkipListWriter::AddItem(u32 value_delta) {
     }
 }
 
-void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+void SkipListWriter::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     if (spill) {
         file->WriteVInt(posting_writer_.GetSize());
         if (posting_writer_.GetSize() == 0)
@@ -69,7 +69,7 @@ void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file, bool spill)
     posting_writer_.Dump(file);
 }
 
-void BufferedSkipListWriter::Load(const SharedPtr<FileReader> &file) {
+void SkipListWriter::Load(const SharedPtr<FileReader> &file) {
     u32 size = file->ReadVInt();
     if (size == 0)
         return;

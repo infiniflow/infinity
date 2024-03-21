@@ -3,7 +3,7 @@
 import stl;
 import memory_pool;
 import index_defines;
-import buffered_byte_slice;
+import posting_byte_slice;
 import inmem_position_list_decoder;
 import doc_list_format_option;
 import position_list_skiplist_reader;
@@ -177,8 +177,7 @@ TEST_F(InMemPositionListDecoderTest, test4) {
     PositionListFormatOption option(of_position_list);
     InDocPositionState state(option);
 
-    BufferedByteSlice *pos_list_buffer =
-        new (byte_slice_pool_.Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(&byte_slice_pool_, &buffer_pool_);
+    PostingByteSlice *pos_list_buffer = new (byte_slice_pool_.Allocate(sizeof(PostingByteSlice))) PostingByteSlice(&byte_slice_pool_, &buffer_pool_);
     InMemPositionListDecoder decoder(option, &byte_slice_pool_);
     decoder.Init(100, NULL, pos_list_buffer);
 
