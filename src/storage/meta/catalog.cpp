@@ -549,18 +549,18 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             }
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
                 auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
-                const auto &db_name = add_segment_entry_op->db_name();
-                const auto &table_name = add_segment_entry_op->table_name();
-                auto segment_id = add_segment_entry_op->segment_id();
-                auto segment_status = add_segment_entry_op->status();
-                auto column_count = add_segment_entry_op->column_count();
-                auto row_count = add_segment_entry_op->row_count();
-                auto actual_row_count = add_segment_entry_op->actual_row_count();
-                auto row_capacity = add_segment_entry_op->row_capacity();
-                auto min_row_ts = add_segment_entry_op->min_row_ts();
-                auto max_row_ts = add_segment_entry_op->max_row_ts();
-                auto deprecate_ts = add_segment_entry_op->deprecate_ts();
-                bool set_sealed = add_segment_entry_op->set_sealed();
+                const auto &db_name = add_segment_entry_op->db_name_;
+                const auto &table_name = add_segment_entry_op->table_name_;
+                auto segment_id = add_segment_entry_op->segment_id_;
+                auto segment_status = add_segment_entry_op->status_;
+                auto column_count = add_segment_entry_op->column_count_;
+                auto row_count = add_segment_entry_op->row_count_;
+                auto actual_row_count = add_segment_entry_op->actual_row_count_;
+                auto row_capacity = add_segment_entry_op->row_capacity_;
+                auto min_row_ts = add_segment_entry_op->min_row_ts_;
+                auto max_row_ts = add_segment_entry_op->max_row_ts_;
+                auto deprecate_ts = add_segment_entry_op->deprecate_ts_;
+                bool set_sealed = add_segment_entry_op->set_sealed_;
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
@@ -581,7 +581,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                                   begin_ts,
                                                                                   txn_id);
                         if (set_sealed) {
-                            auto const &segment_filter_binary = add_segment_entry_op->segment_filter_binary_data();
+                            auto const &segment_filter_binary = add_segment_entry_op->segment_filter_binary_data_;
                             segment->LoadFilterBinaryData(segment_filter_binary);
                         }
                         return segment;
@@ -591,17 +591,17 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             }
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
                 auto add_block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
-                const auto &db_name = add_block_entry_op->db_name();
-                const auto &table_name = add_block_entry_op->table_name();
-                auto segment_id = add_block_entry_op->segment_id();
-                auto block_id = add_block_entry_op->block_id();
-                auto row_count = add_block_entry_op->row_count();
-                auto row_capacity = add_block_entry_op->row_capacity();
-                auto min_row_ts = add_block_entry_op->min_row_ts();
-                auto max_row_ts = add_block_entry_op->max_row_ts();
-                auto check_point_ts = add_block_entry_op->checkpoint_ts();
-                auto check_point_row_count = add_block_entry_op->checkpoint_row_count();
-                bool set_sealed = add_block_entry_op->set_sealed();
+                const auto &db_name = add_block_entry_op->db_name_;
+                const auto &table_name = add_block_entry_op->table_name_;
+                auto segment_id = add_block_entry_op->segment_id_;
+                auto block_id = add_block_entry_op->block_id_;
+                auto row_count = add_block_entry_op->row_count_;
+                auto row_capacity = add_block_entry_op->row_capacity_;
+                auto min_row_ts = add_block_entry_op->min_row_ts_;
+                auto max_row_ts = add_block_entry_op->max_row_ts_;
+                auto check_point_ts = add_block_entry_op->checkpoint_ts_;
+                auto check_point_row_count = add_block_entry_op->checkpoint_row_count_;
+                bool set_sealed = add_block_entry_op->set_sealed_;
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
@@ -619,7 +619,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                             check_point_row_count,
                                                                             buffer_mgr);
                         if (set_sealed) {
-                            auto const &block_filter_binary = add_block_entry_op->block_filter_binary_data();
+                            auto const &block_filter_binary = add_block_entry_op->block_filter_binary_data_;
                             block->LoadFilterBinaryData(block_filter_binary);
                         }
                         return block;

@@ -67,9 +67,7 @@ export enum class CatalogDeltaOpType : i8 {
 /// class CatalogDeltaOperation
 export class CatalogDeltaOperation {
 public:
-    CatalogDeltaOperation() = default;                                                                              // TODO: remove it
-    explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}                                        // TODO: remove it
-    explicit CatalogDeltaOperation(CatalogDeltaOpType type, bool is_delete) : is_delete_(is_delete), type_(type) {} // TODO: remove it
+    explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}
     explicit CatalogDeltaOperation(CatalogDeltaOpType type, TxnTimeStamp begin_ts, bool is_delete, TransactionID txn_id, TxnTimeStamp commit_ts)
         : begin_ts_(begin_ts), txn_id_(txn_id), commit_ts_(commit_ts), is_delete_(is_delete), type_(type) {}
     explicit CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry)
@@ -233,7 +231,7 @@ export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddSegmentEntryOp> ReadAdv(char *&ptr);
 
-    AddSegmentEntryOp() = default;
+    AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY){};
 
     explicit AddSegmentEntryOp(SegmentEntry *segment_entry, bool set_sealed = false)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry), db_name_(segment_entry->GetTableEntry()->GetDBName()),
@@ -275,26 +273,11 @@ public:
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
-    const SharedPtr<String> &db_name() const { return db_name_; }
-    const SharedPtr<String> &table_name() const { return table_name_; }
-    SegmentStatus status() const { return status_; }
-    SegmentID segment_id() const { return segment_id_; }
-    u64 column_count() const { return column_count_; }
-    SizeT row_count() const { return row_count_; }
-    SizeT actual_row_count() const { return actual_row_count_; }
-    SizeT row_capacity() const { return row_capacity_; }
-    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
-    TxnTimeStamp max_row_ts() const { return max_row_ts_; }
-    TxnTimeStamp deprecate_ts() const { return deprecate_ts_; }
-    bool set_sealed() const { return set_sealed_; }
-    const String &segment_filter_binary_data() const { return segment_filter_binary_data_; }
-
-private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> table_name_{};
     SegmentID segment_id_{};
 
-private:
+public:
     SegmentStatus status_{};
     u64 column_count_{0};
     SizeT row_count_{0};
@@ -315,7 +298,7 @@ export class AddBlockEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddBlockEntryOp> ReadAdv(char *&ptr);
 
-    AddBlockEntryOp() = default;
+    AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY){};
 
     explicit AddBlockEntryOp(BlockEntry *block_entry, bool set_sealed = false)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry), block_entry_(block_entry),
@@ -357,26 +340,12 @@ public:
     BlockEntry *block_entry_{};
 
 public:
-    const SharedPtr<String> &db_name() const { return db_name_; }
-    const SharedPtr<String> &table_name() const { return table_name_; }
-    SegmentID segment_id() const { return segment_id_; }
-    BlockID block_id() const { return block_id_; }
-    u16 row_count() const { return row_count_; }
-    u16 row_capacity() const { return row_capacity_; }
-    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
-    TxnTimeStamp max_row_ts() const { return max_row_ts_; }
-    TxnTimeStamp checkpoint_ts() const { return checkpoint_ts_; }
-    u16 checkpoint_row_count() const { return checkpoint_row_count_; }
-    bool set_sealed() const { return set_sealed_; }
-    const String &block_filter_binary_data() const { return block_filter_binary_data_; }
-
-private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> table_name_{};
     SegmentID segment_id_{0};
     BlockID block_id_{0};
 
-private:
+public:
     // For update
     u16 row_capacity_{0};
     u16 row_count_{0};

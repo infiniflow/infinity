@@ -781,7 +781,7 @@ bool GlobalCatalogDeltaEntry::PruneDeltaOp(CatalogDeltaOperation *delta_op, TxnT
         }
         case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
             auto *op = static_cast<AddSegmentEntryOp *>(delta_op);
-            if (op->status() == SegmentStatus::kDeprecated) {
+            if (op->status_ == SegmentStatus::kDeprecated) {
                 prune = true;
             }
             break;

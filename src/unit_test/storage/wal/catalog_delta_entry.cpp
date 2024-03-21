@@ -73,9 +73,22 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
         catalog_delta_entry1->operations().push_back(std::move(op1));
 
         auto op2 = MakeUnique<AddSegmentEntryOp>();
+        op2->db_name_ = db_name;
+        op2->table_name_ = table_name;
+        op2->segment_id_ = segment_id;
+        op2->status_ = SegmentStatus::kUnsealed;
+        op2->column_count_ = op2->row_count_ = op2->actual_row_count_ = op2->row_capacity_ = 0;
+        op2->min_row_ts_ = op2->max_row_ts_ = op2->deprecate_ts_ = 0;
+        op2->set_sealed_ = false;
         catalog_delta_entry1->operations().push_back(std::move(op2));
 
         auto op3 = MakeUnique<AddBlockEntryOp>();
+        op3->db_name_ = db_name;
+        op3->table_name_ = table_name;
+        op3->segment_id_ = segment_id;
+        op3->block_id_ = block_id;
+        op3->row_capacity_ = op3->row_count_ = op3->min_row_ts_ = op3->max_row_ts_ = op3->checkpoint_ts_ = op3->checkpoint_row_count_ = 0;
+        op3->set_sealed_ = false;
         catalog_delta_entry1->operations().push_back(std::move(op3));
 
         auto op4 = MakeUnique<AddColumnEntryOp>(4, false, 0, 0, db_name, table_name, segment_id, block_id, column_id, 0);
@@ -149,12 +162,39 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     // segment entry
     auto op7 = MakeUnique<AddSegmentEntryOp>();
     auto op7_same_name = MakeUnique<AddSegmentEntryOp>();
+
+    op7_same_name->db_name_ = op7->db_name_ = db_name;
+    op7_same_name->table_name_ = op7->table_name_ = table_name;
+    op7_same_name->segment_id_ = op7->segment_id_ = segment_id;
+
+    op7->status_ = SegmentStatus::kUnsealed;
+    op7->column_count_ = op7->row_count_ = op7->actual_row_count_ = op7->row_capacity_ = 0;
+    op7->min_row_ts_ = op7->max_row_ts_ = op7->deprecate_ts_ = 0;
+    op7->set_sealed_ = false;
+    op7_same_name->status_ = SegmentStatus::kUnsealed;
+    op7_same_name->column_count_ = op7_same_name->row_count_ = op7_same_name->actual_row_count_ = op7_same_name->row_capacity_ = 0;
+    op7_same_name->min_row_ts_ = op7_same_name->max_row_ts_ = op7_same_name->deprecate_ts_ = 0;
+    op7_same_name->set_sealed_ = false;
+
     local_catalog_delta_entry->operations().push_back(std::move(op7));
     local_catalog_delta_entry->operations().push_back(std::move(op7_same_name));
 
     // block entry
     auto op9 = MakeUnique<AddBlockEntryOp>();
     auto op9_same_name = MakeUnique<AddBlockEntryOp>();
+
+    op9_same_name->db_name_ = op9->db_name_ = db_name;
+    op9_same_name->table_name_ = op9->table_name_ = table_name;
+    op9_same_name->segment_id_ = op9->segment_id_ = segment_id;
+    op9_same_name->block_id_ = op9->block_id_ = block_id;
+
+    op9->row_capacity_ = op9->row_count_ = op9->min_row_ts_ = op9->max_row_ts_ = op9->checkpoint_ts_ = op9->checkpoint_row_count_ = 0;
+    op9->set_sealed_ = false;
+
+    op9_same_name->row_capacity_ = op9_same_name->row_count_ = op9_same_name->min_row_ts_ = op9_same_name->max_row_ts_ =
+        op9_same_name->checkpoint_ts_ = op9_same_name->checkpoint_row_count_ = 0;
+    op9_same_name->set_sealed_ = false;
+
     local_catalog_delta_entry->operations().push_back(std::move(op9));
     local_catalog_delta_entry->operations().push_back(std::move(op9_same_name));
 
