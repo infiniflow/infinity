@@ -862,15 +862,15 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 
-    {
-        std::stringstream ss;
-        ss << "Save delta catalog ops: ";
-        for (auto &op : flush_delta_entry->operations()) {
-            ss << op->ToString() << ". txn id: " << op->txn_id_ << "\n";
-        }
-        LOG_INFO(ss.str());
-    }
-    // LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    // {
+    //     std::stringstream ss;
+    //     ss << "Save delta catalog ops: ";
+    //     for (auto &op : flush_delta_entry->operations()) {
+    //         ss << op->ToString() << ". txn id: " << op->txn_id_ << "\n";
+    //     }
+    //     LOG_INFO(ss.str());
+    // }
+    LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids());
 

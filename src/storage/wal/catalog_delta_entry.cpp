@@ -829,16 +829,18 @@ bool GlobalCatalogDeltaEntry::PruneDeltaOp(CatalogDeltaOperation *delta_op, TxnT
 }
 
 void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1, TxnTimeStamp current_commit_ts) {
-    auto iter = delta_ops_.lower_bound(encode1);
     SizeT end_i = encode1.rfind('@');
     if (end_i == String::npos) {
         UnrecoverableError(fmt::format("encode1 {} not found '@'", encode1));
     }
     auto end1 = encode1.begin() + end_i;
+    auto encode1_prefix = encode1.substr(0, end_i);
+
+    auto iter = delta_ops_.lower_bound(encode1_prefix);
     while (iter != delta_ops_.end()) {
         const auto &[encode2, delta_op2] = *iter;
         auto [iter1, iter2] = std::mismatch(encode1.begin(), end1, encode2.begin());
-        if (iter1 != encode1.end()) {
+        if (iter1 != end1) {
             break;
         }
         if (iter2 == encode2.end()) { // encode == encode1
@@ -848,6 +850,14 @@ void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1, TxnTi
         if (*iter2 != '#' && *iter2 != '@') {
             ++iter;
             continue;
+        }
+        if (*iter2 == '@') {
+            auto type1 = static_cast<CatalogDeltaOpType>(std::stoi(encode1.substr(end_i + 1)));
+            auto type2 = static_cast<CatalogDeltaOpType>(std::stoi(encode2.substr(iter2 - encode2.begin() + 1)));
+            if (type1 == type2) { // same
+                ++iter;
+                continue;
+            }
         }
         iter = delta_ops_.erase(iter);
     }
