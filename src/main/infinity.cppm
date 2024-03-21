@@ -103,6 +103,8 @@ public:
 
     QueryResult DropIndex(const String &db_name, const String &table_name, const String &index_name, const DropIndexOptions &drop_index_option);
 
+    QueryResult ShowIndex(const String &db_name, const String &table_name, const String &index_name);
+
     QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
