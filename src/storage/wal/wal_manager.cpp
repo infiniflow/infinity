@@ -101,13 +101,13 @@ void WalManager::Stop() {
 
     checkpoint_running_.store(false);
 
-    // Wait for checkpoint thread to stop.
-    LOG_TRACE("WalManager::Stop checkpoint thread join");
-    checkpoint_thread_.join();
-
     // Wait for add delta entries thread to stop.
     LOG_TRACE("WalManager::Stop add delta entries thread join");
     apply_delta_entries_thread_.join();
+
+    // Wait for checkpoint thread to stop.
+    LOG_TRACE("WalManager::Stop checkpoint thread join");
+    checkpoint_thread_.join();
 
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
@@ -257,7 +257,7 @@ void WalManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
 void WalManager::ApplyDeltaEntries() {
     LOG_TRACE("WalManager::ApplyDeltaEntries mainloop begin");
     Catalog *catalog = storage_->catalog();
-    while (checkpoint_running_.load()) {
+    while (checkpoint_running_.load() || !delta_entries_.empty()) {
         auto [max_commit_ts, wal_size] = GetWalState();
         mutex3_.lock();
         if (delta_entries_.empty() || delta_entries_.front()->commit_ts() > max_commit_ts || !allow_add_delta_op_.load()) {
@@ -288,6 +288,7 @@ void WalManager::CheckpointTimer() {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         Checkpoint();
     }
+    Checkpoint();
     LOG_INFO("WalManager::Checkpoint mainloop end");
 }
 
@@ -298,7 +299,7 @@ void WalManager::Checkpoint() {
     i64 full_duration = current_time - last_full_ckp_time_;
     i64 delta_duration = current_time - last_delta_ckp_time_;
 
-    allow_add_delta_op_.store(false); // Prohibit add newer delta entry, because "current_max_commit_ts" is get. 
+    allow_add_delta_op_.store(false); // Prohibit add newer delta entry, because "current_max_commit_ts" is get.
     // So that delta op that can checkpoint always has smaller commit_ts than "current_max_commit_ts".
     DeferFn defer([&] { allow_add_delta_op_.store(true); });
     auto [current_max_commit_ts, current_wal_size] = GetWalState();
@@ -651,8 +652,8 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             // case WalCommandType::SET_SEGMENT_STATUS_SEALED:
-            //     WalCmdSetSegmentStatusSealedReplay(*dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
-            //     break;
+            //     WalCmdSetSegmentStatusSealedReplay(*dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get()), entry.txn_id_,
+            //     entry.commit_ts_); break;
             // case WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA:
             //     WalCmdUpdateSegmentBloomFilterDataReplay(*dynamic_cast<const WalCmdUpdateSegmentBloomFilterData *>(cmd.get()),
             //                                              entry.txn_id_,

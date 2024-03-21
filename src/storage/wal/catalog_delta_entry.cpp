@@ -548,7 +548,8 @@ void AddTableEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     if (other->type_ != CatalogDeltaOpType::ADD_TABLE_ENTRY) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
-    *this = std::move(*static_cast<AddTableEntryOp *>(other.get()));
+    auto *add_table_op = static_cast<AddTableEntryOp *>(other.get());
+    *this = std::move(*add_table_op);
 }
 
 void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
@@ -715,6 +716,10 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) 
     }
     max_commit_ts_ = commit_ts;
     txn_ids_ = {txn_id};
+    for (auto &operation : operations_) {
+        operation->begin_ts_ = txn_id;
+        operation->commit_ts_ = commit_ts;
+    }
 }
 
 String CatalogDeltaEntry::ToString() const {
