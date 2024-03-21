@@ -12,16 +12,14 @@ import position_list_format_option;
 import posting_field;
 import short_list_optimize_util;
 import index_defines;
-import position_bitmap_reader;
 import index_defines;
 module position_list_decoder;
 
 namespace infinity {
 
 PositionListDecoder::PositionListDecoder(const PositionListFormatOption &option, MemoryPool *session_pool)
-    : pos_skiplist_reader_(nullptr), session_pool_(session_pool), pos_encoder_(nullptr), pos_bitmap_reader_(nullptr),
-      pos_bitmap_block_buffer_(nullptr), pos_bitmap_block_count_(0), total_tf_(0), decoded_pos_count_(0), record_offset_(0), pre_record_ttf_(0),
-      offset_in_record_(0), pos_list_begin_(0), last_decode_offset_(0), option_(option), own_pos_bitmap_block_buffer_(false), need_reopen_(true),
+    : pos_skiplist_reader_(nullptr), session_pool_(session_pool), pos_encoder_(nullptr), total_tf_(0), decoded_pos_count_(0), record_offset_(0),
+      pre_record_ttf_(0), offset_in_record_(0), pos_list_begin_(0), last_decode_offset_(0), option_(option), need_reopen_(true),
       pos_single_slice_(nullptr) {}
 
 PositionListDecoder::~PositionListDecoder() {
@@ -30,65 +28,10 @@ PositionListDecoder::~PositionListDecoder() {
             pos_skiplist_reader_->~PositionListSkipListReader();
             session_pool_->Deallocate((void *)pos_skiplist_reader_, sizeof(PositionListSkipListReader));
         }
-        if (pos_bitmap_reader_) {
-            pos_bitmap_reader_->~PositionBitmapReader();
-            session_pool_->Deallocate((void *)pos_bitmap_reader_, sizeof(PositionBitmapReader));
-        }
     } else {
         if (pos_skiplist_reader_)
             delete pos_skiplist_reader_;
-        if (pos_bitmap_reader_)
-            delete pos_bitmap_reader_;
         pos_skiplist_reader_ = nullptr;
-        pos_bitmap_reader_ = nullptr;
-    }
-    if (own_pos_bitmap_block_buffer_) {
-        if (session_pool_) {
-            session_pool_->Deallocate((void *)pos_bitmap_block_buffer_, sizeof(u32) * pos_bitmap_block_count_);
-        } else {
-            delete[] pos_bitmap_block_buffer_;
-        }
-        pos_bitmap_block_buffer_ = nullptr;
-    }
-}
-
-void PositionListDecoder::InitPositionBitmapReader(const ByteSliceList *pos_list, u32 &pos_list_cursor, InDocPositionState *state) {
-    u32 bitmapListBegin = pos_list_cursor;
-    pos_bitmap_reader_ =
-        session_pool_ ? new ((session_pool_)->Allocate(sizeof(PositionBitmapReader))) PositionBitmapReader() : new PositionBitmapReader;
-    pos_bitmap_reader_->Init(pos_list, bitmapListBegin);
-    pos_list_cursor += pos_bitmap_reader_->GetBitmapListSize();
-}
-
-void PositionListDecoder::InitPositionBitmapReader(ByteSlice *pos_list, u32 &pos_list_cursor, InDocPositionState *state) {
-    u32 bitmapListBegin = pos_list_cursor;
-    pos_bitmap_reader_ =
-        session_pool_ ? new ((session_pool_)->Allocate(sizeof(PositionBitmapReader))) PositionBitmapReader() : new PositionBitmapReader;
-    pos_bitmap_reader_->Init(pos_list, bitmapListBegin);
-    pos_list_cursor += pos_bitmap_reader_->GetBitmapListSize();
-}
-
-void PositionListDecoder::InitPositionBitmapBlockBuffer(ByteSliceReader &pos_list_reader,
-                                                        tf_t total_tf,
-                                                        u32 pos_skiplist_start,
-                                                        u32 pos_skiplist_len,
-                                                        InDocPositionState *state) {
-    pos_bitmap_block_count_ = pos_skiplist_len / sizeof(u32);
-    pos_bitmap_block_buffer_ =
-        session_pool_ ? (u32 *)session_pool_->Allocate(pos_bitmap_block_count_ * sizeof(u32)) : new u32[pos_bitmap_block_count_];
-
-    void *tmpPtr = pos_bitmap_block_buffer_;
-    pos_list_reader.ReadMayCopy(tmpPtr, pos_skiplist_len);
-    if (tmpPtr == pos_bitmap_block_buffer_) {
-        own_pos_bitmap_block_buffer_ = true;
-    } else {
-        own_pos_bitmap_block_buffer_ = false;
-        if (session_pool_) {
-            session_pool_->Deallocate((void *)pos_bitmap_block_buffer_, sizeof(u32) * pos_bitmap_block_count_);
-        } else {
-            delete[] pos_bitmap_block_buffer_;
-        }
-        pos_bitmap_block_buffer_ = (u32 *)tmpPtr;
     }
 }
 
@@ -132,10 +75,6 @@ void PositionListDecoder::Init(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_
     total_tf_ = total_tf;
     pos_encoder_ = GetPosListEncoder();
 
-    if (option_.HasTfBitmap()) {
-        InitPositionBitmapReader(pos_list, pos_list_begin, state);
-    }
-
     if (!option_.HasPositionList()) {
         return;
     }
@@ -149,11 +88,7 @@ void PositionListDecoder::Init(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_
     u32 pos_skiplist_start = pos_list_reader_.Tell();
     pos_list_begin_ = pos_skiplist_start + pos_skiplist_len;
 
-    if (option_.HasTfBitmap()) {
-        InitPositionBitmapBlockBuffer(pos_list_reader_, total_tf, pos_skiplist_start, pos_skiplist_len, state);
-    } else {
-        InitPositionSkipList(pos_list, total_tf, pos_skiplist_start, pos_skiplist_len, state);
-    }
+    InitPositionSkipList(pos_list, total_tf, pos_skiplist_start, pos_skiplist_len, state);
 
     pos_list_reader_.Seek(pos_list_begin_);
 }
@@ -161,9 +96,6 @@ void PositionListDecoder::Init(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_
 void PositionListDecoder::Init(const ByteSliceList *pos_list, tf_t total_tf, u32 pos_list_begin, InDocPositionState *state) {
     total_tf_ = total_tf;
     pos_encoder_ = GetPosListEncoder();
-    if (option_.HasTfBitmap()) {
-        InitPositionBitmapReader(pos_list, pos_list_begin, state);
-    }
 
     if (!option_.HasPositionList()) {
         return;
@@ -178,17 +110,13 @@ void PositionListDecoder::Init(const ByteSliceList *pos_list, tf_t total_tf, u32
     u32 pos_skiplist_start = pos_list_reader_.Tell();
     pos_list_begin_ = pos_skiplist_start + pos_skiplist_len;
 
-    if (option_.HasTfBitmap()) {
-        InitPositionBitmapBlockBuffer(pos_list_reader_, total_tf, pos_skiplist_start, pos_skiplist_len, state);
-    } else {
-        InitPositionSkipList(pos_list, total_tf, pos_skiplist_start, pos_skiplist_len, state);
-    }
+    InitPositionSkipList(pos_list, total_tf, pos_skiplist_start, pos_skiplist_len, state);
 
     pos_list_reader_.Seek(pos_list_begin_);
 }
 
 bool PositionListDecoder::SkipTo(ttf_t current_ttf, InDocPositionState *state) {
-    if (!option_.HasPositionList() || option_.HasTfBitmap()) {
+    if (!option_.HasPositionList()) {
         return true;
     }
 
@@ -215,13 +143,10 @@ bool PositionListDecoder::LocateRecord(const InDocPositionState *state, u32 &tf)
     u32 record_offset;
     i32 offset_in_record;
 
-    if (option_.HasTfBitmap()) {
-        CalculateRecordOffsetByPosBitmap(state, tf, record_offset, offset_in_record);
-    } else {
-        record_offset = state->GetRecordOffset();
-        offset_in_record = state->GetOffsetInRecord();
-        tf = state->tf_;
-    }
+    record_offset = state->GetRecordOffset();
+    offset_in_record = state->GetOffsetInRecord();
+    tf = state->tf_;
+
     record_offset_ = record_offset;
     offset_in_record_ = offset_in_record;
 
@@ -244,32 +169,10 @@ bool PositionListDecoder::LocateRecord(const InDocPositionState *state, u32 &tf)
     return true;
 }
 
-void PositionListDecoder::CalculateRecordOffsetByPosBitmap(const InDocPositionState *state, u32 &tf, u32 &record_offset, i32 &offset_in_record) {
-    PositionCountInfo info = pos_bitmap_reader_->GetPosCountInfo(state->GetSeekedDocCount());
-    tf = info.current_doc_pos_count_;
-    u32 pre_agg_pos_count = info.pre_doc_agg_pos_count_;
-    record_offset = record_offset_;
-    u32 decode_block_pos_count = (decoded_pos_count_ & MAX_POS_PER_RECORD_MASK);
-    if (likely(decode_block_pos_count == 0)) {
-        decode_block_pos_count = MAX_POS_PER_RECORD;
-    }
-
-    if (pre_agg_pos_count >= decoded_pos_count_ || pre_agg_pos_count < decoded_pos_count_ - decode_block_pos_count) {
-        u32 blockIndex = pre_agg_pos_count >> MAX_POS_PER_RECORD_BIT_NUM;
-        u32 offset = blockIndex == 0 ? 0 : pos_bitmap_block_buffer_[blockIndex - 1];
-        decoded_pos_count_ = blockIndex == pos_bitmap_block_count_ ? total_tf_ : (blockIndex + 1) << MAX_POS_PER_RECORD_BIT_NUM;
-        decode_block_pos_count = (decoded_pos_count_ & MAX_POS_PER_RECORD_MASK);
-        if (likely(decode_block_pos_count == 0)) {
-            decode_block_pos_count = MAX_POS_PER_RECORD;
-        }
-        record_offset = pos_list_begin_ + offset;
-    }
-    offset_in_record = pre_agg_pos_count - (decoded_pos_count_ - decode_block_pos_count);
-}
-
 u32 PositionListDecoder::DecodeRecord(pos_t *pos_buffer, u32 pos_buffer_len) {
     last_decode_offset_ = pos_list_reader_.Tell();
     auto pos_count = pos_encoder_->Decode(pos_buffer, pos_buffer_len, pos_list_reader_);
     return pos_count;
 }
+
 } // namespace infinity

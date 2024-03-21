@@ -9,7 +9,6 @@ import buffered_byte_slice;
 import buffered_skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
-import position_bitmap_writer;
 import inmem_position_list_skiplist_reader;
 import inmem_doc_list_skiplist_reader;
 import index_defines;
@@ -23,17 +22,13 @@ DocListEncoder::DocListEncoder(const DocListFormatOption &format_option,
                                RecyclePool *buffer_pool,
                                DocListFormat *doc_list_format)
     : doc_list_buffer_(byte_slice_pool, buffer_pool), own_doc_list_format_(false), format_option_(format_option), doc_list_format_(doc_list_format),
-      last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), tf_bitmap_writer_(nullptr), doc_skiplist_writer_(nullptr),
-      byte_slice_pool_(byte_slice_pool) {
+      last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr), byte_slice_pool_(byte_slice_pool) {
     if (!doc_list_format) {
         doc_list_format_ = new DocListFormat;
         doc_list_format_->Init(format_option);
         own_doc_list_format_ = true;
     }
     doc_list_buffer_.Init(doc_list_format_);
-    if (format_option_.HasTfBitmap()) {
-        tf_bitmap_writer_ = new PositionBitmapWriter(byte_slice_pool_);
-    }
     CreateDocSkipListWriter();
 }
 
@@ -41,10 +36,6 @@ DocListEncoder::~DocListEncoder() {
     if (own_doc_list_format_) {
         delete doc_list_format_;
         doc_list_format_ = nullptr;
-    }
-    if (tf_bitmap_writer_) {
-        delete tf_bitmap_writer_;
-        tf_bitmap_writer_ = nullptr;
     }
     if (doc_skiplist_writer_) {
         doc_skiplist_writer_->~BufferedSkipListWriter();
@@ -61,20 +52,12 @@ void DocListEncoder::EndDocument(docid_t doc_id, docpayload_t doc_payload) {
     AddDocument(doc_id, doc_payload, current_tf_);
     df_ += 1;
     current_tf_ = 0;
-    if (tf_bitmap_writer_) {
-        // set to remember the first occ in this doc
-        tf_bitmap_writer_->Set(total_tf_ - current_tf_);
-        tf_bitmap_writer_->EndDocument(df_, total_tf_);
-    }
 }
 
 void DocListEncoder::Flush() {
     FlushDocListBuffer();
     if (doc_skiplist_writer_) {
         doc_skiplist_writer_->Flush();
-    }
-    if (tf_bitmap_writer_) {
-        tf_bitmap_writer_->Resize(total_tf_);
     }
 }
 
@@ -120,9 +103,6 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     }
 
     doc_list_buffer_.Dump(file, spill);
-    if (tf_bitmap_writer_) {
-        tf_bitmap_writer_->Dump(file, total_tf_);
-    }
 }
 
 void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
@@ -142,12 +122,7 @@ u32 DocListEncoder::GetDumpLength() {
         doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
     }
     u32 doc_list_size = doc_list_buffer_.EstimateDumpSize();
-    u32 tf_bitmap_length = 0;
-    if (tf_bitmap_length) {
-        tf_bitmap_length = tf_bitmap_writer_->GetDumpLength(total_tf_);
-    }
-    return VByteCompressor::GetVInt32Length(doc_skiplist_size) + VByteCompressor::GetVInt32Length(doc_list_size) + doc_skiplist_size + doc_list_size +
-           tf_bitmap_length;
+    return VByteCompressor::GetVInt32Length(doc_skiplist_size) + VByteCompressor::GetVInt32Length(doc_list_size) + doc_skiplist_size + doc_list_size;
 }
 
 void DocListEncoder::FlushDocListBuffer() {

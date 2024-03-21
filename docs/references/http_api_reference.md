@@ -505,12 +505,12 @@ curl --request GET \
         {
             "name": "index1",
             "index_type": "HNSW",
-            "columns": "column1"
+            "columns": ["column1"]
         },
         {
             "name": "index2",
             "index_type": "HNSW",
-            "columns": "column2"
+            "columns": ["column2"]
         }
     ]
 }

@@ -17,6 +17,14 @@
 
 namespace infinity {
 
+std::unordered_map<std::string, ConstraintType> string_to_constraint_type = {
+    {"primary key", ConstraintType::kPrimaryKey},
+    {"unique", ConstraintType::kUnique},
+    {"null", ConstraintType::kNull},
+    {"not null", ConstraintType::kNotNull},
+    {"invalid", ConstraintType::kInvalid},
+};
+
 std::string ConstrainTypeToString(ConstraintType type) {
     switch (type) {
         case ConstraintType::kPrimaryKey:
@@ -31,6 +39,15 @@ std::string ConstrainTypeToString(ConstraintType type) {
             return "Invalid";
     }
     ParserError("Unexpected error.");
+}
+
+ConstraintType StringToConstraintType(const std::string &type) {
+    auto iter = string_to_constraint_type.find(type);
+    if(iter != string_to_constraint_type.end()) {
+        return iter->second;
+    } else {
+        return ConstraintType::kInvalid;
+    }
 }
 
 ColumnDef::ColumnDef(int64_t id, std::shared_ptr<DataType> column_type, std::string column_name, std::unordered_set<ConstraintType> constraints)
@@ -62,33 +79,6 @@ std::string ColumnDef::ToString() const {
         ss << " " << ConstrainTypeToString(constraint);
     }
     return ss.str();
-}
-
-ConstraintType ColumnDef::StringToConstraintType(std::string type) {
-    std::map<std::string, int> string_to_constraint_type = {
-        {"primarykey", 1},
-        {"unique", 2},
-        {"null", 3},
-        {"not null", 4},
-        {"invalid", 5},
-    };
-    if(string_to_constraint_type.find(type) != string_to_constraint_type.end()){
-        int num = string_to_constraint_type.find(type)->second;
-        switch (num) {
-            case 1:
-                return ConstraintType::kPrimaryKey;
-            case 2:
-                return ConstraintType::kUnique;
-            case 3:
-                return ConstraintType::kNull;
-            case 4:
-                return ConstraintType::kNotNull;
-            case 5:
-                return ConstraintType::kInvalid;
-        }  
-    }
-    ParserError("Unexpected error.");
-    return ConstraintType::kInvalid;
 }
 
 } // namespace infinity
