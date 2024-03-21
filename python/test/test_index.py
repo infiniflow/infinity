@@ -227,7 +227,6 @@ class TestIndex:
                                                        index.InitParameter("metric", "l2")])], ConflictType.Error)
 
     # drop index then show index
-    @pytest.mark.skip(reason="Not support for showing index yet.")
     def test_drop_index_show_index(self, get_infinity_db):
         # connect
         db_obj = get_infinity_db
@@ -240,6 +239,13 @@ class TestIndex:
                                                       index.IndexType.IVFFlat,
                                                       [index.InitParameter("centroids_count", "128"),
                                                        index.InitParameter("metric", "l2")])], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.show_index("my_index")
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.list_indexes()
+        assert res.error_code == ErrorCode.OK
 
         table_obj.drop_index("my_index")
 

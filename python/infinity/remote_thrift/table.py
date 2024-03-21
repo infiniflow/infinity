@@ -91,6 +91,23 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
+    def show_index(self, index_name: str):
+
+        check_valid_name(index_name, "Index")
+        res = self._conn.show_index(db_name=self._db_name, table_name=self._table_name, index_name=index_name)
+
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def list_indexes(self):
+        res = self._conn.list_indexes(db_name=self._db_name, table_name=self._table_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
     def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
         db_name = self._db_name
