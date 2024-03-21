@@ -57,7 +57,7 @@ public:
     static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
 
     virtual String ToString() const;
-
+    virtual String BuildOtherParamsString() const = 0;
     virtual nlohmann::json Serialize() const;
 
     static SharedPtr<IndexBase> Deserialize(const nlohmann::json &index_def_json);

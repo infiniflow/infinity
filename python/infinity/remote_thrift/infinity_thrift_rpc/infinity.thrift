@@ -372,8 +372,12 @@ struct ShowIndexResponse {
 3: string db_name,
 4: string table_name,
 5: string index_name,
-6: string store_dir,
-7: string index_info,
+6: string index_type,
+7: string index_column_names,
+8: string index_column_ids,
+9: string other_parameters,
+10: string store_dir,
+11: string segment_index_count,
 }
 
 struct GetDatabaseRequest {
