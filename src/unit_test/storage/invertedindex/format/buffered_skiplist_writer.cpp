@@ -4,6 +4,7 @@ import stl;
 import memory_pool;
 import buffered_skiplist_writer;
 import buffered_byte_slice_reader;
+import buffered_byte_slice;
 import index_defines;
 import posting_field;
 import file_writer;
@@ -17,15 +18,14 @@ public:
     BufferedSkipListWriterTest() {
         byte_slice_pool_ = new MemoryPool(BUFFER_SIZE_);
         buffer_pool_ = new RecyclePool(BUFFER_SIZE_);
-//        void *buffer = byte_slice_pool_->Allocate(sizeof(BufferedSkipListWriter));
-//        buffered_skiplist_writer_.reset(new (buffer) BufferedSkipListWriter(byte_slice_pool_, buffer_pool_));
-        buffered_skiplist_writer_ = MakeShared<BufferedSkipListWriter>(byte_slice_pool_, buffer_pool_);
     }
     ~BufferedSkipListWriterTest() {
         delete byte_slice_pool_;
         delete buffer_pool_;
     }
-    void SetUp() override {}
+    void SetUp() override {
+        buffered_skiplist_writer_ = MakeShared<BufferedSkipListWriter>(byte_slice_pool_, buffer_pool_);
+    }
 
     void TearDown() override { buffered_skiplist_writer_.reset(); }
 
@@ -49,41 +49,13 @@ TEST_F(BufferedSkipListWriterTest, test1) {
 
     ASSERT_NE(nullptr, buffered_skiplist_writer_);
     PostingFields posting_fields;
-
-    // auto posting_field = MakeShared<TypedPostingField<u32>>();
     auto posting_field = new TypedPostingField<u32>();
     posting_fields.AddValue(posting_field);
-
-    //    std::cout << "values size: " << posting_fields.values_.size() << std::endl;
-    //    std::cout << "values[0] size: " << posting_fields.values_[0]->GetSize() << std::endl;
-    //
-    //    std::cout << posting_fields.GetTotalSize() << std::endl;
-
     buffered_skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
-    // auto short_buffer = buffered_skiplist_writer_->GetBuffer();
-    // std::cout << "capacity: " << static_cast<int>(short_buffer.Capacity()) << std::endl;
-    // std::cout << "size: " << static_cast<int>(short_buffer.Size()) << std::endl;
-    // std::cout << "new capacity = " << static_cast<int>(short_buffer.AllocatePlan(short_buffer.Capacity())) << std::endl;
 
-    // ASSERT_NE(short_buffer.GetPostingValues(), nullptr);
-
-    // short_buffer.PushBack(0, 1);
-    // short_buffer.
-
-    // buffered_skiplist_writer_->AddItem(delta);
-
-
-    //    auto fs = MakeShared<LocalFileSystem>();
-    //    String file_path = "buffered_skiplist_writer_test1.txt";
-    //    const SizeT BUFFER_SIZE = 1024;
-    //    auto file_writer = MakeShared<FileWriter>(*fs, file_path, BUFFER_SIZE);
     String file_path = "buffered_skiplist_writer_test1.txt";
     auto file_writer = CreateFileWriter(file_path);
-    //    std::cout << "SKIP_LIST_BUFFER_SIZE = " << static_cast<int>(SKIP_LIST_BUFFER_SIZE) << std::endl;
-    //
-    //    std::cout << "EstimateDumpSize: " << buffered_skiplist_writer_->EstimateDumpSize() << std::endl;
-    //    std::cout << "sizeof u32 = " << sizeof(u32) << std::endl;
 
     Vector<u32> expected_values;
     u32 now_value = 0;
@@ -91,19 +63,10 @@ TEST_F(BufferedSkipListWriterTest, test1) {
         buffered_skiplist_writer_->AddItem(delta);
         now_value += delta;
         expected_values.emplace_back(now_value);
-        // std::cout << "after insert " << i << ", EstimateDumpSize=" << buffered_skiplist_writer_->EstimateDumpSize() << std::endl;
     }
 
-    // SizeT expected_dump_size = 40;
-    // ASSERT_EQ(expected_dump_size, buffered_skiplist_writer_->EstimateDumpSize());
-
-    // buffered_skiplist_writer_->Dump(file_writer);
-
-    // std::cout << "Before Dump EstimateDumpSize: " << buffered_skiplist_writer_->EstimateDumpSize() << std::endl;
     buffered_skiplist_writer_->Dump(file_writer);
-    // std::cout << "After Dump EstimateDumpSize: " << buffered_skiplist_writer_->EstimateDumpSize() << std::endl;
 
-    // SharedPtr<BufferedByteSliceReader> reader = MakeShared<BufferedByteSliceReader>();
     auto reader = MakeShared<BufferedByteSliceReader>();
     reader->Open(buffered_skiplist_writer_.get());
 
@@ -112,26 +75,10 @@ TEST_F(BufferedSkipListWriterTest, test1) {
     ASSERT_TRUE(reader->Decode<u32>(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode<u32>(val_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
 
-    //    std::cout << "decode count: " << decode_len << std::endl;
-    //    std::cout << static_cast<int>(pos_buffer[0]) << std::endl;
     for (size_t i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
         auto value = val_buffer[i];
-        // std::cout << i << " " << value << " : " << expected_values[i] << std::endl;
         ASSERT_EQ(value, expected_values[i]);
     }
-    //    for (size_t i = SKIP_LIST_BUFFER_SIZE; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
-    //        auto value = val_buffer[i];
-    //        ASSERT_EQ(value, expected_values[i]);
-    //    }
-    //    std::cout << val_buffer[0] << " " << val_buffer[1] << std::endl;
-
-    // TODO yzc:
-    // invokes AddItem(u32 key) SKIP_LIST_BUFFER_SIZE+2 times
-    // Dump()
-    // check EstimateDumpSize()
-    // read back via BufferedByteSliceReader
-    // check the values
-    //    std::cout << "end" << std::endl;
 }
 
 TEST_F(BufferedSkipListWriterTest, test2) {
@@ -140,8 +87,19 @@ TEST_F(BufferedSkipListWriterTest, test2) {
     ASSERT_NE(nullptr, buffered_skiplist_writer_);
     PostingFields posting_fields;
 
-    auto posting_field_key = new TypedPostingField<u32>();
-    auto posting_field_value = new TypedPostingField<u32>();
+    u8 row_count = 0;
+    u32 offset = 0;
+
+    auto posting_field_key = new TypedPostingField<u32>;
+    posting_field_key->location_ = row_count++;
+    posting_field_key->offset_ = offset;
+    offset += sizeof(u32);
+
+    auto posting_field_value = new TypedPostingField<u32>;
+    posting_field_value->location_ = row_count++;
+    posting_field_value->offset_ = offset;
+    offset += sizeof(u32);
+
     posting_fields.AddValue(posting_field_key);
     posting_fields.AddValue(posting_field_value);
 
@@ -158,67 +116,115 @@ TEST_F(BufferedSkipListWriterTest, test2) {
     u32 now_value = 0;
     for (int i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
         now_key += delta;
-        now_value += delta + 1;
+        now_value += delta - 1;
         buffered_skiplist_writer_->AddItem(now_key, now_value);
         expected_keys.emplace_back(now_key);
         expected_values.emplace_back(now_value);
-        // std::cout << "after insert " << i << ", EstimateDumpSize=" << buffered_skiplist_writer_->EstimateDumpSize() << std::endl;
     }
-    // SizeT expected_dump_size = 40;
-    // ASSERT_EQ(expected_dump_size, buffered_skiplist_writer_->EstimateDumpSize());
 
-    // buffered_skiplist_writer_->Dump(file_writer);
-
-    // std::cout << "Before Dump EstimateDumpSize: " << buffered_skiplist_writer_->EstimateDumpSize() << std::endl;
     buffered_skiplist_writer_->Dump(file_writer);
-    // std::cout << "After Dump EstimateDumpSize: " << buffered_skiplist_writer_->EstimateDumpSize() << std::endl;
 
-    // SharedPtr<BufferedByteSliceReader> reader = MakeShared<BufferedByteSliceReader>();
     auto reader = MakeShared<BufferedByteSliceReader>();
     reader->Open(buffered_skiplist_writer_.get());
 
+    u32 key_buffer[BUFFER_SIZE_];
     u32 val_buffer[BUFFER_SIZE_];
     SizeT decode_len;
 
-    reader->Seek(0);
-    ASSERT_TRUE(reader->Decode<u32>(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
-    ASSERT_TRUE(reader->Decode<u32>(val_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
+    ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
+    ASSERT_TRUE(reader->Decode(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
+    ASSERT_TRUE(reader->Decode(key_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
+    ASSERT_TRUE(reader->Decode(val_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
 
+    u32 read_key = 0;
+    u32 read_value = 0;
     for (size_t i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
-        std::cout << i << " " << val_buffer[i] << std::endl;
+        read_key += key_buffer[i];
+        read_value = val_buffer[i];
+        ASSERT_EQ(read_key, expected_keys[i]);
+        ASSERT_EQ(read_value, expected_values[i]);
     }
 
-    reader->Seek(1);
-    ASSERT_TRUE(reader->Decode<u32>(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
-    ASSERT_TRUE(reader->Decode<u32>(val_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
-
-    for (size_t i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
-        std::cout << i << " " << val_buffer[i] << std::endl;
-    }
-
-    //    std::cout << "decode count: " << decode_len << std::endl;
-    //    std::cout << static_cast<int>(pos_buffer[0]) << std::endl;
-    //    for (size_t i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
-    //        auto value = val_buffer[i];
-    //        // std::cout << i << " " << value << " : " << expected_values[i] << std::endl;
-    //        ASSERT_EQ(value, expected_values[i]);
-    //    }
-
-    // TODO yzc:
-    // invokes AddItem(u32 key, u32 value1) SKIP_LIST_BUFFER_SIZE+2 times
-    // Dump()
-    // check EstimateDumpSize()
-    // read back via BufferedByteSliceReader
-    // check the values
 }
 
 TEST_F(BufferedSkipListWriterTest, test3) {
     using namespace infinity;
 
-    // TODO yzc:
-    // invokes AddItem(u32 key, u32 value1, u32 value2) SKIP_LIST_BUFFER_SIZE+2 times
-    // Dump()
-    // check EstimateDumpSize()
-    // read back via BufferedByteSliceReader
-    // check the values
+    ASSERT_NE(nullptr, buffered_skiplist_writer_);
+    PostingFields posting_fields;
+
+    u8 row_count = 0;
+    u32 offset = 0;
+
+    auto posting_field_key = new TypedPostingField<u32>;
+    posting_field_key->location_ = row_count++;
+    posting_field_key->offset_ = offset;
+    offset += sizeof(u32);
+
+    auto posting_field_value1 = new TypedPostingField<u32>;
+    posting_field_value1->location_ = row_count++;
+    posting_field_value1->offset_ = offset;
+    offset += sizeof(u32);
+
+    auto posting_field_value2 = new TypedPostingField<u32>;
+    posting_field_value2->location_ = row_count++;
+    posting_field_value2->offset_ = offset;
+    offset += sizeof(u32);
+
+    posting_fields.AddValue(posting_field_key);
+    posting_fields.AddValue(posting_field_value1);
+    posting_fields.AddValue(posting_field_value2);
+
+    buffered_skiplist_writer_->Init(&posting_fields);
+    const u32 delta = 10;
+
+    String file_path = "buffered_skiplist_writer_test3.txt";
+    auto file_writer = CreateFileWriter(file_path);
+
+    Vector<u32> expected_keys;
+    Vector<u32> expected_values1;
+    Vector<u32> expected_values2;
+
+    u32 now_key = 0;
+    u32 now_value1 = 0;
+    u32 now_value2 = 0;
+
+    for (int i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
+        now_key += delta;
+        now_value1 += delta - 1;
+        now_value2 += delta - 2;
+        buffered_skiplist_writer_->AddItem(now_key, now_value1, now_value2);
+        expected_keys.emplace_back(now_key);
+        expected_values1.emplace_back(now_value1);
+        expected_values2.emplace_back(now_value2);
+    }
+
+    buffered_skiplist_writer_->Dump(file_writer);
+
+    auto reader = MakeShared<BufferedByteSliceReader>();
+    reader->Open(buffered_skiplist_writer_.get());
+
+    u32 key_buffer[BUFFER_SIZE_];
+    u32 val1_buffer[BUFFER_SIZE_];
+    u32 val2_buffer[BUFFER_SIZE_];
+    SizeT decode_len;
+
+    ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
+    ASSERT_TRUE(reader->Decode(val1_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
+    ASSERT_TRUE(reader->Decode(val2_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
+    ASSERT_TRUE(reader->Decode(key_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
+    ASSERT_TRUE(reader->Decode(val1_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
+    ASSERT_TRUE(reader->Decode(val2_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
+
+    u32 read_key = 0;
+    u32 read_value1 = 0;
+    u32 read_value2 = 0;
+    for (size_t i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
+        read_key += key_buffer[i];
+        read_value1 += val1_buffer[i];
+        read_value2 = val2_buffer[i];
+        ASSERT_EQ(read_key, expected_keys[i]);
+        ASSERT_EQ(read_value1, expected_values1[i]);
+        ASSERT_EQ(read_value2, expected_values2[i]);
+    }
 }
