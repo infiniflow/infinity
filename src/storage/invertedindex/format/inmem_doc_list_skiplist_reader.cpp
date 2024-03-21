@@ -28,7 +28,7 @@ Pair<int, bool> InMemDocListSkipListReader::LoadBuffer() {
     FlushInfo flushInfo = skiplist_buffer_->GetFlushInfo();
 
     SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
-    if (flushInfo.IsValidShortBuffer() == false) {
+    if (flushInfo.IsValidPostingBuffer() == false) {
         decode_count = flush_count;
     }
     if (decode_count == 0) {

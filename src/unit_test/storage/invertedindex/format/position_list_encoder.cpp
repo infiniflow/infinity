@@ -7,7 +7,7 @@ import index_defines;
 import buffered_byte_slice;
 import position_list_format_option;
 import position_list_encoder;
-import buffered_skiplist_writer;
+import skiplist_writer;
 import buffered_byte_slice_reader;
 import file_writer;
 import file_reader;

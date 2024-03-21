@@ -5,7 +5,7 @@ import memory_pool;
 import file_writer;
 import file_reader;
 import buffered_byte_slice;
-import buffered_skiplist_writer;
+import skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
 import index_defines;
@@ -75,7 +75,7 @@ private:
     tf_t total_tf_;
     df_t df_;
 
-    BufferedSkipListWriter *doc_skiplist_writer_{nullptr};
+    SkipListWriter *doc_skiplist_writer_{nullptr};
     MemoryPool *byte_slice_pool_{nullptr};
     friend class InMemDocListDecoderTest;
 };

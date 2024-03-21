@@ -6,7 +6,7 @@ import memory_pool;
 import file_writer;
 import file_reader;
 import buffered_byte_slice;
-import buffered_skiplist_writer;
+import skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
 import inmem_position_list_skiplist_reader;
@@ -38,7 +38,7 @@ DocListEncoder::~DocListEncoder() {
         doc_list_format_ = nullptr;
     }
     if (doc_skiplist_writer_) {
-        doc_skiplist_writer_->~BufferedSkipListWriter();
+        doc_skiplist_writer_->~SkipListWriter();
         doc_skiplist_writer_ = nullptr;
     }
 }
@@ -136,9 +136,9 @@ void DocListEncoder::FlushDocListBuffer() {
 }
 
 void DocListEncoder::CreateDocSkipListWriter() {
-    void *buffer = byte_slice_pool_->Allocate(sizeof(BufferedSkipListWriter));
+    void *buffer = byte_slice_pool_->Allocate(sizeof(SkipListWriter));
     RecyclePool *buffer_pool = dynamic_cast<RecyclePool *>(doc_list_buffer_.GetBufferPool());
-    BufferedSkipListWriter *doc_skiplist_writer = new (buffer) BufferedSkipListWriter(byte_slice_pool_, buffer_pool);
+    SkipListWriter *doc_skiplist_writer = new (buffer) SkipListWriter(byte_slice_pool_, buffer_pool);
     doc_skiplist_writer->Init(doc_list_format_->GetDocSkipListFormat());
     doc_skiplist_writer_ = doc_skiplist_writer;
 }

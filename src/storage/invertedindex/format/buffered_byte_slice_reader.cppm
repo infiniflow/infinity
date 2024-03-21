@@ -8,29 +8,29 @@ import byte_slice_reader;
 import buffered_byte_slice;
 import flush_info;
 import posting_field;
-import short_buffer;
+import posting_buffer;
 export module buffered_byte_slice_reader;
 
 namespace infinity {
 
 export class BufferedByteSliceReader {
 public:
-    BufferedByteSliceReader() : location_cursor_(0), short_buffer_cursor_(0), buffered_byte_slice_(nullptr) {}
+    BufferedByteSliceReader() : location_cursor_(0), posting_buffer_cursor_(0), buffered_byte_slice_(nullptr) {}
 
     ~BufferedByteSliceReader() = default;
 
     void Open(const BufferedByteSlice *buffered_byte_slice) {
         location_cursor_ = 0;
-        short_buffer_cursor_ = 0;
+        posting_buffer_cursor_ = 0;
         byte_slice_reader_.Open(const_cast<ByteSliceList *>(buffered_byte_slice->GetByteSliceList()));
         buffered_byte_slice_ = buffered_byte_slice;
-        posting_values_ = buffered_byte_slice_->GetPostingValues();
+        posting_fields_ = buffered_byte_slice_->GetPostingFields();
     }
 
     void Seek(u32 pos) {
         byte_slice_reader_.Seek(pos);
         location_cursor_ = 0;
-        short_buffer_cursor_ = 0;
+        posting_buffer_cursor_ = 0;
     }
 
     u32 Tell() const { return byte_slice_reader_.Tell(); }
@@ -41,22 +41,22 @@ public:
 private:
     void IncValueCursor() {
         location_cursor_++;
-        if (location_cursor_ == posting_values_->GetSize()) {
+        if (location_cursor_ == posting_fields_->GetSize()) {
             location_cursor_ = 0;
         }
     }
 
-    bool IsValidShortBuffer() const {
+    bool IsValidPostingBuffer() const {
         u32 buffer_size = buffered_byte_slice_->GetBufferSize();
-        return buffer_size > 0 && short_buffer_cursor_ < posting_values_->GetSize() && buffered_byte_slice_->IsShortBufferValid();
+        return buffer_size > 0 && posting_buffer_cursor_ < posting_fields_->GetSize() && buffered_byte_slice_->IsPostingBufferValid();
     }
 
 private:
     u8 location_cursor_;
-    u8 short_buffer_cursor_;
+    u8 posting_buffer_cursor_;
     ByteSliceReader byte_slice_reader_;
     const BufferedByteSlice *buffered_byte_slice_{nullptr};
-    const PostingFields *posting_values_{nullptr};
+    const PostingFields *posting_fields_{nullptr};
 
     friend class BufferedByteSliceReaderTest;
 };
@@ -69,23 +69,23 @@ bool BufferedByteSliceReader::Decode(T *buffer, SizeT count, SizeT &decode_count
     FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
     u32 byte_slice_size = flush_info.GetFlushLength();
 
-    if (byte_slice_reader_.Tell() >= byte_slice_size && !IsValidShortBuffer()) {
+    if (byte_slice_reader_.Tell() >= byte_slice_size && !IsValidPostingBuffer()) {
         return false;
     }
 
-    PostingField *current_value = posting_values_->GetValue(location_cursor_);
+    PostingField *current_value = posting_fields_->GetValue(location_cursor_);
 
     if (byte_slice_reader_.Tell() >= byte_slice_size) {
         SizeT buffer_size = buffered_byte_slice_->GetBufferSize();
         assert(buffer_size <= count);
 
-        const ShortBuffer &shortBuffer = buffered_byte_slice_->GetBuffer();
-        const T *src = shortBuffer.GetRowTyped<T>(current_value->location_);
+        const PostingBuffer &posting_buffer = buffered_byte_slice_->GetBuffer();
+        const T *src = posting_buffer.GetRowTyped<T>(current_value->location_);
 
         std::memcpy((void *)buffer, (const void *)src, buffer_size * sizeof(T));
 
         decode_count = buffer_size;
-        short_buffer_cursor_++;
+        posting_buffer_cursor_++;
     } else {
         decode_count = current_value->Decode((u8 *)buffer, count * sizeof(T), byte_slice_reader_);
     }

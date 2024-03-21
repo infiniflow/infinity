@@ -6,14 +6,14 @@ import file_reader;
 import buffered_byte_slice;
 import short_list_optimize_util;
 import memory_pool;
-export module buffered_skiplist_writer;
+export module skiplist_writer;
 
 namespace infinity {
 
-export class BufferedSkipListWriter : public BufferedByteSlice {
+export class SkipListWriter : public BufferedByteSlice {
 public:
-    BufferedSkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
-    virtual ~BufferedSkipListWriter() = default;
+    SkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
+    virtual ~SkipListWriter() = default;
 
     void AddItem(u32 delta_value1);
 

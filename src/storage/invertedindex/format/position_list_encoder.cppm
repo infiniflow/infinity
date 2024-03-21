@@ -8,7 +8,7 @@ import file_writer;
 import file_reader;
 import index_defines;
 import buffered_byte_slice;
-import buffered_skiplist_writer;
+import skiplist_writer;
 import position_list_format_option;
 import inmem_position_list_decoder;
 export module position_list_encoder;
@@ -37,11 +37,11 @@ public:
 
     const BufferedByteSlice *GetBufferedByteSlice() const { return &pos_list_buffer_; }
 
-    void SetDocSkipListWriter(BufferedSkipListWriter *writer) { pos_skiplist_writer_ = writer; }
+    void SetDocSkipListWriter(SkipListWriter *writer) { pos_skiplist_writer_ = writer; }
 
     const PositionListFormat *GetPositionListFormat() const { return pos_list_format_; }
 
-    BufferedSkipListWriter *GetBufferedSkipListWriter() const { return pos_skiplist_writer_; }
+    SkipListWriter *GetSkipListWriter() const { return pos_skiplist_writer_; }
 
 private:
     void CreatePosSkipListWriter();
@@ -54,7 +54,7 @@ private:
     u32 total_pos_count_;                             // 4byte
     PositionListFormatOption pos_list_format_option_; // 1byte
     bool is_own_format_;                              // 1byte
-    BufferedSkipListWriter *pos_skiplist_writer_;
+    SkipListWriter *pos_skiplist_writer_;
     const PositionListFormat *pos_list_format_;
     MemoryPool *byte_slice_pool_;
 };

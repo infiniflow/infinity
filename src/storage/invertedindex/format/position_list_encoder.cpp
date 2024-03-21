@@ -10,7 +10,7 @@ import file_reader;
 import vbyte_compressor;
 import index_defines;
 import buffered_byte_slice;
-import buffered_skiplist_writer;
+import skiplist_writer;
 import position_list_format_option;
 import inmem_position_list_decoder;
 import inmem_position_list_skiplist_reader;
@@ -34,7 +34,7 @@ PositionListEncoder::PositionListEncoder(const PositionListFormatOption &positio
 
 PositionListEncoder::~PositionListEncoder() {
     if (pos_skiplist_writer_) {
-        pos_skiplist_writer_->~BufferedSkipListWriter();
+        pos_skiplist_writer_->~SkipListWriter();
         pos_skiplist_writer_ = nullptr;
     }
     if (is_own_format_) {
@@ -107,8 +107,8 @@ void PositionListEncoder::CreatePosSkipListWriter() {
     MemoryPool *bufferPool = dynamic_cast<MemoryPool *>(pos_list_buffer_.GetBufferPool());
     assert(bufferPool);
 
-    void *buffer = byte_slice_pool_->Allocate(sizeof(BufferedSkipListWriter));
-    BufferedSkipListWriter *pos_skiplist_writer = new (buffer) BufferedSkipListWriter(byte_slice_pool_, bufferPool);
+    void *buffer = byte_slice_pool_->Allocate(sizeof(SkipListWriter));
+    SkipListWriter *pos_skiplist_writer = new (buffer) SkipListWriter(byte_slice_pool_, bufferPool);
     pos_skiplist_writer->Init(pos_list_format_->GetPositionSkipListFormat());
 
     pos_skiplist_writer_ = pos_skiplist_writer;

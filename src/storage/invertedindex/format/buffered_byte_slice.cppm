@@ -9,7 +9,7 @@ import file_reader;
 import flush_info;
 import posting_field;
 import index_defines;
-import short_buffer;
+import posting_buffer;
 
 export module buffered_byte_slice;
 
@@ -27,7 +27,7 @@ public:
     void PushBack(u8 row, T value);
 
     void EndPushBack() {
-        flush_info_.SetIsValidShortBuffer(true);
+        flush_info_.SetIsValidPostingBuffer(true);
         buffer_.EndPushBack();
     }
 
@@ -37,13 +37,13 @@ public:
 
     MemoryPool *GetBufferPool() const { return buffer_.GetPool(); }
 
-    const PostingFields *GetPostingValues() const { return buffer_.GetPostingValues(); }
+    const PostingFields *GetPostingFields() const { return buffer_.GetPostingFields(); }
 
     void SnapShot(BufferedByteSlice *buffer) const;
 
-    bool IsShortBufferValid() const { return flush_info_.IsValidShortBuffer(); }
+    bool IsPostingBufferValid() const { return flush_info_.IsValidPostingBuffer(); }
 
-    const ShortBuffer &GetBuffer() const { return buffer_; }
+    const PostingBuffer &GetBuffer() const { return buffer_; }
 
     SizeT GetBufferSize() const { return buffer_.Size(); }
 
@@ -64,7 +64,7 @@ protected:
 
 protected:
     FlushInfo flush_info_;
-    ShortBuffer buffer_;
+    PostingBuffer buffer_;
     ByteSliceWriter posting_writer_;
 };
 

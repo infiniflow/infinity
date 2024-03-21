@@ -16,7 +16,7 @@ void BufferedByteSlice::Init(const PostingFields *value) { buffer_.Init(value); 
 
 SizeT BufferedByteSlice::DoFlush() {
     u32 flush_size = 0;
-    const PostingFields *posting_fields = buffer_.GetPostingValues();
+    const PostingFields *posting_fields = buffer_.GetPostingFields();
     for (SizeT i = 0; i < posting_fields->GetSize(); ++i) {
         PostingField *posting_field = posting_fields->GetValue(i);
         u8 *buffer = buffer_.GetRow(posting_field->location_);
@@ -33,7 +33,7 @@ SizeT BufferedByteSlice::Flush() {
     FlushInfo flush_info;
     flush_info.SetFlushCount(flush_info_.GetFlushCount() + buffer_.Size());
     flush_info.SetFlushLength(flush_info_.GetFlushLength() + flush_size);
-    flush_info.SetIsValidShortBuffer(false);
+    flush_info.SetIsValidPostingBuffer(false);
     flush_info_ = flush_info;
 
     buffer_.Clear();
@@ -62,7 +62,7 @@ void BufferedByteSlice::Load(const SharedPtr<FileReader> &file) {
 }
 
 void BufferedByteSlice::SnapShot(BufferedByteSlice *buffer) const {
-    buffer->Init(GetPostingValues());
+    buffer->Init(GetPostingFields());
     buffer->flush_info_ = flush_info_;
     posting_writer_.SnapShot(buffer->posting_writer_);
     buffer_.SnapShot(buffer->buffer_);

@@ -48,7 +48,7 @@ TEST_F(BufferedByteSliceTest, test1) {
     buffered_byte_slice_->EndPushBack();
 
     FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
-    ASSERT_TRUE(flush_info.IsValidShortBuffer());
+    ASSERT_TRUE(flush_info.IsValidPostingBuffer());
 
     buffered_byte_slice_->PushBack(0, (uint32_t)2);
     buffered_byte_slice_->PushBack(1, (uint16_t)3);
@@ -80,7 +80,7 @@ TEST_F(BufferedByteSliceTest, test2) {
     buffered_byte_slice_->Flush();
 
     FlushInfo flush_info = buffered_byte_slice_->GetFlushInfo();
-    ASSERT_TRUE(!flush_info.IsValidShortBuffer());
+    ASSERT_TRUE(!flush_info.IsValidPostingBuffer());
     ASSERT_EQ((uint32_t)1, flush_info.GetFlushCount());
     ASSERT_EQ((size_t)0, buffered_byte_slice_->GetBufferSize());
     ASSERT_EQ((size_t)0, buffered_byte_slice_->Flush());
