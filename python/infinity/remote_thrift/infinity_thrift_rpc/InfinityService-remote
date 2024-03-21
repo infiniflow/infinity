@@ -39,6 +39,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  UploadResponse UploadFileChunk(FileChunk request)')
     print('  ListDatabaseResponse ListDatabase(ListDatabaseRequest request)')
     print('  ListTableResponse ListTable(ListTableRequest request)')
+    print('  ListIndexResponse ListIndex(ListIndexRequest request)')
     print('  SelectResponse ShowVariable(ShowVariableRequest request)')
     print('  ShowTableResponse ShowTable(ShowTableRequest request)')
     print('  SelectResponse ShowColumns(ShowColumnsRequest request)')
@@ -217,6 +218,12 @@ elif cmd == 'ListTable':
         print('ListTable requires 1 args')
         sys.exit(1)
     pp.pprint(client.ListTable(eval(args[0]),))
+
+elif cmd == 'ListIndex':
+    if len(args) != 1:
+        print('ListIndex requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ListIndex(eval(args[0]),))
 
 elif cmd == 'ShowVariable':
     if len(args) != 1:

@@ -275,6 +275,18 @@ struct ListTableResponse {
 3: list<string> table_names = [],
 }
 
+struct ListIndexRequest {
+1: string db_name,
+2: string table_name,
+3: i64 session_id,
+}
+
+struct ListIndexResponse {
+1: i64 error_code,
+2: string error_msg,
+3: list<string> index_names = [],
+}
+
 struct ShowDatabaseRequest {
 1: string db_name,
 2: i64 session_id,
@@ -355,10 +367,13 @@ struct ShowIndexRequest {
 }
 
 struct ShowIndexResponse {
-1: string db_name,
-2: string table_name,
-3: string index_name,
-4: string store_dir,
+1: i64 error_code,
+2: string error_msg,
+3: string db_name,
+4: string table_name,
+5: string index_name,
+6: string store_dir,
+7: string index_info,
 }
 
 struct GetDatabaseRequest {
@@ -518,6 +533,7 @@ UploadResponse UploadFileChunk(1:FileChunk request),
 
 ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),
+ListIndexResponse ListIndex(1:ListIndexRequest request),
 
 SelectResponse ShowVariable(1:ShowVariableRequest request),
 ShowTableResponse ShowTable(1:ShowTableRequest request),
