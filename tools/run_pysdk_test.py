@@ -13,17 +13,11 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print(f"start pysdk test with {pytest_mark}")
     process = subprocess.Popen(
         ["python", "-m", "pytest", "--tb=line", '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
         universal_newlines=True,
     )
 
-    def reader(pipe, func):
-        for line in iter(pipe.readline, ""):
-            func(line.strip())
-
-    threading.Thread(target=reader, args=[process.stdout, print]).start()
-    threading.Thread(target=reader, args=[process.stderr, print]).start()
     process.wait()
     if process.returncode != 0:
         raise Exception(f"An error occurred: {process.stderr}")

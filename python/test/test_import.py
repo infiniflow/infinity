@@ -54,7 +54,7 @@ class TestImport:
         test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)
 
-        res = table_obj.import_data(test_csv_dir, None)
+        res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
         # search
@@ -84,7 +84,8 @@ class TestImport:
             print(res)
 
         print(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
-        table_obj.import_data(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format, None)
+        table_obj.import_data(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
+                              {"file_type":file_format})
         res = table_obj.output(["*"]).to_df()
         print(res)
 
@@ -227,7 +228,6 @@ class TestImport:
         print(res)
 
     # import fvecs, when table with more columns
-    @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_fvecs_table_with_more_columns(self, get_infinity_db, check_data):
@@ -241,7 +241,7 @@ class TestImport:
                                         {"c1": "int", "c2": "vector,128,float"})
         with pytest.raises(Exception, match="ERROR:3037*"):
             test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.fvecs"
-            res = table_obj.import_data(test_csv_dir, None)
+            res = table_obj.import_data(test_csv_dir, import_options={"file_type": "fvecs"})
             assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
@@ -274,7 +274,7 @@ class TestImport:
         table_obj = db_obj.create_table("test_import_embedding_with_not_match_definition", {"c1": "int", "c2": types})
 
         test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
-        res = table_obj.import_data(test_csv_dir, None)
+        res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
@@ -291,7 +291,7 @@ class TestImport:
         table_obj = db_obj.create_table("test_import_varchar_with_not_match_definition", {"c1": "int", "c2": "varchar"})
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_varchar.csv"
-        res = table_obj.import_data(test_csv_dir, None)
+        res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_pl()
@@ -310,7 +310,7 @@ class TestImport:
         table_obj = db_obj.create_table("test_import_10000_columns", {"c1": "int", "c2": "int"})
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_big_int.csv"
-        res = table_obj.import_data(test_csv_dir, None)
+        res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
@@ -332,7 +332,7 @@ class TestImport:
         table_obj = db_obj.create_table("test_table_with_not_matched_columns", columns)
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_commas.csv"
-        res = table_obj.import_data(test_csv_dir, None)
+        res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
@@ -351,7 +351,7 @@ class TestImport:
         table_obj = db_obj.create_table("test_import_exceeding_rows", {"c1": "int", "c2": "varchar"})
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_big_varchar_rows.csv"
-        res = table_obj.import_data(test_csv_dir, None)
+        res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
@@ -370,7 +370,7 @@ class TestImport:
         table_obj = db_obj.create_table("test_import_exceeding_columns", columns)
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_big_columns.csv"
-        res = table_obj.import_data(test_csv_dir, None)
+        res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()

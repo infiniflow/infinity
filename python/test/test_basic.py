@@ -83,7 +83,7 @@ class TestCase:
         for port in ports:
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
-
+            infinity_obj.drop_database("my_db", ConflictType.Ignore)
             # infinity
             db_obj = infinity_obj.create_database("my_db")
             assert db_obj is not None
