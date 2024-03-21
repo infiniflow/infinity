@@ -83,9 +83,7 @@ private:
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts);
 
-    void DropEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                         TransactionID txn_id,
-                         TxnTimeStamp begin_ts);
+    void DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     DBEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
     //
