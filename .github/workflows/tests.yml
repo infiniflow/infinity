@@ -96,7 +96,7 @@ jobs:
 
       - name: Stop infinity sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-debug/src/infinity)
+        run: sudo kill $(pidof cmake-build-debug/src/infinity) && sleep 5s
 
       - name: Check infinity recovery after sqllogictest
         if: ${{ !cancelled() && !failure() }}
@@ -192,7 +192,7 @@ jobs:
 
       - name: Stop infinity sqllogictest release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-release/src/infinity)
+        run: sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
 
       - name: Check infinity recovery after sqllogictest
         if: ${{ !cancelled() && !failure() }}
