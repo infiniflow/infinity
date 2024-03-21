@@ -2,8 +2,8 @@ module;
 
 import stl;
 import memory_pool;
-import buffered_byte_slice;
-import buffered_byte_slice_reader;
+import posting_byte_slice;
+import posting_byte_slice_reader;
 import position_list_skiplist_reader;
 
 export module inmem_position_list_skiplist_reader;
@@ -18,14 +18,14 @@ public:
 
     InMemPositionListSkipListReader(const InMemPositionListSkipListReader &other) = delete;
 
-    void Load(BufferedByteSlice *posting_buffer);
+    void Load(PostingByteSlice *posting_buffer);
 
 private:
     Pair<int, bool> LoadBuffer() override;
 
     MemoryPool *session_pool_;
-    BufferedByteSlice *skiplist_buffer_;
-    BufferedByteSliceReader skiplist_reader_;
+    PostingByteSlice *skiplist_buffer_;
+    PostingByteSliceReader skiplist_reader_;
 };
 
 } // namespace infinity

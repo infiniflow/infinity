@@ -2,8 +2,8 @@
 
 import stl;
 import memory_pool;
-import buffered_byte_slice;
-import buffered_byte_slice_reader;
+import posting_byte_slice;
+import posting_byte_slice_reader;
 import doc_list_format_option;
 import index_defines;
 import flush_info;
