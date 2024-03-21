@@ -171,11 +171,11 @@ jobs:
 
       - name: Check infinity recovery after pysdk test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/infinity > debug.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
-        run: sleep 5s && sudo kill $(pidof cmake-build-debug/src/infinity) && sleep 5s
+        run: sleep 5s && sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
 
       - name: Start infinity sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
@@ -192,11 +192,11 @@ jobs:
 
       - name: Check infinity recovery after sqllogictest
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/infinity > debug.log 2>&1" &
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/infinity > debug.log 2>&1" &
 
       - name: Stop infinity
         if: ${{ !cancelled() && !failure() }}
-        run: sleep 5s && sudo kill $(pidof cmake-build-debug/src/infinity) && sleep 5s
+        run: sleep 5s && sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
 
       - name: Collect infinity release output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
