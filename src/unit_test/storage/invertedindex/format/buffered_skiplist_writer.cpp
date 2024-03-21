@@ -114,6 +114,11 @@ TEST_F(BufferedSkipListWriterTest, test2) {
 
     u32 now_key = 0;
     u32 now_value = 0;
+
+    buffered_skiplist_writer_->AddItem(now_key, now_value);
+    expected_keys.emplace_back(now_key);
+    expected_values.emplace_back(now_value);
+
     for (int i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
         now_key += delta;
         now_value += delta - 1;
@@ -133,8 +138,8 @@ TEST_F(BufferedSkipListWriterTest, test2) {
 
     ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode(val_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
-    ASSERT_TRUE(reader->Decode(key_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
-    ASSERT_TRUE(reader->Decode(val_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
+    ASSERT_TRUE(reader->Decode(key_buffer + SKIP_LIST_BUFFER_SIZE, 3, decode_len));
+    ASSERT_TRUE(reader->Decode(val_buffer + SKIP_LIST_BUFFER_SIZE, 3, decode_len));
 
     u32 read_key = 0;
     u32 read_value = 0;
@@ -188,6 +193,10 @@ TEST_F(BufferedSkipListWriterTest, test3) {
     u32 now_key = 0;
     u32 now_value1 = 0;
     u32 now_value2 = 0;
+    buffered_skiplist_writer_->AddItem(now_key, now_value1, now_value2);
+    expected_keys.emplace_back(now_key);
+    expected_values1.emplace_back(now_value1);
+    expected_values2.emplace_back(now_value2);
 
     for (int i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
         now_key += delta;
@@ -212,14 +221,14 @@ TEST_F(BufferedSkipListWriterTest, test3) {
     ASSERT_TRUE(reader->Decode(key_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode(val1_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
     ASSERT_TRUE(reader->Decode(val2_buffer, SKIP_LIST_BUFFER_SIZE, decode_len));
-    ASSERT_TRUE(reader->Decode(key_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
-    ASSERT_TRUE(reader->Decode(val1_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
-    ASSERT_TRUE(reader->Decode(val2_buffer + SKIP_LIST_BUFFER_SIZE, 2, decode_len));
+    ASSERT_TRUE(reader->Decode(key_buffer + SKIP_LIST_BUFFER_SIZE, 3, decode_len));
+    ASSERT_TRUE(reader->Decode(val1_buffer + SKIP_LIST_BUFFER_SIZE, 3, decode_len));
+    ASSERT_TRUE(reader->Decode(val2_buffer + SKIP_LIST_BUFFER_SIZE, 3, decode_len));
 
     u32 read_key = 0;
     u32 read_value1 = 0;
     u32 read_value2 = 0;
-    for (size_t i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
+    for (size_t i = 0; i < SKIP_LIST_BUFFER_SIZE + 3; ++i) {
         read_key += key_buffer[i];
         read_value1 += val1_buffer[i];
         read_value2 = val2_buffer[i];

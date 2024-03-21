@@ -15,11 +15,13 @@ import short_list_optimize_util;
 namespace infinity {
 
 BufferedSkipListWriter::BufferedSkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool)
-    : BufferedByteSlice(byte_slice_pool, buffer_pool), last_key_(0), last_value1_(0) {}
+    : BufferedByteSlice(byte_slice_pool, buffer_pool), last_key_(-1), last_value1_(-1) {}
 
 void BufferedSkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
-    assert(key > last_key_);
-    assert(value1 > last_value1_);
+    assert(static_cast<u32>(-1) == last_key_ || key > last_key_);
+    assert(static_cast<u32>(-1) == last_value1_ || value1 > last_value1_);
+    last_key_ = static_cast<u32>(-1) == last_key_ ? 0 : last_key_;
+    last_value1_ = static_cast<u32>(-1) == last_value1_ ? 0 : last_value1_;
     PushBack(0, key - last_key_);
     PushBack(1, value1 - last_value1_);
     last_key_ = key;
@@ -32,7 +34,8 @@ void BufferedSkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
 }
 
 void BufferedSkipListWriter::AddItem(u32 key, u32 value1) {
-    assert(key > last_key_);
+    assert(static_cast<u32>(-1) == last_key_ || key > last_key_);
+    last_key_ = static_cast<u32>(-1) == last_key_ ? 0 : last_key_;
     PushBack(0, key - last_key_);
     PushBack(1, value1);
     EndPushBack();
@@ -45,6 +48,7 @@ void BufferedSkipListWriter::AddItem(u32 key, u32 value1) {
 }
 
 void BufferedSkipListWriter::AddItem(u32 value_delta) {
+    last_value1_ = static_cast<u32>(-1) == last_value1_ ? 0 : last_value1_;
     last_value1_ += value_delta;
     PushBack(0, last_value1_);
     EndPushBack();
