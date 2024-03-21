@@ -71,7 +71,7 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("EmbeddingDataType: {} is not support.", knn_scan_shared_data_->elem_type_)));
+            RecoverableError(Status::NotSupport(fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_))));
         }
     }
 }
