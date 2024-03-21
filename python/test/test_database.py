@@ -14,8 +14,9 @@
 
 import threading
 import infinity
-from common import common_values
 import pytest
+from common import common_values
+from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
@@ -538,15 +539,16 @@ class TestDatabase:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Attempt to access an invalid index of column vector")
     def test_show_database(self):
         # create db
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj.drop_database("test_show_database", ConflictType.Ignore)
         infinity_obj.create_database("test_show_database")
 
-        infinity_obj.show_database("test_show_database")
+        res = infinity_obj.show_database("test_show_database")
+        assert res.database_name=="test_show_database"
 
-        infinity_obj.drop_database("test_show_database")
+        infinity_obj.drop_database("test_show_database", ConflictType.Ignore)
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
