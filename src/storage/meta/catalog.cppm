@@ -131,10 +131,7 @@ public:
                               TransactionID txn_id,
                               TxnTimeStamp begin_ts);
 
-    void DropDatabaseReplay(const String &db_name,
-                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                            TransactionID txn_id,
-                            TxnTimeStamp begin_ts);
+    void DropDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -239,6 +236,8 @@ public:
     UniquePtr<String> SaveFullCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
     bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
+
+    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_ops);
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 

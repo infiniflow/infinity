@@ -71,7 +71,7 @@ void Storage::Init() {
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
                                       bg_processor_.get(),
-                                      std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
+                                      wal_mgr_.get(),
                                       new_catalog_->next_txn_id_,
                                       system_start_ts,
                                       config_ptr_->enable_compaction());
