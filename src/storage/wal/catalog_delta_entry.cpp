@@ -760,6 +760,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry
 UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp flush_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
+    TxnTimeStamp max_ts = 0;
     {
         std::unique_lock w_lock(mtx_);
 
@@ -767,17 +768,17 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
 
-        if (max_commit_ts_ > flush_ts) {
-            // all delta op in global delta entry should have been flushed in wal
-            UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {}", max_commit_ts_, flush_ts));
-        }
-        flush_delta_entry->set_commit_ts(flush_ts);
         flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids_.begin(), txn_ids_.end()));
 
+        std::swap(max_ts, max_commit_ts_);
         max_commit_ts_ = 0;
         txn_ids_.clear();
         delta_ops_.clear();
     }
+    if (max_ts > flush_ts) {
+        UnrecoverableError(fmt::format("max_ts_ {} > flush_ts {}", max_ts, flush_ts));
+    }
+    flush_delta_entry->set_commit_ts(flush_ts);
 
     // write delta op from top to bottom.
     std::sort(flush_delta_entry->operations().begin(), flush_delta_entry->operations().end(), [](const auto &lhs, const auto &rhs) {

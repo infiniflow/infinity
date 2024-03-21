@@ -129,6 +129,7 @@ private:
     atomic_u64 last_deltaop_commit_ts_{};
 
     std::mutex mutex3_{};
+    Atomic<bool> allow_add_delta_op_{};
     Deque<UniquePtr<CatalogDeltaEntry>> delta_entries_{};
 
     // Only Checkpoint thread access following members
