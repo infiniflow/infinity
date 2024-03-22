@@ -18,6 +18,8 @@
 
 import statement_common;
 import internal_types;
+import statement_common;
+import internal_types;
 import stl;
 import infinity_context;
 import storage;
@@ -44,6 +46,11 @@ import third_party;
 import base_table_ref;
 import index_secondary;
 import data_block;
+import query_context;
+import txn;
+import index_base;
+import index_full_text;
+import fulltext_index_entry;
 import query_context;
 import txn;
 import index_base;
@@ -375,6 +382,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
     auto column_def2 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
 
+
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
     {
@@ -429,6 +437,11 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
 
         TxnManager *txn_mgr = storage->txn_manager();
 
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        {
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
         {
