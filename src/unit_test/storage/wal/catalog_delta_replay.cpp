@@ -49,6 +49,7 @@ import index_full_text;
 import fulltext_index_entry;
 import bg_task;
 import logger;
+import infinity_exception;
 import default_values;
 import infinity_exception;
 
