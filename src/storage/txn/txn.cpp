@@ -68,15 +68,9 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
 Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
     this->CheckTxn(db_name);
 
-    const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
     // build WalCmd
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name,
-                                                         table_name,
-                                                         WalSegmentInfo{*segment_entry->segment_dir(),
-                                                                        segment_entry->segment_id(),
-                                                                        static_cast<u16>(block_cnt),
-                                                                        DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
-                                                                        last_block_row_count}));
+    WalSegmentInfo segment_info(segment_entry.get());
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info)));
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_name);
     table_store->Import(std::move(segment_entry));

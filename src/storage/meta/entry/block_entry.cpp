@@ -61,39 +61,13 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
 
 UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segment_entry,
                                                       BlockID block_id,
-                                                      TxnTimeStamp checkpoint_ts,
-                                                      u64 column_count,
-                                                      BufferManager *buffer_mgr,
                                                       u16 row_count,
+                                                      u16 row_capacity,
                                                       TxnTimeStamp min_row_ts,
-                                                      TxnTimeStamp max_row_ts) {
-
-    auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
-
-    block_entry->row_count_ = row_count;
-    block_entry->min_row_ts_ = min_row_ts;
-    block_entry->max_row_ts_ = max_row_ts;
-    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
-    block_entry->columns_.reserve(column_count);
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        block_entry->columns_.emplace_back(
-            BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, 0 /*init with 0 outline*/));
-    }
-    block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
-    block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
-    block_entry->checkpoint_row_count_ = row_count;
-    return block_entry;
-}
-
-UniquePtr<BlockEntry> BlockEntry::NewReplayCatalogBlockEntry(const SegmentEntry *segment_entry,
-                                                             BlockID block_id,
-                                                             u16 row_count,
-                                                             u16 row_capacity,
-                                                             TxnTimeStamp min_row_ts,
-                                                             TxnTimeStamp max_row_ts,
-                                                             TxnTimeStamp check_point_ts,
-                                                             u16 checkpoint_row_count,
-                                                             BufferManager *buffer_mgr) {
+                                                      TxnTimeStamp max_row_ts,
+                                                      TxnTimeStamp check_point_ts,
+                                                      u16 checkpoint_row_count,
+                                                      BufferManager *buffer_mgr) {
 
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, 0);
 
@@ -355,15 +329,15 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
     auto min_row_ts = block_entry_json["min_row_ts"];
     auto max_row_ts = block_entry_json["max_row_ts"];
 
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
-                                                                               block_id,
-                                                                               row_count,
-                                                                               row_capacity,
-                                                                               min_row_ts,
-                                                                               max_row_ts,
-                                                                               checkpoint_ts,
-                                                                               row_count,
-                                                                               buffer_mgr);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewReplayBlockEntry(segment_entry,
+                                                                        block_id,
+                                                                        row_count,
+                                                                        row_capacity,
+                                                                        min_row_ts,
+                                                                        max_row_ts,
+                                                                        checkpoint_ts,
+                                                                        row_count,
+                                                                        buffer_mgr);
 
     block_entry->commit_ts_ = block_entry_json["commit_ts"];
     block_entry->begin_ts_ = block_entry_json["begin_ts"];
@@ -402,11 +376,11 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
     return base_dir;
 }
 
-void BlockEntry::AddColumnReplay(std::function<UniquePtr<BlockColumnEntry>()> init_column, ColumnID column_id) {
+void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {
     if (column_id >= columns_.size()) {
         columns_.resize(column_id + 1);
     }
-    columns_[column_id] = init_column();
+    columns_[column_id] = std::move(column_entry);
 }
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {

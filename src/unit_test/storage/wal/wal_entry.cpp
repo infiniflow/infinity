@@ -25,6 +25,7 @@ import third_party;
 import logger;
 import table_def;
 import wal_entry;
+import segment_entry;
 import value;
 
 import data_block;
@@ -72,22 +73,48 @@ SharedPtr<TableDef> MockTableDesc2() {
     return MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
 }
 
+WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT column_count) {
+    WalSegmentInfo segment_info;
+    segment_info.segment_id_ = 0;
+    segment_info.status_ = SegmentStatus::kSealed;
+    segment_info.column_count_ = column_count;
+    segment_info.actual_row_count_ = segment_info.row_count_ = row_count;
+    segment_info.row_capacity_ = row_count * 2;
+    segment_info.min_row_ts_ = segment_info.max_row_ts_ = segment_info.commit_ts_ = segment_info.deprecate_ts_ = segment_info.begin_ts_ = commit_ts;
+    segment_info.txn_id_ = 0;
+    Vector<WalBlockInfo> block_infos_;
+    {
+        WalBlockInfo block_info;
+        block_info.block_id_ = 0;
+        block_info.row_count_ = row_count;
+        block_info.row_capacity_ = row_count;
+        block_info.min_row_ts_ = block_info.max_row_ts_ = block_info.checkpoint_ts_ = commit_ts;
+        block_info.checkpoint_row_count_ = row_count;
+        Vector<i32> next_outline_idxes;
+        for (SizeT i = 0; i < column_count; ++i) {
+            next_outline_idxes.push_back(1);
+        }
+        block_info.next_outline_idxes_ = std::move(next_outline_idxes);
+    }
+    segment_info.block_infos_ = std::move(block_infos_);
+    return segment_info;
+}
+
 void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
 
     for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
         auto entry = MakeShared<WalEntry>();
         entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("default2"));
         entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default", MockTableDesc2()));
-        entry->cmds_.push_back(
-            MakeShared<WalCmdImport>("default",
-                                     "tbl1",
-                                     WalSegmentInfo{"/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, DEFAULT_BLOCK_CAPACITY, 3}));
+        WalSegmentInfo segment_info = MakeSegmentInfo(row_count, commit_ts, 2);
+        entry->cmds_.push_back(MakeShared<WalCmdImport>("default", "tbl1", std::move(segment_info)));
 
         auto data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
         column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
         data_block->Init(column_types);
         for (SizeT i = 0; i < row_count; ++i) {
             data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
@@ -115,9 +142,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        Vector<WalSegmentInfo> new_segment_infos{{"/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, DEFAULT_BLOCK_CAPACITY, 3},
-                                                 {"", 0, 3, DEFAULT_BLOCK_CAPACITY, 3},
-                                                 {"", 0, 3, DEFAULT_BLOCK_CAPACITY, 3}};
+        Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         Vector<SegmentID> deprecated_segment_ids{0, 1, 2};
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), std::move(deprecated_segment_ids)));
         entry->commit_ts_ = 5;
@@ -185,43 +210,44 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds_.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
-    entry->cmds_.push_back(
-        MakeShared<WalCmdImport>("db1",
-                                 "tbl1",
-                                 WalSegmentInfo{"/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, DEFAULT_BLOCK_CAPACITY, 3}));
-
-    Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
-
-    SharedPtr<String> index_name = MakeShared<String>("idx1");
-    auto index_base = IndexIVFFlat::Make(index_name, "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
-    for (auto parameter : parameters) {
-        delete parameter;
+    {
+        WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
+        entry->cmds_.push_back(MakeShared<WalCmdImport>("db1", "tbl1", std::move(segment_info)));
     }
-
-    entry->cmds_.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", "", index_base));
-
+    {
+        Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
+        SharedPtr<String> index_name = MakeShared<String>("idx1");
+        auto index_base = IndexIVFFlat::Make(index_name, "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
+        for (auto parameter : parameters) {
+            delete parameter;
+        }
+        entry->cmds_.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", "", index_base));
+    }
     entry->cmds_.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
+    {
+        SharedPtr<DataBlock> data_block = DataBlock::Make();
+        Vector<SharedPtr<DataType>> column_types;
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        data_block->Init(column_types);
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
+            data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
+        }
+        data_block->Finalize();
 
-    SharedPtr<DataBlock> data_block = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types;
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
-    data_block->Init(column_types);
-    for (SizeT i = 0; i < row_count; ++i) {
-        data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
-        data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
+        entry->cmds_.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
     }
-    data_block->Finalize();
-
-    entry->cmds_.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
-    Vector<RowID> row_ids = {RowID(1, 3)};
-    entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
+    {
+        Vector<RowID> row_ids = {RowID(1, 3)};
+        entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
+    }
     entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
-    Vector<WalSegmentInfo> new_segment_infos{{"/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, DEFAULT_BLOCK_CAPACITY, 3},
-                                             {"", 0, 3, DEFAULT_BLOCK_CAPACITY, 3},
-                                             {"", 0, 3, DEFAULT_BLOCK_CAPACITY, 3}};
-    entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
+    {
+        Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
+        entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
+    }
 
     i32 exp_size = entry->GetSizeInBytes();
     Vector<char> buf(exp_size, char(0));

@@ -35,7 +35,7 @@ import bg_task;
 import extra_ddl_info;
 
 import infinity_exception;
-
+import block_column_entry;
 import block_entry;
 import segment_entry;
 import compact_segments_task;
@@ -315,6 +315,9 @@ void WalManager::Checkpoint() {
     } else if (case2 || case3) {
         is_full_checkpoint = false;
     } else {
+        return;
+    }
+    if (is_full_checkpoint) {
         return;
     }
 
@@ -736,24 +739,40 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
 
 // use by import and compact, add a new segment
 void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
-    auto segment_dir_ptr = MakeShared<String>(segment_info.segment_dir_);
-    auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, segment_info.segment_id_, segment_dir_ptr, commit_ts);
-
-    for (i32 id = 0; id < segment_info.block_entries_size_; ++id) {
-        u16 row_count = (id == segment_info.block_entries_size_ - 1) ? segment_info.last_block_row_count_ : segment_info.block_capacity_;
+    auto *buffer_mgr = storage_->buffer_manager();
+    // auto segment_dir_ptr = MakeShared<String>(segment_info.segment_dir_);
+    auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry,
+                                                             segment_info.segment_id_,
+                                                             segment_info.status_,
+                                                             segment_info.column_count_,
+                                                             segment_info.row_count_,
+                                                             segment_info.actual_row_count_,
+                                                             segment_info.row_capacity_,
+                                                             segment_info.min_row_ts_,
+                                                             segment_info.max_row_ts_,
+                                                             segment_info.commit_ts_,
+                                                             segment_info.deprecate_ts_,
+                                                             segment_info.begin_ts_,
+                                                             segment_info.txn_id_);
+    for (BlockID block_id = 0; block_id < (BlockID)segment_info.block_infos_.size(); ++block_id) {
+        auto &block_info = segment_info.block_infos_[block_id];
         auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
-                                                           id,
-                                                           0,
-                                                           table_entry->ColumnCount(),
-                                                           storage_->buffer_manager(),
-                                                           row_count,
-                                                           commit_ts,
-                                                           commit_ts);
-
-        segment_entry->AppendBlockEntry(std::move(block_entry));
+                                                           block_id,
+                                                           block_info.row_count_,
+                                                           block_info.row_capacity_,
+                                                           block_info.min_row_ts_,
+                                                           block_info.max_row_ts_,
+                                                           block_info.checkpoint_ts_,
+                                                           block_info.checkpoint_row_count_,
+                                                           buffer_mgr);
+        for (ColumnID column_id = 0; column_id < (ColumnID)block_info.next_outline_idxes_.size(); ++column_id) {
+            i32 next_outline_idx = block_info.next_outline_idxes_[column_id];
+            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_outline_idx);
+            block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
+        }
+        segment_entry->AddBlockReplay(std::move(block_entry), block_id); // reuse function from delta catalog.
     }
-
-    table_entry->WalReplaySegment(segment_entry);
+    table_entry->WalReplaySegment(segment_entry); // **DO NOT** reuse function from delta catalog.
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

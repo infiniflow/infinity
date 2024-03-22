@@ -28,6 +28,10 @@ import internal_types;
 
 namespace infinity {
 
+class BlockEntry;
+class SegmentEntry;
+enum class SegmentStatus;
+
 export enum class WalCommandType : i8 {
     INVALID = 0,
     // -----------------------------
@@ -61,13 +65,49 @@ export enum class WalCommandType : i8 {
     COMPACT = 100,
 };
 
-// used in import / compact, create a sealed segment
+export struct WalBlockInfo {
+    BlockID block_id_{};
+    u16 row_count_{};
+    u16 row_capacity_{};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp checkpoint_ts_{};
+    u16 checkpoint_row_count_{0};
+    Vector<i32> next_outline_idxes_;
+
+    WalBlockInfo() = default;
+
+    explicit WalBlockInfo(BlockEntry *block_entry);
+
+    bool operator==(const WalBlockInfo &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalBlockInfo ReadBufferAdv(char *&ptr);
+
+    String ToString() const;
+};
+
 export struct WalSegmentInfo {
-    String segment_dir_{};
     SegmentID segment_id_{};
-    u16 block_entries_size_{};
-    u32 block_capacity_{};
-    u16 last_block_row_count_{};
+    SegmentStatus status_{};
+    u64 column_count_{0};
+    SizeT row_count_{0};
+    SizeT actual_row_count_{0};
+    SizeT row_capacity_{0};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp commit_ts_{0};
+    TxnTimeStamp deprecate_ts_{0};
+    TxnTimeStamp begin_ts_{0};
+    TransactionID txn_id_{0};
+    Vector<WalBlockInfo> block_infos_;
+
+    WalSegmentInfo() = default;
+
+    explicit WalSegmentInfo(SegmentEntry *segment_entry);
 
     bool operator==(const WalSegmentInfo &other) const;
 
@@ -76,6 +116,8 @@ export struct WalSegmentInfo {
     void WriteBufferAdv(char *&buf) const;
 
     static WalSegmentInfo ReadBufferAdv(char *&ptr);
+
+    String ToString() const;
 };
 
 // WalCommandType -> String
@@ -198,7 +240,7 @@ export struct WalCmdImport : public WalCmd {
 
     String db_name_{};
     String table_name_{};
-    WalSegmentInfo segment_info_{};
+    WalSegmentInfo segment_info_;
 };
 
 export struct WalCmdAppend : public WalCmd {

@@ -575,19 +575,19 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
 
                 table_entry->AddSegmentReplay(
                     [&]() {
-                        auto segment = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
-                                                                                  segment_id,
-                                                                                  segment_status,
-                                                                                  column_count,
-                                                                                  row_count,
-                                                                                  actual_row_count,
-                                                                                  row_capacity,
-                                                                                  min_row_ts,
-                                                                                  max_row_ts,
-                                                                                  commit_ts,
-                                                                                  deprecate_ts,
-                                                                                  begin_ts,
-                                                                                  txn_id);
+                        auto segment = SegmentEntry::NewReplaySegmentEntry(table_entry,
+                                                                           segment_id,
+                                                                           segment_status,
+                                                                           column_count,
+                                                                           row_count,
+                                                                           actual_row_count,
+                                                                           row_capacity,
+                                                                           min_row_ts,
+                                                                           max_row_ts,
+                                                                           commit_ts,
+                                                                           deprecate_ts,
+                                                                           begin_ts,
+                                                                           txn_id);
                         return segment;
                     },
                     segment_id);
@@ -610,20 +610,16 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
 
                 auto segment_entry = table_entry->segment_map_.at(segment_id).get();
-                segment_entry->AddBlockReplay(
-                    [&]() {
-                        auto block = BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
-                                                                            block_id,
-                                                                            row_count,
-                                                                            row_capacity,
-                                                                            min_row_ts,
-                                                                            max_row_ts,
-                                                                            check_point_ts,
-                                                                            check_point_row_count,
-                                                                            buffer_mgr);
-                        return block;
-                    },
-                    block_id);
+                segment_entry->AddBlockReplay(BlockEntry::NewReplayBlockEntry(segment_entry,
+                                                                              block_id,
+                                                                              row_count,
+                                                                              row_capacity,
+                                                                              min_row_ts,
+                                                                              max_row_ts,
+                                                                              check_point_ts,
+                                                                              check_point_row_count,
+                                                                              buffer_mgr),
+                                              block_id);
                 break;
             }
             case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
@@ -639,9 +635,8 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id);
-                block_entry->AddColumnReplay(
-                    [&]() { return BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx); },
-                    column_id);
+                block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx),
+                                             column_id);
                 break;
             }
 
