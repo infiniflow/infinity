@@ -5,6 +5,7 @@ import int_encoder;
 import byte_slice_reader;
 import byte_slice_writer;
 import no_compress_encoder;
+import vbyte_compress_encoder;
 
 export module posting_field;
 
@@ -44,6 +45,7 @@ struct ValueTypeTraits<u32> {
 export typedef IntEncoder<u32, NewPForDeltaCompressor> Int32Encoder;
 export typedef IntEncoder<u16, NewPForDeltaCompressor> Int16Encoder;
 export typedef NoCompressIntEncoder<u32> NoCompressEncoder;
+export typedef VByteIntEncoder<u32> VByteCompressEncoder;
 
 template <typename T>
 struct EncoderTypeTraits {
@@ -100,6 +102,22 @@ struct NoCompressPostingField : public PostingField {
     }
 
     const NoCompressEncoder *encoder_;
+};
+
+export template <typename T>
+struct VByteCompressPostingField : public PostingField {
+
+    SizeT GetSize() const override { return sizeof(T); }
+
+    u32 Encode(ByteSliceWriter &slice_writer, const u8 *src, u32 len) const override {
+        return encoder_->Encode(slice_writer, (const T *)src, len / sizeof(T));
+    }
+
+    u32 Decode(u8 *dest, u32 dest_len, ByteSliceReader &slice_reader) const override {
+        return encoder_->Decode((T *)dest, dest_len / sizeof(T), slice_reader);
+    }
+
+    const VByteCompressEncoder *encoder_;
 };
 
 export struct PostingFields {
