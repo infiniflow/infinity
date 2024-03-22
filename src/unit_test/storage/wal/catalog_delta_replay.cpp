@@ -785,3 +785,5 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     }
     infinity::InfinityContext::instance().UnInit();
 }
+
+
