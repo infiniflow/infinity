@@ -185,16 +185,12 @@ TableIndexEntry *TableEntry::CreateIndexReplay(
     return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
 }
 
-void TableEntry::DropIndexReplay(
-    const String &index_name,
-    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    TransactionID txn_id,
-    TxnTimeStamp begin_ts) {
+void TableEntry::DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+    index_meta->DropEntryReplay(txn_id, begin_ts);
 }
 
 TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -205,21 +201,19 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
-void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment,
-                                  std::function<void(SegmentEntry *)> &&update_segment,
-                                  SegmentID segment_id) {
-    if (auto iter = segment_map_.find(segment_id); iter != segment_map_.end()) {
-        auto *segment = iter->second.get();
-        update_segment(segment);
-        if (segment->status() == SegmentStatus::kDeprecated) {
-            segment->Cleanup();
-            segment_map_.erase(iter);
+void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
+    SharedPtr<SegmentEntry> new_segment = init_segment();
+    if (new_segment->status() == SegmentStatus::kDeprecated) {
+        auto iter = segment_map_.find(segment_id);
+        if (iter == segment_map_.end()) {
+            return;
         }
+        iter->second->Cleanup();
+        segment_map_.erase(iter);
         return;
     }
-    SharedPtr<SegmentEntry> new_segment = init_segment();
-    segment_map_.emplace(segment_id, new_segment);
-    if (new_segment->segment_id() == unsealed_id_) {
+    segment_map_[segment_id] = new_segment;
+    if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
     }
 }
@@ -648,7 +642,10 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
         }
-        table_entry->unsealed_segment_ = table_entry->segment_map_.at(unsealed_id);
+        // here the unsealed_segment_ may be nullptr
+        if (table_entry->segment_map_.find(unsealed_id) != table_entry->segment_map_.end()) {
+            table_entry->unsealed_segment_ = table_entry->segment_map_.at(unsealed_id);
+        }
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];

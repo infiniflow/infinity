@@ -4,7 +4,7 @@ module;
 import stl;
 import memory_pool;
 import position_list_decoder;
-import buffered_byte_slice_reader;
+import posting_byte_slice_reader;
 import in_doc_pos_state;
 import short_list_optimize_util;
 import position_list_format_option;
@@ -19,15 +19,15 @@ InMemPositionListDecoder::InMemPositionListDecoder(const PositionListFormatOptio
 
 InMemPositionListDecoder::~InMemPositionListDecoder() {
     if (session_pool_) {
-        pos_list_buffer_->~BufferedByteSlice();
-        session_pool_->Deallocate((void *)pos_list_buffer_, sizeof(BufferedByteSlice));
+        pos_list_buffer_->~PostingByteSlice();
+        session_pool_->Deallocate((void *)pos_list_buffer_, sizeof(PostingByteSlice));
     } else {
         delete pos_list_buffer_;
         pos_list_buffer_ = nullptr;
     }
 }
 
-void InMemPositionListDecoder::Init(ttf_t total_tf, PositionListSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer) {
+void InMemPositionListDecoder::Init(ttf_t total_tf, PositionListSkipListReader *skip_list_reader, PostingByteSlice *pos_list_buffer) {
     total_tf_ = total_tf;
     pos_skiplist_reader_ = skip_list_reader;
     pos_list_buffer_ = pos_list_buffer;

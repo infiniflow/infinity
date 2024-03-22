@@ -1067,7 +1067,7 @@ Status LogicalPlanner::BuildShowDatabase(const ShowStatement *statement, SharedP
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowDatabase,
-                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->schema_name_,
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;

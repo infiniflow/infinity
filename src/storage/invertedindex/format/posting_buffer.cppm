@@ -7,25 +7,23 @@ import memory_pool;
 import posting_field;
 import file_writer;
 import file_reader;
-export module short_buffer;
+export module posting_buffer;
 
 namespace infinity {
 
-/*
- * NOTICE:
- * max row count: 8; max column count: 128
- * column allocate strategy: 2->16->128
- */
-export class ShortBuffer {
+// Small buffer to store uncompressed posting data
+// according to the layout defined in posting formats
+// max row count: 8; max column count: 128
+// column allocate strategy: 2->16->128
+export class PostingBuffer {
 public:
-    // only support max row count is 8
-    ShortBuffer(MemoryPool *pool = nullptr);
+    PostingBuffer(MemoryPool *pool = nullptr);
 
-    ~ShortBuffer();
+    ~PostingBuffer();
 
 public:
     void Init(const PostingFields *values) {
-        posting_values_ = values;
+        posting_fields_ = values;
         for (SizeT i = 0; i < values->GetSize(); ++i) {
             offset_[i] = values->GetValue(i)->offset_;
         }
@@ -40,7 +38,7 @@ public:
 
     u8 Size() const { return size_; }
 
-    u8 GetRowCount() const { return posting_values_->GetSize(); }
+    u8 GetRowCount() const { return posting_fields_->GetSize(); }
 
     template <typename T>
     T *GetRowTyped(u8 n);
@@ -57,11 +55,11 @@ public:
 
     void Clear();
 
-    bool SnapShot(ShortBuffer &buffer) const;
+    bool SnapShot(PostingBuffer &buffer) const;
 
     MemoryPool *GetPool() const { return pool_; }
 
-    const PostingFields *GetPostingValues() const { return posting_values_; }
+    const PostingFields *GetPostingFields() const { return posting_fields_; }
 
     static u8 AllocatePlan(u8 curCapacity);
 
@@ -94,7 +92,7 @@ private:
     bool volatile is_buffer_valid_;
     bool has_pool_;
     MemoryPool *pool_;
-    const PostingFields *posting_values_;
+    const PostingFields *posting_fields_;
 };
 
 //////////////////////////////////////////////////////////
@@ -103,7 +101,7 @@ private:
 //      EndPushBack //End document(column)
 //
 template <typename T>
-inline bool ShortBuffer::PushBack(u8 row, T value) {
+inline bool PostingBuffer::PushBack(u8 row, T value) {
     if (IsFull()) {
         if (!Reallocate()) {
             return false;
@@ -119,23 +117,23 @@ inline bool ShortBuffer::PushBack(u8 row, T value) {
 }
 
 template <typename T>
-inline T *ShortBuffer::GetRowTyped(u8 n) {
+inline T *PostingBuffer::GetRowTyped(u8 n) {
     assert(n < GetRowCount());
     return (T *)(buffer_ + offset_[n] * capacity_);
 }
 
 template <typename T>
-inline const T *ShortBuffer::GetRowTyped(u8 n) const {
+inline const T *PostingBuffer::GetRowTyped(u8 n) const {
     assert(n < GetRowCount());
     return (const T *)(buffer_ + offset_[n] * capacity_);
 }
 
-inline u8 *ShortBuffer::GetRow(u8 n) {
-    PostingField *value = posting_values_->GetValue(n);
+inline u8 *PostingBuffer::GetRow(u8 n) {
+    PostingField *value = posting_fields_->GetValue(n);
     return GetRow((u8 *)buffer_, capacity_, value);
 }
 
-inline u8 *ShortBuffer::GetRow(u8 *buffer, u8 capacity, const PostingField *value) {
+inline u8 *PostingBuffer::GetRow(u8 *buffer, u8 capacity, const PostingField *value) {
     u32 offset = value->offset_;
     if (!offset) {
         return buffer;

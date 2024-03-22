@@ -74,6 +74,13 @@ class InfinityThriftQueryBuilder(ABC):
 
         column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
+        # type casting
+        if (embedding_data_type == 'tinyint' or
+            embedding_data_type == 'smallint' or
+            embedding_data_type == 'int' or
+            embedding_data_type == 'bigint'):
+            embedding_data = [int(x) for x in embedding_data]
+
         if isinstance(embedding_data, list):
             embedding_data = embedding_data
         if isinstance(embedding_data, np.ndarray):
@@ -120,7 +127,7 @@ class InfinityThriftQueryBuilder(ABC):
                 knn_opt_params.append(InitParameter(k, v))
 
         knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
-                           distance_type=dist_type, topn=topn, opt_params = knn_opt_params)
+                           distance_type=dist_type, topn=topn, opt_params=knn_opt_params)
         # print(knn_expr)
         self._search.knn_exprs.append(knn_expr)
         return self

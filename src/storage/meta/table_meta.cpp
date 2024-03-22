@@ -110,12 +110,10 @@ TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
 void TableMeta::DeleteEntry(TransactionID txn_id) { auto erase_list = table_entry_list_.DeleteEntry(txn_id); }
 
 void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                  std::function<void(TableEntry *)> &&update_entry,
                                   TransactionID txn_id,
                                   TxnTimeStamp begin_ts) {
     auto [entry, status] =
         table_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, table_name_, txn_id, begin_ts); },
-                                         std::move(update_entry),
                                          txn_id,
                                          begin_ts);
     if (!status.ok()) {
@@ -123,16 +121,12 @@ void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta 
     }
 }
 
-void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                                TransactionID txn_id,
-                                TxnTimeStamp begin_ts) {
-    auto [entry, status] = table_entry_list_.DropEntryReplay(
-        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, table_name_, txn_id, begin_ts); },
-        txn_id,
-        begin_ts);
+void TableMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, status] = table_entry_list_.DropEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    table_entry->Cleanup();
 }
 
 TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -162,7 +156,7 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_che
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
         table_candidates.reserve(this->table_entry_list().size());
         for (auto &table_entry : this->table_entry_list()) {
-            if (table_entry->entry_type_ == EntryType::kTable) {
+            if (table_entry->entry_type_ == EntryType::kTable && table_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
                 table_candidates.push_back((TableEntry *)table_entry.get());
             }

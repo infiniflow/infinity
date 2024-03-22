@@ -68,7 +68,6 @@ void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, Shared
                                TxnTimeStamp begin_ts) {
     auto [entry, status] =
         db_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, db_name_, txn_id, begin_ts); },
-                                      [&](DBEntry *) { UnrecoverableError("DBEntry is not updatable now"); },
                                       txn_id,
                                       begin_ts);
     if (!status.ok()) {
@@ -76,16 +75,12 @@ void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, Shared
     }
 }
 
-void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                             TransactionID txn_id,
-                             TxnTimeStamp begin_ts) {
-    auto [entry, status] =
-        db_entry_list_.DropEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, db_name_, txn_id, begin_ts); },
-                                       txn_id,
-                                       begin_ts);
+void DBMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_entry, status] = db_entry_list_.DropEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    db_entry->Cleanup();
 }
 
 DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -96,7 +91,8 @@ DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     return entry;
 }
 
-Tuple<SharedPtr<DatabaseInfo>, Status> DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<DatabaseInfo>, Status>
+DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
     auto [db_entry, status] = db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
     if (!status.ok()) {
@@ -127,7 +123,7 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkp
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
         db_candidates.reserve(this->db_entry_list().size());
         for (auto &db_entry : this->db_entry_list()) {
-            if (db_entry->entry_type_ == EntryType::kDatabase) {
+            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
                 db_candidates.push_back((DBEntry *)db_entry.get());
             }

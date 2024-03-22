@@ -131,10 +131,7 @@ public:
                               TransactionID txn_id,
                               TxnTimeStamp begin_ts);
 
-    void DropDatabaseReplay(const String &db_name,
-                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                            TransactionID txn_id,
-                            TxnTimeStamp begin_ts);
+    void DropDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -240,6 +237,8 @@ public:
 
     bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
+    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_ops);
+
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> dir, bool create_default_db);
@@ -265,6 +264,7 @@ public:
     MetaMap<DBMeta> db_meta_map_{};
 
     TransactionID next_txn_id_{};
+    TxnTimeStamp full_ckp_commit_ts_{};
     u64 catalog_version_{}; // TODO seems useless
 
     // Currently, these function or function set can't be changed and also will not be persistent.

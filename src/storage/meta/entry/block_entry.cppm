@@ -77,13 +77,7 @@ public:
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
-    // replay
-    void UpdateBlockInfo(SizeT row_count, TxnTimeStamp max_row_ts, TxnTimeStamp check_point_ts, SizeT check_point_row_count);
-
-    void AddColumnReplay(std::function<UniquePtr<BlockColumnEntry>()> init_column,
-                         std::function<void(BlockColumnEntry *)> update_column,
-                         ColumnID column_id);
-    //
+    void AddColumnReplay(std::function<UniquePtr<BlockColumnEntry>()> init_column, ColumnID column_id);
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
@@ -92,6 +86,8 @@ public:
     void Flush(TxnTimeStamp checkpoint_ts, bool check_commit = true);
 
     void FlushForImport(TxnTimeStamp checkpoint_ts);
+
+    void LoadFilterBinaryData(const String &block_filter_data);
 
 protected:
     u16
