@@ -34,7 +34,7 @@ protected:
     MemoryPool *byte_slice_pool_;
     RecyclePool *buffer_pool_;
     SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
-    const SizeT BUFFER_SIZE_ = 1024;
+    static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
 
 SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) {

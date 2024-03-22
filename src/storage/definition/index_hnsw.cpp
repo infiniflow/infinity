@@ -14,6 +14,7 @@
 
 module;
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -113,6 +114,13 @@ void IndexHnsw::WriteAdv(char *&ptr) const {
 String IndexHnsw::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << ef_;
+    return ss.str();
+}
+
+String IndexHnsw::BuildOtherParamsString() const {
+    std::stringstream ss;
+    ss << "metric = " << MetricTypeToString(metric_type_) << ", encode_type = " << HnswEncodeTypeToString(encode_type_)
+       << ", M = " << M_ << ", ef_construction = " << ef_construction_ << ", ef = " << ef_;
     return ss.str();
 }
 

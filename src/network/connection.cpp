@@ -335,7 +335,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
     String message;
     switch (query_result.root_operator_type_) {
         case LogicalNodeType::kInsert: {
-            message = "INSERT 0 1";
+            message = query_result.ToString();
             break;
         }
         case LogicalNodeType::kImport: {

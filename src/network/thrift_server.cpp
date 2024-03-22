@@ -1131,7 +1131,7 @@ public:
         if (result.IsOk()) {
             SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
             auto row_count = data_block->row_count();
-            if (row_count != 6) {
+            if (row_count != 9) {
                 UnrecoverableError("ShowIndex: query result is invalid.");
             }
 
@@ -1152,12 +1152,32 @@ public:
 
             {
                 Value value = data_block->GetValue(1, 3);
-                response.index_info = value.GetVarchar();
+                response.index_type = value.GetVarchar();
             }
 
             {
                 Value value = data_block->GetValue(1, 4);
+                response.index_column_names = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 5);
+                response.index_column_ids = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 6);
+                response.other_parameters = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 7);
                 response.store_dir = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 8);
+                response.segment_index_count = value.GetVarchar();
             }
 
             response.__set_error_code((i64)(result.ErrorCode()));
