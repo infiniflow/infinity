@@ -38,16 +38,6 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> base_dir, Share
     }
 }
 
-BufferManager::~BufferManager() {
-    SpecificConcurrentQueue<BufferObj *> cleanup_queue;
-    BufferObj *buffer_obj = nullptr;
-    LOG_INFO("~BufferManager");
-    while (gc_queue_.TryDequeue(buffer_obj)) {
-        buffer_obj->TryCleanup();
-    }
-}
-
-
 BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
@@ -87,13 +77,11 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
 void BufferManager::Cleanup(const String &file_path) {
     std::unique_lock w_lock(rw_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-        LOG_INFO(fmt::format("Cleanup buffer object: {}", file_path));
         buffer_map_.erase(iter);
     }
 }
 
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
-    LOG_INFO(fmt::format("RequestSpace: current_memory_size={} need_size={}, memory_limit={}", current_memory_size_, need_size, memory_limit_));
     while (current_memory_size_ + need_size > memory_limit_) {
         BufferObj *buffer_obj1 = nullptr;
         if (gc_queue_.TryDequeue(buffer_obj1)) {

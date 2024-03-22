@@ -37,15 +37,12 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
         type_ = BufferType::kEphemeral;
         status_ = BufferStatus::kNew;
     } else {
-        // LOG_INFO(fmt::format("BufferObj is not ephemeral. {}", (void*)this));
         type_ = BufferType::kPersistent;
         status_ = BufferStatus::kFreed;
     }
 }
 
-BufferObj::~BufferObj() {
-    // LOG_INFO(fmt::format("~Bufferobj {}", (void *)this));
-}
+BufferObj::~BufferObj() = default;
 
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
@@ -88,7 +85,6 @@ void BufferObj::UnloadInner() {
             --rc_;
             if (rc_ == 0) {
                 if (!wait_for_gc_) {
-                    // LOG_INFO(fmt::format("Push buffer object to GC queue. {}", (void *)this));
                     buffer_mgr_->PushGCQueue(this);
                     wait_for_gc_ = true;
                 }
@@ -104,7 +100,6 @@ void BufferObj::UnloadInner() {
 
 bool BufferObj::Free() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    // LOG_INFO(fmt::format("Free bufferobj {}", (void *)this));
     auto status = status_;
     switch (status_) {
         case BufferStatus::kFreed:
@@ -207,7 +202,6 @@ void BufferObj::SetCleaningup() {
 
 void BufferObj::TryCleanup() {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-    LOG_INFO(fmt::format("TryCleanup buffer object: {}, {}", (i32)status_, rc_));
     if ((status_ != BufferStatus::kClean && status_ != BufferStatus::kCleanAfterFree) || rc_ > 0) {
         LOG_TRACE("BufferObj can't be cleaned up.");
         return;

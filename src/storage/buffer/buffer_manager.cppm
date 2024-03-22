@@ -28,8 +28,6 @@ export class BufferManager {
 public:
     explicit BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir);
 
-    ~BufferManager();
-
 public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
     BufferObj *Allocate(UniquePtr<FileWorker> file_worker);
