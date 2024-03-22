@@ -442,8 +442,9 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
         {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        }
+        // auto *txn = txn_mgr->CreateTxn();
+        // txn->Begin();
         {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -798,5 +799,6 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     }
     infinity::InfinityContext::instance().UnInit();
 }
+
 
 
