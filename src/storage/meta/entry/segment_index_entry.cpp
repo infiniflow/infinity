@@ -15,6 +15,7 @@
 module;
 
 #include "type/complex/row_id.h"
+#include <cassert>
 #include <vector>
 
 module segment_index_entry;
@@ -55,6 +56,8 @@ import fulltext_file_worker;
 import fulltext_index_entry;
 import index_full_text;
 import index_defines;
+import column_inverter;
+import block_entry;
 
 namespace infinity {
 
@@ -96,8 +99,9 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
         UnrecoverableError(status.message());
     }
     String column_name = table_index_entry->index_base()->column_name();
-    auto create_index_param =
-        SegmentIndexEntry::GetCreateIndexParam(table_index_entry->index_base(), segment_row_count, table_entry->GetColumnDefByName(column_name));
+    auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(table_index_entry->index_base(),
+                                                                     segment_row_count,
+                                                                     table_entry->GetColumnDefByName(column_name).get());
     auto vector_file_worker = table_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
@@ -127,15 +131,110 @@ BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
 
 BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
 
-Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
-                                             const ColumnDef *column_def,
-                                             const SegmentEntry *segment_entry,
-                                             Txn *txn,
-                                             bool prepare,
-                                             bool check_ts) {
-    TxnTimeStamp begin_ts = txn->BeginTS();
+void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
+    u32 seg_id = block_entry->segment_id();
+    u16 block_id = block_entry->block_id();
+    RowID begin_row_id(seg_id, row_offset + u32(block_id) * block_entry->row_capacity());
 
+    const IndexBase *index_base = table_index_entry_->index_base();
+    const ColumnDef *column_def = table_index_entry_->column_def().get();
+    switch (index_base->index_type_) {
+        case IndexType::kFullText: {
+            const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+            if (memory_indexer_.get() == nullptr) {
+                String base_name = fmt::format("ft_%08d_%08d", begin_row_id.segment_id_, begin_row_id.segment_offset_);
+                memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
+                                                            base_name,
+                                                            begin_row_id,
+                                                            index_fulltext->flag_,
+                                                            index_fulltext->analyzer_,
+                                                            table_index_entry_->GetFulltextByteSlicePool(),
+                                                            table_index_entry_->GetFulltextBufferPool(),
+                                                            table_index_entry_->GetFulltextThreadPool());
+            }
+            u64 column_id = column_def->id();
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+            ColumnLengthPopulater populater = [this](u32 begin_docid, Vector<u32> &lens) -> void {
+                BufferHandle column_length_handle = this->GetIndex();
+                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
+                SizeT num_docs = lens.size();
+                SizeT total_len = 0;
+                for (SizeT i = 0; i < num_docs; i++) {
+                    // TODO yzc: rework ColumnLengthPopulater
+                    // fulltext_column_length.column_length_[begin_row_id.ToUint64() + begin_docid + i] = lens[i];
+                    total_len += lens[i];
+                }
+                std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
+                fulltext_column_length.row_count_ += num_docs;
+                fulltext_column_length.total_length_ += total_len;
+                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
+            };
+            memory_indexer_->Insert(column_vector, row_offset, row_count, populater, false);
+            auto duration = Clock::now().time_since_epoch();
+            u64 ts = ChronoCast<NanoSeconds>(duration).count();
+            table_index_entry_->UpdateFulltextSegmentTs(ts);
+            break;
+        }
+        case IndexType::kIVFFlat:
+        case IndexType::kHnsw:
+        case IndexType::kSecondary: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_WARN(*err_msg);
+            break;
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+    }
+}
+
+void SegmentIndexEntry::MemIndexCommit() {
+    const IndexBase *index_base = table_index_entry_->index_base();
+    if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
+        return;
+    memory_indexer_->Commit();
+}
+
+void SegmentIndexEntry::MemIndexDump(bool spill) {
+    const IndexBase *index_base = table_index_entry_->index_base();
+    if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
+        return;
+    memory_indexer_->Dump(false, spill);
+    if (!spill) {
+        ft_base_names_.push_back(memory_indexer_->GetBaseName());
+        ft_base_rowids_.push_back(memory_indexer_->GetBaseRowId());
+        memory_indexer_.reset();
+    }
+}
+
+void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
+    const IndexBase *index_base = table_index_entry_->index_base();
+    if (index_base->index_type_ != IndexType::kFullText)
+        return;
+    // Init the mem index from previously spilled one.
+    assert(memory_indexer_.get() == nullptr);
+    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+    memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
+                                                base_name,
+                                                base_row_id,
+                                                index_fulltext->flag_,
+                                                index_fulltext->analyzer_,
+                                                table_index_entry_->GetFulltextByteSlicePool(),
+                                                table_index_entry_->GetFulltextBufferPool(),
+                                                table_index_entry_->GetFulltextThreadPool());
+    memory_indexer_->Load();
+}
+
+Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, Txn *txn, bool prepare, bool check_ts) {
+    TxnTimeStamp begin_ts = txn->BeginTS();
     auto *buffer_mgr = txn->buffer_mgr();
+    const IndexBase *index_base = table_index_entry_->index_base();
+    const ColumnDef *column_def = table_index_entry_->column_def().get();
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
@@ -260,8 +359,9 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
         }
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-            String base_name = std::to_string(segment_entry->segment_id());
-            RowID base_row_id(segment_entry->segment_id(), 0);
+            u32 seg_id = segment_entry->segment_id();
+            RowID base_row_id(seg_id, 0);
+            String base_name = fmt::format("ft_%08d_%08d", base_row_id.segment_id_, base_row_id.segment_offset_);
             memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
                                                         base_name,
                                                         base_row_id,
@@ -271,28 +371,30 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                                         table_index_entry_->GetFulltextBufferPool(),
                                                         table_index_entry_->GetFulltextThreadPool());
             u64 column_id = column_def->id();
-            Vector<u32> column_length(segment_entry->row_count());
-            u32 *column_length_ptr = column_length.data();
             auto block_entry_iter = BlockEntryIter(segment_entry);
+            ColumnLengthPopulater populater = [this](u32 begin_docid, Vector<u32> &lens) -> void {
+                BufferHandle column_length_handle = this->GetIndex();
+                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
+                SizeT num_docs = lens.size();
+                SizeT total_len = 0;
+                for (SizeT i = 0; i < num_docs; i++) {
+                    // fulltext_column_length.lengths[begin_row_id + begin_docid + i] = lens[i];
+                    total_len += lens[i];
+                }
+                std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
+                fulltext_column_length.row_count_ += num_docs;
+                fulltext_column_length.total_length_ += total_len;
+                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
+            };
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
-                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), column_length_ptr);
-                column_length_ptr += block_entry->row_count();
+                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), populater, true);
             }
-            memory_indexer_->Commit();
-            memory_indexer_->Dump();
-            {
-                // after dump, all build threads should be finished.
-                BufferHandle column_length_handle = GetIndex();
-                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
-                fulltext_column_length.row_count_ = column_length.size();
-                fulltext_column_length.total_length_ = std::reduce(column_length.begin(), column_length.end(), f32{0});
-                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
-                fulltext_column_length.column_length_ = std::move(column_length);
-            }
+            memory_indexer_->Commit(true);
+            memory_indexer_->Dump(true);
             ft_base_names_.push_back(base_name);
-            ft_base_rowids_.push_back(base_row_id.ToUint64());
+            ft_base_rowids_.push_back(base_row_id);
             auto duration = Clock::now().time_since_epoch();
             u64 ts = ChronoCast<NanoSeconds>(duration).count();
             table_index_entry_->UpdateFulltextSegmentTs(ts);
@@ -337,7 +439,9 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
     return Status::OK();
 }
 
-Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx) {
+Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
+    const IndexBase *index_base = table_index_entry_->index_base();
+    const ColumnDef *column_def = table_index_entry_->column_def().get();
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
             auto InsertHnswDo = [&](auto *hnsw_index, atomic_u64 &create_index_idx) {
@@ -514,7 +618,15 @@ nlohmann::json SegmentIndexEntry::Serialize() {
         index_entry_json["max_ts"] = this->max_ts_;
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
         index_entry_json["ft_base_names"] = this->ft_base_names_;
-        index_entry_json["ft_base_rowids"] = this->ft_base_rowids_;
+        Vector<u64> base_row_ids(this->ft_base_rowids_.size());
+        for (SizeT i = 0; i < this->ft_base_rowids_.size(); i++) {
+            base_row_ids[i] = this->ft_base_rowids_[i].ToUint64();
+        }
+        index_entry_json["ft_base_rowids"] = base_row_ids;
+        if (this->memory_indexer_.get() != nullptr) {
+            index_entry_json["ft_mem_base_name"] = this->memory_indexer_->GetBaseName();
+            index_entry_json["ft_mem_base_rowid"] = this->memory_indexer_->GetBaseRowId().ToUint64();
+        }
     }
 
     return index_entry_json;
@@ -531,9 +643,10 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
         UnrecoverableError(status.message());
         return nullptr;
     }
-    String column_name = table_index_entry->index_base()->column_name();
+    const IndexBase *index_base = table_index_entry->index_base();
+    String column_name = index_base->column_name();
     UniquePtr<CreateIndexParam> create_index_param =
-        GetCreateIndexParam(table_index_entry->index_base(), segment_row_count, table_entry->GetColumnDefByName(column_name));
+        GetCreateIndexParam(index_base, segment_row_count, table_entry->GetColumnDefByName(column_name).get());
     auto segment_index_entry = LoadIndexEntry(table_index_entry, segment_id, buffer_mgr, create_index_param.get());
     if (segment_index_entry.get() == nullptr) {
         UnrecoverableError("Failed to load index entry");
@@ -542,7 +655,26 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->max_ts_ = index_entry_json["max_ts"];
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
     index_entry_json["ft_base_names"].get_to<Vector<String>>(segment_index_entry->ft_base_names_);
-    index_entry_json["ft_base_rowids"].get_to<Vector<u64>>(segment_index_entry->ft_base_rowids_);
+    Vector<u64> base_row_ids;
+    index_entry_json["ft_base_rowids"].get_to<Vector<u64>>(base_row_ids);
+    segment_index_entry->ft_base_rowids_.resize(base_row_ids.size());
+    for (SizeT i = 0; i < base_row_ids.size(); i++) {
+        segment_index_entry->ft_base_rowids_[i] = RowID::FromUint64(base_row_ids[i]);
+    }
+    if (index_entry_json.contains("ft_mem_base_name")) {
+        String base_name = index_entry_json["ft_mem_base_name"];
+        RowID base_row_id = RowID::FromUint64(index_entry_json["ft_mem_base_rowid"]);
+        const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+        segment_index_entry->memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry->index_dir(),
+                                                                         base_name,
+                                                                         base_row_id,
+                                                                         index_fulltext->flag_,
+                                                                         index_fulltext->analyzer_,
+                                                                         table_index_entry->GetFulltextByteSlicePool(),
+                                                                         table_index_entry->GetFulltextBufferPool(),
+                                                                         table_index_entry->GetFulltextThreadPool());
+        segment_index_entry->memory_indexer_->Load();
+    }
     return segment_index_entry;
 }
 

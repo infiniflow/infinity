@@ -103,6 +103,8 @@ export struct Catalog {
 public:
     explicit Catalog(SharedPtr<String> dir);
 
+    ~Catalog();
+
     void SetTxnMgr(TxnManager *txn_mgr);
 
 public:
@@ -281,6 +283,13 @@ private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }
 
     HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
+
+    Atomic<bool> running_{};
+    Thread mem_index_commit_thread_{};
+
+    void MemIndexCommit();
+
+    void MemIndexCommitLoop();
 
 public:
     void PickCleanup(CleanupScanner *scanner);

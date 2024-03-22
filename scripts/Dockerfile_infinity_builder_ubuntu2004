@@ -7,12 +7,12 @@ RUN apt update && apt install -y ca-certificates \
 # Install git wget unzip software-properties-common
 RUN DEBIAN_FRONTEND=noninteractive apt install -y git wget unzip software-properties-common
 
-# Install cmake-3.28.1
-RUN wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz \
-    && tar zxvf cmake-3.28.1-linux-x86_64.tar.gz \
-    && cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin \
-    && cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share \
-    && rm -rf cmake-3.28.1-linux-x86_64
+# Install cmake-3.28.3
+RUN wget https://cmake.org/files/v3.28/cmake-3.28.3-linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.28.3-linux-x86_64.tar.gz \
+    && cp -rf cmake-3.28.3-linux-x86_64/bin/* /usr/local/bin \
+    && cp -rf cmake-3.28.3-linux-x86_64/share/* /usr/local/share \
+    && rm -rf cmake-3.28.3-linux-x86_64
 
 # Install ninja-1.11.1
 RUN wget https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip \

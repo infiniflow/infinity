@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <vector>
 
 module table_index_entry;
@@ -39,6 +40,7 @@ import hnsw_file_worker;
 import secondary_index_file_worker;
 import fulltext_file_worker;
 import embedding_info;
+import block_entry;
 
 namespace infinity {
 
@@ -50,6 +52,11 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kTableIndex, is_delete), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
       index_dir_(index_entry_dir), byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
+    if (!is_delete) {
+        assert(index_base.get() != nullptr);
+        const String &column_name = index_base->column_name();
+        column_def_ = table_index_meta->GetTableEntry()->GetColumnDefByName(column_name);
+    }
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
@@ -217,6 +224,37 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
+void TableIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
+    u32 segment_id = block_entry->segment_id();
+    if (last_segment_.get() != nullptr && last_segment_->segment_id() != segment_id) {
+        last_segment_->MemIndexDump();
+    }
+    auto iter = index_by_segment_.find(segment_id);
+    SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
+    if (iter == index_by_segment_.end()) {
+        auto create_index_param =
+            SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), block_entry->GetSegmentEntry()->row_capacity(), column_def_.get());
+        segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+        index_by_segment_.emplace(segment_id, segment_index_entry);
+    } else {
+        segment_index_entry = iter->second;
+    }
+    segment_index_entry->MemIndexInsert(txn, block_entry, row_offset, row_count);
+    last_segment_ = segment_index_entry;
+}
+
+void TableIndexEntry::MemIndexCommit() {
+    if (last_segment_.get() != nullptr) {
+        last_segment_->MemIndexCommit();
+    }
+}
+
+void TableIndexEntry::MemIndexDump(bool spill) {
+    if (last_segment_.get() != nullptr) {
+        last_segment_->MemIndexDump();
+    }
+}
+
 Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
@@ -229,15 +267,13 @@ TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_i
         fulltext_index_entry->irs_index_->StopSchedule();
         return {fulltext_index_entry, Vector<SegmentIndexEntry *>{}, Status::OK()};
     }
-    const String &column_name = this->index_base()->column_name();
-    const auto *column_def = table_entry->GetColumnDefByName(column_name);
     Vector<SegmentIndexEntry *> segment_index_entries;
     for (const auto *segment_entry : block_index->segments_) {
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_count(), column_def);
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_count(), column_def_.get());
         SegmentID segment_id = segment_entry->segment_id();
         SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         if (!is_replay) {
-            segment_index_entry->CreateIndexPrepare(index_base_.get(), column_def, segment_entry, txn, prepare, check_ts);
+            segment_index_entry->CreateIndexPrepare(segment_entry, txn, prepare, check_ts);
         }
         index_by_segment_.emplace(segment_id, segment_index_entry);
         segment_index_entries.push_back(segment_index_entry.get());
@@ -250,11 +286,9 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
         // TODO
         RecoverableError(Status::NotSupport("Not implemented"));
     }
-    const String &column_name = this->index_base_->column_name();
-    const auto *column_def = table_entry->GetColumnDefByName(column_name);
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
         atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
-        auto status = segment_index_entry->CreateIndexDo(index_base_.get(), column_def, create_index_idx);
+        auto status = segment_index_entry->CreateIndexDo(create_index_idx);
         if (!status.ok()) {
             return status;
         }
