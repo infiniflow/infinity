@@ -60,8 +60,7 @@ public:
                                             const SharedPtr<String> &db_name,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
-                                            TxnTimeStamp commit_ts,
-                                            bool is_delete) noexcept;
+                                            TxnTimeStamp commit_ts) noexcept;
 
 public:
     SharedPtr<String> ToString();
@@ -73,6 +72,8 @@ public:
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
+
+    String GetPathNameTail() const;
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,

@@ -63,9 +63,8 @@ SharedPtr<DBEntry> DBEntry::ReplayDBEntry(DBMeta *db_meta,
                                           const SharedPtr<String> &db_name,
                                           TransactionID txn_id,
                                           TxnTimeStamp begin_ts,
-                                          TxnTimeStamp commit_ts,
-                                          bool is_delete) noexcept {
-    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
+                                          TxnTimeStamp commit_ts) noexcept {
+    auto db_entry = MakeShared<DBEntry>(db_meta, false /*when replay, drop will not create entry*/, db_entry_dir, db_name, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
     return db_entry;
 }
@@ -246,6 +245,14 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     }
 
     return res;
+}
+
+String DBEntry::GetPathNameTail() const {
+    SizeT delimiter_i = db_entry_dir_->rfind('/');
+    if (delimiter_i == String::npos) {
+        return *db_entry_dir_;
+    }
+    return db_entry_dir_->substr(delimiter_i + 1);
 }
 
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }

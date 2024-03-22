@@ -261,6 +261,9 @@ public:
     const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() { return history.GetElements(); }
 
 public:
+    const SharedPtr<String> DataDir() const;
+
+public:
     SharedPtr<String> current_dir_{nullptr};
 
     MetaMap<DBMeta> db_meta_map_{};

@@ -194,12 +194,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
     switch (cmd_type) {
         case WalCommandType::CREATE_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCreateDatabase>(db_name);
+            String db_dir_tail = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCreateDatabase>(std::move(db_name), std::move(db_dir_tail));
             break;
         }
         case WalCommandType::DROP_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropDatabase>(db_name);
+            cmd = MakeShared<WalCmdDropDatabase>(std::move(db_name));
             break;
         }
         case WalCommandType::CREATE_TABLE: {
@@ -416,7 +417,9 @@ bool WalCmdCompact::operator==(const WalCmd &other) const {
     return true;
 }
 
-i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
+i32 WalCmdCreateDatabase::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
+}
 
 i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
 
@@ -484,6 +487,7 @@ i32 WalCmdCompact::GetSizeInBytes() const {
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
     WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->db_dir_tail_);
 }
 
 void WalCmdDropDatabase::WriteAdv(char *&buf) const {

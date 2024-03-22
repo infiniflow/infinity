@@ -159,7 +159,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     }
     txn_store_.AddDBStore(db_entry);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(db_name));
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(std::move(db_name), db_entry->GetPathNameTail()));
     return Status::OK();
 }
 

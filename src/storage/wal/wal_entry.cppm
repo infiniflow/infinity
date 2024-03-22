@@ -139,17 +139,18 @@ export struct WalCmd {
 };
 
 export struct WalCmdCreateDatabase : public WalCmd {
-    explicit WalCmdCreateDatabase(String db_name) : db_name_(std::move(db_name)) {}
+    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_DATABASE; }
     auto operator==(const WalCmd &other) const -> bool override {
         const auto *other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
-        return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_);
+        return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(db_dir_tail_, other_cmd->db_dir_tail_);
     }
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
 
     String db_name_{};
+    String db_dir_tail_{};
 };
 
 export struct WalCmdDropDatabase : public WalCmd {

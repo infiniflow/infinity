@@ -42,6 +42,9 @@ import compact_segments_task;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
 
+import db_meta;
+import db_entry;
+
 module wal_manager;
 
 namespace infinity {
@@ -317,8 +320,8 @@ void WalManager::Checkpoint() {
     } else {
         return;
     }
-    if (is_full_checkpoint) {
-        return;
+    if ((is_full_checkpoint && full_duration == 0) || (!is_full_checkpoint && delta_duration == 0)) {
+        return; // skip checkpoint if the interval is 0
     }
 
     try {
@@ -668,16 +671,17 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
     }
 }
 void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name_, txn_id, commit_ts, storage_->txn_manager(), ConflictType::kIgnore);
-    if (!status.ok()) {
-        UnrecoverableError("Wal Replay: Create database failed");
-    }
-    db_entry->Commit(commit_ts);
+    Catalog *catalog = storage_->catalog();
+    auto db_dir = MakeShared<String>(*catalog->DataDir() + "/" + cmd.db_dir_tail_);
+    catalog->CreateDatabaseReplay(
+        MakeShared<String>(cmd.db_name_),
+        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return DBEntry::ReplayDBEntry(db_meta, db_dir, db_name, txn_id, begin_ts, commit_ts);
+        },
+        txn_id,
+        0 /*begin_ts*/);
 }
 void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    if (*cmd.table_def_->table_name() == "test_create_drop_different_fulltext_index_invalid_options") {
-        LOG_INFO("AA");
-    }
     auto [table_entry, table_status] =
         storage_->catalog()->CreateTable(cmd.db_name_, txn_id, commit_ts, cmd.table_def_, ConflictType::kIgnore, storage_->txn_manager());
 
@@ -688,11 +692,7 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
 }
 
 void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    auto [db_entry, status] = storage_->catalog()->DropDatabase(cmd.db_name_, txn_id, commit_ts, nullptr);
-    if (!status.ok()) {
-        UnrecoverableError("Wal Replay: Drop database failed");
-    }
-    db_entry->Commit(commit_ts);
+    storage_->catalog()->DropDatabaseReplay(cmd.db_name_, txn_id, 0 /*begin_ts*/);
 }
 
 void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

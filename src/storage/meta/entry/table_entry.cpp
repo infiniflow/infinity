@@ -523,18 +523,16 @@ void TableEntry::MemIndexCommit() {
 }
 
 SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
-    try {
-        std::shared_lock lock(this->rw_locker());
-        auto segment = segment_map_.at(segment_id);
-        if ( // TODO: read deprecate segment is allowed
-             // segment->deprecate_ts() < ts ||
-            segment->min_row_ts() > ts) {
-            return nullptr;
-        }
-        return segment;
-    } catch (const std::out_of_range &e) {
+    std::shared_lock lock(this->rw_locker());
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
         return nullptr;
     }
+    const auto &segment = iter->second;
+    if (segment->min_row_ts() > ts) {
+        return nullptr;
+    }
+    return segment;
 }
 
 Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {

@@ -80,9 +80,7 @@ Tuple<DBEntry *, Status>
 Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     auto init_db_meta = [&]() {
         // Not find the db and create new db meta
-        Path catalog_path(*this->current_dir_);
-        Path parent_path = catalog_path.parent_path();
-        auto db_dir = MakeShared<String>(parent_path.string());
+        auto db_dir = this->DataDir();
         // Physical wal log
         return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
     };
@@ -127,9 +125,7 @@ void Catalog::CreateDatabaseReplay(const SharedPtr<String> &db_name,
                                    TxnTimeStamp begin_ts) {
     auto init_db_meta = [&]() {
         // Not find the db and create new db meta
-        Path catalog_path(*this->current_dir_);
-        Path parent_path = catalog_path.parent_path();
-        auto db_dir = MakeShared<String>(parent_path.string());
+        auto db_dir = this->DataDir();
         // Physical wal log
         return DBMeta::NewDBMeta(db_dir, db_name);
     };
@@ -433,9 +429,7 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_defaul
     auto catalog = MakeUnique<Catalog>(dir);
     if (create_default_db) {
         // db current dir is same level as catalog
-        Path catalog_path(*catalog->current_dir_);
-        Path parent_path = catalog_path.parent_path();
-        auto data_dir = MakeShared<String>(parent_path.string());
+        auto data_dir = catalog->DataDir();
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
         SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
@@ -513,7 +507,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                     catalog->CreateDatabaseReplay(
                         db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, db_entry_dir, db_name, txn_id, begin_ts, commit_ts, false);
+                            return DBEntry::ReplayDBEntry(db_meta, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -890,6 +884,13 @@ void Catalog::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entri
 }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
+
+const SharedPtr<String> Catalog::DataDir() const {
+    Path catalog_path(*this->current_dir_);
+    Path parent_path = catalog_path.parent_path();
+    return MakeShared<String>(parent_path.string());
+}
+
 
 void Catalog::MemIndexCommit() {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
