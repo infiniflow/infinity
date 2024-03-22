@@ -19,7 +19,6 @@ module;
 #include <thread>
 
 import stl;
-import defer_op;
 import logger;
 import txn_manager;
 import txn;
@@ -91,7 +90,6 @@ void WalManager::Start() {
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
-    allow_add_delta_op_.store(true);
     apply_delta_entries_thread_ = Thread([this] { ApplyDeltaEntries(); });
     LOG_INFO("WAL manager is started.");
 }
@@ -198,7 +196,7 @@ void WalManager::Flush() {
             entry->WriteAdv(ptr);
             i32 act_size = ptr - buf.data();
             if (exp_size != act_size) {
-                LOG_ERROR(fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}", exp_size, act_size));
+                UnrecoverableError(fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}", exp_size, act_size));
             }
             ofs_.write(buf.data(), ptr - buf.data());
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
@@ -260,7 +258,7 @@ void WalManager::ApplyDeltaEntries() {
     while (checkpoint_running_.load() || !delta_entries_.empty()) {
         auto [max_commit_ts, wal_size] = GetWalState();
         mutex3_.lock();
-        if (delta_entries_.empty() || delta_entries_.front()->commit_ts() > max_commit_ts || !allow_add_delta_op_.load()) {
+        if (delta_entries_.empty() || delta_entries_.front()->commit_ts() > max_commit_ts) {
             mutex3_.unlock();
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
@@ -288,7 +286,6 @@ void WalManager::CheckpointTimer() {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         Checkpoint();
     }
-    Checkpoint();
     LOG_INFO("WalManager::Checkpoint mainloop end");
 }
 
@@ -299,9 +296,6 @@ void WalManager::Checkpoint() {
     i64 full_duration = current_time - last_full_ckp_time_;
     i64 delta_duration = current_time - last_delta_ckp_time_;
 
-    allow_add_delta_op_.store(false); // Prohibit add newer delta entry, because "current_max_commit_ts" is get.
-    // So that delta op that can checkpoint always has smaller commit_ts than "current_max_commit_ts".
-    DeferFn defer([&] { allow_add_delta_op_.store(true); });
     auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {

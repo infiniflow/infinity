@@ -35,6 +35,7 @@ void BGTaskProcessor::Start() {
 }
 
 void BGTaskProcessor::Stop() {
+    LOG_INFO("Background processor is stopping.");
     SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
