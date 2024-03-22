@@ -529,20 +529,18 @@ curl --request POST \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
-{
-    [    
-        {
-            "name": "Tommy",
-            "age": 16,
-            "score": 95
-        },
-        {
-            "name": "Jason",
-            "age": 15,
-            "score": 92
-        },
-    ]
-} '
+[    
+    {
+        "name": "Tommy",
+        "age": 16,
+        "score": 95
+    },
+    {
+        "name": "Jason",
+        "age": 15,
+        "score": 92
+    },
+] '
 ```
 
 #### Response
