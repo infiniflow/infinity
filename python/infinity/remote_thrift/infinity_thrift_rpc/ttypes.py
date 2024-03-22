@@ -4165,20 +4165,28 @@ class ShowIndexResponse(object):
      - db_name
      - table_name
      - index_name
+     - index_type
+     - index_column_names
+     - index_column_ids
+     - other_parameters
      - store_dir
-     - index_info
+     - segment_index_count
 
     """
 
 
-    def __init__(self, error_code=None, error_msg=None, db_name=None, table_name=None, index_name=None, store_dir=None, index_info=None,):
+    def __init__(self, error_code=None, error_msg=None, db_name=None, table_name=None, index_name=None, index_type=None, index_column_names=None, index_column_ids=None, other_parameters=None, store_dir=None, segment_index_count=None,):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_name = db_name
         self.table_name = table_name
         self.index_name = index_name
+        self.index_type = index_type
+        self.index_column_names = index_column_names
+        self.index_column_ids = index_column_ids
+        self.other_parameters = other_parameters
         self.store_dir = store_dir
-        self.index_info = index_info
+        self.segment_index_count = segment_index_count
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -4216,12 +4224,32 @@ class ShowIndexResponse(object):
                     iprot.skip(ftype)
             elif fid == 6:
                 if ftype == TType.STRING:
-                    self.store_dir = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.index_type = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 7:
                 if ftype == TType.STRING:
-                    self.index_info = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.index_column_names = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 8:
+                if ftype == TType.STRING:
+                    self.index_column_ids = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 9:
+                if ftype == TType.STRING:
+                    self.other_parameters = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 10:
+                if ftype == TType.STRING:
+                    self.store_dir = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 11:
+                if ftype == TType.STRING:
+                    self.segment_index_count = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             else:
@@ -4254,13 +4282,29 @@ class ShowIndexResponse(object):
             oprot.writeFieldBegin('index_name', TType.STRING, 5)
             oprot.writeString(self.index_name.encode('utf-8') if sys.version_info[0] == 2 else self.index_name)
             oprot.writeFieldEnd()
+        if self.index_type is not None:
+            oprot.writeFieldBegin('index_type', TType.STRING, 6)
+            oprot.writeString(self.index_type.encode('utf-8') if sys.version_info[0] == 2 else self.index_type)
+            oprot.writeFieldEnd()
+        if self.index_column_names is not None:
+            oprot.writeFieldBegin('index_column_names', TType.STRING, 7)
+            oprot.writeString(self.index_column_names.encode('utf-8') if sys.version_info[0] == 2 else self.index_column_names)
+            oprot.writeFieldEnd()
+        if self.index_column_ids is not None:
+            oprot.writeFieldBegin('index_column_ids', TType.STRING, 8)
+            oprot.writeString(self.index_column_ids.encode('utf-8') if sys.version_info[0] == 2 else self.index_column_ids)
+            oprot.writeFieldEnd()
+        if self.other_parameters is not None:
+            oprot.writeFieldBegin('other_parameters', TType.STRING, 9)
+            oprot.writeString(self.other_parameters.encode('utf-8') if sys.version_info[0] == 2 else self.other_parameters)
+            oprot.writeFieldEnd()
         if self.store_dir is not None:
-            oprot.writeFieldBegin('store_dir', TType.STRING, 6)
+            oprot.writeFieldBegin('store_dir', TType.STRING, 10)
             oprot.writeString(self.store_dir.encode('utf-8') if sys.version_info[0] == 2 else self.store_dir)
             oprot.writeFieldEnd()
-        if self.index_info is not None:
-            oprot.writeFieldBegin('index_info', TType.STRING, 7)
-            oprot.writeString(self.index_info.encode('utf-8') if sys.version_info[0] == 2 else self.index_info)
+        if self.segment_index_count is not None:
+            oprot.writeFieldBegin('segment_index_count', TType.STRING, 11)
+            oprot.writeString(self.segment_index_count.encode('utf-8') if sys.version_info[0] == 2 else self.segment_index_count)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -6429,8 +6473,12 @@ ShowIndexResponse.thrift_spec = (
     (3, TType.STRING, 'db_name', 'UTF8', None, ),  # 3
     (4, TType.STRING, 'table_name', 'UTF8', None, ),  # 4
     (5, TType.STRING, 'index_name', 'UTF8', None, ),  # 5
-    (6, TType.STRING, 'store_dir', 'UTF8', None, ),  # 6
-    (7, TType.STRING, 'index_info', 'UTF8', None, ),  # 7
+    (6, TType.STRING, 'index_type', 'UTF8', None, ),  # 6
+    (7, TType.STRING, 'index_column_names', 'UTF8', None, ),  # 7
+    (8, TType.STRING, 'index_column_ids', 'UTF8', None, ),  # 8
+    (9, TType.STRING, 'other_parameters', 'UTF8', None, ),  # 9
+    (10, TType.STRING, 'store_dir', 'UTF8', None, ),  # 10
+    (11, TType.STRING, 'segment_index_count', 'UTF8', None, ),  # 11
 )
 all_structs.append(GetDatabaseRequest)
 GetDatabaseRequest.thrift_spec = (

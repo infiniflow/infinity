@@ -84,6 +84,12 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
     if (++running_task_n_ == 1) {
         status_ = CompactionStatus::kRunning;
     }
+    if (table_entry_ != nullptr) {
+        LOG_INFO(fmt::format("Start compact task(Add), table_entry: {}, table_ptr: {}, running_task: {}",
+                             *table_entry_->TableEntryDir(),
+                             (u64)table_entry_,
+                             running_task_n_));
+    }
 
     Txn *txn = generate_txn();
     TransactionID txn_id = txn->TxnID();
@@ -116,6 +122,12 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
     // trigger compaction
     if (++running_task_n_ == 1) {
         status_ = CompactionStatus::kRunning;
+    }
+    if (table_entry_ != nullptr) {
+        LOG_INFO(fmt::format("Start compact task(Delete), table_entry: {}, table_ptr: {}, running_task: {}",
+                             *table_entry_->TableEntryDir(),
+                             (u64)table_entry_,
+                             running_task_n_));
     }
 
     if (new_layer >= old_layer) {
@@ -151,6 +163,12 @@ void DBTCompactionAlg::CommitCompact(TransactionID commit_txn_id) {
         status_ = CompactionStatus::kEnable;
         cv_.notify_one();
     }
+    if (table_entry_ != nullptr) {
+        LOG_INFO(fmt::format("Compact task commit, table_entry: {}, table_ptr: {}, running_task: {}",
+                             *table_entry_->TableEntryDir(),
+                             (u64)table_entry_,
+                             running_task_n_));
+    }
 }
 
 void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
@@ -164,6 +182,12 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     }
     if (--running_task_n_ == 0) {
         status_ = CompactionStatus::kEnable;
+    }
+    if (table_entry_ != nullptr) {
+        LOG_INFO(fmt::format("Compact task rollback, table_entry: {}, table_ptr: {}, running_task: {}",
+                             *table_entry_->TableEntryDir(),
+                             (u64)table_entry_,
+                             running_task_n_));
     }
 }
 
@@ -216,6 +240,11 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     }
     for (auto *segment_entry : segment_entries) {
         this->AddSegmentNoCheckInner(segment_entry);
+    }
+    if (running_task_n_ != 0) {
+        UnrecoverableError(fmt::format("Running task is not 0 when enable compaction, table dir: {}, table_ptr: {}",
+                                       *(table_entry_->TableEntryDir()),
+                                       (u64)table_entry_));
     }
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();

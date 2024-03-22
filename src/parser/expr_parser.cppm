@@ -11,15 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
 
-#include "decimal_info.h"
+#include "expr_parser.h"
 
-export module decimal_info;
+export module expr_parser;
 
 namespace infinity {
 
-export using infinity::DecimalInfo;
+export using infinity::ExprParser;
 
 }

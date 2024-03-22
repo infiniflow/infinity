@@ -339,17 +339,17 @@ curl --request GET \
         {
             "column_name": "name",
             "column_type": "varchar",
-            "constraints": ["not null"]
+            "constraints": ""
         },
         {
             "column_name": "age",
             "column_type": "integer",
-            "constraints": ["not null"]
+            "constraints": ""
         },
         {
             "column_name": "score",
             "column_type": "integer",
-            "constraints": ["not null"]
+            "constraints": ""
         }
     ]
 }

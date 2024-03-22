@@ -50,6 +50,8 @@ public:
 
     virtual String ToString() const override;
 
+    virtual String BuildOtherParamsString() const override;
+
     virtual nlohmann::json Serialize() const override;
 
     static SharedPtr<IndexIVFFlat> Deserialize(const nlohmann::json &index_def_json);

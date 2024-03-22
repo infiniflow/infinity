@@ -14,6 +14,7 @@
 
 module;
 
+#include <sstream>
 #include <algorithm>
 #include <string>
 
@@ -38,5 +39,7 @@ void IndexSecondary::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_
             fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString())));
     }
 }
+
+String IndexSecondary::BuildOtherParamsString() const { return ""; }
 
 } // namespace infinity
