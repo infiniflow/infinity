@@ -41,6 +41,7 @@ import secondary_index_file_worker;
 import fulltext_file_worker;
 import embedding_info;
 import block_entry;
+import segment_entry;
 
 namespace infinity {
 
@@ -253,6 +254,17 @@ void TableIndexEntry::MemIndexDump(bool spill) {
     if (last_segment_.get() != nullptr) {
         last_segment_->MemIndexDump();
     }
+}
+
+void TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn) {
+    if (index_base_->index_type_ != IndexType::kFullText) {
+        return;
+    }
+    auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_capacity(), column_def_.get());
+    u32 segment_id = segment_entry->segment_id();
+    SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+    segment_index_entry->PopulateEntirely(segment_entry, txn);
+    index_by_segment_.emplace(segment_id, segment_index_entry);
 }
 
 Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>

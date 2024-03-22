@@ -79,7 +79,7 @@ Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<Se
                                                                         last_block_row_count}));
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_name);
-    table_store->Import(std::move(segment_entry));
+    table_store->Import(std::move(segment_entry), this);
 
     return Status::OK();
 }

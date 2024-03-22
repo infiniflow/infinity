@@ -84,8 +84,8 @@ bool MultiPostingDecoder::DecodeDocBufferInOneSegment(RowID start_row_id,
         return false;
     }
 
-    assert(start_row_id >= base_row_id_ && start_row_id.segment_id_ == base_row_id_.segment_id_);
-    docid_t cur_seg_doc_id = docid_t(start_row_id - base_row_id_);
+    docid_t cur_seg_doc_id = (start_row_id >= base_row_id_) ? docid_t(start_row_id - base_row_id_) : 0;
+
     docid_t first_doc_id, last_doc_id;
     if (!index_decoder_->DecodeDocBuffer(cur_seg_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf)) {
         return false;

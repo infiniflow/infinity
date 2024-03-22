@@ -899,7 +899,7 @@ void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(sc
 void Catalog::MemIndexCommit() {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
     for (auto &[_, db_meta] : *db_meta_map_guard) {
-        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, 0UL);
+        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (status.ok()) {
             db_entry->MemIndexCommit();
         }

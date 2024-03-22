@@ -122,7 +122,7 @@ public:
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }
 
-    void Import(SharedPtr<SegmentEntry> segment_entry);
+    void Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn);
 
     void AddCompactNew(SharedPtr<SegmentEntry> segment_entry);
 
