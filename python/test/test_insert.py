@@ -185,7 +185,6 @@ class TestInsert:
 
         db_obj.drop_table("test_insert_embedding2")
 
-    @pytest.mark.skip("Unexpected error.")
     def test_insert_big_embedding(self):
         """
         target: test insert embedding with big dimension
@@ -382,7 +381,6 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.skip(reason="TODO")
     def test_read_after_shutdown(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")

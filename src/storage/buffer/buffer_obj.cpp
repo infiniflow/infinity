@@ -47,10 +47,9 @@ BufferObj::~BufferObj() = default;
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
-        case BufferStatus::kLoaded: {
-            break;
-        }
-        case BufferStatus::kUnloaded: {
+        case BufferStatus::kLoaded:
+        case BufferStatus::kUnloaded: 
+        case BufferStatus::kCleaningup: {
             break;
         }
         case BufferStatus::kFreed: {
@@ -84,7 +83,10 @@ void BufferObj::UnloadInner() {
         case BufferStatus::kLoaded: {
             --rc_;
             if (rc_ == 0) {
-                buffer_mgr_->PushGCQueue(this);
+                if (!wait_for_gc_) {
+                    buffer_mgr_->PushGCQueue(this);
+                    wait_for_gc_ = true;
+                }
                 status_ = BufferStatus::kUnloaded;
             }
             break;
@@ -97,6 +99,7 @@ void BufferObj::UnloadInner() {
 
 bool BufferObj::Free() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    auto status = status_;
     switch (status_) {
         case BufferStatus::kFreed:
         case BufferStatus::kLoaded: {
@@ -104,7 +107,8 @@ bool BufferObj::Free() {
             // Or has been freed in fronter of the queue.
             return false;
         }
-        case BufferStatus::kUnloaded: {
+        case BufferStatus::kUnloaded:
+        case BufferStatus::kCleaningup: {
             switch (type_) {
                 case BufferType::kTemp:
                 case BufferType::kPersistent: {
@@ -123,7 +127,9 @@ bool BufferObj::Free() {
         }
     }
     file_worker_->FreeInMemory();
-    status_ = BufferStatus::kFreed;
+    if (status != BufferStatus::kCleaningup) {
+        status_ = BufferStatus::kFreed;
+    }
     return true;
 }
 
@@ -163,9 +169,19 @@ void BufferObj::CloseFile() {
     rw_locker_.unlock();
 }
 
-void BufferObj::Cleanup() {
+void BufferObj::SetCleaningup() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     if (status_ != BufferStatus::kFreed && status_ != BufferStatus::kUnloaded) {
-        UnrecoverableError("Assert: buffer object status isn't freed.");
+        UnrecoverableError("Assert: buffer object status isn't freed or unloaded.");
+    }
+    status_ = BufferStatus::kCleaningup;
+}
+
+void BufferObj::TryCleanup() {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    if (status_ != BufferStatus::kCleaningup || rc_ > 0) {
+        LOG_TRACE("BufferObj can't be cleaned up.");
+        return;
     }
     file_worker_->CleanupFile();
     buffer_mgr_->Cleanup(this->GetFilename());
@@ -193,6 +209,12 @@ void BufferObj::CheckState() const {
         }
         case BufferStatus::kNew: {
             if (type_ != BufferType::kEphemeral || rc_ > 0) {
+                UnrecoverableError("Invalid status.");
+            }
+            break;
+        }
+        case BufferStatus::kCleaningup: {
+            if (rc_ > 0) {
                 UnrecoverableError("Invalid status.");
             }
             break;

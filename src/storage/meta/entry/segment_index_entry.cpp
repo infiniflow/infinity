@@ -561,7 +561,7 @@ void SegmentIndexEntry::Cleanup() {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");
         }
-        buffer_obj->Cleanup();
+        buffer_obj->SetCleaningup();
     }
 }
 

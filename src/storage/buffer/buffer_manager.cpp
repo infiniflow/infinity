@@ -91,9 +91,11 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
                 // prevent deadlock
                 continue;
             }
+            buffer_obj1->SetWaitForGC(false);
             if (buffer_obj1->Free()) {
                 current_memory_size_ -= buffer_obj1->GetBufferSize();
             }
+            buffer_obj1->TryCleanup();
         } else {
             UnrecoverableError("Out of memory.");
         }
