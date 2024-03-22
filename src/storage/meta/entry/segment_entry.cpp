@@ -260,6 +260,12 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             if (this->row_count_ > this->row_capacity_) {
                 UnrecoverableError("Not implemented: append data exceed segment row capacity");
             }
+
+            // Realtime index insertion. If the BlockEntry is sealed, dump the realtime index.
+            table_entry_->MemIndexInsert(txn, this->block_entries_.back(), range_block_start_row, actual_appended);
+            if (last_block_entry->GetAvailableCapacity() <= 0) {
+                table_entry_->MemIndexDump(txn);
+            }
         }
         if (to_append_rows == 0) {
             append_state_ptr->current_block_++;
