@@ -37,6 +37,8 @@ import column_def;
 import internal_types;
 import parsed_expr;
 import constant_expr;
+import expr_parser;
+import expression_parser_result;
 
 namespace {
 
@@ -607,9 +609,20 @@ public:
                                 break;
                             }
                             case nlohmann::json::value_t::string: {
-                                json_response["error_code"] = ErrorCode::kNotSupported;
-                                json_response["error_message"] = fmt::format("HTTP API doesn't support insert varchar value now");
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                auto string_value = value.template get<String>();
+                                column_type_map.emplace(key, LiteralType::kString);
+
+                                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                                ExprParser expr_parser;
+                                expr_parser.Parse(string_value, expr_parsed_result.get());
+                                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+                                    json_response["error_code"] = ErrorCode::kInvalidExpression;
+                                    json_response["error_message"] = fmt::format("Invalid expression: {}", string_value);
+                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                }
+
+                                values_row->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
+                                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
                                 break;
                             }
                             case nlohmann::json::value_t::object:
@@ -793,9 +806,26 @@ public:
                                 break;
                             }
                             case nlohmann::json::value_t::string: {
-                                json_response["error_code"] = ErrorCode::kNotSupported;
-                                json_response["error_message"] = fmt::format("HTTP API doesn't support insert varchar value now");
-                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                                if (type_iter->second != LiteralType::kString) {
+                                    json_response["error_code"] = ErrorCode::kDataTypeMismatch;
+                                    json_response["error_message"] = fmt::format("Column: {} expect type STRING", key);
+                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                }
+
+                                auto string_value = value.template get<String>();
+
+                                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                                ExprParser expr_parser;
+                                expr_parser.Parse(string_value, expr_parsed_result.get());
+                                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+                                    json_response["error_code"] = ErrorCode::kInvalidExpression;
+                                    json_response["error_message"] = fmt::format("Invalid expression: {}", string_value);
+                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                }
+
+                                (*values_row)[column_id] = expr_parsed_result->exprs_ptr_->at(0);
+                                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+
                                 break;
                             }
                             case nlohmann::json::value_t::object:
@@ -832,52 +862,6 @@ public:
             json_response["error_message"] = e.what();
         }
 
-        //        std::cout << http_body_json.is_array() << std::endl;
-        //
-        //        for (const auto &value_json : http_body_json) {
-        ////            SizeT value_count = value_json.size();
-        //            for (const auto& item : value_json.items())
-        //            {
-        ////                if(item.key().is_string()) {
-        ////                    std::cout << "string " << std::endl;
-        ////                }
-        ////                auto key = item.to_string();
-        ////                auto value = item.value();
-        ////                std::cout << item << std::endl;
-        ////                value;
-        //                const auto& key = item.key();
-        //                const auto& value = item.value();
-        //                std::cout << key << " " << value.is_string() << std::endl;
-        //            }
-        ////            for(SizeT idx = 0; idx < value_count; ++ idx) {
-        ////                value_json[idx];
-        ////            }
-        //        }
-
-        //        if (result.IsOk()) {
-        //            SizeT block_rows = result.result_table_->DataBlockCount();
-        //            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-        //                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
-        //                auto row_count = data_block->row_count();
-        //                auto column_cnt = result.result_table_->ColumnCount();
-        //                for (int row = 0; row < row_count; ++row) {
-        //                    nlohmann::json json_table;
-        //                    for (SizeT col = 0; col < column_cnt; ++col) {
-        //                        const String &column_name = result.result_table_->GetColumnNameById(col);
-        //                        Value value = data_block->GetValue(col, row);
-        //                        const String &column_value = value.ToString();
-        //                        json_table[column_name] = column_value;
-        //                    }
-        //                    json_response["columns"].push_back(json_table);
-        //                }
-        //            }
-        //            json_response["error_code"] = 0;
-        //            http_status = HTTPStatus::CODE_200;
-        //        } else {
-        //            json_response["error_code"] = result.ErrorCode();
-        //            json_response["error_message"] = result.ErrorMsg();
-        //            http_status = HTTPStatus::CODE_500;
-        //        }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
