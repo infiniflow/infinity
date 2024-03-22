@@ -2,8 +2,8 @@ module;
 
 import stl;
 import memory_pool;
-import buffered_byte_slice;
-import buffered_byte_slice_reader;
+import posting_byte_slice;
+import posting_byte_slice_reader;
 import index_decoder;
 import skiplist_reader;
 import index_defines;
@@ -17,15 +17,15 @@ InMemDocListDecoder::InMemDocListDecoder(MemoryPool *session_pool)
 
 InMemDocListDecoder::~InMemDocListDecoder() {
     if (session_pool_) {
-        doc_list_buffer_->~BufferedByteSlice();
-        session_pool_->Deallocate((void *)doc_list_buffer_, sizeof(BufferedByteSlice));
+        doc_list_buffer_->~PostingByteSlice();
+        session_pool_->Deallocate((void *)doc_list_buffer_, sizeof(PostingByteSlice));
     } else {
         delete doc_list_buffer_;
         doc_list_buffer_ = nullptr;
     }
 }
 
-void InMemDocListDecoder::Init(df_t df, SkipListReader *skiplist_reader, BufferedByteSlice *doc_list_buffer) {
+void InMemDocListDecoder::Init(df_t df, SkipListReader *skiplist_reader, PostingByteSlice *doc_list_buffer) {
     df_ = df;
     skiplist_reader_ = skiplist_reader;
     doc_list_buffer_ = doc_list_buffer;

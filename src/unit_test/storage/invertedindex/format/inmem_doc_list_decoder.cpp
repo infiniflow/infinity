@@ -4,7 +4,7 @@
 import stl;
 import memory_pool;
 import index_defines;
-import buffered_byte_slice;
+import posting_byte_slice;
 import inmem_doc_list_decoder;
 import doc_list_format_option;
 import doc_list_encoder;
@@ -46,8 +46,8 @@ protected:
     void TestDecodeWithOptionFlag(const optionflag_t flag, SizeT doc_num, docid_t *docids, tf_t *tfs, docpayload_t *doc_payloads) {
         DocListFormatOption doc_list_format_option(flag);
         DocListFormat doc_list_format(doc_list_format_option);
-        BufferedByteSlice *posting_buffer =
-            new (byte_slice_pool_->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice *posting_buffer =
+            new (byte_slice_pool_->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(byte_slice_pool_, buffer_pool_);
         posting_buffer->Init(&doc_list_format);
 
         docid_t prev_doc_id = 0;
@@ -188,7 +188,7 @@ TEST_F(InMemDocListDecoderTest, test1) {
 
     DocListFormatOption option(OPTION_FLAG_NONE);
     DocListFormat doc_list_format(option);
-    BufferedByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(byte_slice_pool_, buffer_pool_);
+    PostingByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(byte_slice_pool_, buffer_pool_);
     posting_buffer->Init(&doc_list_format);
 
     docid_t doc1 = 1;
@@ -222,7 +222,7 @@ TEST_F(InMemDocListDecoderTest, test2) {
     DocListFormatOption option(OPTION_FLAG_NONE);
     DocListFormat doc_list_format(option);
 
-    BufferedByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(byte_slice_pool_, buffer_pool_);
+    PostingByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(byte_slice_pool_, buffer_pool_);
 
     posting_buffer->Init(&doc_list_format);
 
@@ -304,7 +304,7 @@ TEST_F(InMemDocListDecoderTest, test4) {
     doc_list_encoder_->EndDocument(1001, 0);
     doc_list_encoder_->EndDocument(1002, 0);
 
-    BufferedByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
+    PostingByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
     posting_buffer->Flush();
 
     doc_list_decoder_ = doc_list_encoder_->GetInMemDocListDecoder(byte_slice_pool_);
@@ -332,7 +332,7 @@ TEST_F(InMemDocListDecoderTest, test5) {
     ttf_t current_ttf = 0;
     docid_t doc_buffer[MAX_DOC_PER_RECORD];
 
-    BufferedByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
+    PostingByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
 
     for (docid_t i = 0; i < 300; ++i) {
         posting_buffer->PushBack(0, i);

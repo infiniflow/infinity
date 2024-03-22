@@ -4,8 +4,8 @@ export module inmem_doc_list_decoder;
 
 import stl;
 import memory_pool;
-import buffered_byte_slice;
-import buffered_byte_slice_reader;
+import posting_byte_slice;
+import posting_byte_slice_reader;
 import index_decoder;
 import skiplist_reader;
 import index_defines;
@@ -25,7 +25,7 @@ public:
     InMemDocListDecoder(MemoryPool *session_pool);
     ~InMemDocListDecoder();
 
-    void Init(df_t df, SkipListReader *skiplist_reader, BufferedByteSlice *doc_list_buffer);
+    void Init(df_t df, SkipListReader *skiplist_reader, PostingByteSlice *doc_list_buffer);
 
     bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
 
@@ -41,8 +41,8 @@ private:
     u32 skiped_item_count_;
     MemoryPool *session_pool_;
     SkipListReader *skiplist_reader_;
-    BufferedByteSlice *doc_list_buffer_;
-    BufferedByteSliceReader doc_list_reader_;
+    PostingByteSlice *doc_list_buffer_;
+    PostingByteSliceReader doc_list_reader_;
     df_t df_;
     bool finish_decoded_;
 };

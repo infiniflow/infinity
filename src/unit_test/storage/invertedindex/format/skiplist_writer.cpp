@@ -2,9 +2,9 @@
 
 import stl;
 import memory_pool;
-import buffered_skiplist_writer;
-import buffered_byte_slice_reader;
-import buffered_byte_slice;
+import skiplist_writer;
+import posting_byte_slice_reader;
+import posting_byte_slice;
 import index_defines;
 import posting_field;
 import file_writer;
@@ -13,21 +13,19 @@ import local_file_system;
 
 using namespace infinity;
 
-class BufferedSkipListWriterTest : public BaseTest {
+class SkipListWriterTest : public BaseTest {
 public:
-    BufferedSkipListWriterTest() {
+    SkipListWriterTest() {
         byte_slice_pool_ = new MemoryPool(BUFFER_SIZE_);
         buffer_pool_ = new RecyclePool(BUFFER_SIZE_);
     }
-    ~BufferedSkipListWriterTest() {
+    ~SkipListWriterTest() {
         delete byte_slice_pool_;
         delete buffer_pool_;
     }
-    void SetUp() override {
-        buffered_skiplist_writer_ = MakeShared<BufferedSkipListWriter>(byte_slice_pool_, buffer_pool_);
-    }
+    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(byte_slice_pool_, buffer_pool_); }
 
-    void TearDown() override { buffered_skiplist_writer_.reset(); }
+    void TearDown() override { skiplist_writer_.reset(); }
 
 protected:
     SharedPtr<FileWriter> CreateFileWriter(String file_name);
@@ -35,40 +33,40 @@ protected:
 protected:
     MemoryPool *byte_slice_pool_;
     RecyclePool *buffer_pool_;
-    SharedPtr<BufferedSkipListWriter> buffered_skiplist_writer_ = nullptr;
+    SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
     const SizeT BUFFER_SIZE_ = 1024;
 };
 
-SharedPtr<FileWriter> BufferedSkipListWriterTest::CreateFileWriter(infinity::String file_path) {
+SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) {
     auto fs = MakeShared<LocalFileSystem>();
     return MakeShared<FileWriter>(*fs, file_path, BUFFER_SIZE_);
 }
 
-TEST_F(BufferedSkipListWriterTest, test1) {
+TEST_F(SkipListWriterTest, test1) {
     using namespace infinity;
 
-    ASSERT_NE(nullptr, buffered_skiplist_writer_);
+    ASSERT_NE(nullptr, skiplist_writer_);
     PostingFields posting_fields;
     auto posting_field = new TypedPostingField<u32>();
     posting_fields.AddValue(posting_field);
-    buffered_skiplist_writer_->Init(&posting_fields);
+    skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = "buffered_skiplist_writer_test1.txt";
+    String file_path = "skiplist_writer_test1.txt";
     auto file_writer = CreateFileWriter(file_path);
 
     Vector<u32> expected_values;
     u32 now_value = 0;
     for (int i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
-        buffered_skiplist_writer_->AddItem(delta);
+        skiplist_writer_->AddItem(delta);
         now_value += delta;
         expected_values.emplace_back(now_value);
     }
 
-    buffered_skiplist_writer_->Dump(file_writer);
+    skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<BufferedByteSliceReader>();
-    reader->Open(buffered_skiplist_writer_.get());
+    auto reader = MakeShared<PostingByteSliceReader>();
+    reader->Open(skiplist_writer_.get());
 
     u32 val_buffer[BUFFER_SIZE_];
     SizeT decode_len;
@@ -81,10 +79,10 @@ TEST_F(BufferedSkipListWriterTest, test1) {
     }
 }
 
-TEST_F(BufferedSkipListWriterTest, test2) {
+TEST_F(SkipListWriterTest, test2) {
     using namespace infinity;
 
-    ASSERT_NE(nullptr, buffered_skiplist_writer_);
+    ASSERT_NE(nullptr, skiplist_writer_);
     PostingFields posting_fields;
 
     u8 row_count = 0;
@@ -103,10 +101,10 @@ TEST_F(BufferedSkipListWriterTest, test2) {
     posting_fields.AddValue(posting_field_key);
     posting_fields.AddValue(posting_field_value);
 
-    buffered_skiplist_writer_->Init(&posting_fields);
+    skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = "buffered_skiplist_writer_test2.txt";
+    String file_path = "skiplist_writer_test2.txt";
     auto file_writer = CreateFileWriter(file_path);
 
     Vector<u32> expected_keys;
@@ -115,22 +113,22 @@ TEST_F(BufferedSkipListWriterTest, test2) {
     u32 now_key = 0;
     u32 now_value = 0;
 
-    buffered_skiplist_writer_->AddItem(now_key, now_value);
+    skiplist_writer_->AddItem(now_key, now_value);
     expected_keys.emplace_back(now_key);
     expected_values.emplace_back(now_value);
 
     for (int i = 0; i < SKIP_LIST_BUFFER_SIZE + 2; ++i) {
         now_key += delta;
         now_value += delta - 1;
-        buffered_skiplist_writer_->AddItem(now_key, now_value);
+        skiplist_writer_->AddItem(now_key, now_value);
         expected_keys.emplace_back(now_key);
         expected_values.emplace_back(now_value);
     }
 
-    buffered_skiplist_writer_->Dump(file_writer);
+    skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<BufferedByteSliceReader>();
-    reader->Open(buffered_skiplist_writer_.get());
+    auto reader = MakeShared<PostingByteSliceReader>();
+    reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];
     u32 val_buffer[BUFFER_SIZE_];
@@ -149,13 +147,12 @@ TEST_F(BufferedSkipListWriterTest, test2) {
         ASSERT_EQ(read_key, expected_keys[i]);
         ASSERT_EQ(read_value, expected_values[i]);
     }
-
 }
 
-TEST_F(BufferedSkipListWriterTest, test3) {
+TEST_F(SkipListWriterTest, test3) {
     using namespace infinity;
 
-    ASSERT_NE(nullptr, buffered_skiplist_writer_);
+    ASSERT_NE(nullptr, skiplist_writer_);
     PostingFields posting_fields;
 
     u8 row_count = 0;
@@ -180,10 +177,10 @@ TEST_F(BufferedSkipListWriterTest, test3) {
     posting_fields.AddValue(posting_field_value1);
     posting_fields.AddValue(posting_field_value2);
 
-    buffered_skiplist_writer_->Init(&posting_fields);
+    skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = "buffered_skiplist_writer_test3.txt";
+    String file_path = "skiplist_writer_test3.txt";
     auto file_writer = CreateFileWriter(file_path);
 
     Vector<u32> expected_keys;
@@ -193,7 +190,7 @@ TEST_F(BufferedSkipListWriterTest, test3) {
     u32 now_key = 0;
     u32 now_value1 = 0;
     u32 now_value2 = 0;
-    buffered_skiplist_writer_->AddItem(now_key, now_value1, now_value2);
+    skiplist_writer_->AddItem(now_key, now_value1, now_value2);
     expected_keys.emplace_back(now_key);
     expected_values1.emplace_back(now_value1);
     expected_values2.emplace_back(now_value2);
@@ -202,16 +199,16 @@ TEST_F(BufferedSkipListWriterTest, test3) {
         now_key += delta;
         now_value1 += delta - 1;
         now_value2 += delta - 2;
-        buffered_skiplist_writer_->AddItem(now_key, now_value1, now_value2);
+        skiplist_writer_->AddItem(now_key, now_value1, now_value2);
         expected_keys.emplace_back(now_key);
         expected_values1.emplace_back(now_value1);
         expected_values2.emplace_back(now_value2);
     }
 
-    buffered_skiplist_writer_->Dump(file_writer);
+    skiplist_writer_->Dump(file_writer);
 
-    auto reader = MakeShared<BufferedByteSliceReader>();
-    reader->Open(buffered_skiplist_writer_.get());
+    auto reader = MakeShared<PostingByteSliceReader>();
+    reader->Open(skiplist_writer_.get());
 
     u32 key_buffer[BUFFER_SIZE_];
     u32 val1_buffer[BUFFER_SIZE_];
