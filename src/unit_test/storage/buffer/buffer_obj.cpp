@@ -78,6 +78,7 @@ TEST_F(BufferObjTest, test1) {
     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
     auto buf2 = buffer_manager.Allocate(std::move(file_worker2));
 
+    /// kEphemeral
     // kNew, kEphemeral
     EXPECT_EQ(buf1->status(), BufferStatus::kNew);
     EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
@@ -109,6 +110,8 @@ TEST_F(BufferObjTest, test1) {
     }
     { auto handle2 = buf2->Load(); }
 
+
+    /// kTemp
     {
         auto handle1 = buf1->Load();
         // kFreed, kEphemeral -> kLoaded kTemp
@@ -129,6 +132,8 @@ TEST_F(BufferObjTest, test1) {
     // kUnloaded, kTemp -> kFreed, kTemp
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
+
+    /// kPersistent
     SaveBufferObj(buf1);
     // kFreed, kTemp -> kFreed, kPersistent
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
@@ -152,6 +157,8 @@ TEST_F(BufferObjTest, test1) {
     // kUnloaded, kPersistent -> kFreed, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
+
+    /// kEphemeral
     {
         auto handle1 = buf1->Load();
         __attribute__((unused)) auto data1 = handle1.GetDataMut();
@@ -214,3 +221,132 @@ TEST_F(BufferObjTest, test1) {
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
 }
+
+// unit test for BufferStatus::kClean transformation
+TEST_F(BufferObjTest, test_status_clean) {
+    SizeT memory_limit = 1024;
+    auto temp_dir = MakeShared<String>("/tmp/infinity/spill");
+    auto base_dir = MakeShared<String>("/tmp/infinity/data");
+
+    BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
+
+    SizeT test_size1 = 1024;
+    auto file_dir1 = MakeShared<String>("/tmp/infinity/data/dir1");
+    auto test_fname1 = MakeShared<String>("test1");
+    auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+    auto buf1 = buffer_manager.Allocate(std::move(file_worker1));
+
+    SizeT test_size2 = 1024;
+    auto file_dir2 = MakeShared<String>("/tmp/infinity/data/dir2");
+    auto test_fname2 = MakeShared<String>("test2");
+    auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
+    auto buf2 = buffer_manager.Allocate(std::move(file_worker2));
+
+    /// kEphemeral
+    // kNew, kEphemeral
+    EXPECT_EQ(buf1->status(), BufferStatus::kNew);
+    EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
+
+    {
+        auto handle1 = buf1->Load();
+        // kNew, kEphemeral -> kLoaded, kEphemeral
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+    }
+
+    // kLoaded, kEphemeral -> kUnloaded, kEphemeral
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+    
+    // kUnloaded, kEphemeral -> kCleanAfterFree, kEphemeral
+    buf1->SetCleaningup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kCleanAfterFree);
+
+    // kCleanAfterFree, kEphemeral -> kLoaded, kEphemeral
+    {
+        auto handle1 = buf1->Load();
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+        EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
+    }
+
+    // kLoaded, kEphemeral -> kUnloaded, kEphemeral
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+
+    { auto handle2 = buf2->Load(); }
+    // kUnloaded, kEphemeral -> kFreed, kEphemeral
+    EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
+
+    // kFreed, kEphemeral -> kClean, kEphemeral
+    buf1->SetCleaningup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
+
+
+    /// kTemp
+    // kClean, kEphemeral -> kLoaded, kTemp
+    {
+        auto handle1 = buf1->Load();
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+        EXPECT_EQ(buf1->type(), BufferType::kTemp);
+    }
+
+    // kLoaded, kTemp -> kUnloaded, kTemp
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+
+    // kUnloaded, kTemp -> kCleanAfterFree, kTemp
+    buf1->SetCleaningup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kCleanAfterFree);
+
+    // kCleanAfterFree, kTemp -> kLoaded, kTemp
+    {
+        auto handle1 = buf1->Load();
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+        EXPECT_EQ(buf1->type(), BufferType::kTemp);
+    }
+
+    // kLoaded, kTemp -> kUnloaded, kTemp
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+
+    { auto handle2 = buf2->Load(); }
+    // kUnloaded, kTemp -> kFreed, kTemp
+    EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
+
+    // kFreed, kTemp -> kClean, kTemp
+    buf1->SetCleaningup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
+
+
+    /// kPersistent
+    SaveBufferObj(buf1);
+    // kClean, kTemp -> kClean, kPersistent
+    EXPECT_EQ(buf1->type(), BufferType::kPersistent);
+
+    {
+        auto handle1 = buf1->Load();
+        // kClean, kPersistent -> kLoaded, kPersistent
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+    }
+
+    // kLoaded, kPersistent -> kUnloaded, kPersistent
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+
+    // kUnloaded, kPersistent -> kCleanAfterFree, kPersistent
+    buf1->SetCleaningup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kCleanAfterFree);
+
+    // kCleanAfterFree, kPersistent -> kLoaded, kPersistent
+    {
+        auto handle1 = buf1->Load();
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+    }
+
+    // kLoaded, kPersistent -> kUnloaded, kPersistent
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+
+    { auto handle2 = buf2->Load(); }
+
+    // kUnloaded, kPersistent -> kFreed, kPersistent
+    EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
+
+    // kFreed, kPersistent -> kClean, kPersistent
+    buf1->SetCleaningup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
+}
+

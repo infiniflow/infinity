@@ -28,7 +28,8 @@ export enum class BufferStatus {
     kLoaded,
     kUnloaded,
     kFreed,
-    kCleaningup,
+    kCleanAfterFree,
+    kClean,
     kNew,
 };
 
