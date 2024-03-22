@@ -24,6 +24,7 @@ module;
 
 #pragma clang diagnostic pop
 
+#include <cassert>
 #include <filesystem>
 #include <string.h>
 #include <unistd.h>
@@ -48,6 +49,8 @@ import file_writer;
 import term_meta;
 import fst;
 import posting_list_format;
+import dict_reader;
+import file_reader;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -78,7 +81,10 @@ MemoryIndexer::~MemoryIndexer() {
     Reset();
 }
 
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 *column_invert_length_ptr, bool offline) {
+void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, ColumnLengthPopulater populater, bool offline) {
+    if (is_spilled_)
+        Load();
+
     u64 seq_inserted(0);
     u32 doc_count(0);
     {
@@ -91,19 +97,19 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     if (offline) {
-        auto func = [this, task, provider, column_invert_length_ptr](int id) {
+        auto func = [this, task, provider, populater](int id) {
             auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            inverter->GetTermListLength(column_invert_length_ptr);
+            inverter->GetTermListLength(populater);
             inverter->SortForOfflineDump();
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
         thread_pool_.push(func);
     } else {
-        auto func = [this, task, provider, column_invert_length_ptr](int id) {
+        auto func = [this, task, provider, populater](int id) {
             auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            inverter->GetTermListLength(column_invert_length_ptr);
+            inverter->GetTermListLength(populater);
             this->ring_inverted_.Put(task->task_seq_, inverter);
         };
         thread_pool_.push(func);
@@ -116,6 +122,7 @@ void MemoryIndexer::Commit(bool offline) {
             PrepareSpillFile();
         }
         while (inflight_tasks_ != 0) {
+            sleep(1);
             this->ring_sorted_.Iterate([this](SharedPtr<ColumnInverter> &inverter) {
                 inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
                 inflight_tasks_--;
@@ -146,8 +153,9 @@ SizeT MemoryIndexer::CommitSync() {
     return num;
 }
 
-void MemoryIndexer::Dump(bool offline) {
+void MemoryIndexer::Dump(bool offline, bool spill) {
     if (offline) {
+        assert(!spill);
         Commit(true);
         OfflineDump();
         return;
@@ -160,24 +168,27 @@ void MemoryIndexer::Dump(bool offline) {
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
-    String posting_file = index_prefix + POSTING_SUFFIX;
+    String posting_file = index_prefix + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : "");
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
-    String dict_file = index_prefix + DICT_SUFFIX;
+    String dict_file = index_prefix + DICT_SUFFIX + (spill ? SPILL_SUFFIX : "");
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
     MemoryIndexer::PostingTable *posting_table = GetPostingTable();
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
-    String fst_file = index_prefix + DICT_SUFFIX + ".fst";
+    String fst_file = dict_file + ".fst";
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
+    if (spill) {
+        posting_file_writer->WriteVInt(i32(doc_count_));
+    }
     if (posting_store_.get() != nullptr) {
         SizeT term_meta_offset = 0;
         for (auto it = posting_table->Begin(); it != posting_table->End(); ++it) {
             const MemoryIndexer::PostingPtr posting_writer = it.Value();
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
-            posting_writer->Dump(posting_file_writer, term_meta);
+            posting_writer->Dump(posting_file_writer, term_meta, spill);
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
             const String &term = it.Key();
             fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
@@ -189,7 +200,33 @@ void MemoryIndexer::Dump(bool offline) {
         fs.AppendFile(dict_file, fst_file);
         fs.DeleteFile(fst_file);
     }
+    is_spilled_ = spill;
     Reset();
+}
+
+// Similar to DiskIndexSegmentReader::GetSegmentPosting
+void MemoryIndexer::Load() {
+    if (!is_spilled_) {
+        assert(doc_count_ == 0);
+    }
+    Path path = Path(index_dir_) / base_name_;
+    String index_prefix = path.string();
+    LocalFileSystem fs;
+    String posting_file = index_prefix + POSTING_SUFFIX + SPILL_SUFFIX;
+    String dict_file = index_prefix + DICT_SUFFIX + SPILL_SUFFIX;
+
+    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag_));
+    SharedPtr<FileReader> posting_reader = MakeShared<FileReader>(fs, posting_file, 1024);
+    String term;
+    TermMeta term_meta;
+    doc_count_ = (u32)posting_reader->ReadVInt();
+
+    while (dict_reader->Next(term, term_meta)) {
+        SharedPtr<PostingWriter> posting = GetOrAddPosting(term);
+        posting_reader->Seek(term_meta.doc_start_);
+        posting->Load(posting_reader);
+    }
+    is_spilled_ = false;
 }
 
 SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
@@ -210,8 +247,6 @@ void MemoryIndexer::Reset() {
         }
         posting_store_->Clear();
     }
-    base_row_id_ = INVALID_ROWID;
-    doc_count_ = 0;
 }
 
 void MemoryIndexer::OfflineDump() {

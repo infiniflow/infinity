@@ -103,6 +103,8 @@ export struct Catalog {
 public:
     explicit Catalog(SharedPtr<String> dir);
 
+    ~Catalog();
+
     void SetTxnMgr(TxnManager *txn_mgr);
 
 public:
@@ -131,10 +133,7 @@ public:
                               TransactionID txn_id,
                               TxnTimeStamp begin_ts);
 
-    void DropDatabaseReplay(const String &db_name,
-                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                            TransactionID txn_id,
-                            TxnTimeStamp begin_ts);
+    void DropDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -240,6 +239,8 @@ public:
 
     bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
+    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_ops);
+
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> dir, bool create_default_db);
@@ -282,6 +283,13 @@ private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }
 
     HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
+
+    Atomic<bool> running_{};
+    Thread mem_index_commit_thread_{};
+
+    void MemIndexCommit();
+
+    void MemIndexCommitLoop();
 
 public:
     void PickCleanup(CleanupScanner *scanner);

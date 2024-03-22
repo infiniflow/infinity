@@ -3,8 +3,8 @@
 
 import stl;
 import memory_pool;
-import buffered_byte_slice;
-import buffered_byte_slice_reader;
+import posting_byte_slice;
+import posting_byte_slice_reader;
 import term_meta;
 import file_writer;
 import file_reader;

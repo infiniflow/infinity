@@ -88,15 +88,6 @@ BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry, Colum
     return column_entry;
 }
 
-void BlockColumnEntry::UpdateColumnInfo(i32 next_outline_idx, BufferManager *buffer_mgr) {
-    i32 old_outline_idx = outline_buffers_.size();
-    for (i32 i = old_outline_idx; i < next_outline_idx; ++i) {
-        auto file_worker = MakeUnique<DataFileWorker>(base_dir_, OutlineFilename(i), DEFAULT_FIXLEN_CHUNK_SIZE);
-        auto *buffer_obj = buffer_mgr->Get(std::move(file_worker));
-        outline_buffers_.emplace_back(buffer_obj);
-    }
-}
-
 ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
@@ -221,6 +212,13 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
     block_column_entry->txn_id_ = column_data_json["txn_id"];
 
     return block_column_entry;
+}
+
+void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    if (!this->Committed()) {
+        this->txn_id_ = txn_id;
+        this->Commit(commit_ts);
+    }
 }
 
 Vector<String> BlockColumnEntry::OutlinePaths() const {

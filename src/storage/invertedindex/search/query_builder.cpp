@@ -72,7 +72,7 @@ QueryBuilder::QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPt
             for (auto &[segment_id, segment_index_entry] : index_by_segment) {
                 Vector<String> &base_names_v = segment_index_entry->GetFulltextBaseNames();
                 base_names.insert(base_names.end(), base_names_v.begin(), base_names_v.end());
-                Vector<u64> &base_row_ids_v = segment_index_entry->GetFulltextBaseRowIDs();
+                Vector<RowID> &base_row_ids_v = segment_index_entry->GetFulltextBaseRowIDs();
                 for (auto base_row_id : base_row_ids_v) {
                     RowID row_id(base_row_id);
                     base_row_ids.push_back(row_id);

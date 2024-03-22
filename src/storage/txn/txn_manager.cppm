@@ -24,16 +24,17 @@ import wal_entry;
 
 namespace infinity {
 
-using PutWalEntryFn = std::function<void(SharedPtr<WalEntry>)>;
-
 class BGTaskProcessor;
 struct Catalog;
+class WalManager;
+class CatalogDeltaEntry;
+
 export class TxnManager {
 public:
     explicit TxnManager(Catalog *catalog,
                         BufferManager *buffer_mgr,
                         BGTaskProcessor *task_processor,
-                        PutWalEntryFn put_wal_entry_fn,
+                        WalManager *wal_mgr,
                         TransactionID start_txn_id,
                         TxnTimeStamp start_ts,
                         bool enable_compaction);
@@ -62,6 +63,8 @@ public:
 
     void PutWalEntry(SharedPtr<WalEntry> entry);
 
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
+
     void Start();
 
     void Stop();
@@ -89,8 +92,7 @@ private:
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
-    // PutWalEntry function
-    PutWalEntryFn put_wal_entry_{};
+    WalManager *wal_mgr_;
 
     TransactionID start_txn_id_{};
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.

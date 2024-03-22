@@ -109,36 +109,12 @@ void SegmentEntry::SetSealed() {
     status_ = SegmentStatus::kSealed;
 }
 
-void SegmentEntry::UpdateSegmentInfo(SegmentStatus status,
-                                     SizeT row_count,
-                                     TxnTimeStamp min_row_ts,
-                                     TxnTimeStamp max_row_ts,
-                                     TxnTimeStamp commit_ts,
-                                     TxnTimeStamp begin_ts,
-                                     TransactionID txn_id) {
-    std::unique_lock lock(rw_locker_);
-    status_ = status;
-    row_count_ = row_count;
-    min_row_ts_ = min_row_ts;
-    max_row_ts_ = max_row_ts;
-    commit_ts_ = commit_ts;
-    begin_ts_ = begin_ts;
-    txn_id_ = txn_id;
-}
-
-void SegmentEntry::AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block,
-                                  std::function<void(BlockEntry *)> &&update_block,
-                                  BlockID block_id) {
+void SegmentEntry::AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, BlockID block_id) {
     BlockID cur_blocks_size = block_entries_.size();
-    if (block_id == cur_blocks_size) {
-        block_entries_.emplace_back(init_block());
-    } else {
-        if (cur_blocks_size < block_id) {
-            UnrecoverableError(fmt::format("BlockColumnEntry::AddBlockReplay: block_id {} is out of range", block_id));
-        }
-        auto *block = block_entries_[(SizeT)block_id].get();
-        update_block(block);
+    if (block_id >= cur_blocks_size) {
+        block_entries_.resize(block_id + 1);
     }
+    block_entries_[block_id] = init_block();
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
@@ -284,6 +260,12 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             if (this->row_count_ > this->row_capacity_) {
                 UnrecoverableError("Not implemented: append data exceed segment row capacity");
             }
+
+            // Realtime index insertion. If the BlockEntry is sealed, dump the realtime index.
+            table_entry_->MemIndexInsert(txn, this->block_entries_.back(), range_block_start_row, actual_appended);
+            if (last_block_entry->GetAvailableCapacity() <= 0) {
+                table_entry_->MemIndexDump(txn);
+            }
         }
         if (to_append_rows == 0) {
             append_state_ptr->current_block_++;
@@ -355,6 +337,7 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
+        this->txn_id_ = txn_id;
         this->Commit(commit_ts);
     }
 }
@@ -490,27 +473,15 @@ void SegmentEntry::Cleanup() {
 
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
 
-Vector<Pair<BlockID, String>> SegmentEntry::GetBlockFilterBinaryDataVector() const {
-    Vector<Pair<BlockID, String>> block_filter_binary_data_vector;
-    block_filter_binary_data_vector.reserve(block_entries_.size());
-    for (const auto &block_entry : block_entries_) {
-        block_filter_binary_data_vector.emplace_back(block_entry->block_id(), block_entry->GetFastRoughFilter()->SerializeToString());
-    }
-    return block_filter_binary_data_vector;
-}
-
 // used in:
 // 1. record minmax filter and optional bloom filter created for sealed segment created by append, import and compact
 // 2. record optional bloom filter created by requirement when the properties of the table is changed ? (maybe will support it in the future)
-void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data) {
+void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data) {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kUnsealed) {
         UnrecoverableError("should not call LoadFilterBinaryData from Unsealed segment");
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
-    for (const auto &[block_id, block_filter] : block_filter_data) {
-        block_entries_[block_id]->GetFastRoughFilter()->DeserializeFromString(block_filter);
-    }
 }
 
 } // namespace infinity

@@ -403,6 +403,7 @@ TxnTimeStamp Txn::Commit() {
         // Don't need to write empty WalEntry (read-only transactions).
         txn_mgr_->Invalidate(commit_ts);
         txn_context_.SetTxnCommitted();
+        LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
         return commit_ts;
     }
     // Put wal entry to the manager in the same order as commit_ts.
@@ -413,6 +414,7 @@ TxnTimeStamp Txn::Commit() {
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
+    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
     return commit_ts;
 }
 
@@ -430,15 +432,13 @@ void Txn::CommitBottom() noexcept {
     txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         // Snapshot the physical operations in one txn
         local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
-        auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
-        bg_task_processor_->Submit(catalog_delta_ops_merge_task);
+        txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
         txn_mgr_->AddWaitFlushTxn(txn_id_);
     }
-
-    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);

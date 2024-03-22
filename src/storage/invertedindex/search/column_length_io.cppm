@@ -65,7 +65,9 @@ public:
     }
 
     inline u32 GetColumnLength(u32 scorer_column_idx, SegmentOffset segment_offset) const {
-        return column_length_vector_[scorer_column_idx][segment_offset];
+        // TODO yzc: adapt for realtime index
+        // return column_length_vector_[scorer_column_idx][segment_offset];
+        return 100UL;
     }
 };
 

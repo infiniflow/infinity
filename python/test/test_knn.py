@@ -183,8 +183,8 @@ class TestKnn:
         [1.0] * 4,
     ])
     @pytest.mark.parametrize("embedding_data_type", [
-        # FIXME "int",
-        "float",
+        ("int", False),
+        ("float", True),
         pytest.param(1, marks=pytest.mark.xfail(reason="Invalid embedding 1.0 type")),
         pytest.param(2.2, marks=pytest.mark.xfail(reason="Invalid embedding 1.0 type")),
         pytest.param("#@!$!@", marks=pytest.mark.xfail(reason="Invalid embedding 1.0 type")),
@@ -208,9 +208,14 @@ class TestKnn:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type, "ip",
-                                                   2).to_pl()
-        print(res)
+        if embedding_data_type[1]:
+            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0], "ip",
+                                                        2).to_pl()
+            print(res)
+        else:
+            with pytest.raises(Exception, match="ERROR:3032*"):
+                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0], "ip",
+                                                        2).to_pl()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)

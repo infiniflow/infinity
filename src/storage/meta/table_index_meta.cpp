@@ -81,7 +81,6 @@ TableIndexEntry *TableIndexMeta::CreateEntryReplay(
     TxnTimeStamp begin_ts) {
     auto [entry, status] =
         index_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, index_name_, txn_id, begin_ts); },
-                                         [](TableIndexEntry *) { UnrecoverableError("TableIndexEntry is not updatable now"); },
                                          txn_id,
                                          begin_ts);
     if (!status.ok()) {
@@ -90,17 +89,12 @@ TableIndexEntry *TableIndexMeta::CreateEntryReplay(
     return entry;
 }
 
-void TableIndexMeta::DropEntryReplay(
-    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    TransactionID txn_id,
-    TxnTimeStamp begin_ts) {
-    auto [entry, status] = index_entry_list_.DropEntryReplay(
-        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, index_name_, txn_id, begin_ts); },
-        txn_id,
-        begin_ts);
+void TableIndexMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [index_entry, status] = index_entry_list_.DropEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
+    index_entry->Cleanup();
 }
 
 TableIndexEntry *TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {

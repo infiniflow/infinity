@@ -47,6 +47,7 @@ import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
 import build_fast_rough_filter_task;
+import block_entry;
 
 namespace infinity {
 
@@ -185,16 +186,12 @@ TableIndexEntry *TableEntry::CreateIndexReplay(
     return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
 }
 
-void TableEntry::DropIndexReplay(
-    const String &index_name,
-    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    TransactionID txn_id,
-    TxnTimeStamp begin_ts) {
+void TableEntry::DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+    index_meta->DropEntryReplay(txn_id, begin_ts);
 }
 
 TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -205,21 +202,19 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
-void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment,
-                                  std::function<void(SegmentEntry *)> &&update_segment,
-                                  SegmentID segment_id) {
-    if (auto iter = segment_map_.find(segment_id); iter != segment_map_.end()) {
-        auto *segment = iter->second.get();
-        update_segment(segment);
-        if (segment->status() == SegmentStatus::kDeprecated) {
-            segment->Cleanup();
-            segment_map_.erase(iter);
+void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
+    SharedPtr<SegmentEntry> new_segment = init_segment();
+    if (new_segment->status() == SegmentStatus::kDeprecated) {
+        auto iter = segment_map_.find(segment_id);
+        if (iter == segment_map_.end()) {
+            return;
         }
+        iter->second->Cleanup();
+        segment_map_.erase(iter);
         return;
     }
-    SharedPtr<SegmentEntry> new_segment = init_segment();
-    segment_map_.emplace(segment_id, new_segment);
-    if (new_segment->segment_id() == unsealed_id_) {
+    segment_map_[segment_id] = new_segment;
+    if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
     }
 }
@@ -495,6 +490,36 @@ Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegment
         }
     }
     return Status::OK();
+}
+
+void TableEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (status.ok()) {
+            table_index_entry->MemIndexInsert(txn, block_entry, row_offset, row_count);
+        }
+    }
+}
+
+void TableEntry::MemIndexDump(Txn *txn, bool spill) {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (status.ok()) {
+            table_index_entry->MemIndexDump(spill);
+        }
+    }
+}
+
+void TableEntry::MemIndexCommit() {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, 0UL);
+        if (status.ok()) {
+            table_index_entry->MemIndexCommit();
+        }
+    }
 }
 
 SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
