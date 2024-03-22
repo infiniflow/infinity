@@ -131,5 +131,7 @@ public:
     void PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup() override;
+
+    void MemIndexCommit();
 };
 } // namespace infinity

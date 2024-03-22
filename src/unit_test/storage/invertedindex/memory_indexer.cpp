@@ -30,6 +30,7 @@ import value;
 import memory_indexer;
 import column_index_reader;
 import posting_iterator;
+import column_inverter;
 
 using namespace infinity;
 
@@ -75,15 +76,21 @@ TEST_F(MemoryIndexerTest, Insert) {
     Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
     Array<u32, 5> column_invert_length = {};
+    ColumnLengthPopulater populater = [&column_invert_length](u32 begin_docid, Vector<u32> &lens) -> void {
+        SizeT num_docs = lens.size();
+        for (SizeT i = 0; i < num_docs; i++) {
+            column_invert_length[begin_docid + i] = lens[i];
+        }
+    };
     MemoryIndexer
         indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer1.Insert(column, 0, 1, column_invert_length.data());
-    indexer1.Insert(column, 1, 3, column_invert_length.data() + 1);
+    indexer1.Insert(column, 0, 1, populater);
+    indexer1.Insert(column, 1, 3, populater);
     indexer1.Dump();
 
     MemoryIndexer
         indexer2("/tmp/infinity/fulltext_tbl1_col1", "chunk2", RowID(0U, 4U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer2.Insert(column, 4, 1, column_invert_length.data() + 4);
+    indexer2.Insert(column, 4, 1, populater);
     while (indexer2.GetInflightTasks() > 0) {
         sleep(1);
         indexer2.CommitSync();
@@ -131,11 +138,17 @@ TEST_F(MemoryIndexerTest, test2) {
     Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
     Array<u32, 5> column_invert_length = {};
+    ColumnLengthPopulater populater = [&column_invert_length](u32 begin_docid, Vector<u32> &lens) -> void {
+        SizeT num_docs = lens.size();
+        for (SizeT i = 0; i < num_docs; i++) {
+            column_invert_length[begin_docid + i] = lens[i];
+        }
+    };
     MemoryIndexer
         indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer1.Insert(column, 0, 2, column_invert_length.data(), true);
-    indexer1.Insert(column, 2, 2, column_invert_length.data() + 2, true);
-    indexer1.Insert(column, 4, 1, column_invert_length.data() + 4, true);
+    indexer1.Insert(column, 0, 2, populater, true);
+    indexer1.Insert(column, 2, 2, populater, true);
+    indexer1.Insert(column, 4, 1, populater, true);
     indexer1.Dump(true);
 
     ColumnIndexReader reader;

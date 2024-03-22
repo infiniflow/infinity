@@ -44,10 +44,11 @@ ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, 
 
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 start_doc_id) {
+void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id) {
+    begin_doc_id_ = begin_doc_id;
     for (SizeT i = 0; i < row_count; ++i) {
         String data = column_vector->ToString(row_offset + i);
-        InvertColumn(start_doc_id + i, data);
+        InvertColumn(begin_doc_id + i, data);
     }
 }
 
@@ -110,9 +111,15 @@ void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
     }
 }
 
-void ColumnInverter::GetTermListLength(u32 *term_list_length_ptr) const {
-    for (const auto &[_, term_list] : terms_per_doc_) {
-        *(term_list_length_ptr++) = term_list->size();
+void ColumnInverter::GetTermListLength(ColumnLengthPopulater populater) const {
+    if (populater) {
+        u32 row_count = terms_per_doc_.size();
+        Vector<u32> lens(row_count);
+        for (SizeT i = 0; i < row_count; i++) {
+            const Pair<u32, UniquePtr<TermList>> &doc_termlist = terms_per_doc_[i];
+            lens[i] = doc_termlist.second->size();
+        }
+        populater(begin_doc_id_, lens);
     }
 }
 

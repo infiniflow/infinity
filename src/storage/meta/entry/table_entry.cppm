@@ -41,6 +41,7 @@ import cleanup_scanner;
 import random;
 import memory_pool;
 import meta_info;
+import block_entry;
 
 namespace infinity {
 
@@ -147,6 +148,15 @@ public:
         return DetermineRandomString(parent_dir, fmt::format("table_{}", table_name));
     }
 
+    // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
+    void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
+
+    // Dump or spill the memory indexer
+    void MemIndexDump(Txn *txn, bool spill = false);
+
+    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
+    void MemIndexCommit();
+
 public:
     // Getter
 
@@ -158,7 +168,7 @@ public:
 
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
-    inline const ColumnDef *GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)].get(); }
+    inline SharedPtr<ColumnDef> GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)]; }
 
     inline SizeT ColumnCount() const { return columns_.size(); }
 
