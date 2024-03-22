@@ -14,6 +14,7 @@
 
 module;
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -80,6 +81,12 @@ SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&, int32_t) {
 String IndexIVFFlat::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << centroids_count_ << ", " << MetricTypeToString(metric_type_);
+    return ss.str();
+}
+
+String IndexIVFFlat::BuildOtherParamsString() const {
+    std::stringstream ss;
+    ss << "metric = " << MetricTypeToString(metric_type_) << ", centroids_count = " << centroids_count_;
     return ss.str();
 }
 

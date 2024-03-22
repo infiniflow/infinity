@@ -2969,14 +2969,18 @@ void swap(ShowIndexRequest &a, ShowIndexRequest &b);
 std::ostream& operator<<(std::ostream& out, const ShowIndexRequest& obj);
 
 typedef struct _ShowIndexResponse__isset {
-  _ShowIndexResponse__isset() : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), store_dir(false), index_info(false) {}
+  _ShowIndexResponse__isset() : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), index_type(false), index_column_names(false), index_column_ids(false), other_parameters(false), store_dir(false), segment_index_count(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool db_name :1;
   bool table_name :1;
   bool index_name :1;
+  bool index_type :1;
+  bool index_column_names :1;
+  bool index_column_ids :1;
+  bool other_parameters :1;
   bool store_dir :1;
-  bool index_info :1;
+  bool segment_index_count :1;
 } _ShowIndexResponse__isset;
 
 class ShowIndexResponse : public virtual ::apache::thrift::TBase {
@@ -2990,8 +2994,12 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
                       db_name(),
                       table_name(),
                       index_name(),
+                      index_type(),
+                      index_column_names(),
+                      index_column_ids(),
+                      other_parameters(),
                       store_dir(),
-                      index_info() {
+                      segment_index_count() {
   }
 
   virtual ~ShowIndexResponse() noexcept;
@@ -3000,8 +3008,12 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
   std::string db_name;
   std::string table_name;
   std::string index_name;
+  std::string index_type;
+  std::string index_column_names;
+  std::string index_column_ids;
+  std::string other_parameters;
   std::string store_dir;
-  std::string index_info;
+  std::string segment_index_count;
 
   _ShowIndexResponse__isset __isset;
 
@@ -3015,9 +3027,17 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
 
   void __set_index_name(const std::string& val);
 
+  void __set_index_type(const std::string& val);
+
+  void __set_index_column_names(const std::string& val);
+
+  void __set_index_column_ids(const std::string& val);
+
+  void __set_other_parameters(const std::string& val);
+
   void __set_store_dir(const std::string& val);
 
-  void __set_index_info(const std::string& val);
+  void __set_segment_index_count(const std::string& val);
 
   bool operator == (const ShowIndexResponse & rhs) const
   {
@@ -3031,9 +3051,17 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
       return false;
     if (!(index_name == rhs.index_name))
       return false;
+    if (!(index_type == rhs.index_type))
+      return false;
+    if (!(index_column_names == rhs.index_column_names))
+      return false;
+    if (!(index_column_ids == rhs.index_column_ids))
+      return false;
+    if (!(other_parameters == rhs.other_parameters))
+      return false;
     if (!(store_dir == rhs.store_dir))
       return false;
-    if (!(index_info == rhs.index_info))
+    if (!(segment_index_count == rhs.segment_index_count))
       return false;
     return true;
   }
