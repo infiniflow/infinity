@@ -49,6 +49,7 @@ import index_full_text;
 import fulltext_index_entry;
 import bg_task;
 import logger;
+import default_values;
 
 using namespace infinity;
 
