@@ -103,26 +103,25 @@ String WalBlockInfo::ToString() const {
 }
 
 WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
-    : segment_id_(segment_entry->segment_id_), status_(segment_entry->status_), column_count_(segment_entry->column_count_),
-      row_count_(segment_entry->row_count_), actual_row_count_(segment_entry->actual_row_count_), row_capacity_(segment_entry->row_capacity_),
-      min_row_ts_(segment_entry->min_row_ts_), max_row_ts_(segment_entry->max_row_ts_), commit_ts_(segment_entry->commit_ts_),
-      deprecate_ts_(segment_entry->deprecate_ts_), begin_ts_(segment_entry->begin_ts_), txn_id_(segment_entry->txn_id_) {
+    : segment_id_(segment_entry->segment_id_), column_count_(segment_entry->column_count_), row_count_(segment_entry->row_count_),
+      actual_row_count_(segment_entry->actual_row_count_), row_capacity_(segment_entry->row_capacity_), min_row_ts_(segment_entry->min_row_ts_),
+      max_row_ts_(segment_entry->max_row_ts_), commit_ts_(segment_entry->commit_ts_), deprecate_ts_(segment_entry->deprecate_ts_),
+      begin_ts_(segment_entry->begin_ts_), txn_id_(segment_entry->txn_id_) {
     for (auto &block_entry : segment_entry->block_entries_) {
         block_infos_.push_back(WalBlockInfo(block_entry.get()));
     }
 }
 
 bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
-    return segment_id_ == other.segment_id_ && status_ == other.status_ && column_count_ == other.column_count_ && row_count_ == other.row_count_ &&
+    return segment_id_ == other.segment_id_ && column_count_ == other.column_count_ && row_count_ == other.row_count_ &&
            actual_row_count_ == other.actual_row_count_ && row_capacity_ == other.row_capacity_ && min_row_ts_ == other.min_row_ts_ &&
            max_row_ts_ == other.max_row_ts_ && commit_ts_ == other.commit_ts_ && deprecate_ts_ == other.deprecate_ts_ &&
            begin_ts_ == other.begin_ts_ && txn_id_ == other.txn_id_ && block_infos_ == other.block_infos_;
 }
 
 i32 WalSegmentInfo::GetSizeInBytes() const {
-    i32 size = sizeof(SegmentID) + sizeof(SegmentStatus) + sizeof(column_count_) + sizeof(row_count_) + sizeof(actual_row_count_) +
-               sizeof(row_capacity_) + sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(commit_ts_) + sizeof(deprecate_ts_) + sizeof(begin_ts_) +
-               sizeof(txn_id_);
+    i32 size = sizeof(SegmentID) + sizeof(column_count_) + sizeof(row_count_) + sizeof(actual_row_count_) + sizeof(row_capacity_) +
+               sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(commit_ts_) + sizeof(deprecate_ts_) + sizeof(begin_ts_) + sizeof(txn_id_);
     size += sizeof(i32);
     for (const auto &block_info : block_infos_) {
         size += block_info.GetSizeInBytes();
@@ -132,7 +131,6 @@ i32 WalSegmentInfo::GetSizeInBytes() const {
 
 void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, segment_id_);
-    WriteBufAdv(buf, status_);
     WriteBufAdv(buf, column_count_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, actual_row_count_);
@@ -152,7 +150,6 @@ void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
 WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
     WalSegmentInfo segment_info;
     segment_info.segment_id_ = ReadBufAdv<SegmentID>(ptr);
-    segment_info.status_ = ReadBufAdv<SegmentStatus>(ptr);
     segment_info.column_count_ = ReadBufAdv<u64>(ptr);
     segment_info.row_count_ = ReadBufAdv<SizeT>(ptr);
     segment_info.actual_row_count_ = ReadBufAdv<SizeT>(ptr);
@@ -172,10 +169,10 @@ WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
 
 String WalSegmentInfo::ToString() const {
     std::stringstream ss;
-    ss << "segment_id: " << segment_id_ << ", status: " << static_cast<i32>(status_) << ", column_count: " << column_count_
-       << ", row_count: " << row_count_ << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_
-       << ", min_row_ts: " << min_row_ts_ << ", max_row_ts: " << max_row_ts_ << ", commit_ts: " << commit_ts_ << ", deprecate_ts: " << deprecate_ts_
-       << ", begin_ts: " << begin_ts_ << ", txn_id: " << txn_id_;
+    ss << "segment_id: " << segment_id_ << ", column_count: " << column_count_ << ", row_count: " << row_count_
+       << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_ << ", min_row_ts: " << min_row_ts_
+       << ", max_row_ts: " << max_row_ts_ << ", commit_ts: " << commit_ts_ << ", deprecate_ts: " << deprecate_ts_ << ", begin_ts: " << begin_ts_
+       << ", txn_id: " << txn_id_;
     ss << ", block_infos: [";
     for (SizeT i = 0; i < block_infos_.size(); i++) {
         ss << block_infos_[i].ToString();

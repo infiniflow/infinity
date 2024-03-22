@@ -76,7 +76,6 @@ SharedPtr<TableDef> MockTableDesc2() {
 WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT column_count) {
     WalSegmentInfo segment_info;
     segment_info.segment_id_ = 0;
-    segment_info.status_ = SegmentStatus::kSealed;
     segment_info.column_count_ = column_count;
     segment_info.actual_row_count_ = segment_info.row_count_ = row_count;
     segment_info.row_capacity_ = row_count * 2;

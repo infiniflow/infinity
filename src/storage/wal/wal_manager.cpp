@@ -324,7 +324,7 @@ void WalManager::Checkpoint() {
     } else {
         return;
     }
-    if ((is_full_checkpoint && full_duration == 0) || (!is_full_checkpoint && delta_duration == 0)) {
+    if ((is_full_checkpoint && cfg_full_checkpoint_interval_sec_ == 0) || (!is_full_checkpoint && cfg_delta_checkpoint_interval_sec_ == 0)) {
         return; // skip checkpoint if the interval is 0
     }
 
@@ -759,7 +759,7 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
     auto *buffer_mgr = storage_->buffer_manager();
     auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry,
                                                              segment_info.segment_id_,
-                                                             segment_info.status_,
+                                                             SegmentStatus::kSealed,
                                                              segment_info.column_count_,
                                                              segment_info.row_count_,
                                                              segment_info.actual_row_count_,

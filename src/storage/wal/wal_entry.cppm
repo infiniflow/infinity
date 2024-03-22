@@ -92,7 +92,6 @@ export struct WalBlockInfo {
 
 export struct WalSegmentInfo {
     SegmentID segment_id_{};
-    SegmentStatus status_{};
     u64 column_count_{0};
     SizeT row_count_{0};
     SizeT actual_row_count_{0};
