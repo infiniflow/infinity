@@ -96,9 +96,9 @@ SharedPtr<TableIndexEntry> TableIndexEntry::ReplayTableIndexEntry(TableIndexMeta
                                                                   const SharedPtr<String> &index_entry_dir,
                                                                   TransactionID txn_id,
                                                                   TxnTimeStamp begin_ts,
-                                                                  TxnTimeStamp commit_ts,
-                                                                  bool is_delete) noexcept {
-    auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_entry_dir, txn_id, begin_ts);
+                                                                  TxnTimeStamp commit_ts) noexcept {
+    auto table_index_entry =
+        MakeShared<TableIndexEntry>(index_base, false /*Replay drop will not create entry*/, table_index_meta, index_entry_dir, txn_id, begin_ts);
     table_index_entry->commit_ts_.store(commit_ts);
     return table_index_entry;
 }
@@ -110,6 +110,14 @@ bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
         homebrewed = index_fulltext->homebrewed_;
     }
     return homebrewed;
+}
+
+String TableIndexEntry::GetPathNameTail() const {
+    SizeT delimiter_i = index_dir_->rfind('/');
+    if (delimiter_i == String::npos) {
+        return *index_dir_;
+    }
+    return index_dir_->substr(delimiter_i + 1);
 }
 
 // For segment_index_entry
@@ -195,7 +203,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        auto table_index_entry = ReplayTableIndexEntry(table_index_meta, nullptr, nullptr, txn_id, begin_ts, commit_ts, true);
+        auto table_index_entry = ReplayTableIndexEntry(table_index_meta, nullptr, nullptr, txn_id, begin_ts, commit_ts);
         table_index_entry->deleted_ = true;
         table_index_entry->commit_ts_.store(commit_ts);
         table_index_entry->begin_ts_ = begin_ts;
@@ -205,7 +213,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
     auto index_base = IndexBase::Deserialize(index_def_entry_json["index_base"]);
 
-    SharedPtr<TableIndexEntry> table_index_entry = ReplayTableIndexEntry(table_index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, false);
+    SharedPtr<TableIndexEntry> table_index_entry = ReplayTableIndexEntry(table_index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts);
     table_index_entry->commit_ts_.store(commit_ts);
     table_index_entry->begin_ts_ = begin_ts;
 

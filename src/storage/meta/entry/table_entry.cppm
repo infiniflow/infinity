@@ -87,7 +87,6 @@ public:
                                                   TransactionID txn_id,
                                                   TxnTimeStamp begin_ts,
                                                   TxnTimeStamp commit_ts,
-                                                  bool is_delete,
                                                   SizeT row_count,
                                                   SegmentID unsealed_id) noexcept;
 
@@ -107,11 +106,10 @@ public:
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
 
     // replay
-    TableIndexEntry *
-    CreateIndexReplay(const SharedPtr<String> &index_name,
-                      std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                      TransactionID txn_id,
-                      TxnTimeStamp begin_ts);
+    TableIndexEntry *CreateIndexReplay(const SharedPtr<String> &index_name,
+                                       std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts);
 
     void DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -173,6 +171,8 @@ public:
     inline SizeT ColumnCount() const { return columns_.size(); }
 
     const SharedPtr<String> &TableEntryDir() const { return table_entry_dir_; }
+
+    String GetPathNameTail() const;
 
     inline SizeT row_count() const { return row_count_; }
 

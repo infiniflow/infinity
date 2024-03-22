@@ -105,10 +105,9 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(TableMeta *table_meta,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts,
                                                    TxnTimeStamp commit_ts,
-                                                   bool is_delete,
                                                    SizeT row_count,
                                                    SegmentID unsealed_id) noexcept {
-    auto table_entry = MakeShared<TableEntry>(is_delete,
+    auto table_entry = MakeShared<TableEntry>(false /*replay drop will not create new entry*/,
                                               std::move(table_entry_dir),
                                               std::move(table_name),
                                               column_defs,
@@ -176,11 +175,10 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     return index_meta->DeleteEntry(txn_id);
 }
 
-TableIndexEntry *TableEntry::CreateIndexReplay(
-    const SharedPtr<String> &index_name,
-    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    TransactionID txn_id,
-    TxnTimeStamp begin_ts) {
+TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_name,
+                                               std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                               TransactionID txn_id,
+                                               TxnTimeStamp begin_ts) {
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_name); };
     auto *index_meta = index_meta_map_.GetMetaNoLock(*index_name, std::move(init_index_meta));
     return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
@@ -548,6 +546,14 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
 }
 
 const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_name_ptr(); }
+
+String TableEntry::GetPathNameTail() const {
+    SizeT delimiter_i = table_entry_dir_->rfind('/');
+    if (delimiter_i == String::npos) {
+        return *table_entry_dir_;
+    }
+    return table_entry_dir_->substr(delimiter_i + 1);
+}
 
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();

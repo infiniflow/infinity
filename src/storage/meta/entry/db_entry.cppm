@@ -75,7 +75,6 @@ public:
 
     String GetPathNameTail() const;
 
-private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
                                             const SharedPtr<String> &table_collection_name,
                                             const Vector<SharedPtr<ColumnDef>> &columns,
@@ -108,6 +107,7 @@ private:
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
+private:
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
     }

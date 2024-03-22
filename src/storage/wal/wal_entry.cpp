@@ -205,8 +205,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         }
         case WalCommandType::CREATE_TABLE: {
             String db_name = ReadBufAdv<String>(ptr);
+            String table_dir_tail = ReadBufAdv<String>(ptr);
             SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateTable>(db_name, table_def);
+            cmd = MakeShared<WalCmdCreateTable>(std::move(db_name), std::move(table_dir_tail), table_def);
             break;
         }
         case WalCommandType::DROP_TABLE: {
@@ -287,9 +288,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::CREATE_INDEX: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            String table_index_dir = ReadBufAdv<String>(ptr);
+            String index_dir_tail = ReadBufAdv<String>(ptr);
             SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, table_index_dir, index_base);
+            cmd = MakeShared<WalCmdCreateIndex>(std::move(db_name), std::move(table_name), std::move(index_dir_tail), std::move(index_base));
             break;
         }
         case WalCommandType::DROP_INDEX: {
@@ -329,14 +330,15 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
 
 bool WalCmdCreateTable::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateTable *>(&other);
-    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && table_def_.get() != nullptr && other_cmd->table_def_.get() != nullptr &&
-           *table_def_ == *other_cmd->table_def_;
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_dir_tail_, other_cmd->table_dir_tail_) &&
+           table_def_.get() != nullptr && other_cmd->table_def_.get() != nullptr && *table_def_ == *other_cmd->table_def_;
 }
 
 bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
-    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_base_.get() != nullptr &&
-           other_cmd->index_base_.get() != nullptr && *index_base_ == *other_cmd->index_base_ && table_index_dir_ == other_cmd->table_index_dir_;
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ &&
+           IsEqual(index_dir_tail_, other_cmd->index_dir_tail_) && index_base_.get() != nullptr && other_cmd->index_base_.get() != nullptr &&
+           *index_base_ == *other_cmd->index_base_;
 }
 
 bool WalCmdDropIndex::operator==(const WalCmd &other) const {
@@ -424,12 +426,13 @@ i32 WalCmdCreateDatabase::GetSizeInBytes() const {
 i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
 
 i32 WalCmdCreateTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + this->table_def_->GetSizeInBytes();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_dir_tail_.size() +
+           this->table_def_->GetSizeInBytes();
 }
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->table_index_dir_.size() + this->index_base_->GetSizeInBytes();
+           this->index_dir_tail_.size() + this->index_base_->GetSizeInBytes();
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
@@ -498,6 +501,7 @@ void WalCmdDropDatabase::WriteAdv(char *&buf) const {
 void WalCmdCreateTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_TABLE);
     WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_dir_tail_);
     this->table_def_->WriteAdv(buf);
 }
 
@@ -505,7 +509,7 @@ void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_INDEX);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->table_index_dir_);
+    WriteBufAdv(buf, this->index_dir_tail_);
     index_base_->WriteAdv(buf);
 }
 
@@ -763,7 +767,6 @@ String WalEntry::ToString() const {
             auto create_index_cmd = dynamic_cast<const WalCmdCreateIndex *>(cmd.get());
             ss << "db name: " << create_index_cmd->db_name_ << std::endl;
             ss << "table name: " << create_index_cmd->table_name_ << std::endl;
-            ss << "table index dir: " << create_index_cmd->table_index_dir_ << std::endl;
             ss << "index def: " << create_index_cmd->index_base_->ToString() << std::endl;
         } else if (cmd->GetType() == WalCommandType::SET_SEGMENT_STATUS_SEALED) {
             auto set_sealed_cmd = dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get());

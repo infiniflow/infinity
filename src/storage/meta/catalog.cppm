@@ -171,13 +171,6 @@ public:
                                                  TxnTimeStamp begin_ts,
                                                  TxnManager *txn_mgr);
 
-    TableIndexEntry *CreateIndexReplay(TableEntry *table_entry,
-                                       const SharedPtr<IndexBase> &index_base,
-                                       const SharedPtr<String> &index_entry_dir,
-                                       TransactionID txn_id,
-                                       TxnTimeStamp begin_ts,
-                                       TxnTimeStamp commit_ts);
-
     Tuple<SharedPtr<TableIndexEntry>, Status> DropIndex(const String &db_name,
                                                         const String &table_name,
                                                         const String &index_name,

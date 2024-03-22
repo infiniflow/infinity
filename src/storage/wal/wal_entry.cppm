@@ -168,7 +168,8 @@ export struct WalCmdDropDatabase : public WalCmd {
 };
 
 export struct WalCmdCreateTable : public WalCmd {
-    WalCmdCreateTable(String db_name, const SharedPtr<TableDef> &table_def) : db_name_(std::move(db_name)), table_def_(table_def) {}
+    WalCmdCreateTable(String db_name, String table_dir_tail, const SharedPtr<TableDef> &table_def)
+        : db_name_(std::move(db_name)), table_dir_tail_(std::move(table_dir_tail)), table_def_(table_def) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_TABLE; }
     bool operator==(const WalCmd &other) const override;
@@ -176,12 +177,13 @@ export struct WalCmdCreateTable : public WalCmd {
     void WriteAdv(char *&buf) const override;
 
     String db_name_{};
+    String table_dir_tail_{};
     SharedPtr<TableDef> table_def_{};
 };
 
 export struct WalCmdCreateIndex : public WalCmd {
-    WalCmdCreateIndex(String db_name, String table_name, String table_index_dir, SharedPtr<IndexBase> index_base)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), table_index_dir_(std::move(table_index_dir)),
+    WalCmdCreateIndex(String db_name, String table_name, String index_dir_tail_, SharedPtr<IndexBase> index_base)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_dir_tail_(std::move(index_dir_tail_)),
           index_base_(std::move(index_base)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_INDEX; }
@@ -194,7 +196,7 @@ export struct WalCmdCreateIndex : public WalCmd {
 
     String db_name_{};
     String table_name_{};
-    String table_index_dir_{};
+    String index_dir_tail_{};
     SharedPtr<IndexBase> index_base_{};
 };
 

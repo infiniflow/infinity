@@ -259,21 +259,6 @@ Tuple<TableIndexEntry *, Status> Catalog::CreateIndex(TableEntry *table_entry,
     );
 }
 
-TableIndexEntry *Catalog::CreateIndexReplay(TableEntry *table_entry,
-                                            const SharedPtr<IndexBase> &index_base,
-                                            const SharedPtr<String> &index_entry_dir,
-                                            TransactionID txn_id,
-                                            TxnTimeStamp begin_ts,
-                                            TxnTimeStamp commit_ts) {
-    return table_entry->CreateIndexReplay(
-        index_base->index_name_,
-        [&](TableIndexMeta *index_meta, SharedPtr<String> index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_entry_dir, txn_id, begin_ts, commit_ts, false);
-        },
-        txn_id,
-        begin_ts);
-}
-
 Tuple<SharedPtr<TableIndexEntry>, Status> Catalog::DropIndex(const String &db_name,
                                                              const String &table_name,
                                                              const String &index_name,
@@ -539,7 +524,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                 txn_id,
                                                                 begin_ts,
                                                                 commit_ts,
-                                                                false,
                                                                 row_count,
                                                                 unsealed_id);
                         },
@@ -650,8 +634,8 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 if (!is_delete) {
                     table_entry->CreateIndexReplay(
                         index_name,
-                        [&](TableIndexMeta *index_meta, const SharedPtr<String> &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, false);
+                        [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);

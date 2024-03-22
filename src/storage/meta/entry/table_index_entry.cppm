@@ -64,7 +64,7 @@ public:
                                                          bool is_delete,
                                                          const SharedPtr<String> &table_entry_dir,
                                                          TableIndexMeta *table_index_meta,
-                                                         Txn *txn, // TODO: remove it
+                                                         Txn *txn,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts);
 
@@ -73,8 +73,7 @@ public:
                                                             const SharedPtr<String> &index_entry_dir,
                                                             TransactionID txn_id,
                                                             TxnTimeStamp begin_ts,
-                                                            TxnTimeStamp commit_ts,
-                                                            bool is_delete) noexcept;
+                                                            TxnTimeStamp commit_ts) noexcept;
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
@@ -94,6 +93,8 @@ public:
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
+
+    String GetPathNameTail() const;
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);

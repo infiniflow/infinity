@@ -107,7 +107,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
 
         auto entry = MakeShared<WalEntry>();
         entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("default2", "AAA_default2"));
-        entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default", MockTableDesc2()));
+        entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default", "BBB_default", MockTableDesc2()));
         WalSegmentInfo segment_info = MakeSegmentInfo(row_count, commit_ts, 2);
         entry->cmds_.push_back(MakeShared<WalCmdImport>("default", "tbl1", std::move(segment_info)));
 
@@ -208,7 +208,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("db1", "AAA_db1"));
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
-    entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
+    entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", "BBB_tb1",MockTableDesc2()));
     entry->cmds_.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
     {
         WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
@@ -221,7 +221,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         for (auto parameter : parameters) {
             delete parameter;
         }
-        entry->cmds_.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", "", index_base));
+        entry->cmds_.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", "CCC_idx1", index_base));
     }
     entry->cmds_.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
     {
