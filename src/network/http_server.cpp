@@ -35,6 +35,8 @@ import infinity_context;
 import query_context;
 import column_def;
 import internal_types;
+import parsed_expr;
+import constant_expr;
 
 namespace {
 
@@ -406,67 +408,269 @@ public:
         String data_body = request->readBodyToString();
         try {
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-            if(http_body_json.is_array() && http_body_json.size() > 0) {
+
+            SizeT row_count = http_body_json.size();
+            if (http_body_json.is_array() && row_count > 0) {
+
+                // First row
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                const auto &first_row_json = http_body_json[0];
+
+                // Used for the column type validation
+                HashMap<String, LiteralType> column_type_map;
+
+                // inserted columns
+                Vector<Vector<ParsedExpr *> *> *column_values = new Vector<Vector<infinity::ParsedExpr *> *>();
+                column_values->reserve(row_count);
+                DeferFn defer_free_column_values([&]() {
+                    if (column_values != nullptr) {
+                        for (auto &value_array : *column_values) {
+                            for (auto &value_ptr : *value_array) {
+                                delete value_ptr;
+                                value_ptr = nullptr;
+                            }
+                            delete value_array;
+                            value_array = nullptr;
+                        }
+                        delete column_values;
+                        column_values = nullptr;
+                    }
+                });
+
+                Vector<ParsedExpr *> *values_row = new Vector<infinity::ParsedExpr *>();
+                Vector<String> *columns = new Vector<String>();
+                DeferFn defer_free_value_row([&]() {
+                    if (values_row != nullptr) {
+                        for (auto &value_ptr : *values_row) {
+                            delete value_ptr;
+                            value_ptr = nullptr;
+                        }
+                        delete values_row;
+                        values_row = nullptr;
+                    }
+                    if (columns != nullptr) {
+                        delete columns;
+                        columns = nullptr;
+                    }
+                });
+                columns->reserve(first_row_json.size());
+                for (const auto &item : first_row_json.items()) {
+                    const auto &key = item.key();
+                    auto iter = column_type_map.find(key);
+                    if (iter != column_type_map.end()) {
+                        json_response["error_code"] = ErrorCode::kDuplicateColumnName;
+                        json_response["error_message"] = fmt::format("Duplicated column name: {}", key);
+                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                    }
+                    columns->emplace_back(key);
+
+                    const auto &value = item.value();
+                    switch (value.type()) {
+                        case nlohmann::json::value_t::boolean: {
+                            auto bool_value = value.template get<bool>();
+                            column_type_map.emplace(key, LiteralType::kBoolean);
+
+                            // Generate constant expression
+                            infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kBoolean);
+                            const_expr->bool_value_ = bool_value;
+                            values_row->emplace_back(const_expr);
+                            const_expr = nullptr;
+                            break;
+                        }
+                        case nlohmann::json::value_t::number_integer: {
+                            auto integer_value = value.template get<i64>();
+                            column_type_map.emplace(key, LiteralType::kInteger);
+
+                            // Generate constant expression
+                            infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
+                            const_expr->integer_value_ = integer_value;
+                            values_row->emplace_back(const_expr);
+                            const_expr = nullptr;
+                            break;
+                        }
+                        case nlohmann::json::value_t::number_unsigned: {
+                            auto integer_value = value.template get<u64>();
+                            column_type_map.emplace(key, LiteralType::kInteger);
+
+                            // Generate constant expression
+                            infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
+                            const_expr->integer_value_ = integer_value;
+                            values_row->emplace_back(const_expr);
+                            const_expr = nullptr;
+                            break;
+                        }
+                        case nlohmann::json::value_t::number_float: {
+                            auto float_value = value.template get<f64>();
+                            column_type_map.emplace(key, LiteralType::kDouble);
+
+                            // Generate constant expression
+                            infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDouble);
+                            const_expr->double_value_ = float_value;
+                            values_row->emplace_back(const_expr);
+                            const_expr = nullptr;
+                            break;
+                        }
+                        case nlohmann::json::value_t::array: {
+                            SizeT dimension = value.size();
+                            if (dimension == 0) {
+                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                json_response["error_message"] = fmt::format("Empty embedding data: {}", value);
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                            }
+
+                            auto first_elem = value[0];
+                            auto first_elem_type = first_elem.type();
+                            if (first_elem_type == nlohmann::json::value_t::number_integer or
+                                first_elem_type == nlohmann::json::value_t::number_unsigned) {
+
+                                // Generate constant expression
+                                infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kIntegerArray);
+                                DeferFn defer_free_integer_array([&]() {
+                                    if (const_expr != nullptr) {
+                                        delete const_expr;
+                                        const_expr = nullptr;
+                                    }
+                                });
+
+                                for (SizeT idx = 0; idx < dimension; ++idx) {
+                                    const auto &value_ref = value[idx];
+                                    const auto &value_type = value_ref.type();
+
+                                    switch (value_type) {
+                                        case nlohmann::json::value_t::number_integer: {
+                                            const_expr->long_array_.emplace_back(value.template get<i64>());
+                                            break;
+                                        }
+                                        case nlohmann::json::value_t::number_unsigned: {
+                                            const_expr->long_array_.emplace_back(value.template get<u64>());
+                                            break;
+                                        }
+                                        default: {
+                                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                            json_response["error_message"] = fmt::format("Embedding element type should be integer");
+                                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                                        }
+                                    }
+                                }
+                            } else if (first_elem_type == nlohmann::json::value_t::number_float) {
+
+                                // Generate constant expression
+                                infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDoubleArray);
+                                DeferFn defer_free_double_array([&]() {
+                                    if (const_expr != nullptr) {
+                                        delete const_expr;
+                                        const_expr = nullptr;
+                                    }
+                                });
+
+                                for (SizeT idx = 0; idx < dimension; ++idx) {
+                                    const auto &value_ref = value[idx];
+                                    const auto &value_type = value_ref.type();
+                                    if (value_type != nlohmann::json::value_t::number_float) {
+                                        json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                        json_response["error_message"] = fmt::format("Embedding element type should be float");
+                                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                                    }
+
+                                    const_expr->double_array_.emplace_back(value.template get<double>());
+                                }
+                            } else {
+                                json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                                json_response["error_message"] = fmt::format("Embedding element type can only be integer or float");
+                                return ResponseFactory::createResponse(http_status, json_response.dump());
+                            }
+
+                            break;
+                        }
+                        case nlohmann::json::value_t::string: {
+                            json_response["error_code"] = ErrorCode::kNotSupported;
+                            json_response["error_message"] = fmt::format("HTTP API doesn't support insert varchar value now");
+                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                            break;
+                        }
+                        case nlohmann::json::value_t::object:
+                        case nlohmann::json::value_t::binary:
+                        case nlohmann::json::value_t::null:
+                        case nlohmann::json::value_t::discarded: {
+                            json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                            json_response["error_message"] = fmt::format("Embedding element type can only be integer or float");
+                            return ResponseFactory::createResponse(http_status, json_response.dump());
+                        }
+                    }
+
+//                    std::cout << key << " " << value.is_string() << std::endl;
+                }
+                column_values->emplace_back(values_row);
+                values_row = nullptr;
+
+                auto result = infinity->Insert(database_name, table_name, columns, column_values);
+                columns = nullptr;
+                column_values = nullptr;
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+                // QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *>
+                // *values);
                 ;
             } else {
                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
                 json_response["error_message"] = fmt::format("Invalid json format: {}", data_body);
             }
-        } catch (nlohmann::json::exception& e) {
+
+        } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
         }
 
-//        std::cout << http_body_json.is_array() << std::endl;
-//
-//        for (const auto &value_json : http_body_json) {
-////            SizeT value_count = value_json.size();
-//            for (const auto& item : value_json.items())
-//            {
-////                if(item.key().is_string()) {
-////                    std::cout << "string " << std::endl;
-////                }
-////                auto key = item.to_string();
-////                auto value = item.value();
-////                std::cout << item << std::endl;
-////                value;
-//                const auto& key = item.key();
-//                const auto& value = item.value();
-//                std::cout << key << " " << value.is_string() << std::endl;
-//            }
-////            for(SizeT idx = 0; idx < value_count; ++ idx) {
-////                value_json[idx];
-////            }
-//        }
+        //        std::cout << http_body_json.is_array() << std::endl;
+        //
+        //        for (const auto &value_json : http_body_json) {
+        ////            SizeT value_count = value_json.size();
+        //            for (const auto& item : value_json.items())
+        //            {
+        ////                if(item.key().is_string()) {
+        ////                    std::cout << "string " << std::endl;
+        ////                }
+        ////                auto key = item.to_string();
+        ////                auto value = item.value();
+        ////                std::cout << item << std::endl;
+        ////                value;
+        //                const auto& key = item.key();
+        //                const auto& value = item.value();
+        //                std::cout << key << " " << value.is_string() << std::endl;
+        //            }
+        ////            for(SizeT idx = 0; idx < value_count; ++ idx) {
+        ////                value_json[idx];
+        ////            }
+        //        }
 
-//        if (result.IsOk()) {
-//            SizeT block_rows = result.result_table_->DataBlockCount();
-//            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-//                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
-//                auto row_count = data_block->row_count();
-//                auto column_cnt = result.result_table_->ColumnCount();
-//                for (int row = 0; row < row_count; ++row) {
-//                    nlohmann::json json_table;
-//                    for (SizeT col = 0; col < column_cnt; ++col) {
-//                        const String &column_name = result.result_table_->GetColumnNameById(col);
-//                        Value value = data_block->GetValue(col, row);
-//                        const String &column_value = value.ToString();
-//                        json_table[column_name] = column_value;
-//                    }
-//                    json_response["columns"].push_back(json_table);
-//                }
-//            }
-//            json_response["error_code"] = 0;
-//            http_status = HTTPStatus::CODE_200;
-//        } else {
-//            json_response["error_code"] = result.ErrorCode();
-//            json_response["error_message"] = result.ErrorMsg();
-//            http_status = HTTPStatus::CODE_500;
-//        }
+        //        if (result.IsOk()) {
+        //            SizeT block_rows = result.result_table_->DataBlockCount();
+        //            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+        //                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+        //                auto row_count = data_block->row_count();
+        //                auto column_cnt = result.result_table_->ColumnCount();
+        //                for (int row = 0; row < row_count; ++row) {
+        //                    nlohmann::json json_table;
+        //                    for (SizeT col = 0; col < column_cnt; ++col) {
+        //                        const String &column_name = result.result_table_->GetColumnNameById(col);
+        //                        Value value = data_block->GetValue(col, row);
+        //                        const String &column_value = value.ToString();
+        //                        json_table[column_name] = column_value;
+        //                    }
+        //                    json_response["columns"].push_back(json_table);
+        //                }
+        //            }
+        //            json_response["error_code"] = 0;
+        //            http_status = HTTPStatus::CODE_200;
+        //        } else {
+        //            json_response["error_code"] = result.ErrorCode();
+        //            json_response["error_message"] = result.ErrorMsg();
+        //            http_status = HTTPStatus::CODE_500;
+        //        }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
-
 
 class ListTableIndexesHandler final : public HttpRequestHandler {
 public:

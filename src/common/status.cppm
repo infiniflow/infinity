@@ -107,6 +107,7 @@ export enum class ErrorCode : long {
     kInsertWithoutValues = 3065,
     kInvalidConflictType = 3066,
     kInvalidJsonFormat = 3067,
+    kDuplicateColumnName = 3068,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -231,6 +232,7 @@ public:
     static Status InsertWithoutValues();
     static Status InvalidConflictType();
     static Status InvalidJsonFormat(const String& invalid_json);
+    static Status DuplicateColumnName(const String& column_name);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
