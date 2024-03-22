@@ -673,3 +673,75 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     }
 }
 
+TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
+    String table_name = "tb1";
+    std::shared_ptr<std::string> config_path = nullptr;
+    infinity::InfinityContext::instance().Init(config_path);
+
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    BufferManager *buffer_manager = storage->buffer_manager();
+    TxnManager *txn_mgr = storage->txn_manager();
+
+    Vector<SharedPtr<ColumnDef>> columns;
+    {
+        i64 column_id = 0;
+        {
+            HashSet<ConstraintType> constraints;
+            auto column_def_ptr =
+                MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+            columns.emplace_back(column_def_ptr);
+        }
+    }
+    {
+        // create table
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+
+        Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+
+        txn_mgr->CommitTxn(txn);
+    }
+    Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
+    this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
+
+    {
+        // add compact
+        auto txn4 = txn_mgr->CreateTxn();
+        txn4->Begin();
+
+        auto [table_entry, status] = txn4->GetTableByName("default", table_name);
+        EXPECT_NE(table_entry, nullptr);
+
+        {
+            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
+            compact_task->Execute();
+        }
+        // rollback
+        txn_mgr->RollBackTxn(txn4);
+    }
+
+    {
+        auto txn5 = txn_mgr->CreateTxn();
+        txn5->Begin();
+        TxnTimeStamp begin_ts = txn5->BeginTS();
+
+        auto [table_entry, status] = txn5->GetTableByName("default", table_name);
+        EXPECT_NE(table_entry, nullptr);
+
+        size_t test_segment_n = segment_sizes.size();
+
+        for (size_t i = 0; i < test_segment_n; ++i) {
+            auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+            EXPECT_NE(segment_entry, nullptr);
+            EXPECT_NE(segment_entry->status(), SegmentStatus::kDeprecated);
+        }
+
+        auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+        EXPECT_EQ(compact_segment, nullptr);
+
+        txn_mgr->CommitTxn(txn5);
+    }
+    infinity::InfinityContext::instance().UnInit();
+}
