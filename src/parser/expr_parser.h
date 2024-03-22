@@ -12,14 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#pragma once
 
-#include "decimal_info.h"
+#include "expression_parser.h"
+#include "expression_parser_result.h"
 
-export module decimal_info;
+#include "expression_lexer.h"
+
+#include <memory>
+#include <string>
 
 namespace infinity {
 
-export using infinity::DecimalInfo;
+class ExprParser {
 
-}
+public:
+    ExprParser();
+
+    ~ExprParser();
+
+    void Parse(const std::string &expr_text, ExpressionParserResult *result);
+
+    void *scanner_{};
+    YY_BUFFER_STATE state_;
+};
+
+} // namespace infinity

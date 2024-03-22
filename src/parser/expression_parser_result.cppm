@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,12 @@
 
 module;
 
-#include "decimal_info.h"
+#include "expression_parser_result.h"
 
-export module decimal_info;
+export module expression_parser_result;
 
 namespace infinity {
 
-export using infinity::DecimalInfo;
+export using infinity::ExpressionParserResult;
 
 }
