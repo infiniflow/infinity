@@ -97,7 +97,6 @@ void WalManager::Start() {
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
-    apply_delta_entries_thread_ = Thread([this] { ApplyDeltaEntries(); });
     LOG_INFO("WAL manager is started.");
 }
 
@@ -105,10 +104,6 @@ void WalManager::Stop() {
     LOG_INFO("WAL manager is stopping...");
 
     checkpoint_running_.store(false);
-
-    // Wait for add delta entries thread to stop.
-    LOG_TRACE("WalManager::Stop add delta entries thread join");
-    apply_delta_entries_thread_.join();
 
     // Wait for checkpoint thread to stop.
     LOG_TRACE("WalManager::Stop checkpoint thread join");
@@ -259,51 +254,46 @@ void WalManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     delta_entries_.push_back(std::move(delta_entry));
 }
 
-void WalManager::ApplyDeltaEntries() {
-    LOG_TRACE("WalManager::ApplyDeltaEntries mainloop begin");
-    Catalog *catalog = storage_->catalog();
-    while (checkpoint_running_.load() || !delta_entries_.empty()) {
-        auto [max_commit_ts, wal_size] = GetWalState();
-        mutex3_.lock();
-        if (delta_entries_.empty() || delta_entries_.front()->commit_ts() > max_commit_ts) {
-            mutex3_.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-
-        Vector<UniquePtr<CatalogDeltaEntry>> flushed_entries;
-        while (!delta_entries_.empty() && delta_entries_.front()->commit_ts() <= max_commit_ts) {
-            flushed_entries.push_back(std::move(delta_entries_.front()));
-            delta_entries_.pop_front();
-        }
-        mutex3_.unlock();
-
-        catalog->AddDeltaEntries(std::move(flushed_entries));
-    }
-    LOG_INFO("WalManager::ApplyDeltaEntries mainloop end");
-}
-
 /*****************************************************************************
  * CHECKPOINT WAL FILE
  *****************************************************************************/
 
 void WalManager::CheckpointTimer() {
     LOG_TRACE("WalManager::Checkpoint mainloop begin");
+    Catalog *catalog = storage_->catalog();
+
+    auto cur_millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    auto check_checkpoint_millis = std::chrono::milliseconds(1000);
     while (checkpoint_running_.load()) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        Checkpoint();
+        auto [max_commit_ts, wal_size] = GetWalState();
+        Vector<UniquePtr<CatalogDeltaEntry>> flushed_entries;
+        {
+            std::unique_lock lock(mutex3_);
+            while (!delta_entries_.empty() && delta_entries_.front()->commit_ts() <= max_commit_ts) {
+                flushed_entries.push_back(std::move(delta_entries_.front()));
+                delta_entries_.pop_front();
+            }
+        }
+
+        catalog->AddDeltaEntries(std::move(flushed_entries));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        auto new_millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (new_millis - cur_millis > check_checkpoint_millis.count()) {
+            cur_millis = new_millis;
+            Checkpoint(max_commit_ts, wal_size);
+        }
     }
     LOG_INFO("WalManager::Checkpoint mainloop end");
 }
 
 // Do checkpoint for transactions which lsn no larger than the given one.
-void WalManager::Checkpoint() {
+void WalManager::Checkpoint(TxnTimeStamp current_max_commit_ts, i64 current_wal_size) {
     bool is_full_checkpoint = false;
     i64 current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     i64 full_duration = current_time - last_full_ckp_time_;
     i64 delta_duration = current_time - last_delta_ckp_time_;
 
-    auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
         //        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {},

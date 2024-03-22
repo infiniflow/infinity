@@ -52,8 +52,7 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 }
 
 i32 WalBlockInfo::GetSizeInBytes() const {
-    i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_) + sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(checkpoint_ts_) +
-               sizeof(row_count_);
+    i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_) + sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(checkpoint_ts_);
     size += sizeof(i32) + next_outline_idxes_.size() * sizeof(i32);
     return size;
 }
