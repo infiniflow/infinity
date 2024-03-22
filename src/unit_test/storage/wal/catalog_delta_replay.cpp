@@ -66,6 +66,41 @@ protected:
             // std::this_thread::sleep_for(std::chrono::seconds(1));
         } while (visible_ts <= last_commit_ts);
     }
+
+    void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
+        for (SizeT segment_size : segment_sizes) {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            auto [table_entry, status] = txn->GetTableByName("default", table_name);
+            table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
+            auto column_count = table_entry->ColumnCount();
+
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
+
+            while (segment_size > 0) {
+                SizeT write_size = std::min(SizeT(DEFAULT_BLOCK_CAPACITY), segment_size);
+                segment_size -= write_size;
+                Vector<ColumnVector> column_vectors;
+                {
+                    auto column_vector = ColumnVector(MakeShared<DataType>(LogicalType::kTinyInt));
+                    column_vector.Initialize();
+                    Value v = Value::MakeTinyInt(static_cast<TinyIntT>(1));
+                    for (int i = 0; i < (int)write_size; ++i) {
+                        column_vector.AppendValue(v);
+                    }
+                    column_vectors.push_back(std::move(column_vector));
+                }
+                block_entry->AppendBlock(column_vectors, 0, write_size, buffer_mgr);
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
+            }
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
+            txn_mgr->CommitTxn(txn);
+        }
+    }
 };
 
 TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
