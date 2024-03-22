@@ -357,6 +357,11 @@ namespace infinity {
 
     using Thread = std::thread;
 
+    // template< class Rep, class Period >
+    // void SleepFor(const std::chrono::duration<Rep, Period>& sleep_duration) {
+    //     std::this_thread::sleep_for(sleep_duration);
+    // }
+
     using atomic_u32 = std::atomic_uint32_t;
     using atomic_u64 = std::atomic_uint64_t;
     using ai64 = std::atomic_int64_t;
