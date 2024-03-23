@@ -59,12 +59,12 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
 }
 
 SharedPtr<DBEntry> DBEntry::ReplayDBEntry(DBMeta *db_meta,
+                                          bool is_delete,
                                           const SharedPtr<String> &db_entry_dir,
                                           const SharedPtr<String> &db_name,
                                           TransactionID txn_id,
                                           TxnTimeStamp begin_ts,
-                                          TxnTimeStamp commit_ts,
-                                          bool is_delete) noexcept {
+                                          TxnTimeStamp commit_ts) noexcept {
     auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
     return db_entry;
@@ -126,15 +126,23 @@ void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
                                 TxnTimeStamp begin_ts) {
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
     auto *table_meta = table_meta_map_.GetMetaNoLock(*table_name, std::move(init_table_meta));
-    table_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
+    table_meta->CreateEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(table_meta, table_name, txn_id, begin_ts); },
+                                  txn_id,
+                                  begin_ts);
 }
 
-void DBEntry::DropTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+void DBEntry::DropTableReplay(const String &table_name,
+                              std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                              TransactionID txn_id,
+                              TxnTimeStamp begin_ts) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    table_meta->DropEntryReplay(txn_id, begin_ts);
+    table_meta->DropEntryReplay(
+        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(table_meta, table_meta->table_name_ptr(), txn_id, begin_ts); },
+        txn_id,
+        begin_ts);
 }
 
 TableEntry *DBEntry::GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -246,6 +254,14 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     }
 
     return res;
+}
+
+String DBEntry::GetPathNameTail() const {
+    SizeT delimiter_i = db_entry_dir_->rfind('/');
+    if (delimiter_i == String::npos) {
+        return *db_entry_dir_;
+    }
+    return db_entry_dir_->substr(delimiter_i + 1);
 }
 
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }

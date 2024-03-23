@@ -58,24 +58,30 @@ import block_entry;
 import block_column_entry;
 import table_index_entry;
 import base_entry;
+import compilation_config;
+
+using namespace infinity;
 
 class WalReplayTest : public BaseTest {
+protected:
+    static std::shared_ptr<std::string> config_path() {
+        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_wal_replay.toml");
+    }
+
     void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
 
     void TearDown() override {
         system("tree  /tmp/infinity");
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        // system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
     }
 };
-
-using namespace infinity;
 
 TEST_F(WalReplayTest, WalReplayDatabase) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -139,7 +145,7 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -200,7 +206,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -258,7 +264,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -290,11 +296,12 @@ TEST_F(WalReplayTest, WalReplayTables) {
 }
 
 TEST_F(WalReplayTest, WalReplayAppend) {
+    SizeT row_count = 2;
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -355,7 +362,6 @@ TEST_F(WalReplayTest, WalReplayAppend) {
         {
             auto *txn5 = txn_mgr->CreateTxn();
             SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
-            SizeT row_count = 2;
 
             // Prepare the input data block
             Vector<SharedPtr<DataType>> column_types;
@@ -401,7 +407,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -429,56 +435,43 @@ TEST_F(WalReplayTest, WalReplayAppend) {
 
             txn_mgr->CommitTxn(txn);
         }
-        //        {
-        //            auto *txn = txn_mgr->CreateTxn();
-        //            txn->Begin();
-        //            Vector<ColumnID> column_ids{0, 1, 2};
-        //            UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
-        //
-        //            txn->GetMetaTableState(read_table_meta.get(), "default", "tbl4", column_ids);
-        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1u);
-        //
-        //            EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
-        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1u);
-        //            for (const auto &segment_pair : read_table_meta->segment_map_) {
-        //                EXPECT_EQ(segment_pair.first, 0);
-        //                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-        //                EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 1u);
-        //                EXPECT_EQ(segment_pair.second.block_map_.size(), 1u);
-        //                for (const auto &block_pair : segment_pair.second.block_map_) {
-        //                    //                    EXPECT_EQ(block_pair.first, 0);
-        //                    EXPECT_NE(block_pair.second.block_entry_, nullptr);
-        //
-        //                    EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(0));
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(1));
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(2));
-        //
-        //                    BlockColumnEntry *column0 = block_pair.second.column_data_map_.at(0).block_column_;
-        //                    BlockColumnEntry *column1 = block_pair.second.column_data_map_.at(1).block_column_;
-        //                    BlockColumnEntry *column2 = block_pair.second.column_data_map_.at(2).block_column_;
-        //
-        //                    SizeT row_count = block_pair.second.block_entry_->row_count_;
-        //                    ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_manager);
-        //                    i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_EQ(col0_ptr[row], (i8)(row));
-        //                    }
-        //
-        //                    ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_manager);
-        //                    i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_EQ(col1_ptr[row], (i64)(row));
-        //                    }
-        //
-        //                    ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_manager);
-        //                    f64 *col2_ptr = (f64 *)(col2_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-        //                    }
-        //                }
-        //            }
-        //        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            TxnTimeStamp begin_ts = txn->BeginTS();
+            auto [table_entry, status] = txn->GetTableByName("default", "tbl4");
+            EXPECT_NE(table_entry, nullptr);
+
+            auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
+            EXPECT_NE(segment_entry, nullptr);
+            EXPECT_EQ(segment_entry->segment_id(), 0u);
+            EXPECT_EQ(segment_entry->row_count(), row_count);
+
+            auto *block_entry = segment_entry->GetBlockEntryByID(0);
+            EXPECT_EQ(block_entry->block_id(), 0u);
+            EXPECT_EQ(block_entry->row_count(), row_count);
+
+            BlockColumnEntry *column0 = block_entry->GetColumnBlockEntry(0);
+            BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
+            BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
+
+            ColumnVector col0 = column0->GetColumnVector(storage->buffer_manager());
+            ColumnVector col1 = column1->GetColumnVector(storage->buffer_manager());
+            ColumnVector col2 = column2->GetColumnVector(storage->buffer_manager());
+
+            for (SizeT i = 0; i < row_count; ++i) {
+                Value v0 = col0.GetValue(i);
+                EXPECT_EQ(v0.GetValue<TinyIntT>(), static_cast<i8>(i));
+
+                Value v1 = col1.GetValue(i);
+                EXPECT_EQ(v1.GetValue<BigIntT>(), static_cast<i64>(i));
+
+                Value v2 = col2.GetValue(i);
+                EXPECT_EQ(v2.GetValue<DoubleT>(), static_cast<f64>(i));
+            }
+
+            txn_mgr->CommitTxn(txn);
+        }
 #ifdef INFINITY_DEBUG
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -493,7 +486,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -642,7 +635,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -701,7 +694,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -791,7 +784,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -831,7 +824,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -905,7 +898,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -937,7 +930,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -1015,7 +1008,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();

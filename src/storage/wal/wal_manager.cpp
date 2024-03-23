@@ -35,12 +35,20 @@ import bg_task;
 import extra_ddl_info;
 
 import infinity_exception;
-
-import block_entry;
-import segment_entry;
+import block_column_entry;
 import compact_segments_task;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
+import column_def;
+
+import db_meta;
+import db_entry;
+import table_meta;
+import table_entry;
+import segment_entry;
+import block_entry;
+import table_index_meta;
+import table_index_entry;
 
 module wal_manager;
 
@@ -90,7 +98,6 @@ void WalManager::Start() {
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
-    apply_delta_entries_thread_ = Thread([this] { ApplyDeltaEntries(); });
     LOG_INFO("WAL manager is started.");
 }
 
@@ -98,10 +105,6 @@ void WalManager::Stop() {
     LOG_INFO("WAL manager is stopping...");
 
     checkpoint_running_.store(false);
-
-    // Wait for add delta entries thread to stop.
-    LOG_TRACE("WalManager::Stop add delta entries thread join");
-    apply_delta_entries_thread_.join();
 
     // Wait for checkpoint thread to stop.
     LOG_TRACE("WalManager::Stop checkpoint thread join");
@@ -252,51 +255,46 @@ void WalManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     delta_entries_.push_back(std::move(delta_entry));
 }
 
-void WalManager::ApplyDeltaEntries() {
-    LOG_TRACE("WalManager::ApplyDeltaEntries mainloop begin");
-    Catalog *catalog = storage_->catalog();
-    while (checkpoint_running_.load() || !delta_entries_.empty()) {
-        auto [max_commit_ts, wal_size] = GetWalState();
-        mutex3_.lock();
-        if (delta_entries_.empty() || delta_entries_.front()->commit_ts() > max_commit_ts) {
-            mutex3_.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-
-        Vector<UniquePtr<CatalogDeltaEntry>> flushed_entries;
-        while (!delta_entries_.empty() && delta_entries_.front()->commit_ts() <= max_commit_ts) {
-            flushed_entries.push_back(std::move(delta_entries_.front()));
-            delta_entries_.pop_front();
-        }
-        mutex3_.unlock();
-
-        catalog->AddDeltaEntries(std::move(flushed_entries));
-    }
-    LOG_INFO("WalManager::ApplyDeltaEntries mainloop end");
-}
-
 /*****************************************************************************
  * CHECKPOINT WAL FILE
  *****************************************************************************/
 
 void WalManager::CheckpointTimer() {
     LOG_TRACE("WalManager::Checkpoint mainloop begin");
+    Catalog *catalog = storage_->catalog();
+
+    auto cur_millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    auto check_checkpoint_millis = std::chrono::milliseconds(1000);
     while (checkpoint_running_.load()) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        Checkpoint();
+        auto [max_commit_ts, wal_size] = GetWalState();
+        Vector<UniquePtr<CatalogDeltaEntry>> flushed_entries;
+        {
+            std::unique_lock lock(mutex3_);
+            while (!delta_entries_.empty() && delta_entries_.front()->commit_ts() <= max_commit_ts) {
+                flushed_entries.push_back(std::move(delta_entries_.front()));
+                delta_entries_.pop_front();
+            }
+        }
+
+        catalog->AddDeltaEntries(std::move(flushed_entries));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        auto new_millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (new_millis - cur_millis > check_checkpoint_millis.count()) {
+            cur_millis = new_millis;
+            Checkpoint(max_commit_ts, wal_size);
+        }
     }
     LOG_INFO("WalManager::Checkpoint mainloop end");
 }
 
 // Do checkpoint for transactions which lsn no larger than the given one.
-void WalManager::Checkpoint() {
+void WalManager::Checkpoint(TxnTimeStamp current_max_commit_ts, i64 current_wal_size) {
     bool is_full_checkpoint = false;
     i64 current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     i64 full_duration = current_time - last_full_ckp_time_;
     i64 delta_duration = current_time - last_delta_ckp_time_;
 
-    auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
         //        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {},
@@ -316,6 +314,13 @@ void WalManager::Checkpoint() {
         is_full_checkpoint = false;
     } else {
         return;
+    }
+    if ((is_full_checkpoint && cfg_full_checkpoint_interval_sec_ == 0) || (!is_full_checkpoint && cfg_delta_checkpoint_interval_sec_ == 0)) {
+        return; // skip checkpoint if the interval is 0
+    }
+
+    if (is_full_checkpoint) {
+        return; // full checkpoint is not supported yet.
     }
 
     try {
@@ -665,51 +670,85 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
     }
 }
 void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name_, txn_id, commit_ts, storage_->txn_manager(), ConflictType::kIgnore);
-    if (!status.ok()) {
-        UnrecoverableError("Wal Replay: Create database failed");
-    }
-    db_entry->Commit(commit_ts);
+    Catalog *catalog = storage_->catalog();
+    auto db_dir = MakeShared<String>(*catalog->DataDir() + "/" + cmd.db_dir_tail_);
+    catalog->CreateDatabaseReplay(
+        MakeShared<String>(cmd.db_name_),
+        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return DBEntry::ReplayDBEntry(db_meta, false, db_dir, db_name, txn_id, begin_ts, commit_ts);
+        },
+        txn_id,
+        0 /*begin_ts*/);
 }
 void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    if (*cmd.table_def_->table_name() == "test_create_drop_different_fulltext_index_invalid_options") {
-        LOG_INFO("AA");
-    }
-    auto [table_entry, table_status] =
-        storage_->catalog()->CreateTable(cmd.db_name_, txn_id, commit_ts, cmd.table_def_, ConflictType::kIgnore, storage_->txn_manager());
-
-    if (!table_status.ok()) {
-        UnrecoverableError("Wal Replay: Create table failed" + *table_status.msg_);
-    }
-    table_entry->Commit(commit_ts);
+    auto *db_entry = storage_->catalog()->GetDatabaseReplay(cmd.db_name_, txn_id, 0 /*begin_ts*/);
+    auto table_dir = MakeShared<String>(*db_entry->db_entry_dir() + "/" + cmd.table_dir_tail_);
+    SharedPtr<String> table_name = cmd.table_def_->table_name();
+    db_entry->CreateTableReplay(
+        table_name,
+        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return TableEntry::ReplayTableEntry(false,
+                                                table_meta,
+                                                table_dir,
+                                                table_name,
+                                                cmd.table_def_->columns(),
+                                                TableEntryType::kTableEntry,
+                                                txn_id,
+                                                begin_ts,
+                                                commit_ts,
+                                                0 /*row_count*/,
+                                                0 /*unsealed_id*/);
+        },
+        txn_id,
+        0 /*begin_ts*/);
 }
 
 void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    auto [db_entry, status] = storage_->catalog()->DropDatabase(cmd.db_name_, txn_id, commit_ts, nullptr);
-    if (!status.ok()) {
-        UnrecoverableError("Wal Replay: Drop database failed");
-    }
-    db_entry->Commit(commit_ts);
+    storage_->catalog()->DropDatabaseReplay(
+        cmd.db_name_,
+        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return DBEntry::ReplayDBEntry(db_meta, true, db_meta->data_dir(), db_name, txn_id, begin_ts, commit_ts);
+        },
+        txn_id,
+        0 /*begin_ts*/);
 }
 
 void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    auto [table_entry, table_status] =
-        storage_->catalog()->DropTableByName(cmd.db_name_, cmd.table_name_, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
-    if (!table_status.ok()) {
-        UnrecoverableError(fmt::format("Wal Replay: Drop table failed {}", table_status.message()));
-    }
-    table_entry->Commit(commit_ts);
+    auto *db_entry = storage_->catalog()->GetDatabaseReplay(cmd.db_name_, txn_id, 0 /*begin_ts*/);
+    db_entry->DropTableReplay(
+        cmd.table_name_,
+        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return TableEntry::ReplayTableEntry(true,
+                                                table_meta,
+                                                nullptr,
+                                                table_name,
+                                                Vector<SharedPtr<ColumnDef>>{},
+                                                TableEntryType::kTableEntry,
+                                                txn_id,
+                                                begin_ts,
+                                                commit_ts,
+                                                0 /*row_count*/,
+                                                0 /*unsealed_id*/);
+        },
+        txn_id,
+        0 /*begin_ts*/);
 }
 
 void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
-    if (!table_status.ok()) {
-        UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
-    }
-
     TxnTimeStamp begin_ts = 0; // TODO: FIX IT
-    auto *table_index_entry =
-        storage_->catalog()->CreateIndexReplay(table_entry, cmd.index_base_, MakeShared<String>(cmd.table_index_dir_), txn_id, begin_ts, commit_ts);
+
+    Catalog *catalog = storage_->catalog();
+    auto *db_entry = catalog->GetDatabaseReplay(cmd.db_name_, txn_id, begin_ts);
+    auto *table_entry = db_entry->GetTableReplay(cmd.table_name_, txn_id, begin_ts);
+
+    auto index_entry_dir = MakeShared<String>(*table_entry->TableEntryDir() + "/" + cmd.index_dir_tail_);
+    auto *table_index_entry = table_entry->CreateIndexReplay(
+        cmd.index_base_->index_name_,
+        [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return TableIndexEntry::ReplayTableIndexEntry(index_meta, false, cmd.index_base_, index_entry_dir, txn_id, begin_ts, commit_ts);
+        },
+        txn_id,
+        begin_ts);
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
@@ -724,40 +763,52 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
 }
 
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    auto [table_index_entry, index_status] =
-        storage_->catalog()
-            ->DropIndex(cmd.db_name_, cmd.table_name_, cmd.index_name_, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
-    if (!index_status.ok()) {
-        UnrecoverableError("Wal Replay: Drop index failed" + *index_status.msg_);
-    }
+    TxnTimeStamp begin_ts = 0; // TODO: FIX IT
 
-    table_index_entry->Commit(commit_ts);
+    Catalog *catalog = storage_->catalog();
+    auto *db_entry = catalog->GetDatabaseReplay(cmd.db_name_, txn_id, begin_ts);
+    auto *table_entry = db_entry->GetTableReplay(cmd.table_name_, txn_id, begin_ts);
+    table_entry->DropIndexReplay(cmd.index_name_, txn_id, begin_ts);
 }
 
 // use by import and compact, add a new segment
 void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
-    auto segment_dir_ptr = MakeShared<String>(segment_info.segment_dir_);
-    auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, segment_info.segment_id_, segment_dir_ptr, commit_ts);
-
-    for (i32 id = 0; id < segment_info.block_entries_size_; ++id) {
-        u16 row_count = (id == segment_info.block_entries_size_ - 1) ? segment_info.last_block_row_count_ : segment_info.block_capacity_;
+    auto *buffer_mgr = storage_->buffer_manager();
+    auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry,
+                                                             segment_info.segment_id_,
+                                                             SegmentStatus::kSealed,
+                                                             segment_info.column_count_,
+                                                             segment_info.row_count_,
+                                                             segment_info.actual_row_count_,
+                                                             segment_info.row_capacity_,
+                                                             segment_info.min_row_ts_,
+                                                             segment_info.max_row_ts_,
+                                                             segment_info.commit_ts_,
+                                                             segment_info.deprecate_ts_,
+                                                             segment_info.begin_ts_,
+                                                             segment_info.txn_id_);
+    for (BlockID block_id = 0; block_id < (BlockID)segment_info.block_infos_.size(); ++block_id) {
+        auto &block_info = segment_info.block_infos_[block_id];
         auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
-                                                           id,
-                                                           0,
-                                                           table_entry->ColumnCount(),
-                                                           storage_->buffer_manager(),
-                                                           row_count,
-                                                           commit_ts,
-                                                           commit_ts);
-
-        segment_entry->AppendBlockEntry(std::move(block_entry));
+                                                           block_id,
+                                                           block_info.row_count_,
+                                                           block_info.row_capacity_,
+                                                           block_info.min_row_ts_,
+                                                           block_info.max_row_ts_,
+                                                           block_info.checkpoint_ts_,
+                                                           block_info.checkpoint_row_count_,
+                                                           buffer_mgr);
+        for (ColumnID column_id = 0; column_id < (ColumnID)block_info.next_outline_idxes_.size(); ++column_id) {
+            i32 next_outline_idx = block_info.next_outline_idxes_[column_id];
+            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_outline_idx);
+            block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
+        }
+        segment_entry->AddBlockReplay(std::move(block_entry), block_id); // reuse function from delta catalog.
     }
-
-    table_entry->WalReplaySegment(segment_entry);
+    table_entry->AddSegmentReplayWal(segment_entry); // **DO NOT** reuse function from delta catalog.
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));

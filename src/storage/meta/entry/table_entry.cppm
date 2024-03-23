@@ -79,15 +79,15 @@ public:
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableEntry> ReplayTableEntry(TableMeta *table_meta,
+    static SharedPtr<TableEntry> ReplayTableEntry(bool is_delete,
+                                                  TableMeta *table_meta,
                                                   SharedPtr<String> table_entry_dir,
                                                   SharedPtr<String> table_name,
-                                                  Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                  const Vector<SharedPtr<ColumnDef>> &column_defs,
                                                   TableEntryType table_entry_type,
                                                   TransactionID txn_id,
                                                   TxnTimeStamp begin_ts,
                                                   TxnTimeStamp commit_ts,
-                                                  bool is_delete,
                                                   SizeT row_count,
                                                   SegmentID unsealed_id) noexcept;
 
@@ -107,15 +107,16 @@ public:
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
 
     // replay
-    TableIndexEntry *
-    CreateIndexReplay(const SharedPtr<String> &index_name,
-                      std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                      TransactionID txn_id,
-                      TxnTimeStamp begin_ts);
+    TableIndexEntry *CreateIndexReplay(const SharedPtr<String> &index_name,
+                                       std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts);
 
     void DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);
 
     void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id);
     //
@@ -174,6 +175,8 @@ public:
 
     const SharedPtr<String> &TableEntryDir() const { return table_entry_dir_; }
 
+    String GetPathNameTail() const;
+
     inline SizeT row_count() const { return row_count_; }
 
     inline TableEntryType EntryType() const { return table_entry_type_; }
@@ -195,11 +198,6 @@ public:
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
     bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
-
-    // wal entry replay
-    void WalReplaySegment(SharedPtr<SegmentEntry> segment_entry);
-
-    void DeltaReplaySegment(SharedPtr<SegmentEntry> segment_entry);
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;

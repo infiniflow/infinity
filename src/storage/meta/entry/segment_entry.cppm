@@ -50,6 +50,7 @@ export struct SegmentEntry : public BaseEntry, public EntryInterface {
 public:
     friend class BlockEntryIter;
     friend struct TableEntry;
+    friend struct WalSegmentInfo;
 
 public:
     explicit SegmentEntry(TableEntry *table_entry,
@@ -61,29 +62,26 @@ public:
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
-    static SharedPtr<SegmentEntry>
-    NewReplaySegmentEntry(TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
-
-    static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(TableEntry *table_entry,
-                                                                SegmentID segment_id,
-                                                                SegmentStatus status,
-                                                                u64 column_count,
-                                                                SizeT row_count,
-                                                                SizeT actual_row_count,
-                                                                SizeT row_capacity,
-                                                                TxnTimeStamp min_row_ts,
-                                                                TxnTimeStamp max_row_ts,
-                                                                TxnTimeStamp commit_ts,
-                                                                TxnTimeStamp deprecate_ts,
-                                                                TxnTimeStamp begin_ts,
-                                                                TransactionID txn_id);
+    static SharedPtr<SegmentEntry> NewReplaySegmentEntry(TableEntry *table_entry,
+                                                         SegmentID segment_id,
+                                                         SegmentStatus status,
+                                                         u64 column_count,
+                                                         SizeT row_count,
+                                                         SizeT actual_row_count,
+                                                         SizeT row_capacity,
+                                                         TxnTimeStamp min_row_ts,
+                                                         TxnTimeStamp max_row_ts,
+                                                         TxnTimeStamp commit_ts,
+                                                         TxnTimeStamp deprecate_ts,
+                                                         TxnTimeStamp begin_ts,
+                                                         TransactionID txn_id);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    void AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, BlockID block_id);
+    void AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id);
 
     void SetSealed();
 
@@ -112,9 +110,6 @@ public:
 
     // `this` is visible in one thread
     BlockID GetNextBlockID() const;
-
-    // `this` is visible in one thread
-    Pair<SizeT, BlockOffset> GetWalInfo() const;
 
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
