@@ -376,18 +376,22 @@ curl --request POST \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
+--data '
 {
-    "create_option": "ignore_if_exists",
     "fields": 
     [
-        "image"
+        "col1"
     ],
     "index": 
     {
         "type": "HNSW",
-        "m": 16,
-        "ef": 200,
+        "M": "16",
+        "ef_construction": "50",
+        "ef": "50",
         "metric": "l2"
+    },
+     "create_option": {
+        "ignore_if_exists": true
     }
 } '
 
@@ -462,13 +466,15 @@ curl --request GET \
 ```
 {
     "error_code": 0,
+    "database_name": "default",
+    "table_name": "test_index_tbl",
     "index_name": "idx1",
-    "column_names": "col1"
-    "index segments": "0/0"
-    "index_name": "my_index",
+    "index_column_ids": "0",
+    "index_column_names": "col1",
     "index_type": "IVFFlat",
     "other_parameters": "metric = l2, centroids_count = 128",
-    "store_dir": "/tmp/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table/eVINACIkLj_index_idx1",
+    "segment_index_count": "0",
+    "storage_directory": "/tmp/infinity/data/yjamyYqzzt_db_default/CxmfWOUCdN_table_test_index_tbl/inlt9JpOyy_index_idx1"
 }
 ```
 
@@ -529,20 +535,18 @@ curl --request POST \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
-{
-    [    
-        {
-            "name": "Tommy",
-            "age": 16,
-            "score": 95
-        },
-        {
-            "name": "Jason",
-            "age": 15,
-            "score": 92
-        },
-    ]
-} '
+[    
+    {
+        "name": "Tommy",
+        "age": 16,
+        "score": 95
+    },
+    {
+        "name": "Jason",
+        "age": 15,
+        "score": 92
+    },
+] '
 ```
 
 #### Response
