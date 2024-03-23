@@ -92,10 +92,10 @@ void TxnCompactStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
 
 ///-----------------------------------------------------------------------------
 
-Tuple<UniquePtr<String>, Status> TxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry) {
+Tuple<UniquePtr<String>, Status> TxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     this->AddSegmentStore(segment_entry.get());
     this->AddSealedSegment(segment_entry.get());
-    table_entry_->Import(std::move(segment_entry));
+    table_entry_->Import(std::move(segment_entry), txn);
     return {nullptr, Status::OK()};
 }
 

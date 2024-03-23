@@ -43,6 +43,7 @@ class TxnManager;
 class TableIndexMeta;
 class BufferManager;
 struct TableEntry;
+struct SegmentEntry;
 class BaseTableRef;
 class AddTableIndexEntryOp;
 
@@ -90,7 +91,7 @@ public:
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
-    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
 
@@ -104,6 +105,9 @@ public:
 
     // Dump or spill the memory indexer
     void MemIndexDump(bool spill = false);
+
+    // Populate index entirely for the segment
+    void PopulateEntirely(SegmentEntry *segment_entry, Txn *txn);
 
     Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
@@ -139,7 +143,7 @@ private:
     const SharedPtr<String> index_dir_{};
     SharedPtr<ColumnDef> column_def_{};
 
-    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
     SharedPtr<SegmentIndexEntry> last_segment_{};
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 

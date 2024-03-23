@@ -194,7 +194,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     index_entries_ = MakeUnique<Vector<SegmentIndexEntry *>>();
 
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
-    HashMap<u32, Vector<SegmentIndexEntry *>> index_entry_map;
+    Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
 
     {
         auto map_guard = table_entry->IndexMetaMap();
@@ -219,11 +219,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             }
 
             // Fill the segment with index
-            const HashMap<u32, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
-            index_entry_map.reserve(index_by_segment.size());
-            for (auto &[segment_id, segment_index] : index_by_segment) {
-                index_entry_map[segment_id].emplace_back(segment_index.get());
-            }
+            index_entry_map = table_index_entry->index_by_segment();
         }
     }
 
@@ -231,7 +227,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     for (SegmentEntry *segment_entry : block_index->segments_) {
         if (auto iter = index_entry_map.find(segment_entry->segment_id()); iter != index_entry_map.end()) {
-            index_entries_->emplace_back(iter->second[0]);
+            index_entries_->emplace_back(iter->second.get());
         } else {
             BlockEntryIter block_entry_iter(segment_entry);
             for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {

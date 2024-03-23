@@ -60,7 +60,7 @@ void ColumnLengthReader::LoadColumnLength(u32 column_counter,
             continue;
         }
         u32 column_index = iter_column_index->second;
-        const HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
+        const Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
         for (auto &[segment_id, segment_index_entry] : index_by_segment) {
             auto &buffer_handle_v = column_length_data_buffer_handles_[segment_id];
             if (buffer_handle_v.empty()) {
