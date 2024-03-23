@@ -38,7 +38,7 @@ protected:
     RecyclePool *buffer_pool_;
     MemoryPool *byte_slice_pool_;
     MemoryPool *decoder_buffer_pool_;
-    const SizeT BUFFER_SIZE_ = 10240;
+    static constexpr SizeT BUFFER_SIZE_ = 10240;
 };
 
 TEST_F(PositionListDecoderTest, test1) {
