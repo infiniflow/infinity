@@ -60,7 +60,7 @@ public:
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 for (int i = 0; i < row_count; ++i) {
                     Value value = data_block->GetValue(0, i);
@@ -158,7 +158,7 @@ public:
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
 
@@ -292,7 +292,7 @@ public:
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
@@ -334,7 +334,7 @@ public:
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
@@ -377,7 +377,7 @@ public:
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
                 auto column_cnt = result.result_table_->ColumnCount();
                 for (int row = 0; row < row_count; ++row) {
@@ -841,8 +841,6 @@ public:
                                 return ResponseFactory::createResponse(http_status, json_response.dump());
                             }
                         }
-
-                        //                    std::cout << key << " " << value.is_string() << std::endl;
                     }
                     column_values->emplace_back(values_row);
                     values_row = nullptr;
@@ -853,13 +851,58 @@ public:
                 column_values = nullptr;
                 json_response["error_code"] = 0;
                 http_status = HTTPStatus::CODE_200;
-                // QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *>
-                // *values);
-                ;
+
             } else {
                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
                 json_response["error_message"] = fmt::format("Invalid json format: {}", data_body);
             }
+
+        } catch (nlohmann::json::exception &e) {
+            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+            json_response["error_message"] = e.what();
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class DeleteHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        nlohmann::json json_response;
+        HTTPStatus http_status = HTTPStatus::CODE_500;
+
+        String data_body = request->readBodyToString();
+        try {
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
+
+            auto database_name = request->getPathVariable("database_name");
+            auto table_name = request->getPathVariable("table_name");
+            const String filter_string = http_body_json["filter"];
+
+            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+            ExprParser expr_parser;
+            expr_parser.Parse(filter_string, expr_parsed_result.get());
+            if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+                json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
+                json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
+            const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
+            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+
+            // Only one block
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+
+            // Get sum delete rows
+            Value value = data_block->GetValue(1, 0);
+            json_response["delete_row_count"] = value.value_.big_int;
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
 
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
@@ -887,7 +930,7 @@ public:
 
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
                 auto row_count = data_block->row_count();
 
                 for (int row = 0; row < row_count; ++row) {
@@ -943,7 +986,7 @@ public:
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             json_response["variable_name"] = variable_name;
-            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
             Value value = data_block->GetValue(0, 0);
             const String &variable_value = value.ToString();
             json_response["variable_value"] = variable_value;
@@ -1110,6 +1153,7 @@ void HTTPServer::Start(u16 port) {
 
     // DML
     router->route("POST", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<InsertHandler>());
+    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<DeleteHandler>());
 
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
