@@ -56,13 +56,11 @@ public:
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
-    void ApplyDeltaEntries();
-
     // Checkpoint is scheduled regularly.
     // Checkpoint for transactions which lsn no larger than lsn_pend_chk_.
     void CheckpointTimer();
 
-    void Checkpoint();
+    void Checkpoint(TxnTimeStamp current_max_commit_ts, i64 current_wal_size);
 
     void Checkpoint(ForceCheckpointTask *ckp_task);
 

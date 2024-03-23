@@ -79,11 +79,9 @@ private:
     Tuple<DBEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryNolock(txn_id, begin_ts); }
 
     // replay
-    void CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-                           TransactionID txn_id,
-                           TxnTimeStamp begin_ts);
+    void CreateEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    void DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     DBEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
     //

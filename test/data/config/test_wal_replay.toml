@@ -1,0 +1,8 @@
+[general]
+version = "0.1.0"
+timezone = "utc-8"
+
+[wal]
+# close all checkpoint for wal test
+delta_checkpoint_interval_sec = 0
+full_checkpoint_interval_sec = 0

@@ -133,7 +133,10 @@ public:
                               TransactionID txn_id,
                               TxnTimeStamp begin_ts);
 
-    void DropDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    void DropDatabaseReplay(const String &db_name,
+                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                            TransactionID txn_id,
+                            TxnTimeStamp begin_ts);
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -170,13 +173,6 @@ public:
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
                                                  TxnManager *txn_mgr);
-
-    TableIndexEntry *CreateIndexReplay(TableEntry *table_entry,
-                                       const SharedPtr<IndexBase> &index_base,
-                                       const SharedPtr<String> &index_entry_dir,
-                                       TransactionID txn_id,
-                                       TxnTimeStamp begin_ts,
-                                       TxnTimeStamp commit_ts);
 
     Tuple<SharedPtr<TableIndexEntry>, Status> DropIndex(const String &db_name,
                                                         const String &table_name,
@@ -239,7 +235,7 @@ public:
 
     bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
-    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_ops);
+    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 
@@ -247,6 +243,12 @@ public:
 
     static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
+private:
+    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
+
+    void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
+
+public:
     static UniquePtr<Catalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
 
     static void LoadFromEntry(Catalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
@@ -259,6 +261,9 @@ public:
     const QueryProfiler *GetProfilerRecord(SizeT index) { return history.GetElement(index); }
 
     const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() { return history.GetElements(); }
+
+public:
+    const SharedPtr<String> DataDir() const;
 
 public:
     SharedPtr<String> current_dir_{nullptr};
