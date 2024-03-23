@@ -14,6 +14,7 @@
 module;
 
 #include <iostream>
+#include <cstring>
 
 module http_server;
 
@@ -39,6 +40,9 @@ import parsed_expr;
 import constant_expr;
 import expr_parser;
 import expression_parser_result;
+import create_index_info;
+import statement_common;
+import extra_ddl_info;
 
 namespace {
 
@@ -997,6 +1001,133 @@ public:
     }
 };
 
+class ShowTableIndexDetailHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+
+        auto result = infinity->ShowIndex(database_name, table_name, index_name);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    auto field_name = data_block->GetValue(0, row).ToString();
+                    auto field_value = data_block->GetValue(1, row).ToString();
+                    json_response[field_name] = field_value;
+                }
+            }
+
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class DropIndexHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+        auto result = infinity->DropIndex(database_name, table_name, index_name, DropIndexOptions());
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class CreateIndexHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+
+        String body_info_str = request->readBodyToString();
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
+
+        CreateIndexOptions options;
+        auto create_option = body_info_json["create_option"];
+        auto ignore_if_exists = create_option["ignore_if_exists"];
+        if (ignore_if_exists.is_boolean() && ignore_if_exists) {
+            options.conflict_type_ = ConflictType::kIgnore;
+        }
+
+        auto fields = body_info_json["fields"];
+        auto index = body_info_json["index"];
+
+        auto index_info_list = new Vector<IndexInfo *>();
+        {
+            auto index_info = new IndexInfo();
+            index_info->column_name_ = fields[0];
+            auto index_param_list = new Vector<InitParameter *>();
+
+            for (auto &ele : index.items()) {
+                String name = ele.key();
+                auto value = ele.value();
+                if (!ele.value().is_string()) {
+                    value = ele.value().dump();
+                }
+
+                if (strcmp(name.c_str(), "type") == 0) {
+                    index_info->index_type_ = IndexInfo::StringToIndexType(value);
+                } else {
+                    index_param_list->push_back(new InitParameter(name, value));
+                }
+            }
+
+            index_info->index_param_list_ = index_param_list;
+            index_info_list->push_back(index_info);
+        }
+
+        auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info_list, options);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 } // namespace
 
 namespace infinity {
@@ -1026,6 +1157,9 @@ void HTTPServer::Start(u16 port) {
 
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<ShowTableIndexDetailHandler>());
+    router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
+    router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
 
     router->route("GET", "/variables/{variable_name}", MakeShared<ShowVariableHandler>());
 
