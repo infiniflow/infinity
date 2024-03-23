@@ -254,15 +254,25 @@ void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
     }
 }
 
-void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry) {
-    std::unique_lock lock(this->rw_locker());
-    SegmentID segment_id = segment_entry->segment_id();
-    SizeT row_count = segment_entry->row_count();
-    auto [_, insert_ok] = this->segment_map_.emplace(segment_id, std::move(segment_entry));
-    if (!insert_ok) {
-        UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
+    {
+        std::unique_lock lock(this->rw_locker());
+        SegmentID segment_id = segment_entry->segment_id();
+        SizeT row_count = segment_entry->row_count();
+        auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
+        if (!insert_ok) {
+            UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+        }
+        this->row_count_ += row_count;
     }
-    this->row_count_ += row_count;
+    // Populate index entirely for the segment
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, txn->BeginTS());
+        if (status.ok()) {
+            table_index_entry->PopulateEntirely(segment_entry.get(), txn);
+        }
+    }
 }
 
 void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
@@ -517,7 +527,7 @@ void TableEntry::MemIndexDump(Txn *txn, bool spill) {
 void TableEntry::MemIndexCommit() {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
-        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, 0UL);
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (status.ok()) {
             table_index_entry->MemIndexCommit();
         }

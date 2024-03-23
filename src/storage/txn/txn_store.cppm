@@ -87,7 +87,7 @@ export class TxnTableStore {
 public:
     explicit inline TxnTableStore(Txn *txn, TableEntry *table_entry) : txn_(txn), table_entry_(table_entry) {}
 
-    Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry);
+    Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn);
 
     Tuple<UniquePtr<String>, Status> Append(const SharedPtr<DataBlock> &input_block);
 

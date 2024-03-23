@@ -64,7 +64,7 @@ QueryBuilder::QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPt
         if (index_reader_.NeedRefreshColumnIndexReader(column_id, ts)) {
             UniquePtr<ColumnIndexReader> column_index_reader = MakeUnique<ColumnIndexReader>();
             String index_dir = *(table_index_entry->index_dir());
-            const HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
+            const Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
             const SharedPtr<IndexBase> &index_def = table_index_entry->table_index_def();
             Vector<String> base_names;
             Vector<RowID> base_row_ids;
@@ -73,13 +73,8 @@ QueryBuilder::QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPt
                 Vector<String> &base_names_v = segment_index_entry->GetFulltextBaseNames();
                 base_names.insert(base_names.end(), base_names_v.begin(), base_names_v.end());
                 Vector<RowID> &base_row_ids_v = segment_index_entry->GetFulltextBaseRowIDs();
-                for (auto base_row_id : base_row_ids_v) {
-                    RowID row_id(base_row_id);
-                    base_row_ids.push_back(row_id);
-                }
-                if (!memory_indexer) {
-                    memory_indexer = segment_index_entry->GetMemoryIndexer();
-                }
+                base_row_ids.insert(base_row_ids.end(), base_row_ids_v.begin(), base_row_ids_v.end());
+                memory_indexer = segment_index_entry->GetMemoryIndexer();
             }
             optionflag_t flag = reinterpret_cast<IndexFullText *>(index_def.get())->flag_;
             column_index_reader->Open(index_dir, base_names, base_row_ids, flag, memory_indexer);
