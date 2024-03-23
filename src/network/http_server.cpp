@@ -930,11 +930,13 @@ public:
 
             Vector<UpdateExpr *> *update_expr_array = new Vector<UpdateExpr *>();
             DeferFn defer_free_update_expr_array([&]() {
-                for (auto &expr : *update_expr_array) {
-                    delete expr;
+                if(update_expr_array != nullptr) {
+                    for (auto &expr : *update_expr_array) {
+                        delete expr;
+                    }
+                    delete update_expr_array;
+                    update_expr_array = nullptr;
                 }
-                delete update_expr_array;
-                update_expr_array = nullptr;
             });
             update_expr_array->reserve(update_clause.size());
 
@@ -1079,6 +1081,7 @@ public:
                 }
 
                 update_expr_array->emplace_back(update_expr);
+                update_expr = nullptr;
             }
 
             String where_clause = http_body_json["filter"];
@@ -1099,6 +1102,7 @@ public:
             expr_parsed_result->exprs_ptr_->at(0) = nullptr;
             update_expr_array = nullptr;
 
+            json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
 
         } catch (nlohmann::json::exception &e) {

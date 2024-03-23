@@ -58,7 +58,7 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
 void BlockVersion::LoadFromFile(const String &version_path) {
     std::ifstream ifs(version_path);
     if (!ifs.is_open()) {
-        LOG_WARN(fmt::format("Failed to open block_version file: {}", version_path));
+        LOG_WARN(fmt::format("Failed to open block_version file to read: {}", version_path));
         // load the block_version file not exist return and create version
         return;
     }
