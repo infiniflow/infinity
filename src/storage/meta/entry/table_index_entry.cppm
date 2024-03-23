@@ -43,6 +43,7 @@ class TxnManager;
 class TableIndexMeta;
 class BufferManager;
 struct TableEntry;
+struct SegmentEntry;
 class BaseTableRef;
 class AddTableIndexEntryOp;
 
@@ -64,17 +65,16 @@ public:
                                                          bool is_delete,
                                                          const SharedPtr<String> &table_entry_dir,
                                                          TableIndexMeta *table_index_meta,
-                                                         Txn *txn, // TODO: remove it
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts);
 
     static SharedPtr<TableIndexEntry> ReplayTableIndexEntry(TableIndexMeta *table_index_meta,
+                                                            bool is_delete,
                                                             const SharedPtr<IndexBase> &index_base,
                                                             const SharedPtr<String> &index_entry_dir,
                                                             TransactionID txn_id,
                                                             TxnTimeStamp begin_ts,
-                                                            TxnTimeStamp commit_ts,
-                                                            bool is_delete) noexcept;
+                                                            TxnTimeStamp commit_ts) noexcept;
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
@@ -91,9 +91,11 @@ public:
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
-    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
+
+    String GetPathNameTail() const;
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
@@ -103,6 +105,9 @@ public:
 
     // Dump or spill the memory indexer
     void MemIndexDump(bool spill = false);
+
+    // Populate index entirely for the segment
+    void PopulateEntirely(SegmentEntry *segment_entry, Txn *txn);
 
     Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
@@ -138,7 +143,7 @@ private:
     const SharedPtr<String> index_dir_{};
     SharedPtr<ColumnDef> column_def_{};
 
-    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
     SharedPtr<SegmentIndexEntry> last_segment_{};
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 

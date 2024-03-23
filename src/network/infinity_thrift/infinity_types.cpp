@@ -7087,12 +7087,28 @@ void ShowIndexResponse::__set_index_name(const std::string& val) {
   this->index_name = val;
 }
 
+void ShowIndexResponse::__set_index_type(const std::string& val) {
+  this->index_type = val;
+}
+
+void ShowIndexResponse::__set_index_column_names(const std::string& val) {
+  this->index_column_names = val;
+}
+
+void ShowIndexResponse::__set_index_column_ids(const std::string& val) {
+  this->index_column_ids = val;
+}
+
+void ShowIndexResponse::__set_other_parameters(const std::string& val) {
+  this->other_parameters = val;
+}
+
 void ShowIndexResponse::__set_store_dir(const std::string& val) {
   this->store_dir = val;
 }
 
-void ShowIndexResponse::__set_index_info(const std::string& val) {
-  this->index_info = val;
+void ShowIndexResponse::__set_segment_index_count(const std::string& val) {
+  this->segment_index_count = val;
 }
 std::ostream& operator<<(std::ostream& out, const ShowIndexResponse& obj)
 {
@@ -7164,16 +7180,48 @@ uint32_t ShowIndexResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 6:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->store_dir);
-          this->__isset.store_dir = true;
+          xfer += iprot->readString(this->index_type);
+          this->__isset.index_type = true;
         } else {
           xfer += iprot->skip(ftype);
         }
         break;
       case 7:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->index_info);
-          this->__isset.index_info = true;
+          xfer += iprot->readString(this->index_column_names);
+          this->__isset.index_column_names = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->index_column_ids);
+          this->__isset.index_column_ids = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 9:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->other_parameters);
+          this->__isset.other_parameters = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 10:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->store_dir);
+          this->__isset.store_dir = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 11:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->segment_index_count);
+          this->__isset.segment_index_count = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -7215,12 +7263,28 @@ uint32_t ShowIndexResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
   xfer += oprot->writeString(this->index_name);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("store_dir", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeFieldBegin("index_type", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->index_type);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("index_column_names", ::apache::thrift::protocol::T_STRING, 7);
+  xfer += oprot->writeString(this->index_column_names);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("index_column_ids", ::apache::thrift::protocol::T_STRING, 8);
+  xfer += oprot->writeString(this->index_column_ids);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("other_parameters", ::apache::thrift::protocol::T_STRING, 9);
+  xfer += oprot->writeString(this->other_parameters);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("store_dir", ::apache::thrift::protocol::T_STRING, 10);
   xfer += oprot->writeString(this->store_dir);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("index_info", ::apache::thrift::protocol::T_STRING, 7);
-  xfer += oprot->writeString(this->index_info);
+  xfer += oprot->writeFieldBegin("segment_index_count", ::apache::thrift::protocol::T_STRING, 11);
+  xfer += oprot->writeString(this->segment_index_count);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -7235,8 +7299,12 @@ void swap(ShowIndexResponse &a, ShowIndexResponse &b) {
   swap(a.db_name, b.db_name);
   swap(a.table_name, b.table_name);
   swap(a.index_name, b.index_name);
+  swap(a.index_type, b.index_type);
+  swap(a.index_column_names, b.index_column_names);
+  swap(a.index_column_ids, b.index_column_ids);
+  swap(a.other_parameters, b.other_parameters);
   swap(a.store_dir, b.store_dir);
-  swap(a.index_info, b.index_info);
+  swap(a.segment_index_count, b.segment_index_count);
   swap(a.__isset, b.__isset);
 }
 
@@ -7246,8 +7314,12 @@ ShowIndexResponse::ShowIndexResponse(const ShowIndexResponse& other239) {
   db_name = other239.db_name;
   table_name = other239.table_name;
   index_name = other239.index_name;
+  index_type = other239.index_type;
+  index_column_names = other239.index_column_names;
+  index_column_ids = other239.index_column_ids;
+  other_parameters = other239.other_parameters;
   store_dir = other239.store_dir;
-  index_info = other239.index_info;
+  segment_index_count = other239.segment_index_count;
   __isset = other239.__isset;
 }
 ShowIndexResponse& ShowIndexResponse::operator=(const ShowIndexResponse& other240) {
@@ -7256,8 +7328,12 @@ ShowIndexResponse& ShowIndexResponse::operator=(const ShowIndexResponse& other24
   db_name = other240.db_name;
   table_name = other240.table_name;
   index_name = other240.index_name;
+  index_type = other240.index_type;
+  index_column_names = other240.index_column_names;
+  index_column_ids = other240.index_column_ids;
+  other_parameters = other240.other_parameters;
   store_dir = other240.store_dir;
-  index_info = other240.index_info;
+  segment_index_count = other240.segment_index_count;
   __isset = other240.__isset;
   return *this;
 }
@@ -7269,8 +7345,12 @@ void ShowIndexResponse::printTo(std::ostream& out) const {
   out << ", " << "db_name=" << to_string(db_name);
   out << ", " << "table_name=" << to_string(table_name);
   out << ", " << "index_name=" << to_string(index_name);
+  out << ", " << "index_type=" << to_string(index_type);
+  out << ", " << "index_column_names=" << to_string(index_column_names);
+  out << ", " << "index_column_ids=" << to_string(index_column_ids);
+  out << ", " << "other_parameters=" << to_string(other_parameters);
   out << ", " << "store_dir=" << to_string(store_dir);
-  out << ", " << "index_info=" << to_string(index_info);
+  out << ", " << "segment_index_count=" << to_string(segment_index_count);
   out << ")";
 }
 

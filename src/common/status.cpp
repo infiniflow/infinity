@@ -340,6 +340,16 @@ Status Status::InsertWithoutValues() { return Status(ErrorCode::kInsertWithoutVa
 
 Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, MakeUnique<String>("Invalid conflict type")); }
 
+Status Status::InvalidJsonFormat(const String &error_message) {
+    return Status(ErrorCode::kInvalidJsonFormat, MakeUnique<String>(fmt::format("Invalid format json: {}", error_message)));
+}
+
+Status Status::DuplicateColumnName(const String &column_name) {
+    return Status(ErrorCode::kDuplicateColumnName, MakeUnique<String>(fmt::format("Duplicated column name: {}", column_name)));
+}
+
+Status Status::InvalidExpression(const String &expr_str) { return Status(ErrorCode::kInvalidExpression, MakeUnique<String>(expr_str)); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

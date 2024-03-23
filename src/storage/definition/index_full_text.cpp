@@ -14,6 +14,7 @@
 
 module;
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -91,6 +92,14 @@ String IndexFullText::ToString() const {
     }
     return output_str;
 }
+
+
+String IndexFullText::BuildOtherParamsString() const {
+    std::stringstream ss;
+    ss << "analyzer = " << analyzer_;
+    return ss.str();
+}
+
 
 nlohmann::json IndexFullText::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();

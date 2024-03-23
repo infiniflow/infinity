@@ -28,6 +28,10 @@ import internal_types;
 
 namespace infinity {
 
+class BlockEntry;
+class SegmentEntry;
+enum class SegmentStatus;
+
 export enum class WalCommandType : i8 {
     INVALID = 0,
     // -----------------------------
@@ -61,13 +65,48 @@ export enum class WalCommandType : i8 {
     COMPACT = 100,
 };
 
-// used in import / compact, create a sealed segment
+export struct WalBlockInfo {
+    BlockID block_id_{};
+    u16 row_count_{};
+    u16 row_capacity_{};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp checkpoint_ts_{};
+    u16 checkpoint_row_count_{0};
+    Vector<i32> next_outline_idxes_;
+
+    WalBlockInfo() = default;
+
+    explicit WalBlockInfo(BlockEntry *block_entry);
+
+    bool operator==(const WalBlockInfo &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalBlockInfo ReadBufferAdv(char *&ptr);
+
+    String ToString() const;
+};
+
 export struct WalSegmentInfo {
-    String segment_dir_{};
     SegmentID segment_id_{};
-    u16 block_entries_size_{};
-    u32 block_capacity_{};
-    u16 last_block_row_count_{};
+    u64 column_count_{0};
+    SizeT row_count_{0};
+    SizeT actual_row_count_{0};
+    SizeT row_capacity_{0};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp commit_ts_{0};
+    TxnTimeStamp deprecate_ts_{0};
+    TxnTimeStamp begin_ts_{0};
+    TransactionID txn_id_{0};
+    Vector<WalBlockInfo> block_infos_;
+
+    WalSegmentInfo() = default;
+
+    explicit WalSegmentInfo(SegmentEntry *segment_entry);
 
     bool operator==(const WalSegmentInfo &other) const;
 
@@ -76,6 +115,8 @@ export struct WalSegmentInfo {
     void WriteBufferAdv(char *&buf) const;
 
     static WalSegmentInfo ReadBufferAdv(char *&ptr);
+
+    String ToString() const;
 };
 
 // WalCommandType -> String
@@ -97,17 +138,18 @@ export struct WalCmd {
 };
 
 export struct WalCmdCreateDatabase : public WalCmd {
-    explicit WalCmdCreateDatabase(String db_name) : db_name_(std::move(db_name)) {}
+    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_DATABASE; }
     auto operator==(const WalCmd &other) const -> bool override {
         const auto *other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
-        return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_);
+        return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(db_dir_tail_, other_cmd->db_dir_tail_);
     }
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
 
     String db_name_{};
+    String db_dir_tail_{};
 };
 
 export struct WalCmdDropDatabase : public WalCmd {
@@ -125,7 +167,8 @@ export struct WalCmdDropDatabase : public WalCmd {
 };
 
 export struct WalCmdCreateTable : public WalCmd {
-    WalCmdCreateTable(String db_name, const SharedPtr<TableDef> &table_def) : db_name_(std::move(db_name)), table_def_(table_def) {}
+    WalCmdCreateTable(String db_name, String table_dir_tail, const SharedPtr<TableDef> &table_def)
+        : db_name_(std::move(db_name)), table_dir_tail_(std::move(table_dir_tail)), table_def_(table_def) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_TABLE; }
     bool operator==(const WalCmd &other) const override;
@@ -133,12 +176,13 @@ export struct WalCmdCreateTable : public WalCmd {
     void WriteAdv(char *&buf) const override;
 
     String db_name_{};
+    String table_dir_tail_{};
     SharedPtr<TableDef> table_def_{};
 };
 
 export struct WalCmdCreateIndex : public WalCmd {
-    WalCmdCreateIndex(String db_name, String table_name, String table_index_dir, SharedPtr<IndexBase> index_base)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), table_index_dir_(std::move(table_index_dir)),
+    WalCmdCreateIndex(String db_name, String table_name, String index_dir_tail_, SharedPtr<IndexBase> index_base)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_dir_tail_(std::move(index_dir_tail_)),
           index_base_(std::move(index_base)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_INDEX; }
@@ -151,7 +195,7 @@ export struct WalCmdCreateIndex : public WalCmd {
 
     String db_name_{};
     String table_name_{};
-    String table_index_dir_{};
+    String index_dir_tail_{};
     SharedPtr<IndexBase> index_base_{};
 };
 
@@ -198,7 +242,7 @@ export struct WalCmdImport : public WalCmd {
 
     String db_name_{};
     String table_name_{};
-    WalSegmentInfo segment_info_{};
+    WalSegmentInfo segment_info_;
 };
 
 export struct WalCmdAppend : public WalCmd {

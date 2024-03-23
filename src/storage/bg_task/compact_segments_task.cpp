@@ -252,13 +252,7 @@ void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
     for (auto &[new_segment, old_segments] : segment_data) {
         if (new_segment->row_count() > 0) {
             new_segment->FlushNewData(flush_ts);
-
-            const auto [block_cnt, last_block_row_count] = new_segment->GetWalInfo();
-            segment_infos.emplace_back(WalSegmentInfo{*new_segment->segment_dir(),
-                                                      new_segment->segment_id(),
-                                                      static_cast<u16>(block_cnt),
-                                                      DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment entry
-                                                      last_block_row_count});
+            segment_infos.push_back(WalSegmentInfo(new_segment.get()));
         }
 
         for (auto *old_segment : old_segments) {

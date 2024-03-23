@@ -100,8 +100,13 @@ Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const 
 
 template <MetaConcept Meta>
 Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExistMeta(const String &name, ConflictType conflict_type) {
+
+
     std::shared_lock r_lock(rw_locker_);
-    if (auto iter = meta_map_.find(name); iter != meta_map_.end()) {
+
+    auto iter = meta_map_.find(name);
+    if (iter != meta_map_.end()) {
+
         return {iter->second.get(), Status::OK(), std::move(r_lock)};
     }
     if (conflict_type == ConflictType::kIgnore) {
@@ -125,7 +130,6 @@ Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExi
         UnrecoverableError("Unimplemented");
     }
 }
-
 template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
     Vector<Meta *> metas;

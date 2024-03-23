@@ -564,7 +564,7 @@ public:
 
     void WriteAdv(char *&ptr);
 
-    static SharedPtr<CatalogDeltaEntry> ReadAdv(char *&ptr, i32 max_bytes);
+    static UniquePtr<CatalogDeltaEntry> ReadAdv(char *&ptr, i32 max_bytes);
 
     [[nodiscard]] String ToString() const;
 
@@ -595,8 +595,8 @@ public:
 
     void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
 
-    // Pick and remove all operations that are committed before `flush_ts`
-    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp flush_ts);
+    // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
+    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts);
 
     SizeT OpSize() const { return delta_ops_.size(); }
 
