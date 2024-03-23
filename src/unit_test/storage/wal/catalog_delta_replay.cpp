@@ -91,6 +91,7 @@ protected:
             }
             usleep(1000 * 1000);
         }
+        usleep(1000 * 1000);
     }
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {

@@ -39,6 +39,7 @@ import block_column_entry;
 import compact_segments_task;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
+import column_def;
 
 import db_meta;
 import db_entry;
@@ -316,6 +317,10 @@ void WalManager::Checkpoint(TxnTimeStamp current_max_commit_ts, i64 current_wal_
     }
     if ((is_full_checkpoint && cfg_full_checkpoint_interval_sec_ == 0) || (!is_full_checkpoint && cfg_delta_checkpoint_interval_sec_ == 0)) {
         return; // skip checkpoint if the interval is 0
+    }
+
+    if (is_full_checkpoint) {
+        return; // full checkpoint is not supported yet.
     }
 
     try {
@@ -670,7 +675,7 @@ void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, Tra
     catalog->CreateDatabaseReplay(
         MakeShared<String>(cmd.db_name_),
         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return DBEntry::ReplayDBEntry(db_meta, db_dir, db_name, txn_id, begin_ts, commit_ts);
+            return DBEntry::ReplayDBEntry(db_meta, false, db_dir, db_name, txn_id, begin_ts, commit_ts);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -682,7 +687,8 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
     db_entry->CreateTableReplay(
         table_name,
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return TableEntry::ReplayTableEntry(table_meta,
+            return TableEntry::ReplayTableEntry(false,
+                                                table_meta,
                                                 table_dir,
                                                 table_name,
                                                 cmd.table_def_->columns(),
@@ -698,12 +704,34 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
 }
 
 void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-    storage_->catalog()->DropDatabaseReplay(cmd.db_name_, txn_id, 0 /*begin_ts*/);
+    storage_->catalog()->DropDatabaseReplay(
+        cmd.db_name_,
+        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return DBEntry::ReplayDBEntry(db_meta, true, db_meta->data_dir(), db_name, txn_id, begin_ts, commit_ts);
+        },
+        txn_id,
+        0 /*begin_ts*/);
 }
 
 void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
     auto *db_entry = storage_->catalog()->GetDatabaseReplay(cmd.db_name_, txn_id, 0 /*begin_ts*/);
-    db_entry->DropTableReplay(cmd.table_name_, txn_id, 0 /*begin_ts*/);
+    db_entry->DropTableReplay(
+        cmd.table_name_,
+        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return TableEntry::ReplayTableEntry(true,
+                                                table_meta,
+                                                nullptr,
+                                                table_name,
+                                                Vector<SharedPtr<ColumnDef>>{},
+                                                TableEntryType::kTableEntry,
+                                                txn_id,
+                                                begin_ts,
+                                                commit_ts,
+                                                0 /*row_count*/,
+                                                0 /*unsealed_id*/);
+        },
+        txn_id,
+        0 /*begin_ts*/);
 }
 
 void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -717,7 +745,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     auto *table_index_entry = table_entry->CreateIndexReplay(
         cmd.index_base_->index_name_,
         [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return TableIndexEntry::ReplayTableIndexEntry(index_meta, cmd.index_base_, index_entry_dir, txn_id, begin_ts, commit_ts);
+            return TableIndexEntry::ReplayTableIndexEntry(index_meta, false, cmd.index_base_, index_entry_dir, txn_id, begin_ts, commit_ts);
         },
         txn_id,
         begin_ts);
@@ -740,7 +768,6 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
     Catalog *catalog = storage_->catalog();
     auto *db_entry = catalog->GetDatabaseReplay(cmd.db_name_, txn_id, begin_ts);
     auto *table_entry = db_entry->GetTableReplay(cmd.table_name_, txn_id, begin_ts);
-
     table_entry->DropIndexReplay(cmd.index_name_, txn_id, begin_ts);
 }
 
@@ -778,11 +805,10 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
         }
         segment_entry->AddBlockReplay(std::move(block_entry), block_id); // reuse function from delta catalog.
     }
-    table_entry->WalReplaySegment(segment_entry); // **DO NOT** reuse function from delta catalog.
+    table_entry->AddSegmentReplayWal(segment_entry); // **DO NOT** reuse function from delta catalog.
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
-
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));

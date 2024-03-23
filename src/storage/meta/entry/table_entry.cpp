@@ -97,17 +97,18 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                   0);
 }
 
-SharedPtr<TableEntry> TableEntry::ReplayTableEntry(TableMeta *table_meta,
+SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
+                                                   TableMeta *table_meta,
                                                    SharedPtr<String> table_entry_dir,
                                                    SharedPtr<String> table_name,
-                                                   Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
                                                    TableEntryType table_entry_type,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts,
                                                    TxnTimeStamp commit_ts,
                                                    SizeT row_count,
                                                    SegmentID unsealed_id) noexcept {
-    auto table_entry = MakeShared<TableEntry>(false /*replay drop will not create new entry*/,
+    auto table_entry = MakeShared<TableEntry>(is_delete,
                                               std::move(table_entry_dir),
                                               std::move(table_name),
                                               column_defs,
@@ -200,18 +201,21 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
+void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
+    SegmentID segment_id = new_segment->segment_id();
+    segment_map_[segment_id] = new_segment;
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegmentNoCheck(new_segment.get());
+    }
+    next_segment_id_++;
+}
+
 void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
     SharedPtr<SegmentEntry> new_segment = init_segment();
-    if (new_segment->status() == SegmentStatus::kDeprecated) {
-        auto iter = segment_map_.find(segment_id);
-        if (iter == segment_map_.end()) {
-            return;
-        }
-        iter->second->Cleanup();
-        segment_map_.erase(iter);
-        return;
-    }
     segment_map_[segment_id] = new_segment;
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegmentNoCheck(new_segment.get());
+    }
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
     }
@@ -724,19 +728,6 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
     }
 
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), txn_id);
-}
-
-void TableEntry::WalReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
-    this->DeltaReplaySegment(std::move(segment_entry));
-    // ATTENTION: focusing on the segment id
-    next_segment_id_++;
-}
-
-void TableEntry::DeltaReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegmentNoCheck(segment_entry.get());
-    }
-    segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
 }
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactAddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {

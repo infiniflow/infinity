@@ -64,11 +64,11 @@ public:
                                                          bool is_delete,
                                                          const SharedPtr<String> &table_entry_dir,
                                                          TableIndexMeta *table_index_meta,
-                                                         Txn *txn,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts);
 
     static SharedPtr<TableIndexEntry> ReplayTableIndexEntry(TableIndexMeta *table_index_meta,
+                                                            bool is_delete,
                                                             const SharedPtr<IndexBase> &index_base,
                                                             const SharedPtr<String> &index_entry_dir,
                                                             TransactionID txn_id,

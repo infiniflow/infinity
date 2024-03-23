@@ -79,10 +79,11 @@ public:
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableEntry> ReplayTableEntry(TableMeta *table_meta,
+    static SharedPtr<TableEntry> ReplayTableEntry(bool is_delete,
+                                                  TableMeta *table_meta,
                                                   SharedPtr<String> table_entry_dir,
                                                   SharedPtr<String> table_name,
-                                                  Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                  const Vector<SharedPtr<ColumnDef>> &column_defs,
                                                   TableEntryType table_entry_type,
                                                   TransactionID txn_id,
                                                   TxnTimeStamp begin_ts,
@@ -114,6 +115,8 @@ public:
     void DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);
 
     void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id);
     //
@@ -195,11 +198,6 @@ public:
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
     bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
-
-    // wal entry replay
-    void WalReplaySegment(SharedPtr<SegmentEntry> segment_entry);
-
-    void DeltaReplaySegment(SharedPtr<SegmentEntry> segment_entry);
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;

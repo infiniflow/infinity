@@ -65,7 +65,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
                                                                bool is_delete,
                                                                const SharedPtr<String> &table_entry_dir,
                                                                TableIndexMeta *table_index_meta,
-                                                               Txn *txn,
                                                                TransactionID txn_id,
                                                                TxnTimeStamp begin_ts) {
     if (is_delete) {
@@ -84,7 +83,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
         if (index_fulltext->homebrewed_) {
             // TODO yzc: remove table_index_entry->fulltext_index_entry_
         } else {
-            table_index_entry->fulltext_index_entry_ = FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry.get(), txn, txn_id, begin_ts);
+            table_index_entry->fulltext_index_entry_ = FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry.get(), txn_id, begin_ts);
         }
     }
 
@@ -92,13 +91,13 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::ReplayTableIndexEntry(TableIndexMeta *table_index_meta,
+                                                                  bool is_delete,
                                                                   const SharedPtr<IndexBase> &index_base,
                                                                   const SharedPtr<String> &index_entry_dir,
                                                                   TransactionID txn_id,
                                                                   TxnTimeStamp begin_ts,
                                                                   TxnTimeStamp commit_ts) noexcept {
-    auto table_index_entry =
-        MakeShared<TableIndexEntry>(index_base, false /*Replay drop will not create entry*/, table_index_meta, index_entry_dir, txn_id, begin_ts);
+    auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_entry_dir, txn_id, begin_ts);
     table_index_entry->commit_ts_.store(commit_ts);
     return table_index_entry;
 }
@@ -203,7 +202,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        auto table_index_entry = ReplayTableIndexEntry(table_index_meta, nullptr, nullptr, txn_id, begin_ts, commit_ts);
+        auto table_index_entry = ReplayTableIndexEntry(table_index_meta, true, nullptr, nullptr, txn_id, begin_ts, commit_ts);
         table_index_entry->deleted_ = true;
         table_index_entry->commit_ts_.store(commit_ts);
         table_index_entry->begin_ts_ = begin_ts;
@@ -213,7 +212,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
     auto index_base = IndexBase::Deserialize(index_def_entry_json["index_base"]);
 
-    SharedPtr<TableIndexEntry> table_index_entry = ReplayTableIndexEntry(table_index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts);
+    SharedPtr<TableIndexEntry> table_index_entry = ReplayTableIndexEntry(table_index_meta, false, index_base, index_dir, txn_id, begin_ts, commit_ts);
     table_index_entry->commit_ts_.store(commit_ts);
     table_index_entry->begin_ts_ = begin_ts;
 

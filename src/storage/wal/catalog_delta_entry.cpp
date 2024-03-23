@@ -621,7 +621,7 @@ i32 CatalogDeltaEntry::GetSizeInBytes() const {
     return size;
 }
 
-SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
+UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_start = ptr;
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
@@ -630,7 +630,7 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     CatalogDeltaEntryHeader header;
     header.size_ = ReadBufAdv<i32>(ptr);
     header.checksum_ = ReadBufAdv<u32>(ptr);
-    auto entry = MakeShared<CatalogDeltaEntry>();
+    auto entry = MakeUnique<CatalogDeltaEntry>();
     i32 size2 = *(i32 *)(ptr_start + header.size_ - sizeof(i32));
     if (header.size_ != size2) {
         return nullptr;
@@ -658,6 +658,11 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
         UnrecoverableError("ptr goes out of range when reading WalEntry");
+    }
+    {
+        for (const auto &operation : entry->operations_) {
+            LOG_INFO(fmt::format("Read delta op: {}", operation->ToString()));
+        }
     }
     return entry;
 }
@@ -731,6 +736,11 @@ String CatalogDeltaEntry::ToString() const {
 }
 
 void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
+    // {
+    //     for (auto &delta_entry : delta_entries) {
+    //         LOG_INFO(fmt::format("Add delta entry: {}", delta_entry->ToString()));
+    //     }
+    // }
     std::unique_lock w_lock(mtx_);
     for (auto &delta_entry : delta_entries) {
         TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
@@ -758,11 +768,13 @@ void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry
                 delta_ops_[encode] = std::move(op);
             }
         }
-        txn_ids_.insert(delta_entry->txn_ids()[0]);
+        if (!delta_entry->txn_ids().empty()) {
+            txn_ids_.insert(delta_entry->txn_ids()[0]);
+        }
     }
 }
 
-UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp flush_ts) {
+UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
     TxnTimeStamp max_ts = 0;
@@ -770,6 +782,9 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
         std::unique_lock w_lock(mtx_);
 
         for (auto &[_, delta_op] : delta_ops_) {
+            if (delta_op->commit_ts_ < full_ckp_ts) {
+                continue;
+            }
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
 
@@ -779,15 +794,20 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
         txn_ids_.clear();
         delta_ops_.clear();
     }
-    if (max_ts > flush_ts) {
-        UnrecoverableError(fmt::format("max_ts_ {} > flush_ts {}", max_ts, flush_ts));
+    if (max_ts > max_commit_ts) {
+        UnrecoverableError(fmt::format("max_ts_ {} > max_commit_ts {}", max_ts, max_commit_ts));
     }
-    flush_delta_entry->set_commit_ts(flush_ts);
+    flush_delta_entry->set_commit_ts(max_commit_ts);
 
     // write delta op from top to bottom.
     std::sort(flush_delta_entry->operations().begin(), flush_delta_entry->operations().end(), [](const auto &lhs, const auto &rhs) {
         return lhs->type_ < rhs->type_;
     });
+    // {
+    //     for (const auto &operation : flush_delta_entry->operations()) {
+    //         LOG_INFO(fmt::format("Flush delta op: {}", operation->ToString()));
+    //     }
+    // }
     return flush_delta_entry;
 }
 

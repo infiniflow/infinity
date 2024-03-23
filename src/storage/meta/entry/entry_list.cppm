@@ -72,7 +72,8 @@ public:
     Tuple<Entry *, Status>
     AddEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Pair<SharedPtr<Entry>, Status> DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<Entry *, Status>
+    DropEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<Entry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -364,32 +365,40 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<
                                                         TransactionID txn_id,
                                                         TxnTimeStamp begin_ts) {
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
-    SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
-    auto *entry_ptr = entry.get();
     switch (find_res) {
         case FindResult::kNotFound: {
+            SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
+            auto *entry_ptr = entry.get();
             entry_list_.push_front(std::move(entry));
             return {entry_ptr, Status::OK()};
         }
-        default: { // FIXME: handle FindRes::kConflict
+        case FindResult::kFound: {
             entry_list_.pop_front();
+            SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
+            auto *entry_ptr = entry.get();
             entry_list_.push_front(std::move(entry));
             return {entry_ptr, Status::OK()};
+        }
+        default: {
+            return {nullptr, Status::InvalidEntry()};
         }
     }
 }
 
 template <EntryConcept Entry>
-Pair<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<Entry *, Status> EntryList<Entry>::DropEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_entry,
+                                                         TransactionID txn_id,
+                                                         TxnTimeStamp begin_ts) {
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
     switch (find_res) {
         case FindResult::kNotFound: {
             return {nullptr, Status::NotFoundEntry()};
         }
         case FindResult::kFound: {
-            SharedPtr<Entry> drop_entry = std::move(entry_list_.front());
-            entry_list_.pop_front();
-            return {drop_entry, Status::OK()};
+            auto dropped_entry = init_entry(txn_id, begin_ts);
+            auto *dropped_entry_ptr = dropped_entry.get();
+            entry_list_.push_front(std::move(dropped_entry));
+            return {dropped_entry_ptr, Status::OK()};
         }
         default: {
             return {nullptr, Status::InvalidEntry()};

@@ -56,6 +56,7 @@ public:
                                          TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> ReplayDBEntry(DBMeta *db_meta,
+                                            bool is_delete,
                                             const SharedPtr<String> &db_entry_dir,
                                             const SharedPtr<String> &db_name,
                                             TransactionID txn_id,
@@ -98,7 +99,10 @@ public:
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts);
 
-    void DropTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    void DropTableReplay(const String &table_name,
+                         std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
 
     TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
     //
