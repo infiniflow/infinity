@@ -670,32 +670,18 @@ curl --request GET \
         method: "rrf",
         match:
         {
-            "title": 
-            {
-                "query": "rock fire",
-                "operator": "and"
-            }
+            fields: "title", 
+            query: "rock fire",
+            operator: "and"
         }
         knn:
         {
-            "vector_column":
-            {
-                "query_vector": [1.0, 2.0],
-                "ef" : 150,
-                "top_k": 3
-            }
+            fields: "vector_column",
+            query_vector: [1.0, 2.0],
+            ef : "150",
+            top_k: 3,
+            metric_type: L2
         }
-    }
-    knn: 
-    {
-        vector: 
-        [
-            0.1,
-            0.2,
-            0.3,
-            0.4,
-        ],
-        top: 1
     }
 } '
 ```
