@@ -28,9 +28,9 @@ export struct ByteSlice {
     }
 
     u8 *volatile data_ = nullptr;
-    SizeT size_ = 0;
-    SizeT offset_ = 0;
-    ByteSlice *next_ = nullptr;
+    SizeT volatile size_ = 0;
+    SizeT volatile offset_ = 0;
+    ByteSlice *volatile next_ = nullptr;
 };
 
 #pragma pack(pop)
@@ -61,7 +61,7 @@ public:
 private:
     ByteSlice *head_;
     ByteSlice *tail_;
-    SizeT total_size_;
+    SizeT volatile total_size_;
     MemoryPool *pool_{nullptr};
 };
 

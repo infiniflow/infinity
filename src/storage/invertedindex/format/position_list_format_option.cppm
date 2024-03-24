@@ -36,19 +36,19 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         {
-            TypedPostingField<u32> *total_pos_value = new TypedPostingField<u32>;
-            total_pos_value->location_ = row_count++;
-            total_pos_value->offset_ = offset;
-            total_pos_value->encoder_ = GetPosListEncoder();
-            values_.push_back(total_pos_value);
+            TypedPostingField<u32> *total_pos_field = new TypedPostingField<u32>;
+            total_pos_field->location_ = row_count++;
+            total_pos_field->offset_ = offset;
+            total_pos_field->encoder_ = GetPosListEncoder();
+            values_.push_back(total_pos_field);
             offset += sizeof(u32);
         }
         {
-            TypedPostingField<u32> *offset_value = new TypedPostingField<u32>;
-            offset_value->location_ = row_count++;
-            offset_value->offset_ = offset;
-            offset_value->encoder_ = GetPosListEncoder();
-            values_.push_back(offset_value);
+            TypedPostingField<u32> *offset_field = new TypedPostingField<u32>;
+            offset_field->location_ = row_count++;
+            offset_field->offset_ = offset;
+            offset_field->encoder_ = GetPosListEncoder();
+            values_.push_back(offset_field);
         }
     }
 
@@ -71,11 +71,11 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         {
-            TypedPostingField<u32> *pos_value = new TypedPostingField<u32>;
-            pos_value->location_ = row_count++;
-            pos_value->offset_ = offset;
-            pos_value->encoder_ = GetPosListEncoder();
-            values_.push_back(pos_value);
+            TypedPostingField<u32> *pos_field = new TypedPostingField<u32>;
+            pos_field->location_ = row_count++;
+            pos_field->offset_ = offset;
+            pos_field->encoder_ = GetPosListEncoder();
+            values_.push_back(pos_field);
             offset += sizeof(u32);
         }
         skiplist_format_ = new PositionSkipListFormat;
