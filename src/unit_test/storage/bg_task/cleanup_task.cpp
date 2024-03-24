@@ -39,6 +39,7 @@ import index_base;
 import third_party;
 import base_table_ref;
 import index_secondary;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -50,11 +51,20 @@ protected:
 
     void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
         TxnTimeStamp visible_ts = 0;
-        do {
+        time_t start = time(nullptr);
+        while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
-            // // sleep for 1s
-            // std::this_thread::sleep_for(std::chrono::seconds(1));
-        } while (visible_ts <= last_commit_ts);
+            if (visible_ts <= last_commit_ts) {
+                break;
+            }
+            // wait for at most 10s
+            time_t end = time(nullptr);
+            if (end - start > 10) {
+                UnrecoverableException("WaitCleanup timeout");
+            }
+            usleep(1000 * 1000);
+        }
+        usleep(1000 * 1000);
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
         cleanup_task->Execute();
     }

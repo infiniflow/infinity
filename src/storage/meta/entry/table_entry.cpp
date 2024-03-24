@@ -97,15 +97,15 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                   0);
 }
 
-SharedPtr<TableEntry> TableEntry::ReplayTableEntry(TableMeta *table_meta,
+SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
+                                                   TableMeta *table_meta,
                                                    SharedPtr<String> table_entry_dir,
                                                    SharedPtr<String> table_name,
-                                                   Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
                                                    TableEntryType table_entry_type,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts,
                                                    TxnTimeStamp commit_ts,
-                                                   bool is_delete,
                                                    SizeT row_count,
                                                    SegmentID unsealed_id) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete,
@@ -176,11 +176,10 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     return index_meta->DeleteEntry(txn_id);
 }
 
-TableIndexEntry *TableEntry::CreateIndexReplay(
-    const SharedPtr<String> &index_name,
-    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    TransactionID txn_id,
-    TxnTimeStamp begin_ts) {
+TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_name,
+                                               std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                               TransactionID txn_id,
+                                               TxnTimeStamp begin_ts) {
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_name); };
     auto *index_meta = index_meta_map_.GetMetaNoLock(*index_name, std::move(init_index_meta));
     return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
@@ -202,18 +201,21 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
+void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
+    SegmentID segment_id = new_segment->segment_id();
+    segment_map_[segment_id] = new_segment;
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegmentNoCheck(new_segment.get());
+    }
+    next_segment_id_++;
+}
+
 void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
     SharedPtr<SegmentEntry> new_segment = init_segment();
-    if (new_segment->status() == SegmentStatus::kDeprecated) {
-        auto iter = segment_map_.find(segment_id);
-        if (iter == segment_map_.end()) {
-            return;
-        }
-        iter->second->Cleanup();
-        segment_map_.erase(iter);
-        return;
-    }
     segment_map_[segment_id] = new_segment;
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegmentNoCheck(new_segment.get());
+    }
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
     }
@@ -252,15 +254,25 @@ void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
     }
 }
 
-void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry) {
-    std::unique_lock lock(this->rw_locker());
-    SegmentID segment_id = segment_entry->segment_id();
-    SizeT row_count = segment_entry->row_count();
-    auto [_, insert_ok] = this->segment_map_.emplace(segment_id, std::move(segment_entry));
-    if (!insert_ok) {
-        UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
+    {
+        std::unique_lock lock(this->rw_locker());
+        SegmentID segment_id = segment_entry->segment_id();
+        SizeT row_count = segment_entry->row_count();
+        auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
+        if (!insert_ok) {
+            UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+        }
+        this->row_count_ += row_count;
     }
-    this->row_count_ += row_count;
+    // Populate index entirely for the segment
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, txn->BeginTS());
+        if (status.ok()) {
+            table_index_entry->PopulateEntirely(segment_entry.get(), txn);
+        }
+    }
 }
 
 void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
@@ -515,7 +527,7 @@ void TableEntry::MemIndexDump(Txn *txn, bool spill) {
 void TableEntry::MemIndexCommit() {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
-        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, 0UL);
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (status.ok()) {
             table_index_entry->MemIndexCommit();
         }
@@ -523,18 +535,16 @@ void TableEntry::MemIndexCommit() {
 }
 
 SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
-    try {
-        std::shared_lock lock(this->rw_locker());
-        auto segment = segment_map_.at(segment_id);
-        if ( // TODO: read deprecate segment is allowed
-             // segment->deprecate_ts() < ts ||
-            segment->min_row_ts() > ts) {
-            return nullptr;
-        }
-        return segment;
-    } catch (const std::out_of_range &e) {
+    std::shared_lock lock(this->rw_locker());
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
         return nullptr;
     }
+    const auto &segment = iter->second;
+    if (segment->min_row_ts() > ts) {
+        return nullptr;
+    }
+    return segment;
 }
 
 Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
@@ -550,6 +560,14 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
 }
 
 const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_name_ptr(); }
+
+String TableEntry::GetPathNameTail() const {
+    SizeT delimiter_i = table_entry_dir_->rfind('/');
+    if (delimiter_i == String::npos) {
+        return *table_entry_dir_;
+    }
+    return table_entry_dir_->substr(delimiter_i + 1);
+}
 
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
@@ -720,19 +738,6 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
     }
 
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), txn_id);
-}
-
-void TableEntry::WalReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
-    this->DeltaReplaySegment(std::move(segment_entry));
-    // ATTENTION: focusing on the segment id
-    next_segment_id_++;
-}
-
-void TableEntry::DeltaReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegmentNoCheck(segment_entry.get());
-    }
-    segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
 }
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactAddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {

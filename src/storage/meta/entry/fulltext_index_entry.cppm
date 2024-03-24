@@ -35,8 +35,7 @@ public:
     FulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
     ~FulltextIndexEntry() override = default;
 
-    static SharedPtr<FulltextIndexEntry>
-    NewFulltextIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<FulltextIndexEntry> NewFulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<FulltextIndexEntry> NewReplayFulltextIndexEntry(TableIndexEntry *table_index_entry,
                                                                      TransactionID txn_id,

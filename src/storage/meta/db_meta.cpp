@@ -63,24 +63,22 @@ Tuple<SharedPtr<DBEntry>, Status> DBMeta::DropNewEntry(std::shared_lock<std::sha
 
 void DBMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = db_entry_list_.DeleteEntry(txn_id); }
 
-void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, TxnTimeStamp)> &&init_entry,
                                TransactionID txn_id,
                                TxnTimeStamp begin_ts) {
-    auto [entry, status] =
-        db_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, db_name_, txn_id, begin_ts); },
-                                      txn_id,
-                                      begin_ts);
+    auto [entry, status] = db_entry_list_.AddEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 }
 
-void DBMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [db_entry, status] = db_entry_list_.DropEntryReplay(txn_id, begin_ts);
+void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, TxnTimeStamp)> &&init_entry,
+                             TransactionID txn_id,
+                             TxnTimeStamp begin_ts) {
+    auto [dropped_entry, status] = db_entry_list_.DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    db_entry->Cleanup();
 }
 
 DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {

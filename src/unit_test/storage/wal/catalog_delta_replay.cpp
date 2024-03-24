@@ -49,7 +49,9 @@ import index_full_text;
 import fulltext_index_entry;
 import bg_task;
 import logger;
+import infinity_exception;
 import default_values;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -60,12 +62,36 @@ protected:
     void TearDown() override {}
 
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        // TxnTimeStamp visible_ts = 0;
+        // auto start = std::chrono::steady_clock::now();
+        // while (true) {
+        //     visible_ts = txn_mgr->GetMinUnflushedTS();
+        //     if (visible_ts <= last_commit_ts) {
+        //         break;
+        //     }
+        //     auto end = std::chrono::steady_clock::now();
+        //     auto duration = std::chrono::duration_cast<Seconds>(end - start);
+        //     if (duration.count() > 10) {
+        //         UnrecoverableException("WaitFlushDeltaOp timeout");
+        //     }
+        //     std::this_thread::sleep_for(Seconds(1));
+        // };
+
         TxnTimeStamp visible_ts = 0;
-        do {
+        time_t start = time(nullptr);
+        while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
-            // // sleep for 1s
-            // std::this_thread::sleep_for(std::chrono::seconds(1));
-        } while (visible_ts <= last_commit_ts);
+            if (visible_ts <= last_commit_ts) {
+                break;
+            }
+            // wait for at most 10s
+            time_t end = time(nullptr);
+            if (end - start > 10) {
+                UnrecoverableException("WaitFlushDeltaOp timeout");
+            }
+            usleep(1000 * 1000);
+        }
+        usleep(1000 * 1000);
     }
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
@@ -448,7 +474,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
                 }
             }
         }
-            txn_mgr->CommitTxn(txn);
+        txn_mgr->CommitTxn(txn);
     }
     infinity::InfinityContext::instance().UnInit();
 }

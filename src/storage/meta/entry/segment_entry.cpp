@@ -66,28 +66,19 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, S
     return segment_entry;
 }
 
-// used by import and compact, add a new segment, status:kSealed
-SharedPtr<SegmentEntry>
-SegmentEntry::NewReplaySegmentEntry(TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts) {
-    auto segment_entry =
-        MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount(), SegmentStatus::kSealed);
-    segment_entry->min_row_ts_ = commit_ts;
-    return segment_entry;
-}
-
-SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *table_entry,
-                                                                   SegmentID segment_id,
-                                                                   SegmentStatus status,
-                                                                   u64 column_count,
-                                                                   SizeT row_count,
-                                                                   SizeT actual_row_count,
-                                                                   SizeT row_capacity,
-                                                                   TxnTimeStamp min_row_ts,
-                                                                   TxnTimeStamp max_row_ts,
-                                                                   TxnTimeStamp commit_ts,
-                                                                   TxnTimeStamp deprecate_ts,
-                                                                   TxnTimeStamp begin_ts,
-                                                                   TransactionID txn_id) {
+SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_entry,
+                                                            SegmentID segment_id,
+                                                            SegmentStatus status,
+                                                            u64 column_count,
+                                                            SizeT row_count,
+                                                            SizeT actual_row_count,
+                                                            SizeT row_capacity,
+                                                            TxnTimeStamp min_row_ts,
+                                                            TxnTimeStamp max_row_ts,
+                                                            TxnTimeStamp commit_ts,
+                                                            TxnTimeStamp deprecate_ts,
+                                                            TxnTimeStamp begin_ts,
+                                                            TransactionID txn_id) {
     auto segment_dir = SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id);
     auto segment_entry = MakeShared<SegmentEntry>(table_entry, std::move(segment_dir), segment_id, row_capacity, column_count, status);
     segment_entry->min_row_ts_ = min_row_ts;
@@ -109,12 +100,12 @@ void SegmentEntry::SetSealed() {
     status_ = SegmentStatus::kSealed;
 }
 
-void SegmentEntry::AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, BlockID block_id) {
+void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id) {
     BlockID cur_blocks_size = block_entries_.size();
     if (block_id >= cur_blocks_size) {
         block_entries_.resize(block_id + 1);
     }
-    block_entries_[block_id] = init_block();
+    block_entries_[block_id] = std::move(block_entry);
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
@@ -200,9 +191,6 @@ bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
 
 // called by one thread
 BlockID SegmentEntry::GetNextBlockID() const { return block_entries_.size(); }
-
-// called by one thread
-Pair<SizeT, BlockOffset> SegmentEntry::GetWalInfo() const { return {block_entries_.size(), block_entries_.back()->row_count()}; }
 
 void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
     std::unique_lock lock(this->rw_locker_);

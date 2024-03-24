@@ -42,6 +42,7 @@ class DataBlock;
 export struct BlockEntry : public BaseEntry {
     friend struct TableEntry;
     friend struct SegmentEntry;
+    friend struct WalBlockInfo;
 
 public:
     // for iterator unit test
@@ -55,29 +56,20 @@ public:
 
     static UniquePtr<BlockEntry> NewReplayBlockEntry(const SegmentEntry *segment_entry,
                                                      BlockID block_id,
-                                                     TxnTimeStamp checkpoint_ts,
-                                                     u64 column_count,
-                                                     BufferManager *buffer_mgr,
                                                      u16 row_count,
+                                                     u16 row_capacity,
                                                      TxnTimeStamp min_row_ts,
-                                                     TxnTimeStamp max_row_ts);
-
-    static UniquePtr<BlockEntry> NewReplayCatalogBlockEntry(const SegmentEntry *segment_entry,
-                                                            BlockID block_id,
-                                                            u16 row_count,
-                                                            u16 row_capacity,
-                                                            TxnTimeStamp min_row_ts,
-                                                            TxnTimeStamp max_row_ts,
-                                                            TxnTimeStamp check_point_ts,
-                                                            u16 checkpoint_row_count,
-                                                            BufferManager *buffer_mgr);
+                                                     TxnTimeStamp max_row_ts,
+                                                     TxnTimeStamp check_point_ts,
+                                                     u16 checkpoint_row_count,
+                                                     BufferManager *buffer_mgr);
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
-    void AddColumnReplay(std::function<UniquePtr<BlockColumnEntry>()> init_column, ColumnID column_id);
+    void AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id);
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 

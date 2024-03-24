@@ -99,6 +99,9 @@ public:
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);
 
+    // Populate index entirely for the segment
+    void PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn);
+
     Status CreateIndexPrepare(const SegmentEntry *segment_entry, Txn *txn, bool prepare, bool check_ts);
 
     Status CreateIndexDo(atomic_u64 &create_index_idx);
