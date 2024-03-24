@@ -2,9 +2,11 @@ module;
 
 import stl;
 import int_encoder;
+import fastpfor;
 import byte_slice_reader;
 import byte_slice_writer;
 import no_compress_encoder;
+import vbyte_compress_encoder;
 
 export module posting_field;
 
@@ -42,8 +44,10 @@ struct ValueTypeTraits<u32> {
 };
 
 export typedef IntEncoder<u32, NewPForDeltaCompressor> Int32Encoder;
+// export typedef IntEncoder<u32, SIMDBitPacking> Int32Encoder;
 export typedef IntEncoder<u16, NewPForDeltaCompressor> Int16Encoder;
 export typedef NoCompressIntEncoder<u32> NoCompressEncoder;
+export typedef VByteIntEncoder<u32> VByteCompressEncoder;
 
 template <typename T>
 struct EncoderTypeTraits {
@@ -57,6 +61,7 @@ struct EncoderTypeTraits<u16> {
 template <>
 struct EncoderTypeTraits<u32> {
     typedef IntEncoder<u32, NewPForDeltaCompressor> Encoder;
+    // typedef IntEncoder<u32, SIMDBitPacking> Encoder;
 };
 
 export const Int32Encoder *GetDocIDEncoder();
@@ -83,7 +88,7 @@ struct TypedPostingField : public PostingField {
         return encoder_->Decode((T *)dest, dest_len / sizeof(T), slice_reader);
     }
 
-    const Encoder *encoder_;
+    const Encoder *encoder_{nullptr};
 };
 
 export template <typename T>
@@ -99,11 +104,27 @@ struct NoCompressPostingField : public PostingField {
         return encoder_->Decode((T *)dest, dest_len / sizeof(T), slice_reader);
     }
 
-    const NoCompressEncoder *encoder_;
+    const NoCompressEncoder *encoder_{nullptr};
+};
+
+export template <typename T>
+struct VByteCompressPostingField : public PostingField {
+
+    SizeT GetSize() const override { return sizeof(T); }
+
+    u32 Encode(ByteSliceWriter &slice_writer, const u8 *src, u32 len) const override {
+        return encoder_->Encode(slice_writer, (const T *)src, len / sizeof(T));
+    }
+
+    u32 Decode(u8 *dest, u32 dest_len, ByteSliceReader &slice_reader) const override {
+        return encoder_->Decode((T *)dest, dest_len / sizeof(T), slice_reader);
+    }
+
+    const VByteCompressEncoder *encoder_{nullptr};
 };
 
 export struct PostingFields {
-    ~PostingFields() {
+    virtual ~PostingFields() {
         for (SizeT i = 0; i < values_.size(); ++i) {
             delete values_[i];
         }
