@@ -3,6 +3,7 @@ module;
 import stl;
 import int_encoder;
 import no_compress_encoder;
+import vbyte_compress_encoder;
 
 module posting_field;
 
@@ -12,6 +13,7 @@ struct EncoderProvider {
     UniquePtr<Int32Encoder> int32_encoder_;
     UniquePtr<Int16Encoder> int16_encoder_;
     UniquePtr<NoCompressIntEncoder<u32>> no_compress_encoder_;
+    UniquePtr<VByteIntEncoder<u32>> vbyte_compress_encoder_;
 
     static EncoderProvider *GetInstance() {
         static EncoderProvider instance;
@@ -34,6 +36,12 @@ struct EncoderProvider {
         if (!no_compress_encoder_.get())
             no_compress_encoder_.reset(new NoCompressEncoder);
         return no_compress_encoder_.get();
+    }
+
+    VByteCompressEncoder *GetVByteCompressEncoder() {
+        if (!vbyte_compress_encoder_.get())
+            vbyte_compress_encoder_.reset(new VByteCompressEncoder);
+        return vbyte_compress_encoder_.get();
     }
 };
 

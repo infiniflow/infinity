@@ -55,25 +55,28 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         {
-            // NoCompressPostingValue<u32> *doc_id_value = new NoCompressPostingValue<u32>;
-            TypedPostingField<u32> *doc_id_value = new TypedPostingField<u32>;
-            doc_id_value->location_ = row_count++;
-            doc_id_value->offset_ = offset;
-            values_.push_back(doc_id_value);
+            // NoCompressPostingValue<u32> *doc_id_field = new NoCompressPostingValue<u32>;
+            TypedPostingField<u32> *doc_id_field = new TypedPostingField<u32>;
+            doc_id_field->location_ = row_count++;
+            doc_id_field->offset_ = offset;
+            doc_id_field->encoder_ = GetSkipListEncoder();
+            values_.push_back(doc_id_field);
             offset += sizeof(u32);
         }
         if (option.HasTfList()) {
-            TypedPostingField<u32> *tf_value = new TypedPostingField<u32>;
-            tf_value->location_ = row_count++;
-            tf_value->offset_ = offset;
-            values_.push_back(tf_value);
+            TypedPostingField<u32> *tf_field = new TypedPostingField<u32>;
+            tf_field->location_ = row_count++;
+            tf_field->offset_ = offset;
+            tf_field->encoder_ = GetSkipListEncoder();
+            values_.push_back(tf_field);
             offset += sizeof(u32);
         }
         {
-            TypedPostingField<u32> *offset_value = new TypedPostingField<u32>;
-            offset_value->location_ = row_count++;
-            offset_value->offset_ = offset;
-            values_.push_back(offset_value);
+            TypedPostingField<u32> *offset_field = new TypedPostingField<u32>;
+            offset_field->location_ = row_count++;
+            offset_field->offset_ = offset;
+            offset_field->encoder_ = GetSkipListEncoder();
+            values_.push_back(offset_field);
         }
     }
 
@@ -96,19 +99,19 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         {
-            TypedPostingField<u32> *doc_id_value = new TypedPostingField<u32>;
-            doc_id_value->location_ = row_count++;
-            doc_id_value->offset_ = offset;
-            doc_id_value->encoder_ = GetDocIDEncoder();
-            values_.push_back(doc_id_value);
+            TypedPostingField<u32> *doc_id_field = new TypedPostingField<u32>;
+            doc_id_field->location_ = row_count++;
+            doc_id_field->offset_ = offset;
+            doc_id_field->encoder_ = GetDocIDEncoder();
+            values_.push_back(doc_id_field);
             offset += sizeof(u32);
         }
         if (option.HasTfList()) {
-            TypedPostingField<u32> *tf_value = new TypedPostingField<u32>;
-            tf_value->location_ = row_count++;
-            tf_value->offset_ = offset;
-            tf_value->encoder_ = GetTFEncoder();
-            values_.push_back(tf_value);
+            TypedPostingField<u32> *tf_field = new TypedPostingField<u32>;
+            tf_field->location_ = row_count++;
+            tf_field->offset_ = offset;
+            tf_field->encoder_ = GetTFEncoder();
+            values_.push_back(tf_field);
             offset += sizeof(u32);
         }
         if (option.HasDocPayload()) {
