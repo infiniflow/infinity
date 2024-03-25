@@ -212,7 +212,6 @@ class TestIndex:
                                                      index.InitParameter("metric", "l2")])], ConflictType.Error)
 
     # create index then show index
-    @pytest.mark.skip(reason="Not support for showing index yet.")
     def test_create_index_show_index(self, get_infinity_db):
         # connect
         db_obj = get_infinity_db
@@ -225,6 +224,9 @@ class TestIndex:
                                                       index.IndexType.IVFFlat,
                                                       [index.InitParameter("centroids_count", "128"),
                                                        index.InitParameter("metric", "l2")])], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.show_index("my_index")
+        print(res)
 
     # drop index then show index
     def test_drop_index_show_index(self, get_infinity_db):
@@ -330,7 +332,7 @@ class TestIndex:
                                                          index.InitParameter("metric", "l2")])], ConflictType.Error)
 
     # create index then insert / import data
-    @pytest.mark.skip(reason="ERROR:3009, Attempt to create IVFFLAT/full-text index on column: c2, data type")
+    @pytest.mark.xfail(reason="ERROR:3009, Attempt to create IVFFLAT/full-text index on column: c2, data type")
     @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat, index.IndexType.FullText])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_create_index_import_data(self, get_infinity_db, index_type, file_format):
@@ -376,7 +378,7 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     # create index on all data are updated.
-    @pytest.mark.skip(reason="Not support yet.")
+    @pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
     def test_create_index_on_update_table(self, get_infinity_db):
         db_obj = get_infinity_db
         db_obj.drop_table("test_create_index_on_update_table", ConflictType.Ignore)

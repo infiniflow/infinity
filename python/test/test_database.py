@@ -170,7 +170,6 @@ class TestDatabase:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Cost too much times")
     def test_create_drop_show_1M_databases(self):
 
         """
@@ -280,87 +279,6 @@ class TestDatabase:
                 print(e)
 
         # 3. disconnect
-        res = infinity_obj.disconnect()
-
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.skip(reason="No if not exists flag now")
-    def test_create_database_with_invalid_option(self):
-        """
-        target: create database with invalid option
-        method:
-        1. create database
-        expect: all operations successfully
-        """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-
-        # option: if not exists
-        # other options are invalid
-        db = infinity_obj.create_database("test_create_database_with_invalid_option", None)
-        res = infinity_obj.drop_database("test_create_database_with_invalid_option")
-
-        # disconnect
-        res = infinity_obj.disconnect()
-
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.skip(reason="No if not exists flag now")
-    def test_create_database_with_if_not_exists(self):
-        """
-        target: create database if not exists
-        method:
-        1. create database
-        expect: all operations successfully
-        """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-
-        # option: if not exists
-        # other options are invalid
-        infinity_obj.drop_database("my_database")
-        db = infinity_obj.create_database("my_database", None)
-        res = infinity_obj.drop_database("my_database")
-
-        # disconnect
-        res = infinity_obj.disconnect()
-
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.skip(reason="No if not exists flag now")
-    def test_drop_database_with_invalid_option(self):
-        """
-        target: drop database with invalid option
-        method:
-        1. drop database
-        expect: all operations successfully
-        """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-
-        # option: if not exists
-        # other options are invalid
-        db = infinity_obj.drop_database("my_database", None)
-        res = infinity_obj.drop_database("my_database")
-
-        # disconnect
-        res = infinity_obj.disconnect()
-
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.skip(reason="No if not exists flag now")
-    def test_drop_database_with_if_not_exists(self):
-        """
-        target: create database if not exists
-        method:
-        1. create database
-        expect: all operations successfully
-        """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-
-        # option: if not exists
-        # other options are invalid
-        db = infinity_obj.create_database("my_database", None)
-        res = infinity_obj.drop_database("my_database", None)
-
-        # disconnect
         res = infinity_obj.disconnect()
 
         assert res.error_code == ErrorCode.OK

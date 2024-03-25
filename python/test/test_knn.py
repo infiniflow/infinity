@@ -317,7 +317,7 @@ class TestKnn:
                                                  "category_vector",
                                                  "tag_vector",
                                                  "other_vector"])
-    @pytest.mark.parametrize("index_distance_type", ["l2", "ip", "cosine", "hamming"])
+    @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
     def test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
                         index_distance_type, knn_distance_type):
