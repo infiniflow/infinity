@@ -64,7 +64,7 @@ class TestImport:
         assert res.error_code == ErrorCode.OK
 
     # import different file format data
-    @pytest.mark.parametrize("check_data", [{"file_name": "test.fvecs",
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("file_format", ["csv",
                                              pytest.param("json", marks=pytest.mark.xfail(
@@ -81,11 +81,12 @@ class TestImport:
 
         if file_format == "fvecs":
             if not check_data:
-                copy_data("test.fvecs")
+                generate_fvecs(100, 128, "pysdk_test.fvecs")
+                copy_data("pysdk_test.fvecs")
             db_obj.drop_table("test_import_different_file_format_data_fvecs")
             table_obj = db_obj.create_table("test_import_different_file_format_data_fvecs",
                                             {"c1": "vector,128,float"}, ConflictType.Error)
-            table_obj.import_data(common_values.TEST_TMP_DIR + "test.fvecs", {"file_type": file_format})
+            table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test.fvecs", {"file_type": file_format})
             res = table_obj.output(["*"]).to_df()
             print(res)
 
