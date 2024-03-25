@@ -101,14 +101,21 @@ public:
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
 
+    // MemIndexCommit is non-blocking.
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
 
+    // MemIndexCommit is blocking.
     // Dump or spill the memory indexer
     void MemIndexDump(bool spill = false);
 
+    // PopulateEntirely is blocking.
     // Populate index entirely for the segment
     void PopulateEntirely(SegmentEntry *segment_entry, Txn *txn);
+
+    // MergeDiskIndexEntirely is blocking.
+    // Merge all disk index chunks into one for each SegmentIndexEntry
+    void MergeDiskIndexEntirely(Txn *txn);
 
     Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
