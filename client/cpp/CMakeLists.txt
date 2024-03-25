@@ -31,5 +31,5 @@ target_link_libraries(
 
 target_include_directories(infinity_client_test PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")
 target_include_directories(infinity_client_test PUBLIC "${CMAKE_SOURCE_DIR}/client/cpp")
-#target_link_libraries(infinity_client_test PUBLIC "${CMAKE_BINARY_DIR}/client/cpp")
+target_link_directories(infinity_client_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
