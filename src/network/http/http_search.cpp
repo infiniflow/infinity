@@ -152,7 +152,10 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                         "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
                     return;
                 }
-
+                auto &match_json = elem.value();
+                match_expr = ParseMatch(match_json, http_status, response);
+                search_expr->AddExpr(match_expr);
+                match_expr = nullptr;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Unknown expression: " + key;
