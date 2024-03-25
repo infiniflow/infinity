@@ -4,7 +4,7 @@
 # bison-3.8.2.tar.xz
 # binutils-2.41.tar.xz
 # gcc-13.2.0.tar.xz
-# cmake-3.28.3-linux-x86_64.tar.gz
+# cmake-3.29.0-linux-x86_64.tar.gz
 # ninja-linux.zip
 # llvm-project-17.0.6.src.tar.xz
 # boost_1_81_0.tar.bz2
@@ -27,7 +27,7 @@ download()
 names="https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz
 https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz
 https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
-https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.tar.gz
+https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
 https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip
 https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/llvm-project-17.0.6.src.tar.xz
 https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.bz2

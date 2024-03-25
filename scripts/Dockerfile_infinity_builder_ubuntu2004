@@ -7,12 +7,12 @@ RUN apt update && apt install -y ca-certificates \
 # Install git wget unzip software-properties-common
 RUN DEBIAN_FRONTEND=noninteractive apt install -y git wget unzip software-properties-common
 
-# Install cmake-3.28.3
-RUN wget https://cmake.org/files/v3.28/cmake-3.28.3-linux-x86_64.tar.gz \
-    && tar zxvf cmake-3.28.3-linux-x86_64.tar.gz \
-    && cp -rf cmake-3.28.3-linux-x86_64/bin/* /usr/local/bin \
-    && cp -rf cmake-3.28.3-linux-x86_64/share/* /usr/local/share \
-    && rm -rf cmake-3.28.3-linux-x86_64
+# Install cmake-3.29.0
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.29.0-linux-x86_64.tar.gz \
+    && cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin \
+    && cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share \
+    && rm -rf cmake-3.29.0-linux-x86_64
 
 # Install ninja-1.11.1
 RUN wget https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip \
@@ -27,9 +27,9 @@ RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test \
     && add-apt-repository -y ppa:mhier/libboost-latest \
     && add-apt-repository -y ppa:rhansen/qemu
 
-# Install g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
+# Install g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev
 RUN apt update \
-    && apt install -y g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
+    && apt install -y g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev
 
 # Create a symbolic link for clang-scan-deps-17
 RUN ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
