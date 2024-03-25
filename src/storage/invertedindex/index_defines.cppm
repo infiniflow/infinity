@@ -51,6 +51,7 @@ export {
     constexpr const char *DICT_SUFFIX = ".dic";
     constexpr const char *POSTING_SUFFIX = ".pos";
     constexpr const char *SPILL_SUFFIX = ".spill";
+    constexpr const char *LENGTH_SUFFIX = ".len";
 
     using ScoredId = Pair<float, u32>;
     using ScoredIds = Vector<ScoredId>;

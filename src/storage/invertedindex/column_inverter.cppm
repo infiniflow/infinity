@@ -31,8 +31,6 @@ import posting_writer;
 
 namespace infinity {
 
-export using ColumnLengthPopulater = std::function<void(u32 begin_docid, Vector<u32> &lens)>;
-
 export class ColumnInverter {
 public:
     ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider);
@@ -55,7 +53,7 @@ public:
 
     void GeneratePosting();
 
-    void GetTermListLength(ColumnLengthPopulater populater) const;
+    void GetTermListLength(u32 *term_list_length_ptr) const;
 
     struct PosInfo {
         u32 term_num_{0};

@@ -31,6 +31,8 @@ import skiplist;
 
 namespace infinity {
 
+class FullTextColumnLengthFileHandler;
+
 export class MemoryIndexer {
 public:
     struct KeyComp {
@@ -52,9 +54,11 @@ public:
     ~MemoryIndexer();
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    // MemoryIndex will load itself it's spilled.
-    void
-    Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, ColumnLengthPopulater populater = nullptr, bool offline = false);
+    void Insert(SharedPtr<ColumnVector> column_vector,
+                u32 row_offset,
+                u32 row_count,
+                SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
+                bool offline = false);
 
     // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
     // Other threads can also call this method.
