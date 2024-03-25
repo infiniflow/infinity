@@ -34,7 +34,6 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import cleanup_task;
 import compact_segments_task;
 import index_base;
 import index_base;

@@ -735,42 +735,40 @@ String CatalogDeltaEntry::ToString() const {
     return sstream.str();
 }
 
-void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
+void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     // {
     //     for (auto &delta_entry : delta_entries) {
     //         LOG_INFO(fmt::format("Add delta entry: {}", delta_entry->ToString()));
     //     }
     // }
     std::unique_lock w_lock(mtx_);
-    for (auto &delta_entry : delta_entries) {
-        TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
+    TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
 
-        if (delta_entry->commit_ts() < max_commit_ts_) {
-            UnrecoverableError(fmt::format("delta_entry->commit_ts() {} < max_commit_ts_ {}. DeltaOp should add in global in sequence of commit_ts",
-                                           delta_entry->commit_ts(),
-                                           max_commit_ts_));
-        }
-        max_commit_ts_ = delta_entry->commit_ts();
+    if (delta_entry->commit_ts() < max_commit_ts_) {
+        UnrecoverableError(fmt::format("delta_entry->commit_ts() {} < max_commit_ts_ {}. DeltaOp should add in global in sequence of commit_ts",
+                                       delta_entry->commit_ts(),
+                                       max_commit_ts_));
+    }
+    max_commit_ts_ = delta_entry->commit_ts();
 
-        for (auto &op : delta_entry->operations()) {
-            bool prune = PruneDeltaOp(op.get(), current_commit_ts);
+    for (auto &op : delta_entry->operations()) {
+        bool prune = PruneDeltaOp(op.get(), current_commit_ts);
 
-            String encode = op->EncodeIndex();
-            auto iter = delta_ops_.find(encode);
-            if (iter != delta_ops_.end()) {
-                auto &delta_op = iter->second;
-                if (!prune) {
-                    delta_op->Merge(std::move(op));
-                } else {
-                    delta_ops_.erase(iter);
-                }
+        String encode = op->EncodeIndex();
+        auto iter = delta_ops_.find(encode);
+        if (iter != delta_ops_.end()) {
+            auto &delta_op = iter->second;
+            if (!prune) {
+                delta_op->Merge(std::move(op));
             } else {
-                delta_ops_[encode] = std::move(op);
+                delta_ops_.erase(iter);
             }
+        } else {
+            delta_ops_[encode] = std::move(op);
         }
-        if (!delta_entry->txn_ids().empty()) {
-            txn_ids_.insert(delta_entry->txn_ids()[0]);
-        }
+    }
+    if (!delta_entry->txn_ids().empty()) {
+        txn_ids_.insert(delta_entry->txn_ids()[0]);
     }
 }
 

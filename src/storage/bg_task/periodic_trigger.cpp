@@ -20,7 +20,7 @@ import stl;
 import logger;
 import infinity_exception;
 import background_process;
-import cleanup_task;
+import bg_task;
 import catalog;
 import txn_manager;
 import third_party;
@@ -39,7 +39,13 @@ void CleanupPeriodicTrigger::Trigger() {
     }
     last_visible_ts_ = visible_ts;
     LOG_INFO(fmt::format("Cleanup visible timestamp: {}", visible_ts));
-    bg_processor_->Submit(MakeShared<CleanupTask>(catalog_, visible_ts));
+    auto cleanup_task = MakeShared<CleanupTask>(catalog_, visible_ts);
+    bg_processor_->Submit(std::move(cleanup_task));
+}
+
+void CheckpointPeriodicTrigger::Trigger() {
+    auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
+    bg_processor_->Submit(std::move(checkpoint_task));
 }
 
 } // namespace infinity

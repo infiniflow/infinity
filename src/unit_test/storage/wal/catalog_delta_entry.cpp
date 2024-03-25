@@ -375,9 +375,7 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     }
 
     // merge
-    Vector<UniquePtr<CatalogDeltaEntry>> delta_entries;
-    delta_entries.push_back(std::move(local_catalog_delta_entry));
-    global_catalog_delta_entry->AddDeltaEntries(std::move(delta_entries));
+    global_catalog_delta_entry->AddDeltaEntry(std::move(local_catalog_delta_entry));
     // check ops
     EXPECT_EQ(global_catalog_delta_entry->OpSize(), 5u);
 }
