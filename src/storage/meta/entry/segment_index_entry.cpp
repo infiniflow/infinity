@@ -52,17 +52,24 @@ import segment_iter;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
-import fulltext_file_worker;
 import fulltext_index_entry;
 import index_full_text;
 import index_defines;
 import column_inverter;
 import block_entry;
+import local_file_system;
+import column_length_io;
 
 namespace infinity {
 
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
     : BaseEntry(EntryType::kSegmentIndex), table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)){};
+
+SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry() {
+    SharedPtr<SegmentIndexEntry> fake_entry;
+    fake_entry.reset(new SegmentIndexEntry(static_cast<TableIndexEntry *>(nullptr), SegmentID(0), Vector<BufferObj *>()));
+    return fake_entry;
+}
 
 SharedPtr<SegmentIndexEntry>
 SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *param) {
@@ -143,6 +150,7 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
             if (memory_indexer_.get() == nullptr) {
                 String base_name = fmt::format("ft_{}", begin_row_id.ToUint64());
+                std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
                                                             base_name,
                                                             begin_row_id,
@@ -152,25 +160,15 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
                                                             table_index_entry_->GetFulltextBufferPool(),
                                                             table_index_entry_->GetFulltextThreadPool());
             }
+            Path column_length_file_base = Path(*table_index_entry_->index_dir()) / (memory_indexer_->GetBaseName());
+            String column_length_file_path_prefix = column_length_file_base.string();
+            String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
+            auto column_length_file_handler =
+                MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, this);
             u64 column_id = column_def->id();
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(txn->buffer_mgr()));
-            ColumnLengthPopulater populater = [this](u32 begin_docid, Vector<u32> &lens) -> void {
-                BufferHandle column_length_handle = this->GetIndex();
-                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
-                SizeT num_docs = lens.size();
-                SizeT total_len = 0;
-                for (SizeT i = 0; i < num_docs; i++) {
-                    // TODO yzc: rework ColumnLengthPopulater
-                    // fulltext_column_length.column_length_[begin_row_id.ToUint64() + begin_docid + i] = lens[i];
-                    total_len += lens[i];
-                }
-                std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-                fulltext_column_length.row_count_ += num_docs;
-                fulltext_column_length.total_length_ += total_len;
-                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
-            };
-            memory_indexer_->Insert(column_vector, row_offset, row_count, populater, false);
+            memory_indexer_->Insert(column_vector, row_offset, row_count, std::move(column_length_file_handler), false);
             auto duration = Clock::now().time_since_epoch();
             u64 ts = ChronoCast<NanoSeconds>(duration).count();
             table_index_entry_->UpdateFulltextSegmentTs(ts);
@@ -206,6 +204,7 @@ void SegmentIndexEntry::MemIndexDump(bool spill) {
         return;
     memory_indexer_->Dump(false, spill);
     if (!spill) {
+        std::unique_lock<std::shared_mutex> lck(rw_locker_);
         ft_base_names_.push_back(memory_indexer_->GetBaseName());
         ft_base_rowids_.push_back(memory_indexer_->GetBaseRowId());
         memory_indexer_.reset();
@@ -249,31 +248,26 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                                                         table_index_entry_->GetFulltextBufferPool(),
                                                         table_index_entry_->GetFulltextThreadPool());
             u64 column_id = column_def->id();
+            Path column_length_file_base = Path(*table_index_entry_->index_dir()) / base_name;
+            String column_length_file_path_prefix = column_length_file_base.string();
+            String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
+            auto column_length_file_handler =
+                MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, this);
             auto block_entry_iter = BlockEntryIter(segment_entry);
-            ColumnLengthPopulater populater = [this](u32 begin_docid, Vector<u32> &lens) -> void {
-                BufferHandle column_length_handle = this->GetIndex();
-                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
-                SizeT num_docs = lens.size();
-                SizeT total_len = 0;
-                for (SizeT i = 0; i < num_docs; i++) {
-                    // fulltext_column_length.lengths[begin_row_id + begin_docid + i] = lens[i];
-                    total_len += lens[i];
-                }
-                std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-                fulltext_column_length.row_count_ += num_docs;
-                fulltext_column_length.total_length_ += total_len;
-                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
-            };
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
-                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), populater, true);
+                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), column_length_file_handler, true);
                 memory_indexer_->Commit(true);
             }
+            column_length_file_handler.reset();
             memory_indexer_->Dump(true);
-            ft_base_names_.push_back(base_name);
-            ft_base_rowids_.push_back(base_row_id);
-            memory_indexer_.reset();
+            {
+                std::unique_lock<std::shared_mutex> lck(rw_locker_);
+                ft_base_names_.push_back(base_name);
+                ft_base_rowids_.push_back(base_row_id);
+                memory_indexer_.reset();
+            }
             auto duration = Clock::now().time_since_epoch();
             u64 ts = ChronoCast<NanoSeconds>(duration).count();
             table_index_entry_->UpdateFulltextSegmentTs(ts);
@@ -561,8 +555,6 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
     return Status::OK();
 }
 
-void SegmentIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { RecoverableError(Status::NotSupport("Not implemented")); }
-
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     if (table_index_entry_->index_base()->index_type_ == IndexType::kFullText) {
         // Fulltext index doesn't need to be checkpointed.
@@ -654,6 +646,8 @@ nlohmann::json SegmentIndexEntry::Serialize() {
             index_entry_json["ft_mem_base_name"] = this->memory_indexer_->GetBaseName();
             index_entry_json["ft_mem_base_rowid"] = this->memory_indexer_->GetBaseRowId().ToUint64();
         }
+        index_entry_json["ft_column_len_sum"] = this->ft_column_len_sum_;
+        index_entry_json["ft_column_len_cnt"] = this->ft_column_len_cnt_;
     }
 
     return index_entry_json;
@@ -702,6 +696,8 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
                                                                          table_index_entry->GetFulltextThreadPool());
         segment_index_entry->memory_indexer_->Load();
     }
+    segment_index_entry->ft_column_len_sum_ = index_entry_json["ft_column_len_sum"];
+    segment_index_entry->ft_column_len_cnt_ = index_entry_json["ft_column_len_cnt"];
     return segment_index_entry;
 }
 

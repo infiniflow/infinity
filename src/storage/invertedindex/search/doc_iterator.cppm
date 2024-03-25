@@ -18,9 +18,7 @@ export module doc_iterator;
 
 import stl;
 import memory_pool;
-import posting_iterator;
 import index_defines;
-import match_data;
 import internal_types;
 
 namespace infinity {

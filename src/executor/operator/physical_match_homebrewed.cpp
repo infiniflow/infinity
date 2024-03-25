@@ -109,7 +109,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         ResultHandler result_handler(1, top_n, score_result.get(), row_id_result.get());
         result_handler.Begin();
         // prepare query_builder
-        query_builder.LoadScorerColumnLength();
+        query_builder.LoadScorerColumnLength(iter_row_id);
         do {
             // call scorer
             float score = query_builder.Score(iter_row_id);
