@@ -120,6 +120,8 @@ class InfinityThriftQueryBuilder(ABC):
             dist_type = KnnDistanceType.InnerProduct
         elif distance_type == 'hamming':
             dist_type = KnnDistanceType.Hamming
+        else:
+            raise Exception(f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
         if knn_params != None:

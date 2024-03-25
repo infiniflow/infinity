@@ -654,3 +654,117 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 #endif
     }
 }
+
+TEST_F(CompactTaskTest, compact_not_exist_table) {
+#ifdef INFINITY_DEBUG
+    infinity::GlobalResourceUsage::Init();
+#endif
+    std::shared_ptr<std::string> config_path = nullptr;
+    infinity::InfinityContext::instance().Init(config_path);
+
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    BufferManager *buffer_mgr = storage->buffer_manager();
+    TxnManager *txn_mgr = storage->txn_manager();
+
+    String table_name = "tb1";
+    SharedPtr<TableDef> tbl1_def = nullptr;
+    {
+        Vector<SharedPtr<ColumnDef>> columns;
+        i64 column_id = 0;
+        HashSet<ConstraintType> constraints;
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+        columns.emplace_back(column_def_ptr);
+        tbl1_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
+    }
+    {
+        // create table
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+
+        Status status = txn->CreateTable("default", tbl1_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+
+        txn_mgr->CommitTxn(txn);
+    }
+    {
+        Vector<SizeT> segment_sizes{1, 10, 100};
+        this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_mgr);
+    }
+    {
+        auto txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        auto [table_entry, status] = txn->GetTableByName("default", table_name);
+        ASSERT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+
+        auto compact_txn = txn_mgr->CreateTxn();
+        auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
+
+        { // drop tb1
+            auto drop_txn = txn_mgr->CreateTxn();
+            drop_txn->Begin();
+            auto status = drop_txn->DropTableCollectionByName("default", table_name, ConflictType::kError);
+            ASSERT_TRUE(status.ok());
+            txn_mgr->CommitTxn(drop_txn);
+        }
+
+        compact_txn->Begin();
+        bool res = compact_task->Execute();
+        ASSERT_FALSE(res);
+        txn_mgr->CommitTxn(compact_txn);
+    }
+
+    //------------------------------------------
+
+    {
+        // create table
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+
+        Status status = txn->CreateTable("default", tbl1_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+
+        txn_mgr->CommitTxn(txn);
+    }
+    {
+        Vector<SizeT> segment_sizes{1, 10, 100};
+        this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_mgr);
+    }
+    {
+        auto txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        auto [table_entry, status] = txn->GetTableByName("default", table_name);
+        ASSERT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+
+        auto compact_txn = txn_mgr->CreateTxn();
+        auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
+
+        { // drop tb1
+            auto drop_txn = txn_mgr->CreateTxn();
+            drop_txn->Begin();
+            auto status = drop_txn->DropTableCollectionByName("default", table_name, ConflictType::kError);
+            ASSERT_TRUE(status.ok());
+            txn_mgr->CommitTxn(drop_txn);
+        }
+        { // create table with same name
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            Status status = txn->CreateTable("default", tbl1_def, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+
+            txn_mgr->CommitTxn(txn);
+        }
+
+        compact_txn->Begin();
+        bool res = compact_task->Execute();
+        ASSERT_FALSE(res);
+        txn_mgr->CommitTxn(compact_txn);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+    infinity::GlobalResourceUsage::UnInit();
+#endif
+}

@@ -783,7 +783,7 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="May cause server kill.")
+    @pytest.mark.skip(reason="Invalid input, May cause server kill.")
     @pytest.mark.parametrize("types", [
         "int", "int8", "int16", "int32", "int64", "integer",
         "float", "float32", "double", "float64",

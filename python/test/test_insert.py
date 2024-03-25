@@ -382,7 +382,6 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.skip(reason="TODO")
     def test_read_after_shutdown(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")

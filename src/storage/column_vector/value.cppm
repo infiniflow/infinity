@@ -15,7 +15,6 @@ module;
 
 export module value;
 
-
 import stl;
 import type_info;
 import logical_type;
@@ -23,6 +22,7 @@ import infinity_exception;
 import internal_types;
 import embedding_info;
 import data_type;
+import knn_expr;
 
 namespace infinity {
 
@@ -95,6 +95,8 @@ public:
         std::memcpy(data_.data(), values_p.data(), len);
     }
 
+    String GetString(EmbeddingInfo* embedding_info);
+
     Pair<const_ptr_t, SizeT> GetData() const { return MakePair<const_ptr_t, SizeT>(data_.data(), data_.size()); }
 
 protected:
@@ -147,17 +149,17 @@ public:
 
     static Value MakeBox(BoxT input);
 
-//    static Value MakePath(PathT input);
-//
-//    static Value MakePolygon(PolygonT input);
+    //    static Value MakePath(PathT input);
+    //
+    //    static Value MakePolygon(PolygonT input);
 
     static Value MakeCircle(CircleT input);
 
-//    static Value MakeBitmap(BitmapT input);
+    //    static Value MakeBitmap(BitmapT input);
 
     static Value MakeUuid(UuidT input);
 
-//    static Value MakeBlob(BlobT input);
+    //    static Value MakeBlob(BlobT input);
 
     static Value MakeRow(RowID input);
 
@@ -172,6 +174,24 @@ public:
         auto embedding_info_ptr = EmbeddingInfo::Make(ToEmbeddingDataType<T>(), vec.size());
         Value value(LogicalType::kEmbedding, embedding_info_ptr);
         value.value_info_ = MakeShared<EmbeddingValueInfo>(vec);
+        if constexpr (std::is_same_v<T, bool>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemBit, vec.size()));
+        } else if constexpr (std::is_same_v<T, i8>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt8, vec.size()));
+        } else if constexpr (std::is_same_v<T, i16>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt16, vec.size()));
+        } else if constexpr (std::is_same_v<T, i32>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt32, vec.size()));
+        } else if constexpr (std::is_same_v<T, i64>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, vec.size()));
+        } else if constexpr (std::is_same_v<T, float>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, vec.size()));
+        } else if constexpr (std::is_same_v<T, double>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, vec.size()));
+        } else {
+            UnrecoverableError("Not supported embedding data type.");
+        }
+
         return value;
     }
 
@@ -297,23 +317,23 @@ LineSegT Value::GetValue() const;
 template <>
 BoxT Value::GetValue() const;
 
-//template <>
-//PathT Value::GetValue() const;
+// template <>
+// PathT Value::GetValue() const;
 //
-//template <>
-//PolygonT Value::GetValue() const;
+// template <>
+// PolygonT Value::GetValue() const;
 
 template <>
 CircleT Value::GetValue() const;
 
-//template <>
-//BitmapT Value::GetValue() const;
+// template <>
+// BitmapT Value::GetValue() const;
 
 template <>
 UuidT Value::GetValue() const;
 
-//template <>
-//BlobT Value::GetValue() const;
+// template <>
+// BlobT Value::GetValue() const;
 
 template <>
 RowID Value::GetValue() const;

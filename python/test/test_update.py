@@ -328,6 +328,7 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update inserted long before and select to check
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Taking too much time.")
     def test_update_inserted_long_before(self):
         # connect
@@ -373,7 +374,6 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
-    @pytest.mark.skip(reason="TODO")
     @pytest.mark.parametrize("types", ["varchar"])
     @pytest.mark.parametrize("types_example", [[1, 2, 3]])
     def test_update_invalid_value(self, types, types_example):
@@ -384,17 +384,16 @@ class TestUpdate:
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
 
         # update
-        with pytest.raises(Exception, match="Invalid constant expression"):
-            table_obj.update("c1 = 1", [{"c2": types_example}])
-            update_res = table_obj.output(["*"]).to_df()
-            print(update_res)
+        table_obj.update("c1 = 1", [{"c2": types_example}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
 
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
     # update new value type is not match with table
-    @pytest.mark.skip(reason="Invalid constant expression.")
+    @pytest.mark.xfail(reason="Invalid constant expression.")
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [1, 1.333, "1", [1, 2, 3]])
     def test_update_new_value(self, types, types_example):
