@@ -60,8 +60,8 @@ inline u32 IntEncoder<T, Compressor>::Decode(T *dest, u32 dest_len, ByteSliceRea
     return (u32)compressor_.Decompress(dest, dest_len, (const u32 *)buf_ptr, comp_len);
 }
 
-export template <typename T>
-class IntEncoder<T, SIMDBitPacking> {
+export template <typename T, FastPForCodec Codec>
+class IntEncoder<T, FastPForWrapper<Codec>> {
 public:
     const static size_t ENCODER_BUFFER_SIZE = 1024;
     const static size_t ENCODER_BUFFER_BYTE_SIZE = ENCODER_BUFFER_SIZE * sizeof(u32);
@@ -78,11 +78,11 @@ public:
     inline u32 Decode(T *dest, u32 dest_len, ByteSliceReader &slice_reader) const;
 
 private:
-    SIMDBitPacking compressor_{};
+    FastPForWrapper<Codec> compressor_{};
 };
 
-template <typename T>
-inline u32 IntEncoder<T, SIMDBitPacking>::Encode(ByteSliceWriter &slice_writer, const T *src, u32 src_len) const {
+template <typename T, FastPForCodec Codec>
+inline u32 IntEncoder<T, FastPForWrapper<Codec>>::Encode(ByteSliceWriter &slice_writer, const T *src, u32 src_len) const {
     u8 buffer[ENCODER_BUFFER_BYTE_SIZE];
     SizeT encode_len = ENCODER_BUFFER_SIZE;
     compressor_.Compress(src, src_len, (T *)buffer, encode_len);
@@ -91,8 +91,8 @@ inline u32 IntEncoder<T, SIMDBitPacking>::Encode(ByteSliceWriter &slice_writer, 
     return encode_len * sizeof(T) + sizeof(u8);
 }
 
-template <typename T>
-inline u32 IntEncoder<T, SIMDBitPacking>::Decode(T *dest, u32 dest_len, ByteSliceReader &slice_reader) const {
+template <typename T, FastPForCodec Codec>
+inline u32 IntEncoder<T, FastPForWrapper<Codec>>::Decode(T *dest, u32 dest_len, ByteSliceReader &slice_reader) const {
     u8 buffer[ENCODER_BUFFER_BYTE_SIZE];
     u32 comp_len = slice_reader.ReadByte();
     void *buf_ptr = buffer;
