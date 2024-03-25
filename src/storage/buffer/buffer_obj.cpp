@@ -200,9 +200,9 @@ void BufferObj::SetCleaningup() {
     }
 }
 
-void BufferObj::TryCleanup() {
+void BufferObj::TryCleanup(bool force_cleanup) {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-    if ((status_ != BufferStatus::kClean && status_ != BufferStatus::kCleanAfterFree) || rc_ > 0) {
+    if ((status_ != BufferStatus::kClean || rc_ > 0) && !force_cleanup) {
         LOG_TRACE("BufferObj can't be cleaned up.");
         return;
     }

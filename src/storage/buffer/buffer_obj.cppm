@@ -66,7 +66,7 @@ public:
 
     void SetCleaningup();
 
-    void TryCleanup();
+    void TryCleanup(bool force_cleanup);
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
@@ -92,10 +92,7 @@ private:
 
 public:
     // interface for unit test
-    BufferStatus status() {
-        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-        return status_;
-    }
+    BufferStatus status() { return status_; }
     BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
 
