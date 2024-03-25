@@ -548,6 +548,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             del_row_ids.push_back(del_row);
             status = txn->Delete(*db_name, *table_name, del_row_ids, true);
             EXPECT_TRUE(status.ok());
+            txn_mgr->CommitTxn(txn);
         }
 
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
@@ -730,6 +731,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
                     }
                 }
             }
+            txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
     }

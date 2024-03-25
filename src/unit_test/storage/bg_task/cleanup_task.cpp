@@ -35,7 +35,6 @@ import compilation_config;
 import cleanup_task;
 import compact_segments_task;
 import index_base;
-import index_base;
 import third_party;
 import base_table_ref;
 import index_secondary;
@@ -412,7 +411,6 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), *column_name, constraints));
     }
     {
-
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();

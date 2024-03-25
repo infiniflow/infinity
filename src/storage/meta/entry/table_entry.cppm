@@ -221,6 +221,8 @@ private:
 
     const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
+    mutable std::shared_mutex rw_locker_{}; // used for segment_map_
+
     // From data table
     Atomic<SizeT> row_count_{}; // this is actual row count
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
@@ -243,7 +245,7 @@ private:
     mutable UniquePtr<CompactionAlg> compaction_alg_{};
 
 private: // TODO: remove it
-    std::shared_mutex &rw_locker() const { return index_meta_map_.rw_locker_; }
+    std::shared_mutex &rw_locker() const { return rw_locker_; }
 
 public: // TODO: remove it?
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }

@@ -24,6 +24,23 @@ import buffer_obj;
 import data_file_worker;
 import global_resource_usage;
 import infinity_context;
+import storage;
+import column_def;
+import logical_type;
+import data_type;
+import data_block;
+import txn_manager;
+import table_def;
+import extra_ddl_info;
+import column_vector;
+import value;
+import catalog;
+import segment_entry;
+import block_entry;
+import status;
+import third_party;
+import base_table_ref;
+import compilation_config;
 
 using namespace infinity;
 
@@ -34,7 +51,7 @@ class BufferObjTest : public BaseTest {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -110,7 +127,6 @@ TEST_F(BufferObjTest, test1) {
     }
     { auto handle2 = buf2->Load(); }
 
-
     /// kTemp
     {
         auto handle1 = buf1->Load();
@@ -131,7 +147,6 @@ TEST_F(BufferObjTest, test1) {
     { auto handle2 = buf2->Load(); }
     // kUnloaded, kTemp -> kFreed, kTemp
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
-
 
     /// kPersistent
     SaveBufferObj(buf1);
@@ -156,7 +171,6 @@ TEST_F(BufferObjTest, test1) {
     { auto handle2 = buf2->Load(); }
     // kUnloaded, kPersistent -> kFreed, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
-
 
     /// kEphemeral
     {
@@ -255,7 +269,7 @@ TEST_F(BufferObjTest, test_status_clean) {
 
     // kLoaded, kEphemeral -> kUnloaded, kEphemeral
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
-    
+
     // kUnloaded, kEphemeral -> kCleanAfterFree, kEphemeral
     buf1->SetCleaningup();
     EXPECT_EQ(buf1->status(), BufferStatus::kCleanAfterFree);
@@ -277,7 +291,6 @@ TEST_F(BufferObjTest, test_status_clean) {
     // kFreed, kEphemeral -> kClean, kEphemeral
     buf1->SetCleaningup();
     EXPECT_EQ(buf1->status(), BufferStatus::kClean);
-
 
     /// kTemp
     // kClean, kEphemeral -> kLoaded, kTemp
@@ -311,7 +324,6 @@ TEST_F(BufferObjTest, test_status_clean) {
     // kFreed, kTemp -> kClean, kTemp
     buf1->SetCleaningup();
     EXPECT_EQ(buf1->status(), BufferStatus::kClean);
-
 
     /// kPersistent
     SaveBufferObj(buf1);
@@ -350,3 +362,85 @@ TEST_F(BufferObjTest, test_status_clean) {
     EXPECT_EQ(buf1->status(), BufferStatus::kClean);
 }
 
+TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
+    constexpr u64 kInsertN = 1024;
+    constexpr u64 kImportSize = 8192;
+
+    Storage *storage = InfinityContext::instance().storage();
+    EXPECT_NE(storage, nullptr);
+    EXPECT_EQ(storage->buffer_manager()->memory_limit(), (u64)8 * 8 * 1024);
+
+    TxnManager *txn_mgr = storage->txn_manager();
+    BufferManager *buffer_mgr = storage->buffer_manager();
+
+    auto db_name = MakeShared<String>("default");
+    auto table_name = MakeShared<String>("table1");
+    auto index_name = MakeShared<String>("idx1");
+    auto column_name = MakeShared<String>("col1");
+
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    {
+        HashSet<ConstraintType> constraints;
+        ColumnID column_id = 0;
+        column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
+    }
+    {
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+    {
+        for (SizeT i = 0; i < kInsertN; ++i) {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            Vector<SharedPtr<ColumnVector>> column_vectors;
+            SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
+            column_vector->Initialize();
+            for (u64 j = 0; j < kImportSize; ++j) {
+                Value v = Value::MakeBigInt(i * 1000 + j);
+                column_vector->AppendValue(v);
+            }
+            column_vectors.push_back(column_vector);
+            auto data_block = DataBlock::Make();
+            data_block->Init(column_vectors);
+
+            auto append_status = txn->Append(*db_name, *table_name, data_block);
+            ASSERT_TRUE(append_status.ok());
+
+            txn_mgr->CommitTxn(txn);
+        }
+    }
+    {
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+
+        EXPECT_EQ(table_entry->row_count(), kInsertN * kImportSize);
+        ASSERT_EQ(table_entry->segment_map().size(), 1ul);
+        {
+            auto &segment_entry = table_entry->segment_map().begin()->second;
+            EXPECT_EQ(segment_entry->row_count(), kInsertN * kImportSize);
+            ASSERT_EQ(segment_entry->block_entries().size(), kInsertN);
+            for (u64 i = 0; i < kInsertN; ++i) {
+                auto block_entry = segment_entry->GetBlockEntryByID(i);
+                EXPECT_EQ(block_entry->row_count(), kImportSize);
+                auto *col = block_entry->GetColumnBlockEntry(0);
+                auto column_vector = col->GetColumnVector(buffer_mgr);
+                for (u64 j = 0; j < kImportSize; ++j) {
+                    Value v1 = column_vector.GetValue(j);
+                    Value v2 = Value::MakeBigInt(i * 1000 + j);
+                    EXPECT_EQ(v1, v2);
+                }
+            }
+        }
+        txn_mgr->CommitTxn(txn);
+    }
+}
