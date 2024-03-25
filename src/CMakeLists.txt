@@ -231,6 +231,8 @@ add_executable(infinity
         ${network_cpp}
         network/http_server.cppm
         network/http_server.cpp
+        network/http/http_search.cppm
+        network/http/http_search.cpp
 )
 
 target_sources(infinity
