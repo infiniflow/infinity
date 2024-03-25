@@ -670,9 +670,9 @@ curl --request GET \
         "method": "rrf",
         "match":
         {
-            "fields": "title", 
-            "query": "rock fire",
-            "operator": "and"
+            "fields": "body", 
+            "query": "bloom",
+            "operator": "topn=1"
         }
         "knn":
         {

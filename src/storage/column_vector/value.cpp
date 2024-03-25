@@ -725,57 +725,133 @@ void Value::Reset() {
 
 String Value::ToString() const {
     switch (type_.type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             return value_.boolean ? "true" : "false";
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             return std::to_string(value_.tiny_int);
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             return std::to_string(value_.small_int);
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             return std::to_string(value_.integer);
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             return std::to_string(value_.big_int);
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             return value_.huge_int.ToString();
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             return std::to_string(value_.float32);
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             return std::to_string(value_.float64);
         }
-        case kDate: {
+        case LogicalType::kDate: {
             return value_.date.ToString();
         }
-        case kTime: {
+        case LogicalType::kTime: {
             return value_.time.ToString();
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             return value_.datetime.ToString();
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             return value_.timestamp.ToString();
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             return value_.interval.ToString();
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             return value_.row.ToString();
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             return value_info_->Get<StringValueInfo>().GetString();
+        }
+        case LogicalType::kEmbedding: {
+            EmbeddingInfo* embedding_info = static_cast<EmbeddingInfo*>(type_.type_info().get());
+            return value_info_->Get<EmbeddingValueInfo>().GetString(embedding_info);
         }
         default: {
             UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
         }
     }
-    return "";
+    return {};
 }
+
+String EmbeddingValueInfo::GetString(EmbeddingInfo* embedding_info) {
+    String res;
+    SizeT count = embedding_info->Dimension();
+    char* ptr = data_.data();
+    switch(embedding_info->Type()) {
+        case EmbeddingDataType::kElemBit: {
+            UnrecoverableError("Not implemented embedding data type: bit.");
+            break;
+        }
+        case EmbeddingDataType::kElemInt8: {
+            for(SizeT i = 0; i < count - 1; ++ i) {
+                i8 element = ((i8*)ptr)[i];
+                res += std::to_string(element) + ", ";
+            }
+            i8 element = ((i8*)ptr)[count - 1];
+            res += std::to_string(element);
+            break;
+        }
+        case EmbeddingDataType::kElemInt16: {
+            for(SizeT i = 0; i < count - 1; ++ i) {
+                i16 element = ((i16*)ptr)[i];
+                res += std::to_string(element) + ", ";
+            }
+            i16 element = ((i16*)ptr)[count - 1];
+            res += std::to_string(element);
+            break;
+        }
+        case EmbeddingDataType::kElemInt32: {
+            for(SizeT i = 0; i < count - 1; ++ i) {
+                i32 element = ((i32*)ptr)[i];
+                res += std::to_string(element) + ", ";
+            }
+            i32 element = ((i32*)ptr)[count - 1];
+            res += std::to_string(element);
+            break;
+        }
+        case EmbeddingDataType::kElemInt64: {
+            for(SizeT i = 0; i < count - 1; ++ i) {
+                i64 element = ((i64*)ptr)[i];
+                res += std::to_string(element) + ", ";
+            }
+            i64 element = ((i64*)ptr)[count - 1];
+            res += std::to_string(element);
+            break;
+        }
+        case EmbeddingDataType::kElemFloat: {
+            for(SizeT i = 0; i < count - 1; ++ i) {
+                f32 element = ((f32*)ptr)[i];
+                res += std::to_string(element) + ", ";
+            }
+            f32 element = ((f32*)ptr)[count - 1];
+            res += std::to_string(element);
+            break;
+        }
+        case EmbeddingDataType::kElemDouble: {
+            for(SizeT i = 0; i < count - 1; ++ i) {
+                f64 element = ((f64*)ptr)[i];
+                res += std::to_string(element) + ", ";
+            }
+            f64 element = ((f64*)ptr)[count - 1];
+            res += std::to_string(element);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not supported embedding data type.");
+            break;
+        }
+    }
+    return res;
+}
+
 
 } // namespace infinity

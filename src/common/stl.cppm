@@ -205,6 +205,8 @@ export namespace std {
     using std::function;
     using std::monostate;
     using std::thread;
+
+    using std::is_same_v;
 } // namespace std
 
 namespace infinity {

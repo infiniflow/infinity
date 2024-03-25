@@ -17,9 +17,11 @@ import pytest
 
 from common import common_values
 import infinity
+import infinity.index as index
+from infinity.errors import ErrorCode
+from infinity.common import ConflictType
 
 from utils import copy_data
-from infinity.common import ConflictType
 
 
 class TestKnn:
@@ -210,12 +212,13 @@ class TestKnn:
         table_obj.import_data(test_csv_dir, None)
         if embedding_data_type[1]:
             res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0], "ip",
-                                                        2).to_pl()
+                                                       2).to_pl()
             print(res)
         else:
             with pytest.raises(Exception, match="ERROR:3032*"):
-                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0], "ip",
-                                                        2).to_pl()
+                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                           "ip",
+                                                           2).to_pl()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -254,13 +257,15 @@ class TestKnn:
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if distance_type[1] and embedding_data_type[1]:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0], distance_type[0],
-                                                    2).to_pl()
+            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                       distance_type[0],
+                                                       2).to_pl()
             print(res)
         else:
             with pytest.raises(Exception, match="ERROR:3032*"):
-                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0], distance_type[0],
-                                                        2).to_pl()
+                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                           distance_type[0],
+                                                           2).to_pl()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -294,8 +299,116 @@ class TestKnn:
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if topn[1]:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "pl", topn[0]).to_pl()
+            res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
             print(res)
         else:
             with pytest.raises(Exception, match="ERROR:3014*"):
-                res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "pl", topn[0]).to_pl()
+                res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("index_column_name", ["gender_vector",
+                                                   "color_vector",
+                                                   "category_vector",
+                                                   "tag_vector",
+                                                   "other_vector"])
+    @pytest.mark.parametrize("knn_column_name", ["gender_vector",
+                                                 "color_vector",
+                                                 "category_vector",
+                                                 "tag_vector",
+                                                 "other_vector"])
+    @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    def test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
+                        index_distance_type, knn_distance_type):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_index", {
+            "variant_id": "varchar",
+            "gender_vector": "vector,4,float",
+            "color_vector": "vector,4,float",
+            "category_vector": "vector,4,float",
+            "tag_vector": "vector,4,float",
+            "other_vector": "vector,4,float",
+            "query_is_recommend": "varchar",
+            "query_gender": "varchar",
+            "query_color": "varchar",
+            "query_price": "float"
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("pysdk_test_knn.csv")
+        test_csv_dir = "/tmp/infinity/test_data/pysdk_test_knn.csv"
+        table_obj.import_data(test_csv_dir, None)
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo(index_column_name,
+                                                      index.IndexType.Hnsw,
+                                                      [
+                                                          index.InitParameter(
+                                                              "M", "16"),
+                                                          index.InitParameter(
+                                                              "ef_construction", "50"),
+                                                          index.InitParameter(
+                                                              "ef", "50"),
+                                                          index.InitParameter(
+                                                              "metric", index_distance_type)
+                                                      ])], ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["variant_id"]).knn(knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
+        print(res)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("index_column_name", ["gender_vector",
+                                                   "color_vector",
+                                                   "category_vector",
+                                                   "tag_vector",
+                                                   "other_vector"])
+    @pytest.mark.parametrize("knn_column_name", ["gender_vector",
+                                                 "color_vector",
+                                                 "category_vector",
+                                                 "tag_vector",
+                                                 "other_vector"])
+    @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    def test_with_index_after(self, get_infinity_db, check_data,
+                        index_column_name, knn_column_name,
+                        index_distance_type, knn_distance_type):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_index", {
+            "variant_id": "varchar",
+            "gender_vector": "vector,4,float",
+            "color_vector": "vector,4,float",
+            "category_vector": "vector,4,float",
+            "tag_vector": "vector,4,float",
+            "other_vector": "vector,4,float",
+            "query_is_recommend": "varchar",
+            "query_gender": "varchar",
+            "query_color": "varchar",
+            "query_price": "float"
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("pysdk_test_knn.csv")
+        test_csv_dir = "/tmp/infinity/test_data/pysdk_test_knn.csv"
+        table_obj.import_data(test_csv_dir, None)
+        res = table_obj.output(["variant_id"]).knn(knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
+        print(res)
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo(index_column_name,
+                                                      index.IndexType.Hnsw,
+                                                      [
+                                                          index.InitParameter(
+                                                              "M", "16"),
+                                                          index.InitParameter(
+                                                              "ef_construction", "50"),
+                                                          index.InitParameter(
+                                                              "ef", "50"),
+                                                          index.InitParameter(
+                                                              "metric", index_distance_type)
+                                                      ])], ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+
