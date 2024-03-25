@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-
+from common import ConflictType
 
 class Database(ABC):
 
@@ -22,7 +22,7 @@ class Database(ABC):
         pass  # implement create table logic here
 
     @abstractmethod
-    def drop_table(self, table_name, if_exists=True):
+    def drop_table(self, table_name, conflict_type: ConflictType = ConflictType.Error):
         pass  # implement drop table logic here
 
     @abstractmethod

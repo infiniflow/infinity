@@ -27,10 +27,11 @@ Note that pypi allow a version of a package [be uploaded only once](https://pypi
 ```python
 import infinity
 from infinity.common import REMOTE_HOST
+from infinity.common import ConflictType
 
 infinity_obj = infinity.connect(REMOTE_HOST)
 db = infinity_obj.get_database("default")
-db.drop_table("my_table", if_exists=True)
+db.drop_table("my_table", ConflictType.Ignore)
 table = db.create_table(
     "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
 table.insert(
