@@ -38,7 +38,6 @@ import index_file_worker;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
-import fulltext_file_worker;
 import embedding_info;
 import block_entry;
 import segment_entry;
@@ -101,6 +100,15 @@ SharedPtr<TableIndexEntry> TableIndexEntry::ReplayTableIndexEntry(TableIndexMeta
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_entry_dir, txn_id, begin_ts);
     table_index_entry->commit_ts_.store(commit_ts);
     return table_index_entry;
+}
+
+Map<SegmentID, SharedPtr<SegmentIndexEntry>> TableIndexEntry::GetIndexBySegmentSnapshot() {
+    std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_snapshot;
+    for (const auto &[segment_id, segment_index_entry] : this->index_by_segment_) {
+        index_by_segment_snapshot.emplace(segment_id, segment_index_entry);
+    }
+    return index_by_segment_snapshot;
 }
 
 bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
@@ -320,6 +328,10 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
     // reference file_worker will be invalidated when vector_file_worker is resized
     const auto *index_base = param->index_base_;
     const auto *column_def = param->column_def_;
+    if (index_base->index_type_ == IndexType::kFullText) {
+        // fulltext doesn't use BufferManager
+        return vector_file_worker;
+    }
 
     auto file_name = MakeShared<String>(IndexFileName(segment_id));
     vector_file_worker.resize(1);
@@ -349,7 +361,7 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
             break;
         }
         case IndexType::kFullText: {
-            file_worker = MakeUnique<FullTextColumnLengthFileWorker>(this->index_dir(), file_name, index_base, column_def);
+            // fulltext doesn't use BufferManager
             break;
         }
         case IndexType::kSecondary: {

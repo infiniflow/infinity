@@ -92,6 +92,7 @@ public:
 
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot();
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
 

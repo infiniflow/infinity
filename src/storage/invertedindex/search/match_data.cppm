@@ -21,7 +21,6 @@ import third_party;
 import index_defines;
 import column_length_io;
 import internal_types;
-import table_entry;
 
 namespace infinity {
 export struct TermColumnMatchData {
@@ -31,17 +30,15 @@ export struct TermColumnMatchData {
 };
 
 class TermDocIterator;
+struct IndexReader;
+
 export class Scorer {
 public:
-    Scorer(u64 num_of_docs);
-
-    ~Scorer() = default;
+    void Init(u64 num_of_docs) { total_df_ = num_of_docs; }
 
     void AddDocIterator(TermDocIterator *iter, u64 column_id);
 
-    void LoadColumnLength(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
-
-    void UpdateTargetSegment(SegmentID segment_id) { column_length_reader_->UpdateTargetSegment(segment_id); }
+    void LoadColumnLength(RowID first_doc_id, IndexReader &index_reader);
 
     float Score(RowID doc_id);
 
@@ -52,16 +49,13 @@ private:
         inline u64 operator()(const u64 &val) const { return val; }
     };
 
-    u64 total_df_;
+    u64 total_df_{0};
     u32 column_counter_{0};
     FlatHashMap<u64, u32, Hash> column_index_map_;
     Vector<u64> column_ids_;
     Vector<Vector<TermDocIterator *>> iterators_;
     Vector<float> avg_column_length_;
-    UniquePtr<ColumnLengthReader> column_length_reader_;
-
-public:
-    using ColumnIndexMapType = decltype(column_index_map_);
+    ColumnLengthReader column_length_reader_;
 };
 
 } // namespace infinity
