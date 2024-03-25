@@ -44,7 +44,7 @@ import create_index_info;
 import statement_common;
 import extra_ddl_info;
 import update_statement;
-import http_select;
+import http_search;
 
 namespace {
 
@@ -175,7 +175,6 @@ public:
                     json_res["res"].push_back(json_database);
                 }
                 for (auto &element : json_res["res"]) {
-                    ;
                     json_response[element["name"]] = element["value"];
                 }
             }
@@ -1128,7 +1127,7 @@ public:
         nlohmann::json json_response;
         HTTPStatus http_status;
 
-        HTTPSelect::Process(database_name, table_name, data_body, http_status, json_response);
+        HTTPSelect::Process(infinity.get(), database_name, table_name, data_body, http_status, json_response);
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -1378,7 +1377,7 @@ void HTTPServer::Start(u16 port) {
     router->route("PUT", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<UpdateHandler>());
 
     // DQL
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<UpdateHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<SelectHandler>());
 
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());

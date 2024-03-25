@@ -14,7 +14,7 @@
 
 module;
 
-export module http_select;
+export module http_search;
 
 import stl;
 import status;
@@ -22,12 +22,13 @@ import third_party;
 import parsed_expr;
 import knn_expr;
 import match_expr;
+import infinity;
 
 namespace infinity {
 
 export class HTTPSelect {
 public:
-    static void Process(const String &db_name, const String &table_name, const String &input_json, HTTPStatus &http_status, nlohmann::json &response);
+    static void Process(Infinity* infinity_ptr,const String &db_name, const String &table_name, const String &input_json, HTTPStatus &http_status, nlohmann::json &response);
 
     static ParsedExpr *ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);

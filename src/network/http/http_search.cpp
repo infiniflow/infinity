@@ -16,7 +16,7 @@ module;
 
 #include <string>
 
-module http_select;
+module http_search;
 
 import stl;
 import third_party;
@@ -28,10 +28,14 @@ import defer_op;
 import expr_parser;
 import expression_parser_result;
 import statement_common;
+import query_result;
+import data_block;
+import value;
 
 namespace infinity {
 
-void HTTPSelect::Process(const String &db_name,
+void HTTPSelect::Process(Infinity* infinity_ptr,
+                         const String &db_name,
                          const String &table_name,
                          const String &input_json_str,
                          HTTPStatus &http_status,
@@ -141,7 +145,36 @@ void HTTPSelect::Process(const String &db_name,
             }
         }
 
-        //        const auto &update_clause = input_json["update"];
+        const QueryResult result = infinity_ptr->Search(db_name, table_name, nullptr, filter, output_columns);
+
+        output_columns = nullptr;
+        filter = nullptr;
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_result_row;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        const String &column_value = value.ToString();
+                        json_result_row[column_name] = column_value;
+                    }
+                    response["output"].push_back(json_result_row);
+                }
+            }
+
+            response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            response["error_code"] = result.ErrorCode();
+            response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
     } catch (nlohmann::json::exception &e) {
         response["error_code"] = ErrorCode::kInvalidJsonFormat;
         response["error_message"] = e.what();
@@ -160,12 +193,14 @@ ParsedExpr *HTTPSelect::ParseFilter(const nlohmann::json &json_object, HTTPStatu
         return nullptr;
     }
 
-    return expr_parsed_result->exprs_ptr_->at(0);
+    ParsedExpr *res = expr_parsed_result->exprs_ptr_->at(0);
+    expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+    return res;
 }
 
 Vector<ParsedExpr *> *HTTPSelect::ParseOutput(const nlohmann::json &output_list, HTTPStatus &http_status, nlohmann::json &response) {
 
-    Vector<ParsedExpr *> *output_columns{nullptr};
+    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr*>();
     DeferFn defer_fn([&]() {
         if (output_columns != nullptr) {
             for (auto &expr : *output_columns) {
@@ -176,6 +211,7 @@ Vector<ParsedExpr *> *HTTPSelect::ParseOutput(const nlohmann::json &output_list,
         }
     });
 
+    output_columns->reserve(output_list.size());
     for (const auto &output_expr_str : output_list) {
         if (!output_expr_str.is_string()) {
             response["error_code"] = ErrorCode::kInvalidExpression;
