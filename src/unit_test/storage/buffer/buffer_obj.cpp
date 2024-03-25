@@ -270,11 +270,11 @@ TEST_F(BufferObjTest, test_status_clean) {
     // kLoaded, kEphemeral -> kUnloaded, kEphemeral
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
 
-    // kUnloaded, kEphemeral -> kCleanAfterFree, kEphemeral
-    buf1->SetCleaningup();
-    EXPECT_EQ(buf1->status(), BufferStatus::kCleanAfterFree);
+    // kUnloaded, kEphemeral -> kClean, kEphemeral
+    buf1->SetAndTryCleanup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
 
-    // kCleanAfterFree, kEphemeral -> kLoaded, kEphemeral
+    // kClean, kEphemeral -> kLoaded, kEphemeral
     {
         auto handle1 = buf1->Load();
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
@@ -288,12 +288,25 @@ TEST_F(BufferObjTest, test_status_clean) {
     // kUnloaded, kEphemeral -> kFreed, kEphemeral
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
-    // kFreed, kEphemeral -> kClean, kEphemeral
-    buf1->SetCleaningup();
-    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
+    // kFreed, kEphemeral -> kNew, kEphemeral
+    buf1->SetAndTryCleanup();
+    auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+    buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
+    EXPECT_EQ(buf1->status(), BufferStatus::kNew);
+
+    {
+        auto handle1 = buf1->Load();
+        // kNew, kEphemeral -> kLoaded, kEphemeral
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+    }
+    // kLoaded, kEphemeral -> kUnloaded, kEphemeral
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+    { auto handle2 = buf2->Load(); }
+    // kUnloaded, kEphemeral -> kFreed, kEphemeral
+    EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
     /// kTemp
-    // kClean, kEphemeral -> kLoaded, kTemp
+    // kFreed, kEphemeral -> kLoaded, kTemp
     {
         auto handle1 = buf1->Load();
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
@@ -303,11 +316,11 @@ TEST_F(BufferObjTest, test_status_clean) {
     // kLoaded, kTemp -> kUnloaded, kTemp
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
 
-    // kUnloaded, kTemp -> kCleanAfterFree, kTemp
-    buf1->SetCleaningup();
-    EXPECT_EQ(buf1->status(), BufferStatus::kCleanAfterFree);
+    // kUnloaded, kTemp -> kClean, kTemp
+    buf1->SetAndTryCleanup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
 
-    // kCleanAfterFree, kTemp -> kLoaded, kTemp
+    // kClean, kTemp -> kLoaded, kTemp
     {
         auto handle1 = buf1->Load();
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
@@ -321,29 +334,36 @@ TEST_F(BufferObjTest, test_status_clean) {
     // kUnloaded, kTemp -> kFreed, kTemp
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
-    // kFreed, kTemp -> kClean, kTemp
-    buf1->SetCleaningup();
-    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
+    // kFreed, kTemp -> kNew, kTemp
+    buf1->SetAndTryCleanup();
+    auto file_worker1_new2 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+    buf1 = buffer_manager.Allocate(std::move(file_worker1_new2));
+    EXPECT_EQ(buf1->status(), BufferStatus::kNew);
+
+    {
+        auto handle1 = buf1->Load();
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+    }
 
     /// kPersistent
     SaveBufferObj(buf1);
-    // kClean, kTemp -> kClean, kPersistent
+    // kNew, kTemp -> kNew, kPersistent
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
 
     {
         auto handle1 = buf1->Load();
-        // kClean, kPersistent -> kLoaded, kPersistent
+        // kNew, kPersistent -> kLoaded, kPersistent
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
     }
 
     // kLoaded, kPersistent -> kUnloaded, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
 
-    // kUnloaded, kPersistent -> kCleanAfterFree, kPersistent
-    buf1->SetCleaningup();
-    EXPECT_EQ(buf1->status(), BufferStatus::kCleanAfterFree);
+    // kUnloaded, kPersistent -> kClean, kPersistent
+    buf1->SetAndTryCleanup();
+    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
 
-    // kCleanAfterFree, kPersistent -> kLoaded, kPersistent
+    // kClean, kPersistent -> kLoaded, kPersistent
     {
         auto handle1 = buf1->Load();
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
@@ -358,8 +378,10 @@ TEST_F(BufferObjTest, test_status_clean) {
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
     // kFreed, kPersistent -> kClean, kPersistent
-    buf1->SetCleaningup();
-    EXPECT_EQ(buf1->status(), BufferStatus::kClean);
+    buf1->SetAndTryCleanup();
+    auto file_worker1_new3 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+    buf1 = buffer_manager.Allocate(std::move(file_worker1_new3));
+    EXPECT_EQ(buf1->status(), BufferStatus::kNew);
 }
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {

@@ -28,7 +28,6 @@ export enum class BufferStatus {
     kLoaded,
     kUnloaded,
     kFreed,
-    kCleanAfterFree,
     kClean,
     kNew,
 };
@@ -64,18 +63,13 @@ public:
 
     void CloseFile();
 
-    void SetCleaningup();
+    void SetAndTryCleanup();
 
     void TryCleanup(bool force_cleanup);
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
-
-    void SetWaitForGC(bool wait_for_gc) {
-        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        wait_for_gc_ = wait_for_gc;
-    }
 
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.
@@ -92,7 +86,10 @@ private:
 
 public:
     // interface for unit test
-    BufferStatus status() { return status_; }
+    BufferStatus status() {
+        std::shared_lock<std::shared_mutex> w_locker(rw_locker_);
+        return status_;
+    }
     BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
 

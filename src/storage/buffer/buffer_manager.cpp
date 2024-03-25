@@ -86,13 +86,8 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
         BufferObj *buffer_obj1 = nullptr;
         if (gc_queue_.TryDequeue(buffer_obj1)) {
             if (buffer_obj == buffer_obj1) {
-                if (buffer_obj1->status() != BufferStatus::kFreed) {
-                    UnrecoverableError("buffer object status isn't freed");
-                }
-                // prevent deadlock
-                continue;
+                UnrecoverableError("buffer object duplicated in gc_queue.");
             }
-            buffer_obj1->SetWaitForGC(false);
             if (buffer_obj1->Free()) {
                 current_memory_size_ -= buffer_obj1->GetBufferSize();
             }

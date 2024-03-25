@@ -581,7 +581,7 @@ void SegmentIndexEntry::Cleanup() {
             UnrecoverableError("vector_buffer should not has nullptr.");
         }
         // here need to force cleanup, otherwise will cause error when shutdown service.
-        buffer_obj->SetCleaningup();
+        buffer_obj->SetAndTryCleanup();
         buffer_obj->TryCleanup(true);
     }
 }
