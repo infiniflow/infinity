@@ -14,11 +14,10 @@
 
 module;
 
-#include "type/complex/row_id.h"
-
 export module segment_index_entry;
 
 import stl;
+import internal_types;
 import buffer_handle;
 import third_party;
 import buffer_obj;
@@ -30,15 +29,13 @@ import column_def;
 import meta_entry_interface;
 import cleanup_scanner;
 import memory_indexer;
-import column_vector;
-import block_entry;
 
 namespace infinity {
 
 class Txn;
-class TableIndexEntry;
+struct TableIndexEntry;
+struct BlockEntry;
 struct TableEntry;
-class FaissIndexPtr;
 class BufferManager;
 struct SegmentEntry;
 
@@ -108,13 +105,29 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def);
 
+    Tuple<Vector<String>, Vector<RowID>, MemoryIndexer *> GetFullTextIndexSnapshot() {
+        std::shared_lock lock(rw_locker_);
+        return {ft_base_names_, ft_base_rowids_, memory_indexer_.get()};
+    }
+    Pair<u64, u32> GetFulltextColumnLenInfo() {
+        std::shared_lock lock(rw_locker_);
+        return {ft_column_len_sum_, ft_column_len_cnt_};
+    }
+    void UpdateFulltextColumnLenInfo(u64 column_len_sum, u32 column_len_cnt) {
+        std::unique_lock lock(rw_locker_);
+        ft_column_len_sum_ += column_len_sum;
+        ft_column_len_cnt_ += column_len_cnt;
+    }
+
+public:
+    // only for unittest
     Vector<String> &GetFulltextBaseNames() { return ft_base_names_; }
     Vector<RowID> &GetFulltextBaseRowIDs() { return ft_base_rowids_; }
-    MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
+    void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
+    static SharedPtr<SegmentIndexEntry> CreateFakeEntry();
 
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
-    void UpdateIndex(TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
     // Load from disk. Is called by SegmentIndexEntry::Deserialize.
     static UniquePtr<SegmentIndexEntry>
     LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
@@ -134,6 +147,9 @@ private:
     Vector<String> ft_base_names_{};
     Vector<RowID> ft_base_rowids_{};
     UniquePtr<MemoryIndexer> memory_indexer_{};
+
+    u64 ft_column_len_sum_{}; // increase only
+    u32 ft_column_len_cnt_{}; // increase only
 };
 
 } // namespace infinity

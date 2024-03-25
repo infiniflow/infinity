@@ -23,6 +23,7 @@ import posting_iterator;
 import index_defines;
 import memory_indexer;
 import internal_types;
+import segment_index_entry;
 
 export module column_index_reader;
 
@@ -33,19 +34,24 @@ public:
     ColumnIndexReader();
     virtual ~ColumnIndexReader() = default;
 
-    void Open(const String &index_dir,
-              const Vector<String> &base_names,
-              const Vector<RowID> &base_rowids,
-              optionflag_t flag,
-              MemoryIndexer *memory_indexer);
+    void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
     UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
 
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
 
+    float GetAvgColumnLength() const;
+
 private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_;
+
+public:
+    // for loading column length files
+    String index_dir_;
+    Vector<String> base_names_;
+    Vector<RowID> base_row_ids_;
 };
 
 namespace detail {

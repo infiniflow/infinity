@@ -19,56 +19,77 @@ export module column_length_io;
 import stl;
 import index_defines;
 import internal_types;
-import default_values;
-import table_entry;
-import buffer_handle;
-import fulltext_file_worker;
-import third_party;
-import infinity_exception;
 
 namespace infinity {
+class SegmentIndexEntry;
+class IndexReader;
+class FileSystem;
+class FileHandler;
 
-export class ColumnLengthWriter {};
+// write array of u32 to file
+// multiple threads will write to different offsets of the file at different times
+export class FullTextColumnLengthFileHandler {
+public:
+    FullTextColumnLengthFileHandler(UniquePtr<FileSystem> file_system, const String &path, SegmentIndexEntry *segment_index_entry);
+    ~FullTextColumnLengthFileHandler();
+    void WriteColumnLength(const u32 *column_length_array, u32 column_length_count, u32 start_from_offset);
+
+private:
+    std::mutex mutex_;
+    UniquePtr<FileSystem> file_system_;
+    UniquePtr<FileHandler> file_handler_;
+    SegmentIndexEntry *segment_index_entry_;
+};
+
+export class FullTextColumnLengthUpdateJob {
+public:
+    FullTextColumnLengthUpdateJob(SharedPtr<FullTextColumnLengthFileHandler> file_handler, u32 column_length_count, u32 start_from_offset);
+    u32 *GetColumnLengthArray() { return column_length_array_.get(); }
+    void DumpToFile();
+
+private:
+    SharedPtr<FullTextColumnLengthFileHandler> file_handler_;
+    UniquePtr<u32[]> column_length_array_;
+    u32 column_length_count_;
+    u32 start_from_offset_;
+};
+
+export class FullTextColumnLengthReader {
+public:
+    FullTextColumnLengthReader(UniquePtr<FileSystem> file_system,
+                               const String &index_dir,
+                               const Vector<String> &base_names,
+                               const Vector<RowID> &base_row_ids);
+
+    inline u32 GetColumnLength(RowID row_id) {
+        // assume that there is a file which contains row_id
+        if (row_id >= next_base_rowid_) [[unlikely]] {
+            SeekFile(row_id);
+        }
+        return column_length_array_[row_id - current_base_rowid_];
+    }
+
+    void SeekFile(RowID row_id);
+
+private:
+    UniquePtr<FileSystem> file_system_;
+    const String &index_dir_;
+    const Vector<String> &base_names_;
+    const Vector<RowID> &base_row_ids_; // must in ascending order, have an INVALID_ROWID at the end
+    RowID current_base_rowid_ = INVALID_ROWID;
+    RowID next_base_rowid_ = INVALID_ROWID;
+    u32 next_base_rowid_index_ = 1;
+    UniquePtr<u32[]> column_length_array_;
+    u32 column_length_array_capacity_ = 0;
+};
 
 export class ColumnLengthReader {
-    struct Hash {
-        inline SegmentID operator()(const SegmentID &val) const { return val; }
-    };
-    u32 column_counter_{};
-    // all available data in the table
-    FlatHashMap<SegmentID, Vector<BufferHandle>, Hash> column_length_data_buffer_handles_;
-    Vector<const u32 *> column_length_vector_;
+    Vector<FullTextColumnLengthReader> column_length_vector_;
 
 public:
-    ColumnLengthReader() = default;
-    ~ColumnLengthReader() = default;
+    void LoadColumnLength(RowID first_doc_id, IndexReader &index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length);
 
-    template <typename ScorerColumnIndexMapType>
-    void LoadColumnLength(u32 column_counter,
-                          ScorerColumnIndexMapType &column_index_map,
-                          TableEntry *table_entry,
-                          TransactionID txn_id,
-                          TxnTimeStamp begin_ts);
-
-    void UpdateAvgColumnLength(Vector<float> &avg_column_length) const;
-
-    inline void UpdateTargetSegment(SegmentID segment_id) {
-        if (auto iter = column_length_data_buffer_handles_.find(segment_id); iter != column_length_data_buffer_handles_.end()) [[likely]] {
-            const Vector<BufferHandle> &buffer_handles = iter->second;
-            for (u32 i = 0; i < column_counter_; ++i) {
-                const auto *column_length_data = static_cast<const FullTextColumnLengthData *>(buffer_handles[i].GetData());
-                column_length_vector_[i] = column_length_data->column_length_.data();
-            }
-        } else {
-            UnrecoverableError(fmt::format("Segment {} is not found in column length data", segment_id));
-        }
-    }
-
-    inline u32 GetColumnLength(u32 scorer_column_idx, SegmentOffset segment_offset) const {
-        // TODO yzc: adapt for realtime index
-        // return column_length_vector_[scorer_column_idx][segment_offset];
-        return 100UL;
-    }
+    inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx].GetColumnLength(row_id); }
 };
 
 } // namespace infinity

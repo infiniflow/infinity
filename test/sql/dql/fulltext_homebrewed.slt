@@ -19,7 +19,7 @@ CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(HOMEBREWED=1);
 query TTI
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 24.278290
+Anarchism 30-APR-2012 03:25:17.000 0 21.669640
 
 # copy data from csv file
 query I
@@ -29,8 +29,20 @@ COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' )
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 25.303307
-Anarchism 30-APR-2012 03:25:17.000 4294967296 25.303307
+Anarchism 30-APR-2012 03:25:17.000 0 22.584518
+Anarchism 30-APR-2012 03:25:17.000 4294967296 22.584518
+
+# copy data from csv file
+query I
+COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+----
+
+query III
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
+----
+Anarchism 30-APR-2012 03:25:17.000 4294967296 22.931860
+Anarchism 30-APR-2012 03:25:17.000 8589934592 22.931860
+Anarchism 30-APR-2012 03:25:17.000 0 22.931860
 
 # Clean up
 statement ok

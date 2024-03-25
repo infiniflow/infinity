@@ -30,24 +30,38 @@ import memory_indexer;
 import dict_reader;
 import posting_list_format;
 import internal_types;
+import segment_index_entry;
+import infinity_exception;
 
 namespace infinity {
 ColumnIndexReader::ColumnIndexReader() {}
 
-void ColumnIndexReader::Open(const String &index_dir,
-                             const Vector<String> &base_names,
-                             const Vector<RowID> &base_rowids,
-                             optionflag_t flag,
-                             MemoryIndexer *memory_indexer) {
+void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment) {
     flag_ = flag;
-    for (SizeT i = 0; i < base_names.size(); i++) {
-        SharedPtr<DiskIndexSegmentReader> segment_reader = MakeShared<DiskIndexSegmentReader>(index_dir, base_names[i], base_rowids[i], flag);
-        segment_readers_.push_back(segment_reader);
+    index_dir_ = std::move(index_dir);
+    index_by_segment_ = std::move(index_by_segment);
+    // need to ensure that segment_id is in ascending order
+    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        auto [base_names, base_row_ids, memory_indexer] = segment_index_entry->GetFullTextIndexSnapshot();
+        // segment_readers
+        for (u32 i = 0; i < base_names.size(); ++i) {
+            SharedPtr<DiskIndexSegmentReader> segment_reader = MakeShared<DiskIndexSegmentReader>(index_dir_, base_names[i], base_row_ids[i], flag);
+            segment_readers_.push_back(std::move(segment_reader));
+        }
+        // for loading column length files
+        base_names_.insert(base_names_.end(), std::move_iterator(base_names.begin()), std::move_iterator(base_names.end()));
+        base_row_ids_.insert(base_row_ids_.end(), base_row_ids.begin(), base_row_ids.end());
+        if (memory_indexer and memory_indexer->GetDocCount() != 0) {
+            // segment_reader
+            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(memory_indexer);
+            segment_readers_.push_back(std::move(segment_reader));
+            // for loading column length file
+            base_names_.push_back(memory_indexer->GetBaseName());
+            base_row_ids_.push_back(memory_indexer->GetBaseRowId());
+        }
     }
-    if (memory_indexer != nullptr && memory_indexer->GetDocCount() != 0) {
-        SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(memory_indexer);
-        segment_readers_.push_back(segment_reader);
-    }
+    // put an INVALID_ROWID at the end of base_row_ids_
+    base_row_ids_.emplace_back(INVALID_ROWID);
 }
 
 UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {
@@ -65,6 +79,20 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryP
     u32 state_pool_size = 0; // TODO
     iter->Init(seg_postings, state_pool_size);
     return iter;
+}
+
+float ColumnIndexReader::GetAvgColumnLength() const {
+    u64 column_len_sum = 0;
+    u32 column_len_cnt = 0;
+    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        auto [sum, cnt] = segment_index_entry->GetFulltextColumnLenInfo();
+        column_len_sum += sum;
+        column_len_cnt += cnt;
+    }
+    if (column_len_cnt == 0) {
+        UnrecoverableError("column_len_cnt is 0");
+    }
+    return static_cast<float>(column_len_sum) / column_len_cnt;
 }
 
 } // namespace infinity
