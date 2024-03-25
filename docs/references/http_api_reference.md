@@ -618,11 +618,11 @@ curl --request PUT \
     --header 'content-type: application/json' \
     --data ' \
 {
-    update:
+    "update":
     {
         "score": 95
     },
-    filter: "age > 15"
+    "filter": "age > 15"
 } '
 ```
 
@@ -646,9 +646,9 @@ curl --request PUT \
 }
 ```
 
-## Select
+## Search
 
-Selects data from a specified table.
+Search data from a specified table.
 
 #### Request
 
@@ -659,43 +659,29 @@ curl --request GET \
     --header 'content-type: application/json' \
     --data ' \
 {
-    output:
+    "output":
     [
         "name",
         "age"
     ],
-    filter: "age > 15",
-    fusion: 
+    "filter": "age > 15",
+    "fusion": 
     {
-        method: "rrf",
-        match:
+        "method": "rrf",
+        "match":
         {
-            "title": 
-            {
-                "query": "rock fire",
-                "operator": "and"
-            }
+            "fields": "title", 
+            "query": "rock fire",
+            "operator": "and"
         }
-        knn:
+        "knn":
         {
-            "vector_column":
-            {
-                "query_vector": [1.0, 2.0],
-                "ef" : 150,
-                "top_k": 3
-            }
+            "fields": "vector_column",
+            "query_vector": [1.0, 2.0],
+            "ef" : "150",
+            "top_k": 3,
+            "metric_type": L2
         }
-    }
-    knn: 
-    {
-        vector: 
-        [
-            0.1,
-            0.2,
-            0.3,
-            0.4,
-        ],
-        top: 1
     }
 } '
 ```

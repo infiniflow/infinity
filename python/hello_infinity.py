@@ -16,23 +16,21 @@ import json
 import infinity
 import infinity.index as index
 from infinity.common import REMOTE_HOST
+from infinity.common import ConflictType
 import pandas as pds
 
 
 def main():
     infinity_obj = infinity.connect(REMOTE_HOST)
     db = infinity_obj.get_database("default")
-    db.drop_table("my_table", if_exists=True)
-    table = db.create_table(
-        "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
-    table.insert(
-        [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
-    table.insert(
-        [{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
-    table.insert(
-        [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
+    # Drop my_table if it already exists
+    db.drop_table("my_table", ConflictType.Ignore)
+    # Create a table named "my_table"
+    table = db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+    table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+    table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
 
-    res = table.output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
+    res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
     print(res)
 
 
@@ -41,21 +39,18 @@ def test():
         infinity_obj = infinity.connect(REMOTE_HOST)
         db = infinity_obj.get_database("default")
         # Drop my_table if it already exists
-        db.drop_table("my_table", if_exists=True)
+        db.drop_table("my_table", ConflictType.Ignore)
         # Create a table named "my_table"
-        table = db.create_table("my_table", {
-            "num": "integer", "body": "varchar", "vec": "vector, 4, float"}, None)
-        table.insert(
-            [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-        table.insert(
-            [{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+        table = db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+        table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+        table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
 
         # `create_index()` is required before match() or fusion()
-        # res = table.create_index("my_index",
-        #                          [index.IndexInfo("body",
-        #                                           index.IndexType.FullText,
-        #                                           [index.InitParameter("ANALYZER", "segmentation")]),
-        #                           ], None)
+        res = table.create_index("my_index",
+                                 [index.IndexInfo("body",
+                                                  index.IndexType.FullText,
+                                                  [index.InitParameter("ANALYZER", "segmentation")]),
+                                  ], ConflictType.Error)
         # assert res.success
 
         res = table.output(["num", "body"]).knn(
@@ -97,5 +92,5 @@ def test():
 
 
 if __name__ == '__main__':
-    # main()
+    main()
     test()
