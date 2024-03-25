@@ -47,9 +47,6 @@ namespace infinity {
 Storage::Storage(const Config *config_ptr) : config_ptr_(config_ptr) {}
 
 void Storage::Init() {
-    // Check the data dir to get latest catalog file.
-    String catalog_dir = String(*config_ptr_->data_dir()) + "/" + String(CATALOG_FILE_DIR);
-
     // Construct buffer manager
     buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->buffer_pool_size(), config_ptr_->data_dir(), config_ptr_->temp_dir());
 
@@ -151,12 +148,13 @@ void Storage::AttachCatalog(const Vector<String> &catalog_files) {
 
 void Storage::InitNewCatalog() {
     LOG_INFO("Init new catalog");
-    String catalog_dir = String(*config_ptr_->data_dir()) + "/" + String(CATALOG_FILE_DIR);
+    auto data_dir = config_ptr_->data_dir();
+    auto catalog_dir = config_ptr_->catalog_dir();
     LocalFileSystem fs;
-    if (!fs.Exists(catalog_dir)) {
-        fs.CreateDirectory(catalog_dir);
+    if (!fs.Exists(*catalog_dir)) {
+        fs.CreateDirectory(*catalog_dir);
     }
-    new_catalog_ = Catalog::NewCatalog(MakeShared<String>(catalog_dir), true);
+    new_catalog_ = Catalog::NewCatalog(std::move(data_dir), std::move(catalog_dir), true);
 }
 
 } // namespace infinity

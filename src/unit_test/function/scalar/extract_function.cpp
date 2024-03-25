@@ -44,7 +44,7 @@ class ExtractFunctionTest : public BaseTest {};
 TEST_F(ExtractFunctionTest, extract_year_test) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr, nullptr);
 
     RegisterExtractFunction(catalog_ptr);
 

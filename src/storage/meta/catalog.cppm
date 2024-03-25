@@ -101,7 +101,7 @@ class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
 export struct Catalog {
 public:
-    explicit Catalog(SharedPtr<String> dir);
+    Catalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir);
 
     ~Catalog();
 
@@ -239,7 +239,7 @@ public:
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 
-    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> dir, bool create_default_db);
+    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir, bool create_default_db);
 
     static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
@@ -263,10 +263,13 @@ public:
     const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() { return history.GetElements(); }
 
 public:
-    const SharedPtr<String> DataDir() const;
+    const SharedPtr<String> &DataDir() const { return data_dir_; }
+
+    const SharedPtr<String> &CatalogDir() const { return catalog_dir_; }
 
 public:
-    SharedPtr<String> current_dir_{nullptr};
+    SharedPtr<String> data_dir_{};
+    SharedPtr<String> catalog_dir_{};
 
     MetaMap<DBMeta> db_meta_map_{};
 

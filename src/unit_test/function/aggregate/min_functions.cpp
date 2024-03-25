@@ -41,7 +41,7 @@ class MinFunctionTest : public BaseTest {};
 TEST_F(MinFunctionTest, min_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr, nullptr);
 
     RegisterMinFunction(catalog_ptr);
 

@@ -82,6 +82,8 @@ public:
     [[nodiscard]] inline LogLevel log_level() const { return system_option_.log_level; }
 
     // Storage
+    [[nodiscard]] inline SharedPtr<String> catalog_dir() const { return system_option_.catalog_dir; }
+
     [[nodiscard]] inline SharedPtr<String> data_dir() const { return system_option_.data_dir; }
 
     [[nodiscard]] inline u64 default_row_size() const { return system_option_.default_row_size; }
@@ -115,7 +117,7 @@ public:
     // Resource
     [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
 
-    [[nodiscard]] inline std::chrono::seconds cleanup_interval() const { return system_option_.cleanup_interval_;}
+    [[nodiscard]] inline std::chrono::seconds cleanup_interval() const { return system_option_.cleanup_interval_; }
 
     [[nodiscard]] inline bool enable_compaction() const { return system_option_.enable_compaction_; }
 

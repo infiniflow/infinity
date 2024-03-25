@@ -43,7 +43,7 @@ class ModuloFunctionsTest : public BaseTest {};
 TEST_F(ModuloFunctionsTest, mod_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr, nullptr);
 
     RegisterModuloFunction(catalog_ptr);
 

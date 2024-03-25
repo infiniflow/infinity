@@ -56,7 +56,8 @@ import segment_index_entry;
 namespace infinity {
 
 // TODO Consider letting it commit as a transaction.
-Catalog::Catalog(SharedPtr<String> dir) : current_dir_(std::move(dir)), running_(true) {
+Catalog::Catalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir)
+    : data_dir_(std::move(data_dir)), catalog_dir_(std::move(catalog_dir)), running_(true) {
     mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
 }
 
@@ -78,12 +79,7 @@ void Catalog::SetTxnMgr(TxnManager *txn_mgr) { txn_mgr_ = txn_mgr; }
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
 Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    auto init_db_meta = [&]() {
-        // Not find the db and create new db meta
-        auto db_dir = this->DataDir();
-        // Physical wal log
-        return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
-    };
+    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(data_dir_, MakeShared<String>(db_name)); };
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
     auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta));
     return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
@@ -396,7 +392,8 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     Vector<DBMeta *> databases;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["current_dir"] = *this->current_dir_;
+        json_res["data_dir"] = *this->data_dir_;
+        json_res["catalog_dir"] = *this->catalog_dir_;
         json_res["next_txn_id"] = this->next_txn_id_;
         json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
         json_res["catalog_version"] = this->catalog_version_;
@@ -412,11 +409,10 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     return json_res;
 }
 
-UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) {
-    auto catalog = MakeUnique<Catalog>(dir);
+UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir, bool create_default_db) {
+    auto catalog = MakeUnique<Catalog>(data_dir, std::move(catalog_dir));
     if (create_default_db) {
         // db current dir is same level as catalog
-        auto data_dir = catalog->DataDir();
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
         SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
@@ -429,7 +425,7 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_defaul
 }
 
 UniquePtr<Catalog> Catalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
-    auto catalog = MakeUnique<Catalog>(nullptr);
+    auto catalog = MakeUnique<Catalog>(nullptr, nullptr);
     if (catalog_paths.empty()) {
         UnrecoverableError(fmt::format("Catalog path is empty"));
     }
@@ -781,10 +777,11 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManag
 }
 
 void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog) {
-    SharedPtr<String> current_dir = MakeShared<String>(catalog_json["current_dir"]);
+    SharedPtr<String> data_dir = MakeShared<String>(catalog_json["data_dir"]);
+    SharedPtr<String> catalog_dir = MakeShared<String>(catalog_json["catalog_dir"]);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    catalog = MakeUnique<Catalog>(current_dir);
+    catalog = MakeUnique<Catalog>(std::move(data_dir), std::move(catalog_dir));
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     catalog->catalog_version_ = catalog_json["catalog_version"];
@@ -899,12 +896,6 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
-
-const SharedPtr<String> Catalog::DataDir() const {
-    Path catalog_path(*this->current_dir_);
-    Path parent_path = catalog_path.parent_path();
-    return MakeShared<String>(parent_path.string());
-}
 
 void Catalog::MemIndexCommit() {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();

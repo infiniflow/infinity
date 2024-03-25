@@ -43,7 +43,7 @@ class InEqualsFunctionsTest : public BaseTest {};
 TEST_F(InEqualsFunctionsTest, inequals_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr, nullptr);
 
     RegisterInEqualsFunction(catalog_ptr);
 

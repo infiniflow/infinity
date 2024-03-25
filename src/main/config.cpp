@@ -154,6 +154,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     LogLevel default_log_level = LogLevel::kInfo;
 
     // Default storage config
+    SharedPtr<String> default_catalog_dir = MakeShared<String>("/tmp/infinity/catalog");
     SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
     u64 default_row_size = 8192lu;
     u64 default_storage_capacity = 64 * 1024lu * 1024lu * 1024lu; // 64Gib
@@ -232,6 +233,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Storage
         {
+            system_option_.catalog_dir = MakeShared<String>(*default_catalog_dir);
             system_option_.data_dir = MakeShared<String>(*default_data_dir);
             system_option_.default_row_size = default_row_size;
             system_option_.storage_capacity_ = default_storage_capacity;
@@ -407,6 +409,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         // Storage
         {
             auto storage_config = config["storage"];
+            system_option_.catalog_dir = MakeShared<String>(storage_config["catalog_dir"].value_or(*default_catalog_dir));
             system_option_.data_dir = MakeShared<String>(storage_config["data_dir"].value_or(*default_data_dir));
             system_option_.default_row_size = storage_config["default_row_size"].value_or(default_row_size);
             String storage_capacity_str = storage_config["storage_capacity"].value_or("64GB");
