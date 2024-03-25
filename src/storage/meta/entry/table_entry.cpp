@@ -284,10 +284,11 @@ void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
     }
 }
 
-void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     SizeT row_count = 0;
 
-    if (this->deleted_) {
+    // Read-only no lock needed.
+    if (this->Deleted()) {
         UnrecoverableError("table is deleted");
         return;
     }
@@ -304,13 +305,15 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
             std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker()); // prevent another read conflict with this append operation
             if (unsealed_segment_.get() == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
-                if (unsealed_segment_) {
+                if (unsealed_segment_.get() != nullptr) {
+                    // The segment is full, need to be set sealed.
                     txn_store_ptr->AddSealedSegment(unsealed_segment_.get());
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
 
                 this->unsealed_segment_ = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn);
+                // FIXME: Why not use new_segment_id directly?
                 unsealed_id_ = unsealed_segment_->segment_id();
                 this->segment_map_.emplace(new_segment_id, this->unsealed_segment_);
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
@@ -698,7 +701,6 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
-    table_entry->deleted_ = deleted;
 
     if (table_entry->deleted_) {
         if (!table_entry->segment_map_.empty()) {

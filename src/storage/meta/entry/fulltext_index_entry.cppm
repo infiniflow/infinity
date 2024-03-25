@@ -32,7 +32,7 @@ class IndexFullText;
 
 export struct FulltextIndexEntry : public BaseEntry {
 public:
-    FulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+    FulltextIndexEntry(TableIndexEntry *table_index_entry, bool deleted, TransactionID txn_id, TxnTimeStamp begin_ts);
     ~FulltextIndexEntry() override = default;
 
     static SharedPtr<FulltextIndexEntry> NewFulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts);

@@ -313,7 +313,7 @@ void Catalog::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
 }
 
 void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
-    return table_entry->Append(txn_id, txn_store, commit_ts, buffer_mgr);
+    return table_entry->AppendData(txn_id, txn_store, commit_ts, buffer_mgr);
 }
 
 void Catalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {

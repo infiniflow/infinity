@@ -46,7 +46,7 @@ export struct BlockEntry : public BaseEntry {
 
 public:
     // for iterator unit test
-    explicit BlockEntry() : BaseEntry(EntryType::kBlock){};
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false){};
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);

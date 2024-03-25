@@ -39,7 +39,7 @@ export enum class EntryType : i8 {
 };
 
 export struct BaseEntry {
-    explicit BaseEntry(EntryType entry_type, bool is_delete = false) : deleted_(is_delete), entry_type_(entry_type) {
+    explicit BaseEntry(EntryType entry_type, bool is_delete) : deleted_(is_delete), entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
         }
@@ -63,7 +63,7 @@ public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-    bool deleted_;
+    const bool deleted_;
 
     const EntryType entry_type_{EntryType::kDummy};
 };

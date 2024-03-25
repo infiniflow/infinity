@@ -29,8 +29,8 @@ import status;
 
 namespace infinity {
 
-FulltextIndexEntry::FulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kIRSIndex) {
+FulltextIndexEntry::FulltextIndexEntry(TableIndexEntry *table_index_entry, bool deleted, TransactionID txn_id, TxnTimeStamp begin_ts)
+    : BaseEntry(EntryType::kIRSIndex, deleted) {
     table_index_entry_ = table_index_entry;
     txn_id_ = txn_id;
     begin_ts_ = begin_ts;
@@ -38,7 +38,7 @@ FulltextIndexEntry::FulltextIndexEntry(TableIndexEntry *table_index_entry, Trans
 
 SharedPtr<FulltextIndexEntry>
 FulltextIndexEntry::NewFulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, txn_id, begin_ts);
+    auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, false, txn_id, begin_ts);
     bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
     if (!homebrewed) {
         fulltext_index_entry->irs_index_ =
@@ -53,14 +53,13 @@ SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewReplayFulltextIndexEntry(Ta
                                                                               TxnTimeStamp begin_ts,
                                                                               TxnTimeStamp commit_ts,
                                                                               bool is_delete) {
-    auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, txn_id, begin_ts);
+    auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, is_delete, txn_id, begin_ts);
     bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
     if (!homebrewed) {
         fulltext_index_entry->irs_index_ =
             MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *fulltext_index_entry->index_dir());
     }
     fulltext_index_entry->commit_ts_.store(commit_ts);
-    fulltext_index_entry->deleted_ = is_delete;
     return fulltext_index_entry;
 }
 
