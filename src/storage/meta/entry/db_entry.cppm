@@ -56,12 +56,12 @@ public:
                                          TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> ReplayDBEntry(DBMeta *db_meta,
+                                            bool is_delete,
                                             const SharedPtr<String> &db_entry_dir,
                                             const SharedPtr<String> &db_name,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
-                                            TxnTimeStamp commit_ts,
-                                            bool is_delete) noexcept;
+                                            TxnTimeStamp commit_ts) noexcept;
 
 public:
     SharedPtr<String> ToString();
@@ -74,7 +74,8 @@ public:
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
 
-private:
+    String GetPathNameTail() const;
+
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
                                             const SharedPtr<String> &table_collection_name,
                                             const Vector<SharedPtr<ColumnDef>> &columns,
@@ -98,7 +99,10 @@ private:
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts);
 
-    void DropTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    void DropTableReplay(const String &table_name,
+                         std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
 
     TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
     //
@@ -107,6 +111,7 @@ private:
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
+private:
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
     }

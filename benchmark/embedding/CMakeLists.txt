@@ -26,6 +26,7 @@ target_link_libraries(
         onnxruntime_mlas
         iresearch
         newpfor
+        fastpfor
         atomic.a
         lz4.a
 )

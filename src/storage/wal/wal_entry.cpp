@@ -31,33 +31,156 @@ import stl;
 import third_party;
 import internal_types;
 
+import block_entry;
+import segment_entry;
+
 namespace infinity {
 
+WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
+    : block_id_(block_entry->block_id_), row_count_(block_entry->row_count_), row_capacity_(block_entry->row_capacity_),
+      min_row_ts_(block_entry->min_row_ts_), max_row_ts_(block_entry->max_row_ts_), checkpoint_ts_(block_entry->checkpoint_ts_) {
+    next_outline_idxes_.resize(block_entry->columns_.size());
+    for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
+        next_outline_idxes_[i] = block_entry->columns_[i]->OutlineBufferCount();
+    }
+}
+
+bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
+    return block_id_ == other.block_id_ && row_count_ == other.row_count_ && row_capacity_ == other.row_capacity_ &&
+           min_row_ts_ == other.min_row_ts_ && max_row_ts_ == other.max_row_ts_ && checkpoint_ts_ == other.checkpoint_ts_ &&
+           next_outline_idxes_ == other.next_outline_idxes_;
+}
+
+i32 WalBlockInfo::GetSizeInBytes() const {
+    i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_) + sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(checkpoint_ts_);
+    size += sizeof(i32) + next_outline_idxes_.size() * sizeof(i32);
+    return size;
+}
+
+void WalBlockInfo::WriteBufferAdv(char *&buf) const {
+    WriteBufAdv(buf, block_id_);
+    WriteBufAdv(buf, row_count_);
+    WriteBufAdv(buf, row_capacity_);
+    WriteBufAdv(buf, min_row_ts_);
+    WriteBufAdv(buf, max_row_ts_);
+    WriteBufAdv(buf, checkpoint_ts_);
+    WriteBufAdv(buf, static_cast<i32>(next_outline_idxes_.size()));
+    for (const auto &idx : next_outline_idxes_) {
+        WriteBufAdv(buf, idx);
+    }
+}
+
+WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
+    WalBlockInfo block_info;
+    block_info.block_id_ = ReadBufAdv<BlockID>(ptr);
+    block_info.row_count_ = ReadBufAdv<u16>(ptr);
+    block_info.row_capacity_ = ReadBufAdv<u16>(ptr);
+    block_info.min_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    block_info.max_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    block_info.checkpoint_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    i32 count = ReadBufAdv<i32>(ptr);
+    block_info.next_outline_idxes_.resize(count);
+    for (i32 i = 0; i < count; i++) {
+        block_info.next_outline_idxes_[i] = ReadBufAdv<i32>(ptr);
+    }
+    return block_info;
+}
+
+String WalBlockInfo::ToString() const {
+    std::stringstream ss;
+    ss << "block_id: " << block_id_ << ", row_count: " << row_count_ << ", row_capacity: " << row_capacity_ << ", min_row_ts: " << min_row_ts_
+       << ", max_row_ts: " << max_row_ts_ << ", checkpoint_ts: " << checkpoint_ts_;
+    ss << ", next_outline_idxes: [";
+    for (SizeT i = 0; i < next_outline_idxes_.size(); i++) {
+        ss << next_outline_idxes_[i];
+        if (i != next_outline_idxes_.size() - 1) {
+            ss << ", ";
+        }
+    }
+    ss << "]";
+    return ss.str();
+}
+
+WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
+    : segment_id_(segment_entry->segment_id_), column_count_(segment_entry->column_count_), row_count_(segment_entry->row_count_),
+      actual_row_count_(segment_entry->actual_row_count_), row_capacity_(segment_entry->row_capacity_), min_row_ts_(segment_entry->min_row_ts_),
+      max_row_ts_(segment_entry->max_row_ts_), commit_ts_(segment_entry->commit_ts_), deprecate_ts_(segment_entry->deprecate_ts_),
+      begin_ts_(segment_entry->begin_ts_), txn_id_(segment_entry->txn_id_) {
+    for (auto &block_entry : segment_entry->block_entries_) {
+        block_infos_.push_back(WalBlockInfo(block_entry.get()));
+    }
+}
+
 bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
-    return segment_dir_ == other.segment_dir_ && segment_id_ == other.segment_id_ && block_entries_size_ == other.block_entries_size_ &&
-           block_capacity_ == other.block_capacity_ && last_block_row_count_ == other.last_block_row_count_;
+    return segment_id_ == other.segment_id_ && column_count_ == other.column_count_ && row_count_ == other.row_count_ &&
+           actual_row_count_ == other.actual_row_count_ && row_capacity_ == other.row_capacity_ && min_row_ts_ == other.min_row_ts_ &&
+           max_row_ts_ == other.max_row_ts_ && commit_ts_ == other.commit_ts_ && deprecate_ts_ == other.deprecate_ts_ &&
+           begin_ts_ == other.begin_ts_ && txn_id_ == other.txn_id_ && block_infos_ == other.block_infos_;
 }
 
 i32 WalSegmentInfo::GetSizeInBytes() const {
-    i32 sz = sizeof(i32) + segment_dir_.size() + sizeof(SegmentID) + sizeof(u16) + sizeof(u32) + sizeof(u16);
-    return sz;
+    i32 size = sizeof(SegmentID) + sizeof(column_count_) + sizeof(row_count_) + sizeof(actual_row_count_) + sizeof(row_capacity_) +
+               sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(commit_ts_) + sizeof(deprecate_ts_) + sizeof(begin_ts_) + sizeof(txn_id_);
+    size += sizeof(i32);
+    for (const auto &block_info : block_infos_) {
+        size += block_info.GetSizeInBytes();
+    }
+    return size;
 }
 
 void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
-    WriteBufAdv(buf, segment_dir_);
     WriteBufAdv(buf, segment_id_);
-    WriteBufAdv(buf, block_entries_size_);
-    WriteBufAdv(buf, block_capacity_);
-    WriteBufAdv(buf, last_block_row_count_);
+    WriteBufAdv(buf, column_count_);
+    WriteBufAdv(buf, row_count_);
+    WriteBufAdv(buf, actual_row_count_);
+    WriteBufAdv(buf, row_capacity_);
+    WriteBufAdv(buf, min_row_ts_);
+    WriteBufAdv(buf, max_row_ts_);
+    WriteBufAdv(buf, commit_ts_);
+    WriteBufAdv(buf, deprecate_ts_);
+    WriteBufAdv(buf, begin_ts_);
+    WriteBufAdv(buf, txn_id_);
+    WriteBufAdv(buf, static_cast<i32>(block_infos_.size()));
+    for (const auto &block_info : block_infos_) {
+        block_info.WriteBufferAdv(buf);
+    }
 }
 
 WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
-    String segment_dir = ReadBufAdv<String>(ptr);
-    SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
-    u16 block_entries_size = ReadBufAdv<u16>(ptr);
-    u32 block_capacity = ReadBufAdv<u32>(ptr);
-    u16 last_block_row_count = ReadBufAdv<u16>(ptr);
-    return {std::move(segment_dir), segment_id, block_entries_size, block_capacity, last_block_row_count};
+    WalSegmentInfo segment_info;
+    segment_info.segment_id_ = ReadBufAdv<SegmentID>(ptr);
+    segment_info.column_count_ = ReadBufAdv<u64>(ptr);
+    segment_info.row_count_ = ReadBufAdv<SizeT>(ptr);
+    segment_info.actual_row_count_ = ReadBufAdv<SizeT>(ptr);
+    segment_info.row_capacity_ = ReadBufAdv<SizeT>(ptr);
+    segment_info.min_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    segment_info.max_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    segment_info.commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    segment_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    segment_info.begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    segment_info.txn_id_ = ReadBufAdv<TransactionID>(ptr);
+    i32 count = ReadBufAdv<i32>(ptr);
+    for (i32 i = 0; i < count; i++) {
+        segment_info.block_infos_.push_back(WalBlockInfo::ReadBufferAdv(ptr));
+    }
+    return segment_info;
+}
+
+String WalSegmentInfo::ToString() const {
+    std::stringstream ss;
+    ss << "segment_id: " << segment_id_ << ", column_count: " << column_count_ << ", row_count: " << row_count_
+       << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_ << ", min_row_ts: " << min_row_ts_
+       << ", max_row_ts: " << max_row_ts_ << ", commit_ts: " << commit_ts_ << ", deprecate_ts: " << deprecate_ts_ << ", begin_ts: " << begin_ts_
+       << ", txn_id: " << txn_id_;
+    ss << ", block_infos: [";
+    for (SizeT i = 0; i < block_infos_.size(); i++) {
+        ss << block_infos_[i].ToString();
+        if (i != block_infos_.size() - 1) {
+            ss << ", ";
+        }
+    }
+    ss << "]";
+    return ss.str();
 }
 
 SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
@@ -67,18 +190,20 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
     switch (cmd_type) {
         case WalCommandType::CREATE_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCreateDatabase>(db_name);
+            String db_dir_tail = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCreateDatabase>(std::move(db_name), std::move(db_dir_tail));
             break;
         }
         case WalCommandType::DROP_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropDatabase>(db_name);
+            cmd = MakeShared<WalCmdDropDatabase>(std::move(db_name));
             break;
         }
         case WalCommandType::CREATE_TABLE: {
             String db_name = ReadBufAdv<String>(ptr);
+            String table_dir_tail = ReadBufAdv<String>(ptr);
             SharedPtr<TableDef> table_def = TableDef::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateTable>(db_name, table_def);
+            cmd = MakeShared<WalCmdCreateTable>(std::move(db_name), std::move(table_dir_tail), table_def);
             break;
         }
         case WalCommandType::DROP_TABLE: {
@@ -159,9 +284,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::CREATE_INDEX: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            String table_index_dir = ReadBufAdv<String>(ptr);
+            String index_dir_tail = ReadBufAdv<String>(ptr);
             SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, table_index_dir, index_base);
+            cmd = MakeShared<WalCmdCreateIndex>(std::move(db_name), std::move(table_name), std::move(index_dir_tail), std::move(index_base));
             break;
         }
         case WalCommandType::DROP_INDEX: {
@@ -201,14 +326,15 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
 
 bool WalCmdCreateTable::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateTable *>(&other);
-    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && table_def_.get() != nullptr && other_cmd->table_def_.get() != nullptr &&
-           *table_def_ == *other_cmd->table_def_;
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_dir_tail_, other_cmd->table_dir_tail_) &&
+           table_def_.get() != nullptr && other_cmd->table_def_.get() != nullptr && *table_def_ == *other_cmd->table_def_;
 }
 
 bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
-    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_base_.get() != nullptr &&
-           other_cmd->index_base_.get() != nullptr && *index_base_ == *other_cmd->index_base_ && table_index_dir_ == other_cmd->table_index_dir_;
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ &&
+           IsEqual(index_dir_tail_, other_cmd->index_dir_tail_) && index_base_.get() != nullptr && other_cmd->index_base_.get() != nullptr &&
+           *index_base_ == *other_cmd->index_base_;
 }
 
 bool WalCmdDropIndex::operator==(const WalCmd &other) const {
@@ -289,17 +415,20 @@ bool WalCmdCompact::operator==(const WalCmd &other) const {
     return true;
 }
 
-i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
+i32 WalCmdCreateDatabase::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
+}
 
 i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
 
 i32 WalCmdCreateTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + this->table_def_->GetSizeInBytes();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_dir_tail_.size() +
+           this->table_def_->GetSizeInBytes();
 }
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->table_index_dir_.size() + this->index_base_->GetSizeInBytes();
+           this->index_dir_tail_.size() + this->index_base_->GetSizeInBytes();
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
@@ -357,6 +486,7 @@ i32 WalCmdCompact::GetSizeInBytes() const {
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
     WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->db_dir_tail_);
 }
 
 void WalCmdDropDatabase::WriteAdv(char *&buf) const {
@@ -367,6 +497,7 @@ void WalCmdDropDatabase::WriteAdv(char *&buf) const {
 void WalCmdCreateTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_TABLE);
     WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_dir_tail_);
     this->table_def_->WriteAdv(buf);
 }
 
@@ -374,7 +505,7 @@ void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_INDEX);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->table_index_dir_);
+    WriteBufAdv(buf, this->index_dir_tail_);
     index_base_->WriteAdv(buf);
 }
 
@@ -613,11 +744,7 @@ String WalEntry::ToString() const {
             ss << "db name: " << import_cmd->db_name_ << std::endl;
             ss << "table name: " << import_cmd->table_name_ << std::endl;
             auto &segment_info = import_cmd->segment_info_;
-            ss << "segment dir: " << segment_info.segment_dir_ << std::endl;
-            ss << "segment id: " << segment_info.segment_id_ << std::endl;
-            ss << "block entries size: " << segment_info.block_entries_size_ << std::endl;
-            ss << "block capacity: " << segment_info.block_capacity_ << std::endl;
-            ss << "last block row count" << segment_info.last_block_row_count_ << std::endl;
+            ss << segment_info.ToString();
         } else if (cmd->GetType() == WalCommandType::APPEND) {
             auto append_cmd = dynamic_cast<const WalCmdAppend *>(cmd.get());
             ss << "db name: " << append_cmd->db_name_ << std::endl;
@@ -636,7 +763,6 @@ String WalEntry::ToString() const {
             auto create_index_cmd = dynamic_cast<const WalCmdCreateIndex *>(cmd.get());
             ss << "db name: " << create_index_cmd->db_name_ << std::endl;
             ss << "table name: " << create_index_cmd->table_name_ << std::endl;
-            ss << "table index dir: " << create_index_cmd->table_index_dir_ << std::endl;
             ss << "index def: " << create_index_cmd->index_base_->ToString() << std::endl;
         } else if (cmd->GetType() == WalCommandType::SET_SEGMENT_STATUS_SEALED) {
             auto set_sealed_cmd = dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get());

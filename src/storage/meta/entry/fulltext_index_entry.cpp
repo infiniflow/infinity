@@ -37,7 +37,7 @@ FulltextIndexEntry::FulltextIndexEntry(TableIndexEntry *table_index_entry, Trans
 }
 
 SharedPtr<FulltextIndexEntry>
-FulltextIndexEntry::NewFulltextIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, TxnTimeStamp begin_ts) {
+FulltextIndexEntry::NewFulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, txn_id, begin_ts);
     bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
     if (!homebrewed) {
@@ -79,7 +79,7 @@ FulltextIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, Tabl
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
 
-    auto fulltext_index_entry = NewFulltextIndexEntry(table_index_entry, nullptr, txn_id, begin_ts);
+    auto fulltext_index_entry = NewFulltextIndexEntry(table_index_entry, txn_id, begin_ts);
     fulltext_index_entry->commit_ts_.store(commit_ts);
     fulltext_index_entry->txn_id_.store(txn_id);
     fulltext_index_entry->begin_ts_ = begin_ts;

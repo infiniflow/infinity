@@ -142,7 +142,7 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
             if (memory_indexer_.get() == nullptr) {
-                String base_name = fmt::format("ft_%08d_%08d", begin_row_id.segment_id_, begin_row_id.segment_offset_);
+                String base_name = fmt::format("ft_{}", begin_row_id.ToUint64());
                 memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
                                                             base_name,
                                                             begin_row_id,
@@ -228,6 +228,72 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
                                                 table_index_entry_->GetFulltextBufferPool(),
                                                 table_index_entry_->GetFulltextThreadPool());
     memory_indexer_->Load();
+}
+
+void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn) {
+    auto *buffer_mgr = txn->buffer_mgr();
+    const IndexBase *index_base = table_index_entry_->index_base();
+    const ColumnDef *column_def = table_index_entry_->column_def().get();
+    switch (index_base->index_type_) {
+        case IndexType::kFullText: {
+            const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+            u32 seg_id = segment_entry->segment_id();
+            RowID base_row_id(seg_id, 0);
+            String base_name = fmt::format("ft_{}", base_row_id.ToUint64());
+            memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
+                                                        base_name,
+                                                        base_row_id,
+                                                        index_fulltext->flag_,
+                                                        index_fulltext->analyzer_,
+                                                        table_index_entry_->GetFulltextByteSlicePool(),
+                                                        table_index_entry_->GetFulltextBufferPool(),
+                                                        table_index_entry_->GetFulltextThreadPool());
+            u64 column_id = column_def->id();
+            auto block_entry_iter = BlockEntryIter(segment_entry);
+            ColumnLengthPopulater populater = [this](u32 begin_docid, Vector<u32> &lens) -> void {
+                BufferHandle column_length_handle = this->GetIndex();
+                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
+                SizeT num_docs = lens.size();
+                SizeT total_len = 0;
+                for (SizeT i = 0; i < num_docs; i++) {
+                    // fulltext_column_length.lengths[begin_row_id + begin_docid + i] = lens[i];
+                    total_len += lens[i];
+                }
+                std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
+                fulltext_column_length.row_count_ += num_docs;
+                fulltext_column_length.total_length_ += total_len;
+                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
+            };
+            for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
+                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), populater, true);
+                memory_indexer_->Commit(true);
+            }
+            memory_indexer_->Dump(true);
+            ft_base_names_.push_back(base_name);
+            ft_base_rowids_.push_back(base_row_id);
+            memory_indexer_.reset();
+            auto duration = Clock::now().time_since_epoch();
+            u64 ts = ChronoCast<NanoSeconds>(duration).count();
+            table_index_entry_->UpdateFulltextSegmentTs(ts);
+            break;
+        }
+        case IndexType::kIVFFlat:
+        case IndexType::kHnsw:
+        case IndexType::kSecondary: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("{} PopulateEntirely is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_WARN(*err_msg);
+            break;
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+    }
 }
 
 Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, Txn *txn, bool prepare, bool check_ts) {
@@ -358,46 +424,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
             break;
         }
         case IndexType::kFullText: {
-            const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-            u32 seg_id = segment_entry->segment_id();
-            RowID base_row_id(seg_id, 0);
-            String base_name = fmt::format("ft_%08d_%08d", base_row_id.segment_id_, base_row_id.segment_offset_);
-            memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
-                                                        base_name,
-                                                        base_row_id,
-                                                        index_fulltext->flag_,
-                                                        index_fulltext->analyzer_,
-                                                        table_index_entry_->GetFulltextByteSlicePool(),
-                                                        table_index_entry_->GetFulltextBufferPool(),
-                                                        table_index_entry_->GetFulltextThreadPool());
-            u64 column_id = column_def->id();
-            auto block_entry_iter = BlockEntryIter(segment_entry);
-            ColumnLengthPopulater populater = [this](u32 begin_docid, Vector<u32> &lens) -> void {
-                BufferHandle column_length_handle = this->GetIndex();
-                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
-                SizeT num_docs = lens.size();
-                SizeT total_len = 0;
-                for (SizeT i = 0; i < num_docs; i++) {
-                    // fulltext_column_length.lengths[begin_row_id + begin_docid + i] = lens[i];
-                    total_len += lens[i];
-                }
-                std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-                fulltext_column_length.row_count_ += num_docs;
-                fulltext_column_length.total_length_ += total_len;
-                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
-            };
-            for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
-                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), populater, true);
-            }
-            memory_indexer_->Commit(true);
-            memory_indexer_->Dump(true);
-            ft_base_names_.push_back(base_name);
-            ft_base_rowids_.push_back(base_row_id);
-            auto duration = Clock::now().time_since_epoch();
-            u64 ts = ChronoCast<NanoSeconds>(duration).count();
-            table_index_entry_->UpdateFulltextSegmentTs(ts);
+            PopulateEntirely(segment_entry, txn);
             break;
         }
         case IndexType::kSecondary: {

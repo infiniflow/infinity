@@ -109,24 +109,22 @@ TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
 
 void TableMeta::DeleteEntry(TransactionID txn_id) { auto erase_list = table_entry_list_.DeleteEntry(txn_id); }
 
-void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry,
                                   TransactionID txn_id,
                                   TxnTimeStamp begin_ts) {
-    auto [entry, status] =
-        table_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, table_name_, txn_id, begin_ts); },
-                                         txn_id,
-                                         begin_ts);
+    auto [entry, status] = table_entry_list_.AddEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 }
 
-void TableMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [table_entry, status] = table_entry_list_.DropEntryReplay(txn_id, begin_ts);
+void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry,
+                                TransactionID txn_id,
+                                TxnTimeStamp begin_ts) {
+    auto [dropped_entry, status] = table_entry_list_.DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    table_entry->Cleanup();
 }
 
 TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {

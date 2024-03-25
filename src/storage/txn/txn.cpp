@@ -68,18 +68,12 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
 Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
     this->CheckTxn(db_name);
 
-    const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
     // build WalCmd
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name,
-                                                         table_name,
-                                                         WalSegmentInfo{*segment_entry->segment_dir(),
-                                                                        segment_entry->segment_id(),
-                                                                        static_cast<u16>(block_cnt),
-                                                                        DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
-                                                                        last_block_row_count}));
+    WalSegmentInfo segment_info(segment_entry.get());
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info)));
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_name);
-    table_store->Import(std::move(segment_entry));
+    table_store->Import(std::move(segment_entry), this);
 
     return Status::OK();
 }
@@ -165,7 +159,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     }
     txn_store_.AddDBStore(db_entry);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(db_name));
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(std::move(db_name), db_entry->GetPathNameTail()));
     return Status::OK();
 }
 
@@ -231,7 +225,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     }
 
     txn_store_.AddTableStore(table_entry);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(std::move(db_name), table_entry->GetPathNameTail(), table_def));
 
     return Status::OK();
 }
@@ -310,9 +304,10 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
 }
 
 Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
-    String index_dir = *table_index_entry->index_dir();
+    String index_dir_tail = table_index_entry->GetPathNameTail();
     auto index_base = table_index_entry->table_index_def();
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_base));
+    wal_entry_->cmds_.push_back(
+        MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base));
     return Status::OK();
 }
 
@@ -323,8 +318,8 @@ Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, c
     if (!status.ok()) {
         return status;
     }
-
-    this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, *table_index_entry->index_dir(), index_base));
+    String index_dir_tail = table_index_entry->GetPathNameTail();
+    this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(index_dir_tail), index_base));
     return Status::OK();
 }
 

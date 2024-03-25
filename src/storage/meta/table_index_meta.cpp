@@ -55,8 +55,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shar
                                                                        TxnTimeStamp begin_ts,
                                                                        TxnManager *txn_mgr) {
     auto init_index_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        auto *txn = txn_mgr->GetTxn(txn_id);
-        return TableIndexEntry::NewTableIndexEntry(index_base, false, table_entry_dir, this, txn, txn_id, begin_ts);
+        return TableIndexEntry::NewTableIndexEntry(index_base, false, table_entry_dir, this, txn_id, begin_ts);
     };
     return index_entry_list_.AddEntry(std::move(r_lock), std::move(init_index_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -67,20 +66,19 @@ Tuple<SharedPtr<TableIndexEntry>, Status> TableIndexMeta::DropTableIndexEntry(st
                                                                               TxnTimeStamp begin_ts,
                                                                               TxnManager *txn_mgr) {
     auto init_drop_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        auto *txn = txn_mgr->GetTxn(txn_id);
-        return TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, this, txn, txn_id, begin_ts);
+        return TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, this, txn_id, begin_ts);
     };
     return index_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 void TableIndexMeta::DeleteEntry(TransactionID txn_id) { auto erase_list = index_entry_list_.DeleteEntry(txn_id); }
 
-TableIndexEntry *TableIndexMeta::CreateEntryReplay(
-    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
-    TransactionID txn_id,
-    TxnTimeStamp begin_ts) {
+TableIndexEntry *
+TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                  TransactionID txn_id,
+                                  TxnTimeStamp begin_ts) {
     auto [entry, status] =
-        index_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, index_name_, txn_id, begin_ts); },
+        index_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, txn_id, begin_ts); },
                                          txn_id,
                                          begin_ts);
     if (!status.ok()) {
@@ -90,11 +88,15 @@ TableIndexEntry *TableIndexMeta::CreateEntryReplay(
 }
 
 void TableIndexMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [index_entry, status] = index_entry_list_.DropEntryReplay(txn_id, begin_ts);
+    auto [dropped_entry, status] = index_entry_list_.DropEntryReplay(
+        [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, this, txn_id, begin_ts);
+        },
+        txn_id,
+        begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    index_entry->Cleanup();
 }
 
 TableIndexEntry *TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {

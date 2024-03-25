@@ -64,6 +64,7 @@ protected:
             }
             usleep(1000 * 1000);
         }
+        usleep(1000 * 1000);
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
         cleanup_task->Execute();
     }

@@ -200,6 +200,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external")
@@ -247,8 +248,8 @@ target_link_libraries(infinity
         zsv_parser
         roaring
         newpfor
+        fastpfor
         openfst
-#        iresearch
 
         thrift.a
         thriftnb.a
@@ -371,6 +372,7 @@ target_link_libraries(unit_test
         zsv_parser
         roaring
         newpfor
+        fastpfor
         openfst
         iresearch
         lz4.a
@@ -430,6 +432,7 @@ target_link_libraries(test_hnsw_bitmask
     zsv_parser
     roaring
     newpfor
+    fastpfor
     openfst
     #        iresearch
 
