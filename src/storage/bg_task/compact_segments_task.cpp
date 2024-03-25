@@ -128,24 +128,28 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(Table
 
 CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type)
     : BGTask(BGTaskType::kCompactSegments, false), task_type_(type), db_name_(table_entry->GetDBName()), table_name_(table_entry->GetTableName()),
-      segments_(std::move(segments)), txn_(txn) {}
+      commit_ts_(table_entry->commit_ts_), segments_(std::move(segments)), txn_(txn) {}
 
-void CompactSegmentsTask::Execute() {
+bool CompactSegmentsTask::Execute() {
     auto [table_entry, status] = txn_->GetTableByName(*db_name_, *table_name_);
     if (!status.ok()) {
         // the table is dropped before the background task is executed.
         if (status.code() == ErrorCode::kTableNotExist) {
             LOG_INFO(fmt::format("Table {} not exist, skip compact", *table_name_));
-            return;
+            return false;
         } else {
             UnrecoverableError("Get table entry failed");
         }
+    }
+    if (table_entry->commit_ts_ != commit_ts_) {
+        return false;
     }
     CompactSegmentsTaskState state(table_entry);
     CompactSegments(state);
     CreateNewIndex(state);
     SaveSegmentsData(state);
     ApplyDeletes(state);
+    return true;
 }
 
 // generate new_table_ref_ to compact
