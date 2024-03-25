@@ -26,17 +26,23 @@ import infinity;
 
 namespace infinity {
 
-export class HTTPSelect {
+export class HTTPSearch {
 public:
-    static void Process(Infinity* infinity_ptr,const String &db_name, const String &table_name, const String &input_json, HTTPStatus &http_status, nlohmann::json &response);
+    static void Process(Infinity *infinity_ptr,
+                        const String &db_name,
+                        const String &table_name,
+                        const String &input_json,
+                        HTTPStatus &http_status,
+                        nlohmann::json &response);
 
     static ParsedExpr *ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Vector<ParsedExpr *> *ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static KnnExpr *ParseKnn(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static KnnExpr *ParseKnn(nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static MatchExpr *ParseMatch(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
 
-    static Tuple<EmbeddingDataType, i64, void*> ParseVector(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static Tuple<i64, void *>
+    ParseVector(nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
 };
 
 } // namespace infinity

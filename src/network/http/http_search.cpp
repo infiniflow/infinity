@@ -23,6 +23,7 @@ import third_party;
 import parsed_expr;
 import knn_expr;
 import match_expr;
+import search_expr;
 import column_expr;
 import defer_op;
 import expr_parser;
@@ -34,7 +35,7 @@ import value;
 
 namespace infinity {
 
-void HTTPSelect::Process(Infinity* infinity_ptr,
+void HTTPSearch::Process(Infinity *infinity_ptr,
                          const String &db_name,
                          const String &table_name,
                          const String &input_json_str,
@@ -53,6 +54,7 @@ void HTTPSelect::Process(Infinity* infinity_ptr,
         Vector<ParsedExpr *> *fusion_exprs{nullptr};
         KnnExpr *knn_expr{nullptr};
         MatchExpr *match_expr{nullptr};
+        SearchExpr *search_expr = new SearchExpr();
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -79,6 +81,10 @@ void HTTPSelect::Process(Infinity* infinity_ptr,
             if (match_expr != nullptr) {
                 delete match_expr;
                 match_expr = nullptr;
+            }
+            if (search_expr != nullptr) {
+                delete search_expr;
+                search_expr = nullptr;
             }
         });
 
@@ -130,6 +136,15 @@ void HTTPSelect::Process(Infinity* infinity_ptr,
                         "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
                     return;
                 }
+                auto &knn_json = elem.value();
+                if (!knn_json.is_object()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "KNN field should be object";
+                    return;
+                }
+                knn_expr = ParseKnn(knn_json, http_status, response);
+                search_expr->AddExpr(knn_expr);
+                knn_expr = nullptr;
             } else if (IsEqual(key, "match")) {
                 if (fusion_exprs != nullptr or knn_expr != nullptr or match_expr != nullptr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
@@ -145,10 +160,11 @@ void HTTPSelect::Process(Infinity* infinity_ptr,
             }
         }
 
-        const QueryResult result = infinity_ptr->Search(db_name, table_name, nullptr, filter, output_columns);
+        const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
 
         output_columns = nullptr;
         filter = nullptr;
+        search_expr = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
@@ -182,7 +198,7 @@ void HTTPSelect::Process(Infinity* infinity_ptr,
     return;
 }
 
-ParsedExpr *HTTPSelect::ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+ParsedExpr *HTTPSearch::ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
 
     UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
     ExprParser expr_parser;
@@ -198,9 +214,9 @@ ParsedExpr *HTTPSelect::ParseFilter(const nlohmann::json &json_object, HTTPStatu
     return res;
 }
 
-Vector<ParsedExpr *> *HTTPSelect::ParseOutput(const nlohmann::json &output_list, HTTPStatus &http_status, nlohmann::json &response) {
+Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list, HTTPStatus &http_status, nlohmann::json &response) {
 
-    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr*>();
+    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
     DeferFn defer_fn([&]() {
         if (output_columns != nullptr) {
             for (auto &expr : *output_columns) {
@@ -237,7 +253,7 @@ Vector<ParsedExpr *> *HTTPSelect::ParseOutput(const nlohmann::json &output_list,
     output_columns = nullptr;
     return res;
 }
-Vector<ParsedExpr *> *HTTPSelect::ParseFusion(const nlohmann::json &funsion_json_object, HTTPStatus &http_status, nlohmann::json &response) {
+Vector<ParsedExpr *> *HTTPSearch::ParseFusion(const nlohmann::json &funsion_json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!funsion_json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = fmt::format("Fusion expression must be a json object: {}", funsion_json_object);
@@ -246,7 +262,7 @@ Vector<ParsedExpr *> *HTTPSelect::ParseFusion(const nlohmann::json &funsion_json
 
     return nullptr;
 }
-KnnExpr *HTTPSelect::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus &http_status, nlohmann::json &response) {
+KnnExpr *HTTPSearch::ParseKnn(nlohmann::json &knn_json_object, HTTPStatus &http_status, nlohmann::json &response) {
 
     KnnExpr *knn_expr = new KnnExpr();
     DeferFn defer_fn([&]() {
@@ -265,10 +281,20 @@ KnnExpr *HTTPSelect::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
             knn_expr->column_expr_ = column_expr;
             column_expr = nullptr;
         } else if (IsEqual(key, "query_vector")) {
-            auto [embedding_data_type, dimension, embedding_ptr] = ParseVector(field_json_obj.value(), http_status, response);
-            knn_expr->embedding_data_type_ = embedding_data_type;
+            String element_type = knn_json_object["element_type"];
+            if (IsEqual(element_type, "float")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
+            } else {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("Not supported vector element type: {}", element_type);
+                return nullptr;
+            }
+
+            auto [dimension, embedding_ptr] = ParseVector(field_json_obj.value(), knn_expr->embedding_data_type_, http_status, response);
             knn_expr->dimension_ = dimension;
             knn_expr->embedding_data_ptr_ = embedding_ptr;
+        } else if (IsEqual(key, "element_type")) {
+            ;
         } else if (IsEqual(key, "top_k")) {
             knn_expr->topn_ = field_json_obj.value();
         } else if (IsEqual(key, "metric_type")) {
@@ -291,7 +317,7 @@ KnnExpr *HTTPSelect::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
             if (knn_expr->opt_params_ == nullptr) {
                 knn_expr->opt_params_ = new Vector<InitParameter *>();
             }
-            InitParameter* parameter = new InitParameter();
+            InitParameter *parameter = new InitParameter();
             parameter->param_name_ = key;
             parameter->param_value_ = field_json_obj.value();
             knn_expr->opt_params_->emplace_back(parameter);
@@ -302,7 +328,7 @@ KnnExpr *HTTPSelect::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
     knn_expr = nullptr;
     return res;
 }
-MatchExpr *HTTPSelect::ParseMatch(const nlohmann::json &match_json_object, HTTPStatus &http_status, nlohmann::json &response) {
+MatchExpr *HTTPSearch::ParseMatch(const nlohmann::json &match_json_object, HTTPStatus &http_status, nlohmann::json &response) {
     MatchExpr *match_expr = new MatchExpr();
     DeferFn defer_fn([&]() {
         if (match_expr != nullptr) {
@@ -338,90 +364,55 @@ MatchExpr *HTTPSelect::ParseMatch(const nlohmann::json &match_json_object, HTTPS
     return res;
 }
 
-Tuple<EmbeddingDataType, i64, void *> HTTPSelect::ParseVector(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+Tuple<i64, void *>
+HTTPSearch::ParseVector(nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_array()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = fmt::format("Can't recognize embedding/vector.");
-        return {EmbeddingDataType::kElemInvalid, 0, nullptr};
+        return {0, nullptr};
     }
     SizeT dimension = json_object.size();
     if (dimension == 0) {
         response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
         response["error_message"] = fmt::format("Empty embedding data");
-        return {EmbeddingDataType::kElemInvalid, 0, nullptr};
+        return {0, nullptr};
     }
 
-    auto first_elem = json_object[0];
-    auto first_elem_type = first_elem.type();
-    if (first_elem_type == nlohmann::json::value_t::number_integer or first_elem_type == nlohmann::json::value_t::number_unsigned) {
-        i32 *embedding_data_ptr = new i32[dimension];
-        DeferFn defer_free_embedding([&]() {
-            if (embedding_data_ptr != nullptr) {
-                delete[] embedding_data_ptr;
-                embedding_data_ptr = nullptr;
-            }
-        });
-
-        for (SizeT idx = 0; idx < dimension; ++idx) {
-            const auto &value_ref = json_object[idx];
-            const auto &value_type = value_ref.type();
-
-            switch (value_type) {
-                case nlohmann::json::value_t::number_integer: {
-                    embedding_data_ptr[idx] = value_ref.template get<i64>();
-                    break;
+    switch (elem_type) {
+        case EmbeddingDataType::kElemFloat: {
+            f32 *embedding_data_ptr = new f32[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
                 }
-                case nlohmann::json::value_t::number_unsigned: {
-                    embedding_data_ptr[idx] = value_ref.template get<u64>();
-                    break;
-                }
-                default: {
-                    response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                    response["error_message"] = fmt::format("Embedding element type should be integer");
-                    return {EmbeddingDataType::kElemInvalid, 0, nullptr};
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_float: {
+                        embedding_data_ptr[idx] = value_ref.template get<double>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be float");
+                        return {0, nullptr};
+                    }
                 }
             }
+
+            f32 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
         }
-
-        i32 *res = embedding_data_ptr;
-        embedding_data_ptr = nullptr;
-        return {EmbeddingDataType::kElemInt32, dimension, res};
-
-    } else if (first_elem_type == nlohmann::json::value_t::number_float) {
-
-        f32 *embedding_data_ptr = new f32[dimension];
-        DeferFn defer_free_embedding([&]() {
-            if (embedding_data_ptr != nullptr) {
-                delete[] embedding_data_ptr;
-                embedding_data_ptr = nullptr;
-            }
-        });
-
-        for (SizeT idx = 0; idx < dimension; ++idx) {
-            const auto &value_ref = json_object[idx];
-            const auto &value_type = value_ref.type();
-
-            switch (value_type) {
-                case nlohmann::json::value_t::number_float: {
-                    embedding_data_ptr[idx] = value_ref.template get<double>();
-                    break;
-                }
-                default: {
-                    response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-                    response["error_message"] = fmt::format("Embedding element type should be float");
-                    return {EmbeddingDataType::kElemInvalid, 0, nullptr};
-                }
-            }
+        default: {
+            response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+            response["error_message"] = fmt::format("Only support float as the embedding data type");
+            return {0, nullptr};
         }
-
-        f32 *res = embedding_data_ptr;
-        embedding_data_ptr = nullptr;
-        return {EmbeddingDataType::kElemInt32, dimension, res};
-
-    } else {
-        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
-        response["error_message"] = fmt::format("Embedding element type can only be integer or float");
-        return {EmbeddingDataType::kElemInvalid, 0, nullptr};
     }
 }
 

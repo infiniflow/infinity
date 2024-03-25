@@ -1127,7 +1127,7 @@ public:
         nlohmann::json json_response;
         HTTPStatus http_status;
 
-        HTTPSelect::Process(infinity.get(), database_name, table_name, data_body, http_status, json_response);
+        HTTPSearch::Process(infinity.get(), database_name, table_name, data_body, http_status, json_response);
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
