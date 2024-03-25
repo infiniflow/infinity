@@ -33,12 +33,12 @@ RUN mkdir -vp $HOME/.cargo && echo "[source.crates-io]" >> $HOME/.cargo/config \
 RUN cargo install sqllogictest-bin
 
 # CMake 3.28+ is requrired for C++20 modules.
-# download https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.tar.gz
-RUN --mount=type=bind,source=cmake-3.28.3-linux-x86_64.tar.gz,target=/root/cmake-3.28.3-linux-x86_64.tar.gz \
-    cd /root && tar xzf cmake-3.28.3-linux-x86_64.tar.gz && cp -rf cmake-3.28.3-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.3-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.3-linux-x86_64
+# download https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
+RUN --mount=type=bind,source=cmake-3.29.0-linux-x86_64.tar.gz,target=/root/cmake-3.29.0-linux-x86_64.tar.gz \
+    cd /root && tar xzf cmake-3.29.0-linux-x86_64.tar.gz && cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.29.0-linux-x86_64
 
 # build dependencies
-RUN apt install -y liblz4-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libthrift-dev
+RUN apt install -y liblz4-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev
 
 # Create a python virtual environment. Set PATH so that the shell activate this virtual environment automatically when entering a container from this image.
 RUN python3 -m venv /usr/local/venv
