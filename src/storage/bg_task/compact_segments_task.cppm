@@ -101,7 +101,7 @@ public:
 
     void CommitTxn() { txn_->txn_mgr()->CommitTxn(txn_); }
 
-    void Execute();
+    bool Execute();
 
     // Called by `SegmentEntry::DeleteData` which is called by wal thread in
     // So to_deletes_ is thread-safe.
@@ -127,6 +127,7 @@ private:
     const CompactSegmentsTaskType task_type_;
     SharedPtr<String> db_name_;
     SharedPtr<String> table_name_;
+    TxnTimeStamp commit_ts_;
     Vector<SegmentEntry *> segments_;
 
     Txn *const txn_;
