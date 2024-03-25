@@ -257,6 +257,7 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
             RecycleWalFile(max_commit_ts);
         }
         SetLastCkpWalSize(wal_size);
+        txn_mgr->CommitTxn(txn);
     } catch (RecoverableException &e) {
         LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
     } catch (UnrecoverableException &e) {

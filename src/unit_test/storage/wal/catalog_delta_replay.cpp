@@ -80,7 +80,7 @@ protected:
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
-            if (visible_ts <= last_commit_ts) {
+            if (visible_ts >= last_commit_ts) {
                 break;
             }
             // wait for at most 10s
@@ -88,9 +88,7 @@ protected:
             if (end - start > 10) {
                 UnrecoverableException("WaitFlushDeltaOp timeout");
             }
-            usleep(1000 * 1000);
         }
-        usleep(1000 * 1000);
     }
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
