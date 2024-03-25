@@ -14,110 +14,108 @@
 
 module;
 
+#include <string>
 #include <vector>
 module column_length_io;
 
 import stl;
 import index_defines;
 import internal_types;
-import status;
-import match_data;
-import create_index_info;
-import table_entry;
-import segment_index_entry;
-import third_party;
-import buffer_handle;
-import fulltext_file_worker;
 import infinity_exception;
 import logger;
+import column_index_reader;
+import file_system_type;
+import file_system;
+import local_file_system;
 
 namespace infinity {
 
-template <typename ScorerColumnIndexMapType>
-void ColumnLengthReader::LoadColumnLength(u32 column_counter,
-                                          ScorerColumnIndexMapType &column_index_map,
-                                          TableEntry *table_entry,
-                                          TransactionID txn_id,
-                                          TxnTimeStamp begin_ts) {
-    column_counter_ = column_counter;
-    column_length_data_buffer_handles_.clear();
-    for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
-        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-        if (!status.ok()) {
-            // Table index entry isn't found
-            RecoverableError(status);
-        }
-        // check index type
-        if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kFullText) {
-            // non-fulltext index
-            continue;
-        }
-        const String column_name = table_index_entry->index_base()->column_name();
-        auto column_id = table_entry->GetColumnIdByName(column_name);
-        auto iter_column_index = column_index_map.find(column_id);
-        if (iter_column_index == column_index_map.end()) {
-            // unnecessary column
-            continue;
-        }
-        u32 column_index = iter_column_index->second;
-        const Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
-        for (auto &[segment_id, segment_index_entry] : index_by_segment) {
-            auto &buffer_handle_v = column_length_data_buffer_handles_[segment_id];
-            if (buffer_handle_v.empty()) {
-                buffer_handle_v.resize(column_counter);
-            }
-            if (buffer_handle_v[column_index].GetData() != nullptr) {
-                UnrecoverableError(fmt::format("Duplicate fulltext indexes for the same column {}", column_name));
-            }
-            buffer_handle_v[column_index] = segment_index_entry->GetIndex();
-        }
-    }
-    // check if all columns are loaded
-    for (const auto &[_, buffer_handle_v] : column_length_data_buffer_handles_) {
-        bool valid = true;
-        if (buffer_handle_v.size() != column_counter) {
-            valid = false;
-        } else {
-            for (const auto &buffer_handle : buffer_handle_v) {
-                if (buffer_handle.GetData() == nullptr) {
-                    valid = false;
-                    break;
-                }
-            }
-        }
-        if (!valid) {
-            UnrecoverableError("segment list mismatch between different fulltext indexes");
-        }
-    }
-    column_length_vector_.resize(column_counter_);
+FullTextColumnLengthFileHandler::FullTextColumnLengthFileHandler(UniquePtr<FileSystem> file_system,
+                                                                 const String &path,
+                                                                 SegmentIndexEntry *segment_index_entry)
+    : file_system_(std::move(file_system)), segment_index_entry_(segment_index_entry) {
+    u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+    file_handler_ = file_system_->OpenFile(path, file_flags, FileLockType::kWriteLock);
 }
 
-template void ColumnLengthReader::LoadColumnLength(u32 column_counter,
-                                                   Scorer::ColumnIndexMapType &column_index_map,
-                                                   TableEntry *table_entry,
-                                                   TransactionID txn_id,
-                                                   TxnTimeStamp begin_ts);
+FullTextColumnLengthFileHandler::~FullTextColumnLengthFileHandler() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    file_handler_->Sync();
+    file_handler_->Close();
+}
 
-void ColumnLengthReader::UpdateAvgColumnLength(Vector<float> &avg_column_length) const {
-    avg_column_length.clear();
-    avg_column_length.resize(column_counter_);
-    u32 total_row_count = 0;
-    for (const auto &[segment_id, buffer_handle_v] : column_length_data_buffer_handles_) {
-        u32 segment_row_cnt = -1;
-        for (u32 i = 0; i < column_counter_; ++i) {
-            auto &buffer_handle = buffer_handle_v[i];
-            auto &column_length_data = *static_cast<const FullTextColumnLengthData *>(buffer_handle.GetData());
-            if (segment_row_cnt == u32(-1)) {
-                segment_row_cnt = column_length_data.row_count_;
-                total_row_count += segment_row_cnt;
-            } else if (segment_row_cnt != column_length_data.row_count_) {
-                UnrecoverableError(fmt::format("Segment {} has different row count for different columns", segment_id));
-            }
-            avg_column_length[i] += column_length_data.total_length_;
-        }
+void FullTextColumnLengthFileHandler::WriteColumnLength(const u32 *column_length_array, u32 column_length_count, u32 start_from_offset) {
+    // 1. update column length info in segment index entry
+    u64 total_column_len_sum = 0;
+    for (u32 i = 0; i < column_length_count; i++) {
+        total_column_len_sum += column_length_array[i];
     }
-    for (auto &len : avg_column_length) {
-        len /= total_row_count;
+    segment_index_entry_->UpdateFulltextColumnLenInfo(total_column_len_sum, column_length_count);
+    // 2. write column length info to file
+    std::lock_guard<std::mutex> lock(mutex_);
+    file_system_->Seek(*file_handler_, start_from_offset * sizeof(u32));
+    u32 expect_write_count = column_length_count * sizeof(u32);
+    i64 write_count = file_system_->Write(*file_handler_, column_length_array, expect_write_count);
+    if (write_count != expect_write_count) {
+        UnrecoverableError("WriteColumnLength: write_count != expect_write_count");
+    }
+}
+
+FullTextColumnLengthUpdateJob::FullTextColumnLengthUpdateJob(SharedPtr<FullTextColumnLengthFileHandler> file_handler,
+                                                             u32 column_length_count,
+                                                             u32 start_from_offset)
+    : file_handler_(std::move(file_handler)), column_length_count_(column_length_count), start_from_offset_(start_from_offset) {
+    column_length_array_ = MakeUniqueForOverwrite<u32[]>(column_length_count);
+}
+
+void FullTextColumnLengthUpdateJob::DumpToFile() {
+    file_handler_->WriteColumnLength(column_length_array_.get(), column_length_count_, start_from_offset_);
+    file_handler_.reset();
+    column_length_array_.reset();
+}
+
+FullTextColumnLengthReader::FullTextColumnLengthReader(UniquePtr<FileSystem> file_system,
+                                                       const String &index_dir,
+                                                       const Vector<String> &base_names,
+                                                       const Vector<RowID> &base_row_ids)
+    : file_system_(std::move(file_system)), index_dir_(index_dir), base_names_(base_names), base_row_ids_(base_row_ids) {}
+
+void FullTextColumnLengthReader::SeekFile(RowID row_id) {
+    while (base_row_ids_[next_base_rowid_index_] <= row_id) {
+        ++next_base_rowid_index_;
+    }
+    current_base_rowid_ = base_row_ids_[next_base_rowid_index_ - 1];
+    next_base_rowid_ = base_row_ids_[next_base_rowid_index_];
+    // load file
+    Path column_length_file_base = Path(index_dir_) / base_names_[next_base_rowid_index_ - 1];
+    String column_length_file_path_prefix = column_length_file_base.string();
+    String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
+    UniquePtr<FileHandler> file_handler = file_system_->OpenFile(column_length_file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    const u32 file_size = file_system_->GetFileSize(*file_handler);
+    if (u32 array_len = file_size / sizeof(u32); array_len > column_length_array_capacity_) {
+        column_length_array_capacity_ = std::max(array_len, std::min<u32>(2 * array_len, 1024 * 8192));
+        column_length_array_ = MakeUniqueForOverwrite<u32[]>(column_length_array_capacity_);
+    }
+    const i64 read_count = file_system_->Read(*file_handler, column_length_array_.get(), file_size);
+    file_handler->Close();
+    if (read_count != file_size) {
+        UnrecoverableError("SeekFile: read_count != file_size");
+    }
+}
+
+void ColumnLengthReader::LoadColumnLength(RowID first_doc_id,
+                                          IndexReader &index_reader,
+                                          const Vector<u64> &column_ids,
+                                          Vector<float> &avg_column_length) {
+    column_length_vector_.clear();
+    column_length_vector_.reserve(column_ids.size());
+    avg_column_length.resize(column_ids.size());
+    for (u32 i = 0; i < column_ids.size(); i++) {
+        u64 column_id = column_ids[i];
+        ColumnIndexReader *reader = index_reader.GetColumnIndexReader(column_id);
+        column_length_vector_.emplace_back(MakeUnique<LocalFileSystem>(), reader->index_dir_, reader->base_names_, reader->base_row_ids_);
+        column_length_vector_.back().SeekFile(first_doc_id);
+        avg_column_length[i] = reader->GetAvgColumnLength();
     }
 }
 
