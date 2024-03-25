@@ -86,7 +86,6 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
                            u32 row_offset,
                            u32 row_count,
                            SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
-                           RowID job_start_row_id,
                            bool offline) {
     if (is_spilled_)
         Load();
@@ -100,8 +99,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
         doc_count = doc_count_;
         doc_count_ += row_count;
     }
-    u32 offset_in_index = job_start_row_id - base_row_id_;
-    auto update_length_job = MakeShared<FullTextColumnLengthUpdateJob>(std::move(fulltext_length_handler), row_count, offset_in_index);
+    auto update_length_job = MakeShared<FullTextColumnLengthUpdateJob>(std::move(fulltext_length_handler), row_count, doc_count);
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     if (offline) {

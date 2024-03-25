@@ -85,8 +85,8 @@ TEST_F(MemoryIndexerTest, Insert) {
         MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path_1, fake_segment_index_entry_1.get());
     MemoryIndexer
         indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer1.Insert(column, 0, 1, column_length_file_handler_1, RowID(0U, 0U));
-    indexer1.Insert(column, 1, 3, std::move(column_length_file_handler_1), RowID(0U, 1U));
+    indexer1.Insert(column, 0, 1, column_length_file_handler_1);
+    indexer1.Insert(column, 1, 3, std::move(column_length_file_handler_1));
     indexer1.Dump();
     fake_segment_index_entry_1->GetFulltextBaseNames().emplace_back("chunk1");
     fake_segment_index_entry_1->GetFulltextBaseRowIDs().emplace_back(RowID(0U, 0U).ToUint64());
@@ -103,7 +103,7 @@ TEST_F(MemoryIndexerTest, Insert) {
                                               byte_slice_pool_,
                                               buffer_pool_,
                                               thread_pool_);
-    indexer2->Insert(column, 4, 1, std::move(column_length_file_handler_2), RowID(0U, 4U));
+    indexer2->Insert(column, 4, 1, std::move(column_length_file_handler_2));
     while (indexer2->GetInflightTasks() > 0) {
         sleep(1);
         indexer2->CommitSync();
@@ -159,9 +159,9 @@ TEST_F(MemoryIndexerTest, test2) {
         MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, fake_segment_index_entry_1.get());
     MemoryIndexer
         indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer1.Insert(column, 0, 2, column_length_file_handler, RowID(0U, 0U), true);
-    indexer1.Insert(column, 2, 2, column_length_file_handler, RowID(0U, 2U), true);
-    indexer1.Insert(column, 4, 1, std::move(column_length_file_handler), 4, true);
+    indexer1.Insert(column, 0, 2, column_length_file_handler, true);
+    indexer1.Insert(column, 2, 2, column_length_file_handler, true);
+    indexer1.Insert(column, 4, 1, std::move(column_length_file_handler), true);
     indexer1.Dump(true);
     fake_segment_index_entry_1->GetFulltextBaseNames().emplace_back("chunk1");
     fake_segment_index_entry_1->GetFulltextBaseRowIDs().emplace_back(RowID(0U, 0U).ToUint64());

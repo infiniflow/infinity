@@ -168,7 +168,7 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
             u64 column_id = column_def->id();
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(txn->buffer_mgr()));
-            memory_indexer_->Insert(column_vector, row_offset, row_count, std::move(column_length_file_handler), begin_row_id, false);
+            memory_indexer_->Insert(column_vector, row_offset, row_count, std::move(column_length_file_handler), false);
             auto duration = Clock::now().time_since_epoch();
             u64 ts = ChronoCast<NanoSeconds>(duration).count();
             table_index_entry_->UpdateFulltextSegmentTs(ts);
@@ -253,14 +253,12 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
             auto column_length_file_handler =
                 MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, this);
-            RowID job_start_row_id = base_row_id;
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
-                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), column_length_file_handler, job_start_row_id, true);
+                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), column_length_file_handler, true);
                 memory_indexer_->Commit(true);
-                job_start_row_id += block_entry->row_count();
             }
             column_length_file_handler.reset();
             memory_indexer_->Dump(true);

@@ -58,7 +58,6 @@ public:
                 u32 row_offset,
                 u32 row_count,
                 SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
-                RowID job_start_row_id,
                 bool offline = false);
 
     // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
