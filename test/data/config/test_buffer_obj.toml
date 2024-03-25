@@ -11,3 +11,4 @@ delta_checkpoint_interval_sec = 1
 
 [buffer]
 buffer_pool_size = "64kb"
+temp_dir         = "/tmp/infinity/temp"

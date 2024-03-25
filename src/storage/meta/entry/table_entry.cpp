@@ -256,7 +256,7 @@ void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
 
 void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     {
-        std::unique_lock lock(this->rw_locker_);
+        std::unique_lock lock(this->rw_locker());
         SegmentID segment_id = segment_entry->segment_id();
         SizeT row_count = segment_entry->row_count();
         auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
@@ -276,7 +276,7 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
 }
 
 void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
-    std::unique_lock lock(this->rw_locker_);
+    std::unique_lock lock(this->rw_locker());
     SegmentID segment_id = segment_entry->segment_id();
     auto [_, insert_ok] = this->segment_map_.emplace(segment_id, std::move(segment_entry));
     if (!insert_ok) {
@@ -301,7 +301,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
 
     while (!append_state_ptr->Finished()) {
         {
-            std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_); // prevent another read conflict with this append operation
+            std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker()); // prevent another read conflict with this append operation
             if (unsealed_segment_.get() == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_) {
@@ -375,7 +375,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
             }
             LOG_INFO(ss);
         }
-        std::unique_lock lock(this->rw_locker_);
+        std::unique_lock lock(this->rw_locker());
         for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
 
             auto *segment_entry = segment_store.segment_entry_;
@@ -430,7 +430,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                 UnrecoverableError(fmt::format("RollbackCompact: segment {} is committed", segment_entry->segment_id()));
             }
             {
-                std::unique_lock lock(this->rw_locker_);
+                std::unique_lock lock(this->rw_locker());
                 if (auto iter = segment_map_.find(segment_entry->segment_id()); iter != segment_map_.end()) {
                     segment = std::move(iter->second);
                     segment_map_.erase(iter);
@@ -470,7 +470,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
 
 Status TableEntry::CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
     {
-        std::unique_lock w_lock(this->rw_locker_);
+        std::unique_lock w_lock(this->rw_locker());
         for (const auto &[segment_id, segment_store] : segment_stores) {
             auto *segment_entry = segment_store.segment_entry_;
             segment_entry->CommitSegment(txn_id, commit_ts);
@@ -490,7 +490,7 @@ Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegment
         if (!segment_entry->Committed()) {
             SharedPtr<SegmentEntry> segment;
             {
-                std::unique_lock w_lock(this->rw_locker_);
+                std::unique_lock w_lock(this->rw_locker());
                 if (auto iter = segment_map_.find(segment_entry->segment_id()); iter != segment_map_.end()) {
                     segment = std::move(iter->second);
                     segment_map_.erase(iter);
@@ -535,7 +535,7 @@ void TableEntry::MemIndexCommit() {
 }
 
 SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
-    std::shared_lock lock(this->rw_locker_);
+    std::shared_lock lock(this->rw_locker());
     auto iter = segment_map_.find(segment_id);
     if (iter == segment_map_.end()) {
         return nullptr;
@@ -572,7 +572,7 @@ String TableEntry::GetPathNameTail() const {
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
-    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker());
     result->Reserve(this->segment_map_.size());
 
     // Add segment that is not deprecated
@@ -590,7 +590,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
     {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;
         json_res["row_count"] = this->row_count_.load();
@@ -732,7 +732,7 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
         delete_row_map[row_id.segment_id_].emplace_back(row_id.segment_offset_);
     }
     Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> check_segments;
-    std::shared_lock lock(this->rw_locker_);
+    std::shared_lock lock(this->rw_locker());
     for (const auto &[segment_id, segment_offsets] : delete_row_map) {
         check_segments.emplace_back(this->segment_map_.at(segment_id).get(), std::move(segment_offsets));
     }
@@ -759,7 +759,7 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
         compaction_alg_->Disable(); // wait for current compaction to finish
     }
     Vector<SegmentEntry *> result;
-    std::shared_lock lock(this->rw_locker_);
+    std::shared_lock lock(this->rw_locker());
     for (const auto &[segment_id, segment] : this->segment_map_) {
         auto status = segment->status();
         if (status == SegmentStatus::kSealed) {
@@ -775,7 +775,7 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
     index_meta_map_.PickCleanup(scanner);
     Vector<SegmentID> cleanup_segment_ids;
     {
-        std::unique_lock lock(this->rw_locker_);
+        std::unique_lock lock(this->rw_locker());
         TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
             SegmentEntry *segment = iter->second.get();

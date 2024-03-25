@@ -582,7 +582,6 @@ void SegmentIndexEntry::Cleanup() {
         }
         // here need to force cleanup, otherwise will cause error when shutdown service.
         buffer_obj->SetAndTryCleanup();
-        buffer_obj->TryCleanup(true);
     }
 }
 

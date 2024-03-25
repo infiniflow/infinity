@@ -65,7 +65,7 @@ public:
 
     void SetAndTryCleanup();
 
-    void TryCleanup(bool force_cleanup);
+    void TryCleanup();
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
