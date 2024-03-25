@@ -28,6 +28,8 @@ public:
     [[nodiscard]] std::string ToString() const override;
 
     void SetExprs(std::vector<infinity::ParsedExpr *> *exprs);
+    void AddExpr(infinity::ParsedExpr *expr);
+    void Validate() const;
 
 public:
     std::vector<MatchExpr *> match_exprs_{};
