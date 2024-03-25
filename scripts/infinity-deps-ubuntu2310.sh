@@ -12,18 +12,18 @@ echo
 sudo apt update && sudo apt install -y git wget
 
 echo
-echo 'step [2/5] : download cmake-3.28.3'
-echo 'command: wget https://cmake.org/files/v3.28/cmake-3.28.3-linux-x86_64.tar.gz'
+echo 'step [2/5] : download cmake-3.29.0'
+echo 'command: wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz'
 echo
-wget https://cmake.org/files/v3.28/cmake-3.28.3-linux-x86_64.tar.gz
+wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
 
 echo
-echo 'step [3/5] : install cmake-3.28.3 into /usr/local/bin and /usr/local/share'
-echo 'command: tar zxvf cmake-3.28.3-linux-x86_64.tar.gz'
-echo 'command: sudo cp -rf cmake-3.28.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.3-linux-x86_64'
+echo 'step [3/5] : install cmake-3.29.0 into /usr/local/bin and /usr/local/share'
+echo 'command: tar zxvf cmake-3.29.0-linux-x86_64.tar.gz'
+echo 'command: sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64'
 echo
-tar zxvf cmake-3.28.3-linux-x86_64.tar.gz
-sudo cp -rf cmake-3.28.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.3-linux-x86_64
+tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
+sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
 
 echo
 echo 'step [4/5] : sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev'
