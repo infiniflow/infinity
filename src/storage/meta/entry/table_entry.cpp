@@ -34,7 +34,6 @@ import status;
 import infinity_exception;
 import index_ivfflat;
 import txn_manager;
-import iresearch_datastore;
 import index_base;
 import index_full_text;
 import catalog_delta_entry;
@@ -246,7 +245,6 @@ void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
                     column2analyzer[column_name] = index_full_text->analyzer_;
                 }
                 if (!column2analyzer.empty()) {
-                    // iresearch requires there is exactly one full index per table.
                     break;
                 }
             }

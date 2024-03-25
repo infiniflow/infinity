@@ -14,8 +14,6 @@
 
 module;
 
-#include "search/filter.hpp"
-
 import stl;
 
 import base_expression;

@@ -27,7 +27,6 @@ class Txn;
 struct TableIndexEntry;
 class BufferManager;
 struct TableEntry;
-class IRSDataStore;
 class IndexFullText;
 
 export struct FulltextIndexEntry : public BaseEntry {
@@ -65,6 +64,5 @@ public:
 
     const TableIndexEntry *table_index_entry_{};
     HashMap<u64, SharedPtr<IndexFullText>> index_info_map_{};
-    UniquePtr<IRSDataStore> irs_index_{};
 };
 } // namespace infinity

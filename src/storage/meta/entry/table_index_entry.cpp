@@ -29,7 +29,6 @@ import infinity_exception;
 import index_full_text;
 import catalog_delta_entry;
 import base_table_ref;
-import iresearch_datastore;
 import create_index_info;
 import base_entry;
 import logger;
@@ -286,13 +285,6 @@ Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
     if (fulltext_index_entry != nullptr && !IsFulltextIndexHomebrewed()) {
-        auto *buffer_mgr = txn->buffer_mgr();
-        for (const auto *segment_entry : block_index->segments_) {
-            fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_base_.get(), segment_entry, buffer_mgr);
-        }
-        fulltext_index_entry->irs_index_->Commit();
-        fulltext_index_entry->irs_index_->StopSchedule();
-        return {fulltext_index_entry, Vector<SegmentIndexEntry *>{}, Status::OK()};
     }
     Vector<SegmentIndexEntry *> segment_index_entries;
     for (const auto *segment_entry : block_index->segments_) {

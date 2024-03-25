@@ -28,7 +28,6 @@ import table_def;
 import third_party;
 import status;
 import logger;
-import iresearch_datastore;
 import base_table_ref;
 import fulltext_index_entry;
 import table_index_meta;
@@ -77,7 +76,7 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
 
     if (fulltext_index_entry) {
         LOG_INFO(fmt::format("ScheduleOptimize"));
-        fulltext_index_entry->irs_index_->ScheduleOptimize();
+        // TODO
     }
     LOG_TRACE("Optimize index");
 }

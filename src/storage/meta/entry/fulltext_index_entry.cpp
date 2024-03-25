@@ -20,7 +20,6 @@ import stl;
 import third_party;
 import infinity_exception;
 import buffer_manager;
-import iresearch_datastore;
 import index_base;
 import index_full_text;
 import logger;
@@ -41,8 +40,6 @@ FulltextIndexEntry::NewFulltextIndexEntry(TableIndexEntry *table_index_entry, Tr
     auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, txn_id, begin_ts);
     bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
     if (!homebrewed) {
-        fulltext_index_entry->irs_index_ =
-            MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *fulltext_index_entry->index_dir());
     }
 
     return fulltext_index_entry;
@@ -56,8 +53,6 @@ SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewReplayFulltextIndexEntry(Ta
     auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, txn_id, begin_ts);
     bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
     if (!homebrewed) {
-        fulltext_index_entry->irs_index_ =
-            MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *fulltext_index_entry->index_dir());
     }
     fulltext_index_entry->commit_ts_.store(commit_ts);
     fulltext_index_entry->deleted_ = is_delete;
