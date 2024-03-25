@@ -64,11 +64,13 @@ class TestImport:
         assert res.error_code == ErrorCode.OK
 
     # import different file format data
+    @pytest.mark.parametrize("check_data", [{"file_name": "test.fvecs",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("file_format", ["csv",
                                              pytest.param("json", marks=pytest.mark.xfail(
                                                  reason="ERROR:3032, Import JSON is not implemented yet")),
                                              "fvecs"])
-    def test_import_different_file_format_data(self, file_format):
+    def test_import_different_file_format_data(self, file_format, check_data):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
@@ -78,11 +80,12 @@ class TestImport:
                                         {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         if file_format == "fvecs":
+            if not check_data:
+                copy_data("test.fvecs")
             db_obj.drop_table("test_import_different_file_format_data_fvecs")
             table_obj = db_obj.create_table("test_import_different_file_format_data_fvecs",
                                             {"c1": "vector,128,float"}, ConflictType.Error)
-            table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test." + file_format,
-                                  {"file_type": file_format})
+            table_obj.import_data(common_values.TEST_TMP_DIR + "test.fvecs", {"file_type": file_format})
             res = table_obj.output(["*"]).to_df()
             print(res)
 
@@ -151,21 +154,19 @@ class TestImport:
         assert res.error_code == ErrorCode.OK
 
     # import format unrecognized data
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_columns.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("file_format", [
         pytest.param("json", marks=pytest.mark.xfail(reason="ERROR:3032, Import JSON is not implemented yet")),
         pytest.param("txt", marks=pytest.mark.xfail(reason="Unrecognized import file type")),
         "csv"])
-    def test_import_format_unrecognized_data(self, get_infinity_db, check_data, file_format):
+    def test_import_format_unrecognized_data(self, get_infinity_db, file_format):
         db_obj = get_infinity_db
 
         db_obj.drop_table("test_import_format_unrecognized_data")
-        table_obj = db_obj.create_table("test_import_format_unrecognized_data", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        table_obj = db_obj.create_table("test_import_format_unrecognized_data", {"c1": "int", "c2": "vector,3,int"},
+                                        ConflictType.Error)
 
-        table_obj.import_data(
-            os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
-            {"file_type": file_format})
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
+                              {"file_type": file_format})
 
         res = table_obj.output(["*"]).to_df()
         print(res)
