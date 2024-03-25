@@ -91,7 +91,6 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
             if (buffer_obj1->Free()) {
                 current_memory_size_ -= buffer_obj1->GetBufferSize();
             }
-            buffer_obj1->TryCleanup(false);
         } else {
             UnrecoverableError("Out of memory.");
         }

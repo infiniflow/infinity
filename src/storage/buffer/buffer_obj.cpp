@@ -102,7 +102,6 @@ void BufferObj::UnloadInner() {
 
 bool BufferObj::Free() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    auto status = status_;
     switch (status_) {
         case BufferStatus::kFreed:
         case BufferStatus::kLoaded: {
@@ -130,10 +129,15 @@ bool BufferObj::Free() {
         }
     }
     file_worker_->FreeInMemory();
-    if (status != BufferStatus::kClean) {
+
+    if (status_ == BufferStatus::kClean) {
+        file_worker_->CleanupFile();
+        buffer_mgr_->RemoveBufferObj(this->GetFilename());
+    } else {
+        wait_for_gc_ = false;
         status_ = BufferStatus::kFreed;
     }
-    wait_for_gc_ = false;
+
     return true;
 }
 
@@ -189,23 +193,13 @@ void BufferObj::SetAndTryCleanup() {
                 UnrecoverableError("Assert: freed buffer object shouldn't in gc_queue.");
             }
             file_worker_->CleanupFile();
-            buffer_mgr_->Cleanup(this->GetFilename());
+            buffer_mgr_->RemoveBufferObj(this->GetFilename());
             break;
         }
         default: {
             UnrecoverableError("Assert: buffer object status isn't freed or unloaded.");
         }
     }
-}
-
-void BufferObj::TryCleanup() {
-    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-    if (status_ != BufferStatus::kClean || rc_ > 0) {
-        LOG_TRACE("BufferObj can't be cleaned up.");
-        return;
-    }
-    file_worker_->CleanupFile();
-    buffer_mgr_->Cleanup(this->GetFilename());
 }
 
 void BufferObj::CheckState() const {

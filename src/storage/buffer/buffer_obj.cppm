@@ -65,8 +65,6 @@ public:
 
     void SetAndTryCleanup();
 
-    void TryCleanup();
-
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
