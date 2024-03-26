@@ -109,6 +109,20 @@ String TableIndexEntry::GetPathNameTail() const {
     return index_dir_->substr(delimiter_i + 1);
 }
 
+SharedPtr<SegmentIndexEntry> TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn) {
+    SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
+    std::unique_lock w_lock(rw_locker_);
+    auto iter = index_by_segment_.find(segment_id);
+    if (iter == index_by_segment_.end()) {
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), DEFAULT_SEGMENT_CAPACITY, column_def_.get());
+        segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+        index_by_segment_.emplace(segment_id, segment_index_entry);
+    } else {
+        segment_index_entry = iter->second;
+    }
+    return segment_index_entry;
+}
+
 // For segment_index_entry
 void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay) {
     {

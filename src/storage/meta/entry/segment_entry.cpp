@@ -170,7 +170,7 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
     BlockID block_id = segment_offset / block_capacity;
     BlockOffset block_offset = segment_offset % block_capacity;
 
-    auto *block_entry = GetBlockEntryByID(block_id);
+    auto *block_entry = GetBlockEntryByID(block_id).get();
     return block_entry->CheckRowVisible(block_offset, check_ts);
 }
 
@@ -249,12 +249,6 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             IncreaseRowCount(actual_appended);
             if (this->row_count_ > this->row_capacity_) {
                 UnrecoverableError("Not implemented: append data exceed segment row capacity");
-            }
-
-            // Realtime index insertion. If the BlockEntry is sealed, dump the realtime index.
-            table_entry_->MemIndexInsert(txn, this->block_entries_.back(), range_block_start_row, actual_appended);
-            if (last_block_entry->GetAvailableCapacity() <= 0) {
-                table_entry_->MemIndexDump(txn);
             }
         }
         if (to_append_rows == 0) {
@@ -349,12 +343,12 @@ void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntr
     }
 }
 
-BlockEntry *SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
+SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
     std::shared_lock lock(rw_locker_);
     if (block_id >= block_entries_.size()) {
         return nullptr;
     }
-    return block_entries_[block_id].get();
+    return block_entries_[block_id];
 }
 
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {

@@ -92,8 +92,8 @@ public:
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot();
     const SharedPtr<String> &index_dir() const { return index_dir_; }
-
     String GetPathNameTail() const;
+    SharedPtr<SegmentIndexEntry> GetOrCreateSegment(SegmentID segment_id, Txn *txn);
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);

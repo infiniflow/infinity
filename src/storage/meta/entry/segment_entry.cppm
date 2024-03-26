@@ -158,7 +158,7 @@ public:
         return deprecate_ts_;
     }
 
-    BlockEntry *GetBlockEntryByID(BlockID block_id) const;
+    SharedPtr<BlockEntry> GetBlockEntryByID(BlockID block_id) const;
 
 public:
     u64 AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
