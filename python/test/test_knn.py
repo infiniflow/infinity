@@ -146,15 +146,15 @@ class TestKnn:
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
-        pytest.param("variant_id", marks=pytest.mark.skip(reason="struct.error: required argument is not a float")),
-        pytest.param("gender_vector", marks=pytest.mark.skip(reason="struct.error: required argument is not a float")),
-        pytest.param(1, marks=pytest.mark.skip(reason="TypeError: object of type 'int' has no len()")),
-        pytest.param(2.4, marks=pytest.mark.skip(reason="TypeError: object of type 'float' has no len()")),
-        pytest.param([1] * 3, marks=pytest.mark.xfail),
+        pytest.param("variant_id", marks=pytest.mark.xfail(reason="Invalid embedding data")),
+        pytest.param("gender_vector", marks=pytest.mark.xfail(reason="Invalid embedding data")),
+        pytest.param(1, marks=pytest.mark.xfail(reason="Invalid embedding data")),
+        pytest.param(2.4, marks=pytest.mark.xfail(reason="Invalid embedding data")),
+        pytest.param([1] * 3, marks=pytest.mark.xfail(reason="Invalid embedding data")),
+        pytest.param((1, 2, 3), marks=pytest.mark.xfail(reason="Invalid embedding data")),
+        pytest.param({"c": "12"}, marks=pytest.mark.xfail(reason="Invalid embedding data")),
         [1] * 4,
-        pytest.param((1, 2, 3), marks=pytest.mark.xfail),
         (1, 2, 3, 4),
-        pytest.param({"c": "12"}, marks=pytest.mark.skip(reason="struct.error: required argument is not a float")),
     ])
     def test_various_embedding_data(self, get_infinity_db, check_data, embedding_data):
         db_obj = get_infinity_db
@@ -272,12 +272,13 @@ class TestKnn:
     @pytest.mark.parametrize("topn", [
         (2, True),
         (10, True),
-        (0, False),
-        (-1, False),
-        pytest.param("word", marks=pytest.mark.skip(reason="struct.error: required argument is not an integer")),
-        pytest.param({}, marks=pytest.mark.skip(reason="struct.error: required argument is not an integer")),
-        pytest.param((), marks=pytest.mark.skip(reason="struct.error: required argument is not an integer")),
-        pytest.param([1] * 4, marks=pytest.mark.skip(reason="struct.error: required argument is not an integer")),
+        (0, False, "ERROR:3014*"),
+        (-1, False, "ERROR:3014*"),
+        (1.1, False, "Invalid topn"),
+        ("test", False, "Invalid topn"),
+        ({}, False, "Invalid topn"),
+        ((), False, "Invalid topn"),
+        ([1] * 4, False, "Invalid topn"),
     ])
     def test_various_topn(self, get_infinity_db, check_data, topn):
         db_obj = get_infinity_db
@@ -302,7 +303,7 @@ class TestKnn:
             res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
             print(res)
         else:
-            with pytest.raises(Exception, match="ERROR:3014*"):
+            with pytest.raises(Exception, match=topn[2]):
                 res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",

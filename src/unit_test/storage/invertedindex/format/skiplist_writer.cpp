@@ -48,6 +48,7 @@ TEST_F(SkipListWriterTest, test1) {
     ASSERT_NE(nullptr, skiplist_writer_);
     PostingFields posting_fields;
     auto posting_field = new TypedPostingField<u32>();
+    posting_field->encoder_ = GetSkipListEncoder();
     posting_fields.AddValue(posting_field);
     skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
@@ -91,11 +92,13 @@ TEST_F(SkipListWriterTest, test2) {
     auto posting_field_key = new TypedPostingField<u32>;
     posting_field_key->location_ = row_count++;
     posting_field_key->offset_ = offset;
+    posting_field_key->encoder_ = GetSkipListEncoder();
     offset += sizeof(u32);
 
     auto posting_field_value = new TypedPostingField<u32>;
     posting_field_value->location_ = row_count++;
     posting_field_value->offset_ = offset;
+    posting_field_value->encoder_ = GetSkipListEncoder();
     offset += sizeof(u32);
 
     posting_fields.AddValue(posting_field_key);
@@ -161,16 +164,22 @@ TEST_F(SkipListWriterTest, test3) {
     auto posting_field_key = new TypedPostingField<u32>;
     posting_field_key->location_ = row_count++;
     posting_field_key->offset_ = offset;
+    posting_field_key->encoder_ = GetSkipListEncoder();
+
     offset += sizeof(u32);
 
     auto posting_field_value1 = new TypedPostingField<u32>;
     posting_field_value1->location_ = row_count++;
     posting_field_value1->offset_ = offset;
+    posting_field_value1->encoder_ = GetSkipListEncoder();
+
     offset += sizeof(u32);
 
     auto posting_field_value2 = new TypedPostingField<u32>;
     posting_field_value2->location_ = row_count++;
     posting_field_value2->offset_ = offset;
+    posting_field_value2->encoder_ = GetSkipListEncoder();
+
     offset += sizeof(u32);
 
     posting_fields.AddValue(posting_field_key);
