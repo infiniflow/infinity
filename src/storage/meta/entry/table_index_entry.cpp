@@ -192,7 +192,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
 
     if (deleted) {
         auto table_index_entry = ReplayTableIndexEntry(table_index_meta, true, nullptr, nullptr, txn_id, begin_ts, commit_ts);
-        table_index_entry->deleted_ = true;
         table_index_entry->commit_ts_.store(commit_ts);
         table_index_entry->begin_ts_ = begin_ts;
         return table_index_entry;
