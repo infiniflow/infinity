@@ -14,7 +14,7 @@ COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' )
 ----
 
 statement ok
-CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(HOMEBREWED=1);
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT;
 
 query TTI
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
@@ -52,7 +52,7 @@ Anarchism 30-APR-2012 03:25:17.000 4294967296 25.553249
 Anarchism 30-APR-2012 03:25:17.000 8589934592 25.553249
 
 statement ok
-CREATE INDEX ft_index2 ON enwiki(doctitle) USING FULLTEXT WITH(HOMEBREWED=1);
+CREATE INDEX ft_index2 ON enwiki(doctitle) USING FULLTEXT;
 
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle,body^5', 'harmful chemical anarchism', 'topn=3');

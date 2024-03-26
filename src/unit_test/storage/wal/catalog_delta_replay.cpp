@@ -45,7 +45,6 @@ import query_context;
 import txn;
 import index_base;
 import index_full_text;
-import fulltext_index_entry;
 import bg_task;
 import logger;
 import infinity_exception;

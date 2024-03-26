@@ -19,6 +19,7 @@ export {
         of_doc_payload = 2,    // 1 << 1
         of_position_list = 4,  // 1 << 2
         of_term_frequency = 8, // 1 << 3
+
     };
 
     typedef u16 docpayload_t;
