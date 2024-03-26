@@ -49,6 +49,7 @@ import status;
 import session_manager;
 import base_statement;
 import parser_result;
+import parser_assert;
 
 namespace infinity {
 
@@ -168,6 +169,11 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StopProfile(QueryPhase::kRollback);
         query_result.result_table_ = nullptr;
         query_result.status_.Init(e.ErrorCode(), e.what());
+
+    } catch (ParserException &e) {
+
+        query_result.result_table_ = nullptr;
+        query_result.status_.Init(ErrorCode::kParserError, e.what());
 
     } catch (UnrecoverableException &e) {
 
