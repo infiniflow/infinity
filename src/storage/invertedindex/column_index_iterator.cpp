@@ -32,7 +32,10 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
     posting_decoder_ = MakeShared<PostingDecoder>(format_option);
 }
 
-ColumnIndexIterator::~ColumnIndexIterator() {}
+ColumnIndexIterator::~ColumnIndexIterator() {
+    ByteSlice::DestroySlice(doc_list_slice_);
+    ByteSlice::DestroySlice(pos_list_slice_);
+}
 
 bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {
     bool ret = dict_reader_->Next(key, term_meta_);

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "type/complex/row_id.h"
-#include "type/logical_type.h"
 #include "unit_test/base_test.h"
+
 #include <iostream>
 #include <unistd.h>
 import stl;
@@ -34,6 +33,8 @@ import column_inverter;
 import segment_index_entry;
 import local_file_system;
 import column_length_io;
+import internal_types;
+import logical_type;
 
 using namespace infinity;
 
