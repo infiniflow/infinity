@@ -21,6 +21,11 @@ module cleanup_scanner;
 import stl;
 import catalog;
 import base_entry;
+import local_file_system;
+import infinity_exception;
+import status;
+import logger;
+import third_party;
 
 namespace infinity {
 
@@ -33,6 +38,21 @@ void CleanupScanner::Scan() { catalog_->PickCleanup(this); }
 void CleanupScanner::Cleanup() && {
     for (auto &entry : entries_) {
         std::move(*entry).Cleanup();
+    }
+}
+
+void CleanupScanner::CleanupDir(const String &dir) {
+    LocalFileSystem fs;
+    try {
+        fs.DeleteEmptyDirectory(dir);
+    } catch (const RecoverableException &e) {
+        if (e.ErrorCode() == ErrorCode::kDirNotFound) {
+            // this happen when delta checkpoint records "drop table/db/...", and cleanup is called.
+            // then restart the system, table entry will be created but no directory will be found
+            LOG_INFO(fmt::format("Cleanup: Dir {} not found. Skip", dir));
+        } else {
+            throw;
+        }
     }
 }
 

@@ -48,6 +48,7 @@ import local_file_system;
 import build_fast_rough_filter_task;
 import block_entry;
 import segment_index_entry;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -829,8 +830,7 @@ void TableEntry::Cleanup() {
     index_meta_map_.Cleanup();
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *table_entry_dir_));
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*table_entry_dir_);
+    CleanupScanner::CleanupDir(*table_entry_dir_);  
 }
 
 } // namespace infinity
