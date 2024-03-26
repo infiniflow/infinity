@@ -39,7 +39,6 @@ import value;
 import third_party;
 import base_table_ref;
 import load_meta;
-import fulltext_index_entry;
 import block_entry;
 import block_column_entry;
 import logical_type;

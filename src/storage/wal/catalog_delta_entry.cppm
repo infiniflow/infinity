@@ -27,7 +27,6 @@ import segment_entry;
 import block_entry;
 import block_column_entry;
 import table_index_entry;
-import fulltext_index_entry;
 import segment_index_entry;
 import catalog;
 import serialize;
@@ -55,8 +54,7 @@ export enum class CatalogDeltaOpType : i8 {
     // INDEX
     // -----------------------------
     ADD_TABLE_INDEX_ENTRY = 11,
-    ADD_FULLTEXT_INDEX_ENTRY = 12,
-    ADD_SEGMENT_INDEX_ENTRY = 13,
+    ADD_SEGMENT_INDEX_ENTRY = 12,
 
     // -----------------------------
     // SEGMENT STATUS
@@ -380,40 +378,6 @@ public:
     SharedPtr<String> index_name_{};
     SharedPtr<String> index_dir_{};
     SharedPtr<IndexBase> index_base_{};
-};
-
-/// class AddFulltextIndexEntryOp
-export class AddFulltextIndexEntryOp : public CatalogDeltaOperation {
-public:
-    static UniquePtr<AddFulltextIndexEntryOp> ReadAdv(char *&ptr);
-
-    explicit AddFulltextIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY) {}
-
-    explicit AddFulltextIndexEntryOp(FulltextIndexEntry *fulltext_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY, fulltext_index_entry),
-          db_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
-          table_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
-          index_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->index_name()) {}
-
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY; }
-    String GetTypeStr() const final { return "ADD_FULLTEXT_INDEX_ENTRY"; }
-    [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-        total_size += sizeof(i32) + this->db_name_->size();
-        total_size += sizeof(i32) + this->table_name_->size();
-        total_size += sizeof(i32) + this->index_name_->size();
-        return total_size;
-    }
-    void WriteAdv(char *&buf) const final;
-    const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}#FTX@{}", *db_name_, *table_name_, *index_name_, (u8)(type_))); }
-    bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
-
-public:
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> table_name_{};
-    SharedPtr<String> index_name_{};
 };
 
 /// class AddSegmentColumnEntryOperation

@@ -29,7 +29,6 @@ import third_party;
 import status;
 import logger;
 import base_table_ref;
-import fulltext_index_entry;
 import table_index_meta;
 
 namespace infinity {
@@ -49,11 +48,9 @@ bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *opera
 
 void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState *operator_state) {
     // Get tables from catalog
-    auto txn = query_context->GetTxn();
-    TransactionID txn_id = txn->TxnID();
     LOG_INFO(fmt::format("OptimizeIndex {} {}", db_name_, object_name_));
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
-    auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
+    auto txn = query_context->GetTxn();
+    auto [_, table_status] = txn->GetTableByName(db_name_, object_name_);
 
     if (!table_status.ok()) {
         operator_state->status_ = table_status;
@@ -61,23 +58,6 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
         return;
     }
 
-    SharedPtr<FulltextIndexEntry> fulltext_index_entry;
-    {
-        auto map_guard = table_entry->IndexMetaMap();
-        for (auto &[index_name, table_index_meta] : *map_guard) {
-            auto [table_index_entry, index_status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-            if (!index_status.ok()) {
-                operator_state->status_ = index_status;
-                RecoverableError(index_status);
-            }
-            fulltext_index_entry = table_index_entry->fulltext_index_entry();
-        }
-    }
-
-    if (fulltext_index_entry) {
-        LOG_INFO(fmt::format("ScheduleOptimize"));
-        // TODO
-    }
     LOG_TRACE("Optimize index");
 }
 

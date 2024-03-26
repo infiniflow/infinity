@@ -220,33 +220,18 @@ void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&ini
     }
 }
 
-void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
-                                      Map<String, String> &column2analyzer) {
+void TableEntry::GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer) {
     column2analyzer.clear();
-    {
-        auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-        for (auto &[_, table_index_meta] : *index_meta_map_guard) {
-            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-            if (status.ok()) {
-                fulltext_index_entry = table_index_entry->fulltext_index_entry();
-                const IndexBase *index_base = table_index_entry->index_base();
-                if (index_base->index_type_ != IndexType::kFullText)
-                    continue;
-                auto index_full_text = static_cast<const IndexFullText *>(index_base);
-                if (index_full_text->homebrewed_) {
-                    // set fulltext_index_entry to nullptr to indicate that the index is homebrewed
-                    fulltext_index_entry = nullptr;
-                    column2analyzer.clear();
-                    return;
-                }
-                for (auto &column_name : index_full_text->column_names_) {
-                    column2analyzer[column_name] = index_full_text->analyzer_;
-                }
-                if (!column2analyzer.empty()) {
-                    break;
-                }
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+        if (status.ok()) {
+            const IndexBase *index_base = table_index_entry->index_base();
+            if (index_base->index_type_ != IndexType::kFullText)
+                continue;
+            auto index_full_text = static_cast<const IndexFullText *>(index_base);
+            for (auto &column_name : index_full_text->column_names_) {
+                column2analyzer[column_name] = index_full_text->analyzer_;
             }
         }
     }

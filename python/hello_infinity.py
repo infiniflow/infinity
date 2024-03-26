@@ -57,7 +57,7 @@ def test():
         res = table.create_index("my_index",
                                  [index.IndexInfo("body",
                                                   index.IndexType.FullText,
-                                                  [index.InitParameter("homebrewed", "1")]),
+                                                  []),
                                   ], ConflictType.Error)
         # assert res.success
 

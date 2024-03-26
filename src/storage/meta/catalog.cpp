@@ -50,7 +50,6 @@ import table_index_meta;
 import base_entry;
 import block_entry;
 import block_column_entry;
-import fulltext_index_entry;
 import segment_index_entry;
 
 namespace infinity {
@@ -675,24 +674,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         begin_ts);
                 } else {
                     table_entry->DropIndexReplay(*index_name, txn_id, begin_ts);
-                }
-                break;
-            }
-            case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
-                auto add_fulltext_index_entry_op = static_cast<AddFulltextIndexEntryOp *>(op.get());
-                const auto &db_name = add_fulltext_index_entry_op->db_name_;
-                const auto &table_name = add_fulltext_index_entry_op->table_name_;
-                const auto &index_name = add_fulltext_index_entry_op->index_name_;
-
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
-                auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
-
-                auto fulltext_index_entry =
-                    FulltextIndexEntry::NewReplayFulltextIndexEntry(table_index_entry, txn_id, begin_ts, commit_ts, is_delete);
-                table_index_entry->fulltext_index_entry().swap(fulltext_index_entry);
-                if (fulltext_index_entry.get() != nullptr) {
-                    UnrecoverableError(fmt::format("Fulltext index {} is already in the catalog", *index_name));
                 }
                 break;
             }

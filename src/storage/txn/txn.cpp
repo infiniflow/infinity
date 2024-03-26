@@ -273,18 +273,14 @@ Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db
 
 Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
     auto *table_entry = table_ref->table_entry_ptr_;
-    auto [fulltext_index_entry, segment_index_entries, status] =
+    auto [segment_index_entries, status] =
         table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
     if (!status.ok()) {
         return Status::OK();
     }
 
     auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
-    if (fulltext_index_entry == nullptr) {
-        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
-    } else {
-        txn_table_store->AddFulltextIndexStore(table_index_entry, fulltext_index_entry);
-    }
+    txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
     return Status::OK();
 }
 
