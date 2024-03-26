@@ -130,7 +130,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
         SharedPtr<LogicalNode> logical_plan = logical_planner_->LogicalPlan();
         StopProfile(QueryPhase::kLogicalPlan);
-
+//        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
         optimizer_->optimize(logical_plan);
@@ -140,7 +140,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kPhysicalPlan);
         UniquePtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
         StopProfile(QueryPhase::kPhysicalPlan);
-
+//        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
@@ -152,13 +152,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kTaskBuild);
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
         StopProfile(QueryPhase::kTaskBuild);
-
+//        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
         scheduler_->Schedule(plan_fragment.get());
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = logical_plan->operator_type();
         StopProfile(QueryPhase::kExecution);
-
+//        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
