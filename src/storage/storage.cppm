@@ -22,6 +22,7 @@ import buffer_manager;
 import wal_manager;
 import background_process;
 import periodic_trigger_thread;
+import log_file;
 
 export module storage;
 
@@ -45,7 +46,7 @@ public:
 
     void UnInit();
 
-    void AttachCatalog(const Vector<String> &catalog_files);
+    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
     void InitNewCatalog();
 

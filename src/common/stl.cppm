@@ -66,6 +66,8 @@ export namespace std {
     using std::errc;
 
     using std::stoi;
+    using std::stol;
+    using std::stoll;
     using std::strtol;
     using std::strtof;
     using std::strtod;

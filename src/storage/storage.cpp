@@ -41,6 +41,7 @@ import status;
 import bg_task;
 import periodic_trigger_thread;
 import periodic_trigger;
+import log_file;
 
 namespace infinity {
 
@@ -52,7 +53,7 @@ void Storage::Init() {
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
-                                      Path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
+                                      *config_ptr_->wal_dir(),
                                       config_ptr_->wal_size_threshold(),
                                       config_ptr_->delta_checkpoint_interval_wal_bytes(),
                                       config_ptr_->flush_at_commit());
@@ -139,12 +140,12 @@ void Storage::UnInit() {
     fmt::print("Shutdown storage successfully\n");
 }
 
-void Storage::AttachCatalog(const Vector<String> &catalog_files) {
-    LOG_INFO(fmt::format("Attach catalogs from {} files", catalog_files.size()));
-    for (const auto &catalog_file : catalog_files) {
-        LOG_TRACE(fmt::format("Catalog file: {}", catalog_file.c_str()));
+void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
+    LOG_TRACE(fmt::format("Full catalog file: {}", full_ckp_info.path_));
+    for (const auto &delta_ckp_info : delta_ckp_infos) {
+        LOG_TRACE(fmt::format("Delta catalog file: {}", delta_ckp_info.path_));
     }
-    new_catalog_ = Catalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
+    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
 void Storage::InitNewCatalog() {

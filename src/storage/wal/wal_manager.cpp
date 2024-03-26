@@ -49,14 +49,16 @@ import segment_entry;
 import block_entry;
 import table_index_meta;
 import table_index_entry;
+import log_file;
+import default_values;
 
 module wal_manager;
 
 namespace infinity {
 
-WalManager::WalManager(Storage *storage, String wal_path, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option)
-    : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes),
-      wal_path_(std::move(wal_path)), storage_(storage), running_(false), flush_option_(flush_option) {}
+WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option)
+    : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
+      wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option) {}
 
 WalManager::~WalManager() {
     if (running_.load()) {
@@ -252,9 +254,10 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
 
         txn->Checkpoint(max_commit_ts, is_full_checkpoint);
 
-        // TODO: recycle delta checkpoint file
+        WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
         if (is_full_checkpoint) {
-            RecycleWalFile(max_commit_ts);
+            const auto &catalog_dir = *storage_->catalog()->CatalogDir();
+            CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
         }
         SetLastCkpWalSize(wal_size);
         txn_mgr->CommitTxn(txn);
@@ -295,10 +298,8 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
         ofs_.close();
     }
 
-    Path old_file_path = Path(wal_path_);
-
-    String new_file_path = old_file_path.string() + '.' + std::to_string(max_commit_ts);
-    LOG_INFO(fmt::format("Wal Swap to new path: {}", new_file_path.c_str()));
+    String new_file_path = fmt::format("{}/{}", wal_dir_, WalFile::WalFilename(max_commit_ts));
+    LOG_INFO(fmt::format("Wal {} swap to new path: {}", wal_path_, new_file_path));
 
     // Rename the current wal file to a new one.
     LocalFileSystem fs;
@@ -358,36 +359,21 @@ i64 WalManager::ReplayWalFile() {
     }
 
     Vector<String> wal_list{};
-    for (const auto &entry : std::filesystem::directory_iterator(Path(wal_path_).parent_path())) {
-        if (entry.is_regular_file()) {
-            wal_list.push_back(entry.path().string());
+    {
+        auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
+        if (!wal_infos.empty()) {
+            std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+                return a.max_commit_ts_ > b.max_commit_ts_;
+            });
         }
+        if (temp_wal_info.has_value()) {
+            wal_list.push_back(temp_wal_info->path_);
+        }
+        for (const auto &wal_info : wal_infos) {
+            wal_list.push_back(wal_info.path_);
+        }
+        // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
     }
-
-    // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
-    std::sort(wal_list.begin(), wal_list.end(), [](const std::string &a, const std::string &b) {
-        auto get_lastNumber = [](const std::string &s) {
-            auto pos = s.find_last_of('.');
-            if (pos != std::string::npos) {
-                return std::stol(s.substr(pos + 1));
-            } else {
-                throw std::invalid_argument("No '.' found");
-            }
-        };
-        bool is_a_wal_log = (a.length() >= 7 && a.substr(a.length() - 7) == "wal.log");
-        bool is_b_wal_log = (b.length() >= 7 && b.substr(b.length() - 7) == "wal.log");
-
-        if (is_a_wal_log) {
-            return true;
-        } else if (is_b_wal_log) {
-            return false;
-        }
-
-        SizeT num_a = get_lastNumber(a);
-        SizeT num_b = get_lastNumber(b);
-
-        return num_a > num_b;
-    });
 
     LOG_INFO("Start Wal Replay");
     // log the wal files.
@@ -396,12 +382,11 @@ i64 WalManager::ReplayWalFile() {
     }
     LOG_INFO(fmt::format("List wal file size: {}", wal_list.size()));
 
-    i64 max_commit_ts = 0;
-    String catalog_path;
+    TxnTimeStamp max_commit_ts = 0;
     Vector<SharedPtr<WalEntry>> replay_entries;
-    Vector<String> checkpoint_catalog_paths;
+    String catalog_dir = "";
 
-    {
+    { // if no checkpoint, max_commit_ts is 0
         WalListIterator iterator(wal_list);
         // phase 1: find the max commit ts and catalog path
         LOG_INFO("Replay phase 1: find the max commit ts and catalog path");
@@ -415,28 +400,11 @@ i64 WalManager::ReplayWalFile() {
 
             replay_entries.push_back(wal_entry);
 
-            if (wal_entry->IsCheckPoint()) {
-
-                checkpoint_catalog_paths.push_back(wal_entry->GetCheckpointInfo().second);
-
-                if (wal_entry->IsFullCheckPoint()) {
-                    auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
-                    if (current_max_commit_ts > max_commit_ts) {
-                        max_commit_ts = current_max_commit_ts;
-                        catalog_path = current_catalog_path;
-                    }
-                    LOG_TRACE(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
-                    LOG_TRACE(fmt::format("Find catalog path: {}", catalog_path));
-                    break;
-                } else {
-                    // delta checkpoint
-                    auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
-                    // if the current max commit ts is greater than the max commit ts, update the max commit ts and catalog path
-                    if (current_max_commit_ts > max_commit_ts) {
-                        max_commit_ts = current_max_commit_ts;
-                        catalog_path = current_catalog_path;
-                    }
-                }
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            if (wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                catalog_dir = Path(checkpoint_cmd->catalog_path_).parent_path().string();
+                break;
             }
         }
         LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
@@ -461,11 +429,15 @@ i64 WalManager::ReplayWalFile() {
 
     // Note: Init a new catalog when not found any checkpoint wal entry
     // Indicates that the system has not done checkpoint in the previous.
-    if (checkpoint_catalog_paths.empty()) {
+    if (catalog_dir == "") { // no checkpoint found
         storage_->InitNewCatalog();
     } else {
-        std::reverse(checkpoint_catalog_paths.begin(), checkpoint_catalog_paths.end());
-        storage_->AttachCatalog(checkpoint_catalog_paths);
+        auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
+        if (!catalog_fileinfo.has_value()) {
+            UnrecoverableError(fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir));
+        }
+        auto &[full_catalog_fileinfo, delta_catalog_fileinfos] = catalog_fileinfo.value();
+        storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfos);
     }
 
     // phase 3: replay the entries
@@ -473,23 +445,14 @@ i64 WalManager::ReplayWalFile() {
     std::reverse(replay_entries.begin(), replay_entries.end());
     TxnTimeStamp system_start_ts = 0;
     TransactionID last_txn_id = 0;
-    SizeT replay_count = 0;
-    for (; replay_count < replay_entries.size(); ++replay_count) {
-        if (replay_entries[replay_count]->commit_ts_ > max_commit_ts) {
-            break;
-        }
-    }
 
-    for (; replay_count < replay_entries.size(); ++replay_count) {
-        if (replay_entries[replay_count]->commit_ts_ <= max_commit_ts) {
+    for (SizeT replay_count = 0; replay_count < replay_entries.size(); ++replay_count) {
+        if (replay_entries[replay_count]->commit_ts_ < max_commit_ts) {
             UnrecoverableError("Wal Replay: Commit ts should be greater than max commit ts");
         }
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
-        if (replay_entries[replay_count]->IsCheckPoint()) {
-            LOG_TRACE(fmt::format("\nSKIP checkpoint entry: {}", replay_entries[replay_count]->ToString()));
-            continue;
-        }
+
         ReplayWalEntry(*replay_entries[replay_count]);
         LOG_INFO(replay_entries[replay_count]->ToString());
     }
@@ -501,33 +464,7 @@ i64 WalManager::ReplayWalFile() {
     storage_->catalog()->InitDeltaEntry(max_commit_ts_);
     return system_start_ts;
 }
-/*****************************************************************************
- * GC WAL FILE
- *****************************************************************************/
 
-/**
- * @brief Gc the old wal files.
- * Only delete the wal.log.* files. the wal.log file is current wal file.
- * Check if the wal.log.* files are too old.
- * if * is little than the max_commit_ts, we will delete it.
- */
-void WalManager::RecycleWalFile(TxnTimeStamp full_ckp_ts) {
-    // Gc old wal files.
-    LOG_INFO("WalManager::Checkpoint begin to gc wal files");
-    LocalFileSystem fs;
-    if (fs.Exists(wal_path_)) {
-        for (const auto &entry : std::filesystem::directory_iterator(Path(wal_path_).parent_path())) {
-            if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
-                auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
-                if (std::stoll(suffix) < i64(full_ckp_ts)) {
-                    fs.DeleteFile(entry.path());
-                    LOG_TRACE(fmt::format("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str()));
-                }
-            }
-        }
-    }
-    LOG_INFO("WalManager::Checkpoint end to gc wal files");
-}
 void WalManager::ReplayWalEntry(const WalEntry &entry) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
@@ -581,6 +518,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
         }
     }
 }
+
 void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
     Catalog *catalog = storage_->catalog();
     auto db_dir = MakeShared<String>(*catalog->DataDir() + "/" + cmd.db_dir_tail_);
