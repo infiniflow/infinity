@@ -60,7 +60,7 @@ public:
 
     void RecycleWalFile(TxnTimeStamp full_ckp_ts);
 
-    // Should only called in `Flush` thread
+    // Should only call in `Flush` thread
     i64 WalSize() const { return wal_size_; }
 
 private:
