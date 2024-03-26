@@ -87,7 +87,6 @@ private:
     static bool IsDateTimeValid(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second);
 
 public:
-    // used in iresearch, need to be public
     DateType date{};
     TimeType time{};
 };

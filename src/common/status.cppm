@@ -138,6 +138,7 @@ export enum class ErrorCode : long {
     kDirNotFound = 7009,
     kDataIOError = 7010,
     kUnexpectedError = 7011,
+    kParserError = 7012,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -264,6 +265,7 @@ public:
     static Status DirNotFound(const String &path);
     static Status DataIOError(const String &detailed_info);
     static Status UnexpectedError(const String &detailed_info);
+    static Status ParserError(const String &detailed_info);
 
     // meta
     static Status InvalidEntry();

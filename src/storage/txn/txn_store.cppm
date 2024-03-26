@@ -30,7 +30,6 @@ class Txn;
 struct Catalog;
 struct DBEntry;
 struct TableIndexEntry;
-struct FulltextIndexEntry;
 struct TableEntry;
 struct SegmentEntry;
 struct BlockEntry;
@@ -67,8 +66,6 @@ public:
 public:
     TableIndexEntry *const table_index_entry_{};
 
-    FulltextIndexEntry *fulltext_index_entry_{};
-
     HashMap<SegmentID, SegmentIndexEntry *> index_entry_map_{};
 };
 
@@ -94,8 +91,6 @@ public:
     void AddIndexStore(TableIndexEntry *table_index_entry);
 
     void AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries);
-
-    void AddFulltextIndexStore(TableIndexEntry *table_index_entry, FulltextIndexEntry *fulltext_index_entry);
 
     TxnIndexStore *GetIndexStore(TableIndexEntry *table_index_entry);
 

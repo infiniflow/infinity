@@ -20,7 +20,6 @@ import stl;
 
 import txn_store;
 import segment_index_entry;
-import fulltext_index_entry;
 import segment_index_entry;
 import base_entry;
 import index_base;
@@ -90,11 +89,9 @@ public:
     const SharedPtr<IndexBase> &table_index_def() const { return index_base_; }
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
-    SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot();
     const SharedPtr<String> &index_dir() const { return index_dir_; }
-    bool IsFulltextIndexHomebrewed() const;
 
     String GetPathNameTail() const;
 
@@ -117,7 +114,7 @@ public:
     // Merge all disk index chunks into one for each SegmentIndexEntry
     void MergeDiskIndexEntirely(Txn *txn);
 
-    Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
+    Tuple<Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
@@ -153,7 +150,6 @@ private:
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
     SharedPtr<SegmentIndexEntry> last_segment_{};
-    SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 
     // For fulltext index
     MemoryPool byte_slice_pool_{};

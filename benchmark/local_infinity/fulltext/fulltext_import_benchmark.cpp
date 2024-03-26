@@ -100,7 +100,6 @@ int main() {
 
         {
             auto index_param_list = new std::vector<InitParameter *>();
-            index_param_list->push_back(new InitParameter("ANALYZER", "segmentation"));
             index_info->index_param_list_ = index_param_list;
         }
         index_info_list->push_back(index_info);
