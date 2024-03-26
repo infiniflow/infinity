@@ -27,7 +27,7 @@ class Catalog;
 
 export class BGTaskProcessor {
 public:
-    explicit BGTaskProcessor(WalManager *wal_manager, Catalog *catalog);
+    explicit BGTaskProcessor(WalManager *wal_manager, Catalog *catalog, TxnTimeStamp start_ts);
     void Start();
     void Stop();
 

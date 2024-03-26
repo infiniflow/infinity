@@ -29,7 +29,8 @@ import third_party;
 
 namespace infinity {
 
-BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, Catalog *catalog) : wal_manager_(wal_manager), catalog_(catalog) {}
+BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, Catalog *catalog, TxnTimeStamp start_ts)
+    : wal_manager_(wal_manager), catalog_(catalog), max_commit_ts_(start_ts) {}
 
 void BGTaskProcessor::Start() {
     processor_thread_ = Thread([this] { Process(); });
