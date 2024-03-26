@@ -1,6 +1,6 @@
-#ifndef yy_search_HEADER_H
-#define yy_search_HEADER_H 1
-#define yy_search_IN_HEADER 1
+#ifndef yyHEADER_H
+#define yyHEADER_H 1
+#define yyIN_HEADER 1
 
 #line 6 "search_lexer.h"
 
@@ -27,29 +27,11 @@
      * We will address this in a future release of flex, or omit the C++ scanner
      * altogether.
      */
-    #define yyFlexLexer yy_search_FlexLexer
+    #define yyFlexLexer yyFlexLexer
 /* %endif */
 
 /* %if-c-only */
 /* %endif */
-
-#ifdef yyalloc
-#define yy_search_alloc_ALREADY_DEFINED
-#else
-#define yyalloc yy_search_alloc
-#endif
-
-#ifdef yyrealloc
-#define yy_search_realloc_ALREADY_DEFINED
-#else
-#define yyrealloc yy_search_realloc
-#endif
-
-#ifdef yyfree
-#define yy_search_free_ALREADY_DEFINED
-#else
-#define yyfree yy_search_free
-#endif
 
 /* %if-c-only */
 /* %endif */
@@ -401,154 +383,154 @@ static int yy_flex_strlen ( const char * );
 #undef YY_DECL
 #endif
 
-#ifndef yy_search__create_buffer_ALREADY_DEFINED
+#ifndef yy_create_buffer_ALREADY_DEFINED
 #undef yy_create_buffer
 #endif
-#ifndef yy_search__delete_buffer_ALREADY_DEFINED
+#ifndef yy_delete_buffer_ALREADY_DEFINED
 #undef yy_delete_buffer
 #endif
-#ifndef yy_search__scan_buffer_ALREADY_DEFINED
+#ifndef yy_scan_buffer_ALREADY_DEFINED
 #undef yy_scan_buffer
 #endif
-#ifndef yy_search__scan_string_ALREADY_DEFINED
+#ifndef yy_scan_string_ALREADY_DEFINED
 #undef yy_scan_string
 #endif
-#ifndef yy_search__scan_bytes_ALREADY_DEFINED
+#ifndef yy_scan_bytes_ALREADY_DEFINED
 #undef yy_scan_bytes
 #endif
-#ifndef yy_search__init_buffer_ALREADY_DEFINED
+#ifndef yy_init_buffer_ALREADY_DEFINED
 #undef yy_init_buffer
 #endif
-#ifndef yy_search__flush_buffer_ALREADY_DEFINED
+#ifndef yy_flush_buffer_ALREADY_DEFINED
 #undef yy_flush_buffer
 #endif
-#ifndef yy_search__load_buffer_state_ALREADY_DEFINED
+#ifndef yy_load_buffer_state_ALREADY_DEFINED
 #undef yy_load_buffer_state
 #endif
-#ifndef yy_search__switch_to_buffer_ALREADY_DEFINED
+#ifndef yy_switch_to_buffer_ALREADY_DEFINED
 #undef yy_switch_to_buffer
 #endif
-#ifndef yy_search_push_buffer_state_ALREADY_DEFINED
+#ifndef yypush_buffer_state_ALREADY_DEFINED
 #undef yypush_buffer_state
 #endif
-#ifndef yy_search_pop_buffer_state_ALREADY_DEFINED
+#ifndef yypop_buffer_state_ALREADY_DEFINED
 #undef yypop_buffer_state
 #endif
-#ifndef yy_search_ensure_buffer_stack_ALREADY_DEFINED
+#ifndef yyensure_buffer_stack_ALREADY_DEFINED
 #undef yyensure_buffer_stack
 #endif
-#ifndef yy_search_lex_ALREADY_DEFINED
+#ifndef yylex_ALREADY_DEFINED
 #undef yylex
 #endif
-#ifndef yy_search_restart_ALREADY_DEFINED
+#ifndef yyrestart_ALREADY_DEFINED
 #undef yyrestart
 #endif
-#ifndef yy_search_lex_init_ALREADY_DEFINED
+#ifndef yylex_init_ALREADY_DEFINED
 #undef yylex_init
 #endif
-#ifndef yy_search_lex_init_extra_ALREADY_DEFINED
+#ifndef yylex_init_extra_ALREADY_DEFINED
 #undef yylex_init_extra
 #endif
-#ifndef yy_search_lex_destroy_ALREADY_DEFINED
+#ifndef yylex_destroy_ALREADY_DEFINED
 #undef yylex_destroy
 #endif
-#ifndef yy_search_get_debug_ALREADY_DEFINED
+#ifndef yyget_debug_ALREADY_DEFINED
 #undef yyget_debug
 #endif
-#ifndef yy_search_set_debug_ALREADY_DEFINED
+#ifndef yyset_debug_ALREADY_DEFINED
 #undef yyset_debug
 #endif
-#ifndef yy_search_get_extra_ALREADY_DEFINED
+#ifndef yyget_extra_ALREADY_DEFINED
 #undef yyget_extra
 #endif
-#ifndef yy_search_set_extra_ALREADY_DEFINED
+#ifndef yyset_extra_ALREADY_DEFINED
 #undef yyset_extra
 #endif
-#ifndef yy_search_get_in_ALREADY_DEFINED
+#ifndef yyget_in_ALREADY_DEFINED
 #undef yyget_in
 #endif
-#ifndef yy_search_set_in_ALREADY_DEFINED
+#ifndef yyset_in_ALREADY_DEFINED
 #undef yyset_in
 #endif
-#ifndef yy_search_get_out_ALREADY_DEFINED
+#ifndef yyget_out_ALREADY_DEFINED
 #undef yyget_out
 #endif
-#ifndef yy_search_set_out_ALREADY_DEFINED
+#ifndef yyset_out_ALREADY_DEFINED
 #undef yyset_out
 #endif
-#ifndef yy_search_get_leng_ALREADY_DEFINED
+#ifndef yyget_leng_ALREADY_DEFINED
 #undef yyget_leng
 #endif
-#ifndef yy_search_get_text_ALREADY_DEFINED
+#ifndef yyget_text_ALREADY_DEFINED
 #undef yyget_text
 #endif
-#ifndef yy_search_get_lineno_ALREADY_DEFINED
+#ifndef yyget_lineno_ALREADY_DEFINED
 #undef yyget_lineno
 #endif
-#ifndef yy_search_set_lineno_ALREADY_DEFINED
+#ifndef yyset_lineno_ALREADY_DEFINED
 #undef yyset_lineno
 #endif
-#ifndef yy_search_get_column_ALREADY_DEFINED
+#ifndef yyget_column_ALREADY_DEFINED
 #undef yyget_column
 #endif
-#ifndef yy_search_set_column_ALREADY_DEFINED
+#ifndef yyset_column_ALREADY_DEFINED
 #undef yyset_column
 #endif
-#ifndef yy_search_wrap_ALREADY_DEFINED
+#ifndef yywrap_ALREADY_DEFINED
 #undef yywrap
 #endif
-#ifndef yy_search_get_lval_ALREADY_DEFINED
+#ifndef yyget_lval_ALREADY_DEFINED
 #undef yyget_lval
 #endif
-#ifndef yy_search_set_lval_ALREADY_DEFINED
+#ifndef yyset_lval_ALREADY_DEFINED
 #undef yyset_lval
 #endif
-#ifndef yy_search_get_lloc_ALREADY_DEFINED
+#ifndef yyget_lloc_ALREADY_DEFINED
 #undef yyget_lloc
 #endif
-#ifndef yy_search_set_lloc_ALREADY_DEFINED
+#ifndef yyset_lloc_ALREADY_DEFINED
 #undef yyset_lloc
 #endif
-#ifndef yy_search_alloc_ALREADY_DEFINED
+#ifndef yyalloc_ALREADY_DEFINED
 #undef yyalloc
 #endif
-#ifndef yy_search_realloc_ALREADY_DEFINED
+#ifndef yyrealloc_ALREADY_DEFINED
 #undef yyrealloc
 #endif
-#ifndef yy_search_free_ALREADY_DEFINED
+#ifndef yyfree_ALREADY_DEFINED
 #undef yyfree
 #endif
-#ifndef yy_search_text_ALREADY_DEFINED
+#ifndef yytext_ALREADY_DEFINED
 #undef yytext
 #endif
-#ifndef yy_search_leng_ALREADY_DEFINED
+#ifndef yyleng_ALREADY_DEFINED
 #undef yyleng
 #endif
-#ifndef yy_search_in_ALREADY_DEFINED
+#ifndef yyin_ALREADY_DEFINED
 #undef yyin
 #endif
-#ifndef yy_search_out_ALREADY_DEFINED
+#ifndef yyout_ALREADY_DEFINED
 #undef yyout
 #endif
-#ifndef yy_search__flex_debug_ALREADY_DEFINED
+#ifndef yy_flex_debug_ALREADY_DEFINED
 #undef yy_flex_debug
 #endif
-#ifndef yy_search_lineno_ALREADY_DEFINED
+#ifndef yylineno_ALREADY_DEFINED
 #undef yylineno
 #endif
-#ifndef yy_search_tables_fload_ALREADY_DEFINED
+#ifndef yytables_fload_ALREADY_DEFINED
 #undef yytables_fload
 #endif
-#ifndef yy_search_tables_destroy_ALREADY_DEFINED
+#ifndef yytables_destroy_ALREADY_DEFINED
 #undef yytables_destroy
 #endif
-#ifndef yy_search_TABLES_NAME_ALREADY_DEFINED
+#ifndef yyTABLES_NAME_ALREADY_DEFINED
 #undef yyTABLES_NAME
 #endif
 
-#line 85 "search_lexer.l"
+#line 84 "search_lexer.l"
 
 
-#line 553 "search_lexer.h"
-#undef yy_search_IN_HEADER
-#endif /* yy_search_HEADER_H */
+#line 535 "search_lexer.h"
+#undef yyIN_HEADER
+#endif /* yyHEADER_H */

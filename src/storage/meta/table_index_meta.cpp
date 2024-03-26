@@ -26,10 +26,9 @@ import default_values;
 import txn_state;
 import logger;
 import third_party;
-
+import table_entry;
 import infinity_exception;
 import status;
-import iresearch_datastore;
 import extra_ddl_info;
 import local_file_system;
 import txn;

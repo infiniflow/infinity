@@ -31,7 +31,6 @@ import internal_types;
 import value;
 import third_party;
 import base_table_ref;
-import fulltext_index_entry;
 import block_entry;
 import block_column_entry;
 import logical_type;

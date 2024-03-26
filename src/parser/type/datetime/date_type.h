@@ -28,7 +28,6 @@ struct DateType {
 
     inline int32_t GetValue() const { return value; }
 
-    // keep compatible with iresearch
     operator int32_t() const { return value; }
 
     inline void FromString(const std::string_view &date_str) { FromString(date_str.data(), date_str.size()); }
