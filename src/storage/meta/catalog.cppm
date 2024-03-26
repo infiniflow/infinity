@@ -101,7 +101,7 @@ class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
 export struct Catalog {
 public:
-    Catalog(SharedPtr<String> data_dir);
+    explicit Catalog(SharedPtr<String> data_dir);
 
     ~Catalog();
 

@@ -61,6 +61,10 @@ void Storage::Init() {
     // Replay wal file wrap init catalog
     TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
 
+    BuiltinFunctions builtin_functions(new_catalog_);
+    builtin_functions.Init();
+    // Catalog finish init here.
+
     bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
     // Construct txn manager
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
@@ -76,9 +80,6 @@ void Storage::Init() {
     wal_mgr_->Start();
 
     bg_processor_->Start();
-
-    BuiltinFunctions builtin_functions(new_catalog_);
-    builtin_functions.Init();
 
     auto txn = txn_mgr_->CreateTxn();
     txn->Begin();
