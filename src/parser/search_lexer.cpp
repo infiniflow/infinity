@@ -28,29 +28,11 @@
      * We will address this in a future release of flex, or omit the C++ scanner
      * altogether.
      */
-    #define yyFlexLexer yy_search_FlexLexer
+    #define yyFlexLexer yyFlexLexer
 /* %endif */
 
 /* %if-c-only */
 /* %endif */
-
-#ifdef yyalloc
-#define yy_search_alloc_ALREADY_DEFINED
-#else
-#define yyalloc yy_search_alloc
-#endif
-
-#ifdef yyrealloc
-#define yy_search_realloc_ALREADY_DEFINED
-#else
-#define yyrealloc yy_search_realloc
-#endif
-
-#ifdef yyfree
-#define yy_search_free_ALREADY_DEFINED
-#else
-#define yyfree yy_search_free
-#endif
 
 /* %if-c-only */
 /* %endif */
@@ -523,9 +505,9 @@ static const flex_int16_t yy_chk[108] =
 
 static const flex_int16_t yy_rule_linenum[26] =
     {   0,
-       47,   49,   50,   51,   53,   54,   56,   57,   58,   60,
-       62,   64,   66,   67,   69,   70,   71,   73,   74,   75,
-       76,   79,   80,   81,   82
+       46,   48,   49,   50,   52,   53,   55,   56,   57,   59,
+       61,   63,   65,   66,   68,   69,   70,   72,   73,   74,
+       75,   78,   79,   80,   81
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -562,10 +544,10 @@ using token = infinity::SearchParser::token;
 /* for temporary storage of quoted string */
 static thread_local std::stringstream string_buffer;
 
-#line 566 "search_lexer.cpp"
+#line 548 "search_lexer.cpp"
 #define YY_NO_INPUT 1
 
-#line 569 "search_lexer.cpp"
+#line 551 "search_lexer.cpp"
 
 #define INITIAL 0
 #define SINGLE_QUOTED_STRING 1
@@ -759,16 +741,16 @@ YY_DECL
 
 	{
 /* %% [7.0] user's declarations go here */
-#line 39 "search_lexer.l"
+#line 38 "search_lexer.l"
 
           /** Code executed at the beginning of yylex **/
-#line 42 "search_lexer.l"
+#line 41 "search_lexer.l"
             yylval = lval;
 
             /* Note: special characters in pattern shall be double-quoted or escaped with backslash: " <^.+|/()[]{}" */
 
 
-#line 772 "search_lexer.cpp"
+#line 754 "search_lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -846,121 +828,121 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 47 "search_lexer.l"
+#line 46 "search_lexer.l"
 /* ignore \t\n and space */;
 	YY_BREAK
 case 2:
-#line 50 "search_lexer.l"
+#line 49 "search_lexer.l"
 case 3:
-#line 51 "search_lexer.l"
+#line 50 "search_lexer.l"
 case 4:
 YY_RULE_SETUP
-#line 51 "search_lexer.l"
+#line 50 "search_lexer.l"
 { return token::AND; }
 	YY_BREAK
 case 5:
-#line 54 "search_lexer.l"
+#line 53 "search_lexer.l"
 case 6:
 YY_RULE_SETUP
-#line 54 "search_lexer.l"
+#line 53 "search_lexer.l"
 { return token::OR; }
 	YY_BREAK
 case 7:
-#line 57 "search_lexer.l"
+#line 56 "search_lexer.l"
 case 8:
-#line 58 "search_lexer.l"
+#line 57 "search_lexer.l"
 case 9:
 YY_RULE_SETUP
-#line 58 "search_lexer.l"
+#line 57 "search_lexer.l"
 { return token::NOT; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 60 "search_lexer.l"
+#line 59 "search_lexer.l"
 { return token::LPAREN; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 62 "search_lexer.l"
+#line 61 "search_lexer.l"
 { return token::RPAREN; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 64 "search_lexer.l"
+#line 63 "search_lexer.l"
 { return token::OP_COLON; }
 	YY_BREAK
 case 13:
-#line 67 "search_lexer.l"
+#line 66 "search_lexer.l"
 case 14:
 YY_RULE_SETUP
-#line 67 "search_lexer.l"
+#line 66 "search_lexer.l"
 { yylval->build(std::strtof(yytext+1, NULL)); return token::CARAT; }
 	YY_BREAK
 case 15:
-#line 70 "search_lexer.l"
+#line 69 "search_lexer.l"
 case 16:
-#line 71 "search_lexer.l"
+#line 70 "search_lexer.l"
 case 17:
 YY_RULE_SETUP
-#line 71 "search_lexer.l"
+#line 70 "search_lexer.l"
 { yylval->build<std::string>(yytext); return token::STRING; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 73 "search_lexer.l"
+#line 72 "search_lexer.l"
 { BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 74 "search_lexer.l"
+#line 73 "search_lexer.l"
 { string_buffer << '\''; }
 	YY_BREAK
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 75 "search_lexer.l"
+#line 74 "search_lexer.l"
 { string_buffer << yytext; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 76 "search_lexer.l"
+#line 75 "search_lexer.l"
 { BEGIN INITIAL; yylval->build<std::string>(string_buffer.str()); return token::STRING; }
 	YY_BREAK
 case YY_STATE_EOF(SINGLE_QUOTED_STRING):
-#line 77 "search_lexer.l"
+#line 76 "search_lexer.l"
 { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 79 "search_lexer.l"
+#line 78 "search_lexer.l"
 { BEGIN DOUBLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 80 "search_lexer.l"
+#line 79 "search_lexer.l"
 { string_buffer << '\"'; }
 	YY_BREAK
 case 24:
 /* rule 24 can match eol */
 YY_RULE_SETUP
-#line 81 "search_lexer.l"
+#line 80 "search_lexer.l"
 { string_buffer << yytext; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 82 "search_lexer.l"
+#line 81 "search_lexer.l"
 { BEGIN INITIAL; yylval->build<std::string>(string_buffer.str()); return token::STRING; }
 	YY_BREAK
 case YY_STATE_EOF(DOUBLE_QUOTED_STRING):
-#line 83 "search_lexer.l"
+#line 82 "search_lexer.l"
 { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 85 "search_lexer.l"
+#line 84 "search_lexer.l"
 ECHO;
 	YY_BREAK
-#line 964 "search_lexer.cpp"
+#line 946 "search_lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -2079,6 +2061,6 @@ void yyfree (void * ptr )
 
 /* %ok-for-header */
 
-#line 85 "search_lexer.l"
+#line 84 "search_lexer.l"
 
 

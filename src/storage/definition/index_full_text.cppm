@@ -37,11 +37,10 @@ public:
                   const String &file_name,
                   Vector<String> column_names,
                   const String &analyzer,
-                  bool homebrewed,
                   optionflag_t flag = OPTION_FLAG_ALL)
-        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), homebrewed_(homebrewed), flag_(flag) {
+        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), flag_(flag) {
         if (analyzer.empty()) {
-            analyzer_ = homebrewed ? "standard" : "segmentation";
+            analyzer_ = "standard";
         }
     };
 
@@ -71,7 +70,6 @@ public:
 
 public:
     String analyzer_{};
-    bool homebrewed_{false};
     optionflag_t flag_{OPTION_FLAG_ALL};
 };
 

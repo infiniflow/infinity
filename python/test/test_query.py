@@ -45,7 +45,7 @@ class TestQuery:
         res = table.create_index("my_index",
                                  [index.IndexInfo("body",
                                                   index.IndexType.FullText,
-                                                  [index.InitParameter("ANALYZER", "segmentation")]),
+                                                  []),
                                   ], ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -64,7 +64,9 @@ class TestQuery:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_query_builder", conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_query_builder", {"c1": "int"}, ConflictType.Error)
+        db_obj.drop_table("test_query_builder",
+                          conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_query_builder", {"c1": "int"}, ConflictType.Error)
         query_builder = table_obj.query_builder
         query_builder.output(["*"]).to_df()

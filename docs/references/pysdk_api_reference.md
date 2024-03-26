@@ -278,7 +278,7 @@ db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",
                              [index.IndexInfo("body",
 							                                index.IndexType.FullText,
-	                                            [index.InitParameter("ANALYZER", "segmentation")]),
+	                                            []),
                               index.IndexInfo("doctitle",
                                               index.IndexType.FullText,
                                               []),
