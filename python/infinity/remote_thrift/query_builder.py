@@ -74,17 +74,25 @@ class InfinityThriftQueryBuilder(ABC):
 
         column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
+        if not isinstance(topn, int):
+            raise Exception(f"Invalid topn, type should be embedded, but get {type(topn)}")
+
         # type casting
+        if isinstance(embedding_data, list):
+            embedding_data = embedding_data
+        elif isinstance(embedding_data, tuple):
+            embedding_data = embedding_data
+        elif isinstance(embedding_data, np.ndarray):
+            embedding_data = embedding_data.tolist()
+        else:
+            raise Exception(f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
+
         if (embedding_data_type == 'tinyint' or
             embedding_data_type == 'smallint' or
             embedding_data_type == 'int' or
             embedding_data_type == 'bigint'):
             embedding_data = [int(x) for x in embedding_data]
 
-        if isinstance(embedding_data, list):
-            embedding_data = embedding_data
-        if isinstance(embedding_data, np.ndarray):
-            embedding_data = embedding_data.tolist()
         data = EmbeddingData()
         elem_type = ElementType.ElementFloat32
         if embedding_data_type == 'bit':
