@@ -192,15 +192,14 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         posting_file_writer->WriteVInt(i32(doc_count_));
     }
     if (posting_store_.get() != nullptr) {
-        SizeT term_meta_offset = 0;
         for (auto it = posting_table->Begin(); it != posting_table->End(); ++it) {
             const MemoryIndexer::PostingPtr posting_writer = it.Value();
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta, spill);
+            SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
             const String &term = it.Key();
             fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
-            term_meta_offset = dict_file_writer->TotalWrittenBytes();
         }
         posting_file_writer->Sync();
         dict_file_writer->Sync();
@@ -280,52 +279,59 @@ void MemoryIndexer::OfflineDump() {
     String fst_file = index_prefix + DICT_SUFFIX + ".fst";
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
-    FstBuilder builder(wtr);
+    FstBuilder fst_builder(wtr);
 
     u16 record_length;
     char buf[MAX_TUPLE_LENGTH];
+    String last_term_str;
     std::string_view last_term;
-    u32 last_term_pos = 0;
     u32 last_doc_id = INVALID_DOCID;
-    Deque<String> term_buffer;
     UniquePtr<PostingWriter> posting;
-    SizeT term_meta_offset = 0;
 
     for (u64 i = 0; i < count; ++i) {
         fread(&record_length, sizeof(u16), 1, f);
         fread(buf, record_length, 1, f);
         TermTuple tuple(buf, record_length);
         if (tuple.term_ != last_term) {
+            assert(last_term < tuple.term_);
             if (last_doc_id != INVALID_DOCID) {
                 posting->EndDocument(last_doc_id, 0);
-                if (posting.get()) {
-                    TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
-                    posting->Dump(posting_file_writer, term_meta);
-                    term_meta_dumpler.Dump(dict_file_writer, term_meta);
-                    builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
-                    term_meta_offset = dict_file_writer->TotalWrittenBytes();
-                }
+                // printf(" EndDocument1-%u\n", last_doc_id);
             }
-            term_buffer.push_back(String(tuple.term_));
-            std::string_view view(term_buffer.back());
-            last_term.swap(view);
+            if (posting.get()) {
+                TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
+                posting->Dump(posting_file_writer, term_meta);
+                SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
+                term_meta_dumpler.Dump(dict_file_writer, term_meta);
+                fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
+            }
             posting = MakeUnique<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
+            // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
+            last_term_str = String(tuple.term_);
+            last_term = std::string_view(last_term_str);
         } else if (last_doc_id != tuple.doc_id_) {
+            assert(last_doc_id != INVALID_DOCID);
+            assert(last_doc_id < tuple.doc_id_);
+            assert(posting.get() != nullptr);
             posting->EndDocument(last_doc_id, 0);
+            // printf(" EndDocument2-%u\n", last_doc_id);
         }
         last_doc_id = tuple.doc_id_;
-        if (tuple.term_pos_ != last_term_pos) {
-            last_term_pos = tuple.term_pos_;
-            posting->AddPosition(last_term_pos);
-        }
+        posting->AddPosition(tuple.term_pos_);
+        // printf(" pos-%u", tuple.term_pos_);
     }
-
     if (last_doc_id != INVALID_DOCID) {
         posting->EndDocument(last_doc_id, 0);
+        // printf(" EndDocument3-%u\n", last_doc_id);
+        TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
+        posting->Dump(posting_file_writer, term_meta);
+        SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
+        term_meta_dumpler.Dump(dict_file_writer, term_meta);
+        fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
     }
     posting_file_writer->Sync();
     dict_file_writer->Sync();
-    builder.Finish();
+    fst_builder.Finish();
     fs.AppendFile(dict_file, fst_file);
     fs.DeleteFile(fst_file);
 
