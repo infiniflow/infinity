@@ -79,7 +79,7 @@ private:
     // called when BufferHandle destructs, to decrease rc_ by 1.
     void UnloadInner();
 
-    // check the invalid state
+    // check the invalid state, only used in tests.
     void CheckState() const;
 
 public:
