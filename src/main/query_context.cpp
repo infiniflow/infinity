@@ -107,6 +107,8 @@ QueryResult QueryContext::Query(const String &query) {
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     QueryResult query_result;
 //    ProfilerStart("Query");
+//    BaseProfiler profiler;
+//    profiler.Begin();
     try {
         this->CreateTxn();
         this->BeginTxn();
@@ -184,6 +186,8 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
 //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
+//    profiler.End();
+//    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
     return query_result;
 }
 

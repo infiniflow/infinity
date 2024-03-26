@@ -57,22 +57,25 @@ def insert_sift_1m(path):
 
     count = 0
     start = time.time()
-
+    loop_start = time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
         table_obj.insert([{"col1": query_vec}])    
         count += 1
+        if count % 1000 == 0:
+            loop_end = time.time()
+            dur = loop_end - loop_start
+            print(f"Insert 1000 rows cost time: {dur} s")
+            loop_start = time.time()
 
     end = time.time()
     dur = end - start
     print(f"Import sift_1m cost time: {dur} s, tps: {count * 1.0 / dur}")
 
-    assert res.error_code == ErrorCode.OK
-
-    start = time.time()
-    create_index("sift_benchmark")
-    end = time.time()
-    dur = end - start
-    print(f"Create index on sift_1m cost time: {dur} s")
+    # start = time.time()
+    # create_index("sift_benchmark")
+    # end = time.time()
+    # dur = end - start
+    # print(f"Create index on sift_1m cost time: {dur} s")
 
 
 def insert_gist_1m(path):
@@ -192,10 +195,10 @@ def process_pool(threads, path, table_name):
 
 
 def insert_data(threads, data_set, path):
-    if not os.path.exists(path + "/sift_base.fvecs") and not os.path.exists(path + "/gist_base.fvecs"):
+    if not os.path.exists(path + "/sift_query.fvecs") and not os.path.exists(path + "/gist_base.fvecs"):
         raise Exception("Invalid data set")
     if data_set == "sift_1m":
-        data_path = path + "/sift_base.fvecs"
+        data_path = path + "/sift_query.fvecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             process_pool(threads, data_path, "sift_benchmark")
