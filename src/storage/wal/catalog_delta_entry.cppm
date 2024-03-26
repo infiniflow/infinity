@@ -27,7 +27,6 @@ import segment_entry;
 import block_entry;
 import block_column_entry;
 import table_index_entry;
-import fulltext_index_entry;
 import segment_index_entry;
 import catalog;
 import serialize;
@@ -55,8 +54,7 @@ export enum class CatalogDeltaOpType : i8 {
     // INDEX
     // -----------------------------
     ADD_TABLE_INDEX_ENTRY = 11,
-    ADD_FULLTEXT_INDEX_ENTRY = 12,
-    ADD_SEGMENT_INDEX_ENTRY = 13,
+    ADD_SEGMENT_INDEX_ENTRY = 12,
 
     // -----------------------------
     // SEGMENT STATUS
@@ -382,40 +380,6 @@ public:
     SharedPtr<IndexBase> index_base_{};
 };
 
-/// class AddFulltextIndexEntryOp
-export class AddFulltextIndexEntryOp : public CatalogDeltaOperation {
-public:
-    static UniquePtr<AddFulltextIndexEntryOp> ReadAdv(char *&ptr);
-
-    explicit AddFulltextIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY) {}
-
-    explicit AddFulltextIndexEntryOp(FulltextIndexEntry *fulltext_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY, fulltext_index_entry),
-          db_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
-          table_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
-          index_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->index_name()) {}
-
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY; }
-    String GetTypeStr() const final { return "ADD_FULLTEXT_INDEX_ENTRY"; }
-    [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-        total_size += sizeof(i32) + this->db_name_->size();
-        total_size += sizeof(i32) + this->table_name_->size();
-        total_size += sizeof(i32) + this->index_name_->size();
-        return total_size;
-    }
-    void WriteAdv(char *&buf) const final;
-    const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}#FTX@{}", *db_name_, *table_name_, *index_name_, (u8)(type_))); }
-    bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
-
-public:
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> table_name_{};
-    SharedPtr<String> index_name_{};
-};
-
 /// class AddSegmentColumnEntryOperation
 export class AddSegmentIndexEntryOp : public CatalogDeltaOperation {
 public:
@@ -593,10 +557,15 @@ export class GlobalCatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
 
-    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
+    // Must be called before any checkpoint.
+    void InitMaxCommitTS(TxnTimeStamp max_commit_ts) { max_commit_ts_ = max_commit_ts; }
+
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts);
+
+    Tuple<TxnTimeStamp, i64> GetCheckpointState() const { return {max_commit_ts_, wal_size_}; }
 
     SizeT OpSize() const { return delta_ops_.size(); }
 
@@ -610,7 +579,9 @@ private:
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
-    TransactionID max_commit_ts_{0};
+    // update by add delta entry, read by bg_process::checkpoint
+    TxnTimeStamp max_commit_ts_{0};
+    i64 wal_size_{};
 };
 
 } // namespace infinity

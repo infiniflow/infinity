@@ -27,11 +27,11 @@ import buffer_obj;
 module buffer_manager;
 
 namespace infinity {
-BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir)
-    : base_dir_(std::move(base_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0) {
+BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir)
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0) {
     LocalFileSystem fs;
-    if (!fs.Exists(*base_dir_)) {
-        fs.CreateDirectory(*base_dir_);
+    if (!fs.Exists(*data_dir_)) {
+        fs.CreateDirectory(*data_dir_);
     }
     if (!fs.Exists(*temp_dir_)) {
         fs.CreateDirectory(*temp_dir_);

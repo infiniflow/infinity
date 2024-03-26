@@ -34,7 +34,6 @@ import status;
 import infinity_exception;
 import index_ivfflat;
 import txn_manager;
-import iresearch_datastore;
 import index_base;
 import index_full_text;
 import catalog_delta_entry;
@@ -48,6 +47,7 @@ import compact_segments_task;
 import local_file_system;
 import build_fast_rough_filter_task;
 import block_entry;
+import segment_index_entry;
 
 namespace infinity {
 
@@ -221,34 +221,18 @@ void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&ini
     }
 }
 
-void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
-                                      Map<String, String> &column2analyzer) {
+void TableEntry::GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer) {
     column2analyzer.clear();
-    {
-        auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-        for (auto &[_, table_index_meta] : *index_meta_map_guard) {
-            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-            if (status.ok()) {
-                fulltext_index_entry = table_index_entry->fulltext_index_entry();
-                const IndexBase *index_base = table_index_entry->index_base();
-                if (index_base->index_type_ != IndexType::kFullText)
-                    continue;
-                auto index_full_text = static_cast<const IndexFullText *>(index_base);
-                if (index_full_text->homebrewed_) {
-                    // set fulltext_index_entry to nullptr to indicate that the index is homebrewed
-                    fulltext_index_entry = nullptr;
-                    column2analyzer.clear();
-                    return;
-                }
-                for (auto &column_name : index_full_text->column_names_) {
-                    column2analyzer[column_name] = index_full_text->analyzer_;
-                }
-                if (!column2analyzer.empty()) {
-                    // iresearch requires there is exactly one full index per table.
-                    break;
-                }
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+        if (status.ok()) {
+            const IndexBase *index_base = table_index_entry->index_base();
+            if (index_base->index_type_ != IndexType::kFullText)
+                continue;
+            auto index_full_text = static_cast<const IndexFullText *>(index_base);
+            for (auto &column_name : index_full_text->column_names_) {
+                column2analyzer[column_name] = index_full_text->analyzer_;
             }
         }
     }
@@ -321,6 +305,9 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
         row_count += actual_appended;
     }
+
+    // Realtime index insertion
+    MemIndexInsert(txn, append_state_ptr->append_ranges_);
 
     this->row_count_ += row_count;
 }
@@ -504,13 +491,43 @@ Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegment
     return Status::OK();
 }
 
-void TableEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
+void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
+    Map<SegmentID, Vector<AppendRange>> seg_append_ranges;
+    SizeT num_ranges = append_ranges.size();
+    for (SizeT i = 0; i < num_ranges; i++) {
+        AppendRange &range = append_ranges[i];
+        seg_append_ranges[range.segment_id_].push_back(range);
+    }
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-        if (status.ok()) {
-            table_index_entry->MemIndexInsert(txn, block_entry, row_offset, row_count);
-        }
+        if (!status.ok())
+            continue;
+        for (auto &[seg_id, ranges] : seg_append_ranges)
+            MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
+    }
+}
+
+void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges) {
+    SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(seg_id, MAX_TIMESTAMP);
+    SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->GetOrCreateSegment(seg_id, txn);
+    Vector<SharedPtr<BlockEntry>> block_entries;
+    SizeT num_ranges = append_ranges.size();
+    SizeT dump_idx = SizeT(-1);
+    // Determine the last sealed BlockEntry
+    for (SizeT i = 0; i < num_ranges; i++) {
+        AppendRange &range = append_ranges[i];
+        SharedPtr<BlockEntry> block_entry = segment_entry->GetBlockEntryByID(range.block_id_);
+        block_entries.push_back(block_entry);
+        if (block_entry->GetAvailableCapacity() <= 0)
+            dump_idx = i;
+    }
+    for (SizeT i = 0; i < num_ranges; i++) {
+        AppendRange &range = append_ranges[i];
+        SharedPtr<BlockEntry> block_entry = block_entries[i];
+        segment_index_entry->MemIndexInsert(txn, block_entry, range.start_offset_, range.row_count_);
+        if (i == dump_idx)
+            segment_index_entry->MemIndexDump();
     }
 }
 

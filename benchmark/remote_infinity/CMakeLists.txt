@@ -19,7 +19,6 @@ target_link_libraries(
         sql_parser
         onnxruntime_mlas
         zsv_parser
-        iresearch
         newpfor
         fastpfor
         lz4.a

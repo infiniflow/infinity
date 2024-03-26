@@ -31,6 +31,7 @@ import background_process;
 import catalog_delta_entry;
 import default_values;
 import wal_manager;
+import bg_task;
 
 namespace infinity {
 
@@ -129,9 +130,8 @@ void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     if (is_running_.load() == false) {
         UnrecoverableError("TxnManager is not running, cannot add delta entry");
     }
-    if (wal_mgr_ == nullptr)
-        return;
-    wal_mgr_->AddDeltaEntry(std::move(delta_entry));
+    i64 wal_size = wal_mgr_->WalSize();
+    bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry), wal_size));
 }
 
 void TxnManager::Start() {

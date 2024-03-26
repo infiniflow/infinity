@@ -84,7 +84,7 @@ protected:
     bool is_raw_{false};
     bool case_sensitive_{false};
     bool contain_lower_{false};
-    bool extract_eng_stem_{false};
+    bool extract_eng_stem_{true};
     bool extract_synonym_{false};
     bool chinese_{false};
     bool remove_stopwords_{false};

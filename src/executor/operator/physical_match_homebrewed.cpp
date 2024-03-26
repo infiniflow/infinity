@@ -31,7 +31,6 @@ import internal_types;
 import value;
 import third_party;
 import base_table_ref;
-import fulltext_index_entry;
 import block_entry;
 import block_column_entry;
 import logical_type;
@@ -83,16 +82,13 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     FullTextQueryContext full_text_query_context;
     full_text_query_context.query_tree_ = std::move(query_tree);
     UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
-    if (!doc_iterator) {
-        RecoverableError(Status::SyntaxError("no available column with fulltext index found"));
-        return false;
-    }
-
-    // 3 full text search
     u32 result_count = 0;
     UniquePtr<float[]> score_result;
     UniquePtr<RowID[]> row_id_result;
-    if (RowID iter_row_id = doc_iterator->Doc(); iter_row_id != INVALID_ROWID) [[likely]] {
+
+    // 3 full text search
+    RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : doc_iterator->Doc();
+    if (iter_row_id != INVALID_ROWID) [[likely]] {
         u32 top_n = 0;
         if (auto iter_n_option = search_ops.options_.find("topn"); iter_n_option != search_ops.options_.end()) {
             int top_n_option = std::stoi(iter_n_option->second);

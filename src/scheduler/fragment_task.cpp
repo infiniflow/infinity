@@ -34,6 +34,7 @@ import base_table_ref;
 import defer_op;
 import fragment_context;
 import status;
+import parser_assert;
 
 namespace infinity {
 
@@ -90,6 +91,9 @@ void FragmentTask::OnExecute(i64) {
         } catch (RecoverableException &e) {
             LOG_ERROR(e.what());
             operator_status = Status(e.ErrorCode(), e.what());
+        } catch (ParserException &e) {
+            LOG_ERROR(e.what());
+            operator_status = Status::ParserError(e.what());
         } catch (UnrecoverableException &e) {
             LOG_CRITICAL(e.what());
             throw e;

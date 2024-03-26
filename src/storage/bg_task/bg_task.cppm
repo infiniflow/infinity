@@ -18,18 +18,20 @@ import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
-
+import cleanup_scanner;
 
 export module bg_task;
 
 namespace infinity {
 
 export enum class BGTaskType {
-    kForceCheckpoint, // Manually triggered by PhysicalFlush
     kStopProcessor,
+    kForceCheckpoint, // Manually triggered by PhysicalFlush
+    kAddDeltaEntry,
+    kCheckpoint,
     kCompactSegments,
     kCleanup,
-    kUpdateSegmentBloomFilterData,
+    kUpdateSegmentBloomFilterData, // Not used
     kInvalid
 };
 
@@ -74,16 +76,55 @@ export struct StopProcessorTask final : public BGTask {
 };
 
 export struct ForceCheckpointTask final : public BGTask {
-    explicit ForceCheckpointTask(Txn *txn) : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn) {}
-    explicit ForceCheckpointTask(Txn *txn, bool is_full_checkpoint)
-        : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(is_full_checkpoint) {}
+    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true)
+        : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint) {}
 
     ~ForceCheckpointTask() = default;
 
     String ToString() const final { return "Force Checkpoint Task"; }
 
     Txn *txn_{};
-    bool is_full_checkpoint_{true};
+    bool is_full_checkpoint_{};
+};
+
+export struct AddDeltaEntryTask final : public BGTask {
+    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size)
+        : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)), wal_size_(wal_size) {}
+
+    String ToString() const final { return "Add Delta Entry Task"; }
+
+    UniquePtr<CatalogDeltaEntry> delta_entry_{};
+    i64 wal_size_{};
+};
+
+export struct CheckpointTask final : public BGTask {
+    CheckpointTask(bool full_checkpoint) : BGTask(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
+
+    String ToString() const final { return "Checkpoint Task"; }
+    bool is_full_checkpoint_{};
+};
+
+export class CleanupTask final : public BGTask {
+public:
+    // Try clean up is async task?
+    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
+
+public:
+    ~CleanupTask() override = default;
+
+    String ToString() const override { return "CleanupTask"; }
+
+    void Execute() {
+        CleanupScanner scanner(catalog_, visible_ts_);
+        scanner.Scan();
+        // FIXME(sys): This is a blocking call, should it be async?
+        std::move(scanner).Cleanup();
+    }
+
+private:
+    Catalog *const catalog_;
+
+    const TxnTimeStamp visible_ts_;
 };
 
 } // namespace infinity

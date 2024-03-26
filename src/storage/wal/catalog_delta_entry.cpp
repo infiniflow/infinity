@@ -62,10 +62,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             operation = AddTableIndexEntryOp::ReadAdv(ptr, ptr_end);
             break;
         }
-        case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
-            operation = AddFulltextIndexEntryOp::ReadAdv(ptr);
-            break;
-        }
         case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
             operation = AddSegmentIndexEntryOp::ReadAdv(ptr);
             break;
@@ -199,16 +195,6 @@ UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(char *&ptr, char *
     return add_table_index_op;
 }
 
-UniquePtr<AddFulltextIndexEntryOp> AddFulltextIndexEntryOp::ReadAdv(char *&ptr) {
-    auto add_fulltext_index_op = MakeUnique<AddFulltextIndexEntryOp>();
-    add_fulltext_index_op->ReadAdvBase(ptr);
-
-    add_fulltext_index_op->db_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
-    add_fulltext_index_op->table_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
-    add_fulltext_index_op->index_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
-    return add_fulltext_index_op;
-}
-
 UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
     auto add_segment_index_op = MakeUnique<AddSegmentIndexEntryOp>();
     add_segment_index_op->ReadAdvBase(ptr);
@@ -323,13 +309,6 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     }
 }
 
-void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, *this->table_name_);
-    WriteBufAdv(buf, *this->index_name_);
-}
-
 void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
@@ -430,10 +409,6 @@ const String AddTableIndexEntryOp::ToString() const {
                        index_base_.get() != nullptr ? index_base_->ToString() : "nullptr");
 }
 
-const String AddFulltextIndexEntryOp::ToString() const {
-    return fmt::format("AddFulltextIndexEntryOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, *index_name_);
-}
-
 const String AddSegmentIndexEntryOp::ToString() const {
     return fmt::format("AddSegmentIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} min_ts: {} max_ts: {}",
                        *db_name_,
@@ -510,12 +485,6 @@ bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
            *index_base_ == *rhs_op->index_base_;
 }
 
-bool AddFulltextIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
-    auto *rhs_op = dynamic_cast<const AddFulltextIndexEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
-           IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_);
-}
-
 bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddSegmentIndexEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
@@ -580,13 +549,6 @@ void AddTableIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
     *this = std::move(*static_cast<AddTableIndexEntryOp *>(other.get()));
-}
-
-void AddFulltextIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
-    }
-    *this = std::move(*static_cast<AddFulltextIndexEntryOp *>(other.get()));
 }
 
 void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
@@ -735,47 +697,49 @@ String CatalogDeltaEntry::ToString() const {
     return sstream.str();
 }
 
-void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
+void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
     // {
     //     for (auto &delta_entry : delta_entries) {
     //         LOG_INFO(fmt::format("Add delta entry: {}", delta_entry->ToString()));
     //     }
     // }
     std::unique_lock w_lock(mtx_);
-    for (auto &delta_entry : delta_entries) {
-        TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
+    TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
 
-        if (delta_entry->commit_ts() < max_commit_ts_) {
-            UnrecoverableError(fmt::format("delta_entry->commit_ts() {} < max_commit_ts_ {}. DeltaOp should add in global in sequence of commit_ts",
-                                           delta_entry->commit_ts(),
-                                           max_commit_ts_));
-        }
-        max_commit_ts_ = delta_entry->commit_ts();
+    TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
+    if (max_commit_ts_ > max_commit_ts || wal_size_ > wal_size) {
+        UnrecoverableError(
+            fmt::format("max_commit_ts_ {} > max_commit_ts {} or wal_size_ {} > wal_size {}", max_commit_ts_, max_commit_ts, wal_size_, wal_size));
+    }
+    max_commit_ts_ = max_commit_ts;
+    wal_size_ = wal_size;
 
-        for (auto &op : delta_entry->operations()) {
-            bool prune = PruneDeltaOp(op.get(), current_commit_ts);
+    for (auto &op : delta_entry->operations()) {
+        bool prune = PruneDeltaOp(op.get(), current_commit_ts);
 
-            String encode = op->EncodeIndex();
-            auto iter = delta_ops_.find(encode);
-            if (iter != delta_ops_.end()) {
-                auto &delta_op = iter->second;
-                if (!prune) {
-                    delta_op->Merge(std::move(op));
-                } else {
-                    delta_ops_.erase(iter);
-                }
+        String encode = op->EncodeIndex();
+        auto iter = delta_ops_.find(encode);
+        if (iter != delta_ops_.end()) {
+            auto &delta_op = iter->second;
+            if (!prune) {
+                delta_op->Merge(std::move(op));
             } else {
-                delta_ops_[encode] = std::move(op);
+                delta_ops_.erase(iter);
             }
+        } else {
+            delta_ops_[encode] = std::move(op);
         }
-        if (!delta_entry->txn_ids().empty()) {
-            txn_ids_.insert(delta_entry->txn_ids()[0]);
-        }
+    }
+    if (!delta_entry->txn_ids().empty()) {
+        txn_ids_.insert(delta_entry->txn_ids()[0]);
     }
 }
 
 UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
+    if (max_commit_ts != max_commit_ts_) {
+        UnrecoverableError(fmt::format("max_commit_ts {} != max_commit_ts_ {}", max_commit_ts, max_commit_ts_));
+    }
 
     TxnTimeStamp max_ts = 0;
     {
@@ -793,9 +757,6 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
         std::swap(max_ts, max_commit_ts_);
         txn_ids_.clear();
         delta_ops_.clear();
-    }
-    if (max_ts > max_commit_ts) {
-        UnrecoverableError(fmt::format("max_ts_ {} > max_commit_ts {}", max_ts, max_commit_ts));
     }
     flush_delta_entry->set_commit_ts(max_commit_ts);
 

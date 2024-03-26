@@ -50,13 +50,17 @@ import table_index_meta;
 import base_entry;
 import block_entry;
 import block_column_entry;
-import fulltext_index_entry;
 import segment_index_entry;
 
 namespace infinity {
 
 // TODO Consider letting it commit as a transaction.
-Catalog::Catalog(SharedPtr<String> dir) : current_dir_(std::move(dir)), running_(true) {
+Catalog::Catalog(SharedPtr<String> data_dir)
+    : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(*data_dir_ + "/" + String(CATALOG_FILE_DIR))), running_(true) {
+    LocalFileSystem fs;
+    if (!fs.Exists(*catalog_dir_)) {
+        fs.CreateDirectory(*catalog_dir_);
+    }
     mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
 }
 
@@ -78,12 +82,7 @@ void Catalog::SetTxnMgr(TxnManager *txn_mgr) { txn_mgr_ = txn_mgr; }
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
 Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    auto init_db_meta = [&]() {
-        // Not find the db and create new db meta
-        auto db_dir = this->DataDir();
-        // Physical wal log
-        return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
-    };
+    auto init_db_meta = [&]() { return DBMeta::NewDBMeta(data_dir_, MakeShared<String>(db_name)); };
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
     auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta));
     return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
@@ -396,7 +395,7 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     Vector<DBMeta *> databases;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["current_dir"] = *this->current_dir_;
+        json_res["data_dir"] = *this->data_dir_;
         json_res["next_txn_id"] = this->next_txn_id_;
         json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
         json_res["catalog_version"] = this->catalog_version_;
@@ -412,11 +411,10 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     return json_res;
 }
 
-UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) {
-    auto catalog = MakeUnique<Catalog>(dir);
+UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_default_db) {
+    auto catalog = MakeUnique<Catalog>(data_dir);
     if (create_default_db) {
         // db current dir is same level as catalog
-        auto data_dir = catalog->DataDir();
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
         SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
@@ -429,25 +427,22 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_defaul
 }
 
 UniquePtr<Catalog> Catalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
-    auto catalog = MakeUnique<Catalog>(nullptr);
     if (catalog_paths.empty()) {
         UnrecoverableError(fmt::format("Catalog path is empty"));
     }
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", catalog_paths[0]));
-    catalog = Catalog::LoadFromFile(catalog_paths[0], buffer_mgr);
+    auto catalog = Catalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
-    Vector<UniquePtr<CatalogDeltaEntry>> catalog_delta_entries;
     TxnTimeStamp max_commit_ts = 0;
     for (SizeT i = 1; i < catalog_paths.size(); i++) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", catalog_paths[i]));
         auto catalog_delta_entry = Catalog::LoadFromFileDelta(catalog_paths[i]);
         max_commit_ts = std::max(max_commit_ts, catalog_delta_entry->commit_ts());
-        catalog_delta_entries.emplace_back(std::move(catalog_delta_entry));
+        catalog->AddDeltaEntry(std::move(catalog_delta_entry), 0 /*wal_size*/);
     }
-    catalog->AddDeltaEntries(std::move(catalog_delta_entries));
     catalog->LoadFromEntryDelta(max_commit_ts, buffer_mgr);
 
     LOG_TRACE(fmt::format("Catalog Delta Op is done"));
@@ -646,7 +641,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto *block_entry = segment_entry->GetBlockEntryByID(block_id);
+                auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx),
                                              column_id);
                 break;
@@ -675,24 +670,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         begin_ts);
                 } else {
                     table_entry->DropIndexReplay(*index_name, txn_id, begin_ts);
-                }
-                break;
-            }
-            case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
-                auto add_fulltext_index_entry_op = static_cast<AddFulltextIndexEntryOp *>(op.get());
-                const auto &db_name = add_fulltext_index_entry_op->db_name_;
-                const auto &table_name = add_fulltext_index_entry_op->table_name_;
-                const auto &index_name = add_fulltext_index_entry_op->index_name_;
-
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
-                auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
-
-                auto fulltext_index_entry =
-                    FulltextIndexEntry::NewReplayFulltextIndexEntry(table_index_entry, txn_id, begin_ts, commit_ts, is_delete);
-                table_index_entry->fulltext_index_entry().swap(fulltext_index_entry);
-                if (fulltext_index_entry.get() != nullptr) {
-                    UnrecoverableError(fmt::format("Fulltext index {} is already in the catalog", *index_name));
                 }
                 break;
             }
@@ -756,7 +733,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto *block_entry = segment_entry->GetBlockEntryByID(block_id);
+                auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 block_entry->LoadFilterBinaryData(block_filter_binary);
                 break;
             }
@@ -767,7 +744,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
 }
 
 UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
-    UniquePtr<Catalog> catalog = nullptr;
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     SizeT file_size = fs.GetFileSize(*catalog_file_handler);
@@ -778,15 +754,14 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManag
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
-    Deserialize(catalog_json, buffer_mgr, catalog);
-    return catalog;
+    return Deserialize(catalog_json, buffer_mgr);
 }
 
-void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog) {
-    SharedPtr<String> current_dir = MakeShared<String>(catalog_json["current_dir"]);
+UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
+    SharedPtr<String> data_dir = MakeShared<String>(catalog_json["data_dir"]);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    catalog = MakeUnique<Catalog>(current_dir);
+    auto catalog = MakeUnique<Catalog>(std::move(data_dir));
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     catalog->catalog_version_ = catalog_json["catalog_version"];
@@ -796,6 +771,7 @@ void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buf
             catalog->db_meta_map().emplace(*db_meta->db_name(), std::move(db_meta));
         }
     }
+    return catalog;
 }
 
 UniquePtr<String> Catalog::SaveFullCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts) {
@@ -898,17 +874,11 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     return false;
 }
 
-void Catalog::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
-    global_catalog_delta_entry_->AddDeltaEntries(std::move(delta_entries));
+void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
+    global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry), wal_size);
 }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
-
-const SharedPtr<String> Catalog::DataDir() const {
-    Path catalog_path(*this->current_dir_);
-    Path parent_path = catalog_path.parent_path();
-    return MakeShared<String>(parent_path.string());
-}
 
 void Catalog::MemIndexCommit() {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
@@ -926,5 +896,9 @@ void Catalog::MemIndexCommitLoop() {
         MemIndexCommit();
     }
 }
+
+Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_catalog_delta_entry_->GetCheckpointState(); }
+
+void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }
 
 } // namespace infinity

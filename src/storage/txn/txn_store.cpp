@@ -66,9 +66,6 @@ void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState
 TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
 
 void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
-    if (fulltext_index_entry_ != nullptr) {
-        local_delta_ops->AddOperation(MakeUnique<AddFulltextIndexEntryOp>(fulltext_index_entry_));
-    }
     for (auto [segment_id, segment_index_entry] : index_entry_map_) {
         local_delta_ops->AddOperation(MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry));
     }
@@ -155,14 +152,6 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
             UnrecoverableError(fmt::format("Attempt to add segment index of segment {} store twice", segment_index_entry->segment_id()));
         }
     }
-}
-
-void TxnTableStore::AddFulltextIndexStore(TableIndexEntry *table_index_entry, FulltextIndexEntry *fulltext_index_entry) {
-    auto *txn_index_store = this->GetIndexStore(table_index_entry);
-    if (txn_index_store->fulltext_index_entry_ != nullptr) {
-        UnrecoverableError("Attempt to add fulltext index store twice");
-    }
-    txn_index_store->fulltext_index_entry_ = fulltext_index_entry;
 }
 
 void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {

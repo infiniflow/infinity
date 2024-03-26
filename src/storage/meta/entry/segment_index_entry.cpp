@@ -52,7 +52,6 @@ import segment_iter;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
-import fulltext_index_entry;
 import index_full_text;
 import index_defines;
 import column_inverter;
@@ -159,6 +158,9 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
                                                             table_index_entry_->GetFulltextByteSlicePool(),
                                                             table_index_entry_->GetFulltextBufferPool(),
                                                             table_index_entry_->GetFulltextThreadPool());
+                auto now = Clock::now().time_since_epoch();
+                u64 ts = ChronoCast<NanoSeconds>(now).count();
+                table_index_entry_->UpdateFulltextSegmentTs(ts);
             }
             Path column_length_file_base = Path(*table_index_entry_->index_dir()) / (memory_indexer_->GetBaseName());
             String column_length_file_path_prefix = column_length_file_base.string();
@@ -169,9 +171,6 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(txn->buffer_mgr()));
             memory_indexer_->Insert(column_vector, row_offset, row_count, std::move(column_length_file_handler), false);
-            auto duration = Clock::now().time_since_epoch();
-            u64 ts = ChronoCast<NanoSeconds>(duration).count();
-            table_index_entry_->UpdateFulltextSegmentTs(ts);
             break;
         }
         case IndexType::kIVFFlat:
@@ -208,6 +207,9 @@ void SegmentIndexEntry::MemIndexDump(bool spill) {
         ft_base_names_.push_back(memory_indexer_->GetBaseName());
         ft_base_rowids_.push_back(memory_indexer_->GetBaseRowId());
         memory_indexer_.reset();
+        auto now = Clock::now().time_since_epoch();
+        u64 ts = ChronoCast<NanoSeconds>(now).count();
+        table_index_entry_->UpdateFulltextSegmentTs(ts);
     }
 }
 

@@ -34,7 +34,6 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import cleanup_task;
 import compact_segments_task;
 import index_base;
 import index_base;
@@ -46,7 +45,6 @@ import query_context;
 import txn;
 import index_base;
 import index_full_text;
-import fulltext_index_entry;
 import bg_task;
 import logger;
 import infinity_exception;
@@ -81,7 +79,7 @@ protected:
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
-            if (visible_ts <= last_commit_ts) {
+            if (visible_ts >= last_commit_ts) {
                 break;
             }
             // wait for at most 10s
@@ -89,9 +87,7 @@ protected:
             if (end - start > 10) {
                 UnrecoverableException("WaitFlushDeltaOp timeout");
             }
-            usleep(1000 * 1000);
         }
-        usleep(1000 * 1000);
     }
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {

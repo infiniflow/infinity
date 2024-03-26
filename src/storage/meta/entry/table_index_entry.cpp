@@ -29,7 +29,6 @@ import infinity_exception;
 import index_full_text;
 import catalog_delta_entry;
 import base_table_ref;
-import iresearch_datastore;
 import create_index_info;
 import base_entry;
 import logger;
@@ -78,15 +77,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     if (index_base->column_names_.size() != 1) {
         RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
     }
-    if (index_base->index_type_ == IndexType::kFullText) {
-        SharedPtr<IndexFullText> index_fulltext = std::static_pointer_cast<IndexFullText>(index_base);
-        if (index_fulltext->homebrewed_) {
-            // TODO yzc: remove table_index_entry->fulltext_index_entry_
-        } else {
-            table_index_entry->fulltext_index_entry_ = FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry.get(), txn_id, begin_ts);
-        }
-    }
-
     return table_index_entry;
 }
 
@@ -111,21 +101,26 @@ Map<SegmentID, SharedPtr<SegmentIndexEntry>> TableIndexEntry::GetIndexBySegmentS
     return index_by_segment_snapshot;
 }
 
-bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
-    bool homebrewed = false;
-    if (index_base_->index_type_ == IndexType::kFullText) {
-        SharedPtr<IndexFullText> index_fulltext = std::static_pointer_cast<IndexFullText>(index_base_);
-        homebrewed = index_fulltext->homebrewed_;
-    }
-    return homebrewed;
-}
-
 String TableIndexEntry::GetPathNameTail() const {
     SizeT delimiter_i = index_dir_->rfind('/');
     if (delimiter_i == String::npos) {
         return *index_dir_;
     }
     return index_dir_->substr(delimiter_i + 1);
+}
+
+SharedPtr<SegmentIndexEntry> TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn) {
+    SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
+    std::unique_lock w_lock(rw_locker_);
+    auto iter = index_by_segment_.find(segment_id);
+    if (iter == index_by_segment_.end()) {
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), DEFAULT_SEGMENT_CAPACITY, column_def_.get());
+        segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+        index_by_segment_.emplace(segment_id, segment_index_entry);
+    } else {
+        segment_index_entry = iter->second;
+    }
+    return segment_index_entry;
 }
 
 // For segment_index_entry
@@ -139,16 +134,12 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
             }
             segment_index_entry->Commit(commit_ts);
         }
-        if (txn_index_store->fulltext_index_entry_ != nullptr) {
-            txn_index_store->fulltext_index_entry_->Commit(commit_ts);
-        }
         if (!Committed()) {
             commit_ts_.store(commit_ts);
         }
     }
 }
 
-// For fulltext_index_entry
 void TableIndexEntry::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
     {
         std::unique_lock w_lock(rw_locker_);
@@ -158,10 +149,6 @@ void TableIndexEntry::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
                 UnrecoverableError("Failed to erase segment index entry");
             }
         }
-        if (txn_index_store->fulltext_index_entry_ != nullptr) {
-            txn_index_store->fulltext_index_entry_->Cleanup();
-            fulltext_index_entry_.reset();
-        }
     }
 }
 
@@ -169,7 +156,6 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 
     Vector<SegmentIndexEntry *> segment_index_entry_candidates;
-    FulltextIndexEntry *fulltext_index_entry_candidate_{};
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json["txn_id"] = this->txn_id_.load();
@@ -186,16 +172,10 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
         for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
             segment_index_entry_candidates.emplace_back((SegmentIndexEntry *)index_entry.get());
         }
-
-        fulltext_index_entry_candidate_ = this->fulltext_index_entry_.get();
     }
 
     for (const auto &segment_index_entry : segment_index_entry_candidates) {
         json["segment_indexes"].emplace_back(segment_index_entry->Serialize());
-    }
-
-    if (fulltext_index_entry_candidate_ != nullptr) {
-        json["fulltext_index_entry"] = fulltext_index_entry_candidate_->Serialize(max_commit_ts);
     }
 
     return json;
@@ -231,11 +211,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
                 SegmentIndexEntry::Deserialize(segment_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
             table_index_entry->index_by_segment_.emplace(segment_index_entry->segment_id(), std::move(segment_index_entry));
         }
-    }
-
-    if (index_def_entry_json.contains("fulltext_index_entry")) {
-        table_index_entry->fulltext_index_entry_ =
-            FulltextIndexEntry::Deserialize(index_def_entry_json["fulltext_index_entry"], table_index_entry.get(), buffer_mgr);
     }
     return table_index_entry;
 }
@@ -282,18 +257,8 @@ void TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn) {
     index_by_segment_.emplace(segment_id, segment_index_entry);
 }
 
-Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
+Tuple<Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
-    FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
-    if (fulltext_index_entry != nullptr && !IsFulltextIndexHomebrewed()) {
-        auto *buffer_mgr = txn->buffer_mgr();
-        for (const auto *segment_entry : block_index->segments_) {
-            fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_base_.get(), segment_entry, buffer_mgr);
-        }
-        fulltext_index_entry->irs_index_->Commit();
-        fulltext_index_entry->irs_index_->StopSchedule();
-        return {fulltext_index_entry, Vector<SegmentIndexEntry *>{}, Status::OK()};
-    }
     Vector<SegmentIndexEntry *> segment_index_entries;
     for (const auto *segment_entry : block_index->segments_) {
         auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_count(), column_def_.get());
@@ -305,7 +270,7 @@ TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_i
         index_by_segment_.emplace(segment_id, segment_index_entry);
         segment_index_entries.push_back(segment_index_entry.get());
     }
-    return {nullptr, segment_index_entries, Status::OK()};
+    return {segment_index_entries, Status::OK()};
 }
 
 Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
@@ -431,9 +396,6 @@ void TableIndexEntry::Cleanup() {
     }
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
         segment_index_entry->Cleanup();
-    }
-    if (this->fulltext_index_entry_.get() != nullptr) {
-        fulltext_index_entry_->Cleanup();
     }
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *index_dir_));

@@ -121,13 +121,6 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<AddFulltextIndexEntryOp>();
-            op->db_name_ = db_name;
-            op->table_name_ = table_name;
-            op->index_name_ = index_name;
-            catalog_delta_entry1->operations().push_back(std::move(op));
-        }
-        {
             auto op = MakeUnique<AddSegmentIndexEntryOp>();
             op->db_name_ = db_name;
             op->table_name_ = table_name;
@@ -314,17 +307,6 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
     }
     {
-        auto op1 = MakeUnique<AddFulltextIndexEntryOp>();
-        auto op1_same_name = MakeUnique<AddFulltextIndexEntryOp>();
-
-        op1_same_name->db_name_ = op1->db_name_ = db_name;
-        op1_same_name->table_name_ = op1->table_name_ = table_name;
-        op1_same_name->index_name_ = op1->index_name_ = index_name;
-
-        local_catalog_delta_entry->operations().push_back(std::move(op1));
-        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
-    }
-    {
         auto op1 = MakeUnique<AddSegmentIndexEntryOp>();
         auto op1_same_name = MakeUnique<AddSegmentIndexEntryOp>();
 
@@ -375,9 +357,7 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     }
 
     // merge
-    Vector<UniquePtr<CatalogDeltaEntry>> delta_entries;
-    delta_entries.push_back(std::move(local_catalog_delta_entry));
-    global_catalog_delta_entry->AddDeltaEntries(std::move(delta_entries));
+    global_catalog_delta_entry->AddDeltaEntry(std::move(local_catalog_delta_entry), 0);
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 5u);
+    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 4u);
 }

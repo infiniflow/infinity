@@ -47,7 +47,6 @@ namespace infinity {
 
 class IndexBase;
 struct TableIndexEntry;
-class FulltextIndexEntry;
 class TableMeta;
 class Txn;
 struct Catalog;
@@ -150,7 +149,7 @@ public:
     }
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
+    void MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges);
 
     // Dump or spill the memory indexer
     void MemIndexDump(Txn *txn, bool spill = false);
@@ -187,10 +186,7 @@ public:
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 
-    void GetFulltextAnalyzers(TransactionID txn_id,
-                              TxnTimeStamp begin_ts,
-                              SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
-                              Map<String, String> &column2analyzer);
+    void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -244,6 +240,8 @@ private:
 
 private: // TODO: remove it
     std::shared_mutex &rw_locker() const { return index_meta_map_.rw_locker_; }
+
+    void MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges);
 
 public: // TODO: remove it?
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }

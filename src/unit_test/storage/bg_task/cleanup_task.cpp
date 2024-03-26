@@ -32,7 +32,7 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import cleanup_task;
+import bg_task;
 import compact_segments_task;
 import index_base;
 import third_party;
@@ -53,7 +53,7 @@ protected:
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
-            if (visible_ts <= last_commit_ts) {
+            if (visible_ts >= last_commit_ts) {
                 break;
             }
             // wait for at most 10s
@@ -63,7 +63,6 @@ protected:
             }
             usleep(1000 * 1000);
         }
-        usleep(1000 * 1000);
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
         cleanup_task->Execute();
     }

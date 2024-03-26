@@ -447,7 +447,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             EXPECT_EQ(segment_entry->segment_id(), 0u);
             EXPECT_EQ(segment_entry->row_count(), row_count);
 
-            auto *block_entry = segment_entry->GetBlockEntryByID(0);
+            auto *block_entry = segment_entry->GetBlockEntryByID(0).get();
             EXPECT_EQ(block_entry->block_id(), 0u);
             EXPECT_EQ(block_entry->row_count(), row_count);
 
@@ -653,7 +653,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
             EXPECT_NE(segment_entry, nullptr);
             EXPECT_EQ(segment_entry->segment_id(), 0u);
-            auto *block_entry = segment_entry->GetBlockEntryByID(0);
+            auto *block_entry = segment_entry->GetBlockEntryByID(0).get();
             EXPECT_EQ(block_entry->block_id(), 0u);
             EXPECT_EQ(block_entry->row_count(), 1u);
 
@@ -808,7 +808,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
             EXPECT_EQ(compact_segment->row_count(), test_segment_n);
 
-            auto block_entry = compact_segment->GetBlockEntryByID(0);
+            auto block_entry = compact_segment->GetBlockEntryByID(0).get();
             EXPECT_NE(block_entry, nullptr);
             EXPECT_EQ(block_entry->row_count(), test_segment_n);
         }
