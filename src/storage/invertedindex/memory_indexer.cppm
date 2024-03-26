@@ -14,7 +14,6 @@
 
 module;
 
-#include "type/complex/row_id.h"
 #include <cstdio>
 
 export module memory_indexer;
@@ -28,6 +27,7 @@ import third_party;
 import internal_types;
 import ring;
 import skiplist;
+import internal_types;
 
 namespace infinity {
 

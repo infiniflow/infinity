@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "type/complex/row_id.h"
-#include "type/logical_type.h"
 #include "unit_test/base_test.h"
 
 import stl;
@@ -30,6 +28,8 @@ import value;
 import column_inverter;
 import segment_posting;
 import posting_iterator;
+import internal_types;
+import logical_type;
 
 using namespace infinity;
 
