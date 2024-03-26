@@ -21,6 +21,7 @@ import bg_task;
 import wal_entry;
 import options;
 import catalog_delta_entry;
+import blocking_queue;
 
 namespace infinity {
 
@@ -40,7 +41,7 @@ public:
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    int PutEntry(SharedPtr<WalEntry> entry);
+    void PutEntry(SharedPtr<WalEntry> entry);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -98,8 +99,7 @@ private:
     Thread flush_thread_{};
 
     // TxnManager and Flush thread access following members
-    std::mutex mutex_{};
-    Deque<SharedPtr<WalEntry>> que_{};
+    BlockingQueue<SharedPtr<WalEntry>> blocking_queue_{};
 
     // Only Flush thread access following members
     std::ofstream ofs_{};

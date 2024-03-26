@@ -62,7 +62,6 @@ WalManager::~WalManager() {
     if (running_.load()) {
         Stop();
     }
-    que_.clear();
 }
 
 void WalManager::Start() {
@@ -104,14 +103,7 @@ void WalManager::Stop() {
     txn_mgr->Stop();
 
     // pop all the entries in the queue. and notify the condition variable.
-    std::lock_guard guard(mutex_);
-    for (const auto &entry : que_) {
-        Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
-        if (txn != nullptr) {
-            txn->CancelCommitBottom();
-        }
-    }
-    que_.clear();
+    blocking_queue_.Enqueue(nullptr);
 
     // Wait for flush thread to stop
     LOG_TRACE("WalManager::Stop flush thread join");
@@ -123,18 +115,14 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-int WalManager::PutEntry(SharedPtr<WalEntry> entry) {
+void WalManager::PutEntry(SharedPtr<WalEntry> entry) {
     if (!running_.load()) {
-        return -1;
+        return;
     }
-    int rc = 0;
-    mutex_.lock();
-    if (running_.load()) {
-        que_.push_back(entry);
-        rc = -1;
-    }
-    mutex_.unlock();
-    return rc;
+
+    blocking_queue_.Enqueue(entry);
+
+    return ;
 }
 
 void WalManager::SetLastCkpWalSize(i64 wal_size) {
@@ -156,16 +144,19 @@ void WalManager::Flush() {
 
     Deque<SharedPtr<WalEntry>> log_batch{};
     while (running_.load()) {
-        mutex_.lock();
-        que_.swap(log_batch);
-        mutex_.unlock();
+        blocking_queue_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            LOG_WARN("WalManager::Dequeue empty batch logs");
             continue;
         }
         // auto [max_commit_ts, wal_size] = GetWalState();
         for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
+            if(entry == nullptr) {
+                // terminate entry
+                running_ = false;
+                break;
+            }
             if (entry->cmds_.empty()) {
                 UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
@@ -185,13 +176,17 @@ void WalManager::Flush() {
             wal_size_ += act_size;
         }
 
+        if(!running_.load()) {
+            break;
+        }
+
         switch (flush_option_) {
             case FlushOption::kFlushAtOnce: {
                 ofs_.flush();
                 break;
             }
             case FlushOption::kOnlyWrite: {
-//                ofs_.flush(); // FIXME: not flush, only write
+                ofs_.flush(); // FIXME: not flush, only write
                 break;
             }
             case FlushOption::kFlushPerSecond: {
