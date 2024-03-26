@@ -425,14 +425,13 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, SharedPtr<Str
 }
 
 UniquePtr<Catalog> Catalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
-    auto catalog = MakeUnique<Catalog>(nullptr, nullptr);
     if (catalog_paths.empty()) {
         UnrecoverableError(fmt::format("Catalog path is empty"));
     }
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", catalog_paths[0]));
-    catalog = Catalog::LoadFromFile(catalog_paths[0], buffer_mgr);
+    auto catalog = Catalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
     TxnTimeStamp max_commit_ts = 0;
@@ -440,7 +439,7 @@ UniquePtr<Catalog> Catalog::LoadFromFiles(const Vector<String> &catalog_paths, B
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", catalog_paths[i]));
         auto catalog_delta_entry = Catalog::LoadFromFileDelta(catalog_paths[i]);
         max_commit_ts = std::max(max_commit_ts, catalog_delta_entry->commit_ts());
-        catalog->AddDeltaEntry(std::move(catalog_delta_entry));
+        catalog->AddDeltaEntry(std::move(catalog_delta_entry), 0 /*wal_size*/);
     }
     catalog->LoadFromEntryDelta(max_commit_ts, buffer_mgr);
 
@@ -761,7 +760,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
 }
 
 UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
-    UniquePtr<Catalog> catalog = nullptr;
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     SizeT file_size = fs.GetFileSize(*catalog_file_handler);
@@ -772,16 +770,15 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManag
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
-    Deserialize(catalog_json, buffer_mgr, catalog);
-    return catalog;
+    return Deserialize(catalog_json, buffer_mgr);
 }
 
-void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog) {
+UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
     SharedPtr<String> data_dir = MakeShared<String>(catalog_json["data_dir"]);
     SharedPtr<String> catalog_dir = MakeShared<String>(catalog_json["catalog_dir"]);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    catalog = MakeUnique<Catalog>(std::move(data_dir), std::move(catalog_dir));
+    auto catalog = MakeUnique<Catalog>(std::move(data_dir), std::move(catalog_dir));
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     catalog->catalog_version_ = catalog_json["catalog_version"];
@@ -791,6 +788,7 @@ void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buf
             catalog->db_meta_map().emplace(*db_meta->db_name(), std::move(db_meta));
         }
     }
+    return catalog;
 }
 
 UniquePtr<String> Catalog::SaveFullCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts) {
@@ -893,7 +891,9 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     return false;
 }
 
-void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
+void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
+    global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry), wal_size);
+}
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 
@@ -913,5 +913,9 @@ void Catalog::MemIndexCommitLoop() {
         MemIndexCommit();
     }
 }
+
+Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_catalog_delta_entry_->GetCheckpointState(); }
+
+void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }
 
 } // namespace infinity

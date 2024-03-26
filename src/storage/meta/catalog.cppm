@@ -235,15 +235,15 @@ public:
 
     bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
-    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
-
-    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir, bool create_default_db);
 
     static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
 private:
+    static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
+
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
 
     void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
@@ -283,8 +283,6 @@ public:
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
-    UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
-
     TxnManager *txn_mgr_{nullptr};
 
 private: // TODO: remove this
@@ -301,6 +299,15 @@ private: // TODO: remove this
 
 public:
     void PickCleanup(CleanupScanner *scanner);
+
+    // delta checkpoint info
+public:
+    Tuple<TxnTimeStamp, i64> GetCheckpointState() const;
+
+    void InitDeltaEntry(TxnTimeStamp max_commit_ts);
+
+private:
+    UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
 };
 
 } // namespace infinity

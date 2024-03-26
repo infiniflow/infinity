@@ -497,6 +497,8 @@ i64 WalManager::ReplayWalFile() {
     LOG_TRACE(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
     storage_->catalog()->next_txn_id_ = last_txn_id;
     this->max_commit_ts_ = system_start_ts;
+
+    storage_->catalog()->InitDeltaEntry(max_commit_ts_);
     return system_start_ts;
 }
 /*****************************************************************************

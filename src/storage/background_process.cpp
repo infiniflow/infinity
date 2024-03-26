@@ -14,6 +14,8 @@
 
 module;
 
+#include <tuple>
+
 module background_process;
 
 import stl;
@@ -29,8 +31,7 @@ import third_party;
 
 namespace infinity {
 
-BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, Catalog *catalog, TxnTimeStamp start_ts)
-    : wal_manager_(wal_manager), catalog_(catalog), max_commit_ts_(start_ts) {}
+BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, Catalog *catalog) : wal_manager_(wal_manager), catalog_(catalog) {}
 
 void BGTaskProcessor::Start() {
     processor_thread_ = Thread([this] { Process(); });
@@ -60,20 +61,21 @@ void BGTaskProcessor::Process() {
             }
             case BGTaskType::kForceCheckpoint: {
                 ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
-                wal_manager_->Checkpoint(force_ckp_task, max_commit_ts_, wal_size_);
+                auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
+                wal_manager_->Checkpoint(force_ckp_task, max_commit_ts, wal_size);
                 break;
             }
             case BGTaskType::kAddDeltaEntry: {
                 auto *task = static_cast<AddDeltaEntryTask *>(bg_task.get());
                 auto &delta_entry = task->delta_entry_;
-                UpdateCheckpointState(delta_entry->commit_ts(), task->wal_size_);
-                catalog_->AddDeltaEntry(std::move(delta_entry));
+                catalog_->AddDeltaEntry(std::move(delta_entry), task->wal_size_);
                 break;
             }
             case BGTaskType::kCheckpoint: {
                 auto *task = static_cast<CheckpointTask *>(bg_task.get());
                 bool is_full_checkpoint = task->is_full_checkpoint_;
-                wal_manager_->Checkpoint(is_full_checkpoint, max_commit_ts_, wal_size_);
+                auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
+                wal_manager_->Checkpoint(is_full_checkpoint, max_commit_ts, wal_size);
                 break;
             }
             case BGTaskType::kCompactSegments: {
@@ -101,19 +103,6 @@ void BGTaskProcessor::Process() {
 
         bg_task->Complete();
     }
-}
-
-void BGTaskProcessor::UpdateCheckpointState(TxnTimeStamp max_commit_ts, i64 wal_size) {
-    if (max_commit_ts < max_commit_ts_ || wal_size < wal_size_) {
-        UnrecoverableError(
-            fmt::format("Invalid update checkpoint state: old max_commit_ts: {}, new max_commit_ts: {}, old wal_size: {}, new wal_size: {}",
-                        max_commit_ts_,
-                        max_commit_ts,
-                        wal_size_,
-                        wal_size));
-    }
-    max_commit_ts_ = max_commit_ts;
-    wal_size_ = wal_size;
 }
 
 } // namespace infinity

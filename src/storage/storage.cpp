@@ -61,7 +61,7 @@ void Storage::Init() {
     // Replay wal file wrap init catalog
     TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
 
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get(), system_start_ts);
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
     // Construct txn manager
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
