@@ -236,6 +236,15 @@ void SortMerger<KeyType, LenType>::Predict(DirectIO &io_stream) {
         u32 last_pos = -1;
         pre_buf_num_ = 0;
         while (1) {
+            if (pos + sizeof(LenType) > s) {
+                // the last record of this microrun
+                IASSERT(last_pos != (u32)-1); // buffer too small that can't hold one record
+                LenType len = *(LenType *)(pre_buf_ + last_pos) + sizeof(LenType);
+                char *tmp = (char *)malloc(len);
+                memcpy(tmp, pre_buf_ + last_pos, len);
+                pre_heap_.push(KeyAddr(tmp, addr + (u64)pos, idx));
+                break;
+            }
             LenType len = *(LenType *)(pre_buf_ + pos);
             if (pos + sizeof(LenType) + len > s) {
                 // the last record of this microrun
