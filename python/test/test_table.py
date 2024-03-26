@@ -783,20 +783,22 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Invalid input, May cause server kill.")
     @pytest.mark.parametrize("types", [
         "int", "int8", "int16", "int32", "int64", "integer",
         "float", "float32", "double", "float64",
         "varchar",
         "bool",
         "vector, 3, float"])
-    def test_column_numbers(self, types):
+    @pytest.mark.parametrize("column_number", [[
+        0, 1, pow(2, 63) - 1
+    ]])
+    def test_column_numbers(self, types, column_number):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_column_numbers", ConflictType.Ignore)
 
-        values = {"c" + str(i): types for i in range(pow(2, 63) - 1)}
+        values = {"c" + str(i): types for i in column_number}
         db_obj.create_table("test_column_numbers", values, ConflictType.Error)
 
     @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
