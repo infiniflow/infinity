@@ -47,7 +47,6 @@ namespace infinity {
 
 class IndexBase;
 struct TableIndexEntry;
-class FulltextIndexEntry;
 class TableMeta;
 class Txn;
 struct Catalog;
@@ -187,10 +186,7 @@ public:
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 
-    void GetFulltextAnalyzers(TransactionID txn_id,
-                              TxnTimeStamp begin_ts,
-                              SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
-                              Map<String, String> &column2analyzer);
+    void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);

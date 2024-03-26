@@ -62,10 +62,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             operation = AddTableIndexEntryOp::ReadAdv(ptr, ptr_end);
             break;
         }
-        case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
-            operation = AddFulltextIndexEntryOp::ReadAdv(ptr);
-            break;
-        }
         case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
             operation = AddSegmentIndexEntryOp::ReadAdv(ptr);
             break;
@@ -199,16 +195,6 @@ UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(char *&ptr, char *
     return add_table_index_op;
 }
 
-UniquePtr<AddFulltextIndexEntryOp> AddFulltextIndexEntryOp::ReadAdv(char *&ptr) {
-    auto add_fulltext_index_op = MakeUnique<AddFulltextIndexEntryOp>();
-    add_fulltext_index_op->ReadAdvBase(ptr);
-
-    add_fulltext_index_op->db_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
-    add_fulltext_index_op->table_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
-    add_fulltext_index_op->index_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
-    return add_fulltext_index_op;
-}
-
 UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
     auto add_segment_index_op = MakeUnique<AddSegmentIndexEntryOp>();
     add_segment_index_op->ReadAdvBase(ptr);
@@ -323,13 +309,6 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     }
 }
 
-void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, *this->table_name_);
-    WriteBufAdv(buf, *this->index_name_);
-}
-
 void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
@@ -430,10 +409,6 @@ const String AddTableIndexEntryOp::ToString() const {
                        index_base_.get() != nullptr ? index_base_->ToString() : "nullptr");
 }
 
-const String AddFulltextIndexEntryOp::ToString() const {
-    return fmt::format("AddFulltextIndexEntryOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, *index_name_);
-}
-
 const String AddSegmentIndexEntryOp::ToString() const {
     return fmt::format("AddSegmentIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} min_ts: {} max_ts: {}",
                        *db_name_,
@@ -510,12 +485,6 @@ bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
            *index_base_ == *rhs_op->index_base_;
 }
 
-bool AddFulltextIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
-    auto *rhs_op = dynamic_cast<const AddFulltextIndexEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
-           IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_);
-}
-
 bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddSegmentIndexEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
@@ -580,13 +549,6 @@ void AddTableIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
     *this = std::move(*static_cast<AddTableIndexEntryOp *>(other.get()));
-}
-
-void AddFulltextIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
-    }
-    *this = std::move(*static_cast<AddFulltextIndexEntryOp *>(other.get()));
 }
 
 void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {

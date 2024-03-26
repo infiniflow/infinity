@@ -201,11 +201,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external/frozen/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/highway")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
@@ -251,11 +246,8 @@ target_link_libraries(infinity
         roaring
         newpfor
         fastpfor
-        openfst
-
         thrift.a
         thriftnb.a
-        iresearch
         lz4.a
         atomic.a
         event.a
@@ -375,8 +367,6 @@ target_link_libraries(unit_test
         roaring
         newpfor
         fastpfor
-        openfst
-        iresearch
         lz4.a
         atomic.a
 #        profiler
@@ -401,7 +391,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlo
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
@@ -435,12 +424,8 @@ target_link_libraries(test_hnsw_bitmask
     roaring
     newpfor
     fastpfor
-    openfst
-    #        iresearch
-
     thrift.a
     thriftnb.a
-    iresearch
     lz4.a
     atomic.a
     event.a

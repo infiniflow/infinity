@@ -52,7 +52,6 @@ import segment_iter;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
-import fulltext_index_entry;
 import index_full_text;
 import index_defines;
 import column_inverter;
