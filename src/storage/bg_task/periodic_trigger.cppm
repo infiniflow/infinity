@@ -62,4 +62,16 @@ private:
     TxnTimeStamp last_visible_ts_{0};
 };
 
+export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
+public:
+    explicit CheckpointPeriodicTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, bool full_checkpoint)
+        : PeriodicTrigger(interval), bg_processor_(bg_processor), is_full_checkpoint_(full_checkpoint) {}
+
+    virtual void Trigger() override;
+
+private:
+    BGTaskProcessor *const bg_processor_{};
+    bool is_full_checkpoint_{};
+};
+
 } // namespace infinity

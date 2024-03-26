@@ -53,6 +53,8 @@ public:
 
     BufferManager *GetBufferMgr() const { return buffer_mgr_; }
 
+    Catalog *GetCatalog() const { return catalog_; }
+
     BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
 
     TxnTimeStamp GetTimestamp(bool prepare_wal = false);

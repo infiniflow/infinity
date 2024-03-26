@@ -26,7 +26,7 @@ class BufferObj;
 
 export class BufferManager {
 public:
-    explicit BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir);
+    explicit BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir);
 
 public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
@@ -37,7 +37,7 @@ public:
 
     void Cleanup(const String &file_path);
 
-    SharedPtr<String> BaseDir() const { return base_dir_; }
+    SharedPtr<String> GetDataDir() const { return data_dir_; }
 
     SharedPtr<String> GetTempDir() const { return temp_dir_; }
 
@@ -46,9 +46,7 @@ public:
         return memory_limit_;
     }
 
-    u64 memory_usage() const {
-        return current_memory_size_.load();
-    }
+    u64 memory_usage() const { return current_memory_size_.load(); }
 
 private:
     friend class BufferObj;
@@ -62,7 +60,7 @@ private:
 private:
     std::shared_mutex rw_locker_{};
 
-    SharedPtr<String> base_dir_;
+    SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
     atomic_u64 current_memory_size_{}; // TODO: need to be atomic
