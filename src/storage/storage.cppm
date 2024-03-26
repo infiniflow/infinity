@@ -50,6 +50,8 @@ public:
 
     void InitNewCatalog();
 
+    const Config *config() const { return config_ptr_; }
+
 private:
     const Config *config_ptr_{};
     UniquePtr<Catalog> new_catalog_{};

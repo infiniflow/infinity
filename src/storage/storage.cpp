@@ -105,7 +105,7 @@ void Storage::Init() {
             periodic_trigger_thread_->AddTrigger(
                 MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(full_checkpoint_interval_sec), bg_processor_.get(), true));
         } else {
-            LOG_WARN("Full checkpoint interval is not set, auto full checkpoint task will not be triggered");
+            LOG_WARN("Full checkpoint interval is not set, auto full checkpoint task will NOT be triggered");
         }
 
         i64 delta_checkpoint_interval_sec = config_ptr_->delta_checkpoint_interval_sec();
@@ -113,7 +113,7 @@ void Storage::Init() {
             periodic_trigger_thread_->AddTrigger(
                 MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(delta_checkpoint_interval_sec), bg_processor_.get(), false));
         } else {
-            LOG_WARN("Delta checkpoint interval is not set, auto delta checkpoint task will not be triggered");
+            LOG_WARN("Delta checkpoint interval is not set, auto delta checkpoint task will NOT be triggered");
         }
 
         periodic_trigger_thread_->Start();

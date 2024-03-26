@@ -55,13 +55,12 @@ public:
 
     static void RecycleCatalogFile(TxnTimeStamp full_ckp_ts, const String &catalog_dir);
 
-private:
     static Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> ParseCheckpointFilenames(const String &catalog_dir);
 };
 
 export class WalFile {
 public:
-    static Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> ParseWalFilenames(const String &wal_dir);
+    static Pair<TempWalFileInfo, Vector<WalFileInfo>> ParseWalFilenames(const String &wal_dir);
 
     static String WalFilename(TxnTimeStamp max_commit_ts);
 

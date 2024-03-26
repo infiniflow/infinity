@@ -478,7 +478,8 @@ void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
     // only save the catalog delta entry
     bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path);
     if (skip) {
-        return;
+        LOG_INFO("No delta catalog file is written");
+        // should not skip wal write.
     }
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
 }

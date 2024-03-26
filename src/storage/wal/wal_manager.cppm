@@ -27,6 +27,7 @@ namespace infinity {
 class Storage;
 class BGTaskProcessor;
 class TableEntry;
+class Txn;
 
 export class WalManager {
 public:
@@ -60,6 +61,10 @@ public:
 
     // Should only called in `Flush` thread
     i64 WalSize() const { return wal_size_; }
+
+private:
+    // Checkpoint Helper
+    void CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size);
 
 private:
     void SetLastCkpWalSize(i64 wal_size);

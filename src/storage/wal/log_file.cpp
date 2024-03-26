@@ -148,7 +148,7 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
     return {full_infos, delta_infos};
 }
 
-Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
+Pair<TempWalFileInfo, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
     LocalFileSystem fs;
     const auto &entries = fs.ListDirectory(wal_dir);
     if (entries.empty()) {
@@ -181,17 +181,20 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
                 continue;
             }
             auto file_prefix = filename.substr(0, dot_pos);
-            if (IsEqual(file_prefix, String("WAL"))) {
+            if (!IsEqual(file_prefix, String(WAL_FILE_PREFIX))) {
                 LOG_WARN(fmt::format("Wal file {} has wrong file name", entry->path().string()));
                 continue;
             }
             wal_infos.push_back({entry->path().string(), checkpoint_ts});
         }
     }
-    return {cur_wal_info, wal_infos};
+    if (!cur_wal_info.has_value()) {
+        UnrecoverableError(fmt::format("Current wal file not found in the wal directory: {}", wal_dir));
+    }
+    return {*cur_wal_info, wal_infos};
 }
 
-String WalFile::WalFilename(TxnTimeStamp max_commit_ts) { return fmt::format("{}{}", String(WAL_FILE_PREFIX), max_commit_ts); }
+String WalFile::WalFilename(TxnTimeStamp max_commit_ts) { return fmt::format("{}.{}", String(WAL_FILE_PREFIX), max_commit_ts); }
 
 String WalFile::TempWalFilename() { return String(WAL_FILE_TEMP_FILE); }
 

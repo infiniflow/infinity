@@ -242,10 +242,24 @@ void WalManager::Flush() {
 
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size) {
+    TxnManager *txn_mgr = storage_->txn_manager();
+    Txn *txn = txn_mgr->CreateTxn();
+    txn->Begin();
+
+    this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
+
+    txn_mgr->CommitTxn(txn);
+}
+
+void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size) {
+    bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
+
+    this->CheckpointInner(is_full_checkpoint, ckp_task->txn_, max_commit_ts, wal_size);
+}
+
+void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size) {
     try {
-        TxnManager *txn_mgr = storage_->txn_manager();
-        Txn *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+
         LOG_INFO(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
                              is_full_checkpoint ? "FULL" : "DELTA",
                              txn->TxnID(),
@@ -260,28 +274,14 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
             CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
         }
         SetLastCkpWalSize(wal_size);
-        txn_mgr->CommitTxn(txn);
+
+        LOG_INFO(fmt::format("{} Checkpoint is done for commit_ts <= {}", is_full_checkpoint ? "FULL" : "DELTA", max_commit_ts));
     } catch (RecoverableException &e) {
         LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
     } catch (UnrecoverableException &e) {
         LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
         throw e;
     }
-}
-
-void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size) {
-    bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
-
-    LOG_INFO(fmt::format("Force Checkpoint Task, txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                         ckp_task->txn_->TxnID(),
-                         ckp_task->txn_->BeginTS(),
-                         max_commit_ts));
-
-    ckp_task->txn_->Checkpoint(max_commit_ts, is_full_checkpoint);
-
-    // This function doesn't change the ckp related variable, which won't affect the following checkpoint correctness.
-
-    LOG_INFO(fmt::format("Full Checkpoint is done for commit_ts <= {}", max_commit_ts));
 }
 
 /**
@@ -310,6 +310,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     if (!ofs_.is_open()) {
         UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
     }
+    LOG_INFO(fmt::format("Open new wal file {}", wal_path_));
 }
 
 /*****************************************************************************
@@ -366,9 +367,7 @@ i64 WalManager::ReplayWalFile() {
                 return a.max_commit_ts_ > b.max_commit_ts_;
             });
         }
-        if (temp_wal_info.has_value()) {
-            wal_list.push_back(temp_wal_info->path_);
-        }
+        wal_list.push_back(temp_wal_info.path_);
         for (const auto &wal_info : wal_infos) {
             wal_list.push_back(wal_info.path_);
         }
@@ -396,7 +395,7 @@ i64 WalManager::ReplayWalFile() {
                 break;
             }
 
-            LOG_TRACE(wal_entry->ToString());
+            LOG_INFO(wal_entry->ToString());
 
             replay_entries.push_back(wal_entry);
 
@@ -426,12 +425,17 @@ i64 WalManager::ReplayWalFile() {
             }
         }
     }
+    if (!wal_list.empty() && catalog_dir == "") {
+        UnrecoverableError(fmt::format("Wal Replay: Parse catalog file failed, cannot find the checkpoint entry"));
+    }
 
     // Note: Init a new catalog when not found any checkpoint wal entry
     // Indicates that the system has not done checkpoint in the previous.
     if (catalog_dir == "") { // no checkpoint found
+        LOG_INFO(fmt::format("No checkpoint found, init a new catalog"));
         storage_->InitNewCatalog();
     } else {
+        LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
         auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
         if (!catalog_fileinfo.has_value()) {
             UnrecoverableError(fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir));
