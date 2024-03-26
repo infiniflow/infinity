@@ -63,7 +63,6 @@ WalManager::~WalManager() {
         Stop();
     }
     que_.clear();
-    que2_.clear();
 }
 
 void WalManager::Start() {
@@ -78,7 +77,7 @@ void WalManager::Start() {
         fs.CreateDirectory(wal_dir);
     }
     // TODO: recovery from wal checkpoint
-    ofs_ = StdOfStream(wal_path_, std::ios::app | std::ios::binary);
+    ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
         UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
     }
@@ -153,17 +152,19 @@ i64 WalManager::GetLastCkpWalSize() {
 // ~10s. So it's necessary to sync for a batch of transactions, and to
 // checkpoint for a batch of sync.
 void WalManager::Flush() {
-    LOG_TRACE("WalManager::Flush mainloop begin");
+    LOG_TRACE("WalManager::Flush log mainloop begin");
+
+    Deque<SharedPtr<WalEntry>> log_batch{};
     while (running_.load()) {
         mutex_.lock();
-        que_.swap(que2_);
+        que_.swap(log_batch);
         mutex_.unlock();
-        if (que2_.empty()) {
+        if (log_batch.empty()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
         // auto [max_commit_ts, wal_size] = GetWalState();
-        for (const auto &entry : que2_) {
+        for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry->cmds_.empty()) {
                 UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
@@ -190,7 +191,7 @@ void WalManager::Flush() {
                 break;
             }
             case FlushOption::kOnlyWrite: {
-                ofs_.flush(); // FIXME: not flush, only write
+//                ofs_.flush(); // FIXME: not flush, only write
                 break;
             }
             case FlushOption::kFlushPerSecond: {
@@ -201,13 +202,13 @@ void WalManager::Flush() {
 
         TxnManager *txn_mgr = storage_->txn_manager();
         // Commit sequentially so they get visible in the same order with wal.
-        for (const auto &entry : que2_) {
+        for (const auto &entry : log_batch) {
             Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
             if (txn != nullptr) {
                 txn->CommitBottom();
             }
         }
-        que2_.clear();
+        log_batch.clear();
 
         // Check if the wal file is too large, swap to a new one.
         try {

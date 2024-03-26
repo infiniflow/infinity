@@ -102,8 +102,7 @@ private:
     Deque<SharedPtr<WalEntry>> que_{};
 
     // Only Flush thread access following members
-    Deque<SharedPtr<WalEntry>> que2_{};
-    StdOfStream ofs_{};
+    std::ofstream ofs_{};
     TxnTimeStamp max_commit_ts_{};
     i64 wal_size_{};
     FlushOption flush_option_{FlushOption::kOnlyWrite};
