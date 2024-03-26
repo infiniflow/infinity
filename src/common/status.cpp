@@ -439,6 +439,10 @@ Status Status::UnexpectedError(const String &detailed_info) {
     return Status(ErrorCode::kUnexpectedError, MakeUnique<String>(fmt::format("Unexpected error: {}", detailed_info)));
 }
 
+Status Status::ParserError(const String &detailed_info) {
+    return Status(ErrorCode::kParserError, MakeUnique<String>(fmt::format("Parser error: {}", detailed_info)));
+}
+
 Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }

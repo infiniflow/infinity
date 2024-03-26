@@ -183,7 +183,7 @@ class TestImport:
         "int", "int8", "int16", "int32", "int64", "integer",
         "float", "float32", "double", "float64",
         "varchar",
-        pytest.param("bool", marks=pytest.mark.skip(reason="Core dumped."))
+        ("bool", 7012)
     ])
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
                                              "data_dir": common_values.TEST_TMP_DIR},
@@ -198,15 +198,23 @@ class TestImport:
             copy_data("pysdk_test_" + delimiter[0] + ".csv")
         db_obj = get_infinity_db
         db_obj.drop_table("test_csv_with_different_delimiter")
-        table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": types, "c2": types},
-                                        ConflictType.Error)
-        table_obj.import_data(common_values.TEST_TMP_DIR + "/pysdk_test_" + delimiter[0] + ".csv",
-                              import_options={
-                                  "delimiter": delimiter[1]
-                              })
-
-        res = table_obj.output(["*"]).to_df()
-        print(res)
+        if not isinstance(types, tuple):
+            table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": types, "c2": types},
+                                            ConflictType.Error)
+            table_obj.import_data(common_values.TEST_TMP_DIR + "/pysdk_test_" + delimiter[0] + ".csv",
+                                import_options={
+                                    "delimiter": delimiter[1]
+                                })
+            res = table_obj.output(["*"]).to_df()
+            print(res)
+        else:
+            table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": types[0], "c2": types[0]},
+                                            ConflictType.Error)
+            with pytest.raises(Exception, match=f"ERROR:{types[1]}*"):
+                table_obj.import_data(common_values.TEST_TMP_DIR + "/pysdk_test_" + delimiter[0] + ".csv",
+                                    import_options={
+                                        "delimiter": delimiter[1]
+                                    })
 
     # import csv with delimiter more than one character
     @pytest.mark.parametrize("delimiter", ["blankspace"])
