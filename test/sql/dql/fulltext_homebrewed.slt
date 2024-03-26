@@ -37,12 +37,30 @@ query I
 COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
 
-query III
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
+query TTI rowsort
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical anarchism', 'topn=3');
 ----
-Anarchism 30-APR-2012 03:25:17.000 4294967296 22.931860
-Anarchism 30-APR-2012 03:25:17.000 8589934592 22.931860
-Anarchism 30-APR-2012 03:25:17.000 0 22.931860
+Anarchism 30-APR-2012 03:25:17.000 0 25.553249
+Anarchism 30-APR-2012 03:25:17.000 4294967296 25.553249
+Anarchism 30-APR-2012 03:25:17.000 8589934592 25.553249
+
+query TTI rowsort
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle,body^5', 'harmful chemical anarchism', 'topn=3');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 25.553249
+Anarchism 30-APR-2012 03:25:17.000 4294967296 25.553249
+Anarchism 30-APR-2012 03:25:17.000 8589934592 25.553249
+
+statement ok
+CREATE INDEX ft_index2 ON enwiki(doctitle) USING FULLTEXT WITH(HOMEBREWED=1);
+
+query TTI rowsort
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle,body^5', 'harmful chemical anarchism', 'topn=3');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 25.554928
+Anarchism 30-APR-2012 03:25:17.000 4294967296 25.554928
+Anarchism 30-APR-2012 03:25:17.000 8589934592 25.554928
+
 
 # Clean up
 statement ok
