@@ -880,7 +880,6 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
         String idx_name = "test_full_idx";
         const String idx_file_name = "test_full_idx.json";
         String analyzer{};
-        bool homebrewd = true;
         Vector<String> col_name_list{"col1"};
 
         {
@@ -892,7 +891,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
 
-                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer, homebrewd);
+                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer);
                 std::shared_ptr<IndexBase> fullIdxBasePtr = std::make_shared<IndexFullText>(fullIdxBase);
 
                 auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, fullIdxBasePtr, ConflictType::kInvalid);
