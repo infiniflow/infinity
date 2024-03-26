@@ -17,6 +17,7 @@ module;
 #include "ctpl_stl.h"
 #include <algorithm>
 #include <atomic>
+#include <bit>
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -72,6 +73,7 @@ export namespace std {
     using std::strtof;
     using std::strtod;
 
+    using std::bit_cast;
     using std::memcpy;
     using std::memset;
     using std::memcmp;
@@ -105,6 +107,7 @@ export namespace std {
     using std::fill_n;
     using std::find;
     using std::floor;
+    using std::ceil;
     using std::fmod;
     using std::forward_list;
     using std::isalnum;
@@ -121,6 +124,7 @@ export namespace std {
     using std::sort;
     using std::unique;
     using std::reduce;
+    using std::accumulate;
     using std::sqrt;
     using std::transform;
 

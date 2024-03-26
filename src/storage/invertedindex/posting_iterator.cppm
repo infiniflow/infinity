@@ -18,7 +18,7 @@ export module posting_iterator;
 namespace infinity {
 export class PostingIterator {
 public:
-    PostingIterator(const PostingFormatOption &posting_option, MemoryPool *session_pool);
+    PostingIterator(optionflag_t flag, MemoryPool *session_pool);
 
     ~PostingIterator();
 

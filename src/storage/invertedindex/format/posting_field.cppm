@@ -70,6 +70,8 @@ export const Int32Encoder *GetTFEncoder();
 
 export const Int16Encoder *GetDocPayloadEncoder();
 
+export const Int16Encoder *GetTermPercentageEncoder();
+
 export const Int32Encoder *GetSkipListEncoder();
 
 export const Int32Encoder *GetPosListEncoder();
@@ -134,7 +136,9 @@ export struct PostingFields {
 
     SizeT GetSize() const { return values_.size(); }
 
-    SizeT GetTotalSize() const { return values_.size() * values_[0]->GetSize(); }
+    SizeT GetTotalSize() const {
+        return std::accumulate(values_.begin(), values_.end(), 0, [](SizeT sum, PostingField *field) { return sum + field->GetSize(); });
+    }
 
     void AddValue(PostingField *value) { values_.push_back(value); }
 

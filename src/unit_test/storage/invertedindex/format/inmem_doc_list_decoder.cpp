@@ -10,6 +10,7 @@ import doc_list_format_option;
 import doc_list_encoder;
 
 using namespace infinity;
+constexpr u32 default_document_legnth = 10;
 
 class InMemDocListDecoderTest : public BaseTest {
 public:
@@ -26,12 +27,15 @@ public:
         doc_list_encoder_ = new DocListEncoder(doc_list_format_option, byte_slice_pool_, buffer_pool_);
 
         for (SizeT i = 0; i < 128; ++i) {
-            doc_list_encoder_->EndDocument(i, 0);
+            doc_list_encoder_->AddPosition();
+            doc_list_encoder_->EndDocument(i, default_document_legnth, 0);
         }
         for (SizeT i = 128; i < 256; ++i) {
-            doc_list_encoder_->EndDocument(i * 2, 0);
+            doc_list_encoder_->AddPosition();
+            doc_list_encoder_->EndDocument(i * 2, default_document_legnth, 0);
         }
-        doc_list_encoder_->EndDocument(1000, 0);
+        doc_list_encoder_->AddPosition();
+        doc_list_encoder_->EndDocument(1000, default_document_legnth, 0);
     }
     void TearDown() override {
         doc_list_encoder_ptr_.reset();
@@ -64,7 +68,7 @@ protected:
             posting_buffer->EndPushBack();
         }
 
-        InMemDocListDecoder doc_list_decoder(byte_slice_pool_);
+        InMemDocListDecoder doc_list_decoder(byte_slice_pool_, doc_list_format_option);
         doc_list_decoder.Init(2, nullptr, posting_buffer);
 
         docid_t first_doc_id = 0;
@@ -111,7 +115,7 @@ protected:
             doc_list_encoder_ptr_->AddPosition();
             doc_list_encoder_ptr_->AddPosition();
             // tf = 2
-            doc_list_encoder_ptr_->EndDocument(i, i * 2);
+            doc_list_encoder_ptr_->EndDocument(i, default_document_legnth, i * 2);
         }
 
         if (need_flush) {
@@ -198,7 +202,7 @@ TEST_F(InMemDocListDecoderTest, test1) {
     posting_buffer->PushBack(0, doc2 - doc1);
     posting_buffer->EndPushBack();
 
-    InMemDocListDecoder doc_list_decoder(byte_slice_pool_);
+    InMemDocListDecoder doc_list_decoder(byte_slice_pool_, option);
     doc_list_decoder.Init(2, nullptr, posting_buffer);
 
     docid_t first_doc_id = 0;
@@ -232,7 +236,7 @@ TEST_F(InMemDocListDecoderTest, test2) {
     }
     posting_buffer->Flush();
 
-    InMemDocListDecoder doc_list_decoder(byte_slice_pool_);
+    InMemDocListDecoder doc_list_decoder(byte_slice_pool_, option);
     doc_list_decoder.Init(2, nullptr, posting_buffer);
 
     docid_t first_doc_id = 0;
@@ -301,8 +305,10 @@ TEST_F(InMemDocListDecoderTest, test4) {
     ttf_t current_ttf = 0;
     docid_t doc_buffer[MAX_DOC_PER_RECORD];
 
-    doc_list_encoder_->EndDocument(1001, 0);
-    doc_list_encoder_->EndDocument(1002, 0);
+    doc_list_encoder_->AddPosition();
+    doc_list_encoder_->EndDocument(1001, default_document_legnth, 0);
+    doc_list_encoder_->AddPosition();
+    doc_list_encoder_->EndDocument(1002, default_document_legnth, 0);
 
     PostingByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
     posting_buffer->Flush();

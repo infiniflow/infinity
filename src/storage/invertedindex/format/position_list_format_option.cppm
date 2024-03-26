@@ -9,7 +9,7 @@ namespace infinity {
 
 export class PositionListFormatOption {
 public:
-    explicit PositionListFormatOption(optionflag_t option_flag = OPTION_FLAG_ALL) { Init(option_flag); }
+    explicit PositionListFormatOption(optionflag_t option_flag) { Init(option_flag); }
     ~PositionListFormatOption() {}
 
     inline void Init(optionflag_t option_flag) {

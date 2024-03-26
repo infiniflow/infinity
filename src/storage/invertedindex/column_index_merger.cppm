@@ -35,5 +35,10 @@ private:
     RecyclePool *buffer_pool_{nullptr};
     SharedPtr<FileWriter> posting_file_writer_;
     LocalFileSystem fs_;
+
+    // TODO:
+    // for column length info
+    std::shared_mutex column_length_mutex_;
+    Vector<u32> column_length_array_;
 };
 } // namespace infinity

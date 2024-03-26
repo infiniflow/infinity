@@ -12,20 +12,20 @@ import index_defines;
 import posting_byte_slice;
 import skiplist_writer;
 import position_list_format_option;
+import posting_list_format;
 import inmem_position_list_decoder;
-import inmem_position_list_skiplist_reader;
+import skiplist_reader;
 import short_list_optimize_util;
 
 namespace infinity {
-PositionListEncoder::PositionListEncoder(const PositionListFormatOption &position_list_format_option,
+PositionListEncoder::PositionListEncoder(const PostingFormatOption &format_option,
                                          MemoryPool *byte_slice_pool,
                                          MemoryPool *buffer_pool,
                                          const PositionListFormat *pos_list_format)
-    : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0),
-      pos_list_format_option_(position_list_format_option), is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format),
-      byte_slice_pool_(byte_slice_pool) {
+    : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0), format_option_(format_option),
+      is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format), byte_slice_pool_(byte_slice_pool) {
     if (!pos_list_format) {
-        pos_list_format_ = new PositionListFormat(position_list_format_option);
+        pos_list_format_ = new PositionListFormat(format_option_.GetPosListFormatOption());
         is_own_format_ = true;
     }
     pos_list_buffer_.Init(pos_list_format_);
@@ -135,21 +135,21 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder(Memor
     // doclist -> ttf -> pos skiplist -> poslist
     ttf_t ttf = total_pos_count_;
 
-    InMemPositionListSkipListReader *in_mem_skiplist_reader = nullptr;
+    SkipListReaderPostingByteSlice *in_mem_skiplist_reader = nullptr;
     if (pos_skiplist_writer_) {
         // not support tf bitmap in realtime segment
-        in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListSkipListReader)))
-                                                    InMemPositionListSkipListReader(session_pool)
-                                              : new InMemPositionListSkipListReader(session_pool);
+        in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(SkipListReaderPostingByteSlice)))
+                                                    SkipListReaderPostingByteSlice(format_option_.GetDocListFormatOption(), session_pool)
+                                              : new SkipListReaderPostingByteSlice(format_option_.GetDocListFormatOption(), session_pool);
         in_mem_skiplist_reader->Load(pos_skiplist_writer_);
     }
     PostingByteSlice *posting_buffer = new (session_pool->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(session_pool, session_pool);
     pos_list_buffer_.SnapShot(posting_buffer);
 
     InMemPositionListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListDecoder)))
-                                                           InMemPositionListDecoder(pos_list_format_option_, session_pool)
-                                                     : new InMemPositionListDecoder(pos_list_format_option_, session_pool);
-    decoder->Init(ttf, in_mem_skiplist_reader, posting_buffer);
+                                                           InMemPositionListDecoder(format_option_, session_pool)
+                                                     : new InMemPositionListDecoder(format_option_, session_pool);
+    decoder->Init(ttf, in_mem_skiplist_reader, sizeof(SkipListReaderPostingByteSlice), posting_buffer);
 
     return decoder;
 }

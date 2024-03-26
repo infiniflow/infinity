@@ -30,7 +30,9 @@ ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag,
 
 ColumnIndexMerger::~ColumnIndexMerger() {}
 
-SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() { return MakeShared<PostingMerger>(memory_pool_, buffer_pool_); }
+SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() {
+    return MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_length_mutex_, column_length_array_);
+}
 
 void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name) {
     assert(base_names.size() == base_rowids.size());

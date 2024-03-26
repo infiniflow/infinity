@@ -49,8 +49,8 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  const SharedPtr<String> &index_entry_dir,
                                  TransactionID txn_id,
                                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTableIndex, is_delete), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
-      index_dir_(index_entry_dir), byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
+    : BaseEntry(EntryType::kTableIndex, is_delete), byte_slice_pool_(), buffer_pool_(), thread_pool_(4), table_index_meta_(table_index_meta),
+      index_base_(std::move(index_base)), index_dir_(index_entry_dir) {
     if (!is_delete) {
         assert(index_base.get() != nullptr);
         const String &column_name = index_base->column_name();
@@ -119,6 +119,9 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::GetOrCreateSegment(SegmentID segme
         index_by_segment_.emplace(segment_id, segment_index_entry);
     } else {
         segment_index_entry = iter->second;
+    }
+    if (last_segment_.get() == nullptr || last_segment_->segment_id() < segment_id) {
+        last_segment_ = segment_index_entry;
     }
     return segment_index_entry;
 }
@@ -222,8 +225,7 @@ void TableIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry
     auto iter = index_by_segment_.find(segment_id);
     SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
     if (iter == index_by_segment_.end()) {
-        auto create_index_param =
-            SegmentIndexEntry::GetCreateIndexParam(index_base_, block_entry->GetSegmentEntry()->row_capacity(), column_def_);
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, block_entry->GetSegmentEntry()->row_capacity(), column_def_);
         segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         index_by_segment_.emplace(segment_id, segment_index_entry);
     } else {
@@ -363,7 +365,8 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
     return vector_file_worker;
 }
 
-UniquePtr<CreateIndexParam> TableIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def) {
+UniquePtr<CreateIndexParam>
+TableIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def) {
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);

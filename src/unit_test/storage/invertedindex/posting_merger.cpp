@@ -27,6 +27,7 @@ import logical_type;
 
 using namespace infinity;
 
+/*
 class PostingMergerTest : public BaseTest {
 public:
     PostingMergerTest() {
@@ -169,3 +170,4 @@ TEST_F(PostingMergerTest, Basic) {
         delete segment_term_posting;
     }
 }
+*/

@@ -6,7 +6,8 @@ import index_defines;
 import posting_byte_slice;
 import inmem_position_list_decoder;
 import doc_list_format_option;
-import position_list_skiplist_reader;
+import posting_list_format;
+import skiplist_reader;
 import position_list_encoder;
 import in_doc_pos_state;
 import position_list_format_option;
@@ -22,7 +23,7 @@ public:
 
 protected:
     void TestDecodeWithOptionFlag(const optionflag_t flag, tf_t tf, pos_t *pos_list, bool need_flush) {
-        PositionListFormatOption option(flag);
+        PostingFormatOption option(flag);
 
         PositionListEncoder position_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
         for (SizeT i = 0; i < (SizeT)tf; ++i) {
@@ -37,7 +38,7 @@ protected:
         ASSERT_TRUE(position_list_decoder);
 
         // compress mode is useless in decoder
-        InDocPositionState state(option);
+        InDocPositionState state(option.GetPosListFormatOption());
         ASSERT_TRUE(position_list_decoder->SkipTo(0, &state));
 
         u32 temp_tf = 0;
@@ -83,7 +84,7 @@ protected:
     }
 
     void InnerTestSkipAndLocateAndDecode(optionflag_t flag, ttf_t ttf, bool need_flush) {
-        PositionListFormatOption option(flag);
+        PostingFormatOption option(flag);
 
         PositionListEncoder position_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
         pos_t sum = 0;
@@ -99,7 +100,7 @@ protected:
         InMemPositionListDecoder *position_list_decoder(position_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
         ASSERT_TRUE(position_list_decoder);
 
-        InDocPositionState state(option);
+        InDocPositionState state(option.GetPosListFormatOption());
 
         i32 record_offset = 0;
         u32 temp_tf = 0;
@@ -130,7 +131,7 @@ protected:
 
 TEST_F(InMemPositionListDecoderTest, test1) {
     constexpr optionflag_t NO_PAYLOAD = of_position_list | of_term_frequency;
-    PositionListFormatOption option(NO_PAYLOAD);
+    PostingFormatOption option(NO_PAYLOAD);
 
     PositionListEncoder position_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
     position_list_encoder.AddPosition(3);
@@ -139,7 +140,7 @@ TEST_F(InMemPositionListDecoderTest, test1) {
     InMemPositionListDecoder *position_list_decoder(position_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
     ASSERT_TRUE(position_list_decoder);
 
-    InDocPositionState state(option);
+    InDocPositionState state(option.GetPosListFormatOption());
     ASSERT_TRUE(position_list_decoder->SkipTo(0, &state));
 
     u32 tf = 0;
@@ -150,6 +151,8 @@ TEST_F(InMemPositionListDecoderTest, test1) {
     pos_t posBuffer[MAX_POS_PER_RECORD];
     ASSERT_EQ((u32)1, position_list_decoder->DecodeRecord(posBuffer, MAX_POS_PER_RECORD));
     ASSERT_EQ((pos_t)3, posBuffer[0]);
+    position_list_decoder->~InMemPositionListDecoder();
+    byte_slice_pool_.Deallocate((void *)position_list_decoder, sizeof(InMemPositionListDecoder));
 }
 
 TEST_F(InMemPositionListDecoderTest, test2) {
@@ -174,12 +177,12 @@ TEST_F(InMemPositionListDecoderTest, test3) {
 }
 
 TEST_F(InMemPositionListDecoderTest, test4) {
-    PositionListFormatOption option(of_position_list);
-    InDocPositionState state(option);
+    PostingFormatOption option(of_position_list);
+    InDocPositionState state(option.GetPosListFormatOption());
 
     PostingByteSlice *pos_list_buffer = new (byte_slice_pool_.Allocate(sizeof(PostingByteSlice))) PostingByteSlice(&byte_slice_pool_, &buffer_pool_);
     InMemPositionListDecoder decoder(option, &byte_slice_pool_);
-    decoder.Init(100, NULL, pos_list_buffer);
+    decoder.Init(100, NULL, 0, pos_list_buffer);
 
     // current ttf over totalTF
     ASSERT_FALSE(decoder.SkipTo(101, &state));

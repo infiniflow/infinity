@@ -1,4 +1,5 @@
 module;
+#include <cassert>
 
 module doc_list_encoder;
 import stl;
@@ -9,11 +10,11 @@ import posting_byte_slice;
 import skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
-import inmem_position_list_skiplist_reader;
-import inmem_doc_list_skiplist_reader;
+import skiplist_reader;
 import index_defines;
 import skiplist_reader;
 import vbyte_compressor;
+import logger;
 
 namespace infinity {
 
@@ -48,8 +49,8 @@ void DocListEncoder::AddPosition() {
     total_tf_++;
 }
 
-void DocListEncoder::EndDocument(docid_t doc_id, docpayload_t doc_payload) {
-    AddDocument(doc_id, doc_payload, current_tf_);
+void DocListEncoder::EndDocument(docid_t doc_id, u32 doc_len, docpayload_t doc_payload) {
+    AddDocument(doc_id, doc_payload, current_tf_, doc_len);
     df_ += 1;
     current_tf_ = 0;
 }
@@ -61,7 +62,7 @@ void DocListEncoder::Flush() {
     }
 }
 
-void DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf) {
+void DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf, u32 doc_len) {
     doc_list_buffer_.PushBack(0, doc_id - last_doc_id_);
     int n = 1;
     if (format_option_.HasTfList()) {
@@ -73,6 +74,9 @@ void DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t 
     doc_list_buffer_.EndPushBack();
     last_doc_id_ = doc_id;
     last_doc_payload_ = doc_payload;
+    block_max_tf_ = std::max(block_max_tf_, tf);
+    assert((tf > 0 and tf <= doc_len));
+    block_max_percentage_ = std::max(block_max_percentage_, static_cast<float>(tf) / doc_len);
     if (doc_list_buffer_.NeedFlush()) {
         FlushDocListBuffer();
     }
@@ -85,6 +89,10 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
         file->WriteVInt(current_tf_);
         file->WriteVInt(total_tf_);
         file->WriteVInt(df_);
+        file->WriteVInt(block_max_tf_);
+        assert((sizeof(i32) == sizeof(float)));
+        i32 block_max_percentage = std::bit_cast<i32>(block_max_percentage_);
+        file->WriteInt(block_max_percentage);
     } else {
         Flush();
         u32 doc_skiplist_size = 0;
@@ -111,6 +119,9 @@ void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
     current_tf_ = file->ReadVInt();
     total_tf_ = file->ReadVInt();
     df_ = file->ReadVInt();
+    block_max_tf_ = file->ReadVInt();
+    i32 block_max_percentage = file->ReadInt();
+    block_max_percentage_ = std::bit_cast<float>(block_max_percentage);
 
     doc_skiplist_writer_->Load(file);
     doc_list_buffer_.Load(file);
@@ -133,6 +144,8 @@ void DocListEncoder::FlushDocListBuffer() {
         }
         AddSkipListItem(flush_size);
     }
+    block_max_tf_ = 0;
+    block_max_percentage_ = 0.0f;
 }
 
 void DocListEncoder::CreateDocSkipListWriter() {
@@ -145,8 +158,12 @@ void DocListEncoder::CreateDocSkipListWriter() {
 
 void DocListEncoder::AddSkipListItem(u32 item_size) {
     const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
-
-    if (skiplist_format->HasTfList()) {
+    if (skiplist_format->HasBlockMax()) {
+        assert((block_max_percentage_ > 0 and block_max_percentage_ <= 1.0f));
+        u32 max_percentage_field = static_cast<u32>(std::ceil(block_max_percentage_ * std::numeric_limits<u16>::max()));
+        assert((max_percentage_field <= std::numeric_limits<u16>::max()));
+        doc_skiplist_writer_->AddItem(last_doc_id_, total_tf_, block_max_tf_, static_cast<u16>(max_percentage_field), item_size);
+    } else if (skiplist_format->HasTfList()) {
         doc_skiplist_writer_->AddItem(last_doc_id_, total_tf_, item_size);
     } else {
         doc_skiplist_writer_->AddItem(last_doc_id_, item_size);
@@ -155,23 +172,12 @@ void DocListEncoder::AddSkipListItem(u32 item_size) {
 
 InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_pool) const {
     df_t df = df_;
-    SkipListReader *skiplist_reader = nullptr;
+    SkipListReaderPostingByteSlice *skiplist_reader = nullptr;
     if (doc_skiplist_writer_) {
-        const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
-
-        if (skiplist_format->HasTfList()) {
-            InMemDocListSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListSkipListReader)))
-                                                                                    InMemDocListSkipListReader(session_pool)
-                                                                              : new InMemDocListSkipListReader(session_pool);
-            in_mem_skiplist_reader->Load(doc_skiplist_writer_);
-            skiplist_reader = in_mem_skiplist_reader;
-        } else {
-            InMemPositionListSkipListReader *in_mem_skiplist_reader =
-                session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListSkipListReader))) InMemPositionListSkipListReader(session_pool)
-                             : new InMemPositionListSkipListReader(session_pool);
-            in_mem_skiplist_reader->Load(doc_skiplist_writer_);
-            skiplist_reader = in_mem_skiplist_reader;
-        }
+        skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(SkipListReaderPostingByteSlice)))
+                                             SkipListReaderPostingByteSlice(format_option_, session_pool)
+                                       : new SkipListReaderPostingByteSlice(format_option_, session_pool);
+        skiplist_reader->Load(doc_skiplist_writer_);
     }
 
     PostingByteSlice *doc_list_buffer = session_pool ? new (session_pool->Allocate(sizeof(PostingByteSlice)))
@@ -179,8 +185,9 @@ InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_
                                                      : new PostingByteSlice(session_pool, session_pool);
     doc_list_buffer_.SnapShot(doc_list_buffer);
 
-    InMemDocListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListDecoder))) InMemDocListDecoder(session_pool)
-                                                : new InMemDocListDecoder(session_pool);
+    InMemDocListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListDecoder)))
+                                                      InMemDocListDecoder(session_pool, format_option_)
+                                                : new InMemDocListDecoder(session_pool, format_option_);
     decoder->Init(df, skiplist_reader, doc_list_buffer);
 
     return decoder;
