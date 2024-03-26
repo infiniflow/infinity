@@ -68,7 +68,7 @@ class TableScanTest : public BaseTest {
 
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
-    auto catalog = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity"));
+    auto catalog = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
 
     Config config;
     config.Init(nullptr);
@@ -83,8 +83,6 @@ TEST_F(TableScanTest, block_read_test) {
     UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.worker_cpu_limit(), config.total_memory_size());
 
     UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>(session_ptr.get());
-
-
 
     query_context->Init(&config, nullptr, &storage, resource_manager.get(), session_manager.get());
 

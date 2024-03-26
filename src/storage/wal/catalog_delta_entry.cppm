@@ -593,10 +593,15 @@ export class GlobalCatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
 
-    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
+    // Must be called before any checkpoint.
+    void InitMaxCommitTS(TxnTimeStamp max_commit_ts) { max_commit_ts_ = max_commit_ts; }
+
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts);
+
+    Tuple<TxnTimeStamp, i64> GetCheckpointState() const { return {max_commit_ts_, wal_size_}; }
 
     SizeT OpSize() const { return delta_ops_.size(); }
 
@@ -610,7 +615,9 @@ private:
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
-    TransactionID max_commit_ts_{0};
+    // update by add delta entry, read by bg_process::checkpoint
+    TxnTimeStamp max_commit_ts_{0};
+    i64 wal_size_{};
 };
 
 } // namespace infinity

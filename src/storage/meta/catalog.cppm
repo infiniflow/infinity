@@ -101,7 +101,7 @@ class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
 export struct Catalog {
 public:
-    explicit Catalog(SharedPtr<String> dir);
+    explicit Catalog(SharedPtr<String> data_dir);
 
     ~Catalog();
 
@@ -235,23 +235,20 @@ public:
 
     bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
-    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
-    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
-
-    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> dir, bool create_default_db);
+    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
 
     static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
 private:
+    static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
+
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
 
     void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
 
-public:
     static UniquePtr<Catalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
-
-    static void LoadFromEntry(Catalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods
@@ -263,10 +260,13 @@ public:
     const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() { return history.GetElements(); }
 
 public:
-    const SharedPtr<String> DataDir() const;
+    const SharedPtr<String> &DataDir() const { return data_dir_; }
+
+    const SharedPtr<String> &CatalogDir() const { return catalog_dir_; }
 
 public:
-    SharedPtr<String> current_dir_{nullptr};
+    SharedPtr<String> data_dir_{};
+    SharedPtr<String> catalog_dir_{};
 
     MetaMap<DBMeta> db_meta_map_{};
 
@@ -279,8 +279,6 @@ public:
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
-
-    UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
 
     TxnManager *txn_mgr_{nullptr};
 
@@ -298,6 +296,15 @@ private: // TODO: remove this
 
 public:
     void PickCleanup(CleanupScanner *scanner);
+
+    // delta checkpoint info
+public:
+    Tuple<TxnTimeStamp, i64> GetCheckpointState() const;
+
+    void InitDeltaEntry(TxnTimeStamp max_commit_ts);
+
+private:
+    UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
 };
 
 } // namespace infinity
