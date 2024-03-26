@@ -1,6 +1,4 @@
 #include "unit_test/base_test.h"
-#include "type/complex/row_id.h"
-#include "type/logical_type.h"
 
 import posting_merger;
 import stl;
@@ -24,6 +22,8 @@ import segment_index_entry;
 import column_length_io;
 import posting_decoder;
 import column_index_merger;
+import internal_types;
+import logical_type;
 
 using namespace infinity;
 
