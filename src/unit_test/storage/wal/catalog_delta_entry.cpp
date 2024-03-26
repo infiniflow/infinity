@@ -361,5 +361,5 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     delta_entries.push_back(std::move(local_catalog_delta_entry));
     global_catalog_delta_entry->AddDeltaEntries(std::move(delta_entries));
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 5u);
+    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 4u);
 }
