@@ -1127,7 +1127,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
     if (segment_id_.has_value() && block_id_.has_value()) {
         if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
-            auto *block_entry = segment_entry->GetBlockEntryByID(*block_id_);
+            auto *block_entry = segment_entry->GetBlockEntryByID(*block_id_).get();
             if (block_entry != nullptr) {
                 auto version_path = block_entry->VersionFilePath();
 
