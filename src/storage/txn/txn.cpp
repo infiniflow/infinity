@@ -474,7 +474,7 @@ void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) 
 
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
 void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
-    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
+    String dir_name = *txn_mgr_->GetCatalog()->CatalogDir();
     String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.DELTA.{}", dir_name, max_commit_ts));
     // only save the catalog delta entry
     bool skip = catalog_->SaveDeltaCatalog(delta_path, max_commit_ts);
@@ -485,7 +485,7 @@ void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
 }
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
-    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
+    String dir_name = *txn_mgr_->GetCatalog()->CatalogDir();
 
     //    String delta_path = String(fmt::format("{}/META_CATALOG.{}.delta", dir_name, max_commit_ts));
     //    String delta_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.delta", dir_name, max_commit_ts));

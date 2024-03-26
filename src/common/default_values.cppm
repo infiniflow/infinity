@@ -88,10 +88,10 @@ export {
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
-    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024 * 1024;
+    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 8 * 1024;
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 60;          // 60 seconds
-    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 5;         // 20 seconds
-    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
+    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 5;         // 5 seconds
+    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024;
     constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
     constexpr std::string_view WAL_FILE_PREFIX = "wal.log.";
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";

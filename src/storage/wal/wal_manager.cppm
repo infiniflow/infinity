@@ -30,13 +30,7 @@ class TableEntry;
 
 export class WalManager {
 public:
-    WalManager(Storage *storage,
-               String wal_path,
-               u64 wal_size_threshold,
-               u64 full_checkpoint_interval_sec,
-               u64 delta_checkpoint_interval_sec,
-               u64 delta_checkpoint_interval_wal_bytes,
-               FlushOption flush_option);
+    WalManager(Storage *storage, String wal_path, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option);
 
     ~WalManager();
 
@@ -54,15 +48,9 @@ public:
     // checkpoint for a batch of sync.
     void Flush();
 
-    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
+    void Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size);
 
-    // Checkpoint is scheduled regularly.
-    // Checkpoint for transactions which lsn no larger than lsn_pend_chk_.
-    void CheckpointTimer();
-
-    void Checkpoint(TxnTimeStamp current_max_commit_ts, i64 current_wal_size);
-
-    void Checkpoint(ForceCheckpointTask *ckp_task);
+    void Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size);
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
 
@@ -72,9 +60,12 @@ public:
 
     void RecycleWalFile(TxnTimeStamp full_ckp_ts);
 
+    // Should only called in `Flush` thread
+    i64 WalSize() const { return wal_size_; }
+
 private:
-    void SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size);
-    Tuple<TxnTimeStamp, i64> GetWalState();
+    void SetLastCkpWalSize(i64 wal_size);
+    i64 GetLastCkpWalSize();
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
@@ -94,8 +85,6 @@ private:
 
 public:
     u64 cfg_wal_size_threshold_{};
-    u64 cfg_full_checkpoint_interval_sec_{};
-    u64 cfg_delta_checkpoint_interval_sec_{};
     u64 cfg_delta_checkpoint_interval_wal_bytes_{};
 
 private:
@@ -106,10 +95,7 @@ private:
 
     // WalManager state
     Atomic<bool> running_{};
-    Atomic<bool> checkpoint_running_{};
     Thread flush_thread_{};
-    Thread checkpoint_thread_{};
-    Thread apply_delta_entries_thread_{};
 
     // TxnManager and Flush thread access following members
     std::mutex mutex_{};
@@ -118,25 +104,15 @@ private:
     // Only Flush thread access following members
     Deque<SharedPtr<WalEntry>> que2_{};
     StdOfStream ofs_{};
+    TxnTimeStamp max_commit_ts_{};
+    i64 wal_size_{};
+    FlushOption flush_option_{FlushOption::kOnlyWrite};
 
     // Flush and Checkpoint threads access following members
     std::mutex mutex2_{};
-    TxnTimeStamp max_commit_ts_{};
-    i64 wal_size_{};
-    atomic_u64 last_ckp_commit_ts_{};
-    atomic_u64 last_deltaop_commit_ts_{};
-
-    std::mutex mutex3_{};
-    Deque<UniquePtr<CatalogDeltaEntry>> delta_entries_{};
+    i64 last_ckp_wal_size_{};
 
     // Only Checkpoint thread access following members
-    i64 last_full_ckp_wal_size_{};
-    i64 last_delta_ckp_wal_size_{};
-    i64 last_full_ckp_time_{};
-    i64 last_delta_ckp_time_{};
-    FlushOption flush_option_{FlushOption::kOnlyWrite};
-
-    Vector<String> wal_list_{};
 };
 
 } // namespace infinity
