@@ -56,8 +56,12 @@ import segment_index_entry;
 namespace infinity {
 
 // TODO Consider letting it commit as a transaction.
-Catalog::Catalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir)
-    : data_dir_(std::move(data_dir)), catalog_dir_(std::move(catalog_dir)), running_(true) {
+Catalog::Catalog(SharedPtr<String> data_dir)
+    : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(*data_dir_ + "/" + String(CATALOG_FILE_DIR))), running_(true) {
+    LocalFileSystem fs;
+    if (!fs.Exists(*catalog_dir_)) {
+        fs.CreateDirectory(*catalog_dir_);
+    }
     mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
 }
 
@@ -393,7 +397,6 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["data_dir"] = *this->data_dir_;
-        json_res["catalog_dir"] = *this->catalog_dir_;
         json_res["next_txn_id"] = this->next_txn_id_;
         json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
         json_res["catalog_version"] = this->catalog_version_;
@@ -409,8 +412,8 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     return json_res;
 }
 
-UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir, bool create_default_db) {
-    auto catalog = MakeUnique<Catalog>(data_dir, std::move(catalog_dir));
+UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_default_db) {
+    auto catalog = MakeUnique<Catalog>(data_dir);
     if (create_default_db) {
         // db current dir is same level as catalog
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
@@ -775,10 +778,9 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManag
 
 UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
     SharedPtr<String> data_dir = MakeShared<String>(catalog_json["data_dir"]);
-    SharedPtr<String> catalog_dir = MakeShared<String>(catalog_json["catalog_dir"]);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    auto catalog = MakeUnique<Catalog>(std::move(data_dir), std::move(catalog_dir));
+    auto catalog = MakeUnique<Catalog>(std::move(data_dir));
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     catalog->catalog_version_ = catalog_json["catalog_version"];

@@ -101,7 +101,7 @@ class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
 export struct Catalog {
 public:
-    Catalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir);
+    Catalog(SharedPtr<String> data_dir);
 
     ~Catalog();
 
@@ -237,7 +237,7 @@ public:
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
-    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, SharedPtr<String> catalog_dir, bool create_default_db);
+    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
 
     static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
@@ -248,10 +248,7 @@ private:
 
     void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
 
-public:
     static UniquePtr<Catalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
-
-    static void LoadFromEntry(Catalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods

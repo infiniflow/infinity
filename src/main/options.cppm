@@ -69,7 +69,6 @@ export struct SystemOptions {
     //    spdlog::level::level_enum log_level{spdlog::level::info};
 
     // Storage
-    SharedPtr<String> catalog_dir{};
     SharedPtr<String> data_dir{};
     u64 default_row_size{};
     u64 storage_capacity_{};

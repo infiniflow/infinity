@@ -82,8 +82,6 @@ public:
     [[nodiscard]] inline LogLevel log_level() const { return system_option_.log_level; }
 
     // Storage
-    [[nodiscard]] inline SharedPtr<String> catalog_dir() const { return system_option_.catalog_dir; }
-
     [[nodiscard]] inline SharedPtr<String> data_dir() const { return system_option_.data_dir; }
 
     [[nodiscard]] inline u64 default_row_size() const { return system_option_.default_row_size; }

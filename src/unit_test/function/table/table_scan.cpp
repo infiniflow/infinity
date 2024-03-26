@@ -68,7 +68,7 @@ class TableScanTest : public BaseTest {
 
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
-    auto catalog = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"), MakeShared<String>("/tmp/infinity/catalog"));
+    auto catalog = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
 
     Config config;
     config.Init(nullptr);

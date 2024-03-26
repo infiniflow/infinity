@@ -94,6 +94,7 @@ export {
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024;
     constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
     constexpr std::string_view WAL_FILE_PREFIX = "wal.log.";
+    constexpr std::string_view CATALOG_FILE_DIR = "catalog";
 
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr bool DEFAULT_ENABLE_COMPACTION = true;

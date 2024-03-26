@@ -43,7 +43,7 @@ class MulFunctionsTest : public BaseTest {};
 TEST_F(MulFunctionsTest, mul_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr, nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
 
     RegisterMulFunction(catalog_ptr);
 
