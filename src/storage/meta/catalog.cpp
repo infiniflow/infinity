@@ -641,7 +641,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto *block_entry = segment_entry->GetBlockEntryByID(block_id);
+                auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx),
                                              column_id);
                 break;
@@ -733,7 +733,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto *block_entry = segment_entry->GetBlockEntryByID(block_id);
+                auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 block_entry->LoadFilterBinaryData(block_filter_binary);
                 break;
             }
