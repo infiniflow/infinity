@@ -28,7 +28,6 @@ module;
 #include <filesystem>
 #include <string.h>
 #include <unistd.h>
-
 module memory_indexer;
 
 import stl;
@@ -290,6 +289,14 @@ void MemoryIndexer::OfflineDump() {
 
     for (u64 i = 0; i < count; ++i) {
         fread(&record_length, sizeof(u16), 1, f);
+        if (record_length >= MAX_TUPLE_LENGTH) {
+            // rubbish tuple, abandoned
+            char *buffer = new char[record_length];
+            fread(buffer, record_length, 1, f);
+            // TermTuple tuple(buffer, record_length);
+            delete[] buffer;
+            continue;
+        }
         fread(buf, record_length, 1, f);
         TermTuple tuple(buf, record_length);
         if (tuple.term_ != last_term) {
