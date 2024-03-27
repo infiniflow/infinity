@@ -217,6 +217,8 @@ private:
 
     const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
+    mutable std::shared_mutex rw_locker_{};
+
     // From data table
     Atomic<SizeT> row_count_{}; // this is actual row count
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
@@ -239,8 +241,6 @@ private:
     mutable UniquePtr<CompactionAlg> compaction_alg_{};
 
 private: // TODO: remove it
-    std::shared_mutex &rw_locker() const { return index_meta_map_.rw_locker_; }
-
     void MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges);
 
 public: // TODO: remove it?
