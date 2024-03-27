@@ -26,9 +26,9 @@ namespace infinity {
 
 export enum class BGTaskType {
     kStopProcessor,
-    kForceCheckpoint, // Manually triggered by PhysicalFlush
     kAddDeltaEntry,
     kCheckpoint,
+    kForceCheckpoint, // Manually triggered by PhysicalFlush
     kCompactSegments,
     kCleanup,
     kUpdateSegmentBloomFilterData, // Not used
@@ -96,18 +96,6 @@ export struct StopProcessorTask final : public BGTask {
     String ToString() const final { return "Stop Task"; }
 };
 
-export struct ForceCheckpointTask final : public BGTask {
-    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true)
-        : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint) {}
-
-    ~ForceCheckpointTask() = default;
-
-    String ToString() const final { return "Force Checkpoint Task"; }
-
-    Txn *txn_{};
-    bool is_full_checkpoint_{};
-};
-
 export struct AddDeltaEntryTask final : public BGTask {
     AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size)
         : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)), wal_size_(wal_size) {}
@@ -118,10 +106,26 @@ export struct AddDeltaEntryTask final : public BGTask {
     i64 wal_size_{};
 };
 
-export struct CheckpointTask final : public BGTask {
-    CheckpointTask(bool full_checkpoint) : BGTask(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
+export struct CheckpointTaskBase : public BGTask {
+    CheckpointTaskBase(BGTaskType type, bool async) : BGTask(type, async) {}
+};
+
+export struct CheckpointTask final : public CheckpointTaskBase {
+    CheckpointTask(bool full_checkpoint) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
 
     String ToString() const final { return "Checkpoint Task"; }
+    bool is_full_checkpoint_{};
+};
+
+export struct ForceCheckpointTask final : public CheckpointTaskBase {
+    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true)
+        : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint) {}
+
+    ~ForceCheckpointTask() = default;
+
+    String ToString() const override { return "Force Checkpoint Task"; }
+
+    Txn *txn_{};
     bool is_full_checkpoint_{};
 };
 
