@@ -34,6 +34,7 @@ import default_values;
 import physical_operator_type;
 import physical_operator;
 import physical_sink;
+import base_statement;
 
 namespace infinity {
 
@@ -112,7 +113,7 @@ SizeT TaskScheduler::GetStartFragments(PlanFragment *plan_fragment, Vector<PlanF
     return all_fragment_n;
 }
 
-void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
+void TaskScheduler::Schedule(PlanFragment *plan_fragment, StatementType statement_type) {
     if (!initialized_) {
         UnrecoverableError("Scheduler isn't initialized");
     }
@@ -188,7 +189,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
             continue;
         }
 
-        fragment_task->OnExecute(worker_id);
+        fragment_task->OnExecute();
         fragment_task->SetLastWorkID(worker_id);
 
         bool error = false;

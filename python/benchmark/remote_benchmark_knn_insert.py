@@ -234,8 +234,8 @@ if __name__ == '__main__':
         "-d",
         "--data",
         type=str,
-        # default='sift_1m',
-        default='gist_1m',
+        default='sift_1m',
+        # default='gist_1m',
         dest="data_set",
     )
 

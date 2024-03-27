@@ -29,6 +29,8 @@ import bound_update_statement;
 import logical_node;
 import explain_statement;
 import logical_node_type;
+import base_statement;
+#include "base_statement.h"
 
 module optimizer;
 
@@ -45,10 +47,10 @@ Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query
 
 void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std::move(rule)); }
 
-void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan) {
+void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType statement_type) {
     // Expression folding should be done in logical planner before optimizer
     // Non-select plan, the root node won't be project.
-    if(unoptimized_plan->operator_type() != LogicalNodeType::kProjection) {
+    if(statement_type != StatementType::kSelect) {
         return ;
     }
 

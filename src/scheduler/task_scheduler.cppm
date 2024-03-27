@@ -14,12 +14,13 @@
 
 module;
 
+export module task_scheduler;
+
 import config;
 import stl;
 import fragment_task;
 import blocking_queue;
-
-export module task_scheduler;
+import base_statement;
 
 namespace infinity {
 
@@ -47,7 +48,7 @@ public:
     void UnInit();
 
     // Schedule start fragments
-    void Schedule(PlanFragment * plan_fragment_root);
+    void Schedule(PlanFragment * plan_fragment_root, StatementType statement_type);
 
     // `plan_fragment` can be scheduled because all of its dependencies are met.
     void ScheduleFragment(PlanFragment *plan_fragment);
