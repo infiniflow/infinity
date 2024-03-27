@@ -56,6 +56,7 @@ import logical_type;
 import create_index_info;
 import segment_index_entry;
 import segment_iter;
+import segment_entry;
 
 namespace infinity {
 
@@ -212,10 +213,38 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("path");
             output_names_->emplace_back("size");
 
-            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowSegment: {
+            output_names_->reserve(10);
+            output_types_->reserve(10);
+
+            output_names_->emplace_back("id");
+            output_names_->emplace_back("status");
+            output_names_->emplace_back("dir");
+            output_names_->emplace_back("size");
+            output_names_->emplace_back("block_count");
+            output_names_->emplace_back("row_capacity");
+            output_names_->emplace_back("row_count");
+            output_names_->emplace_back("actual_row_count");
+            output_names_->emplace_back("room");
+            output_names_->emplace_back("column_count");
+
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+
         case ShowType::kShowBlocks: {
             output_names_->reserve(2);
             output_types_->reserve(2);
@@ -305,6 +334,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowSegments: {
             ExecuteShowSegments(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowSegment: {
+            ExecuteShowSegmentDetail(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowBlocks: {
@@ -1160,6 +1193,116 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
         }
     }
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    auto txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
+
+    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
+        return;
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bigint_type
+    };
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeBigInt(segment_entry->segment_id());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_entry->status()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(*segment_entry->segment_dir());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*segment_entry->segment_dir()));
+            Value value = Value::MakeVarchar(seg_size);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(segment_entry->block_entries().size());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(segment_entry->row_capacity());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(segment_entry->row_count());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(segment_entry->actual_row_count());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(segment_entry->Room());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(segment_entry->column_count());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+    }else {
+        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        return;
+    }
+
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
