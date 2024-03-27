@@ -80,7 +80,7 @@ void WalManager::Start() {
         fs.CreateDirectory(wal_dir_);
     }
     // TODO: recovery from wal checkpoint
-    ofs_ = StdOfStream(wal_path_, std::ios::app | std::ios::binary);
+    ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
         UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
     }

@@ -44,7 +44,7 @@ void FragmentTask::Init() {
     operator_states_.resize(operator_count_);
 }
 
-void FragmentTask::OnExecute(i64) {
+void FragmentTask::OnExecute() {
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is running", task_id_, FragmentId()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();

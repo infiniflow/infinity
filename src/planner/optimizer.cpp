@@ -28,6 +28,8 @@ import bound_delete_statement;
 import bound_update_statement;
 import logical_node;
 import explain_statement;
+import logical_node_type;
+import base_statement;
 
 module optimizer;
 
@@ -44,7 +46,24 @@ Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query
 
 void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std::move(rule)); }
 
-void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan) {
+void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType statement_type) {
+    // Expression folding should be done in logical planner before optimizer
+    // Non-select plan, the root node won't be project.
+    switch(statement_type) {
+        case StatementType::kSelect:
+        case StatementType::kExplain:
+        case StatementType::kDelete:
+        case StatementType::kUpdate:
+        {
+            ; // continue;
+            break;
+        }
+        default: {
+            return ;
+        }
+    }
+
+    // Only work for select
     SizeT rule_count = rules_.size();
     for (SizeT idx = 0; idx < rule_count; ++idx) {
         const auto &rule = rules_[idx];
