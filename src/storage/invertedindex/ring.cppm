@@ -83,7 +83,9 @@ public:
     void Iterate(std::function<void(T &)> func) {
         std::unique_lock<std::mutex> lock(mutex_);
         for (u64 off = off_ground_; off < off_filled_; off++) {
-            func(ring_buf_[off & cap_mask_]);
+            T &obj = ring_buf_[off & cap_mask_];
+            func(obj);
+            obj = T();
         }
         off_ground_ = off_filled_;
     }

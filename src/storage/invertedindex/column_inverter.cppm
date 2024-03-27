@@ -38,6 +38,7 @@ public:
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
+    ~ColumnInverter();
 
     void InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
 
@@ -74,9 +75,9 @@ public:
     void SpillSortResults(FILE *spill_file, u64 &tuple_count);
 
 private:
-    using TermBuffer = Vector<char, PoolAllocator<char>>;
-    using PosInfoVec = Vector<PosInfo, PoolAllocator<PosInfo>>;
-    using U32Vec = Vector<u32, PoolAllocator<u32>>;
+    using TermBuffer = Vector<char>;
+    using PosInfoVec = Vector<PosInfo>;
+    using U32Vec = Vector<u32>;
 
     struct CompareTermRef {
         const char *const term_buffer_;
@@ -109,7 +110,6 @@ private:
     void MergePrepare();
 
     UniquePtr<Analyzer> analyzer_{nullptr};
-    PoolAllocator<char> alloc_;
     u32 begin_doc_id_{0};
     TermBuffer terms_;
     PosInfoVec positions_;

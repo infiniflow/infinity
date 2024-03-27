@@ -18,6 +18,7 @@ module;
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <vector>
 module column_inverter;
 import stl;
@@ -42,12 +43,13 @@ static u32 Align(u32 unaligned) {
 }
 
 ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider)
-    : analyzer_(AnalyzerPool::instance().Get(analyzer)), alloc_(memory_pool), terms_(alloc_), positions_(alloc_), term_refs_(alloc_),
-      posting_writer_provider_(posting_writer_provider) {
+    : analyzer_(AnalyzerPool::instance().Get(analyzer)), posting_writer_provider_(posting_writer_provider) {
     if (analyzer_.get() == nullptr) {
         UnrecoverableError(fmt::format("Invalid analyzer: {}", analyzer));
     }
 }
+
+ColumnInverter::~ColumnInverter() = default;
 
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
