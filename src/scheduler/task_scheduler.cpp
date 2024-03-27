@@ -35,8 +35,8 @@ import physical_operator_type;
 import physical_operator;
 import physical_sink;
 import base_statement;
-import create_statement;
 import extra_ddl_info;
+import create_statement;
 
 namespace infinity {
 
