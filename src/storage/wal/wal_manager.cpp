@@ -374,9 +374,11 @@ i64 WalManager::ReplayWalFile() {
         }
         if (temp_wal_info.has_value()) {
             wal_list.push_back(temp_wal_info->path_);
+            LOG_INFO(fmt::format("Find temp wal file: {}", temp_wal_info->path_));
         }
         for (const auto &wal_info : wal_infos) {
             wal_list.push_back(wal_info.path_);
+            LOG_INFO(fmt::format("Find wal file: {}", wal_info.path_));
         }
         // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
     }
@@ -388,10 +390,6 @@ i64 WalManager::ReplayWalFile() {
 
     LOG_INFO("Start Wal Replay");
     // log the wal files.
-    for (const auto &wal_file : wal_list) {
-        LOG_TRACE(fmt::format("List wal file: {}", wal_file.c_str()));
-    }
-    LOG_INFO(fmt::format("List wal file size: {}", wal_list.size()));
 
     TxnTimeStamp max_commit_ts = 0;
     Vector<SharedPtr<WalEntry>> replay_entries;
@@ -409,14 +407,13 @@ i64 WalManager::ReplayWalFile() {
 
             LOG_INFO(wal_entry->ToString());
 
-            replay_entries.push_back(wal_entry);
-
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
             if (wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_dir = Path(checkpoint_cmd->catalog_path_).parent_path().string();
                 break;
             }
+            replay_entries.push_back(wal_entry);
         }
         LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
 
@@ -557,7 +554,8 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
                                                 begin_ts,
                                                 commit_ts,
                                                 0 /*row_count*/,
-                                                0 /*unsealed_id*/);
+                                                INVALID_SEGMENT_ID /*unsealed_id*/,
+                                                0 /*next_segment_id*/);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -588,7 +586,8 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
                                                 begin_ts,
                                                 commit_ts,
                                                 0 /*row_count*/,
-                                                0 /*unsealed_id*/);
+                                                INVALID_SEGMENT_ID /*unsealed_id*/,
+                                                0 /*next_segment_id*/);
         },
         txn_id,
         0 /*begin_ts*/);
@@ -632,7 +631,8 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
 }
 
 // use by import and compact, add a new segment
-void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
+SharedPtr<SegmentEntry>
+WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TransactionID txn_id, TxnTimeStamp commit_ts) {
     auto *buffer_mgr = storage_->buffer_manager();
     auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry,
                                                              segment_info.segment_id_,
@@ -641,31 +641,32 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
                                                              segment_info.row_count_,
                                                              segment_info.actual_row_count_,
                                                              segment_info.row_capacity_,
-                                                             segment_info.min_row_ts_,
-                                                             segment_info.max_row_ts_,
-                                                             segment_info.commit_ts_,
-                                                             segment_info.deprecate_ts_,
-                                                             segment_info.begin_ts_,
-                                                             segment_info.txn_id_);
+                                                             commit_ts, /*min_row_ts*/
+                                                             commit_ts, /*max_row_ts*/
+                                                             commit_ts, /*commit_ts*/
+                                                             UNCOMMIT_TS /*deprecate_ts*/,
+                                                             0 /*begin_ts*/, // FIXME
+                                                             txn_id);
     for (BlockID block_id = 0; block_id < (BlockID)segment_info.block_infos_.size(); ++block_id) {
         auto &block_info = segment_info.block_infos_[block_id];
         auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
                                                            block_id,
                                                            block_info.row_count_,
                                                            block_info.row_capacity_,
-                                                           block_info.min_row_ts_,
-                                                           block_info.max_row_ts_,
-                                                           block_info.checkpoint_ts_,
-                                                           block_info.checkpoint_row_count_,
+                                                           commit_ts,             /*min_row_ts*/
+                                                           commit_ts,             /*max_row_ts*/
+                                                           commit_ts,             /*commit_ts*/
+                                                           commit_ts,             /*checkpoint_ts*/
+                                                           block_info.row_count_, /*checkpoint_row_count*/
                                                            buffer_mgr);
         for (ColumnID column_id = 0; column_id < (ColumnID)block_info.next_outline_idxes_.size(); ++column_id) {
             i32 next_outline_idx = block_info.next_outline_idxes_[column_id];
-            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_outline_idx);
+            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_outline_idx, commit_ts);
             block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
         }
         segment_entry->AddBlockReplay(std::move(block_entry), block_id); // reuse function from delta catalog.
     }
-    table_entry->AddSegmentReplayWal(segment_entry); // **DO NOT** reuse function from delta catalog.
+    return segment_entry;
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -674,7 +675,8 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_i
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
 
-    ReplaySegment(table_entry, cmd.segment_info_, commit_ts);
+    auto segment_entry = this->ReplaySegment(table_entry, cmd.segment_info_, txn_id, commit_ts);
+    table_entry->AddSegmentReplayWalImport(segment_entry);
 }
 
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -698,7 +700,8 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
     }
 
     for (const auto &new_segment_info : cmd.new_segment_infos_) {
-        ReplaySegment(table_entry, new_segment_info, commit_ts);
+        auto segment_entry = this->ReplaySegment(table_entry, new_segment_info, txn_id, commit_ts);
+        table_entry->AddSegmentReplayWalCompact(segment_entry);
     }
 
     for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {

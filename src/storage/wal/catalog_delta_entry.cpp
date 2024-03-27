@@ -137,6 +137,7 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
     add_table_op->column_defs_ = std::move(columns);
     add_table_op->row_count_ = ReadBufAdv<SizeT>(ptr);
     add_table_op->unsealed_id_ = ReadBufAdv<SegmentID>(ptr);
+    add_table_op->next_segment_id_ = ReadBufAdv<SegmentID>(ptr);
     return add_table_op;
 }
 
@@ -276,6 +277,7 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
     }
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->unsealed_id_);
+    WriteBufAdv(buf, this->next_segment_id_);
 }
 
 void AddSegmentEntryOp::WriteAdv(char *&buf) const {
@@ -379,7 +381,8 @@ const String AddTableEntryOp::ToString() const {
     for (const auto &column_def : column_defs_) {
         sstream << fmt::format(" column_def: {}", column_def->ToString());
     }
-    sstream << fmt::format(" row_count: {}", row_count_);
+    sstream << fmt::format(" row_count: {}", row_count_) << fmt::format(" unsealed_id: {}", unsealed_id_)
+            << fmt::format(" next_segment_id: {}", next_segment_id_);
     return sstream.str();
 }
 
@@ -483,7 +486,7 @@ bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
                IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*table_entry_dir_, *rhs_op->table_entry_dir_) &&
                table_entry_type_ == rhs_op->table_entry_type_ && row_count_ == rhs_op->row_count_ && unsealed_id_ == rhs_op->unsealed_id_ &&
-               column_defs_.size() == rhs_op->column_defs_.size();
+               next_segment_id_ == rhs_op->next_segment_id_ && column_defs_.size() == rhs_op->column_defs_.size();
     if (!res) {
         return false;
     }

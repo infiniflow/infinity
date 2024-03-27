@@ -63,9 +63,11 @@ TableEntry::TableEntry(bool is_delete,
                        TableMeta *table_meta,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts,
-                       SegmentID unsealed_id)
+                       SegmentID unsealed_id,
+                       SegmentID next_segment_id)
     : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)),
-      table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id) {
+      table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id),
+      next_segment_id_(next_segment_id) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -98,7 +100,8 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                   table_meta,
                                   txn_id,
                                   begin_ts,
-                                  0);
+                                  INVALID_SEGMENT_ID,
+                                  0 /*next_segment_id*/);
 }
 
 SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
@@ -111,7 +114,8 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    TxnTimeStamp begin_ts,
                                                    TxnTimeStamp commit_ts,
                                                    SizeT row_count,
-                                                   SegmentID unsealed_id) noexcept {
+                                                   SegmentID unsealed_id,
+                                                   SegmentID next_segment_id) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete,
                                               std::move(table_entry_dir),
                                               std::move(table_name),
@@ -120,7 +124,8 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                               table_meta,
                                               txn_id,
                                               begin_ts,
-                                              unsealed_id);
+                                              unsealed_id,
+                                              next_segment_id);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
     table_entry->row_count_.store(row_count);
@@ -204,6 +209,13 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     }
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
+
+void TableEntry::AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry) {
+    this->AddSegmentReplayWal(segment_entry);
+    row_count_ += segment_entry->actual_row_count();
+}
+
+void TableEntry::AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry) { this->AddSegmentReplayWal(segment_entry); }
 
 void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
     SegmentID segment_id = new_segment->segment_id();
@@ -770,7 +782,7 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     return result;
 }
 
-nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
     Vector<SegmentEntry *> segment_candidates;
@@ -818,7 +830,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
-        json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts, is_full_checkpoint));
+        json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
     }
     json_res["unsealed_id"] = unsealed_id_;
 
@@ -867,11 +879,11 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     TransactionID txn_id = table_entry_json["txn_id"];
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
+    SegmentID next_segment_id = table_entry_json["next_segment_id"];
 
-    UniquePtr<TableEntry> table_entry =
-        MakeUnique<TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id);
+    UniquePtr<TableEntry> table_entry = MakeUnique<
+        TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
     table_entry->row_count_ = row_count;
-    table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
 
     if (table_entry_json.contains("segments")) {
         for (const auto &segment_json : table_entry_json["segments"]) {

@@ -152,7 +152,7 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, table_entry), db_name_(table_entry->GetDBName()),
           table_name_(table_entry->GetTableName()), table_entry_dir_(table_entry->TableEntryDir()), column_defs_(table_entry->column_defs()),
           row_count_(table_entry->row_count()), // TODO: fix it
-          unsealed_id_(table_entry->unsealed_id()) {}
+          unsealed_id_(table_entry->unsealed_id()), next_segment_id_(table_entry->next_segment_id()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_ENTRY; }
     String GetTypeStr() const final { return "ADD_TABLE_ENTRY"; }
@@ -174,7 +174,7 @@ public:
         }
 
         total_size += sizeof(SizeT);
-        total_size += sizeof(SegmentID);
+        total_size += sizeof(SegmentID) * 2;
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -191,6 +191,7 @@ public:
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
     SizeT row_count_{0};
     SegmentID unsealed_id_{};
+    SegmentID next_segment_id_{0};
 };
 
 /// class AddSegmentEntryOp

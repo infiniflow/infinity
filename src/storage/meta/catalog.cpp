@@ -391,7 +391,7 @@ Tuple<SpecialFunction *, Status> Catalog::GetSpecialFunctionByNameNoExcept(Catal
     return {catalog->special_functions_[function_name].get(), Status::OK()};
 }
 
-nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
     Vector<DBMeta *> databases;
     {
@@ -407,7 +407,7 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     }
 
     for (auto &db_meta : databases) {
-        json_res["databases"].emplace_back(db_meta->Serialize(max_commit_ts, is_full_checkpoint));
+        json_res["databases"].emplace_back(db_meta->Serialize(max_commit_ts));
     }
     return json_res;
 }
@@ -524,6 +524,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto entry_type = add_table_entry_op->table_entry_type_;
                 auto row_count = add_table_entry_op->row_count_;
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
+                SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 if (!is_delete) {
@@ -540,7 +541,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                 begin_ts,
                                                                 commit_ts,
                                                                 row_count,
-                                                                unsealed_id);
+                                                                unsealed_id,
+                                                                next_segment_id);
                         },
                         txn_id,
                         begin_ts);
@@ -558,7 +560,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                 begin_ts,
                                                                 commit_ts,
                                                                 row_count,
-                                                                unsealed_id);
+                                                                unsealed_id,
+                                                                next_segment_id);
                         },
                         txn_id,
                         begin_ts);
@@ -625,6 +628,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                               row_capacity,
                                                                               min_row_ts,
                                                                               max_row_ts,
+                                                                              commit_ts,
                                                                               check_point_ts,
                                                                               check_point_row_count,
                                                                               buffer_mgr),
@@ -644,8 +648,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
-                block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx),
-                                             column_id);
+                block_entry->AddColumnReplay(
+                    BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, commit_ts),
+                    column_id);
                 break;
             }
 
@@ -812,7 +817,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Serialize catalog to string
     full_ckp_commit_ts_ = max_commit_ts;
-    nlohmann::json catalog_json = Serialize(max_commit_ts, true);
+    nlohmann::json catalog_json = Serialize(max_commit_ts);
     String catalog_str = catalog_json.dump();
 
     // Save catalog to tmp file.

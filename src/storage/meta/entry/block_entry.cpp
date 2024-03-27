@@ -66,6 +66,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
                                                       u16 row_capacity,
                                                       TxnTimeStamp min_row_ts,
                                                       TxnTimeStamp max_row_ts,
+                                                      TxnTimeStamp commit_ts,
                                                       TxnTimeStamp check_point_ts,
                                                       u16 checkpoint_row_count,
                                                       BufferManager *buffer_mgr) {
@@ -75,6 +76,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->row_count_ = row_count;
     block_entry->min_row_ts_ = min_row_ts;
     block_entry->max_row_ts_ = max_row_ts;
+    block_entry->commit_ts_ = commit_ts;
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
     block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
@@ -320,13 +322,14 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
 UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
     u64 block_id = block_entry_json["block_id"];
-    TxnTimeStamp checkpoint_ts = block_entry_json["checkpoint_ts"];
 
     auto block_dir = block_entry_json["block_dir"];
     auto row_capacity = block_entry_json["row_capacity"];
     auto row_count = block_entry_json["row_count"];
     auto min_row_ts = block_entry_json["min_row_ts"];
     auto max_row_ts = block_entry_json["max_row_ts"];
+    auto commit_ts = block_entry_json["commit_ts"];
+    auto checkpoint_ts = block_entry_json["checkpoint_ts"];
 
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewReplayBlockEntry(segment_entry,
                                                                         block_id,
@@ -334,11 +337,11 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
                                                                         row_capacity,
                                                                         min_row_ts,
                                                                         max_row_ts,
+                                                                        commit_ts,
                                                                         checkpoint_ts,
                                                                         row_count,
                                                                         buffer_mgr);
 
-    block_entry->commit_ts_ = block_entry_json["commit_ts"];
     block_entry->begin_ts_ = block_entry_json["begin_ts"];
     block_entry->txn_id_ = block_entry_json["txn_id"];
 

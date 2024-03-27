@@ -230,7 +230,7 @@ public:
 
 public:
     // Serialization and Deserialization
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     void SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_path);
 

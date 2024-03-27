@@ -67,7 +67,8 @@ public:
                         TableMeta *table_meta,
                         TransactionID txn_id,
                         TxnTimeStamp begin_ts,
-                        SegmentID unsealed_id);
+                        SegmentID unsealed_id,
+                        SegmentID next_segment_id);
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
                                                const SharedPtr<String> &db_entry_dir,
@@ -88,7 +89,8 @@ public:
                                                   TxnTimeStamp begin_ts,
                                                   TxnTimeStamp commit_ts,
                                                   SizeT row_count,
-                                                  SegmentID unsealed_id) noexcept;
+                                                  SegmentID unsealed_id,
+                                                  SegmentID next_segment_id) noexcept;
 
 public:
     Tuple<TableIndexEntry *, Status>
@@ -115,10 +117,16 @@ public:
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    void AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry);
+
+    void AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry);
+
+private:
     void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);
 
+public:
     void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id);
-    //
+
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }
 
@@ -143,6 +151,8 @@ public:
     Status RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores);
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
+
+    SegmentID next_segment_id() const { return next_segment_id_; }
 
     static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name) {
         return DetermineRandomString(parent_dir, fmt::format("table_{}", table_name));
@@ -194,7 +204,7 @@ public:
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
 public:
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
@@ -229,7 +239,7 @@ private:
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
     SharedPtr<SegmentEntry> unsealed_segment_{};
     SegmentID unsealed_id_{};
-    atomic_u32 next_segment_id_{};
+    Atomic<SegmentID> next_segment_id_{};
 
 public:
     // set nullptr to close auto compaction

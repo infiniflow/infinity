@@ -37,8 +37,7 @@ import segment_entry;
 namespace infinity {
 
 WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
-    : block_id_(block_entry->block_id_), row_count_(block_entry->row_count_), row_capacity_(block_entry->row_capacity_),
-      min_row_ts_(block_entry->min_row_ts_), max_row_ts_(block_entry->max_row_ts_), checkpoint_ts_(block_entry->checkpoint_ts_) {
+    : block_id_(block_entry->block_id_), row_count_(block_entry->row_count_), row_capacity_(block_entry->row_capacity_) {
     next_outline_idxes_.resize(block_entry->columns_.size());
     for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
         next_outline_idxes_[i] = block_entry->columns_[i]->OutlineBufferCount();
@@ -47,12 +46,11 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
     return block_id_ == other.block_id_ && row_count_ == other.row_count_ && row_capacity_ == other.row_capacity_ &&
-           min_row_ts_ == other.min_row_ts_ && max_row_ts_ == other.max_row_ts_ && checkpoint_ts_ == other.checkpoint_ts_ &&
            next_outline_idxes_ == other.next_outline_idxes_;
 }
 
 i32 WalBlockInfo::GetSizeInBytes() const {
-    i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_) + sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(checkpoint_ts_);
+    i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
     size += sizeof(i32) + next_outline_idxes_.size() * sizeof(i32);
     return size;
 }
@@ -61,9 +59,6 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
-    WriteBufAdv(buf, min_row_ts_);
-    WriteBufAdv(buf, max_row_ts_);
-    WriteBufAdv(buf, checkpoint_ts_);
     WriteBufAdv(buf, static_cast<i32>(next_outline_idxes_.size()));
     for (const auto &idx : next_outline_idxes_) {
         WriteBufAdv(buf, idx);
@@ -75,9 +70,6 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     block_info.block_id_ = ReadBufAdv<BlockID>(ptr);
     block_info.row_count_ = ReadBufAdv<u16>(ptr);
     block_info.row_capacity_ = ReadBufAdv<u16>(ptr);
-    block_info.min_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    block_info.max_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    block_info.checkpoint_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     i32 count = ReadBufAdv<i32>(ptr);
     block_info.next_outline_idxes_.resize(count);
     for (i32 i = 0; i < count; i++) {
@@ -88,8 +80,7 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
 
 String WalBlockInfo::ToString() const {
     std::stringstream ss;
-    ss << "block_id: " << block_id_ << ", row_count: " << row_count_ << ", row_capacity: " << row_capacity_ << ", min_row_ts: " << min_row_ts_
-       << ", max_row_ts: " << max_row_ts_ << ", checkpoint_ts: " << checkpoint_ts_;
+    ss << "block_id: " << block_id_ << ", row_count: " << row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", next_outline_idxes: [";
     for (SizeT i = 0; i < next_outline_idxes_.size(); i++) {
         ss << next_outline_idxes_[i];
@@ -103,9 +94,7 @@ String WalBlockInfo::ToString() const {
 
 WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
     : segment_id_(segment_entry->segment_id_), column_count_(segment_entry->column_count_), row_count_(segment_entry->row_count_),
-      actual_row_count_(segment_entry->actual_row_count_), row_capacity_(segment_entry->row_capacity_), min_row_ts_(segment_entry->min_row_ts_),
-      max_row_ts_(segment_entry->max_row_ts_), commit_ts_(segment_entry->commit_ts_), deprecate_ts_(segment_entry->deprecate_ts_),
-      begin_ts_(segment_entry->begin_ts_), txn_id_(segment_entry->txn_id_) {
+      actual_row_count_(segment_entry->actual_row_count_), row_capacity_(segment_entry->row_capacity_) {
     for (auto &block_entry : segment_entry->block_entries_) {
         block_infos_.push_back(WalBlockInfo(block_entry.get()));
     }
@@ -113,14 +102,11 @@ WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
 
 bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
     return segment_id_ == other.segment_id_ && column_count_ == other.column_count_ && row_count_ == other.row_count_ &&
-           actual_row_count_ == other.actual_row_count_ && row_capacity_ == other.row_capacity_ && min_row_ts_ == other.min_row_ts_ &&
-           max_row_ts_ == other.max_row_ts_ && commit_ts_ == other.commit_ts_ && deprecate_ts_ == other.deprecate_ts_ &&
-           begin_ts_ == other.begin_ts_ && txn_id_ == other.txn_id_ && block_infos_ == other.block_infos_;
+           actual_row_count_ == other.actual_row_count_ && row_capacity_ == other.row_capacity_ && block_infos_ == other.block_infos_;
 }
 
 i32 WalSegmentInfo::GetSizeInBytes() const {
-    i32 size = sizeof(SegmentID) + sizeof(column_count_) + sizeof(row_count_) + sizeof(actual_row_count_) + sizeof(row_capacity_) +
-               sizeof(min_row_ts_) + sizeof(max_row_ts_) + sizeof(commit_ts_) + sizeof(deprecate_ts_) + sizeof(begin_ts_) + sizeof(txn_id_);
+    i32 size = sizeof(SegmentID) + sizeof(column_count_) + sizeof(row_count_) + sizeof(actual_row_count_) + sizeof(row_capacity_);
     size += sizeof(i32);
     for (const auto &block_info : block_infos_) {
         size += block_info.GetSizeInBytes();
@@ -134,12 +120,6 @@ void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, actual_row_count_);
     WriteBufAdv(buf, row_capacity_);
-    WriteBufAdv(buf, min_row_ts_);
-    WriteBufAdv(buf, max_row_ts_);
-    WriteBufAdv(buf, commit_ts_);
-    WriteBufAdv(buf, deprecate_ts_);
-    WriteBufAdv(buf, begin_ts_);
-    WriteBufAdv(buf, txn_id_);
     WriteBufAdv(buf, static_cast<i32>(block_infos_.size()));
     for (const auto &block_info : block_infos_) {
         block_info.WriteBufferAdv(buf);
@@ -153,12 +133,6 @@ WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
     segment_info.row_count_ = ReadBufAdv<SizeT>(ptr);
     segment_info.actual_row_count_ = ReadBufAdv<SizeT>(ptr);
     segment_info.row_capacity_ = ReadBufAdv<SizeT>(ptr);
-    segment_info.min_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    segment_info.max_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    segment_info.commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    segment_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    segment_info.begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    segment_info.txn_id_ = ReadBufAdv<TransactionID>(ptr);
     i32 count = ReadBufAdv<i32>(ptr);
     for (i32 i = 0; i < count; i++) {
         segment_info.block_infos_.push_back(WalBlockInfo::ReadBufferAdv(ptr));
@@ -169,9 +143,7 @@ WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
 String WalSegmentInfo::ToString() const {
     std::stringstream ss;
     ss << "segment_id: " << segment_id_ << ", column_count: " << column_count_ << ", row_count: " << row_count_
-       << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_ << ", min_row_ts: " << min_row_ts_
-       << ", max_row_ts: " << max_row_ts_ << ", commit_ts: " << commit_ts_ << ", deprecate_ts: " << deprecate_ts_ << ", begin_ts: " << begin_ts_
-       << ", txn_id: " << txn_id_;
+       << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", block_infos: [";
     for (SizeT i = 0; i < block_infos_.size(); i++) {
         ss << block_infos_[i].ToString();
