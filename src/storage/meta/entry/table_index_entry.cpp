@@ -192,7 +192,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
 
     if (deleted) {
         auto table_index_entry = ReplayTableIndexEntry(table_index_meta, true, nullptr, nullptr, txn_id, begin_ts, commit_ts);
-        table_index_entry->deleted_ = true;
         table_index_entry->commit_ts_.store(commit_ts);
         table_index_entry->begin_ts_ = begin_ts;
         return table_index_entry;
@@ -399,8 +398,13 @@ void TableIndexEntry::Cleanup() {
     }
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *index_dir_));
+
+    // FIXME(sys): delete full text index by whole directory tmply, should call CleanupScanner::CleanupDir
     LocalFileSystem fs;
-    fs.DeleteDirectory(*index_dir_); // FIXME(sys): delete full text index by whole directory tmply
+    if (!fs.Exists(*index_dir_)) {
+        return;
+    }
+    fs.DeleteDirectory(*index_dir_);
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}

@@ -66,6 +66,8 @@ export namespace std {
     using std::errc;
 
     using std::stoi;
+    using std::stol;
+    using std::stoll;
     using std::strtol;
     using std::strtof;
     using std::strtod;
@@ -273,8 +275,6 @@ namespace infinity {
     constexpr std::nullopt_t None = std::nullopt;
 
     using NoneType = std::nullopt_t;
-
-    using StdOfStream = std::ofstream;
 
     // String
 

@@ -183,9 +183,9 @@ void PhysicalShow::Init() {
 
             output_names_->emplace_back("record_no");
             output_names_->emplace_back("command parsing");
-            output_names_->emplace_back("logical plann building");
+            output_names_->emplace_back("logical plan building");
             output_names_->emplace_back("plan optimizing");
-            output_names_->emplace_back("physical plann building");
+            output_names_->emplace_back("physical plan building");
             output_names_->emplace_back("pipeline building");
             output_names_->emplace_back("task building");
             output_names_->emplace_back("execution");

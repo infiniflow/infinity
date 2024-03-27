@@ -207,7 +207,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("db1", "AAA_db1"));
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
-    entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", "BBB_tb1",MockTableDesc2()));
+    entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", "BBB_tb1", MockTableDesc2()));
     entry->cmds_.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
     {
         WalSegmentInfo segment_info = MakeSegmentInfo(100, 8, 2);
@@ -284,7 +284,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     }
 
     Vector<SharedPtr<WalEntry>> replay_entries;
-    int64_t max_commit_ts = 0;
+    TxnTimeStamp max_commit_ts = 0;
     String catalog_path;
     {
         auto iterator = WalEntryIterator::Make(wal_file_path);
@@ -295,10 +295,13 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             if (wal_entry == nullptr) {
                 break;
             }
-            if (!wal_entry->IsCheckPoint()) {
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
-                std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                catalog_path = checkpoint_cmd->catalog_path_;
+
                 Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
                 Println("Catalog Path: {}", catalog_path);
                 break;
@@ -325,7 +328,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
         }
     }
-    EXPECT_EQ(max_commit_ts, 123);
+    EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
     EXPECT_EQ(replay_entries.size(), 1u);
 }
@@ -349,7 +352,7 @@ TEST_F(WalEntryTest, WalListIterator) {
     }
 
     Vector<SharedPtr<WalEntry>> replay_entries;
-    int64_t max_commit_ts = 0;
+    TxnTimeStamp max_commit_ts = 0;
     String catalog_path;
     {
         WalListIterator iterator({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
@@ -360,10 +363,13 @@ TEST_F(WalEntryTest, WalListIterator) {
             if (wal_entry.get() == nullptr) {
                 break;
             }
-            if (!wal_entry->IsCheckPoint()) {
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            if (!wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
                 replay_entries.push_back(wal_entry);
             } else {
-                std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                catalog_path = checkpoint_cmd->catalog_path_;
+
                 Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
                 Println("Catalog Path: {}", catalog_path);
                 break;
@@ -390,7 +396,7 @@ TEST_F(WalEntryTest, WalListIterator) {
             Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
         }
     }
-    EXPECT_EQ(max_commit_ts, 123);
+    EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
     EXPECT_EQ(replay_entries.size(), 1u);
 }

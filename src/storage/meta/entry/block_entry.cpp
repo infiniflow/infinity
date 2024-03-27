@@ -34,12 +34,13 @@ import segment_entry;
 import column_vector;
 import bitmask;
 import block_version;
+import cleanup_scanner;
 
 namespace infinity {
 
 /// class BlockEntry
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts)
-    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
+    : BaseEntry(EntryType::kBlock, false), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
       checkpoint_ts_(checkpoint_ts) {}
 
 UniquePtr<BlockEntry>
@@ -287,8 +288,7 @@ void BlockEntry::Cleanup() {
     }
     block_version_->Cleanup(this->VersionFilePath());
 
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*block_dir_);
+    CleanupScanner::CleanupDir(*block_dir_);
 }
 
 // TODO: introduce BlockColumnMeta

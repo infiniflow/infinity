@@ -28,6 +28,7 @@ import file_system_type;
 import infinity_exception;
 import third_party;
 import logger;
+import status;
 
 module local_file_system;
 
@@ -236,7 +237,7 @@ void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
     std::error_code error_code;
     Path p{path};
     if (!std::filesystem::exists(p, error_code)) {
-        UnrecoverableError(fmt::format("DeleteEmptyDirectory: {} is not exist", path));
+        RecoverableError(Status::DirNotFound(path));
     }
     std::filesystem::remove(p, error_code);
     if (error_code.value() != 0) {

@@ -69,7 +69,15 @@ public:
 
     static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
-    // Txn OPs
+    // Txn steps:
+    // 1. CreateTxn
+    // 2. Begin
+    // 3. Commit() / Rollback
+    // 3.1 PrepareCommit - multiple thread
+    // 3.2 WriteWAL - single threads
+    // 3.3 PrepareWriteData - single thread
+    // 3.4 Commit - multiple threads
+
     void Begin();
 
     TxnTimeStamp Commit();
