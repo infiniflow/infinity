@@ -98,8 +98,9 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
             if (buffer_obj == buffer_obj1) {
                 UnrecoverableError("buffer object duplicated in gc_queue.");
             }
+            auto size = buffer_obj1->GetBufferSize();
             if (buffer_obj1->Free()) {
-                current_memory_size_ -= buffer_obj1->GetBufferSize();
+                current_memory_size_ -= size;
             }
         } else {
             UnrecoverableError("Out of memory.");

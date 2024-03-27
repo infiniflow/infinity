@@ -299,7 +299,10 @@ TEST_F(BufferObjTest, test_status_clean) {
     buf1->CheckState();
 
     // kClean, kEphemeral -> kLoaded, kEphemeral
+    { auto handle2 = buf2->Load(); }
     {
+        auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+        buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
         auto handle1 = buf1->Load();
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
@@ -355,10 +358,20 @@ TEST_F(BufferObjTest, test_status_clean) {
     buf1->CheckState();
 
     // kClean, kTemp -> kLoaded, kTemp
+    { auto handle2 = buf2->Load(); }
     {
+        auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+        buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
         auto handle1 = buf1->Load();
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
-        EXPECT_EQ(buf1->type(), BufferType::kTemp);
+        buf1->CheckState();
+    }
+    { auto handle2 = buf2->Load(); }
+    EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
+    {
+        auto handle1 = buf1->Load();
+        // kFreed, kTemp -> kLoaded, kTemp
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         buf1->CheckState();
     }
 
@@ -406,6 +419,15 @@ TEST_F(BufferObjTest, test_status_clean) {
     buf1->CheckState();
 
     // kClean, kPersistent -> kLoaded, kPersistent
+    { auto handle2 = buf2->Load(); }
+    {
+        auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
+        buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
+        auto handle1 = buf1->Load();
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+        buf1->CheckState();
+    }
+    SaveBufferObj(buf1);
     {
         auto handle1 = buf1->Load();
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);

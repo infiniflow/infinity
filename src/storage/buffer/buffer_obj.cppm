@@ -79,9 +79,6 @@ private:
     // called when BufferHandle destructs, to decrease rc_ by 1.
     void UnloadInner();
 
-    // check the invalid state, only used in tests.
-    void CheckState() const;
-
 public:
     // interface for unit test
     BufferStatus status() {
@@ -90,6 +87,9 @@ public:
     }
     BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
+
+    // check the invalid state, only used in tests.
+    void CheckState() const;
 
 protected:
     std::shared_mutex rw_locker_{};
