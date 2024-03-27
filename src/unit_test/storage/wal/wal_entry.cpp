@@ -79,16 +79,12 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
     segment_info.column_count_ = column_count;
     segment_info.actual_row_count_ = segment_info.row_count_ = row_count;
     segment_info.row_capacity_ = row_count * 2;
-    segment_info.min_row_ts_ = segment_info.max_row_ts_ = segment_info.commit_ts_ = segment_info.deprecate_ts_ = segment_info.begin_ts_ = commit_ts;
-    segment_info.txn_id_ = 0;
     Vector<WalBlockInfo> block_infos_;
     {
         WalBlockInfo block_info;
         block_info.block_id_ = 0;
         block_info.row_count_ = row_count;
         block_info.row_capacity_ = row_count;
-        block_info.min_row_ts_ = block_info.max_row_ts_ = block_info.checkpoint_ts_ = commit_ts;
-        block_info.checkpoint_row_count_ = row_count;
         Vector<i32> next_outline_idxes;
         for (SizeT i = 0; i < column_count; ++i) {
             next_outline_idxes.push_back(1);

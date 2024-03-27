@@ -76,7 +76,7 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
 
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
@@ -94,8 +94,6 @@ public:
     void RollbackCompact();
 
     void FlushNewData(TxnTimeStamp flush_ts);
-
-    void FlushDataToDisk(TxnTimeStamp max_commit_ts);
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 

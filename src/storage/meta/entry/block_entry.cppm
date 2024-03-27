@@ -60,6 +60,7 @@ public:
                                                      u16 row_capacity,
                                                      TxnTimeStamp min_row_ts,
                                                      TxnTimeStamp max_row_ts,
+                                                     TxnTimeStamp commit_ts,
                                                      TxnTimeStamp check_point_ts,
                                                      u16 checkpoint_row_count,
                                                      BufferManager *buffer_mgr);

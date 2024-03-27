@@ -203,7 +203,7 @@ SharedPtr<String> DBEntry::ToString() {
     return res;
 }
 
-nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
     Vector<TableMeta *> table_metas;
@@ -224,7 +224,7 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
         }
     }
     for (TableMeta *table_meta : table_metas) {
-        json_res["tables"].emplace_back(table_meta->Serialize(max_commit_ts, is_full_checkpoint));
+        json_res["tables"].emplace_back(table_meta->Serialize(max_commit_ts));
     }
     return json_res;
 }
