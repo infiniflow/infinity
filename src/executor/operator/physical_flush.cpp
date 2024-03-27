@@ -55,7 +55,7 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     // full checkpoint here
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn(), true /*is_full_checkpoint*/);
     auto *wal_mgr = query_context->storage()->wal_manager();
-    if (!wal_mgr->TrySubmitCheckpointTask(std::move(force_ckp_task))) {
+    if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
         LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));
     }
     force_ckp_task->Wait();
