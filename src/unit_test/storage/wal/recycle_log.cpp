@@ -41,7 +41,7 @@ protected:
 
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override {}
+    void TearDown() override { system("rm -rf /tmp/infinity"); }
 };
 
 TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
@@ -81,7 +81,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
                 }
-                { // loop until the wal directory has more than one wal
+                { // loop until the wal directory has a non-temp wal
                     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
                     if (wal_infos.size() > 0) {
                         break;
@@ -126,6 +126,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
+        infinity::InfinityContext::instance().UnInit();
 
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -173,7 +174,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
                 }
-                { // loop until the wal directory has more than one wal
+                { // loop until the wal directory has a non-temp wal
                     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
                     if (wal_infos.size() > 0) {
                         break;
@@ -232,6 +233,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
+        infinity::InfinityContext::instance().UnInit();
 
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);

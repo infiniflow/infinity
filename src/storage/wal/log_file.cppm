@@ -18,7 +18,6 @@ export module log_file;
 
 import stl;
 
-
 // responsible for parsing and generating filenames for catalog files and wal files
 
 namespace infinity {
@@ -60,7 +59,7 @@ public:
 
 export class WalFile {
 public:
-    static Pair<TempWalFileInfo, Vector<WalFileInfo>> ParseWalFilenames(const String &wal_dir);
+    static Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> ParseWalFilenames(const String &wal_dir);
 
     static String WalFilename(TxnTimeStamp max_commit_ts);
 

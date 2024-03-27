@@ -74,16 +74,16 @@ void WalManager::Start() {
     bool changed = running_.compare_exchange_strong(expected, true);
     if (!changed)
         return;
-    Path wal_dir = Path(wal_path_).parent_path();
     LocalFileSystem fs;
-    if (!fs.Exists(wal_dir)) {
-        fs.CreateDirectory(wal_dir);
+    if (!fs.Exists(wal_dir_)) {
+        fs.CreateDirectory(wal_dir_);
     }
     // TODO: recovery from wal checkpoint
     ofs_ = StdOfStream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
         UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_path_));
     }
+    LOG_INFO(fmt::format("Open wal file: {}", wal_path_));
 
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
@@ -354,10 +354,6 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
  */
 i64 WalManager::ReplayWalFile() {
     LocalFileSystem fs;
-    if (!fs.Exists(wal_path_) || fs.GetFileSizeByPath(wal_path_) == 0) {
-        storage_->InitNewCatalog();
-        return 0;
-    }
 
     Vector<String> wal_list{};
     {
@@ -367,11 +363,18 @@ i64 WalManager::ReplayWalFile() {
                 return a.max_commit_ts_ > b.max_commit_ts_;
             });
         }
-        wal_list.push_back(temp_wal_info.path_);
+        if (temp_wal_info.has_value()) {
+            wal_list.push_back(temp_wal_info->path_);
+        }
         for (const auto &wal_info : wal_infos) {
             wal_list.push_back(wal_info.path_);
         }
         // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
+    }
+    if (wal_list.empty()) {
+        LOG_INFO(fmt::format("No checkpoint found, init a new catalog"));
+        storage_->InitNewCatalog();
+        return 0;
     }
 
     LOG_INFO("Start Wal Replay");
@@ -425,24 +428,18 @@ i64 WalManager::ReplayWalFile() {
             }
         }
     }
-    if (!wal_list.empty() && catalog_dir == "") {
-        UnrecoverableError(fmt::format("Wal Replay: Parse catalog file failed, cannot find the checkpoint entry"));
-    }
 
-    // Note: Init a new catalog when not found any checkpoint wal entry
-    // Indicates that the system has not done checkpoint in the previous.
-    if (catalog_dir == "") { // no checkpoint found
-        LOG_INFO(fmt::format("No checkpoint found, init a new catalog"));
-        storage_->InitNewCatalog();
-    } else {
-        LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
-        auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
-        if (!catalog_fileinfo.has_value()) {
-            UnrecoverableError(fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir));
-        }
-        auto &[full_catalog_fileinfo, delta_catalog_fileinfos] = catalog_fileinfo.value();
-        storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfos);
+    if (catalog_dir == "") {
+        // once wal is not empty, a checkpoint should always be found.
+        UnrecoverableError(fmt::format("No checkpoint found in wal"));
     }
+    LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
+    auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
+    if (!catalog_fileinfo.has_value()) {
+        UnrecoverableError(fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir));
+    }
+    auto &[full_catalog_fileinfo, delta_catalog_fileinfos] = catalog_fileinfo.value();
+    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfos);
 
     // phase 3: replay the entries
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));

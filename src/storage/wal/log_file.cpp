@@ -71,7 +71,7 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp full_ckp_ts, const String &cat
         if (full_info.max_commit_ts_ < full_ckp_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(full_info.path_);
-            LOG_TRACE(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
+            LOG_INFO(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
         } else if (full_info.max_commit_ts_ == full_ckp_ts) {
             found = true;
         }
@@ -84,7 +84,7 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp full_ckp_ts, const String &cat
         if (delta_info.max_commit_ts_ <= full_ckp_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(delta_info.path_);
-            LOG_TRACE(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
+            LOG_INFO(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
         }
     }
 }
@@ -148,8 +148,11 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
     return {full_infos, delta_infos};
 }
 
-Pair<TempWalFileInfo, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
+Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
     LocalFileSystem fs;
+    if (!fs.Exists(wal_dir)) {
+        return {None, Vector<WalFileInfo>{}};
+    }
     const auto &entries = fs.ListDirectory(wal_dir);
     if (entries.empty()) {
         return {TempWalFileInfo{}, Vector<WalFileInfo>{}};
@@ -189,9 +192,10 @@ Pair<TempWalFileInfo, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const Stri
         }
     }
     if (!cur_wal_info.has_value()) {
-        UnrecoverableError(fmt::format("Current wal file not found in the wal directory: {}", wal_dir));
+        // this happens when temp wal file is swapped and new wal is not created yet
+        LOG_INFO(fmt::format("Current wal file not found in the wal directory: {}", wal_dir));
     }
-    return {*cur_wal_info, wal_infos};
+    return {cur_wal_info, wal_infos};
 }
 
 String WalFile::WalFilename(TxnTimeStamp max_commit_ts) { return fmt::format("{}.{}", String(WAL_FILE_PREFIX), max_commit_ts); }
@@ -207,10 +211,10 @@ String WalFile::TempWalFilename() { return String(WAL_FILE_TEMP_FILE); }
 void WalFile::RecycleWalFile(TxnTimeStamp ckp_ts, const String &wal_dir) {
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
-        if (wal_info.max_commit_ts_ < ckp_ts) {
+        if (wal_info.max_commit_ts_ <= ckp_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(wal_info.path_);
-            LOG_TRACE(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
+            LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
         }
     }
 }
