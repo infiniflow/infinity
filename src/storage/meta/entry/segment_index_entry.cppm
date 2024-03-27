@@ -28,6 +28,7 @@ import index_base;
 import column_def;
 import meta_entry_interface;
 import cleanup_scanner;
+import chunk_index_entry;
 import memory_indexer;
 
 namespace infinity {
@@ -106,8 +107,15 @@ public:
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
 
     Tuple<Vector<String>, Vector<RowID>, MemoryIndexer *> GetFullTextIndexSnapshot() {
+        Vector<String> base_names;
+        Vector<RowID> base_rowids;
         std::shared_lock lock(rw_locker_);
-        return {ft_base_names_, ft_base_rowids_, memory_indexer_.get()};
+        for (SizeT i = 0; i < chunk_index_entries_.size(); i++) {
+            auto &chunk_index_entry = chunk_index_entries_[i];
+            base_names.push_back(chunk_index_entry->base_name_);
+            base_rowids.push_back(chunk_index_entry->base_rowid_);
+        }
+        return {base_names, base_rowids, memory_indexer_.get()};
     }
     Pair<u64, u32> GetFulltextColumnLenInfo() {
         std::shared_lock lock(rw_locker_);
@@ -120,9 +128,8 @@ public:
     }
 
 public:
+    void AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
     // only for unittest
-    Vector<String> &GetFulltextBaseNames() { return ft_base_names_; }
-    Vector<RowID> &GetFulltextBaseRowIDs() { return ft_base_rowids_; }
     void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
     static SharedPtr<SegmentIndexEntry> CreateFakeEntry();
 
@@ -144,8 +151,7 @@ private:
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry
     TxnTimeStamp checkpoint_ts_{0};
 
-    Vector<String> ft_base_names_{};
-    Vector<RowID> ft_base_rowids_{};
+    Vector<UniquePtr<ChunkIndexEntry>> chunk_index_entries_{};
     UniquePtr<MemoryIndexer> memory_indexer_{};
 
     u64 ft_column_len_sum_{}; // increase only

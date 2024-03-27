@@ -20,7 +20,6 @@ import stl;
 
 import txn_store;
 import segment_index_entry;
-import segment_index_entry;
 import base_entry;
 import index_base;
 import block_index;

@@ -69,6 +69,9 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
     for (auto [segment_id, segment_index_entry] : index_entry_map_) {
         local_delta_ops->AddOperation(MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry));
     }
+    for (auto chunk_index_entry : chunk_index_entries_) {
+        local_delta_ops->AddOperation(MakeUnique<AddChunkIndexEntryOp>(chunk_index_entry));
+    }
 }
 
 ///-----------------------------------------------------------------------------

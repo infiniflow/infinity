@@ -35,6 +35,7 @@ struct SegmentEntry;
 struct BlockEntry;
 class DataBlock;
 class SegmentIndexEntry;
+class ChunkIndexEntry;
 class BGTaskProcessor;
 class TxnManager;
 enum class CompactSegmentsTaskType;
@@ -67,6 +68,7 @@ public:
     TableIndexEntry *const table_index_entry_{};
 
     HashMap<SegmentID, SegmentIndexEntry *> index_entry_map_{};
+    Vector<ChunkIndexEntry *> chunk_index_entries_{};
 };
 
 export struct TxnCompactStore {

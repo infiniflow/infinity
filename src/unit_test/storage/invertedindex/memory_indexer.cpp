@@ -89,8 +89,7 @@ TEST_F(MemoryIndexerTest, Insert) {
     indexer1.Insert(column, 0, 1, column_length_file_handler_1);
     indexer1.Insert(column, 1, 3, std::move(column_length_file_handler_1));
     indexer1.Dump();
-    fake_segment_index_entry_1->GetFulltextBaseNames().emplace_back("chunk1");
-    fake_segment_index_entry_1->GetFulltextBaseRowIDs().emplace_back(RowID(0U, 0U).ToUint64());
+    fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 4U);
 
     auto fake_segment_index_entry_2 = SegmentIndexEntry::CreateFakeEntry();
     String column_length_file_path_2 = String("/tmp/infinity/fulltext_tbl1_col1/chunk2") + LENGTH_SUFFIX;
@@ -164,8 +163,7 @@ TEST_F(MemoryIndexerTest, test2) {
     indexer1.Insert(column, 2, 2, column_length_file_handler, true);
     indexer1.Insert(column, 4, 1, std::move(column_length_file_handler), true);
     indexer1.Dump(true);
-    fake_segment_index_entry_1->GetFulltextBaseNames().emplace_back("chunk1");
-    fake_segment_index_entry_1->GetFulltextBaseRowIDs().emplace_back(RowID(0U, 0U).ToUint64());
+    fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
 

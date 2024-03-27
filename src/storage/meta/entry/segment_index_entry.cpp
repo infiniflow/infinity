@@ -58,6 +58,7 @@ import column_inverter;
 import block_entry;
 import local_file_system;
 import column_length_io;
+import chunk_index_entry;
 
 namespace infinity {
 
@@ -203,9 +204,7 @@ void SegmentIndexEntry::MemIndexDump(bool spill) {
         return;
     memory_indexer_->Dump(false, spill);
     if (!spill) {
-        std::unique_lock<std::shared_mutex> lck(rw_locker_);
-        ft_base_names_.push_back(memory_indexer_->GetBaseName());
-        ft_base_rowids_.push_back(memory_indexer_->GetBaseRowId());
+        AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
         memory_indexer_.reset();
         auto now = Clock::now().time_since_epoch();
         u64 ts = ChronoCast<NanoSeconds>(now).count();
@@ -265,9 +264,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             column_length_file_handler.reset();
             memory_indexer_->Dump(true);
             {
-                std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                ft_base_names_.push_back(base_name);
-                ft_base_rowids_.push_back(base_row_id);
+                AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
                 memory_indexer_.reset();
             }
             auto duration = Clock::now().time_since_epoch();
@@ -625,6 +622,11 @@ void SegmentIndexEntry::SaveIndexFile() {
         }
     }
 }
+void SegmentIndexEntry::AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
+    std::shared_lock lock(rw_locker_);
+    assert(chunk_index_entries_.empty() || base_rowid == chunk_index_entries_.back()->base_rowid_ + chunk_index_entries_.back()->row_count_);
+    chunk_index_entries_.push_back(MakeUnique<ChunkIndexEntry>(this, base_name, base_rowid, row_count));
+}
 
 nlohmann::json SegmentIndexEntry::Serialize() {
     if (this->deleted_) {
@@ -638,15 +640,9 @@ nlohmann::json SegmentIndexEntry::Serialize() {
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
-        index_entry_json["ft_base_names"] = this->ft_base_names_;
-        Vector<u64> base_row_ids(this->ft_base_rowids_.size());
-        for (SizeT i = 0; i < this->ft_base_rowids_.size(); i++) {
-            base_row_ids[i] = this->ft_base_rowids_[i].ToUint64();
-        }
-        index_entry_json["ft_base_rowids"] = base_row_ids;
-        if (this->memory_indexer_.get() != nullptr) {
-            index_entry_json["ft_mem_base_name"] = this->memory_indexer_->GetBaseName();
-            index_entry_json["ft_mem_base_rowid"] = this->memory_indexer_->GetBaseRowId().ToUint64();
+
+        for (auto &chunk_index_entry : chunk_index_entries_) {
+            index_entry_json["chunk_index_entries"].push_back(chunk_index_entry->Serialize());
         }
         index_entry_json["ft_column_len_sum"] = this->ft_column_len_sum_;
         index_entry_json["ft_column_len_cnt"] = this->ft_column_len_cnt_;
@@ -677,27 +673,13 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_index_entry->max_ts_ = index_entry_json["max_ts"];
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
-    index_entry_json["ft_base_names"].get_to<Vector<String>>(segment_index_entry->ft_base_names_);
-    Vector<u64> base_row_ids;
-    index_entry_json["ft_base_rowids"].get_to<Vector<u64>>(base_row_ids);
-    segment_index_entry->ft_base_rowids_.resize(base_row_ids.size());
-    for (SizeT i = 0; i < base_row_ids.size(); i++) {
-        segment_index_entry->ft_base_rowids_[i] = RowID::FromUint64(base_row_ids[i]);
+    if (index_entry_json.contains("chunk_index_entries")) {
+        for (const auto &chunk_index_entry_json : index_entry_json["chunk_index_entries"]) {
+            UniquePtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::Deserialize(chunk_index_entry_json, segment_index_entry.get());
+            segment_index_entry->chunk_index_entries_.push_back(std::move(chunk_index_entry));
+        }
     }
-    if (index_entry_json.contains("ft_mem_base_name")) {
-        String base_name = index_entry_json["ft_mem_base_name"];
-        RowID base_row_id = RowID::FromUint64(index_entry_json["ft_mem_base_rowid"]);
-        const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-        segment_index_entry->memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry->index_dir(),
-                                                                         base_name,
-                                                                         base_row_id,
-                                                                         index_fulltext->flag_,
-                                                                         index_fulltext->analyzer_,
-                                                                         table_index_entry->GetFulltextByteSlicePool(),
-                                                                         table_index_entry->GetFulltextBufferPool(),
-                                                                         table_index_entry->GetFulltextThreadPool());
-        segment_index_entry->memory_indexer_->Load();
-    }
+
     segment_index_entry->ft_column_len_sum_ = index_entry_json["ft_column_len_sum"];
     segment_index_entry->ft_column_len_cnt_ = index_entry_json["ft_column_len_cnt"];
     return segment_index_entry;

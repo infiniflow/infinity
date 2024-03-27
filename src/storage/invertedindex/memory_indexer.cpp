@@ -133,7 +133,6 @@ void MemoryIndexer::Commit(bool offline) {
             PrepareSpillFile();
         }
         while (inflight_tasks_ != 0) {
-            sleep(1);
             this->ring_sorted_.Iterate([this](SharedPtr<ColumnInverter> &inverter) {
                 inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
                 inflight_tasks_--;
