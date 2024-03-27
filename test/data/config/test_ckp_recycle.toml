@@ -1,0 +1,8 @@
+[general]
+version = "0.1.0"
+timezone = "utc-8"
+
+[wal]
+# make delta and full checkpoint manual to test recyle
+delta_checkpoint_interval_sec = 0
+full_checkpoint_interval_sec = 0

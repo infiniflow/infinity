@@ -373,7 +373,7 @@ export struct WalEntryHeader {
     u32 checksum_{}; // crc32 of the entry, including the header and the
     // payload. User shall populate it before writing to wal.
     i64 txn_id_{};    // txn id of the entry
-    i64 commit_ts_{}; // commit timestamp of the txn
+    TxnTimeStamp commit_ts_{}; // commit timestamp of the txn
 };
 
 export struct WalEntry : WalEntryHeader {
@@ -392,11 +392,7 @@ export struct WalEntry : WalEntryHeader {
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 
-    [[nodiscard]] Pair<i64, String> GetCheckpointInfo() const;
-
-    [[nodiscard]] bool IsCheckPoint() const;
-
-    [[nodiscard]] bool IsFullCheckPoint() const;
+    [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
 
     [[nodiscard]] String ToString() const;
 };

@@ -27,10 +27,11 @@ namespace infinity {
 class Storage;
 class BGTaskProcessor;
 class TableEntry;
+class Txn;
 
 export class WalManager {
 public:
-    WalManager(Storage *storage, String wal_path, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option);
+    WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option);
 
     ~WalManager();
 
@@ -58,10 +59,12 @@ public:
 
     void ReplayWalEntry(const WalEntry &entry);
 
-    void RecycleWalFile(TxnTimeStamp full_ckp_ts);
-
     // Should only called in `Flush` thread
     i64 WalSize() const { return wal_size_; }
+
+private:
+    // Checkpoint Helper
+    void CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size);
 
 private:
     void SetLastCkpWalSize(i64 wal_size);
@@ -90,7 +93,9 @@ public:
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
+    String wal_dir_{};
     String wal_path_{};
+
     Storage *storage_{};
 
     // WalManager state

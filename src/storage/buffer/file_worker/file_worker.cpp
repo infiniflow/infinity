@@ -108,7 +108,8 @@ void FileWorker::CleanupFile() {
 
     String file_path = fmt::format("{}/{}", *file_dir_, *file_name_);
     if (!fs.Exists(file_path)) {
-        // UnrecoverableError(fmt::format("File {} not found.", file_path));
+        // this may happen the same reason as in "CleanupScanner::CleanupDir"
+        LOG_INFO(fmt::format("Cleanup: File {} not found.", file_path));
         return;
     }
     LOG_INFO(fmt::format("Cleanup file: {}", file_path));

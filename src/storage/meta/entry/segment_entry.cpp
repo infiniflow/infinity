@@ -450,8 +450,7 @@ void SegmentEntry::Cleanup() {
     for (auto &block_entry : block_entries_) {
         block_entry->Cleanup();
     }
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*segment_dir_);
+    CleanupScanner::CleanupDir(*segment_dir_);
 }
 
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}

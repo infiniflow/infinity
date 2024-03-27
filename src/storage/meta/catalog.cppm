@@ -42,6 +42,7 @@ import base_entry;
 
 import meta_entry_interface;
 import cleanup_scanner;
+import log_file;
 
 namespace infinity {
 
@@ -231,24 +232,25 @@ public:
     // Serialization and Deserialization
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    UniquePtr<String> SaveFullCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
+    void SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_path);
 
-    bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
+    bool SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_path);
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
 
-    static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog>
+    LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr);
 
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
-    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
+    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info);
 
     void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
 
-    static UniquePtr<Catalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods

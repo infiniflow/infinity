@@ -34,6 +34,7 @@ import segment_entry;
 import column_vector;
 import bitmask;
 import block_version;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -287,8 +288,7 @@ void BlockEntry::Cleanup() {
     }
     block_version_->Cleanup(this->VersionFilePath());
 
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*block_dir_);
+    CleanupScanner::CleanupDir(*block_dir_);
 }
 
 // TODO: introduce BlockColumnMeta
