@@ -189,6 +189,12 @@ void BufferObj::CloseFile() {
 void BufferObj::SetAndTryCleanup() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
+        case BufferStatus::kNew: {
+            // when insert data into table with index, the index buffer_obj
+            // will remain BufferStatus::kNew, so we should allow this situation
+            status_ = BufferStatus::kClean;
+            break;
+        }
         case BufferStatus::kUnloaded: {
             if (!wait_for_gc_) {
                 UnrecoverableError("Assert: unloaded buffer object should in gc_queue.");
