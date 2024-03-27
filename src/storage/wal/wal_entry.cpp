@@ -697,32 +697,27 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     return entry;
 }
 
-Pair<i64, String> WalEntry::GetCheckpointInfo() const {
-    for (const auto &cmd : cmds_) {
-        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
-            auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
-            return {checkpoint_cmd->max_commit_ts_, checkpoint_cmd->catalog_path_};
+bool WalEntry::IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const {
+    auto iter = cmds_.begin();
+    while (iter != cmds_.end()) {
+        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
+            checkpoint_cmd = static_cast<WalCmdCheckpoint *>((*iter).get());
+            break;
         }
+        ++iter;
     }
-    return {-1, ""};
-}
-
-bool WalEntry::IsCheckPoint() const {
-    for (const auto &cmd : cmds_) {
-        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
-            return true;
-        }
+    if (iter == cmds_.end()) {
+        return false;
     }
-    return false;
-}
-
-bool WalEntry::IsFullCheckPoint() const {
-    for (const auto &cmd : cmds_) {
-        if (cmd->GetType() == WalCommandType::CHECKPOINT && dynamic_cast<const WalCmdCheckpoint *>(cmd.get())->is_full_checkpoint_) {
-            return true;
-        }
+    Vector<SharedPtr<WalCmd>> tail_cmds(iter + 1, cmds_.end());
+    if (!tail_cmds.empty()) {
+        auto tail_entry = MakeShared<WalEntry>();
+        tail_entry->txn_id_ = txn_id_;
+        tail_entry->commit_ts_ = commit_ts_;
+        tail_entry->cmds_ = std::move(tail_cmds);
+        replay_entries.push_back(std::move(tail_entry));
     }
-    return false;
+    return true;
 }
 
 String WalEntry::ToString() const {

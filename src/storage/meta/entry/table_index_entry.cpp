@@ -398,8 +398,13 @@ void TableIndexEntry::Cleanup() {
     }
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *index_dir_));
+
+    // FIXME(sys): delete full text index by whole directory tmply, should call CleanupScanner::CleanupDir
     LocalFileSystem fs;
-    fs.DeleteDirectory(*index_dir_); // FIXME(sys): delete full text index by whole directory tmply
+    if (!fs.Exists(*index_dir_)) {
+        return;
+    }
+    fs.DeleteDirectory(*index_dir_);
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
