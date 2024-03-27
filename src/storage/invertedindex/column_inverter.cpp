@@ -18,7 +18,6 @@ module;
 #include <cassert>
 #include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <vector>
 module column_inverter;
 import stl;
