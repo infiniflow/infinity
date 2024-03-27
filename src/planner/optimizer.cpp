@@ -50,8 +50,18 @@ void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std
 void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType statement_type) {
     // Expression folding should be done in logical planner before optimizer
     // Non-select plan, the root node won't be project.
-    if(statement_type != StatementType::kSelect && statement_type != StatementType::kExplain) {
-        return ;
+    switch(statement_type) {
+        case StatementType::kSelect:
+        case StatementType::kExplain:
+        case StatementType::kDelete:
+        case StatementType::kUpdate:
+        {
+            ; // continue;
+            break;
+        }
+        default: {
+            return ;
+        }
     }
 
     // Only work for select

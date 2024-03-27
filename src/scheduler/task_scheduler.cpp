@@ -121,15 +121,25 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
     }
     // DumpPlanFragment(plan_fragment);
     bool use_scheduler = false;
-    if (base_statement->Type() == StatementType::kSelect or base_statement->Type() == StatementType::kExplain) {
-        use_scheduler = true;
-    } else {
-        if (base_statement->Type() == StatementType::kCreate) {
+    switch(base_statement->Type()) {
+        case StatementType::kSelect:
+        case StatementType::kExplain:
+        case StatementType::kDelete:
+        case StatementType::kUpdate:
+        {
+            use_scheduler = true; // continue;
+            break;
+        }
+        case StatementType::kCreate: {
             const CreateStatement *create_statement = static_cast<const CreateStatement *>(base_statement);
             if (create_statement->create_info_->type_ == DDLType::kIndex) {
                 // Create index will generate multiple tasks
                 use_scheduler = true;
             }
+            break;
+        }
+        default: {
+            ;
         }
     }
 
