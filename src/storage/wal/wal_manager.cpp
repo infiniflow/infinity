@@ -394,6 +394,7 @@ i64 WalManager::ReplayWalFile() {
     TxnTimeStamp max_commit_ts = 0;
     Vector<SharedPtr<WalEntry>> replay_entries;
     String catalog_dir = "";
+    TxnTimeStamp system_start_ts = 0;
 
     { // if no checkpoint, max_commit_ts is 0
         WalListIterator iterator(wal_list);
@@ -411,6 +412,7 @@ i64 WalManager::ReplayWalFile() {
             if (wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_dir = Path(checkpoint_cmd->catalog_path_).parent_path().string();
+                system_start_ts = wal_entry->commit_ts_;
                 break;
             }
             replay_entries.push_back(wal_entry);
@@ -450,7 +452,6 @@ i64 WalManager::ReplayWalFile() {
     // phase 3: replay the entries
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));
     std::reverse(replay_entries.begin(), replay_entries.end());
-    TxnTimeStamp system_start_ts = 0;
     TransactionID last_txn_id = 0;
 
     for (SizeT replay_count = 0; replay_count < replay_entries.size(); ++replay_count) {
@@ -469,6 +470,7 @@ i64 WalManager::ReplayWalFile() {
     this->max_commit_ts_ = system_start_ts;
 
     storage_->catalog()->InitDeltaEntry(max_commit_ts_);
+    LOG_INFO(fmt::format("System start ts: {}", system_start_ts));
     return system_start_ts;
 }
 
