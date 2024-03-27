@@ -14,8 +14,6 @@
 
 module;
 
-#include "type/complex/row_id.h"
-
 export module inmem_index_segment_reader;
 
 import stl;
@@ -25,6 +23,7 @@ import index_segment_reader;
 import index_defines;
 import posting_writer;
 import memory_indexer;
+import internal_types;
 
 namespace infinity {
 export class InMemIndexSegmentReader : public IndexSegmentReader {

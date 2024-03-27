@@ -39,7 +39,7 @@ namespace infinity {
 
 /// class BlockEntry
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts)
-    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
+    : BaseEntry(EntryType::kBlock, false), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
       checkpoint_ts_(checkpoint_ts) {}
 
 UniquePtr<BlockEntry>

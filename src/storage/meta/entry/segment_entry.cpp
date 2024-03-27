@@ -52,7 +52,7 @@ SegmentEntry::SegmentEntry(TableEntry *table_entry,
                            SizeT row_capacity,
                            SizeT column_count,
                            SegmentStatus status)
-    : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
+    : BaseEntry(EntryType::kSegment, false), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
       column_count_(column_count), status_(status) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
@@ -206,9 +206,11 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
     if (this->status_ != SegmentStatus::kUnsealed) {
         UnrecoverableError("AppendData to sealed/compacting/no_delete/deprecated segment");
     }
-    if (this->row_capacity_ - this->row_count_ <= 0) {
-        return 0;
+
+    if (this->row_capacity_ <= this->row_count_) {
+        UnrecoverableError(fmt::format("Segment {} error, row_count {}, capacity {}", segment_id_, row_count_, row_capacity_));
     }
+
     //    SizeT start_row = this->row_count_;
     SizeT append_block_count = append_state_ptr->blocks_.size();
     u64 total_copied{0};
@@ -395,7 +397,6 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
                                                                      segment_status);
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
-    segment_entry->deleted_ = segment_entry_json["deleted"];
     segment_entry->row_count_ = segment_entry_json["row_count"];
     segment_entry->actual_row_count_ = segment_entry_json["actual_row_count"];
 
