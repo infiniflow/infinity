@@ -154,7 +154,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StopProfile(QueryPhase::kTaskBuild);
         LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
-        scheduler_->Schedule(plan_fragment.get(), statement->type_);
+        scheduler_->Schedule(plan_fragment.get(), statement);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = logical_plan->operator_type();
         StopProfile(QueryPhase::kExecution);

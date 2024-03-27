@@ -35,6 +35,8 @@ import physical_operator_type;
 import physical_operator;
 import physical_sink;
 import base_statement;
+import create_statement;
+import extra_ddl_info;
 
 namespace infinity {
 
@@ -49,7 +51,7 @@ void TaskScheduler::Init(const Config *config_ptr) {
     u64 cpu_count = Thread::hardware_concurrency();
 
     u64 cpu_select_step = cpu_count / worker_count_;
-    if(cpu_select_step >= 2) {
+    if (cpu_select_step >= 2) {
         cpu_select_step = 2;
     } else {
         cpu_select_step = 1;
@@ -95,9 +97,9 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
     return min_workload_worker_id;
 }
 
-SizeT TaskScheduler::GetStartFragments(PlanFragment *plan_fragment, Vector<PlanFragment *>& leaf_fragments) {
+SizeT TaskScheduler::GetStartFragments(PlanFragment *plan_fragment, Vector<PlanFragment *> &leaf_fragments) {
     SizeT all_fragment_n = 0;
-    std::function<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root)->void {
+    std::function<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) -> void {
         all_fragment_n += root->GetContext()->Tasks().size();
         if (root->Children().empty()) {
             leaf_fragments.emplace_back(root);
@@ -113,11 +115,37 @@ SizeT TaskScheduler::GetStartFragments(PlanFragment *plan_fragment, Vector<PlanF
     return all_fragment_n;
 }
 
-void TaskScheduler::Schedule(PlanFragment *plan_fragment, StatementType statement_type) {
+void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
         UnrecoverableError("Scheduler isn't initialized");
     }
     // DumpPlanFragment(plan_fragment);
+    bool use_scheduler = false;
+    if (base_statement->Type() == StatementType::kSelect or base_statement->Type() == StatementType::kExplain) {
+        use_scheduler = true;
+    } else {
+        if (base_statement->Type() == StatementType::kCreate) {
+            const CreateStatement *create_statement = static_cast<const CreateStatement *>(base_statement);
+            if (create_statement->create_info_->type_ == DDLType::kIndex) {
+                // Create index will generate multiple tasks
+                use_scheduler = true;
+            }
+        }
+    }
+
+    if(!use_scheduler) {
+        if (!plan_fragment->HasChild()) {
+            if (plan_fragment->GetContext()->Tasks().size() == 1) {
+                FragmentTask *task = plan_fragment->GetContext()->Tasks()[0].get();
+                RunTask(task);
+                return ;
+            } else {
+                UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
+            }
+        } else {
+            UnrecoverableError("None select statement has multiple fragments.");
+        }
+    }
 
     Vector<PlanFragment *> start_fragments;
     SizeT task_n = GetStartFragments(plan_fragment, start_fragments);
@@ -133,6 +161,27 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, StatementType statemen
             ScheduleTask(task.get(), worker_id);
         }
     }
+}
+
+void TaskScheduler::RunTask(FragmentTask *task) {
+
+    bool finish = false;
+    bool error = false;
+    task->fragment_context()->notifier()->SetTaskN(1);
+    do {
+        task->TryIntoWorkerLoop();
+        task->OnExecute();
+        if (task->status() != FragmentTaskStatus::kError) {
+            if (task->IsComplete()) {
+                task->CompleteTask();
+                finish = true;
+            }
+        } else {
+            error = true;
+            finish = true;
+        }
+    } while (!finish);
+    task->fragment_context()->notifier()->FinishTask(error, task->fragment_context());
 }
 
 void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {

@@ -48,7 +48,7 @@ public:
     void UnInit();
 
     // Schedule start fragments
-    void Schedule(PlanFragment * plan_fragment_root, StatementType statement_type);
+    void Schedule(PlanFragment * plan_fragment_root, const BaseStatement* base_statement);
 
     // `plan_fragment` can be scheduled because all of its dependencies are met.
     void ScheduleFragment(PlanFragment *plan_fragment);
@@ -61,6 +61,8 @@ private:
     SizeT GetStartFragments(PlanFragment* plan_fragment, Vector<PlanFragment *>& leaf_fragments);
 
     void ScheduleTask(FragmentTask *task, u64 worker_id);
+
+    void RunTask(FragmentTask *task);
 
     void WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id);
 
