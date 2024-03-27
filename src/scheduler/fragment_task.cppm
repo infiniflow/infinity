@@ -57,7 +57,7 @@ public:
 
     void Init();
 
-    void OnExecute(i64 worker_id);
+    void OnExecute();
 
     inline void SetLastWorkID(i64 worker_id) { last_worker_id_ = worker_id; }
 

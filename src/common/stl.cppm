@@ -276,8 +276,6 @@ namespace infinity {
 
     using NoneType = std::nullopt_t;
 
-    using StdOfStream = std::ofstream;
-
     // String
 
     using String = std::basic_string<char>;
