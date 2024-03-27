@@ -62,7 +62,7 @@ import column_length_io;
 namespace infinity {
 
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
-    : BaseEntry(EntryType::kSegmentIndex), table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)){};
+    : BaseEntry(EntryType::kSegmentIndex, false), table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)){};
 
 SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry() {
     SharedPtr<SegmentIndexEntry> fake_entry;

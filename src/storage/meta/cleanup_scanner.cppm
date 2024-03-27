@@ -36,6 +36,8 @@ public:
 
     TxnTimeStamp visible_ts() const { return visible_ts_; }
 
+    static void CleanupDir(const String &dir);
+
 private:
     Catalog *const catalog_;
     const TxnTimeStamp visible_ts_;

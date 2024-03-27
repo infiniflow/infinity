@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "type/logical_type.h"
 #include "unit_test/base_test.h"
 
 import infinity_exception;
@@ -37,6 +36,7 @@ import varchar_cast;
 import internal_types;
 import logical_type;
 import data_type;
+import logical_type;
 
 class VarcharTest : public BaseTest {};
 

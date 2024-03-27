@@ -34,6 +34,7 @@ import catalog_delta_entry;
 import column_def;
 import local_file_system;
 import extra_ddl_info;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -244,7 +245,6 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
 
     u64 commit_ts = db_entry_json["commit_ts"];
     res->commit_ts_.store(commit_ts);
-    res->deleted_ = deleted;
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
@@ -273,8 +273,7 @@ void DBEntry::Cleanup() {
     table_meta_map_.Cleanup();
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *db_entry_dir_));
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*db_entry_dir_);
+    CleanupScanner::CleanupDir(*db_entry_dir_);
 }
 
 void DBEntry::MemIndexCommit() {
