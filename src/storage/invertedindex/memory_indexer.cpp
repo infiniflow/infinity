@@ -132,12 +132,12 @@ void MemoryIndexer::Commit(bool offline) {
         if (nullptr == spill_file_handle_) {
             PrepareSpillFile();
         }
+        SharedPtr<ColumnInverter> inverter;
         while (inflight_tasks_ != 0) {
-            this->ring_sorted_.Iterate([this](SharedPtr<ColumnInverter> &inverter) {
-                inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
-                inflight_tasks_--;
-                num_runs_++;
-            });
+            this->ring_sorted_.Get(inverter);
+            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
+            inflight_tasks_--;
+            num_runs_++;
         }
     } else
         thread_pool_.push([this](int id) { this->CommitSync(); });

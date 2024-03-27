@@ -130,6 +130,7 @@ public:
 public:
     void AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
     // only for unittest
+    MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
     void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
     static SharedPtr<SegmentIndexEntry> CreateFakeEntry();
 
