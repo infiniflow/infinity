@@ -741,7 +741,6 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
         UnrecoverableError(fmt::format("max_commit_ts {} != max_commit_ts_ {}", max_commit_ts, max_commit_ts_));
     }
 
-    TxnTimeStamp max_ts = 0;
     {
         std::unique_lock w_lock(mtx_);
 
@@ -754,7 +753,6 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
 
         flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids_.begin(), txn_ids_.end()));
 
-        std::swap(max_ts, max_commit_ts_);
         txn_ids_.clear();
         delta_ops_.clear();
     }

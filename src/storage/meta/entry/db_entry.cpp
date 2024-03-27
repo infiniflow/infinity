@@ -34,6 +34,7 @@ import catalog_delta_entry;
 import column_def;
 import local_file_system;
 import extra_ddl_info;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -272,8 +273,7 @@ void DBEntry::Cleanup() {
     table_meta_map_.Cleanup();
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *db_entry_dir_));
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*db_entry_dir_);
+    CleanupScanner::CleanupDir(*db_entry_dir_);
 }
 
 void DBEntry::MemIndexCommit() {
