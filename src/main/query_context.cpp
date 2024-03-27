@@ -107,8 +107,8 @@ QueryResult QueryContext::Query(const String &query) {
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     QueryResult query_result;
 //    ProfilerStart("Query");
-    BaseProfiler profiler;
-    profiler.Begin();
+//    BaseProfiler profiler;
+//    profiler.Begin();
     try {
         this->CreateTxn();
         this->BeginTxn();
@@ -152,13 +152,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kTaskBuild);
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
         StopProfile(QueryPhase::kTaskBuild);
-        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
+//        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
         scheduler_->Schedule(plan_fragment.get(), statement);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = logical_plan->operator_type();
         StopProfile(QueryPhase::kExecution);
-        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
+//        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
