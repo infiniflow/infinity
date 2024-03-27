@@ -35,6 +35,27 @@ export enum class BGTaskType {
     kInvalid
 };
 
+export String BGTaskTypeToString(BGTaskType type) {
+    switch (type) {
+        case BGTaskType::kStopProcessor:
+            return "StopProcessor";
+        case BGTaskType::kForceCheckpoint:
+            return "ForceCheckpoint";
+        case BGTaskType::kAddDeltaEntry:
+            return "AddDeltaEntry";
+        case BGTaskType::kCheckpoint:
+            return "Checkpoint";
+        case BGTaskType::kCompactSegments:
+            return "CompactSegments";
+        case BGTaskType::kCleanup:
+            return "Cleanup";
+        case BGTaskType::kUpdateSegmentBloomFilterData:
+            return "UpdateSegmentBloomFilterData";
+        default:
+            return "Invalid";
+    }
+}
+
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
 

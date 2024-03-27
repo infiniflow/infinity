@@ -54,6 +54,7 @@ void BGTaskProcessor::Process() {
     while (running) {
         SharedPtr<BGTask> bg_task = task_queue_.DequeueReturn();
 
+        LOG_INFO(fmt::format("Processing background task: {}.", BGTaskTypeToString(bg_task->type_)));
         switch (bg_task->type_) {
             case BGTaskType::kStopProcessor: {
                 running = false;
@@ -102,6 +103,7 @@ void BGTaskProcessor::Process() {
         }
 
         bg_task->Complete();
+        LOG_INFO(fmt::format("Processing background task DONE: {}.", BGTaskTypeToString(bg_task->type_)));
     }
 }
 
