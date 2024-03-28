@@ -30,8 +30,6 @@ import logical_node;
 import explain_statement;
 import logical_node_type;
 import base_statement;
-#include "base_statement.h"
-
 module optimizer;
 
 namespace infinity {
