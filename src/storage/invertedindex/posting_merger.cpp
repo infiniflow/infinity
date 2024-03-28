@@ -145,8 +145,8 @@ private:
 
 class SortedPosting {
 public:
-    SortedPosting(const PostingFormatOption &format_option, RowID base_row_id, PostingDecoder *posting_decoder)
-        : format_option_(format_option), base_row_id_(base_row_id), doc_merger_(format_option, posting_decoder) {}
+    SortedPosting(const PostingFormatOption &format_option, docid_t base_doc_id, PostingDecoder *posting_decoder)
+        : format_option_(format_option), base_doc_id_(base_doc_id), doc_merger_(format_option, posting_decoder) {}
     ~SortedPosting() {}
 
     bool Next() {
@@ -163,23 +163,15 @@ public:
             return;
         }
         SharedPtr<PostingWriter> posting_writer = pos_dumper->GetPostingWriter();
-        doc_merger_.Merge(static_cast<docid_t>(GetCurrentRowID().ToUint64()), posting_writer.get());
+        doc_merger_.Merge(base_doc_id_ + current_doc_id_, posting_writer.get());
     }
-
-    RowID GetCurrentRowID() const { return base_row_id_ + current_doc_id_; }
 
 private:
     PostingFormatOption format_option_;
-    RowID base_row_id_;
+    docid_t base_doc_id_{0};
     docid_t current_doc_id_{INVALID_DOCID};
     DocMerger doc_merger_;
 };
-
-struct SortedPostingComparator {
-    bool operator()(const SortedPosting *lhs, const SortedPosting *rhs) { return lhs->GetCurrentRowID() > rhs->GetCurrentRowID(); }
-};
-
-using PriorityQueue = Heap<SortedPosting *, SortedPostingComparator>;
 
 PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool) : memory_pool_(memory_pool), buffer_pool_(buffer_pool) {
     posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_);
@@ -188,23 +180,19 @@ PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool) 
 PostingMerger::~PostingMerger() {}
 
 void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_postings) {
-    PriorityQueue queue;
+    // segment_term_postings is already sorted by base_row_id
+    RowID merge_base_rowid = segment_term_postings[0]->GetBaesRowId();
     for (u32 i = 0; i < segment_term_postings.size(); ++i) {
         SegmentTermPosting *term_posting = segment_term_postings[i];
         RowID base_row_id = term_posting->GetBaesRowId();
+        u32 base_doc_id = base_row_id - merge_base_rowid;
         PostingDecoder *decoder = term_posting->GetPostingDecoder();
-        SortedPosting *sorted_posting = new SortedPosting(format_option_, base_row_id, decoder);
-        queue.push(sorted_posting);
+        SortedPosting sorted_posting(format_option_, base_doc_id, decoder);
+        while (sorted_posting.Next()) {
+            sorted_posting.Merge(posting_dumper_);
+        }
     }
 
-    while (!queue.empty()) {
-        SortedPosting *sorted_posting = queue.top();
-        queue.pop();
-        while (sorted_posting->Next()) {
-            sorted_posting->Merge(posting_dumper_);
-        }
-        delete sorted_posting;
-    }
     posting_dumper_->EndSegment();
 }
 
