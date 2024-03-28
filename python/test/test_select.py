@@ -34,7 +34,7 @@ class TestSelect:
         target: test table select apis
         method:
         1. create tables
-            - 'table_1'
+            - 'test_select'
                 - c1 int primary key
                 - c2 int not null
         2. insert
@@ -52,41 +52,41 @@ class TestSelect:
             - (8, 8)
             - (9, 9)
         3. select
-            - select * from table_1
+            - select * from test_select
                 - Consistent with 2. Insert
-            - select c1, c2 from table_1
+            - select c1, c2 from test_select
                 - Consistent with 2. Insert
-            - select c1 + c2 from table_1 where (c1 = 3)
+            - select c1 + c2 from test_select where (c1 = 3)
                 - 6
-            - select c1 from table_1 where c1 > 2 and c2 < 4
+            - select c1 from test_select where c1 > 2 and c2 < 4
                 - 3
-            - select c2 from table_1 where (-7 < c1 or 9 <= c1) and (c1 = 3)
+            - select c2 from test_select where (-7 < c1 or 9 <= c1) and (c1 = 3)
                 - 3
-            - select c2 from table_1 where (-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)
+            - select c2 from test_select where (-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)
                 - -7
                 - 1
-            - select c2 from table_1 where ((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))
+            - select c2 from test_select where ((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))
                 - -7
                 - 1
-            - select c2 from table_1 where (-7 < c1 or 9 <= c1) and (c2 = 3)
+            - select c2 from test_select where (-7 < c1 or 9 <= c1) and (c2 = 3)
                 - 3
-            - select c2 from table_1 where (-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)
+            - select c2 from test_select where (-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)
                 - -7
                 - 1
-            - select c2 from table_1 where ((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))
+            - select c2 from test_select where ((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))
                 - -7
                 - 1
         4. drop tables
-            - 'table_1'
+            - 'test_select'
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         # infinity
-        db_obj.drop_table("test_infinity_select", True)
+        db_obj.drop_table("test_select", True)
         table_obj = db_obj.create_table(
-            "test_infinity_select", {"c1": "int, primary key, not null", "c2": "int, not null"}, ConflictType.Error)
+            "test_select", {"c1": "int, primary key, not null", "c2": "int, not null"}, ConflictType.Error)
 
         assert table_obj is not None
 
@@ -151,14 +151,88 @@ class TestSelect:
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
         #                               .astype({'c2': dtype('int32')}))
 
-        res = db_obj.drop_table("table_1")
+        res = db_obj.drop_table("test_select")
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_aggregate(self):
+        """
+        target: test table select apis
+        methods:
+        1. create tables
+            - 'test_select_aggregate'
+                - c1 int primary key
+                - c2 float not null
+        2. insert
+            - (-30, -1.43)
+            - (-2, 2.5)
+            - (42, -5.1)
+            - (0, 0)
+            - (1, 1)
+            - (2, 2)
+            - (3, 3)
+            - (-8, -8)
+            - (-13, -7.5)
+            - (-6.3, 1.1)
+            - (17, 0.47)
+            - (85, 62)
+            - (90, -19)
+        3. select
+            - select count(*) from test_select_aggregate
+                - 13
+            - select max(c1) from test_select_aggregate
+                - 90
+            - select min(c2) from test_select_aggregate
+                - -19
+            - select min(c1) + max(c2) from test_select_aggregate
+                - 32'
+            - select sum(c1) from test_select_aggregate
+                - -203.3
+            - select avg(c2) from test_select_aggregate
+                - 2.387692308
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+
+        # infinity
+        db_obj.drop_table("test_select_aggregate", True)
+        table_obj = db_obj.create_table(
+            "test_select_aggregate", {"c1": "int, primary key, not null", "c2": "float, not null"}, ConflictType.Error)
+
+        assert table_obj is not None
+
+        res = table_obj.insert(
+            [{"c1": -30, "c2": -1.43}, {"c1": -2, "c2": -2.5}, {"c1": 42, "c2": -5.1}, {"c1": 0, "c2": 0},
+             {"c1": 1, "c2": 1},
+             {"c1": 2, "c2": 2}, {"c1": 3, "c2": 3}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert(
+            [{"c1": -8, "c2": -8}, {"c1": -13, "c2": -7.5}, {"c1": -6.3, "c2": 1.1}, {"c1": 17, "c2": 0.47},
+             {"c1": 85, "c2": 62},
+             {"c1": 90, "c2": -19}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["count(*)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == 13
+        res = table_obj.output(["max(c1)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == 90
+        res = table_obj.output(["min(c2)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == -19
+        res = table_obj.output(["min(c1) + max(c2)"]).to_pl()
+        print(res)
+        res = table_obj.output(["sum(c1)"]).to_pl()
+        print(res)
+        res = table_obj.output(["avg(c2)"]).to_pl()
+        print(res)
+
+        res = db_obj.drop_table("test_select_aggregate")
+        assert res.error_code == ErrorCode.OK
 
     def test_select_varchar(self):
         """
         target: test table select apis
         method:
         1. create tables
-            - 'table_1'
+            - 'test_select_varchar'
                 - c1 varchar primary key
                 - c2 varchar not null
         2. insert
@@ -176,29 +250,29 @@ class TestSelect:
             - ('l', 'l')
             - ('m', 'm')
         3. select
-            - select * from table_1
+            - select * from test_select_varchar
                 - Consistent with 2. Insert
-            - select c1, c2 from table_1
+            - select c1, c2 from test_select_varchar
                 - Consistent with 2. Insert
-            - select c1 + c2 from table_1 where (c1 = 'a')
+            - select c1 + c2 from test_select_varchar where (c1 = 'a')
                 - 'aa'
-            - select c1 from table_1 where c1 > 'a' and c2 < 'c'
+            - select c1 from test_select_varchar where c1 > 'a' and c2 < 'c'
                 - 'b'
-            - select c2 from table_1 where ('a' < c1 or 'm' <= c1) and (c1 = 'a')
+            - select c2 from test_select_varchar where ('a' < c1 or 'm' <= c1) and (c1 = 'a')
                 - 'a'
-            - select c2 from table_1 where ('a' < c1 and c1 <= 'b') or (c1 >= 'c' and 'd' > c1)
+            - select c2 from test_select_varchar where ('a' < c1 and c1 <= 'b') or (c1 >= 'c' and 'd' > c1)
                 - 'b'
                 - 'c'
-            - select c2 from table_1 where ((c1 >= 'a' and 'd' >= c1) or (c1 >= 'e' and 'j' > c1)) and ((c1 > 'e' and c1 <= 'f') or (c1 > 'a' and c1 < 'c'))
+            - select c2 from test_select_varchar where ((c1 >= 'a' and 'd' >= c1) or (c1 >= 'e' and 'j' > c1)) and ((c1 > 'e' and c1 <= 'f') or (c1 > 'a' and c1 < 'c'))
                 - 'b'
                 - 'c'
-            - select c2 from table_1 where ('a' < c1 or 'm' <= c1) and (c2 = 'a')
+            - select c2 from test_select_varchar where ('a' < c1 or 'm' <= c1) and (c2 = 'a')
                 - 'a'
-            - select c2 from table_1 where ('a' < c1 and c2 <= 'b') or (c1 >= 'c' and 'd' > c2)`
+            - select c2 from test_select_varchar where ('a' < c1 and c2 <= 'b') or (c1 >= 'c' and 'd' > c2)`
                 - 'b'
                 - 'c'
         4. drop tables
-               - 'table_1'
+               - 'test_select_varchar'
         expect: all operations successfully
 
         """
@@ -231,6 +305,7 @@ class TestSelect:
         # res = table_obj.output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
         res = db_obj.drop_table("test_select_varchar")
+        assert res.error_code == ErrorCode.OK
 
     def test_select_big(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -249,9 +324,7 @@ class TestSelect:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_select_embedding_int32(self, check_data):
         """
-
         TestSelect.test_select_embedding()
-
         This method tests the functionality of selecting embeddings from a table in the database.
 
         Parameters:
@@ -299,7 +372,6 @@ class TestSelect:
     def test_select_embedding_float(self, check_data):
         """
         Method: test_select_embedding_float
-
         This method performs a series of tests on the `test_select_embedding_float` table in the Infinity database.
 
         Parameters:
@@ -351,7 +423,6 @@ class TestSelect:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_select_big_embedding(self, check_data):
         """
-
         Method: test_select_big_embedding
 
         Description:
@@ -389,7 +460,6 @@ class TestSelect:
             assert res.error_code == ErrorCode.OK
 
     def test_select_same_output(self):
-
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_select_same_output", True)
