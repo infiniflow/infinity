@@ -33,7 +33,7 @@ private:
     optionflag_t flag_;
     MemoryPool *memory_pool_{nullptr};
     RecyclePool *buffer_pool_{nullptr};
-    SharedPtr<FileWriter> posting_file_;
+    SharedPtr<FileWriter> posting_file_writer_;
     LocalFileSystem fs_;
 };
 } // namespace infinity
