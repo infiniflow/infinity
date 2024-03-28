@@ -42,8 +42,11 @@ public:
 
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 
-    static UniquePtr<BlockColumnEntry>
-    NewReplayBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager, i32 next_outline_idx);
+    static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry,
+                                                                 ColumnID column_id,
+                                                                 BufferManager *buffer_manager,
+                                                                 i32 next_outline_idx,
+                                                                 TxnTimeStamp commit_ts);
 
     nlohmann::json Serialize();
 

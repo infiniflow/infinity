@@ -36,7 +36,7 @@ using namespace infinity;
 class RecycleLogTest : public BaseTest {
 protected:
     static std::shared_ptr<std::string> test_ckp_recycle_config() {
-        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_ckp_recycle.toml");
+        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     }
 
     void SetUp() override { system("rm -rf /tmp/infinity"); }
