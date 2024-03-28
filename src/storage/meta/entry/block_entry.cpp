@@ -260,8 +260,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts, bool check_commit) {
                 return;
         }
         checkpoint_version.created_ = this->block_version_->created_;
-        checkpoint_version.deleted_.reserve(checkpoint_row_count);
-        std::memcpy(checkpoint_version.deleted_.data(), deleted.data(), checkpoint_row_count * sizeof(TxnTimeStamp));
+        checkpoint_version.deleted_ = deleted;
     }
     for (int i = 0; i < checkpoint_row_count; i++) {
         if (checkpoint_version.deleted_[i] > checkpoint_ts) {
