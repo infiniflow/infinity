@@ -126,6 +126,8 @@ public:
 
     Status BuildShowBlocks(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowBlock(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
