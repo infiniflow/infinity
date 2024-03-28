@@ -48,6 +48,7 @@ import local_file_system;
 import build_fast_rough_filter_task;
 import block_entry;
 import segment_index_entry;
+import chunk_index_entry;
 import cleanup_scanner;
 
 namespace infinity {
@@ -251,11 +252,20 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         this->row_count_ += row_count;
     }
     // Populate index entirely for the segment
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, txn->BeginTS());
         if (status.ok()) {
-            table_index_entry->PopulateEntirely(segment_entry.get(), txn);
+            SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn);
+            if (segment_index_entry.get() != nullptr) {
+                Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
+                txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+                for (auto &chunk_index_entry : segment_index_entry->GetChunkIndexEntries()) {
+                    txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                }
+                table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+            }
         }
     }
 }
@@ -516,7 +526,14 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
 
 void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges) {
     SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(seg_id, MAX_TIMESTAMP);
-    SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->GetOrCreateSegment(seg_id, txn);
+    SharedPtr<SegmentIndexEntry> segment_index_entry;
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+    bool created = table_index_entry->GetOrCreateSegment(seg_id, txn, segment_index_entry);
+    if (created) {
+        Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
+        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+        table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+    }
     Vector<SharedPtr<BlockEntry>> block_entries;
     SizeT num_ranges = append_ranges.size();
     SizeT dump_idx = SizeT(-1);
@@ -532,17 +549,27 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
         segment_index_entry->MemIndexInsert(txn, block_entry, range.start_offset_, range.row_count_);
-        if (i == dump_idx)
-            segment_index_entry->MemIndexDump();
+        if (i == dump_idx) {
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
+            if (chunk_index_entry.get() != nullptr) {
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+            }
+        }
     }
 }
 
 void TableEntry::MemIndexDump(Txn *txn, bool spill) {
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
         if (status.ok()) {
-            table_index_entry->MemIndexDump(spill);
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(spill);
+            if (chunk_index_entry.get() != nullptr) {
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+            }
         }
     }
 }

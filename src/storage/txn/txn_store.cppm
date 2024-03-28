@@ -94,6 +94,8 @@ public:
 
     void AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries);
 
+    void AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry);
+
     TxnIndexStore *GetIndexStore(TableIndexEntry *table_index_entry);
 
     void DropIndexStore(TableIndexEntry *table_index_entry);

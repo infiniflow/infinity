@@ -109,21 +109,24 @@ String TableIndexEntry::GetPathNameTail() const {
     return index_dir_->substr(delimiter_i + 1);
 }
 
-SharedPtr<SegmentIndexEntry> TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn) {
-    SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
+bool TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry) {
+    bool created = false;
     std::unique_lock w_lock(rw_locker_);
     auto iter = index_by_segment_.find(segment_id);
     if (iter == index_by_segment_.end()) {
         auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, DEFAULT_SEGMENT_CAPACITY, column_def_);
         segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         index_by_segment_.emplace(segment_id, segment_index_entry);
+        if (last_segment_.get() == nullptr) {
+            last_segment_ = segment_index_entry;
+        } else {
+            assert(last_segment_->segment_id() < segment_id);
+        }
+        created = true;
     } else {
         segment_index_entry = iter->second;
     }
-    if (last_segment_.get() == nullptr || last_segment_->segment_id() < segment_id) {
-        last_segment_ = segment_index_entry;
-    }
-    return segment_index_entry;
+    return created;
 }
 
 // For segment_index_entry
@@ -217,22 +220,22 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
-void TableIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
+SharedPtr<SegmentIndexEntry> TableIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
     u32 segment_id = block_entry->segment_id();
-    if (last_segment_.get() != nullptr && last_segment_->segment_id() != segment_id) {
-        last_segment_->MemIndexDump();
-    }
     auto iter = index_by_segment_.find(segment_id);
     SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
+    SharedPtr<SegmentIndexEntry> new_entry = nullptr;
     if (iter == index_by_segment_.end()) {
         auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, block_entry->GetSegmentEntry()->row_capacity(), column_def_);
         segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         index_by_segment_.emplace(segment_id, segment_index_entry);
+        new_entry = segment_index_entry;
     } else {
         segment_index_entry = iter->second;
     }
     segment_index_entry->MemIndexInsert(txn, block_entry, row_offset, row_count);
     last_segment_ = segment_index_entry;
+    return new_entry;
 }
 
 void TableIndexEntry::MemIndexCommit() {
@@ -241,21 +244,24 @@ void TableIndexEntry::MemIndexCommit() {
     }
 }
 
-void TableIndexEntry::MemIndexDump(bool spill) {
+SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(bool spill) {
+    SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     if (last_segment_.get() != nullptr) {
-        last_segment_->MemIndexDump();
+        chunk_index_entry = last_segment_->MemIndexDump();
     }
+    return chunk_index_entry;
 }
 
-void TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn) {
+SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn) {
     if (index_base_->index_type_ != IndexType::kFullText) {
-        return;
+        return nullptr;
     }
     auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_capacity(), column_def_);
     u32 segment_id = segment_entry->segment_id();
     SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
     segment_index_entry->PopulateEntirely(segment_entry, txn);
     index_by_segment_.emplace(segment_id, segment_index_entry);
+    return segment_index_entry;
 }
 
 Tuple<Vector<SegmentIndexEntry *>, Status>

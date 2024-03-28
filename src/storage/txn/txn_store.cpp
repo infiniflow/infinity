@@ -157,6 +157,11 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
     }
 }
 
+void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry) {
+    auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    txn_index_store->chunk_index_entries_.push_back(chunk_index_entry);
+}
+
 void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
     if (txn_indexes_.contains(table_index_entry)) {
         table_index_entry->Cleanup();

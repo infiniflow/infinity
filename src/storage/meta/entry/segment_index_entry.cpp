@@ -159,9 +159,7 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
                                                             table_index_entry_->GetFulltextByteSlicePool(),
                                                             table_index_entry_->GetFulltextBufferPool(),
                                                             table_index_entry_->GetFulltextThreadPool());
-                auto now = Clock::now().time_since_epoch();
-                u64 ts = ChronoCast<NanoSeconds>(now).count();
-                table_index_entry_->UpdateFulltextSegmentTs(ts);
+                table_index_entry_->UpdateFulltextSegmentTs(txn->CommitTS());
             }
             Path column_length_file_base = Path(*table_index_entry_->index_dir()) / (memory_indexer_->GetBaseName());
             String column_length_file_path_prefix = column_length_file_base.string();
@@ -198,18 +196,17 @@ void SegmentIndexEntry::MemIndexCommit() {
     memory_indexer_->Commit();
 }
 
-void SegmentIndexEntry::MemIndexDump(bool spill) {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
+    SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
     if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
-        return;
+        return nullptr;
     memory_indexer_->Dump(false, spill);
     if (!spill) {
-        AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
+        chunk_index_entry = AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
         memory_indexer_.reset();
-        auto now = Clock::now().time_since_epoch();
-        u64 ts = ChronoCast<NanoSeconds>(now).count();
-        table_index_entry_->UpdateFulltextSegmentTs(ts);
     }
+    return chunk_index_entry;
 }
 
 void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
@@ -267,9 +264,6 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                 AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
                 memory_indexer_.reset();
             }
-            auto duration = Clock::now().time_since_epoch();
-            u64 ts = ChronoCast<NanoSeconds>(duration).count();
-            table_index_entry_->UpdateFulltextSegmentTs(ts);
             break;
         }
         case IndexType::kIVFFlat:
@@ -622,10 +616,12 @@ void SegmentIndexEntry::SaveIndexFile() {
         }
     }
 }
-void SegmentIndexEntry::AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
     assert(chunk_index_entries_.empty() || base_rowid == chunk_index_entries_.back()->base_rowid_ + chunk_index_entries_.back()->row_count_);
-    chunk_index_entries_.push_back(MakeUnique<ChunkIndexEntry>(this, base_name, base_rowid, row_count));
+    SharedPtr<ChunkIndexEntry> chunk_index_entry = MakeShared<ChunkIndexEntry>(this, base_name, base_rowid, row_count);
+    chunk_index_entries_.push_back(chunk_index_entry);
+    return chunk_index_entry;
 }
 
 nlohmann::json SegmentIndexEntry::Serialize() {

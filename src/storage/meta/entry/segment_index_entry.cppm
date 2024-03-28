@@ -92,7 +92,7 @@ public:
     void MemIndexCommit();
 
     // Dump or spill the memory indexer
-    void MemIndexDump(bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
 
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);
@@ -105,6 +105,8 @@ public:
     Status CreateIndexDo(atomic_u64 &create_index_idx);
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
+
+    Vector<SharedPtr<ChunkIndexEntry>> &GetChunkIndexEntries() { return chunk_index_entries_; }
 
     Tuple<Vector<String>, Vector<RowID>, MemoryIndexer *> GetFullTextIndexSnapshot() {
         Vector<String> base_names;
@@ -128,7 +130,7 @@ public:
     }
 
 public:
-    void AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
+    SharedPtr<ChunkIndexEntry> AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
     void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
@@ -152,7 +154,7 @@ private:
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry
     TxnTimeStamp checkpoint_ts_{0};
 
-    Vector<UniquePtr<ChunkIndexEntry>> chunk_index_entries_{};
+    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
     UniquePtr<MemoryIndexer> memory_indexer_{};
 
     u64 ft_column_len_sum_{}; // increase only

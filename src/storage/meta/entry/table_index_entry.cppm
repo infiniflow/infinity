@@ -20,6 +20,7 @@ import stl;
 
 import txn_store;
 import segment_index_entry;
+import chunk_index_entry;
 import base_entry;
 import index_base;
 import block_index;
@@ -92,10 +93,10 @@ public:
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot();
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     String GetPathNameTail() const;
-    SharedPtr<SegmentIndexEntry> GetOrCreateSegment(SegmentID segment_id, Txn *txn);
+    bool GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry);
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
+    SharedPtr<SegmentIndexEntry> MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
 
     // MemIndexCommit is non-blocking.
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
@@ -103,11 +104,11 @@ public:
 
     // MemIndexCommit is blocking.
     // Dump or spill the memory indexer
-    void MemIndexDump(bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
 
     // PopulateEntirely is blocking.
     // Populate index entirely for the segment
-    void PopulateEntirely(SegmentEntry *segment_entry, Txn *txn);
+    SharedPtr<SegmentIndexEntry> PopulateEntirely(SegmentEntry *segment_entry, Txn *txn);
 
     // MergeDiskIndexEntirely is blocking.
     // Merge all disk index chunks into one for each SegmentIndexEntry
@@ -127,9 +128,9 @@ public:
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
     ThreadPool &GetFulltextThreadPool() { return thread_pool_; }
-    u64 GetFulltexSegmentUpdateTs() { return segment_update_ts_; }
+    TxnTimeStamp GetFulltexSegmentUpdateTs() { return segment_update_ts_; }
 
-    void UpdateFulltextSegmentTs(u64 ts) { segment_update_ts_ = ts; }
+    void UpdateFulltextSegmentTs(TxnTimeStamp ts) { segment_update_ts_ = ts; }
 
     void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
 
@@ -145,7 +146,7 @@ private:
     MemoryPool byte_slice_pool_{};
     RecyclePool buffer_pool_{};
     ThreadPool thread_pool_{};
-    u64 segment_update_ts_{0};
+    TxnTimeStamp segment_update_ts_{0};
 
     std::shared_mutex rw_locker_{};
     TableIndexMeta *const table_index_meta_{};
