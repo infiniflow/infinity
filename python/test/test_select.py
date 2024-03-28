@@ -29,130 +29,130 @@ class TestSelect:
     def test_version(self):
         print(infinity.__version__)
 
-    # def test_select(self):
-    #     """
-    #     target: test table select apis
-    #     method:
-    #     1. create tables
-    #         - 'table_1'
-    #             - c1 int primary key
-    #             - c2 int not null
-    #     2. insert
-    #         - (-3, -3)
-    #         - (-2, -2)
-    #         - (-1, -1)
-    #         - (0, 0)
-    #         - (1, 1)
-    #         - (2, 2)
-    #         - (3, 3)
-    #         - (-8, -8)
-    #         - (-7, -7)
-    #         - (-6, -6)
-    #         - (7, 7)
-    #         - (8, 8)
-    #         - (9, 9)
-    #     3. select
-    #         - select * from table_1
-    #             - Consistent with 2. Insert
-    #         - select c1, c2 from table_1
-    #             - Consistent with 2. Insert
-    #         - select c1 + c2 from table_1 where (c1 = 3)
-    #             - 6
-    #         - select c1 from table_1 where c1 > 2 and c2 < 4
-    #             - 3
-    #         - select c2 from table_1 where (-7 < c1 or 9 <= c1) and (c1 = 3)
-    #             - 3
-    #         - select c2 from table_1 where (-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)
-    #             - -7
-    #             - 1
-    #         - select c2 from table_1 where ((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))
-    #             - -7
-    #             - 1
-    #         - select c2 from table_1 where (-7 < c1 or 9 <= c1) and (c2 = 3)
-    #             - 3
-    #         - select c2 from table_1 where (-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)
-    #             - -7
-    #             - 1
-    #         - select c2 from table_1 where ((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))
-    #             - -7
-    #             - 1
-    #     4. drop tables
-    #         - 'table_1'
-    #     expect: all operations successfully
-    #     """
-    #     infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-    #     db_obj = infinity_obj.get_database("default")
-    #
-    #     # infinity
-    #     db_obj.drop_table("test_infinity_select", True)
-    #     table_obj = db_obj.create_table(
-    #         "test_infinity_select", {"c1": "int, primary key, not null", "c2": "int, not null"}, ConflictType.Error)
-    #
-    #     assert table_obj is not None
-    #
-    #     res = table_obj.insert(
-    #         [{"c1": -3, "c2": -3}, {"c1": -2, "c2": -2}, {"c1": -1, "c2": -1}, {"c1": 0, "c2": 0}, {"c1": 1, "c2": 1},
-    #          {"c1": 2, "c2": 2}, {"c1": 3, "c2": 3}])
-    #     assert res.error_code == ErrorCode.OK
-    #
-    #     res = table_obj.insert(
-    #         [{"c1": -8, "c2": -8}, {"c1": -7, "c2": -7}, {"c1": -6, "c2": -6}, {"c1": 7, "c2": 7}, {"c1": 8, "c2": 8},
-    #          {"c1": 9, "c2": 9}])
-    #     assert res.error_code == ErrorCode.OK
-    #
-    #     res = table_obj.output(["*"]).to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
-    #                                                      'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
-    #                                   .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
-    #
-    #     res = table_obj.output(["c1", "c2"]).to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
-    #                                                      'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
-    #                                   .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
-    #
-    #     res = table_obj.output(
-    #         ["c1 + c2"]).filter("c1 = 3").to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + c2)': (6,)})
-    #                                   .astype({'(c1 + c2)': dtype('int32')}))
-    #
-    #     res = table_obj.output(
-    #         ["c1"]).filter("c1 > 2 and c2 < 4").to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)})
-    #                                   .astype({'c1': dtype('int32')}))
-    #
-    #     res = table_obj.output(["c2"]).filter(
-    #         "(-7 < c1 or 9 <= c1) and (c1 = 3)").to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
-    #                                   .astype({'c2': dtype('int32')}))
-    #
-    #     res = table_obj.output(["c2"]).filter(
-    #         "(-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)").to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-    #                                   .astype({'c2': dtype('int32')}))
-    #
-    #     res = table_obj.output(["c2"]).filter(
-    #         "((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))").to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-    #                                   .astype({'c2': dtype('int32')}))
-    #
-    #     res = table_obj.output(["c2"]).filter(
-    #         "(-7 < c1 or 9 <= c1) and (c2 = 3)").to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
-    #                                   .astype({'c2': dtype('int32')}))
-    #
-    #     res = table_obj.output(["c2"]).filter(
-    #         "(-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)").to_df()
-    #     pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-    #                                   .astype({'c2': dtype('int32')}))
-    #
-    #     # Need fix rbo caused it Planner Error: Indices must be in order @src/planner/bound/base_table_ref.cppm:45
-    #     # res = table_obj.output(["c2"]).filter(
-    #     #     "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
-    #     # pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-    #     #                               .astype({'c2': dtype('int32')}))
-    #
-    #     res = db_obj.drop_table("table_1")
-    #
+    def test_select(self):
+        """
+        target: test table select apis
+        method:
+        1. create tables
+            - 'table_1'
+                - c1 int primary key
+                - c2 int not null
+        2. insert
+            - (-3, -3)
+            - (-2, -2)
+            - (-1, -1)
+            - (0, 0)
+            - (1, 1)
+            - (2, 2)
+            - (3, 3)
+            - (-8, -8)
+            - (-7, -7)
+            - (-6, -6)
+            - (7, 7)
+            - (8, 8)
+            - (9, 9)
+        3. select
+            - select * from table_1
+                - Consistent with 2. Insert
+            - select c1, c2 from table_1
+                - Consistent with 2. Insert
+            - select c1 + c2 from table_1 where (c1 = 3)
+                - 6
+            - select c1 from table_1 where c1 > 2 and c2 < 4
+                - 3
+            - select c2 from table_1 where (-7 < c1 or 9 <= c1) and (c1 = 3)
+                - 3
+            - select c2 from table_1 where (-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)
+                - -7
+                - 1
+            - select c2 from table_1 where ((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))
+                - -7
+                - 1
+            - select c2 from table_1 where (-7 < c1 or 9 <= c1) and (c2 = 3)
+                - 3
+            - select c2 from table_1 where (-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)
+                - -7
+                - 1
+            - select c2 from table_1 where ((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))
+                - -7
+                - 1
+        4. drop tables
+            - 'table_1'
+        expect: all operations successfully
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+
+        # infinity
+        db_obj.drop_table("test_infinity_select", True)
+        table_obj = db_obj.create_table(
+            "test_infinity_select", {"c1": "int, primary key, not null", "c2": "int, not null"}, ConflictType.Error)
+
+        assert table_obj is not None
+
+        res = table_obj.insert(
+            [{"c1": -3, "c2": -3}, {"c1": -2, "c2": -2}, {"c1": -1, "c2": -1}, {"c1": 0, "c2": 0}, {"c1": 1, "c2": 1},
+             {"c1": 2, "c2": 2}, {"c1": 3, "c2": 3}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.insert(
+            [{"c1": -8, "c2": -8}, {"c1": -7, "c2": -7}, {"c1": -6, "c2": -6}, {"c1": 7, "c2": 7}, {"c1": 8, "c2": 8},
+             {"c1": 9, "c2": 9}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
+                                                         'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(["c1", "c2"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
+                                                         'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+
+        res = table_obj.output(
+            ["c1 + c2"]).filter("c1 = 3").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + c2)': (6,)})
+                                      .astype({'(c1 + c2)': dtype('int32')}))
+
+        res = table_obj.output(
+            ["c1"]).filter("c1 > 2 and c2 < 4").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)})
+                                      .astype({'c1': dtype('int32')}))
+
+        res = table_obj.output(["c2"]).filter(
+            "(-7 < c1 or 9 <= c1) and (c1 = 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
+                                      .astype({'c2': dtype('int32')}))
+
+        res = table_obj.output(["c2"]).filter(
+            "(-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
+
+        res = table_obj.output(["c2"]).filter(
+            "((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
+
+        res = table_obj.output(["c2"]).filter(
+            "(-7 < c1 or 9 <= c1) and (c2 = 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
+                                      .astype({'c2': dtype('int32')}))
+
+        res = table_obj.output(["c2"]).filter(
+            "(-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
+
+        # Need fix rbo caused it Planner Error: Indices must be in order @src/planner/bound/base_table_ref.cppm:45
+        # res = table_obj.output(["c2"]).filter(
+        #     "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
+        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+        #                               .astype({'c2': dtype('int32')}))
+
+        res = db_obj.drop_table("table_1")
+
     # def test_select_varchar(self):
     #     """
     #     target: test table select apis
