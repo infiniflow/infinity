@@ -119,6 +119,7 @@ public:
     const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
 
     void LoadFilterBinaryData(const String &segment_filter_data);
+    static String SegmentStatusToString(const SegmentStatus &type);
 
 public:
     // Const getter

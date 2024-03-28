@@ -953,6 +953,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
         }
+        case ShowStmtType::kSegment: {
+            return BuildShowSegment(statement, bind_context_ptr);
+        }
         case ShowStmtType::kBlocks: {
             return BuildShowBlocks(statement, bind_context_ptr);
         }
@@ -1021,6 +1024,18 @@ Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedP
                                                                   bind_context_ptr->GenerateTableIndex(),
                                                                   statement->segment_id_,
                                                                   statement->block_id_);
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowSegment(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowSegment,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_);
 
     this->logical_plan_ = logical_show;
     return Status::OK();
