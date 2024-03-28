@@ -35,7 +35,7 @@ public:
     // Get an existing BufferHandle from memory or disk.
     BufferObj *Get(UniquePtr<FileWorker> file_worker);
 
-    void Cleanup(const String &file_path);
+    void RemoveBufferObj(const String &file_path);
 
     SharedPtr<String> GetDataDir() const { return data_dir_; }
 

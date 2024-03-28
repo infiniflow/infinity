@@ -58,7 +58,8 @@ namespace infinity {
 
 WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
-      wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option) {}
+      wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0),
+      checkpoint_in_progress_(false) {}
 
 WalManager::~WalManager() {
     if (running_.load()) {
@@ -228,12 +229,23 @@ void WalManager::Flush() {
         // Check if total wal is too large, do delta checkpoint
         i64 last_ckp_wal_size = GetLastCkpWalSize();
         if (wal_size_ - last_ckp_wal_size > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
-            auto *bg_processor = storage_->bg_processor();
             auto checkpoint_task = MakeShared<CheckpointTask>(false /*delta checkpoint*/);
-            bg_processor->Submit(std::move(checkpoint_task));
+            if (!this->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
+                LOG_TRACE("Skip delta checkpoint(size) because there is already a checkpoint task running.");
+            }
         }
     }
     LOG_TRACE("WalManager::Flush mainloop end");
+}
+
+bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task) {
+    bool expect = false;
+    if (checkpoint_in_progress_.compare_exchange_strong(expect, true)) {
+        storage_->bg_processor()->Submit(ckp_task);
+        return true;
+    }
+    ckp_task->Complete();
+    return false;
 }
 
 /*****************************************************************************
@@ -282,6 +294,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
         throw e;
     }
+    checkpoint_in_progress_.store(false);
 }
 
 /**

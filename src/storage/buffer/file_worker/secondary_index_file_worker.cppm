@@ -33,7 +33,7 @@ export struct CreateSecondaryIndexParam : public CreateIndexParam {
     // which will cause the index file worker count to be inconsistent when we read the index file
     const u32 row_count_{};     // rows in the segment, include the deleted rows
     const u32 part_capacity_{}; // split sorted index data into parts
-    CreateSecondaryIndexParam(const IndexBase *index_base, const ColumnDef *column_def, u32 row_count, u32 part_capacity)
+    CreateSecondaryIndexParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, u32 row_count, u32 part_capacity)
         : CreateIndexParam(index_base, column_def), row_count_(row_count), part_capacity_(part_capacity) {}
 };
 
@@ -44,8 +44,8 @@ export class SecondaryIndexFileWorker final : public IndexFileWorker {
 public:
     explicit SecondaryIndexFileWorker(SharedPtr<String> file_dir,
                                       SharedPtr<String> file_name,
-                                      const IndexBase *index_base,
-                                      const ColumnDef *column_def,
+                                      SharedPtr<IndexBase> index_base,
+                                      SharedPtr<ColumnDef> column_def,
                                       u32 worker_id,
                                       u32 row_count,
                                       u32 part_capacity)

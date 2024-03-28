@@ -47,9 +47,7 @@ BufferObj::~BufferObj() = default;
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
-        case BufferStatus::kLoaded: {
-            break;
-        }
+        case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
             break;
         }
@@ -64,6 +62,10 @@ BufferHandle BufferObj::Load() {
         case BufferStatus::kNew: {
             buffer_mgr_->RequestSpace(GetBufferSize(), this);
             file_worker_->AllocateInMemory();
+            break;
+        }
+        case BufferStatus::kClean: {
+            UnrecoverableError("Invalid status when load buffer_obj.");
             break;
         }
     }
@@ -84,7 +86,10 @@ void BufferObj::UnloadInner() {
         case BufferStatus::kLoaded: {
             --rc_;
             if (rc_ == 0) {
-                buffer_mgr_->PushGCQueue(this);
+                if (!wait_for_gc_) {
+                    buffer_mgr_->PushGCQueue(this);
+                    wait_for_gc_ = true;
+                }
                 status_ = BufferStatus::kUnloaded;
             }
             break;
@@ -116,14 +121,32 @@ bool BufferObj::Free() {
                     break;
                 }
             }
+            file_worker_->FreeInMemory();
+            wait_for_gc_ = false;
+            status_ = BufferStatus::kFreed;
+            break;
+        }
+        case BufferStatus::kClean: {
+            switch (type_) {
+                case BufferType::kTemp:
+                case BufferType::kPersistent: {
+                    // do nothing
+                    break;
+                }
+                case BufferType::kEphemeral: {
+                    file_worker_->WriteToFile(true);
+                    break;
+                }
+            }
+            file_worker_->FreeInMemory();
+            file_worker_->CleanupFile();
+            buffer_mgr_->RemoveBufferObj(this->GetFilename());
             break;
         }
         case BufferStatus::kNew: {
             UnrecoverableError("Invalid call.");
         }
     }
-    file_worker_->FreeInMemory();
-    status_ = BufferStatus::kFreed;
     return true;
 }
 
@@ -163,12 +186,34 @@ void BufferObj::CloseFile() {
     rw_locker_.unlock();
 }
 
-void BufferObj::Cleanup() {
-    if (status_ != BufferStatus::kFreed && status_ != BufferStatus::kUnloaded) {
-        UnrecoverableError("Assert: buffer object status isn't freed.");
+void BufferObj::SetAndTryCleanup() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    switch (status_) {
+        case BufferStatus::kNew: {
+            // when insert data into table with index, the index buffer_obj
+            // will remain BufferStatus::kNew, so we should allow this situation
+            status_ = BufferStatus::kClean;
+            break;
+        }
+        case BufferStatus::kUnloaded: {
+            if (!wait_for_gc_) {
+                UnrecoverableError("Assert: unloaded buffer object should in gc_queue.");
+            }
+            status_ = BufferStatus::kClean;
+            break;
+        }
+        case BufferStatus::kFreed: {
+            if (wait_for_gc_) {
+                UnrecoverableError("Assert: freed buffer object shouldn't in gc_queue.");
+            }
+            file_worker_->CleanupFile();
+            buffer_mgr_->RemoveBufferObj(this->GetFilename());
+            break;
+        }
+        default: {
+            UnrecoverableError("Assert: buffer object status isn't freed or unloaded.");
+        }
     }
-    file_worker_->CleanupFile();
-    buffer_mgr_->Cleanup(this->GetFilename());
 }
 
 void BufferObj::CheckState() const {
@@ -180,19 +225,25 @@ void BufferObj::CheckState() const {
             break;
         }
         case BufferStatus::kUnloaded: {
-            if (rc_ > 0) {
+            if (rc_ > 0 || !wait_for_gc_) {
                 UnrecoverableError("Invalid status.");
             }
             break;
         }
         case BufferStatus::kFreed: {
-            if (rc_ > 0) {
+            if (rc_ > 0 || wait_for_gc_) {
                 UnrecoverableError("Invalid status.");
             }
             break;
         }
         case BufferStatus::kNew: {
-            if (type_ != BufferType::kEphemeral || rc_ > 0) {
+            if (type_ != BufferType::kEphemeral || rc_ > 0 || wait_for_gc_) {
+                UnrecoverableError("Invalid status.");
+            }
+            break;
+        }
+        case BufferStatus::kClean: {
+            if (rc_ > 0 || !wait_for_gc_) {
                 UnrecoverableError("Invalid status.");
             }
             break;

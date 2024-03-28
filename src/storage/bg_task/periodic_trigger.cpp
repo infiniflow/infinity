@@ -45,7 +45,9 @@ void CleanupPeriodicTrigger::Trigger() {
 
 void CheckpointPeriodicTrigger::Trigger() {
     auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
-    bg_processor_->Submit(std::move(checkpoint_task));
+    if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
+        LOG_TRACE(fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+    }
 }
 
 } // namespace infinity

@@ -20,6 +20,7 @@ import stl;
 import background_process;
 import catalog;
 import txn_manager;
+import wal_manager;
 
 namespace infinity {
 
@@ -64,13 +65,13 @@ private:
 
 export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit CheckpointPeriodicTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, bool full_checkpoint)
-        : PeriodicTrigger(interval), bg_processor_(bg_processor), is_full_checkpoint_(full_checkpoint) {}
+    explicit CheckpointPeriodicTrigger(std::chrono::milliseconds interval, WalManager *wal_mgr, bool full_checkpoint)
+        : PeriodicTrigger(interval), wal_mgr_(wal_mgr), is_full_checkpoint_(full_checkpoint) {}
 
     virtual void Trigger() override;
 
 private:
-    BGTaskProcessor *const bg_processor_{};
+    WalManager *const wal_mgr_{};
     bool is_full_checkpoint_{};
 };
 
