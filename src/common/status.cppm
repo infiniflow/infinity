@@ -110,6 +110,7 @@ export enum class ErrorCode : long {
     kDuplicateColumnName = 3068,
     kInvalidExpression = 3069,
     kSegmentNotExist = 3070,
+    kAggregateFunctionWithEmptyArgs = 3071,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -192,7 +193,6 @@ public:
     static Status TableNotExist(const String &table_name);
     static Status IndexNotExist(const String &index_name);
     static Status ColumnNotExist(const String &column_name);
-    static Status SegmentNotExist(const SegmentID &segment_id);
     static Status AggNotAllowInWhere(const String &func_name);
     static Status ColumnInSelectNotInGroupBy(const String &column_name);
     static Status NoSysVar(const String &variable_name);
@@ -238,6 +238,8 @@ public:
     static Status InvalidJsonFormat(const String& invalid_json);
     static Status DuplicateColumnName(const String& column_name);
     static Status InvalidExpression(const String& expr_str);
+    static Status SegmentNotExist(const SegmentID &segment_id);
+    static Status AggregateFunctionWithEmptyArgs();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
