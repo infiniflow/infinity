@@ -212,7 +212,6 @@ class TestSelect:
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["count(*)"]).to_pl()
-        print(res)
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 13
         res = table_obj.output(["max(c1)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 90
