@@ -240,7 +240,6 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
         storage_->bg_processor()->Submit(ckp_task);
         return true;
     }
-    ckp_task->Complete();
     return false;
 }
 
