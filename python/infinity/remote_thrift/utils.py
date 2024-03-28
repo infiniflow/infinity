@@ -23,7 +23,7 @@ from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 
 
-def traverse_conditions(cons) -> ttypes.ParsedExpr:
+def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
     if isinstance(cons, exp.Binary):
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
@@ -32,7 +32,10 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
 
         arguments = []
         for value in cons.hashable_args:
-            expr = traverse_conditions(value)
+            if fn:
+                expr = fn(value)
+            else:
+                expr = traverse_conditions(value)
             arguments.append(expr)
         function_expr.arguments = arguments
 
@@ -105,6 +108,32 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
     else:
         raise Exception(f"unknown condition type: {cons}")
 
+def parse_expr(expr) -> ttypes.ParsedExpr:
+    try :
+        return traverse_conditions(expr, parse_expr)
+    except:
+        if isinstance(expr, exp.Func):
+            arguments = []
+            for arg in expr.args.values():
+                if arg:
+                    arguments.append(parse_expr(arg))
+            func_expr = ttypes.FunctionExpr(
+                function_name=expr.key,
+                arguments=arguments
+            )
+            expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+            parsed_expr = ttypes.ParsedExpr(type=expr_type)
+            return parsed_expr
+        elif isinstance(expr, exp.Star):
+            column_expr = ttypes.ColumnExpr(
+                star=True,
+                column_name=[]
+            )
+            expr_type = ttypes.ParsedExprType(column_expr=column_expr)
+            parsed_expr = ttypes.ParsedExpr(type=expr_type)
+            return parsed_expr
+        else:
+            raise Exception(f"unknown expression type: {expr}")
 
 # invalid_name_array = [
 #     [],

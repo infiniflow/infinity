@@ -22,12 +22,12 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 from pyarrow import Table
-from sqlglot import condition
+from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import logic_type_to_dtype
-from infinity.remote_thrift.utils import traverse_conditions
+from infinity.remote_thrift.utils import traverse_conditions, parse_expr
 
 '''FIXME: How to disable validation of only the search field?'''
 
@@ -188,6 +188,9 @@ class InfinityThriftQueryBuilder(ABC):
         self._columns = columns
         select_list: List[ParsedExpr] = []
         for column in columns:
+            if isinstance(column, str):
+                column = column.lower()
+
             match column:
                 case "*":
                     column_expr = ColumnExpr(star=True, column_name=[])
@@ -200,9 +203,14 @@ class InfinityThriftQueryBuilder(ABC):
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
-
+                case "_score":
+                    func_expr = FunctionExpr(
+                        function_name="score", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
                 case _:
-                    select_list.append(traverse_conditions(condition(column)))
+                    select_list.append(parse_expr(maybe_parse(column)))
 
         self._columns = select_list
         return self

@@ -19,6 +19,9 @@ import column_index_iterator;
 import segment_term_posting;
 import fst;
 import internal_types;
+import posting_byte_slice_reader;
+import posting_merger;
+import third_party;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool)
@@ -37,7 +40,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
     String posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
-    posting_file_ = MakeShared<FileWriter>(fs_, posting_file, 1024);
+    posting_file_writer_ = MakeShared<FileWriter>(fs_, posting_file, 1024);
 
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
@@ -50,13 +53,17 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
 
     while (!term_posting_queue.Empty()) {
         const Vector<SegmentTermPosting *> &merging_term_postings = term_posting_queue.GetCurrentMerging(term);
+
         MergeTerm(term, term_meta, merging_term_postings);
+
         term_meta_dumpler.Dump(dict_file_writer, term_meta);
+
         fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
         term_meta_offset = dict_file_writer->TotalWrittenBytes();
         term_posting_queue.MoveToNextTerm();
     }
     dict_file_writer->Sync();
+    posting_file_writer_->Sync();
     fst_builder.Finish();
     fs_.AppendFile(dict_file, fst_file);
     fs_.DeleteFile(fst_file);
@@ -67,9 +74,10 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
 void ColumnIndexMerger::MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings) {
     SharedPtr<PostingMerger> posting_merger = CreatePostingMerger();
     posting_merger->Merge(merging_term_postings);
-    posting_merger->Dump(posting_file_, term_meta);
-    memory_pool_->Reset();
-    buffer_pool_->Reset();
+
+    posting_merger->Dump(posting_file_writer_, term_meta);
+//    memory_pool_->Reset();
+//    buffer_pool_->Reset();
 }
 
 } // namespace infinity
