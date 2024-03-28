@@ -18,10 +18,10 @@ module;
 import stl;
 import base_expression;
 import aggregate_function;
-
-import infinity_exception;
-
 import cast_table;
+
+import status;
+import infinity_exception;
 
 module aggregate_function_set;
 
@@ -78,7 +78,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
 
 i64 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument) {
     if (argument.get() == nullptr) {
-        UnrecoverableError("Argument is NULL");
+        RecoverableError(Status::AggregateFunctionWithEmptyArgs());
     }
 
     i64 cost = CastTable::instance().GetCastCost(argument->Type().type(), func.argument_type_.type());
