@@ -16,6 +16,7 @@ import term_meta;
 import column_index_iterator;
 import segment_term_posting;
 import internal_types;
+import third_party;
 
 namespace infinity {
 
@@ -162,7 +163,7 @@ public:
             return;
         }
         SharedPtr<PostingWriter> posting_writer = pos_dumper->GetPostingWriter();
-        doc_merger_.Merge(current_doc_id_, posting_writer.get());
+        doc_merger_.Merge(static_cast<docid_t>(GetCurrentRowID().ToUint64()), posting_writer.get());
     }
 
     RowID GetCurrentRowID() const { return base_row_id_ + current_doc_id_; }

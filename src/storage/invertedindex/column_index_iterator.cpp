@@ -13,6 +13,8 @@ import index_defines;
 import term_meta;
 import dict_reader;
 import local_file_system;
+import third_party;
+
 namespace infinity {
 
 ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &base_name, optionflag_t flag) {
@@ -54,6 +56,10 @@ void ColumnIndexIterator::DecodeDocList() {
     u32 doc_skiplist_len = posting_file_->ReadVInt();
     u32 doc_list_len = posting_file_->ReadVInt();
 
+    if (doc_list_slice_ != nullptr) {
+        ByteSlice::DestroySlice(doc_list_slice_);
+    }
+
     doc_list_slice_ = ByteSlice::CreateSlice(doc_list_len);
 
     i64 cursor = posting_file_->GetFilePointer() + doc_skiplist_len;
@@ -65,6 +71,10 @@ void ColumnIndexIterator::DecodeDocList() {
 void ColumnIndexIterator::DecodePosList() {
     u32 pos_skiplist_len = posting_file_->ReadVInt();
     u32 pos_list_len = posting_file_->ReadVInt();
+
+    if (pos_list_slice_ != nullptr) {
+        ByteSlice::DestroySlice(pos_list_slice_);
+    }
 
     pos_list_slice_ = ByteSlice::CreateSlice(pos_list_len);
 
