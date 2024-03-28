@@ -203,6 +203,9 @@ Status Status::IndexNotExist(const String &index_name) {
 Status Status::ColumnNotExist(const String &column_name) {
     return Status(ErrorCode::kColumnNotExist, MakeUnique<String>(fmt::format("Column: {} doesn't exist", column_name)));
 }
+Status Status::SegmentNotExist(const SegmentID &segment_id) {
+    return Status(ErrorCode::kSegmentNotExist, MakeUnique<String>(fmt::format("Segment: {} doesn't exist", segment_id)));
+}
 
 Status Status::AggNotAllowInWhere(const String &func_name) {
     return Status(ErrorCode::kAggNotAllowInWhereClause,

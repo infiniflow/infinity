@@ -465,5 +465,21 @@ void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data) {
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
 }
+String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
+    switch (type) {
+        case SegmentStatus::kUnsealed:
+            return "Unsealed";
+        case SegmentStatus::kSealed:
+            return "Sealed";
+        case SegmentStatus::kCompacting:
+            return "Compacting";
+        case SegmentStatus::kNoDelete:
+            return "NoDelete";
+        case SegmentStatus::kDeprecated:
+            return "Deprecated";
+        default:
+            return "Invalid Status";
+    }
+}
 
 } // namespace infinity

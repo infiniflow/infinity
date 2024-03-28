@@ -114,7 +114,7 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::GetOrCreateSegment(SegmentID segme
     std::unique_lock w_lock(rw_locker_);
     auto iter = index_by_segment_.find(segment_id);
     if (iter == index_by_segment_.end()) {
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), DEFAULT_SEGMENT_CAPACITY, column_def_.get());
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, DEFAULT_SEGMENT_CAPACITY, column_def_);
         segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         index_by_segment_.emplace(segment_id, segment_index_entry);
     } else {
@@ -223,7 +223,7 @@ void TableIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry
     SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
     if (iter == index_by_segment_.end()) {
         auto create_index_param =
-            SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), block_entry->GetSegmentEntry()->row_capacity(), column_def_.get());
+            SegmentIndexEntry::GetCreateIndexParam(index_base_, block_entry->GetSegmentEntry()->row_capacity(), column_def_);
         segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         index_by_segment_.emplace(segment_id, segment_index_entry);
     } else {
@@ -249,7 +249,7 @@ void TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn) {
     if (index_base_->index_type_ != IndexType::kFullText) {
         return;
     }
-    auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_capacity(), column_def_.get());
+    auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_capacity(), column_def_);
     u32 segment_id = segment_entry->segment_id();
     SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
     segment_index_entry->PopulateEntirely(segment_entry, txn);
@@ -260,7 +260,7 @@ Tuple<Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     Vector<SegmentIndexEntry *> segment_index_entries;
     for (const auto *segment_entry : block_index->segments_) {
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_count(), column_def_.get());
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_count(), column_def_);
         SegmentID segment_id = segment_entry->segment_id();
         SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         if (!is_replay) {
@@ -290,8 +290,8 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
 Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
     Vector<UniquePtr<IndexFileWorker>> vector_file_worker;
     // reference file_worker will be invalidated when vector_file_worker is resized
-    const auto *index_base = param->index_base_;
-    const auto *column_def = param->column_def_;
+    const auto index_base = param->index_base_;
+    const auto column_def = param->column_def_;
     if (index_base->index_type_ == IndexType::kFullText) {
         // fulltext doesn't use BufferManager
         return vector_file_worker;
@@ -363,7 +363,7 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
     return vector_file_worker;
 }
 
-UniquePtr<CreateIndexParam> TableIndexEntry::GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def) {
+UniquePtr<CreateIndexParam> TableIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def) {
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);

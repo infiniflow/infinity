@@ -19,6 +19,7 @@ import file_worker;
 import third_party;
 import local_file_system;
 import logger;
+import specific_concurrent_queue;
 
 import infinity_exception;
 import buffer_obj;
@@ -73,7 +74,7 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
 }
 
 // return false if buffer_obj is not loaded
-void BufferManager::Cleanup(const String &file_path) {
+void BufferManager::RemoveBufferObj(const String &file_path) {
     std::unique_lock w_lock(rw_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         buffer_map_.erase(iter);
@@ -83,16 +84,23 @@ void BufferManager::Cleanup(const String &file_path) {
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
     while (current_memory_size_ + need_size > memory_limit_) {
         BufferObj *buffer_obj1 = nullptr;
+        /// FIXME: Actually it is not a good idea to use the moodycamel::ConcurrentQueue.
+        /// When dealing with heavy concurrent read requests, and each request holds some buffer_objs that may cause
+        /// memory usage to exceed the memory_limit, the current handling will lead to some problems. We should consider
+        /// triggering the garbage collection (gc) to free up unnecessary buffer_objs in gc_queue. But currently, we
+        /// only attempt this once, and the service may crash if the head item of the queue shouldn't be freed.
+        /// TODO:
+        /// 1. Replace moodycamel::ConcurrentQueue with a queue using a replacement strategy.
+        /// 2. When encountering out-of-memory situations, first attempt to trigger the gc to try to free up some buffer_objs
+        ///    (not only once now) in gc_queue.
+        /// 3. If the memory usage still exceeds the memory_limit, then consider crashing the service or outputting a warning log.
         if (gc_queue_.TryDequeue(buffer_obj1)) {
             if (buffer_obj == buffer_obj1) {
-                if (buffer_obj1->status() != BufferStatus::kFreed) {
-                    UnrecoverableError("buffer object status isn't freed");
-                }
-                // prevent deadlock
-                continue;
+                UnrecoverableError("buffer object duplicated in gc_queue.");
             }
+            auto size = buffer_obj1->GetBufferSize();
             if (buffer_obj1->Free()) {
-                current_memory_size_ -= buffer_obj1->GetBufferSize();
+                current_memory_size_ -= size;
             }
         } else {
             UnrecoverableError("Out of memory.");

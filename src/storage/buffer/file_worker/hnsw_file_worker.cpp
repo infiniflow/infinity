@@ -57,7 +57,7 @@ void HnswFileWorker::AllocateInMemory() {
     }
 
     SizeT dimension = GetDimension();
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
     SizeT M = index_hnsw->M_;
     SizeT ef_c = index_hnsw->ef_construction_;
     auto AllocateData = [&](auto *hnsw_index) { data_ = static_cast<void *>(hnsw_index); };
@@ -119,7 +119,7 @@ void HnswFileWorker::FreeInMemory() {
     if (!data_) {
         UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
     auto FreeData = [&](auto *hnsw_index) { delete hnsw_index; };
     EmbeddingDataType embedding_type = GetType();
     switch (embedding_type) {
@@ -181,7 +181,7 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
     if (!data_) {
         UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
     auto SaveData = [&](auto *hnsw_index) { hnsw_index->Save(*file_handler_); };
     switch (GetType()) {
         case kElemFloat: {
@@ -239,7 +239,7 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
 
 void HnswFileWorker::ReadFromFileImpl() {
     // TODO!! not save index parameter in index file.
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
     auto LoadData = [&](auto *hnsw_index) { data_ = static_cast<void *>(hnsw_index); };
     switch (GetType()) {
         case kElemFloat: {

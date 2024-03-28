@@ -105,9 +105,9 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
         UnrecoverableError(status.message());
     }
     String column_name = table_index_entry->index_base()->column_name();
-    auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(table_index_entry->index_base(),
+    auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(),
                                                                      segment_row_count,
-                                                                     table_entry->GetColumnDefByName(column_name).get());
+                                                                     table_entry->GetColumnDefByName(column_name));
     auto vector_file_worker = table_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
@@ -582,13 +582,13 @@ void SegmentIndexEntry::Cleanup() {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");
         }
-        buffer_obj->Cleanup();
+        buffer_obj->SetAndTryCleanup();
     }
 }
 
 void SegmentIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
-UniquePtr<CreateIndexParam> SegmentIndexEntry::GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def) {
+UniquePtr<CreateIndexParam> SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def) {
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);
@@ -669,7 +669,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     const IndexBase *index_base = table_index_entry->index_base();
     String column_name = index_base->column_name();
     UniquePtr<CreateIndexParam> create_index_param =
-        GetCreateIndexParam(index_base, segment_row_count, table_entry->GetColumnDefByName(column_name).get());
+        GetCreateIndexParam(table_index_entry->table_index_def(), segment_row_count, table_entry->GetColumnDefByName(column_name));
     auto segment_index_entry = LoadIndexEntry(table_index_entry, segment_id, buffer_mgr, create_index_param.get());
     if (segment_index_entry.get() == nullptr) {
         UnrecoverableError("Failed to load index entry");

@@ -742,3 +742,44 @@ curl --request GET \
     "error_message": "No variable {variable_name}."
 }
 ```
+
+## Show segment
+
+Show specific segment details
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "error_code": 0,
+    "actual_row_count": "4",
+    "block_count": "1",
+    "column_count": "2",
+    "dir": "/tmp/infinity/data/BCvJAOlTOt_db_default/wUxDzXjGjE_table_test1/seg_0",
+    "id": "0",
+    "room": "8388604",
+    "row_capacity": "8388608",
+    "row_count": "4",
+    "size": "192.08KB",
+    "status": "Unsealed"
+}
+```
+
+- 500 Error
+
+```
+{
+    "error_code": 3070,
+    "error_message": "Segment: {segment_id} doesn't exist."
+}
+```

@@ -36,7 +36,7 @@ export struct CreateAnnIVFFlatParam : public CreateIndexParam {
     // used when ivfflat_index_def->centroids_count_ == 0
     const SizeT row_count_{};
 
-    CreateAnnIVFFlatParam(const IndexBase *index_base, const ColumnDef *column_def, SizeT row_count)
+    CreateAnnIVFFlatParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, SizeT row_count)
         : CreateIndexParam(index_base, column_def), row_count_(row_count) {}
 };
 
@@ -47,8 +47,8 @@ class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
 public:
     explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
-                                       const IndexBase *index_base,
-                                       const ColumnDef *column_def,
+                                       SharedPtr<IndexBase> index_base,
+                                       SharedPtr<ColumnDef> column_def,
                                        SizeT row_count)
         : IndexFileWorker(std::move(file_dir), std::move(file_name), index_base, column_def), default_centroid_num_((u32)std::sqrt(row_count)) {}
 
@@ -92,7 +92,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     }
     SizeT dimension = GetDimension();
 
-    const auto *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base_);
+    const auto *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base_.get());
     auto centroids_count = index_ivfflat->centroids_count_;
     if (centroids_count == 0) {
         centroids_count = default_centroid_num_;

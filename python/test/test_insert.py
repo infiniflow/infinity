@@ -185,7 +185,6 @@ class TestInsert:
 
         db_obj.drop_table("test_insert_embedding2")
 
-    @pytest.mark.skip("Unexpected error.")
     def test_insert_big_embedding(self):
         """
         target: test insert embedding with big dimension
@@ -230,7 +229,6 @@ class TestInsert:
         res = db_obj.drop_table("test_insert_big_embedding_float")
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip("Unexpected error.")
     @pytest.mark.parametrize("types", ["vector,65535,int", "vector,65535,float"])
     @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 65535}],
                                                 [{"c1": [4] * 65535}],

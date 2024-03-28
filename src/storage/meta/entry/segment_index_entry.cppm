@@ -103,7 +103,7 @@ public:
 
     Status CreateIndexDo(atomic_u64 &create_index_idx);
 
-    static UniquePtr<CreateIndexParam> GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def);
+    static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
 
     Tuple<Vector<String>, Vector<RowID>, MemoryIndexer *> GetFullTextIndexSnapshot() {
         std::shared_lock lock(rw_locker_);

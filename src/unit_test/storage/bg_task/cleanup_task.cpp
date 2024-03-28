@@ -35,7 +35,6 @@ import compilation_config;
 import bg_task;
 import compact_segments_task;
 import index_base;
-import index_base;
 import third_party;
 import base_table_ref;
 import index_secondary;
@@ -69,7 +68,7 @@ protected:
     }
 };
 
-TEST_F(CleanupTaskTest, TestDeleteDB_Simple) {
+TEST_F(CleanupTaskTest, test_delete_db_simple) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
@@ -106,7 +105,7 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Simple) {
     InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
+TEST_F(CleanupTaskTest, test_delete_db_complex) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
@@ -162,7 +161,7 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
     InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, TestDeleteTable_Simple) {
+TEST_F(CleanupTaskTest, test_delete_table_simple) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
@@ -214,7 +213,7 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Simple) {
     InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
+TEST_F(CleanupTaskTest, test_delete_table_complex) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
@@ -290,7 +289,7 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
     InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
+TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
     constexpr int kImportN = 5;
     constexpr int kImportSize = 100;
 
@@ -383,7 +382,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
     InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
+TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     constexpr int kImportN = 5;
     constexpr int kImportSize = 100;
 
@@ -411,7 +410,6 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), *column_name, constraints));
     }
     {
-
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();

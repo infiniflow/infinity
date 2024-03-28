@@ -50,6 +50,8 @@ public:
     // checkpoint for a batch of sync.
     void Flush();
 
+    bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
+
     void Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size);
 
     void Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size);
@@ -117,6 +119,7 @@ private:
     // Flush and Checkpoint threads access following members
     std::mutex mutex2_{};
     i64 last_ckp_wal_size_{};
+    Atomic<bool> checkpoint_in_progress_{false};
 
     // Only Checkpoint thread access following members
 };

@@ -88,6 +88,8 @@ private:
 
     void ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state);
 
+    void ExecuteShowSegmentDetail(QueryContext *query_context, ShowOperatorState *show_operator_state);
+
     void ExecuteShowBlocks(QueryContext *query_context, ShowOperatorState *show_operator_state);
 
     void ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *operator_state);
