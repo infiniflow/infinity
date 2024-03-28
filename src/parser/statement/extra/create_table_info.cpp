@@ -41,6 +41,24 @@ CreateTableInfo::~CreateTableInfo() {
 
 std::string CreateTableInfo::ToString() const {
     std::stringstream ss;
+    ss << table_name_ << " ";
+    switch(this->conflict_type_) {
+        case ConflictType::kIgnore: {
+            ss << "Ignore ";
+            break;
+        }
+        case ConflictType::kError: {
+            ss << "Error ";
+            break;
+        }
+        case ConflictType::kReplace: {
+            ss << "Replace ";
+            break;
+        }
+        default: {
+            ParserError("Invalid conflict type.");
+        }
+    }
     return ss.str();
 }
 

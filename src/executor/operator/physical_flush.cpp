@@ -57,6 +57,7 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
     auto *wal_mgr = query_context->storage()->wal_manager();
     if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
         LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));
+        return ;
     }
     force_ckp_task->Wait();
     LOG_TRACE("Flushed data");
