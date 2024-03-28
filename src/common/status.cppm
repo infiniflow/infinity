@@ -111,6 +111,7 @@ export enum class ErrorCode : long {
     kInvalidExpression = 3069,
     kSegmentNotExist = 3070,
     kAggregateFunctionWithEmptyArgs = 3071,
+    kBlockNotExist = 3072,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -239,6 +240,7 @@ public:
     static Status DuplicateColumnName(const String& column_name);
     static Status InvalidExpression(const String& expr_str);
     static Status SegmentNotExist(const SegmentID &segment_id);
+    static Status BlockNotExist(const BlockID &block_id);
     static Status AggregateFunctionWithEmptyArgs();
 
     // 4. TXN fail

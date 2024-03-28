@@ -783,3 +783,42 @@ curl --request GET \
     "error_message": "Segment: {segment_id} doesn't exist."
 }
 ```
+
+## Show block
+
+Show specific block detail
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "error_code": 0,
+    "id": "0",
+    "checkpoint_row_count": "4",
+    "checkpoint_ts": "209",
+    "column_count": "2",
+    "path": "/tmp/infinity/data/CS4HkE8F0H_db_default/IF5Luj1FdG_table_test1/seg_0/blk_0/version",
+    "row_capacity": "8192",
+    "row_count": "4",
+    "size": "192.08KB"
+}
+```
+
+- 500 Error
+
+```
+{
+    "error_code": 3072,
+    "error_message": "Block: {block_id} doesn't exist."
+}
+```

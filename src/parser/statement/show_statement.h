@@ -34,6 +34,7 @@ enum class ShowStmtType {
     kSegments,
     kSegment,
     kBlocks,
+    kBlock,
     kSessionStatus,
     kGlobalStatus,
     kVar,

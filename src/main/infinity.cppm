@@ -105,8 +105,9 @@ public:
 
     QueryResult ShowIndex(const String &db_name, const String &table_name, const String &index_name);
 
-
     QueryResult ShowSegment(const String &db_name,const String &table_name, const SegmentID &segment_id);
+
+    QueryResult ShowBlock(const String &db_name,const String &table_name, const SegmentID &segment_id, const BlockID &block_id);
 
     QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
 
