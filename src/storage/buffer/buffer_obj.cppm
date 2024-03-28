@@ -28,6 +28,7 @@ export enum class BufferStatus {
     kLoaded,
     kUnloaded,
     kFreed,
+    kClean,
     kNew,
 };
 
@@ -62,7 +63,7 @@ public:
 
     void CloseFile();
 
-    void Cleanup();
+    void SetAndTryCleanup();
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
@@ -78,14 +79,17 @@ private:
     // called when BufferHandle destructs, to decrease rc_ by 1.
     void UnloadInner();
 
-    // check the invalid state
-    void CheckState() const;
-
 public:
     // interface for unit test
-    BufferStatus status() const { return status_; }
+    BufferStatus status() {
+        std::shared_lock<std::shared_mutex> w_locker(rw_locker_);
+        return status_;
+    }
     BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
+
+    // check the invalid state, only used in tests.
+    void CheckState() const;
 
 protected:
     std::shared_mutex rw_locker_{};
@@ -95,6 +99,7 @@ protected:
     BufferStatus status_{BufferStatus::kNew};
     BufferType type_{BufferType::kTemp};
     u64 rc_{0};
+    bool wait_for_gc_{false};
     const UniquePtr<FileWorker> file_worker_;
 };
 

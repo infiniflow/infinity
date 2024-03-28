@@ -76,7 +76,7 @@ protected:
     }
 };
 
-TEST_F(WalReplayTest, WalReplayDatabase) {
+TEST_F(WalReplayTest, wal_replay_database) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -175,7 +175,7 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
     }
 }
 
-TEST_F(WalReplayTest, WalReplayTables) {
+TEST_F(WalReplayTest, wal_replay_tables) {
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -295,7 +295,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
     }
 }
 
-TEST_F(WalReplayTest, WalReplayAppend) {
+TEST_F(WalReplayTest, wal_replay_append) {
     SizeT row_count = 2;
     {
 #ifdef INFINITY_DEBUG
@@ -481,7 +481,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
     }
 }
 
-TEST_F(WalReplayTest, WalReplayImport) {
+TEST_F(WalReplayTest, wal_replay_import) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -688,7 +688,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 }
 
 // FIXME: The test case diverges from the original intent.
-TEST_F(WalReplayTest, WalReplayCompact) {
+TEST_F(WalReplayTest, wal_replay_compact) {
     u64 test_segment_n = 2;
     {
 #ifdef INFINITY_DEBUG
@@ -819,7 +819,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
     }
 }
 
-TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
+TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -925,7 +925,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
     }
 }
 
-TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
+TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();

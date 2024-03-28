@@ -118,7 +118,7 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
     table_index_info->index_entry_dir_ = table_index_entry->index_dir();
     table_index_info->segment_index_count_ = table_index_entry->index_by_segment().size();
 
-    const IndexBase *index_base = table_index_entry->index_base();
+    auto index_base = table_index_entry->index_base();
     table_index_info->index_type_ = MakeShared<String>(IndexInfo::IndexTypeToString(index_base->index_type_));
     table_index_info->index_other_params_ = MakeShared<String>(index_base->BuildOtherParamsString());
 
