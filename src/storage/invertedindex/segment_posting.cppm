@@ -31,16 +31,10 @@ public:
     SegmentPosting(const PostingFormatOption &posting_option = OPTION_FLAG_ALL);
     ~SegmentPosting() {}
 
-    bool operator==(const SegmentPosting &seg_posting) const {
-        return /*(slice_list_ == seg_posting.slice_list_) && */ (term_meta_ == seg_posting.term_meta_) &&
-               /*(posting_option_ == seg_posting.posting_option_) */ (base_row_id_ == seg_posting.base_row_id_) &&
-               (doc_count_ == seg_posting.doc_count_) && (posting_writer_ == seg_posting.posting_writer_);
-    }
-
     // for on disk segment posting
     void Init(const SharedPtr<ByteSliceList> &slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
     // for in memory segment posting
-    void Init(RowID base_row_id, PostingWriter *posting_writer);
+    void Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer);
 
     RowID GetBaseRowId() const { return base_row_id_; }
     void SetBaseRowId(RowID base_row_id) { base_row_id_ = base_row_id; }
@@ -51,8 +45,8 @@ public:
     const PostingFormatOption &GetPostingFormatOption() const { return posting_option_; }
     void SetPostingFormatOption(const PostingFormatOption &option) { posting_option_ = option; }
 
-    const PostingWriter *GetInMemPostingWriter() const { return posting_writer_; }
-    bool IsInMemorySegment() const { return posting_writer_ != nullptr; }
+    const SharedPtr<PostingWriter> &GetInMemPostingWriter() const { return posting_writer_; }
+    bool IsInMemorySegment() const { return posting_writer_.get(); }
 
     void GetInMemTermMeta(TermMeta &tm) {
         df_t df = posting_writer_->GetDF();
@@ -70,7 +64,7 @@ private:
     RowID base_row_id_;
     u32 doc_count_;
     TermMeta term_meta_;
-    PostingWriter *posting_writer_;
+    SharedPtr<PostingWriter> posting_writer_;
     PostingFormatOption posting_option_;
 };
 } // namespace infinity

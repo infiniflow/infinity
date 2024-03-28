@@ -37,7 +37,7 @@ void SegmentPosting::Init(const SharedPtr<ByteSliceList> &slice_list, RowID base
     posting_writer_ = nullptr;
 }
 
-void SegmentPosting::Init(RowID base_row_id, PostingWriter *posting_writer) {
+void SegmentPosting::Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer) {
     base_row_id_ = base_row_id;
     doc_count_ = posting_writer->GetDF();
     posting_writer_ = posting_writer;

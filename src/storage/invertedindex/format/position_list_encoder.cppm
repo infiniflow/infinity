@@ -37,11 +37,7 @@ public:
 
     const PostingByteSlice *GetBufferedByteSlice() const { return &pos_list_buffer_; }
 
-    void SetDocSkipListWriter(SkipListWriter *writer) { pos_skiplist_writer_ = writer; }
-
     const PositionListFormat *GetPositionListFormat() const { return pos_list_format_; }
-
-    SkipListWriter *GetSkipListWriter() const { return pos_skiplist_writer_; }
 
 private:
     void CreatePosSkipListWriter();
@@ -54,7 +50,7 @@ private:
     u32 total_pos_count_;                             // 4byte
     PositionListFormatOption pos_list_format_option_; // 1byte
     bool is_own_format_;                              // 1byte
-    SkipListWriter *pos_skiplist_writer_;
+    UniquePtr<SkipListWriter> pos_skiplist_writer_;
     const PositionListFormat *pos_list_format_;
     MemoryPool *byte_slice_pool_;
 };

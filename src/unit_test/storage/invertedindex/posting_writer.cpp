@@ -80,7 +80,7 @@ TEST_F(PostingWriterTest, test1) {
         SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
         SegmentPosting seg_posting;
         RowID base_row_id = 0;
-        seg_posting.Init(base_row_id, posting.get());
+        seg_posting.Init(base_row_id, posting);
         seg_postings->push_back(seg_posting);
         PostingIterator iter(PostingFormatOption(flag_), &byte_slice_pool_);
         iter.Init(seg_postings, 0);

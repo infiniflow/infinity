@@ -75,7 +75,7 @@ private:
     tf_t total_tf_;
     df_t df_;
 
-    SkipListWriter *doc_skiplist_writer_{nullptr};
+    UniquePtr<SkipListWriter> doc_skiplist_writer_;
     MemoryPool *byte_slice_pool_{nullptr};
     friend class InMemDocListDecoderTest;
 };

@@ -37,10 +37,6 @@ DocListEncoder::~DocListEncoder() {
         delete doc_list_format_;
         doc_list_format_ = nullptr;
     }
-    if (doc_skiplist_writer_) {
-        doc_skiplist_writer_->~SkipListWriter();
-        doc_skiplist_writer_ = nullptr;
-    }
 }
 
 void DocListEncoder::AddPosition() {
@@ -128,7 +124,7 @@ u32 DocListEncoder::GetDumpLength() {
 void DocListEncoder::FlushDocListBuffer() {
     u32 flush_size = doc_list_buffer_.Flush();
     if (flush_size > 0) {
-        if (doc_skiplist_writer_ == nullptr) {
+        if (!doc_skiplist_writer_.get()) {
             CreateDocSkipListWriter();
         }
         AddSkipListItem(flush_size);
@@ -136,11 +132,9 @@ void DocListEncoder::FlushDocListBuffer() {
 }
 
 void DocListEncoder::CreateDocSkipListWriter() {
-    void *buffer = byte_slice_pool_->Allocate(sizeof(SkipListWriter));
     RecyclePool *buffer_pool = dynamic_cast<RecyclePool *>(doc_list_buffer_.GetBufferPool());
-    SkipListWriter *doc_skiplist_writer = new (buffer) SkipListWriter(byte_slice_pool_, buffer_pool);
-    doc_skiplist_writer->Init(doc_list_format_->GetDocSkipListFormat());
-    doc_skiplist_writer_ = doc_skiplist_writer;
+    doc_skiplist_writer_ = MakeUnique<SkipListWriter>(byte_slice_pool_, buffer_pool);
+    doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
 }
 
 void DocListEncoder::AddSkipListItem(u32 item_size) {
@@ -163,13 +157,13 @@ InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_
             InMemDocListSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListSkipListReader)))
                                                                                     InMemDocListSkipListReader(session_pool)
                                                                               : new InMemDocListSkipListReader(session_pool);
-            in_mem_skiplist_reader->Load(doc_skiplist_writer_);
+            in_mem_skiplist_reader->Load(doc_skiplist_writer_.get());
             skiplist_reader = in_mem_skiplist_reader;
         } else {
             InMemPositionListSkipListReader *in_mem_skiplist_reader =
                 session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListSkipListReader))) InMemPositionListSkipListReader(session_pool)
                              : new InMemPositionListSkipListReader(session_pool);
-            in_mem_skiplist_reader->Load(doc_skiplist_writer_);
+            in_mem_skiplist_reader->Load(doc_skiplist_writer_.get());
             skiplist_reader = in_mem_skiplist_reader;
         }
     }

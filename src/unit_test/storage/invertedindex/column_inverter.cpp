@@ -103,7 +103,7 @@ TEST_F(ColumnInverterTest, Invert) {
         ASSERT_EQ(posting->GetDF(), expected.doc_ids.size());
 
         SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>(1);
-        seg_postings->at(0).Init(u64(0), posting.get());
+        seg_postings->at(0).Init(u64(0), posting);
 
         PostingIterator post_iter(flag_, &byte_slice_pool_);
         post_iter.Init(seg_postings, 0);
