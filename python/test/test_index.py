@@ -13,10 +13,13 @@
 # limitations under the License.
 import os
 import pytest
+import sqlglot
+import time
 
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
+from sqlglot import exp, parse_one
 
 TEST_DATA_DIR = "/test/data/"
 
@@ -143,8 +146,7 @@ class TestIndex:
         (index.IndexType.IVFFlat, True)
     ])
     @pytest.mark.parametrize("params", [
-        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
-            1, 2), False), ({"1": 2}, False),
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
         ([index.InitParameter("centroids_count", "128"),
           index.InitParameter("metric", "l2")], True)
     ])
@@ -176,9 +178,8 @@ class TestIndex:
         ("c1", True)])
     @pytest.mark.parametrize("index_type", [(index.IndexType.FullText, True)])
     @pytest.mark.parametrize("params", [
-        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
-            1, 2), False), ({"1": 2}, False),
-        ([], True)
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False),
+        ((1, 2), False), ({"1": 2}, False), ([], True)
     ])
     @pytest.mark.parametrize("types", ["int", "int8", "int16", "int32", "int64", "integer",
                                        "float", "float32", "double", "float64",
@@ -359,6 +360,47 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
                               file_format + "/pysdk_test." + file_format)
+
+    @pytest.mark.parametrize("file_format", ["csv"])
+    def test_insert_data_fulltext_index_search(self, get_infinity_db, file_format):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_insert_data_fulltext_index_search", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_data_fulltext_index_search", {
+            "doctitle": "varchar",
+            "docdate": "varchar", "body": "varchar"}, ConflictType.Error)
+        res = table_obj.create_index("body_index",
+                                     [index.IndexInfo("body",
+                                                      index.IndexType.FullText,
+                                                      [])])
+        assert res.error_code == ErrorCode.OK
+
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
+                              file_format + "/enwiki_99." + file_format,
+                              import_options={"delimiter": "\t"})
+        time.sleep(5)
+        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
+            "body^5", "harmful chemical", "topn=3").to_pl()
+        assert not res.is_empty()
+        print(res)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
+                              file_format + "/enwiki_99." + file_format,
+                              import_options={"delimiter": "\t"})
+        time.sleep(5)
+        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
+            "body^5", "harmful chemical", "topn=3").to_pl()
+        assert not res.is_empty()
+        print(res)
+
+        res = table_obj.create_index("doctitle_index",
+                                     [index.IndexInfo("doctitle",
+                                                      index.IndexType.FullText,
+                                                      [])])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
+            "doctitle,body^5", "harmful chemical anarchism", "topn=3").to_pl()
+        assert not res.is_empty()
+        print(res)
 
     # create index on all data are deleted table.
     def test_create_index_on_deleted_table(self, get_infinity_db):

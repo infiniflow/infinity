@@ -105,6 +105,20 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
     else:
         raise Exception(f"unknown condition type: {cons}")
 
+def parse_expr(expr) -> ttypes.ParsedExpr:
+    try :
+        return traverse_conditions(expr)
+    except:
+        if isinstance(expr, exp.Func):
+            func_expr = ttypes.FunctionExpr(
+                function_name=expr.key,
+                arguments=[parse_expr(arg) for arg in expr.args]
+            )
+            expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+            parse_expr = ttypes.ParsedExpr(type=expr_type)
+            return parse_expr
+        else:
+            raise Exception(f"unknown expression type: {expr}")
 
 # invalid_name_array = [
 #     [],
