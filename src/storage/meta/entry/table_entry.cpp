@@ -331,7 +331,9 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
 
-        row_count += block_row_hashmap.size();
+        for (const auto &[_, block_row_offsets] : block_row_hashmap) {
+            row_count += block_row_offsets.size();
+        }
     }
     this->row_count_ -= row_count;
     return Status::OK();
