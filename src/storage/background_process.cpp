@@ -71,8 +71,7 @@ void BGTaskProcessor::Process() {
                 }
                 case BGTaskType::kAddDeltaEntry: {
                     auto *task = static_cast<AddDeltaEntryTask *>(bg_task.get());
-                    auto &delta_entry = task->delta_entry_;
-                    catalog_->AddDeltaEntry(std::move(delta_entry), task->wal_size_);
+                    catalog_->AddDeltaEntry(std::move(task->delta_entry_), task->wal_size_);
                     break;
                 }
                 case BGTaskType::kCheckpoint: {

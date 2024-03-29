@@ -434,6 +434,9 @@ void Txn::CommitBottom() noexcept {
 
     txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
 
+    if (!local_catalog_delta_ops_entry_->operations().empty()) {
+        local_catalog_delta_ops_entry_->set_sequence(txn_mgr_->NextSequence());
+    }
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;

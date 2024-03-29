@@ -703,35 +703,53 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     //         LOG_INFO(fmt::format("Add delta entry: {}", delta_entry->ToString()));
     //     }
     // }
-    std::unique_lock w_lock(mtx_);
-    TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
+    if(delta_entry->sequence() != last_sequence_ + 1) {
+        // Discontinuous
+        u64 entry_sequence = delta_entry->sequence();
+        sequence_heap_.push(entry_sequence);
+        delta_entry_map_.emplace(entry_sequence, std::move(delta_entry));
+    } else {
+        // Continuous
+        do {
+            TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
 
-    TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
-    if (max_commit_ts_ > max_commit_ts || wal_size_ > wal_size) {
-        UnrecoverableError(
-            fmt::format("max_commit_ts_ {} > max_commit_ts {} or wal_size_ {} > wal_size {}", max_commit_ts_, max_commit_ts, wal_size_, wal_size));
-    }
-    max_commit_ts_ = max_commit_ts;
-    wal_size_ = wal_size;
-
-    for (auto &op : delta_entry->operations()) {
-        bool prune = PruneDeltaOp(op.get(), current_commit_ts);
-
-        String encode = op->EncodeIndex();
-        auto iter = delta_ops_.find(encode);
-        if (iter != delta_ops_.end()) {
-            auto &delta_op = iter->second;
-            if (!prune) {
-                delta_op->Merge(std::move(op));
-            } else {
-                delta_ops_.erase(iter);
+            TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
+            if (max_commit_ts_ > max_commit_ts || wal_size_ > wal_size) {
+                UnrecoverableError(
+                        fmt::format("max_commit_ts_ {} > max_commit_ts {} or wal_size_ {} > wal_size {}", max_commit_ts_, max_commit_ts, wal_size_, wal_size));
             }
-        } else {
-            delta_ops_[encode] = std::move(op);
-        }
-    }
-    if (!delta_entry->txn_ids().empty()) {
-        txn_ids_.insert(delta_entry->txn_ids()[0]);
+            max_commit_ts_ = max_commit_ts;
+            wal_size_ = wal_size;
+
+            for (auto &op : delta_entry->operations()) {
+                bool prune = PruneDeltaOp(op.get(), current_commit_ts);
+
+                String encode = op->EncodeIndex();
+                auto iter = delta_ops_.find(encode);
+                if (iter != delta_ops_.end()) {
+                    auto &delta_op = iter->second;
+                    if (!prune) {
+                        delta_op->Merge(std::move(op));
+                    } else {
+                        delta_ops_.erase(iter);
+                    }
+                } else {
+                    delta_ops_[encode] = std::move(op);
+                }
+            }
+            if (!delta_entry->txn_ids().empty()) {
+                txn_ids_.insert(delta_entry->txn_ids()[0]);
+            }
+
+            ++ last_sequence_;
+
+            if(!sequence_heap_.empty() && sequence_heap_.top() == last_sequence_ + 1) {
+                delta_entry = std::move(delta_entry_map_[sequence_heap_.top()]);
+                sequence_heap_.pop();
+            } else {
+                break;
+            }
+        } while(true);
     }
 }
 
@@ -742,8 +760,6 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     }
 
     {
-        std::unique_lock w_lock(mtx_);
-
         for (auto &[_, delta_op] : delta_ops_) {
             if (delta_op->commit_ts_ < full_ckp_ts) {
                 continue;
