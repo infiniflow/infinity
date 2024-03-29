@@ -353,6 +353,9 @@ Status Status::InvalidExpression(const String &expr_str) { return Status(ErrorCo
 Status Status::SegmentNotExist(const SegmentID &segment_id) {
     return Status(ErrorCode::kSegmentNotExist, MakeUnique<String>(fmt::format("Segment: {} doesn't exist", segment_id)));
 }
+Status Status::BlockNotExist(const BlockID &block_id) {
+    return Status(ErrorCode::kBlockNotExist, MakeUnique<String>(fmt::format("Block: {} doesn't exist", block_id)));
+}
 
 Status Status::AggregateFunctionWithEmptyArgs() {
     return Status(ErrorCode::kAggregateFunctionWithEmptyArgs, MakeUnique<String>("Aggregate function with empty arguments"));
