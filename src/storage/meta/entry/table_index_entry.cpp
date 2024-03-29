@@ -117,11 +117,6 @@ bool TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedP
         auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, DEFAULT_SEGMENT_CAPACITY, column_def_);
         segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         index_by_segment_.emplace(segment_id, segment_index_entry);
-        if (last_segment_.get() == nullptr) {
-            last_segment_ = segment_index_entry;
-        } else {
-            assert(last_segment_->segment_id() < segment_id);
-        }
         created = true;
     } else {
         segment_index_entry = iter->second;
@@ -267,6 +262,7 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
 Tuple<Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     Vector<SegmentIndexEntry *> segment_index_entries;
+    SegmentID unsealed_id = table_entry->unsealed_id();
     for (const auto *segment_entry : block_index->segments_) {
         auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_count(), column_def_);
         SegmentID segment_id = segment_entry->segment_id();
@@ -276,6 +272,9 @@ TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_i
         }
         index_by_segment_.emplace(segment_id, segment_index_entry);
         segment_index_entries.push_back(segment_index_entry.get());
+        if (unsealed_id == segment_id) {
+            last_segment_ = segment_index_entry;
+        }
     }
     return {segment_index_entries, Status::OK()};
 }
