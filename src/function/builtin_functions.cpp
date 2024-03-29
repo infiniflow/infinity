@@ -68,7 +68,6 @@ void BuiltinFunctions::Init() {
 void BuiltinFunctions::RegisterAggregateFunction() {
     RegisterAvgFunction(catalog_ptr_);
     RegisterCountFunction(catalog_ptr_);
-    RegisterCountStarFunction(catalog_ptr_);
     RegisterFirstFunction(catalog_ptr_);
     RegisterMaxFunction(catalog_ptr_);
     RegisterMinFunction(catalog_ptr_);
