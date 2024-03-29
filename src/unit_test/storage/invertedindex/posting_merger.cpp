@@ -13,6 +13,7 @@ import index_defines;
 import column_index_reader;
 import posting_iterator;
 import file_system;
+import file_system_type;
 import local_file_system;
 import file_writer;
 import term_meta;
@@ -24,6 +25,7 @@ import posting_decoder;
 import column_index_merger;
 import internal_types;
 import logical_type;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -118,7 +120,6 @@ TEST_F(PostingMergerTest, Basic) {
     String dict_file = index_prefix;
     dict_file.append(DICT_SUFFIX);
 
-
     String posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
 
@@ -155,9 +156,39 @@ TEST_F(PostingMergerTest, Basic) {
         }
     }
 
-    auto posting_merger = MakeShared<PostingMerger>(memory_pool_, buffer_pool_);
+    auto merge_base_rowid = row_ids[0];
+    for (auto& row_id : row_ids) {
+        merge_base_rowid = std::min(merge_base_rowid, row_id);
+    }
 
-    posting_merger->Merge(segment_term_postings);
+    std::shared_mutex column_length_mutex;
+    Vector<u32> column_length_array;
+    {
+        LocalFileSystem fs;
+        // prepare column length info
+        // the indexes to be merged should be from the same segment
+        // otherwise the range of row_id will be very large ( >= 2^32)
+        std::unique_lock<std::shared_mutex> lock(column_length_mutex);
+        column_length_array.clear();
+        for (u32 i = 0; i < base_names.size(); ++i) {
+            String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
+            RowID base_row_id = row_ids[i];
+            u32 id_offset = base_row_id - merge_base_rowid;
+            UniquePtr<FileHandler> file_handler = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            const u32 file_size = fs.GetFileSize(*file_handler);
+            u32 file_read_array_len = file_size / sizeof(u32);
+            column_length_array.resize(id_offset + file_read_array_len);
+            const i64 read_count = fs.Read(*file_handler, column_length_array.data() + id_offset, file_size);
+            file_handler->Close();
+            if (read_count != file_size) {
+                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
+            }
+        }
+    }
+
+    auto posting_merger = MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_length_mutex, column_length_array);
+
+    posting_merger->Merge(segment_term_postings, merge_base_rowid);
     EXPECT_EQ(posting_merger->GetDF(), static_cast<u32>(2));
     EXPECT_EQ(posting_merger->GetTotalTF(), static_cast<u32>(3));
     for (auto segment_term_posting : segment_term_postings) {

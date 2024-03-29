@@ -18,10 +18,11 @@ module posting_iterator;
 
 namespace infinity {
 
-PostingIterator::PostingIterator(const PostingFormatOption &posting_option, MemoryPool *session_pool)
-    : posting_option_(posting_option), session_pool_(session_pool), last_doc_id_in_buffer_(INVALID_ROWID), current_row_id_(INVALID_ROWID),
+PostingIterator::PostingIterator(optionflag_t flag, MemoryPool *session_pool)
+    : posting_option_(flag), session_pool_(session_pool), last_doc_id_in_buffer_(INVALID_ROWID), current_row_id_(INVALID_ROWID),
       doc_buffer_cursor_(nullptr), current_ttf_(0), tf_buffer_cursor_(0), tf_buffer_(nullptr), doc_payload_buffer_(nullptr),
-      posting_decoder_(nullptr), need_move_to_current_doc_(false), in_doc_pos_iter_inited_(false), in_doc_pos_iterator_(nullptr) {
+      posting_decoder_(nullptr), need_move_to_current_doc_(false), in_doc_pos_iter_inited_(false), state_(posting_option_.GetPosListFormatOption()),
+      in_doc_pos_iterator_(nullptr) {
     tf_buffer_ = (tf_t *)((session_pool_)->Allocate(sizeof(tf_t) * MAX_DOC_PER_RECORD));
     doc_payload_buffer_ = (docpayload_t *)((session_pool_)->Allocate(sizeof(docpayload_t) * MAX_DOC_PER_RECORD));
     doc_buffer_base_ = doc_buffer_;
@@ -57,7 +58,6 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
         if (!posting_decoder_->DecodeDocBuffer(row_id, doc_buffer_, current_row_id, last_doc_id_in_buffer_, current_ttf_))
             return ret;
         doc_buffer_cursor_ = doc_buffer_ + 1;
-        posting_option_ = posting_decoder_->GetPostingFormatOption();
     }
     docid_t *cursor = doc_buffer_cursor_;
     while (current_row_id < row_id) {
@@ -114,7 +114,7 @@ void PostingIterator::Reset() {
         session_pool_->Deallocate((void *)posting_decoder_, sizeof(posting_decoder_));
     }
 
-    posting_decoder_ = new (session_pool_->Allocate(sizeof(MultiPostingDecoder))) MultiPostingDecoder(&state_, session_pool_);
+    posting_decoder_ = new (session_pool_->Allocate(sizeof(MultiPostingDecoder))) MultiPostingDecoder(posting_option_, &state_, session_pool_);
     posting_decoder_->Init(segment_postings_);
 
     current_row_id_ = INVALID_ROWID;

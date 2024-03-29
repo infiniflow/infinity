@@ -16,7 +16,11 @@ import term_meta;
 namespace infinity {
 export class PostingWriter {
 public:
-    PostingWriter(MemoryPool *byte_slice_pool, RecyclePool *buffer_pool, PostingFormatOption posting_option);
+    PostingWriter(MemoryPool *byte_slice_pool,
+                  RecyclePool *buffer_pool,
+                  PostingFormatOption posting_option,
+                  std::shared_mutex &column_length_mutex,
+                  Vector<u32> &column_length_array);
 
     ~PostingWriter();
 
@@ -44,6 +48,11 @@ public:
 
     InMemPostingDecoder *CreateInMemPostingDecoder(MemoryPool *session_pool) const;
 
+    u32 GetDocColumnLength(docid_t doc_id) {
+        std::shared_lock lock(column_length_mutex_);
+        return column_length_array_[doc_id];
+    }
+
 private:
     MemoryPool *byte_slice_pool_;
     RecyclePool *buffer_pool_;
@@ -51,6 +60,9 @@ private:
     PostingFormat *posting_format_{nullptr};
     DocListEncoder *doc_list_encoder_{nullptr};
     PositionListEncoder *position_list_encoder_{nullptr};
+    // for column length info
+    std::shared_mutex &column_length_mutex_;
+    Vector<u32> &column_length_array_;
 };
 
 export using PostingWriterProvider = std::function<SharedPtr<PostingWriter>(const String &)>;

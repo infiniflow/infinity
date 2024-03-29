@@ -7,6 +7,7 @@ import byte_slice_reader;
 import posting_decoder;
 import index_defines;
 import posting_field;
+import doc_list_format_option;
 
 export module index_decoder;
 
@@ -14,7 +15,7 @@ namespace infinity {
 
 export class IndexDecoder {
 public:
-    IndexDecoder() {}
+    IndexDecoder(const DocListFormatOption &doc_list_format_option) : doc_list_format_option_(doc_list_format_option) {}
 
     virtual ~IndexDecoder() = default;
 
@@ -32,13 +33,18 @@ public:
 
 protected:
     u32 skiped_item_count_ = {0};
+    DocListFormatOption doc_list_format_option_;
 };
 
 export template <typename SkipListType>
 class SkipIndexDecoder : public IndexDecoder {
 public:
-    SkipIndexDecoder(MemoryPool *session_pool, ByteSliceReader *doc_list_reader, u32 doc_list_begin)
-        : skiplist_reader_(nullptr), session_pool_(session_pool), doc_list_reader_(doc_list_reader), doc_list_begin_pos_(doc_list_begin) {
+    SkipIndexDecoder(MemoryPool *session_pool,
+                     ByteSliceReader *doc_list_reader,
+                     u32 doc_list_begin,
+                     const DocListFormatOption &doc_list_format_option)
+        : IndexDecoder(doc_list_format_option), skiplist_reader_(nullptr), session_pool_(session_pool), doc_list_reader_(doc_list_reader),
+          doc_list_begin_pos_(doc_list_begin) {
         doc_id_encoder_ = GetDocIDEncoder();
         tf_list_encoder_ = GetTFEncoder();
         doc_payload_encoder_ = GetDocPayloadEncoder();
@@ -56,13 +62,15 @@ public:
     }
 
     void InitSkipList(u32 start, u32 end, ByteSliceList *posting_list, df_t df) {
-        skiplist_reader_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipListType))) SkipListType()) : new SkipListType();
-        skiplist_reader_->Load(posting_list, start, end, (df - 1) / MAX_DOC_PER_RECORD + 1);
+        skiplist_reader_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipListType))) SkipListType(doc_list_format_option_))
+                                         : new SkipListType(doc_list_format_option_);
+        skiplist_reader_->Load(posting_list, start, end);
     }
 
     void InitSkipList(u32 start, u32 end, ByteSlice *posting_list, df_t df) {
-        skiplist_reader_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipListType))) SkipListType()) : new SkipListType();
-        skiplist_reader_->Load(posting_list, start, end, (df - 1) / MAX_DOC_PER_RECORD + 1);
+        skiplist_reader_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipListType))) SkipListType(doc_list_format_option_))
+                                         : new SkipListType(doc_list_format_option_);
+        skiplist_reader_->Load(posting_list, start, end);
     }
 
     bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf) {

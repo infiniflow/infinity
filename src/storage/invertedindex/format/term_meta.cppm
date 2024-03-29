@@ -55,8 +55,6 @@ export struct TermMeta {
 export class TermMetaLoader {
 public:
     TermMetaLoader(const PostingFormatOption &option);
-    TermMetaLoader() = default;
-    ~TermMetaLoader() = default;
 
     void Load(ByteSliceReader *byte_slice_reader, TermMeta &term_meta) const;
     void Load(const SharedPtr<FileReader> &reader, TermMeta &term_meta) const;
@@ -69,8 +67,6 @@ private:
 export class TermMetaDumper {
 public:
     explicit TermMetaDumper(const PostingFormatOption &option) : option_(option) {}
-    TermMetaDumper() = default;
-    ~TermMetaDumper() = default;
 
     u32 CalculateStoreSize(const TermMeta &term_meta) const;
     void Dump(const SharedPtr<FileWriter> &file, const TermMeta &term_meta) const;

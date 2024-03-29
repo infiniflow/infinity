@@ -16,14 +16,15 @@ module posting_writer;
 
 namespace infinity {
 
-PostingWriter::PostingWriter(MemoryPool *byte_slice_pool, RecyclePool *buffer_pool, PostingFormatOption posting_option)
+PostingWriter::PostingWriter(MemoryPool *byte_slice_pool,
+                             RecyclePool *buffer_pool,
+                             PostingFormatOption posting_option,
+                             std::shared_mutex &column_length_mutex,
+                             Vector<u32> &column_length_array)
     : byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), posting_option_(posting_option),
-      posting_format_(new PostingFormat(posting_option)) {
+      posting_format_(new PostingFormat(posting_option)), column_length_mutex_(column_length_mutex), column_length_array_(column_length_array) {
     if (posting_option.HasPositionList()) {
-        position_list_encoder_ = new PositionListEncoder(posting_option_.GetPosListFormatOption(),
-                                                         byte_slice_pool_,
-                                                         buffer_pool_,
-                                                         posting_format_->GetPositionListFormat());
+        position_list_encoder_ = new PositionListEncoder(posting_option_, byte_slice_pool_, buffer_pool_, posting_format_->GetPositionListFormat());
     }
     doc_list_encoder_ =
         new DocListEncoder(posting_option_.GetDocListFormatOption(), byte_slice_pool_, buffer_pool_, posting_format_->GetDocListFormat());
@@ -42,7 +43,8 @@ PostingWriter::~PostingWriter() {
 }
 
 void PostingWriter::EndDocument(docid_t doc_id, docpayload_t doc_payload) {
-    doc_list_encoder_->EndDocument(doc_id, doc_payload);
+    u32 doc_len = GetDocColumnLength(doc_id);
+    doc_list_encoder_->EndDocument(doc_id, doc_len, doc_payload);
     if (position_list_encoder_) {
         position_list_encoder_->EndDocument();
     }
