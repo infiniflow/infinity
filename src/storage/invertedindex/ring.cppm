@@ -80,8 +80,11 @@ public:
         return seq;
     }
 
-    void Iterate(std::function<void(T &)> func) {
+    void Iterate(std::function<void(T &)> func, bool wait_if_empty = true) {
         std::unique_lock<std::mutex> lock(mutex_);
+        if (off_ground_ == off_filled_ && wait_if_empty) {
+            cv_empty_.wait(lock, [this] { return off_ground_ < off_filled_; });
+        }
         for (u64 off = off_ground_; off < off_filled_; off++) {
             T &obj = ring_buf_[off & cap_mask_];
             func(obj);

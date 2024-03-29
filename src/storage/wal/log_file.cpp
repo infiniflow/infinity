@@ -49,7 +49,7 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> CatalogFile::P
         LOG_WARN(fmt::format("Delta catalog file {} is newer than the max checkpoint ts {}", delta_infos.back().path_, max_checkpoint_ts));
         delta_infos.pop_back();
     }
-    while (!delta_infos.empty() && delta_infos.front().max_commit_ts_ < last_full_info.max_commit_ts_) {
+    while (!delta_infos.empty() && delta_infos.front().max_commit_ts_ <= last_full_info.max_commit_ts_) {
         LOG_WARN(fmt::format("Delta catalog file {} is older than the full catalog file {}", delta_infos.front().path_, last_full_info.path_));
         delta_infos.erase(delta_infos.begin());
     }
@@ -155,7 +155,7 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
     }
     const auto &entries = fs.ListDirectory(wal_dir);
     if (entries.empty()) {
-        return {TempWalFileInfo{}, Vector<WalFileInfo>{}};
+        return {None, Vector<WalFileInfo>{}};
     }
     Optional<TempWalFileInfo> cur_wal_info;
     Vector<WalFileInfo> wal_infos;

@@ -47,7 +47,7 @@ import log_file;
 namespace infinity {
 
 class TxnManager;
-
+class Txn;
 class ProfileHistory {
 private:
     std::mutex lock_{};
@@ -297,6 +297,8 @@ private: // TODO: remove this
     void MemIndexCommitLoop();
 
 public:
+    void MemIndexRecover(Txn *faked_txn);
+
     void PickCleanup(CleanupScanner *scanner);
 
     // delta checkpoint info

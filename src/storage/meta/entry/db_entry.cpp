@@ -286,4 +286,14 @@ void DBEntry::MemIndexCommit() {
     }
 }
 
+void DBEntry::MemIndexRecover(Txn *faked_txn) {
+    auto table_meta_map_guard = table_meta_map_.GetMetaMap();
+    for (auto &[_, table_meta] : *table_meta_map_guard) {
+        auto [table_entry, status] = table_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
+        if (status.ok()) {
+            table_entry->MemIndexRecover(faked_txn);
+        }
+    }
+}
+
 } // namespace infinity
