@@ -48,7 +48,7 @@ public:
 
     void DoSeek(RowID doc_id) override;
 
-    u32 GetDF() const override;
+    u32 GetDF() const override { return or_iterator_df_; }
 
 private:
     DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }
@@ -73,6 +73,7 @@ private:
     }
 
     Vector<DocIteratorEntry> iterator_heap_;
-    u32 count_{0};
+    u32 count_{};
+    u32 or_iterator_df_{};
 };
 } // namespace infinity

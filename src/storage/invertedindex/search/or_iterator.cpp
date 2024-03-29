@@ -35,6 +35,10 @@ OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) {
         AdjustDown(i);
     }
     doc_id_ = iterator_heap_[1].doc_id_;
+    // init df
+    or_iterator_df_ = std::accumulate(children_.begin(), children_.end(), 0, [](u32 sum, const UniquePtr<DocIterator> &iter) -> u32 {
+        return sum + iter->GetDF();
+    });
 }
 
 OrIterator::~OrIterator() {}
@@ -47,14 +51,6 @@ void OrIterator::DoSeek(RowID id) {
         AdjustDown(1);
     }
     doc_id_ = iterator_heap_[1].doc_id_;
-}
-
-u32 OrIterator::GetDF() const {
-    u32 sum = 0;
-    for (u32 i = 0; i < children_.size(); ++i) {
-        sum += children_[i]->GetDF();
-    }
-    return sum;
 }
 
 } // namespace infinity

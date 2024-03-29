@@ -36,10 +36,8 @@ void AndNotIterator::DoSeek(RowID doc_id) {
     bool next_loop = false;
     do {
         children_[0]->Seek(doc_id);
-        if (RowID doc = children_[0]->Doc(); doc != doc_id) {
-            doc_id = doc;
-        }
-        if (doc_id == INVALID_ROWID) {
+        doc_id = children_[0]->Doc();
+        if (doc_id == INVALID_ROWID) [[unlikely]] {
             break;
         }
         // now doc_id < INVALID_ROWID

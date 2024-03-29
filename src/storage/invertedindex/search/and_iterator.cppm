@@ -33,9 +33,10 @@ public:
 
     void DoSeek(RowID doc_id) override;
 
-    u32 GetDF() const override;
+    u32 GetDF() const override { return and_iterator_df_; }
 
 private:
     Vector<DocIterator *> sorted_iterators_;
+    u32 and_iterator_df_{};
 };
 } // namespace infinity
