@@ -160,6 +160,8 @@ public:
     // Invoked once at init stage to recovery memory index.
     void MemIndexRecover(BufferManager* buffer_manager);
 
+    void OptimizeIndex(Txn *txn);
+
 public:
     // Getter
 

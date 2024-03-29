@@ -387,7 +387,8 @@ class TestIndex:
         for i in range(len(data["doctitle"])):
             value = [{"doctitle": data["doctitle"][i],
                       "docdate": data["docdate"][i], "body": data["body"][i]}]
-            table_obj.insert(value)
+            for j in range(250):
+                table_obj.insert(value)
         time.sleep(5)
         res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
             "body^5", "harmful chemical", "topn=3").to_pl()
