@@ -97,12 +97,7 @@ void TxnManager::SendToWAL(Txn *txn) {
         UnrecoverableError("TxnManager is null");
     }
 
-    std::unique_lock<std::shared_mutex> lk(rw_locker_);
-
-    TxnTimeStamp commit_ts = this->GetTimestamp();
-    txn->SetTxnCommitting(commit_ts);
-
-    wal_mgr_->PutEntry(txn->GetWALEntry());
+    wal_mgr_->PutEntry(txn->GetWALEntry(), txn);
 }
 
 void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {

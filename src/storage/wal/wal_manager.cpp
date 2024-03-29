@@ -106,7 +106,7 @@ void WalManager::Stop() {
     txn_mgr->Stop();
 
     // pop all the entries in the queue. and notify the condition variable.
-    blocking_queue_.Enqueue(nullptr);
+    blocking_queue_.Enqueue(nullptr, nullptr);
 
     // Wait for flush thread to stop
     LOG_TRACE("WalManager::Stop flush thread join");
@@ -118,12 +118,12 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-void WalManager::PutEntry(WalEntry* entry) {
+void WalManager::PutEntry(WalEntry* entry, Txn* txn) {
     if (!running_.load()) {
         return;
     }
 
-    blocking_queue_.Enqueue(entry);
+    blocking_queue_.Enqueue(entry, txn);
 
     return ;
 }
@@ -189,7 +189,7 @@ void WalManager::Flush() {
                 break;
             }
             case FlushOption::kOnlyWrite: {
-                ofs_.flush(); // FIXME: not flush, only write
+//                ofs_.flush(); // FIXME: not flush, only write
                 break;
             }
             case FlushOption::kFlushPerSecond: {

@@ -21,6 +21,8 @@ import default_values;
 import logger;
 import third_party;
 import wal_entry;
+import txn;
+import txn_manager;
 
 namespace infinity {
 
@@ -28,12 +30,17 @@ export class WALEntryBlockingQueue {
 public:
     explicit WALEntryBlockingQueue(SizeT capacity = DEFAULT_BLOCKING_QUEUE_SIZE) : capacity_(capacity) {}
 
-    bool Enqueue(WalEntry* task) {
+    bool Enqueue(WalEntry* task, Txn* txn) {
         {
             std::unique_lock <std::mutex> lock(queue_mutex_);
+
+            if(txn != nullptr) {
+                TxnTimeStamp commit_ts = txn->txn_mgr()->GetTimestamp();
+                txn->SetTxnCommitting(commit_ts);
+            }
+
             full_cv_.wait(lock, [this] {
-                bool ok = queue_.size() < capacity_;
-                return ok;
+                return queue_.size() < capacity_;
             });
             queue_.push_back(task);
         }

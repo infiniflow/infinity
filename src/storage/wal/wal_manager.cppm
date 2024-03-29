@@ -42,7 +42,7 @@ public:
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    void PutEntry(WalEntry* entry);
+    void PutEntry(WalEntry* entry, Txn* txn);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
