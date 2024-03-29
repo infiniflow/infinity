@@ -379,8 +379,8 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
         }
         for (auto &block_entry : this->block_entries_) {
             if (block_entry->commit_ts_ <= max_commit_ts) {
-                json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
                 block_entry->Flush(max_commit_ts);
+                json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
             }
         }
     }

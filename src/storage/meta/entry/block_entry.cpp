@@ -299,7 +299,11 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     json_res["block_id"] = this->block_id_;
     json_res["checkpoint_ts"] = this->checkpoint_ts_;
-    json_res["row_count"] = this->checkpoint_row_count_;
+    if (row_count_ != checkpoint_row_count_) {
+        UnrecoverableError(
+            fmt::format("BlockEntry row_count_ {} != checkpoint_row_count_ {}. Block should flush before.", row_count_, checkpoint_row_count_));
+    }
+    json_res["row_count"] = this->row_count_;
     json_res["row_capacity"] = this->row_capacity_;
     json_res["block_dir"] = *this->block_dir_;
     for (const auto &block_column_entry : this->columns_) {
