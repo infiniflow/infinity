@@ -281,6 +281,11 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
 
     auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
     txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+    for (auto &segment_index_entry : segment_index_entries) {
+        for (auto &chunk_index_intry : segment_index_entry->GetChunkIndexEntries()) {
+            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
+        }
+    }
     return Status::OK();
 }
 

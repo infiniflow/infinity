@@ -45,11 +45,10 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     Path path = Path(index_dir_) / dst_base_name;
     String index_prefix = path.string();
     String dict_file = index_prefix + DICT_SUFFIX;
-    String fst_file = dict_file + DICT_SUFFIX + ".fst";
+    String fst_file = dict_file + ".fst";
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs_, dict_file, 1024);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-    String posting_file = path.string();
-    posting_file.append(POSTING_SUFFIX);
+    String posting_file = index_prefix + POSTING_SUFFIX;
     posting_file_writer_ = MakeShared<FileWriter>(fs_, posting_file, 1024);
 
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
