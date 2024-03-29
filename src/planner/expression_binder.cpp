@@ -292,6 +292,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                 if (col_expr->star_) {
                     String &table_name = bind_context_ptr->table_names_[0];
                     TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+                    col_expr->names_.clear();
                     col_expr->names_.emplace_back(table_entry->GetColumnDefByID(0)->name_);
                 }
             }
