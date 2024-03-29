@@ -198,7 +198,7 @@ private:
     void CheckTxn(const String &db_name);
 
 private:
-    TxnStore txn_store_;
+    TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
 
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal

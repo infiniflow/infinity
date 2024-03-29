@@ -213,7 +213,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
 
         op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
 
-        op2->is_delete_ = true;
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kDelete;
 
         op1_same_name->db_entry_dir_ = op2->db_entry_dir_ = op1->db_entry_dir_ = db_dir;
 
@@ -232,7 +233,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
         op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
 
-        op2->is_delete_ = true;
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kDelete;
 
         op1_same_name->table_entry_dir_ = op2->table_entry_dir_ = op1->table_entry_dir_ = table_entry_dir;
         op1_same_name->column_defs_ = op2->column_defs_ = op1->column_defs_ = column_defs;
@@ -313,7 +315,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
         op1_same_name->index_name_ = op2->index_name_ = op1->index_name_ = index_name;
 
-        op2->is_delete_ = true;
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kDelete;
 
         op1_same_name->index_dir_ = op2->index_dir_ = op1->index_dir_ = index_dir;
         op1_same_name->index_base_ = op2->index_base_ = op1->index_base_ = index_base;
@@ -376,9 +379,58 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     }
 
     // merge
-    global_catalog_delta_entry->AddDeltaEntry(std::move(local_catalog_delta_entry), 0);
+    global_catalog_delta_entry->AddDeltaEntry(std::move(local_catalog_delta_entry), 0 /*wal_size*/);
     // check ops
     EXPECT_EQ(global_catalog_delta_entry->OpSize(), 4u);
 
     infinity::InfinityContext::instance().UnInit();
+}
+
+TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
+    GTEST_SKIP();
+
+    auto db_name = MakeShared<String>("db_test");
+    auto db_dir = MakeShared<String>("data");
+    auto table_name = MakeShared<String>("table_test");
+    auto table_entry_dir = MakeShared<String>("data/db_test/table_test");
+
+    auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
+    auto AddDeltaEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag) {
+        auto op1 = MakeUnique<AddDBEntryOp>();
+        op1->db_name_ = db_name;
+        op1->db_entry_dir_ = db_dir;
+        op1->merge_flag_ = merge_flag;
+        delta_entry->operations().push_back(std::move(op1));
+    };
+    {
+        TxnTimeStamp commit_ts = 1;
+        auto delta_entry = std::make_unique<CatalogDeltaEntry>();
+        delta_entry->set_txn_ids({1});
+        delta_entry->set_commit_ts(commit_ts);
+        AddDeltaEntry(delta_entry.get(), MergeFlag::kNew);
+        AddDeltaEntry(delta_entry.get(), MergeFlag::kUpdate);
+        global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry), 0 /*wal_size*/);
+
+        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+        EXPECT_EQ(merged_entry->operations().size(), 0u);
+    }
+    {
+        TxnTimeStamp commit_ts = 2;
+        auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+        delta_entry1->set_txn_ids({1});
+        delta_entry1->set_commit_ts(commit_ts);
+        AddDeltaEntry(delta_entry1.get(), MergeFlag::kNew);
+        AddDeltaEntry(delta_entry1.get(), MergeFlag::kUpdate);
+        global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry1), 0 /*wal_size*/);
+
+        auto delta_entry2 = std::make_unique<CatalogDeltaEntry>();
+        delta_entry2->set_txn_ids({2});
+        delta_entry2->set_commit_ts(commit_ts);
+        AddDeltaEntry(delta_entry2.get(), MergeFlag::kDelete);
+        AddDeltaEntry(delta_entry2.get(), MergeFlag::kNew);
+        global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry2), 0 /*wal_size*/);
+
+        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+        EXPECT_EQ(merged_entry->operations().size(), 1u);
+    }
 }

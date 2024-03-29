@@ -56,8 +56,7 @@ public:
                                                                    TxnTimeStamp max_ts,
                                                                    TransactionID txn_id,
                                                                    TxnTimeStamp begin_ts,
-                                                                   TxnTimeStamp commit_ts,
-                                                                   bool is_delete);
+                                                                   TxnTimeStamp commit_ts);
 
     [[nodiscard]] BufferHandle GetIndex();
 

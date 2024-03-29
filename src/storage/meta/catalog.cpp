@@ -399,7 +399,6 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["data_dir"] = *this->data_dir_;
         json_res["next_txn_id"] = this->next_txn_id_;
         json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
-        json_res["catalog_version"] = this->catalog_version_;
         databases.reserve(this->db_meta_map().size());
         for (auto &db_meta : this->db_meta_map()) {
             databases.push_back(db_meta.second.get());
@@ -437,11 +436,13 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
 
     // Load catalogs delta checkpoints and merge.
     TxnTimeStamp max_commit_ts = 0;
+
+    auto global_catalog_delta_entry = MakeUnique<GlobalCatalogDeltaEntry>();
     for (const auto &delta_ckp_info : delta_ckp_infos) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
         auto catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
         max_commit_ts = std::max(max_commit_ts, catalog_delta_entry->commit_ts());
-        catalog->ReplayDeltaEntry(std::move(catalog_delta_entry));
+        global_catalog_delta_entry->ReplayDeltaEntry(std::move(catalog_delta_entry));
     }
     catalog->LoadFromEntryDelta(max_commit_ts, buffer_mgr);
 
@@ -482,7 +483,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
         auto commit_ts = op->commit_ts_;
         auto txn_id = op->txn_id_;
         auto begin_ts = op->begin_ts_;
-        auto is_delete = op->is_delete_;
+        MergeFlag merge_flag = op->merge_flag_;
         if (op->commit_ts_ < full_ckp_commit_ts_) {
             // Ignore the old txn
             continue;
@@ -496,19 +497,20 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
                 const auto &db_name = add_db_entry_op->db_name_;
                 const auto &db_entry_dir = add_db_entry_op->db_entry_dir_;
-                if (!is_delete) {
-                    this->CreateDatabaseReplay(
-                        db_name,
-                        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
-                        },
-                        txn_id,
-                        begin_ts);
-                } else {
+                if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
                     this->DropDatabaseReplay(
                         *db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                             return DBEntry::ReplayDBEntry(db_meta, true, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                        },
+                        txn_id,
+                        begin_ts);
+                }
+                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDeleteAndNew) {
+                    this->CreateDatabaseReplay(
+                        db_name,
+                        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -527,11 +529,11 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                if (!is_delete) {
-                    db_entry->CreateTableReplay(
-                        table_name,
+                if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
+                    db_entry->DropTableReplay(
+                        *table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableEntry::ReplayTableEntry(false,
+                            return TableEntry::ReplayTableEntry(true,
                                                                 table_meta,
                                                                 table_entry_dir,
                                                                 table_name,
@@ -546,11 +548,12 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         },
                         txn_id,
                         begin_ts);
-                } else {
-                    db_entry->DropTableReplay(
-                        *table_name,
+                }
+                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDeleteAndNew) {
+                    db_entry->CreateTableReplay(
+                        table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableEntry::ReplayTableEntry(true,
+                            return TableEntry::ReplayTableEntry(false,
                                                                 table_meta,
                                                                 table_entry_dir,
                                                                 table_name,
@@ -668,7 +671,10 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
-                if (!is_delete) {
+                if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
+                    table_entry->DropIndexReplay(*index_name, txn_id, begin_ts);
+                }
+                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDeleteAndNew) {
                     table_entry->CreateIndexReplay(
                         index_name,
                         [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -676,8 +682,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         },
                         txn_id,
                         begin_ts);
-                } else {
-                    table_entry->DropIndexReplay(*index_name, txn_id, begin_ts);
                 }
                 break;
             }
@@ -707,8 +711,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                                              max_ts,
                                                                                              txn_id,
                                                                                              begin_ts,
-                                                                                             commit_ts,
-                                                                                             is_delete);
+                                                                                             commit_ts);
                     bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
                     if (!insert_ok) {
                         UnrecoverableError(fmt::format("Segment index {} is already in the catalog", segment_id));
@@ -802,7 +805,6 @@ UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, Buff
     auto catalog = MakeUnique<Catalog>(std::move(data_dir));
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
-    catalog->catalog_version_ = catalog_json["catalog_version"];
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
@@ -915,8 +917,6 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
     global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry), wal_size);
 }
-
-void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 

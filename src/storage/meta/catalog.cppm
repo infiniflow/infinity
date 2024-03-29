@@ -238,8 +238,6 @@ public:
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
-    void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
-
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
 
     static UniquePtr<Catalog>
@@ -275,9 +273,11 @@ public:
     MetaMap<DBMeta> db_meta_map_{};
 
     TransactionID next_txn_id_{};
-    TxnTimeStamp full_ckp_commit_ts_{};
-    u64 catalog_version_{}; // TODO seems useless
 
+private:
+    TxnTimeStamp full_ckp_commit_ts_{};
+
+public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
