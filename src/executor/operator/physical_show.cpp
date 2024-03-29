@@ -256,6 +256,31 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+
+        case ShowType::kShowBlock: {
+            output_names_->reserve(8);
+            output_types_->reserve(8);
+
+            output_names_->emplace_back("id");
+            output_names_->emplace_back("path");
+            output_names_->emplace_back("size");
+            output_names_->emplace_back("row_capacity");
+            output_names_->emplace_back("row_count");
+            output_names_->emplace_back("checkpoint_row_count");
+            output_names_->emplace_back("column_count");
+            output_names_->emplace_back("checkpoint_ts");
+
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+
         case ShowType::kShowSessionStatus: {
             output_names_->reserve(2);
             output_types_->reserve(2);
@@ -342,6 +367,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowBlocks: {
             ExecuteShowBlocks(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowBlock: {
+            ExecuteShowBlockDetail(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowViews: {
@@ -1360,6 +1389,106 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
+
+void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    auto txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
+
+    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
+        return;
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bigint_type
+    };
+    output_block_ptr->Init(column_types);
+
+    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
+    if (!segment_entry) {
+        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        return;
+    }
+
+    auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
+    if (!block_entry) {
+        RecoverableError(Status::BlockNotExist(*block_id_));
+        return;
+    }
+
+    SizeT column_id = 0;
+    {
+        Value value = Value::MakeBigInt(block_entry->block_id());
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    ++column_id;
+    {
+        Value value = Value::MakeVarchar(*block_entry->base_dir());
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    ++column_id;
+    {
+        const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*block_entry->base_dir()));
+        Value value = Value::MakeVarchar(blk_size);
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    ++column_id;
+    {
+        Value value = Value::MakeBigInt(block_entry->row_capacity());
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    ++column_id;
+    {
+        Value value = Value::MakeBigInt(block_entry->row_count());
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    ++column_id;
+    {
+        Value value = Value::MakeBigInt(block_entry->checkpoint_row_count());
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    ++column_id;
+    {
+        Value value = Value::MakeBigInt(block_entry->columns().size());
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    ++column_id;
+    {
+        Value value = Value::MakeBigInt(block_entry->checkpoint_ts());
+        ValueExpression value_expr(value);
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
 
 // Execute show system table
 void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *show_operator_state) {
