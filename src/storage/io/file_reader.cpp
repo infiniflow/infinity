@@ -52,9 +52,10 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
             RecoverableError(Status::DataIOError(fmt::format("No enough data from file: {}", file_handler_->path_.string())));
         }
 
-        buffer_offset_ += buffer_offset_ + read_size;
+        buffer_start_ += buffer_offset_ + read_size;
         buffer_offset_ = buffer_length_ = 0;
     }
+    // buffer_offset_ += read_size;
 }
 
 bool FileReader::Finished() const { return buffer_start_ + buffer_offset_ >= file_size_; }

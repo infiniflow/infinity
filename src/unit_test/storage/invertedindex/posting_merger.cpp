@@ -157,7 +157,12 @@ TEST_F(PostingMergerTest, Basic) {
 
     auto posting_merger = MakeShared<PostingMerger>(memory_pool_, buffer_pool_);
 
-    posting_merger->Merge(segment_term_postings);
+    auto merge_base_rowid = row_ids[0];
+    for (auto& row_id : row_ids) {
+        merge_base_rowid = std::min(merge_base_rowid, row_id);
+    }
+
+    posting_merger->Merge(segment_term_postings, merge_base_rowid);
     EXPECT_EQ(posting_merger->GetDF(), static_cast<u32>(2));
     EXPECT_EQ(posting_merger->GetTotalTF(), static_cast<u32>(3));
     for (auto segment_term_posting : segment_term_postings) {
