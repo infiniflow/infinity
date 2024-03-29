@@ -36,7 +36,7 @@ public:
                 return ok;
             });
             queue_.push_back(task);
-            if(task->vip_) {
+            if(task.get() != nullptr && task->vip_) {
                 LOG_INFO(fmt::format("Finish send blocking queue1: {}", queue_.size()));
             }
         }
@@ -71,22 +71,16 @@ public:
     void DequeueBulk(Deque<SharedPtr<WalEntry>> &output_array) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] {
-            for(const auto& wal_entry_ptr: queue_) {
-                if(wal_entry_ptr->vip_) {
-                    LOG_INFO("Receive vip entry");
-                }
-            }
-
             return !queue_.empty();
         });
 
-        for(const auto& wal_entry_ptr: queue_) {
-            if(wal_entry_ptr->vip_) {
-                LOG_INFO("Receive vip entry");
-            }
-            output_array.emplace_back(wal_entry_ptr);
-        }
-//        output_array = queue_;
+//        for(const auto& wal_entry_ptr: queue_) {
+//            if(wal_entry_ptr.get() != nullptr && wal_entry_ptr->vip_) {
+//                LOG_INFO("Receive vip entry");
+//            }
+//            output_array.emplace_back(wal_entry_ptr);
+//        }
+        output_array = queue_;
 //        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
         queue_.clear();
         full_cv_.notify_one();

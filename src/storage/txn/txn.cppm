@@ -177,8 +177,6 @@ public:
 
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    void CheckpointBG(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
-
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
     void DeltaCheckpoint(const TxnTimeStamp max_commit_ts);

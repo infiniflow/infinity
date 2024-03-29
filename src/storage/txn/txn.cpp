@@ -380,10 +380,6 @@ void Txn::Begin() {
 }
 
 TxnTimeStamp Txn::Commit() {
-    if(vip_) {
-        LOG_INFO("VIP txn is starting to commit");
-    }
-    LOG_TRACE(fmt::format("Txn commit: {} is started.", txn_id_));
     TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     txn_context_.SetTxnCommitting(commit_ts);
     // TODO: serializability validation. ASSUMES always valid for now.
@@ -399,9 +395,6 @@ TxnTimeStamp Txn::Commit() {
         txn_mgr_->Invalidate(commit_ts);
         txn_context_.SetTxnCommitted();
         LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
-        if(vip_) {
-            LOG_INFO("VIP txn is readonly.");
-        }
         return commit_ts;
     }
     // Put wal entry to the manager in the same order as commit_ts.
@@ -490,14 +483,6 @@ void Txn::Rollback() {
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    if (is_full_checkpoint) {
-        FullCheckpoint(max_commit_ts);
-    } else {
-        DeltaCheckpoint(max_commit_ts);
-    }
-}
-
-void Txn::CheckpointBG(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {
         FullCheckpoint(max_commit_ts);
     } else {
