@@ -858,7 +858,7 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
 
     {
         for (auto &[_, delta_op] : delta_ops_) {
-            if (delta_op->commit_ts_ < full_ckp_ts) {
+            if (delta_op->commit_ts_ <= full_ckp_ts) { // skip the delta op that is before full checkpoint
                 continue;
             }
             flush_delta_entry->AddOperation(std::move(delta_op));
