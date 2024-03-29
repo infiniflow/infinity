@@ -80,6 +80,9 @@ void Storage::Init() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    Txn *faked_txn = txn_mgr_->CreateTxn();
+    new_catalog_->MemIndexRecover(faked_txn);
+
     bg_processor_->Start();
 
     auto txn = txn_mgr_->CreateTxn();

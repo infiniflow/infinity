@@ -114,7 +114,6 @@ TEST_F(MemoryIndexerTest, Insert) {
     indexer1.Insert(column_, 0, 1, column_length_file_handler_1);
     indexer1.Insert(column_, 1, 3, std::move(column_length_file_handler_1));
     indexer1.Dump();
-    fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 4U);
 
     String column_length_file_path_2 = String("/tmp/infinity/fulltext_tbl1_col1/chunk2") + LENGTH_SUFFIX;
     auto column_length_file_handler_2 =
@@ -139,23 +138,6 @@ TEST_F(MemoryIndexerTest, Insert) {
     ColumnIndexReader reader;
     reader.Open(flag_, "/tmp/infinity/fulltext_tbl1_col1", std::move(index_by_segment));
     Check(reader);
-
-    /*     // Merge two chunks and validate the output
-        fake_segment_index_entry_1->GetMemoryIndexer()->Dump();
-        String dst_base_name = "merged_index";
-        Vector<String> base_names = {"chunk1", "chunk2"};
-        Vector<RowID> row_ids = {RowID{0U, 0U}, RowID{0U, 4U}};
-        auto column_index_merger = MakeShared<ColumnIndexMerger>("/tmp/infinity/fulltext_tbl1_col1", flag_, &byte_slice_pool_, &buffer_pool_);
-        column_index_merger->Merge(base_names, row_ids, dst_base_name);
-
-        auto fake_segment_index_entry_3 = SegmentIndexEntry::CreateFakeEntry();
-        fake_segment_index_entry_3->AddChunkIndexEntry(dst_base_name, RowID(0U, 0U).ToUint64(), 5U);
-        Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_3 = {{0, fake_segment_index_entry_3}};
-
-        ColumnIndexReader reader3;
-        reader.Open(flag_, "/tmp/infinity/fulltext_tbl1_col1", std::move(index_by_segment_3));
-        Check(reader);
-     */
 }
 
 TEST_F(MemoryIndexerTest, test2) {

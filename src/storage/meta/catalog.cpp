@@ -929,6 +929,16 @@ void Catalog::MemIndexCommitLoop() {
     }
 }
 
+void Catalog::MemIndexRecover(Txn *faked_txn) {
+    auto db_meta_map_guard = db_meta_map_.GetMetaMap();
+    for (auto &[_, db_meta] : *db_meta_map_guard) {
+        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
+        if (status.ok()) {
+            db_entry->MemIndexRecover(faked_txn);
+        }
+    }
+}
+
 Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_catalog_delta_entry_->GetCheckpointState(); }
 
 void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }

@@ -187,6 +187,7 @@ void SegmentIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_ent
             UnrecoverableError(*err_msg);
         }
     }
+    max_ts_ = txn->CommitTS();
 }
 
 void SegmentIndexEntry::MemIndexCommit() {
@@ -281,6 +282,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             UnrecoverableError(*err_msg);
         }
     }
+    max_ts_ = txn->CommitTS();
 }
 
 Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, Txn *txn, bool prepare, bool check_ts) {
