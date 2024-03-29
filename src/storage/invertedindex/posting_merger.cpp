@@ -181,7 +181,6 @@ PostingMerger::~PostingMerger() {}
 
 void PostingMerger::Merge(const Vector<SegmentTermPosting *>& segment_term_postings, const RowID& merge_base_rowid) {
     // segment_term_postings is already sorted by base_row_id
-    // RowID merge_base_rowid = segment_term_postings[0]->GetBaseRowId();
     for (u32 i = 0; i < segment_term_postings.size(); ++i) {
         SegmentTermPosting *term_posting = segment_term_postings[i];
         RowID base_row_id = term_posting->GetBaseRowId();
