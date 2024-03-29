@@ -11,6 +11,7 @@ import index_defines;
 import term_meta;
 import column_index_iterator;
 import segment_term_posting;
+import internal_types;
 
 namespace infinity {
 
@@ -21,7 +22,7 @@ public:
 
     ~PostingMerger();
 
-    void Merge(const Vector<SegmentTermPosting *> &segment_term_postings);
+    void Merge(const Vector<SegmentTermPosting *> &segment_term_postings, const RowID& merge_base_rowid);
 
     void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
 

@@ -27,7 +27,7 @@ public:
 private:
     SharedPtr<PostingMerger> CreatePostingMerger();
 
-    void MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings);
+    void MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings, const RowID &merge_base_rowid);
 
     String index_dir_;
     optionflag_t flag_;

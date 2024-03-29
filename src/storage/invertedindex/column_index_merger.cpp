@@ -2,6 +2,7 @@ module;
 
 #include <fstream>
 #include <string>
+#include <cassert>
 
 module column_index_merger;
 
@@ -32,6 +33,10 @@ ColumnIndexMerger::~ColumnIndexMerger() {}
 SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() { return MakeShared<PostingMerger>(memory_pool_, buffer_pool_); }
 
 void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name) {
+    assert(base_names.size() == base_rowids.size());
+    if (base_rowids.empty()) {
+        return;
+    }
     Path path = Path(index_dir_) / dst_base_name;
     String index_prefix = path.string();
     String dict_file = index_prefix + DICT_SUFFIX;
@@ -51,10 +56,15 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     TermMeta term_meta;
     SizeT term_meta_offset = 0;
 
+    auto merge_base_rowid = base_rowids[0];
+    for (auto& row_id : base_rowids) {
+        merge_base_rowid = std::min(merge_base_rowid, row_id);
+    }
+
     while (!term_posting_queue.Empty()) {
         const Vector<SegmentTermPosting *> &merging_term_postings = term_posting_queue.GetCurrentMerging(term);
 
-        MergeTerm(term, term_meta, merging_term_postings);
+        MergeTerm(term, term_meta, merging_term_postings, merge_base_rowid);
 
         term_meta_dumpler.Dump(dict_file_writer, term_meta);
 
@@ -71,9 +81,12 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     buffer_pool_->Release();
 }
 
-void ColumnIndexMerger::MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings) {
+void ColumnIndexMerger::MergeTerm(const String &term,
+                                  TermMeta &term_meta,
+                                  const Vector<SegmentTermPosting *> &merging_term_postings,
+                                  const RowID &merge_base_rowid) {
     SharedPtr<PostingMerger> posting_merger = CreatePostingMerger();
-    posting_merger->Merge(merging_term_postings);
+    posting_merger->Merge(merging_term_postings, merge_base_rowid);
 
     posting_merger->Dump(posting_file_writer_, term_meta);
 //    memory_pool_->Reset();
