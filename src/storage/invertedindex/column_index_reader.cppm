@@ -62,7 +62,13 @@ struct Hash {
 export struct IndexReader {
     ColumnIndexReader *GetColumnIndexReader(u64 column_id) { return column_index_readers_[column_id].get(); }
 
-    bool NeedRefreshColumnIndexReader(u64 column_id, u64 ts) { return column_index_flags_[column_id] < ts; }
+    bool NeedRefreshColumnIndexReader(u64 column_id, u64 ts) {
+        auto it = column_index_flags_.find(column_id);
+        if (it != column_index_flags_.end()) {
+            return it->second < ts;
+        }
+        return true;
+    }
 
     void SetColumnIndexReader(u64 column_id, u64 ts, UniquePtr<ColumnIndexReader> column_index_reader) {
         column_index_flags_[column_id] = ts;

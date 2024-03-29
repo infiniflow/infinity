@@ -157,6 +157,9 @@ public:
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
 
+    // Invoked once at init stage to recovery memory index.
+    void MemIndexRecover(Txn *faked_txn);
+
 public:
     // Getter
 

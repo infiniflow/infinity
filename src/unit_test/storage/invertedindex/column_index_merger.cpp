@@ -145,9 +145,8 @@ void ColumnIndexMergerTest::MergeAndCheckIndex(const String& index_dir,
     column_index_merger->Merge(base_names, base_row_ids, dst_base_name);
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    fake_segment_index_entry_1->GetFulltextBaseNames().emplace_back(dst_base_name);
-    fake_segment_index_entry_1->GetFulltextBaseRowIDs().emplace_back(RowID(0U, 0U).ToUint64());
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
+    fake_segment_index_entry_1->AddChunkIndexEntry(dst_base_name, RowID(0U, 0U), 0U);
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
     auto dir = index_dir;
     reader.Open(flag_, std::move(dir), std::move(index_by_segment));

@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <fstream>
 
 module catalog_delta_entry;
@@ -64,6 +65,10 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
         }
         case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
             operation = AddSegmentIndexEntryOp::ReadAdv(ptr);
+            break;
+        }
+        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+            operation = AddChunkIndexEntryOp::ReadAdv(ptr);
             break;
         }
         case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
@@ -208,6 +213,20 @@ UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
     return add_segment_index_op;
 }
 
+UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
+    auto add_chunk_index_op = MakeUnique<AddChunkIndexEntryOp>();
+    add_chunk_index_op->ReadAdvBase(ptr);
+
+    add_chunk_index_op->db_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_chunk_index_op->table_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_chunk_index_op->index_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_chunk_index_op->segment_id_ = ReadBufAdv<SegmentID>(ptr);
+    add_chunk_index_op->base_name_ = ReadBufAdv<String>(ptr);
+    add_chunk_index_op->base_rowid_ = RowID::FromUint64(ReadBufAdv<u64>(ptr));
+    add_chunk_index_op->row_count_ = ReadBufAdv<u32>(ptr);
+    return add_chunk_index_op;
+}
+
 UniquePtr<SetSegmentStatusSealedOp> SetSegmentStatusSealedOp::ReadAdv(char *&ptr) {
     auto set_segment_status_sealed_op = MakeUnique<SetSegmentStatusSealedOp>();
     set_segment_status_sealed_op->ReadAdvBase(ptr);
@@ -319,6 +338,17 @@ void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_ts_);
 }
 
+void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
+    WriteBufAdv(buf, *this->index_name_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->base_name_);
+    WriteBufAdv(buf, this->base_rowid_.ToUint64());
+    WriteBufAdv(buf, this->row_count_);
+}
+
 void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
@@ -419,6 +449,17 @@ const String AddSegmentIndexEntryOp::ToString() const {
                        max_ts_);
 }
 
+const String AddChunkIndexEntryOp::ToString() const {
+    return fmt::format("AddChunkIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} base_name: {} base_rowid: {} row_count: {}",
+                       *db_name_,
+                       *table_name_,
+                       *index_name_,
+                       segment_id_,
+                       base_name_,
+                       base_rowid_.ToUint64(),
+                       row_count_);
+}
+
 const String SetSegmentStatusSealedOp::ToString() const {
     return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", *db_name_, *table_name_, segment_id_);
 }
@@ -492,6 +533,13 @@ bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const 
            min_ts_ == rhs_op->min_ts_ && max_ts_ == rhs_op->max_ts_;
 }
 
+bool AddChunkIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddChunkIndexEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_) && segment_id_ == rhs_op->segment_id_ &&
+           base_name_ == rhs_op->base_name_ && base_rowid_ == rhs_op->base_rowid_ && row_count_ == rhs_op->row_count_;
+}
+
 bool SetSegmentStatusSealedOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const SetSegmentStatusSealedOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
@@ -556,6 +604,13 @@ void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
     *this = std::move(*static_cast<AddSegmentIndexEntryOp *>(other.get()));
+}
+
+void AddChunkIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddChunkIndexEntryOp *>(other.get()));
 }
 
 void SetSegmentStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other) { UnrecoverableError("SetSegmentStatusSealedOp::Merge not allowed"); }

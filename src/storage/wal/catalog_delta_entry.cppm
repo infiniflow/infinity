@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module catalog_delta_entry;
 
 import table_def;
@@ -28,6 +30,7 @@ import block_entry;
 import block_column_entry;
 import table_index_entry;
 import segment_index_entry;
+import chunk_index_entry;
 import catalog;
 import serialize;
 import third_party;
@@ -55,6 +58,7 @@ export enum class CatalogDeltaOpType : i8 {
     // -----------------------------
     ADD_TABLE_INDEX_ENTRY = 11,
     ADD_SEGMENT_INDEX_ENTRY = 12,
+    ADD_CHUNK_INDEX_ENTRY = 13,
 
     // -----------------------------
     // SEGMENT STATUS
@@ -422,6 +426,61 @@ public:
     SegmentID segment_id_{0};
     TxnTimeStamp min_ts_{0};
     TxnTimeStamp max_ts_{0};
+};
+
+/// class AddSegmentColumnEntryOperation
+export class AddChunkIndexEntryOp : public CatalogDeltaOperation {
+public:
+    static UniquePtr<AddChunkIndexEntryOp> ReadAdv(char *&ptr);
+
+    AddChunkIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {}
+
+    explicit AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry),
+          db_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
+          table_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
+          index_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->index_name()),
+          segment_id_(chunk_index_entry->segment_index_entry_->segment_id()), base_name_(chunk_index_entry->base_name_),
+          base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_) {}
+
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_CHUNK_INDEX_ENTRY"; }
+    [[nodiscard]] SizeT GetSizeInBytes() const final {
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_->size();
+        total_size += sizeof(i32) + this->table_name_->size();
+        total_size += sizeof(i32) + this->index_name_->size();
+        total_size += sizeof(SegmentID);
+        total_size += sizeof(i32) + this->base_name_.size();
+        total_size += sizeof(RowID);
+        total_size += sizeof(u32);
+        return total_size;
+    }
+    void WriteAdv(char *&buf) const final;
+    const String ToString() const final;
+    const String EncodeIndex() const final {
+        return String(fmt::format("#{}#{}#{}#{}#{}#{}#{}@{}",
+                                  *db_name_,
+                                  *table_name_,
+                                  *index_name_,
+                                  segment_id_,
+                                  base_name_,
+                                  base_rowid_.ToUint64(),
+                                  row_count_,
+                                  (u8)(type_)));
+    }
+    void Flush(TxnTimeStamp max_commit_ts);
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+
+public:
+    SharedPtr<String> db_name_{};
+    SharedPtr<String> table_name_{};
+    SharedPtr<String> index_name_{};
+    SegmentID segment_id_{0};
+    String base_name_{};
+    RowID base_rowid_;
+    u32 row_count_{0};
 };
 
 // used when a segment is sealed (import, append, compact)

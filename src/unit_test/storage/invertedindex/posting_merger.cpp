@@ -90,8 +90,7 @@ void PostingMergerTest::CreateIndex() {
         indexer1("/tmp/infinity/posting_merger", "chunk1", RowID(0U, 0U), flag_, "standard", *byte_slice_pool_, *buffer_pool_, thread_pool_);
     indexer1.Insert(column, 0, 1, column_length_file_handler_1);
     indexer1.Dump();
-    fake_segment_index_entry_1->GetFulltextBaseNames().emplace_back("chunk1");
-    fake_segment_index_entry_1->GetFulltextBaseRowIDs().emplace_back(RowID(0U, 0U).ToUint64());
+    fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
     String column_length_file_path_2 = String("/tmp/infinity/posting_merger/chunk2") + LENGTH_SUFFIX;
     auto column_length_file_handler_2 =

@@ -60,8 +60,8 @@ public:
                 SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
                 bool offline = false);
 
-    // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
-    // Other threads can also call this method.
+    // Commit(false) is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
+    // Commit(true) is blocking and thread-unsafe. There shall be onle one thread call this method at a time.
     void Commit(bool offline = false);
 
     // CommitSync wait at max 100ms to get a batch of insertions and commit them. Returens the size of the batch.

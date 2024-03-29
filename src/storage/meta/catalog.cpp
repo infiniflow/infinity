@@ -710,6 +710,34 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 }
                 break;
             }
+            case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+                auto add_chunk_index_entry_op = static_cast<AddChunkIndexEntryOp *>(op.get());
+                const auto &db_name = add_chunk_index_entry_op->db_name_;
+                const auto &table_name = add_chunk_index_entry_op->table_name_;
+                const auto &index_name = add_chunk_index_entry_op->index_name_;
+                auto segment_id = add_chunk_index_entry_op->segment_id_;
+                const auto &base_name = add_chunk_index_entry_op->base_name_;
+                auto base_rowid = add_chunk_index_entry_op->base_rowid_;
+                auto row_count = add_chunk_index_entry_op->row_count_;
+
+                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+
+                if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
+                    auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
+                    auto *segment_entry = iter->second.get();
+                    if (segment_entry->status() == SegmentStatus::kDeprecated) {
+                        UnrecoverableError(fmt::format("Segment {} is deprecated", segment_id));
+                    }
+                    auto iter2 = table_index_entry->index_by_segment().find(segment_id);
+                    if (iter2 == table_index_entry->index_by_segment().end()) {
+                        UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
+                    }
+                    auto *segment_index_entry = iter2->second.get();
+                    segment_index_entry->AddChunkIndexEntry(base_name, base_rowid, row_count);
+                }
+                break;
+            }
             case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
                 auto *set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
                 const auto &db_name = set_segment_status_sealed_op->db_name_;
@@ -898,6 +926,16 @@ void Catalog::MemIndexCommitLoop() {
     while (running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         MemIndexCommit();
+    }
+}
+
+void Catalog::MemIndexRecover(Txn *faked_txn) {
+    auto db_meta_map_guard = db_meta_map_.GetMetaMap();
+    for (auto &[_, db_meta] : *db_meta_map_guard) {
+        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
+        if (status.ok()) {
+            db_entry->MemIndexRecover(faked_txn);
+        }
     }
 }
 
