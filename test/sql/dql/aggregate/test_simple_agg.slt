@@ -341,7 +341,7 @@ SELECT MIN(c1) FROM simple_agg_with_modify
 
 query II
 SELECT MIN(c2) FROM simple_agg_with_modify
-----`
+----
 1.000000
 
 query I
