@@ -69,7 +69,7 @@ export struct WalBlockInfo {
     BlockID block_id_{};
     u16 row_count_{};
     u16 row_capacity_{};
-    Vector<i32> next_outline_idxes_;
+    Vector<Pair<i32, u64>> outline_infos_;
 
     WalBlockInfo() = default;
 

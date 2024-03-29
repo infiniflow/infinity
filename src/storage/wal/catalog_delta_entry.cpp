@@ -186,6 +186,7 @@ UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(char *&ptr) {
     add_column_op->block_id_ = ReadBufAdv<BlockID>(ptr);
     add_column_op->column_id_ = ReadBufAdv<ColumnID>(ptr);
     add_column_op->next_outline_idx_ = ReadBufAdv<i32>(ptr);
+    add_column_op->last_chunk_offset_ = ReadBufAdv<u64>(ptr);
     return add_column_op;
 }
 
@@ -317,6 +318,7 @@ void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->block_id_);
     WriteBufAdv(buf, this->column_id_);
     WriteBufAdv(buf, this->next_outline_idx_);
+    WriteBufAdv(buf, this->last_chunk_offset_);
 }
 
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
@@ -424,13 +426,15 @@ const String AddBlockEntryOp::ToString() const {
 }
 
 const String AddColumnEntryOp::ToString() const {
-    return fmt::format("AddColumnEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} column_id: {} next_outline_idx: {}",
-                       *db_name_,
-                       *table_name_,
-                       segment_id_,
-                       block_id_,
-                       column_id_,
-                       next_outline_idx_);
+    return fmt::format(
+        "AddColumnEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} column_id: {} next_outline_idx: {}, last_chunk_offset: {}",
+        *db_name_,
+        *table_name_,
+        segment_id_,
+        block_id_,
+        column_id_,
+        next_outline_idx_,
+        last_chunk_offset_);
 }
 
 const String AddTableIndexEntryOp::ToString() const {
@@ -519,7 +523,7 @@ bool AddColumnEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddColumnEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
            IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ && block_id_ == rhs_op->block_id_ &&
-           column_id_ == rhs_op->column_id_ && next_outline_idx_ == rhs_op->next_outline_idx_;
+           column_id_ == rhs_op->column_id_ && next_outline_idx_ == rhs_op->next_outline_idx_ && last_chunk_offset_ == rhs_op->last_chunk_offset_;
 }
 
 bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {

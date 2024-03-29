@@ -69,6 +69,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                         ColumnID column_id,
                                                                         BufferManager *buffer_manager,
                                                                         i32 next_outline_idx,
+                                                                        u64 last_chunk_offset,
                                                                         TxnTimeStamp commit_ts) {
     UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
     column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
@@ -88,6 +89,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
         auto *buffer_obj = buffer_manager->Get(std::move(file_worker));
         column_entry->outline_buffers_.emplace_back(buffer_obj);
     }
+    column_entry->last_chunk_offset_ = last_chunk_offset;
 
     return column_entry;
 }
@@ -197,6 +199,7 @@ nlohmann::json BlockColumnEntry::Serialize() {
     {
         std::shared_lock lock(mutex_);
         json_res["next_outline_idx"] = outline_buffers_.size();
+        json_res["last_chunk_offset"] = this->LastChunkOff();
     }
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
@@ -210,7 +213,9 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
     ColumnID column_id = column_data_json["column_id"];
     i32 next_outline_idx = column_data_json["next_outline_idx"];
     TxnTimeStamp commit_ts = column_data_json["commit_ts"];
-    UniquePtr<BlockColumnEntry> block_column_entry = NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, commit_ts);
+    u64 last_chunk_offset = column_data_json["last_chunk_offset"];
+    UniquePtr<BlockColumnEntry> block_column_entry =
+        NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts);
 
     block_column_entry->begin_ts_ = column_data_json["begin_ts"];
     block_column_entry->txn_id_ = column_data_json["txn_id"];

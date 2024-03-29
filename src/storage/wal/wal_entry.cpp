@@ -38,20 +38,21 @@ namespace infinity {
 
 WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     : block_id_(block_entry->block_id_), row_count_(block_entry->row_count_), row_capacity_(block_entry->row_capacity_) {
-    next_outline_idxes_.resize(block_entry->columns_.size());
+    outline_infos_.resize(block_entry->columns_.size());
     for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
-        next_outline_idxes_[i] = block_entry->columns_[i]->OutlineBufferCount();
+        auto *column = block_entry->columns_[i].get();
+        outline_infos_[i] = {column->OutlineBufferCount(), column->LastChunkOff()};
     }
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
     return block_id_ == other.block_id_ && row_count_ == other.row_count_ && row_capacity_ == other.row_capacity_ &&
-           next_outline_idxes_ == other.next_outline_idxes_;
+           outline_infos_ == other.outline_infos_;
 }
 
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
-    size += sizeof(i32) + next_outline_idxes_.size() * sizeof(i32);
+    size += sizeof(i32) + outline_infos_.size() * (sizeof(i32) + sizeof(u64));
     return size;
 }
 
@@ -59,9 +60,10 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, block_id_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
-    WriteBufAdv(buf, static_cast<i32>(next_outline_idxes_.size()));
-    for (const auto &idx : next_outline_idxes_) {
+    WriteBufAdv(buf, static_cast<i32>(outline_infos_.size()));
+    for (const auto &[idx, off] : outline_infos_) {
         WriteBufAdv(buf, idx);
+        WriteBufAdv(buf, off);
     }
 }
 
@@ -71,9 +73,9 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     block_info.row_count_ = ReadBufAdv<u16>(ptr);
     block_info.row_capacity_ = ReadBufAdv<u16>(ptr);
     i32 count = ReadBufAdv<i32>(ptr);
-    block_info.next_outline_idxes_.resize(count);
+    block_info.outline_infos_.resize(count);
     for (i32 i = 0; i < count; i++) {
-        block_info.next_outline_idxes_[i] = ReadBufAdv<i32>(ptr);
+        block_info.outline_infos_[i] = {ReadBufAdv<i32>(ptr), ReadBufAdv<u64>(ptr)};
     }
     return block_info;
 }
@@ -82,9 +84,10 @@ String WalBlockInfo::ToString() const {
     std::stringstream ss;
     ss << "block_id: " << block_id_ << ", row_count: " << row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", next_outline_idxes: [";
-    for (SizeT i = 0; i < next_outline_idxes_.size(); i++) {
-        ss << next_outline_idxes_[i];
-        if (i != next_outline_idxes_.size() - 1) {
+    for (SizeT i = 0; i < outline_infos_.size(); i++) {
+        auto &[idx, off] = outline_infos_[i];
+        ss << "(" << idx << ", " << off << ")";
+        if (i != outline_infos_.size() - 1) {
             ss << ", ";
         }
     }

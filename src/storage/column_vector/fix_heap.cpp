@@ -34,14 +34,21 @@ FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size)
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
+    current_chunk_idx_ = INVALID_CHUNK_ID;
 }
 
 FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size)
-    : current_chunk_size_(chunk_size), current_chunk_idx_(block_column_entry->OutlineBufferCount()), buffer_mgr_(buffer_mgr),
+    : current_chunk_size_(chunk_size), current_chunk_offset_(block_column_entry->LastChunkOff()), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
+    int cnt = block_column_entry->OutlineBufferCount();
+    if (cnt == 0) {
+        current_chunk_idx_ = INVALID_CHUNK_ID;
+    } else {
+        current_chunk_idx_ = cnt - 1;
+    }
 }
 
 FixHeapManager::~FixHeapManager() {
@@ -65,18 +72,19 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
     }
 }
 
-Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
+Pair<ChunkId, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
         UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes));
     }
 
     SizeT rest_nbytes = nbytes;
-    u64 start_chunk_id = current_chunk_idx_;
-    u64 start_chunk_offset = current_chunk_offset_;
 
-    if (chunks_.empty()) {
+    if (current_chunk_idx_ == INVALID_CHUNK_ID) {
+        current_chunk_idx_ = 0;
         chunks_.emplace(current_chunk_idx_, AllocateChunk());
     }
+    ChunkId start_chunk_id = current_chunk_idx_;
+    ChunkId start_chunk_offset = current_chunk_offset_;
     if (current_chunk_offset_ + nbytes > current_chunk_size_) {
         rest_nbytes -= (current_chunk_size_ - current_chunk_offset_);
         while (rest_nbytes > current_chunk_size_) {
@@ -100,7 +108,7 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
     if (auto iter = chunks_.find(chunk_id); iter != chunks_.end()) {
         return iter->second;
     }
-    if (buffer_mgr_ == nullptr || chunk_id >= block_column_entry_->OutlineBufferCount()) {
+    if (buffer_mgr_ == nullptr || chunk_id >= (ChunkId)block_column_entry_->OutlineBufferCount()) {
         UnrecoverableError("No such chunk in heap");
     }
     auto *outline_buffer = block_column_entry_->GetOutlineBuffer(chunk_id);
@@ -120,11 +128,11 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
 }
 
 // return value: start chunk id & chunk offset
-Pair<u64, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) {
+Pair<ChunkId, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) {
     auto [chunk_id, chunk_offset] = Allocate(nbytes);
 
-    u64 start_chunk_id = chunk_id;
-    u64 start_chunk_offset = chunk_offset;
+    ChunkId start_chunk_id = chunk_id;
+    ChunkId start_chunk_offset = chunk_offset;
     while (nbytes > 0) {
         VectorHeapChunk &chunk = ReadChunk(chunk_id);
         char *start_ptr = chunk.GetPtrMut() + chunk_offset;
@@ -141,15 +149,18 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) 
             chunk_offset = 0;
         }
     }
+    if (buffer_mgr_ != nullptr) {
+        block_column_entry_->SetLastChunkOff(current_chunk_offset_);
+    }
 
     return {start_chunk_id, start_chunk_offset};
 }
 
 // return value: start chunk id & chunk offset
-Pair<u64, u64> FixHeapManager::AppendToHeap(FixHeapManager *src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes) {
+Pair<ChunkId, u64> FixHeapManager::AppendToHeap(FixHeapManager *src_heap_mgr, ChunkId src_chunk_id, u64 src_chunk_offset, SizeT nbytes) {
     auto [chunk_id, chunk_offset] = Allocate(nbytes);
-    u64 start_chunk_id = chunk_id;
-    u64 start_chunk_offset = chunk_offset;
+    ChunkId start_chunk_id = chunk_id;
+    ChunkId start_chunk_offset = chunk_offset;
     while (nbytes > 0) {
         VectorHeapChunk &dst_chunk = ReadChunk(chunk_id);
         char *start_ptr = dst_chunk.GetPtrMut() + chunk_offset;
@@ -187,13 +198,16 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(FixHeapManager *src_heap_mgr, u64 sr
             src_chunk_offset += copy_size;
         }
     }
+    if (buffer_mgr_ != nullptr) {
+        block_column_entry_->SetLastChunkOff(current_chunk_offset_);
+    }
 
     return {start_chunk_id, start_chunk_offset};
 }
 
 // Read #nbytes size of data from offset: #chunk_offset of chunk: #chunk_id to buffer: #buffer, Make sure the buffer has enough space to hold
 // the size of data.
-void FixHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes) {
+void FixHeapManager::ReadFromHeap(char *buffer, ChunkId chunk_id, u64 chunk_offset, SizeT nbytes) {
     while (nbytes > 0) {
         const VectorHeapChunk &src_chunk = ReadChunk(chunk_id);
         const char *start_ptr = src_chunk.GetPtr() + chunk_offset;

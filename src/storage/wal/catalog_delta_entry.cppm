@@ -316,7 +316,8 @@ public:
           db_name_(column_entry->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetDBName()),
           table_name_(column_entry->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetTableName()),
           segment_id_(column_entry->GetBlockEntry()->GetSegmentEntry()->segment_id()), block_id_(column_entry->GetBlockEntry()->block_id()),
-          column_id_(column_entry->column_id()), next_outline_idx_(column_entry->OutlineBufferCount()) {}
+          column_id_(column_entry->column_id()), next_outline_idx_(column_entry->OutlineBufferCount()),
+          last_chunk_offset_(column_entry->LastChunkOff()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_COLUMN_ENTRY; }
     String GetTypeStr() const final { return "ADD_COLUMN_ENTRY"; }
@@ -324,7 +325,7 @@ public:
         auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
         total_size += sizeof(i32) + this->db_name_->size();
         total_size += sizeof(i32) + this->table_name_->size();
-        total_size += sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(i32);
+        total_size += sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(i32) + sizeof(last_chunk_offset_);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -342,6 +343,7 @@ public:
     BlockID block_id_{};
     ColumnID column_id_{};
     i32 next_outline_idx_{0};
+    u64 last_chunk_offset_{};
 };
 
 /// class AddTableIndexEntryOp

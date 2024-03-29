@@ -643,13 +643,14 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto block_id = add_column_entry_op->block_id_;
                 auto column_id = add_column_entry_op->column_id_;
                 i32 next_outline_idx = add_column_entry_op->next_outline_idx_;
+                u64 last_chunk_offset = add_column_entry_op->last_chunk_offset_;
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 block_entry->AddColumnReplay(
-                    BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, commit_ts),
+                    BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts),
                     column_id);
                 break;
             }
