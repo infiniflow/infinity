@@ -14,6 +14,8 @@
 
 module;
 
+#include <iostream>
+#include <cassert>
 #include <string>
 
 module physical_match;
@@ -92,9 +94,15 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     u32 result_count = 0;
     UniquePtr<float[]> score_result;
     UniquePtr<RowID[]> row_id_result;
+#ifdef INFINITY_DEBUG
+    if (doc_iterator.get() != nullptr) {
+        LOG_TRACE("DocIterator created successfully");
+        full_text_query_context.query_tree_->PrintTree(std::cerr);
+    }
+#endif
 
     // 3 full text search
-    RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : doc_iterator->Doc();
+    RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->PrepareFirstDoc(), doc_iterator->Doc());
     if (iter_row_id != INVALID_ROWID) [[likely]] {
         u32 top_n = 0;
         if (auto iter_n_option = search_ops.options_.find("topn"); iter_n_option != search_ops.options_.end()) {

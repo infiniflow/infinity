@@ -24,13 +24,10 @@ import internal_types;
 
 namespace infinity {
 
-AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) {
-    children_ = std::move(iterators);
+AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiQueryDocIterator(std::move(iterators)) {
     // initialize doc_id_ to first valid doc
     DoSeek(0);
 }
-
-AndNotIterator::~AndNotIterator() {}
 
 void AndNotIterator::DoSeek(RowID doc_id) {
     bool next_loop = false;

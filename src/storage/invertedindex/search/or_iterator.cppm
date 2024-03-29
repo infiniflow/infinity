@@ -42,8 +42,6 @@ public:
 
     OrIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    virtual ~OrIterator();
-
     bool IsOr() const override { return true; }
 
     void DoSeek(RowID doc_id) override;
@@ -52,6 +50,8 @@ public:
 
 private:
     DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }
+
+    const DocIterator *GetDocIterator(u32 i) const { return children_[i].get(); }
 
     void AdjustDown(u32 idx) {
         DocIteratorEntry *heap = iterator_heap_.data();

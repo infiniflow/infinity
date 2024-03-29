@@ -1,0 +1,79 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+module;
+
+export module blockmax_term_doc_iterator;
+
+import stl;
+import index_defines;
+import internal_types;
+import posting_iterator;
+import term_doc_iterator;
+import early_terminate_iterator;
+
+namespace infinity {
+class MemoryPool;
+class SegmentPosting;
+class FullTextColumnLengthReader;
+
+export class BlockMaxTermDocIterator final : public EarlyTerminateIterator {
+public:
+    BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool);
+
+    bool InitPostingIterator(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32 state_pool_size);
+
+    void MultiplyWeight(float factor) { weight_ *= factor; }
+
+    Pair<RowID, float> NextWithThreshold(float threshold) override;
+
+    Pair<RowID, float> BlockNextWithThreshold(float threshold) override;
+
+    void UpdateScoreThreshold(float threshold) override {} // do nothing
+
+    bool BlockSkipTo(RowID doc_id, float threshold) override;
+
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const { return iter_.GetBlockMaxInfo(); }
+
+    void InitBM25Info(u64 total_df, float avg_column_len, FullTextColumnLengthReader *column_length_reader);
+
+    RowID BlockMinPossibleDocID() const override {
+        const RowID prev_end = iter_.PrevBlockLastDocID();
+        return prev_end == 0 ? 0 : prev_end + 1;
+    }
+
+    RowID BlockLastDocID() const override { return iter_.BlockLastDocID(); }
+
+    // weight included
+    float BlockMaxBM25Score() override;
+
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold) override;
+
+    // weight included
+    float BM25Score();
+
+private:
+    // similar to TermDocIterator
+    PostingIterator iter_; // initialized in constructor and InitPostingIterator() function
+    float weight_ = 1.0f;  // changed in MultiplyWeight()
+    // for BM25 Score
+    float avg_column_len_ = 0;
+    FullTextColumnLengthReader *column_length_reader_ = nullptr;
+    float bm25_common_score_ = 0; // include: weight * smooth_idf * (k1 + 1.0F)
+    float block_max_bm25_score_cache_ = 0;
+    RowID block_max_bm25_score_cache_end_id_ = INVALID_ROWID;
+};
+} // namespace infinity

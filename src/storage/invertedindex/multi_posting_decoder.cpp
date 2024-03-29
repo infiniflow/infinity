@@ -24,12 +24,6 @@ import internal_types;
 
 namespace infinity {
 
-MultiPostingDecoder::MultiPostingDecoder(const PostingFormatOption &format_option, InDocPositionState *state, MemoryPool *pool)
-    : format_option_(format_option), session_pool_(pool), in_doc_state_keeper_(state, pool) {
-    need_decode_tf_ = format_option_.HasTfList();
-    need_decode_doc_payload_ = format_option_.HasDocPayload();
-}
-
 MultiPostingDecoder::~MultiPostingDecoder() {
     if (index_decoder_) {
         if (session_pool_) {
@@ -46,14 +40,27 @@ void MultiPostingDecoder::Init(SharedPtr<Vector<SegmentPosting>> &seg_postings) 
     MoveToSegment(0UL);
 }
 
-bool MultiPostingDecoder::DecodeDocBuffer(RowID start_row_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf) {
+bool MultiPostingDecoder::SkipTo(RowID start_row_id, RowID &prev_last_doc_id, RowID &last_doc_id, ttf_t &current_ttf) {
     while (true) {
-        if (DecodeDocBufferInOneSegment(start_row_id, doc_buffer, first_doc_id, last_doc_id, current_ttf)) {
+        if (SkipInOneSegment(start_row_id, prev_last_doc_id, last_doc_id, current_ttf)) {
             return true;
         }
         if (!MoveToSegment(start_row_id)) {
             return false;
         }
+    }
+    return false;
+}
+
+// u32: block max tf
+// u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+Pair<u32, u16> MultiPostingDecoder::GetBlockMaxInfo() const { return index_decoder_->GetBlockMaxInfo(); }
+
+bool MultiPostingDecoder::DecodeCurrentDocIDBuffer(docid_t *doc_buffer) {
+    if (need_decode_doc_id_) {
+        index_decoder_->DecodeCurrentDocIDBuffer(doc_buffer);
+        need_decode_doc_id_ = false;
+        return true;
     }
     return false;
 }
@@ -74,27 +81,22 @@ void MultiPostingDecoder::DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payloa
     }
 }
 
-bool MultiPostingDecoder::DecodeDocBufferInOneSegment(RowID start_row_id,
-                                                      docid_t *doc_buffer,
-                                                      RowID &first_row_id,
-                                                      RowID &last_row_id,
-                                                      ttf_t &current_ttf) {
+bool MultiPostingDecoder::SkipInOneSegment(RowID start_row_id, RowID &prev_last_row_id, RowID &last_row_id, ttf_t &current_ttf) {
     RowID next_seg_base_row_id = GetSegmentBaseRowId(segment_cursor_);
     if (next_seg_base_row_id != INVALID_ROWID && start_row_id >= next_seg_base_row_id) {
         // start docid not in current segment
         return false;
     }
-
     docid_t cur_seg_doc_id = (start_row_id >= base_row_id_) ? docid_t(start_row_id - base_row_id_) : 0;
-
-    docid_t first_doc_id, last_doc_id;
-    if (!index_decoder_->DecodeDocBuffer(cur_seg_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf)) {
+    docid_t prev_last_doc_id, last_doc_id;
+    if (!index_decoder_->DecodeSkipList(cur_seg_doc_id, prev_last_doc_id, last_doc_id, current_ttf)) {
         return false;
     }
+    need_decode_doc_id_ = true;
     need_decode_tf_ = format_option_.HasTfList();
     need_decode_doc_payload_ = format_option_.HasDocPayload();
 
-    first_row_id = base_row_id_ + first_doc_id;
+    prev_last_row_id = base_row_id_ + prev_last_doc_id;
     last_row_id = base_row_id_ + last_doc_id;
     return true;
 }

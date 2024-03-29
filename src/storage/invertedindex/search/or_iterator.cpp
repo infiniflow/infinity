@@ -22,8 +22,7 @@ import index_defines;
 import multi_query_iterator;
 import doc_iterator;
 namespace infinity {
-OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) {
-    children_ = std::move(iterators);
+OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiQueryDocIterator(std::move(iterators)) {
     count_ = children_.size();
     iterator_heap_.resize(children_.size() + 1);
     for (u32 i = 0; i < children_.size(); ++i) {
@@ -40,8 +39,6 @@ OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) {
         return sum + iter->GetDF();
     });
 }
-
-OrIterator::~OrIterator() {}
 
 void OrIterator::DoSeek(RowID id) {
     while (id > iterator_heap_[1].doc_id_) {

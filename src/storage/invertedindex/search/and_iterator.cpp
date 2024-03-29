@@ -23,8 +23,7 @@ import internal_types;
 
 namespace infinity {
 
-AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) {
-    children_ = std::move(iterators);
+AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiQueryDocIterator(std::move(iterators)) {
     sorted_iterators_.reserve(children_.size());
     for (u32 i = 0; i < children_.size(); ++i) {
         sorted_iterators_.push_back(children_[i].get());
@@ -38,8 +37,6 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) {
         and_iterator_df_ = std::min(and_iterator_df_, c->GetDF());
     }
 }
-
-AndIterator::~AndIterator() {}
 
 void AndIterator::DoSeek(RowID doc_id) {
     auto ib = sorted_iterators_.begin();

@@ -95,6 +95,8 @@ export class ColumnLengthReader {
 public:
     void LoadColumnLength(RowID first_doc_id, IndexReader &index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length);
 
+    FullTextColumnLengthReader* GetColumnLengthReader(u32 scorer_column_idx) { return &column_length_vector_[scorer_column_idx]; }
+
     inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx].GetColumnLength(row_id); }
 };
 
