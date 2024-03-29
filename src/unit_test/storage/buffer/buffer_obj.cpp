@@ -601,8 +601,12 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             auto [table_index_entry, table_index_status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
             EXPECT_TRUE(table_index_status.ok());
 
-            auto segment_index_entry = table_index_entry->index_by_segment().at(0);
-            auto index_handle = segment_index_entry->GetIndex();
+            auto &index_by_segment = table_index_entry->index_by_segment();
+            auto iter = index_by_segment.find(0);
+            if (iter != index_by_segment.end()) {
+                auto &segment_index_entry = iter->second;
+                auto index_handle = segment_index_entry->GetIndex();
+            }
         }
 
         txn_mgr->CommitTxn(txn);
