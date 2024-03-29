@@ -38,8 +38,6 @@ public:
 
     UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
 
-    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
-
     float GetAvgColumnLength() const;
 
 private:

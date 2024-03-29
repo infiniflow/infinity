@@ -7,14 +7,15 @@ import position_list_decoder;
 import posting_byte_slice_reader;
 import in_doc_pos_state;
 import short_list_optimize_util;
+import posting_list_format;
 import position_list_format_option;
-import position_list_skiplist_reader;
+import skiplist_reader;
 import index_defines;
 module inmem_position_list_decoder;
 
 namespace infinity {
 
-InMemPositionListDecoder::InMemPositionListDecoder(const PositionListFormatOption &option, MemoryPool *session_pool)
+InMemPositionListDecoder::InMemPositionListDecoder(const PostingFormatOption &option, MemoryPool *session_pool)
     : PositionListDecoder(option, session_pool), pos_list_buffer_(nullptr) {}
 
 InMemPositionListDecoder::~InMemPositionListDecoder() {
@@ -27,9 +28,13 @@ InMemPositionListDecoder::~InMemPositionListDecoder() {
     }
 }
 
-void InMemPositionListDecoder::Init(ttf_t total_tf, PositionListSkipListReader *skip_list_reader, PostingByteSlice *pos_list_buffer) {
+void InMemPositionListDecoder::Init(ttf_t total_tf,
+                                    SkipListReader *skip_list_reader,
+                                    u32 skiplist_reader_real_size,
+                                    PostingByteSlice *pos_list_buffer) {
     total_tf_ = total_tf;
     pos_skiplist_reader_ = skip_list_reader;
+    skiplist_reader_real_size_ = skiplist_reader_real_size;
     pos_list_buffer_ = pos_list_buffer;
     pos_list_reader_.Open(pos_list_buffer);
     decoded_pos_count_ = 0;

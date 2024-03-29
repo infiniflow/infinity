@@ -12,20 +12,26 @@ module inmem_doc_list_decoder;
 
 namespace infinity {
 
-InMemDocListDecoder::InMemDocListDecoder(MemoryPool *session_pool)
-    : skiped_item_count_(0), session_pool_(session_pool), skiplist_reader_(nullptr), doc_list_buffer_(nullptr), df_(0), finish_decoded_(false) {}
+InMemDocListDecoder::InMemDocListDecoder(MemoryPool *session_pool, const DocListFormatOption &doc_list_format_option)
+    : IndexDecoder(doc_list_format_option), session_pool_(session_pool) {}
 
 InMemDocListDecoder::~InMemDocListDecoder() {
     if (session_pool_) {
+        if (skiplist_reader_) {
+            skiplist_reader_->~SkipListReaderPostingByteSlice();
+            session_pool_->Deallocate((void *)skiplist_reader_, sizeof(SkipListReaderPostingByteSlice));
+        }
         doc_list_buffer_->~PostingByteSlice();
         session_pool_->Deallocate((void *)doc_list_buffer_, sizeof(PostingByteSlice));
     } else {
+        if (skiplist_reader_) {
+            delete skiplist_reader_;
+        }
         delete doc_list_buffer_;
-        doc_list_buffer_ = nullptr;
     }
 }
 
-void InMemDocListDecoder::Init(df_t df, SkipListReader *skiplist_reader, PostingByteSlice *doc_list_buffer) {
+void InMemDocListDecoder::Init(df_t df, SkipListReaderPostingByteSlice *skiplist_reader, PostingByteSlice *doc_list_buffer) {
     df_ = df;
     skiplist_reader_ = skiplist_reader;
     doc_list_buffer_ = doc_list_buffer;

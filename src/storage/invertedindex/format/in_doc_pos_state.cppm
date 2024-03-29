@@ -12,8 +12,8 @@ namespace infinity {
 class PositionListDecoder;
 export class InDocPositionState {
 public:
-    InDocPositionState(const PositionListFormatOption &option = PositionListFormatOption())
-        : pos_decoder_(nullptr), record_offset_(0), offset_in_record_(0), total_position_count_(0) {}
+    InDocPositionState(const PositionListFormatOption &option)
+        : pos_decoder_(nullptr), record_offset_(0), offset_in_record_(0), total_position_count_(0), option_(option) {}
     virtual ~InDocPositionState() = default;
 
     void SetRowID(RowID row_id) { row_id_ = row_id; }

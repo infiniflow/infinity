@@ -48,12 +48,15 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta))
         return false;
-    posting_reader_->Seek(term_meta.doc_start_);
     u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
     ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
-    posting_reader_->Read((char *)slice->data_, file_length);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        posting_reader_->Seek(term_meta.doc_start_);
+        posting_reader_->Read((char *)slice->data_, file_length);
+    }
     SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
-    seg_posting.Init(byte_slice_list, base_row_id_, term_meta.doc_freq_, term_meta);
+    seg_posting.Init(std::move(byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
     return true;
 }
 

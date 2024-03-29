@@ -12,14 +12,8 @@ namespace infinity {
 
 export class PostingFormatOption {
 public:
-    inline PostingFormatOption(optionflag_t flag = OPTION_FLAG_ALL) : has_term_payload_(false) { InitOptionFlag(flag); }
-    ~PostingFormatOption() = default;
-
-    inline void InitOptionFlag(optionflag_t flag) {
-        has_term_payload_ = flag & of_term_payload;
-        doc_list_format_option_.Init(flag);
-        pos_list_format_option_.Init(flag);
-    }
+    inline PostingFormatOption(optionflag_t flag)
+        : has_term_payload_(flag & of_term_payload), doc_list_format_option_(flag), pos_list_format_option_(flag) {}
 
     bool HasTfList() const { return doc_list_format_option_.HasTfList(); }
 

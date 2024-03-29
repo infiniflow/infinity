@@ -18,7 +18,11 @@ namespace infinity {
 class PostingDumper;
 export class PostingMerger {
 public:
-    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool);
+    PostingMerger(MemoryPool *memory_pool,
+                  RecyclePool *buffer_pool,
+                  optionflag_t flag,
+                  std::shared_mutex &column_length_mutex,
+                  Vector<u32> &column_length_array);
 
     ~PostingMerger();
 
@@ -37,5 +41,8 @@ private:
     SharedPtr<PostingDumper> posting_dumper_;
     df_t df_;
     ttf_t ttf_;
+    // for column length info
+    std::shared_mutex &column_length_mutex_;
+    Vector<u32> &column_length_array_;
 };
 } // namespace infinity
