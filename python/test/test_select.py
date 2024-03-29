@@ -145,11 +145,10 @@ class TestSelect:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
 
-        # Need fix rbo caused it Planner Error: Indices must be in order @src/planner/bound/base_table_ref.cppm:45
-        # res = table_obj.output(["c2"]).filter(
-        #     "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
-        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-        #                               .astype({'c2': dtype('int32')}))
+        res = table_obj.output(["c2"]).filter(
+            "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
 
         res = db_obj.drop_table("test_select")
         assert res.error_code == ErrorCode.OK
