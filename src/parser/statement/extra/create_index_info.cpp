@@ -81,13 +81,16 @@ std::string CreateIndexInfo::ToString() const {
     ss << "CREATE INDEX ";
     switch (conflict_type_) {
         case ConflictType::kIgnore: {
-            ss << "IF NOT EXISTS ";
+            ss << "Ignore ";
+            break;
         }
         case ConflictType::kError: {
+            ss << "Error ";
             break;
         }
         case ConflictType::kReplace: {
-            ParserError("Not implemented.");
+            ss << "Replace ";
+            break;
         }
         case ConflictType::kInvalid: {
             ParserError("Invalid conflict type.");
