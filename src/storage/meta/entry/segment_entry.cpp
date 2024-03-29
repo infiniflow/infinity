@@ -315,6 +315,7 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
 }
 
 void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    std::unique_lock w_lock(rw_locker_);
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
         UnrecoverableError(fmt::format("SegmentEntry commit_ts {} is less than max_row_ts {}", commit_ts, max_row_ts_));

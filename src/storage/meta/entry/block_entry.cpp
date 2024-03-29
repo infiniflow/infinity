@@ -186,6 +186,8 @@ void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const 
 }
 
 void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    std::unique_lock w_lock(this->rw_locker_);
+
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         UnrecoverableError(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));

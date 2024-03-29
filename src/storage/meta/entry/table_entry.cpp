@@ -496,14 +496,11 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
 }
 
 Status TableEntry::CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
-    {
-        std::unique_lock w_lock(this->rw_locker_);
-        for (const auto &[segment_id, segment_store] : segment_stores) {
-            auto *segment_entry = segment_store.segment_entry_;
-            segment_entry->CommitSegment(txn_id, commit_ts);
-            for (auto *block_entry : segment_store.block_entries_) {
-                block_entry->CommitBlock(txn_id, commit_ts);
-            }
+    for (const auto &[segment_id, segment_store] : segment_stores) {
+        auto *segment_entry = segment_store.segment_entry_;
+        segment_entry->CommitSegment(txn_id, commit_ts);
+        for (auto *block_entry : segment_store.block_entries_) {
+            block_entry->CommitBlock(txn_id, commit_ts);
         }
     }
     return Status::OK();
