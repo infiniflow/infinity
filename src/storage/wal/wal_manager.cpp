@@ -122,9 +122,13 @@ void WalManager::PutEntry(SharedPtr<WalEntry> entry) {
     if (!running_.load()) {
         return;
     }
-
+    if(entry->vip_) {
+        LOG_INFO("Entering WAL Manager's blocking queue");
+    }
     blocking_queue_.Enqueue(entry);
-
+    if(entry->vip_) {
+        LOG_INFO("Finish entering WAL Manager's blocking queue");
+    }
     return ;
 }
 
@@ -145,15 +149,25 @@ i64 WalManager::GetLastCkpWalSize() {
 void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
-    Deque<SharedPtr<WalEntry>> log_batch{};
+//    Deque<SharedPtr<WalEntry>> log_batch{};
+    SharedPtr<WalEntry> entry;
+
     while (running_.load()) {
-        blocking_queue_.DequeueBulk(log_batch);
-        if (log_batch.empty()) {
-            LOG_WARN("WalManager::Dequeue empty batch logs");
-            continue;
-        }
+//        blocking_queue_.DequeueBulk(log_batch);
+        blocking_queue_.Dequeue(entry);
+//        LOG_INFO("WAL flush is started.");
+//        if (log_batch.empty()) {
+//            LOG_WARN("WalManager::Dequeue empty batch logs");
+//            continue;
+//        }
         // auto [max_commit_ts, wal_size] = GetWalState();
-        for (const auto &entry : log_batch) {
+        bool vip_wal = false;
+//        for (const auto &entry : log_batch) {
+            LOG_TRACE(fmt::format("Flush txn {} WAL.", entry->txn_id_));
+            vip_wal = entry->vip_;
+            if(entry->vip_) {
+                LOG_INFO("Start to flush vip WAL entry");
+            }
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if(entry == nullptr) {
                 // terminate entry
@@ -177,7 +191,10 @@ void WalManager::Flush() {
             // update
             max_commit_ts_ = entry->commit_ts_;
             wal_size_ += act_size;
-        }
+            if(entry->vip_) {
+                LOG_INFO("Finish flushing vip WAL entry");
+            }
+//        }
 
         if(!running_.load()) {
             break;
@@ -200,13 +217,16 @@ void WalManager::Flush() {
 
         TxnManager *txn_mgr = storage_->txn_manager();
         // Commit sequentially so they get visible in the same order with wal.
-        for (const auto &entry : log_batch) {
+        if(vip_wal) {
+            LOG_INFO("Finish flushed vip WAL entry");
+        }
+//        for (const auto &entry : log_batch) {
             Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
             if (txn != nullptr) {
                 txn->CommitBottom();
             }
-        }
-        log_batch.clear();
+//        }
+//        log_batch.clear();
 
         // Check if the wal file is too large, swap to a new one.
         try {
@@ -225,11 +245,13 @@ void WalManager::Flush() {
         // Check if total wal is too large, do delta checkpoint
         i64 last_ckp_wal_size = GetLastCkpWalSize();
         if (wal_size_ - last_ckp_wal_size > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
+            LOG_TRACE("Reach the WAL limit trigger the DELTA checkpoint");
             auto checkpoint_task = MakeShared<CheckpointTask>(false /*delta checkpoint*/);
             if (!this->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
                 LOG_TRACE("Skip delta checkpoint(size) because there is already a checkpoint task running.");
             }
         }
+        LOG_TRACE("WAL flush is finished.");
     }
     LOG_TRACE("WalManager::Flush mainloop end");
 }
@@ -249,19 +271,23 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
 
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size) {
+    LOG_INFO("Prepare to start checkpoint txn");
     TxnManager *txn_mgr = storage_->txn_manager();
     Txn *txn = txn_mgr->CreateTxn();
+    txn->vip_ = true;
     txn->Begin();
 
     this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
-
+    LOG_INFO("committing checkpoint txn");
     txn_mgr->CommitTxn(txn);
+    LOG_INFO("commit checkpoint txn");
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
-    this->CheckpointInner(is_full_checkpoint, ckp_task->txn_, max_commit_ts, wal_size);
+    ckp_task->txn_->Checkpoint(max_commit_ts, is_full_checkpoint);
+//    this->CheckpointInner(is_full_checkpoint, ckp_task->txn_, max_commit_ts, wal_size);
 }
 
 void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size) {
@@ -273,7 +299,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
                              txn->BeginTS(),
                              max_commit_ts));
 
-        txn->Checkpoint(max_commit_ts, is_full_checkpoint);
+        txn->CheckpointBG(max_commit_ts, is_full_checkpoint);
 
         WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
         if (is_full_checkpoint) {
@@ -290,6 +316,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         throw e;
     }
     checkpoint_in_progress_.store(false);
+    LOG_INFO("Unset checkpoint flag");
 }
 
 /**

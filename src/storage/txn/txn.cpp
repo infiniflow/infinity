@@ -380,6 +380,10 @@ void Txn::Begin() {
 }
 
 TxnTimeStamp Txn::Commit() {
+    if(vip_) {
+        LOG_INFO("VIP txn is starting to commit");
+    }
+    LOG_TRACE(fmt::format("Txn commit: {} is started.", txn_id_));
     TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     txn_context_.SetTxnCommitting(commit_ts);
     // TODO: serializability validation. ASSUMES always valid for now.
@@ -395,21 +399,38 @@ TxnTimeStamp Txn::Commit() {
         txn_mgr_->Invalidate(commit_ts);
         txn_context_.SetTxnCommitted();
         LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
+        if(vip_) {
+            LOG_INFO("VIP txn is readonly.");
+        }
         return commit_ts;
     }
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_id_;
     wal_entry_->commit_ts_ = commit_ts;
+    wal_entry_->vip_ = vip_;
     txn_mgr_->PutWalEntry(wal_entry_);
-
+//    if(vip_) {
+//        LOG_INFO("VIP txn is send WAL");
+//    }
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(lock_);
+    if(vip_) {
+        LOG_INFO("VIP txn is send WAL");
+    }
     cond_var_.wait(lk, [this] { return done_bottom_; });
+    if(vip_) {
+        LOG_INFO("VIP txn is committed");
+    }
     LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
     return commit_ts;
 }
 
 void Txn::CommitBottom() noexcept {
+    if(vip_) {
+        LOG_INFO("VIP txn bottom is started");
+    }
+    LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
+
     // prepare to commit txn local data into table
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
@@ -435,6 +456,10 @@ void Txn::CommitBottom() noexcept {
     std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
+    if(vip_) {
+        LOG_INFO("VIP txn bottom is finished");
+    }
+    LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_id_));
 }
 
 void Txn::CancelCommitBottom() {
@@ -465,6 +490,14 @@ void Txn::Rollback() {
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    if (is_full_checkpoint) {
+        FullCheckpoint(max_commit_ts);
+    } else {
+        DeltaCheckpoint(max_commit_ts);
+    }
+}
+
+void Txn::CheckpointBG(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {
         FullCheckpoint(max_commit_ts);
     } else {

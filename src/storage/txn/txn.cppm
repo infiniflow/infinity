@@ -177,6 +177,8 @@ public:
 
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
+    void CheckpointBG(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
     void DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
@@ -185,6 +187,8 @@ public:
 
     // Create txn store if not exists
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
+
+    bool vip_{false};
 
 private:
     TxnTableStore *GetTxnTableStore(const String &table_name);

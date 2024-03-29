@@ -18,6 +18,8 @@ export module blocking_queue;
 
 import stl;
 import default_values;
+import logger;
+import third_party;
 
 namespace infinity {
 
@@ -30,27 +32,45 @@ public:
         allow_enqueue_ = false;
     }
 
-    bool Enqueue(T& task) {
+    bool Enqueue(T& task, bool vip = false) {
         if (!allow_enqueue_) {
             return false;
         }
 
         std::unique_lock<std::mutex> lock(queue_mutex_);
-        full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
+        full_cv_.wait(lock, [this, vip] {
+            bool ok = queue_.size() < capacity_;
+            if(vip) {
+                LOG_INFO(fmt::format("OK in blocking queue1 {}, {}", ok, queue_.size()));
+            }
+            return ok;
+        });
         queue_.push_back(task);
         empty_cv_.notify_one();
+        if(vip) {
+            LOG_INFO("Finish send blocking queue1");
+        }
         return true;
     }
 
-    bool Enqueue(T&& task) {
+    bool Enqueue(T&& task, bool vip = false) {
         if (!allow_enqueue_) {
             return false;
         }
 
         std::unique_lock<std::mutex> lock(queue_mutex_);
-        full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
+        full_cv_.wait(lock, [this, vip] {
+            bool ok = queue_.size() < capacity_;
+            if(vip) {
+                LOG_INFO(fmt::format("OK in blocking queue2 {}", ok));
+            }
+            return ok;
+        });
         queue_.push_back(std::forward<T>(task));
         empty_cv_.notify_one();
+        if(vip) {
+            LOG_INFO("Finish send blocking queue2");
+        }
         return true;
     }
 

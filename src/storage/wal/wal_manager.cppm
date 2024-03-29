@@ -21,7 +21,7 @@ import bg_task;
 import wal_entry;
 import options;
 import catalog_delta_entry;
-import blocking_queue;
+import wal_entry_blocking_queue;
 
 namespace infinity {
 
@@ -108,7 +108,7 @@ private:
     Thread flush_thread_{};
 
     // TxnManager and Flush thread access following members
-    BlockingQueue<SharedPtr<WalEntry>> blocking_queue_{};
+    WALEntryBlockingQueue blocking_queue_{};
 
     // Only Flush thread access following members
     std::ofstream ofs_{};

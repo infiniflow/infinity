@@ -137,7 +137,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
         case kRowID: {
             //            SizeT buffer_size = row_count * column_type->Size();
             if (block_column_entry->buffer_->Save()) {
-                block_column_entry->buffer_->Sync();
+//                block_column_entry->buffer_->Sync();
                 block_column_entry->buffer_->CloseFile();
             }
 
