@@ -35,7 +35,7 @@ FullTextColumnLengthFileHandler::FullTextColumnLengthFileHandler(UniquePtr<FileS
                                                                  SegmentIndexEntry *segment_index_entry)
     : file_system_(std::move(file_system)), segment_index_entry_(segment_index_entry) {
     u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-    file_handler_ = file_system_->OpenFile(path, file_flags, FileLockType::kWriteLock);
+    file_handler_ = file_system_->OpenFile(path, file_flags, FileLockType::kNoLock);
 }
 
 FullTextColumnLengthFileHandler::~FullTextColumnLengthFileHandler() {
@@ -59,16 +59,29 @@ void FullTextColumnLengthFileHandler::WriteColumnLength(const u32 *column_length
     if (write_count != expect_write_count) {
         UnrecoverableError("WriteColumnLength: write_count != expect_write_count");
     }
+    file_handler_->Sync();
 }
 
 FullTextColumnLengthUpdateJob::FullTextColumnLengthUpdateJob(SharedPtr<FullTextColumnLengthFileHandler> file_handler,
                                                              u32 column_length_count,
-                                                             u32 start_from_offset)
-    : file_handler_(std::move(file_handler)), column_length_count_(column_length_count), start_from_offset_(start_from_offset) {
+                                                             u32 start_from_offset,
+                                                             std::shared_mutex &memory_indexer_mutex,
+                                                             Vector<u32> &memory_indexer_array)
+    : file_handler_(std::move(file_handler)), column_length_count_(column_length_count), start_from_offset_(start_from_offset),
+      memory_indexer_mutex_(memory_indexer_mutex), memory_indexer_array_(memory_indexer_array) {
     column_length_array_ = MakeUniqueForOverwrite<u32[]>(column_length_count);
 }
 
 void FullTextColumnLengthUpdateJob::DumpToFile() {
+    // 1. update column length info in memory indexer
+    {
+        std::unique_lock lock(memory_indexer_mutex_);
+        if (memory_indexer_array_.size() < start_from_offset_ + column_length_count_) {
+            memory_indexer_array_.resize(start_from_offset_ + column_length_count_);
+        }
+        Copy(column_length_array_.get(), column_length_array_.get() + column_length_count_, memory_indexer_array_.data() + start_from_offset_);
+    }
+    // 2. write to file
     file_handler_->WriteColumnLength(column_length_array_.get(), column_length_count_, start_from_offset_);
     file_handler_.reset();
     column_length_array_.reset();
@@ -90,7 +103,7 @@ void FullTextColumnLengthReader::SeekFile(RowID row_id) {
     Path column_length_file_base = Path(index_dir_) / base_names_[next_base_rowid_index_ - 1];
     String column_length_file_path_prefix = column_length_file_base.string();
     String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
-    UniquePtr<FileHandler> file_handler = file_system_->OpenFile(column_length_file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    UniquePtr<FileHandler> file_handler = file_system_->OpenFile(column_length_file_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
     const u32 file_size = file_system_->GetFileSize(*file_handler);
     if (u32 array_len = file_size / sizeof(u32); array_len > column_length_array_capacity_) {
         column_length_array_capacity_ = std::max(array_len, std::min<u32>(2 * array_len, 1024 * 8192));

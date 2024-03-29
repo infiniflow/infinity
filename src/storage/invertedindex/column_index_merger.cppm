@@ -27,7 +27,7 @@ public:
 private:
     SharedPtr<PostingMerger> CreatePostingMerger();
 
-    void MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings);
+    void MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings, const RowID &merge_base_rowid);
 
     String index_dir_;
     optionflag_t flag_;
@@ -35,5 +35,9 @@ private:
     RecyclePool *buffer_pool_{nullptr};
     SharedPtr<FileWriter> posting_file_writer_;
     LocalFileSystem fs_;
+
+    // for column length info
+    std::shared_mutex column_length_mutex_;
+    Vector<u32> column_length_array_;
 };
 } // namespace infinity

@@ -5,7 +5,7 @@ import stl;
 import memory_pool;
 import index_defines;
 import posting_byte_slice;
-import position_list_format_option;
+import posting_list_format;
 import position_list_encoder;
 import skiplist_writer;
 import posting_byte_slice_reader;
@@ -31,7 +31,7 @@ protected:
 
 TEST_F(PositionListEncoderTest, test1) {
     optionflag_t option_flag = of_position_list | of_term_frequency;
-    PositionListFormatOption format_option(option_flag);
+    PostingFormatOption format_option(option_flag);
     PositionListEncoder position_encoder(format_option, &byte_slice_pool_, &buffer_pool_);
 
     for (u32 i = 0; i <= MAX_DOC_PER_RECORD + 1; i++) {
@@ -47,7 +47,7 @@ TEST_F(PositionListEncoderTest, test1) {
 
 TEST_F(PositionListEncoderTest, test2) {
     optionflag_t option_flag = of_position_list | of_term_frequency;
-    PositionListFormatOption format_option(option_flag);
+    PostingFormatOption format_option(option_flag);
     PositionListEncoder position_encoder(format_option, &byte_slice_pool_, &buffer_pool_);
 
     for (u32 i = 1; i <= MAX_DOC_PER_RECORD + 1; i++) {

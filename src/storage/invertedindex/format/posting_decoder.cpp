@@ -10,6 +10,7 @@ import position_list_format_option;
 import doc_list_format_option;
 
 import infinity_exception;
+import third_party;
 
 module posting_decoder;
 

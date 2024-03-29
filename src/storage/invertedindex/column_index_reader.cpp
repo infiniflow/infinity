@@ -75,7 +75,7 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryP
     }
     if (seg_postings->empty())
         return nullptr;
-    auto iter = MakeUnique<PostingIterator>(PostingFormatOption(flag_), session_pool);
+    auto iter = MakeUnique<PostingIterator>(flag_, session_pool);
     u32 state_pool_size = 0; // TODO
     iter->Init(seg_postings, state_pool_size);
     return iter;

@@ -30,6 +30,9 @@ import segment_posting;
 import posting_iterator;
 import internal_types;
 import logical_type;
+import local_file_system;
+import segment_index_entry;
+import column_length_io;
 
 using namespace infinity;
 
@@ -39,6 +42,8 @@ protected:
     RecyclePool buffer_pool_{};
     optionflag_t flag_{OPTION_FLAG_ALL};
     Map<String, SharedPtr<PostingWriter>> postings_;
+    std::shared_mutex column_length_mutex_;
+    Vector<u32> column_length_array_;
 
 public:
     struct ExpectedPosting {
@@ -57,7 +62,8 @@ public:
         if (it != postings_.end()) {
             return it->second;
         }
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
+        SharedPtr<PostingWriter> posting =
+            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
         postings_[term] = posting;
         return posting;
     }
@@ -81,11 +87,28 @@ TEST_F(ColumnInverterTest, Invert) {
     }
     Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
+    auto fake_segment_index_entry = SegmentIndexEntry::CreateFakeEntry();
+    String folder = "/tmp/infinity/test_column_inverter/chunk1";
+    auto fs = MakeUnique<LocalFileSystem>();
+    fs->CreateDirectory(folder);
+    String column_length_file_path = folder + LENGTH_SUFFIX;
+    auto column_length_file_handler =
+        MakeShared<FullTextColumnLengthFileHandler>(std::move(fs), column_length_file_path, fake_segment_index_entry.get());
+    auto update_length_job_1 =
+        MakeShared<FullTextColumnLengthUpdateJob>(column_length_file_handler, 3, 0, column_length_mutex_, column_length_array_);
+    auto update_length_job_2 =
+        MakeShared<FullTextColumnLengthUpdateJob>(std::move(column_length_file_handler), 2, 3, column_length_mutex_, column_length_array_);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     ColumnInverter inverter1("standard", &byte_slice_pool_, provider);
     ColumnInverter inverter2("standard", &byte_slice_pool_, provider);
     inverter1.InvertColumn(column, 0, 3, 0);
     inverter2.InvertColumn(column, 3, 2, 3);
+    inverter1.GetTermListLength(update_length_job_1->GetColumnLengthArray());
+    inverter2.GetTermListLength(update_length_job_2->GetColumnLengthArray());
+    update_length_job_1->DumpToFile();
+    update_length_job_2->DumpToFile();
+    update_length_job_1.reset();
+    update_length_job_2.reset();
 
     inverter1.Merge(inverter2);
 

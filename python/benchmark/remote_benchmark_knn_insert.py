@@ -58,21 +58,25 @@ def insert_sift_1m(path):
     count = 0
     start = time.time()
 
+    loop_start = time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
-        table_obj.insert([{"col1": query_vec}])    
+        table_obj.insert([{"col1": query_vec}])
         count += 1
+        if count % 10000 == 0:
+            loop_end = time.time()
+            dur = loop_end - start
+            # dur = loop_end - loop_start
+            print(f"{count} rows inserted, cost time: {dur} s")
+            # loop_start = time.time()
 
     end = time.time()
     dur = end - start
     print(f"Import sift_1m cost time: {dur} s, tps: {count * 1.0 / dur}")
-
-    assert res.error_code == ErrorCode.OK
-
-    start = time.time()
-    create_index("sift_benchmark")
-    end = time.time()
-    dur = end - start
-    print(f"Create index on sift_1m cost time: {dur} s")
+    # start = time.time()
+    # create_index("sift_benchmark")
+    # end = time.time()
+    # dur = end - start
+    # print(f"Create index on sift_1m cost time: {dur} s")
 
 
 def insert_gist_1m(path):
@@ -93,21 +97,26 @@ def insert_gist_1m(path):
     count = 0
     start = time.time()
 
+    loop_start = time.time()
     for idx, query_vec in enumerate(fvecs_read(path)):
         table_obj.insert([{"col1": query_vec}])
         count += 1
+        if count % 10000 == 0:
+            loop_end = time.time()
+            dur = loop_end - start
+            # dur = loop_end - loop_start
+            print(f"{count} rows inserted, cost time: {dur} s")
+            # loop_start = time.time()
 
     end = time.time()
     dur = end - start
     print(f"Import gist_1m cost time: {dur} s, tps: {count * 1.0 / dur}")
 
-    assert res.error_code == ErrorCode.OK
-
-    start = time.time()
-    create_index("gist_benchmark")
-    end = time.time()
-    dur = end - start
-    print(f"Create index on gist_1m cost time: {dur} s")
+    # start = time.time()
+    # create_index("gist_benchmark")
+    # end = time.time()
+    # dur = end - start
+    # print(f"Create index on gist_1m cost time: {dur} s")
 
 
 def create_index(table_name):
@@ -226,7 +235,8 @@ if __name__ == '__main__':
         "-d",
         "--data",
         type=str,
-        default='sift_1m',  # gist_1m
+        default='sift_1m',
+        # default='gist_1m',
         dest="data_set",
     )
 

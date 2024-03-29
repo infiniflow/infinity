@@ -40,7 +40,7 @@ public:
 
     void AddPosition();
 
-    void EndDocument(docid_t doc_id, docpayload_t doc_payload);
+    void EndDocument(docid_t doc_id, u32 doc_len, docpayload_t doc_payload);
 
     void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
 
@@ -55,7 +55,7 @@ public:
     PostingByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
 
 private:
-    void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf);
+    void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf, u32 doc_len);
 
     void FlushDocListBuffer();
 
@@ -74,6 +74,9 @@ private:
     tf_t current_tf_;
     tf_t total_tf_;
     df_t df_;
+    // for skip list block
+    tf_t block_max_tf_ = 0;
+    float block_max_percentage_ = 0.0f;
 
     UniquePtr<SkipListWriter> doc_skiplist_writer_;
     MemoryPool *byte_slice_pool_{nullptr};

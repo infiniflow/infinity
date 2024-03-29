@@ -142,6 +142,12 @@ private:
     }
 
 private:
+    // For fulltext index
+    MemoryPool byte_slice_pool_{};
+    RecyclePool buffer_pool_{};
+    ThreadPool thread_pool_{};
+    u64 segment_update_ts_{0};
+
     std::shared_mutex rw_locker_{};
     TableIndexMeta *const table_index_meta_{};
     const SharedPtr<IndexBase> index_base_{};
@@ -150,12 +156,6 @@ private:
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
     SharedPtr<SegmentIndexEntry> last_segment_{};
-
-    // For fulltext index
-    MemoryPool byte_slice_pool_{};
-    RecyclePool buffer_pool_{};
-    ThreadPool thread_pool_{};
-    u64 segment_update_ts_{0};
 
 public:
     void Cleanup() override;

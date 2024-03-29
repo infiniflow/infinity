@@ -100,7 +100,11 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
         doc_count = doc_count_;
         doc_count_ += row_count;
     }
-    auto update_length_job = MakeShared<FullTextColumnLengthUpdateJob>(std::move(fulltext_length_handler), row_count, doc_count);
+    auto update_length_job = MakeShared<FullTextColumnLengthUpdateJob>(std::move(fulltext_length_handler),
+                                                                       row_count,
+                                                                       doc_count,
+                                                                       column_length_mutex_,
+                                                                       column_length_array_);
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     if (offline) {
@@ -244,7 +248,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
         return iter.Value();
     else {
         SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(&posting_table_->byte_slice_pool_, &posting_table_->buffer_pool_, PostingFormatOption(flag_));
+            MakeShared<PostingWriter>(&posting_table_->byte_slice_pool_, &posting_table_->buffer_pool_, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
         posting_store.Insert(term, posting);
         return posting;
     }
@@ -313,7 +317,8 @@ void MemoryIndexer::OfflineDump() {
                 term_meta_dumpler.Dump(dict_file_writer, term_meta);
                 fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
             }
-            posting = MakeUnique<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
+            posting =
+                MakeUnique<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
             // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
             last_term_str = String(tuple.term_);
             last_term = std::string_view(last_term_str);

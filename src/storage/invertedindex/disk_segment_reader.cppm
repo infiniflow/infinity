@@ -37,6 +37,7 @@ public:
 private:
     RowID base_row_id_{INVALID_ROWID};
     SharedPtr<DictionaryReader> dict_reader_;
+    mutable std::mutex mutex_;
     SharedPtr<FileReader> posting_reader_;
     LocalFileSystem fs_{};
 };

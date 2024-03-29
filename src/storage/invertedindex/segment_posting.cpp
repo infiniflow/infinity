@@ -26,11 +26,8 @@ import internal_types;
 module segment_posting;
 
 namespace infinity {
-SegmentPosting::SegmentPosting(const PostingFormatOption &posting_option)
-    : base_row_id_(INVALID_ROWID), doc_count_(0), posting_writer_(nullptr), posting_option_(posting_option) {}
-
-void SegmentPosting::Init(const SharedPtr<ByteSliceList> &slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta) {
-    slice_list_ = slice_list;
+void SegmentPosting::Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta) {
+    slice_list_ = std::move(slice_list);
     base_row_id_ = base_row_id;
     doc_count_ = doc_count;
     term_meta_ = term_meta;

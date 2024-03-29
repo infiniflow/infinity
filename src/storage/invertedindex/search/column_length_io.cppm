@@ -43,7 +43,11 @@ private:
 
 export class FullTextColumnLengthUpdateJob {
 public:
-    FullTextColumnLengthUpdateJob(SharedPtr<FullTextColumnLengthFileHandler> file_handler, u32 column_length_count, u32 start_from_offset);
+    FullTextColumnLengthUpdateJob(SharedPtr<FullTextColumnLengthFileHandler> file_handler,
+                                  u32 column_length_count,
+                                  u32 start_from_offset,
+                                  std::shared_mutex &memory_indexer_mutex,
+                                  Vector<u32> &memory_indexer_array);
     u32 *GetColumnLengthArray() { return column_length_array_.get(); }
     void DumpToFile();
 
@@ -52,6 +56,8 @@ private:
     UniquePtr<u32[]> column_length_array_;
     u32 column_length_count_;
     u32 start_from_offset_;
+    std::shared_mutex &memory_indexer_mutex_;
+    Vector<u32> &memory_indexer_array_;
 };
 
 export class FullTextColumnLengthReader {

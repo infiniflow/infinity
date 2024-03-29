@@ -17,11 +17,11 @@ import internal_types;
 namespace infinity {
 export class MultiPostingDecoder {
 public:
-    MultiPostingDecoder(InDocPositionState *state, MemoryPool *pool);
+    MultiPostingDecoder(const PostingFormatOption &format_option, InDocPositionState *state, MemoryPool *pool);
 
     ~MultiPostingDecoder();
 
-    void Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings);
+    void Init(SharedPtr<Vector<SegmentPosting>> &seg_postings);
 
     inline void MoveToCurrentDocPosition(ttf_t current_ttf) { in_doc_state_keeper_.MoveToDoc(current_ttf); }
 
@@ -32,8 +32,6 @@ public:
     void DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payload_buffer);
 
     InDocPositionIterator *GetInDocPositionIterator() { return in_doc_pos_iterator_; }
-
-    const PostingFormatOption &GetPostingFormatOption() const { return cur_segment_format_option_; }
 
     u32 InnerGetSeekedDocCount() const { return index_decoder_->InnerGetSeekedDocCount(); }
 
@@ -67,18 +65,18 @@ private:
     bool MoveToSegment(RowID start_row_id);
 
 private:
-    PostingFormatOption cur_segment_format_option_;
-    RowID base_row_id_;
+    PostingFormatOption format_option_;
     bool need_decode_tf_;
     bool need_decode_doc_payload_;
-    IndexDecoder *index_decoder_;
-    u32 segment_cursor_;
-    u32 segment_count_;
+    RowID base_row_id_ = 0;
+    IndexDecoder *index_decoder_ = nullptr;
+    u32 segment_cursor_ = 0;
+    u32 segment_count_ = 0;
 
     SharedPtr<Vector<SegmentPosting>> seg_postings_;
     ByteSliceReader doc_list_reader_;
     MemoryPool *session_pool_;
-    InDocPositionIterator *in_doc_pos_iterator_;
+    InDocPositionIterator *in_doc_pos_iterator_ = nullptr;
     InDocStateKeeper in_doc_state_keeper_;
 };
 } // namespace infinity
