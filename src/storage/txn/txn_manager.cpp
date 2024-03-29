@@ -76,53 +76,33 @@ u64 TxnManager::GetNewTxnID() {
     return new_txn_id;
 }
 
-TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
-    std::lock_guard<std::mutex> guard(mutex_);
+TxnTimeStamp TxnManager::GetTimestamp() {
     TxnTimeStamp ts = ++start_ts_;
-    if (prepare_wal && wal_mgr_ != nullptr) {
-        priority_que_[ts] = nullptr;
-    }
     return ts;
 }
 
-TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id, bool prepare_wal) {
-    TxnTimeStamp ts = GetTimestamp(prepare_wal);
-    std::lock_guard<std::mutex> guard(mutex_);
+TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id) {
+    TxnTimeStamp ts = GetTimestamp();
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     ts_map_.emplace(ts, txn_id);
     return ts;
 }
 
-void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
-    // Check if the is_running_ is true
-    if (is_running_.load() == false) {
-        UnrecoverableError("TxnManager is not running, cannot invalidate");
-    }
-    std::lock_guard<std::mutex> guard(mutex_);
-    SizeT cnt = priority_que_.erase(commit_ts);
-    if (cnt > 0 && !priority_que_.empty()) {
-        auto it = priority_que_.begin();
-        while (it != priority_que_.end() && it->second.get() != nullptr) {
-            wal_mgr_->PutEntry(it->second);
-            it = priority_que_.erase(it);
-        }
-    }
-}
-
-void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
+void TxnManager::SendToWAL(Txn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("TxnManager is not running, cannot put wal entry");
     }
-    if (wal_mgr_ == nullptr)
-        return;
-    std::unique_lock<std::mutex> lk(mutex_);
-    priority_que_[entry->commit_ts_] = entry;
-    auto it = priority_que_.begin();
-    while (it != priority_que_.end() && it->second.get() != nullptr) {
-        wal_mgr_->PutEntry(it->second);
-        it = priority_que_.erase(it);
+    if (wal_mgr_ == nullptr) {
+        UnrecoverableError("TxnManager is null");
     }
-    return;
+
+    std::unique_lock<std::shared_mutex> lk(rw_locker_);
+
+    TxnTimeStamp commit_ts = this->GetTimestamp();
+    txn->SetTxnCommitting(commit_ts);
+
+    wal_mgr_->PutEntry(txn->GetWALEntry());
 }
 
 void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
@@ -148,9 +128,9 @@ void TxnManager::Stop() {
     }
 
     LOG_INFO("Txn manager is stopping...");
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = priority_que_.begin();
-    while (it != priority_que_.end()) {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    auto it = txn_map_.begin();
+    while (it != txn_map_.end()) {
         // remove and notify the wal manager condition variable
         auto txn = GetTxn(it->first);
         if (txn != nullptr) {
@@ -158,7 +138,7 @@ void TxnManager::Stop() {
         }
         ++it;
     }
-    priority_que_.clear();
+    txn_map_.clear();
     LOG_INFO("TxnManager is stopped");
 }
 

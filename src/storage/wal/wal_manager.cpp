@@ -118,7 +118,7 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-void WalManager::PutEntry(SharedPtr<WalEntry> entry) {
+void WalManager::PutEntry(WalEntry* entry) {
     if (!running_.load()) {
         return;
     }
@@ -145,7 +145,7 @@ i64 WalManager::GetLastCkpWalSize() {
 void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
-    Deque<SharedPtr<WalEntry>> log_batch{};
+    Deque<WalEntry*> log_batch{};
     while (running_.load()) {
         blocking_queue_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
@@ -177,9 +177,6 @@ void WalManager::Flush() {
             // update
             max_commit_ts_ = entry->commit_ts_;
             wal_size_ += act_size;
-            if(entry->vip_) {
-                LOG_INFO("Finish flushing vip WAL entry");
-            }
         }
 
         if(!running_.load()) {
@@ -259,9 +256,7 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
     txn->Begin();
 
     this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
-    LOG_INFO("committing checkpoint txn");
     txn_mgr->CommitTxn(txn);
-    LOG_INFO("commit checkpoint txn");
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size) {

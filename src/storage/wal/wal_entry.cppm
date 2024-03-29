@@ -396,7 +396,6 @@ export struct WalEntry : WalEntryHeader {
 
     [[nodiscard]] String ToString() const;
 
-    bool vip_{false};
 };
 
 export class WalEntryIterator {

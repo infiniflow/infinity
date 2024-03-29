@@ -28,7 +28,7 @@ export class WALEntryBlockingQueue {
 public:
     explicit WALEntryBlockingQueue(SizeT capacity = DEFAULT_BLOCKING_QUEUE_SIZE) : capacity_(capacity) {}
 
-    bool Enqueue(SharedPtr<WalEntry>& task) {
+    bool Enqueue(WalEntry* task) {
         {
             std::unique_lock <std::mutex> lock(queue_mutex_);
             full_cv_.wait(lock, [this] {
@@ -36,29 +36,12 @@ public:
                 return ok;
             });
             queue_.push_back(task);
-            if(task.get() != nullptr && task->vip_) {
-                LOG_INFO(fmt::format("Finish send blocking queue1: {}", queue_.size()));
-            }
         }
         empty_cv_.notify_one();
         return true;
     }
 
-    bool Enqueue(SharedPtr<WalEntry>&& task) {
-
-        {
-            std::unique_lock <std::mutex> lock(queue_mutex_);
-            full_cv_.wait(lock, [this] {
-                bool ok = queue_.size() < capacity_;
-                return ok;
-            });
-            queue_.push_back(std::forward < SharedPtr < WalEntry >> (task));
-        }
-        empty_cv_.notify_one();
-        return true;
-    }
-
-    void Dequeue(SharedPtr<WalEntry>& task) {
+    void Dequeue(WalEntry*& task) {
         {
             std::unique_lock <std::mutex> lock(queue_mutex_);
             empty_cv_.wait(lock, [this] { return !queue_.empty(); });
@@ -68,18 +51,12 @@ public:
         full_cv_.notify_one();
     }
 
-    void DequeueBulk(Deque<SharedPtr<WalEntry>> &output_array) {
+    void DequeueBulk(Deque<WalEntry*> &output_array) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] {
             return !queue_.empty();
         });
 
-//        for(const auto& wal_entry_ptr: queue_) {
-//            if(wal_entry_ptr.get() != nullptr && wal_entry_ptr->vip_) {
-//                LOG_INFO("Receive vip entry");
-//            }
-//            output_array.emplace_back(wal_entry_ptr);
-//        }
         output_array = queue_;
 //        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
         queue_.clear();
@@ -100,7 +77,7 @@ protected:
     mutable std::mutex queue_mutex_{};
     std::condition_variable full_cv_{};
     std::condition_variable empty_cv_{};
-    Deque<SharedPtr<WalEntry>> queue_{};
+    Deque<WalEntry*> queue_{};
     SizeT capacity_{DEFAULT_BLOCKING_QUEUE_SIZE};
 };
 
