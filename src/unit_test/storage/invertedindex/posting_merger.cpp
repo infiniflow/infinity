@@ -157,7 +157,7 @@ TEST_F(PostingMergerTest, Basic) {
     }
 
     auto merge_base_rowid = row_ids[0];
-    for (auto &row_id : row_ids) {
+    for (auto& row_id : row_ids) {
         merge_base_rowid = std::min(merge_base_rowid, row_id);
     }
 

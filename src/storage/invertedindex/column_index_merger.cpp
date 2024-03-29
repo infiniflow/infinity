@@ -62,7 +62,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     SizeT term_meta_offset = 0;
 
     auto merge_base_rowid = base_rowids[0];
-    for (auto &row_id : base_rowids) {
+    for (auto& row_id : base_rowids) {
         merge_base_rowid = std::min(merge_base_rowid, row_id);
     }
 
@@ -116,8 +116,8 @@ void ColumnIndexMerger::MergeTerm(const String &term,
     posting_merger->Merge(merging_term_postings, merge_base_rowid);
 
     posting_merger->Dump(posting_file_writer_, term_meta);
-    //    memory_pool_->Reset();
-    //    buffer_pool_->Reset();
+//    memory_pool_->Reset();
+//    buffer_pool_->Reset();
 }
 
 } // namespace infinity
