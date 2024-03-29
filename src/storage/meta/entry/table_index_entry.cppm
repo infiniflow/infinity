@@ -95,9 +95,6 @@ public:
     String GetPathNameTail() const;
     bool GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry);
 
-    // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    SharedPtr<SegmentIndexEntry> MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
-
     // MemIndexCommit is non-blocking.
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();

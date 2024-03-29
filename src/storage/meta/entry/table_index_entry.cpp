@@ -215,24 +215,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
-SharedPtr<SegmentIndexEntry> TableIndexEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
-    u32 segment_id = block_entry->segment_id();
-    auto iter = index_by_segment_.find(segment_id);
-    SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
-    SharedPtr<SegmentIndexEntry> new_entry = nullptr;
-    if (iter == index_by_segment_.end()) {
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, block_entry->GetSegmentEntry()->row_capacity(), column_def_);
-        segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
-        index_by_segment_.emplace(segment_id, segment_index_entry);
-        new_entry = segment_index_entry;
-    } else {
-        segment_index_entry = iter->second;
-    }
-    segment_index_entry->MemIndexInsert(txn, block_entry, row_offset, row_count);
-    last_segment_ = segment_index_entry;
-    return new_entry;
-}
-
 void TableIndexEntry::MemIndexCommit() {
     if (last_segment_.get() != nullptr) {
         last_segment_->MemIndexCommit();
