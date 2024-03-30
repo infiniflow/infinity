@@ -109,8 +109,8 @@ public:
         {
             std::unique_lock <std::mutex> lock(queue_mutex_);
             empty_cv_.wait(lock, [this] { return !queue_.empty(); });
-            output_array = queue_;
-//        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
+            output_array.swap(queue_);
+//            output_array.insert(output_array.end(), queue_.begin(), queue_.end());
             queue_.clear();
         }
         full_cv_.notify_one();

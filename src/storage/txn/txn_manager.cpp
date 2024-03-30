@@ -127,9 +127,9 @@ void TxnManager::Stop() {
     auto it = txn_map_.begin();
     while (it != txn_map_.end()) {
         // remove and notify the wal manager condition variable
-        auto txn = GetTxn(it->first);
-        if (txn != nullptr) {
-            txn->CancelCommitBottom();
+        Txn* txn_ptr = it->second.get();
+        if (txn_ptr != nullptr) {
+            txn_ptr->CancelCommitBottom();
         }
         ++it;
     }

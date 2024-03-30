@@ -64,7 +64,7 @@ public:
             return !queue_.empty();
         });
 
-        output_array = queue_;
+        output_array.swap(queue_);
 //        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
         queue_.clear();
         full_cv_.notify_one();

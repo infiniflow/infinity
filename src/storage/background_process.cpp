@@ -114,6 +114,7 @@ void BGTaskProcessor::Process() {
 
             bg_task->Complete();
         }
+        tasks.clear();
     }
 }
 
