@@ -158,7 +158,7 @@ public:
     void MemIndexCommit();
 
     // Invoked once at init stage to recovery memory index.
-    void MemIndexRecover(Txn *faked_txn);
+    void MemIndexRecover(BufferManager* buffer_manager);
 
 public:
     // Getter
