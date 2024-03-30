@@ -591,13 +591,12 @@ public:
 
     [[nodiscard]] String ToString() const;
 
-    void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts);
+    void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, u64 sequence);
 
     const Vector<TransactionID> &txn_ids() const { return txn_ids_; }
     void set_txn_ids(Vector<TransactionID> &&txn_ids) { txn_ids_ = std::move(txn_ids); }
     TxnTimeStamp commit_ts() const { return max_commit_ts_; }
     void set_commit_ts(TransactionID commit_ts) { max_commit_ts_ = commit_ts; }
-    void set_sequence(u64 sequence) { sequence_ = sequence; }
     u64 sequence() const { return sequence_; }
 
     void AddOperation(UniquePtr<CatalogDeltaOperation> operation) { operations_.emplace_back(std::move(operation)); }

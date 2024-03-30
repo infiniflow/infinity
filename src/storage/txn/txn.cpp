@@ -414,13 +414,9 @@ TxnTimeStamp Txn::Commit() {
     cond_var_.wait(lk, [this] { return done_bottom_; });
     LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, this->CommitTS()));
 
-    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
-
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         // Snapshot the physical operations in one txn
-        local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS());
-        txn_mgr_->AddWaitFlushTxn(txn_id_);
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }
     return this->CommitTS();
@@ -439,8 +435,11 @@ void Txn::CommitBottom() noexcept {
 
     txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
 
+    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
+
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        local_catalog_delta_ops_entry_->set_sequence(txn_mgr_->NextSequence());
+        local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
+        txn_mgr_->AddWaitFlushTxn(txn_id_);
     }
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);

@@ -731,11 +731,12 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) {
 }
 
 // called by wal thread
-void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
+void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, u64 sequence) {
     LOG_TRACE(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     if (max_commit_ts_ != UNCOMMIT_TS || !txn_ids_.empty()) {
         UnrecoverableError(fmt::format("CatalogDeltaEntry SaveState failed, max_commit_ts_ {} txn_ids_ size {}", max_commit_ts_, txn_ids_.size()));
     }
+    sequence_ = sequence;
     max_commit_ts_ = commit_ts;
     txn_ids_ = {txn_id};
     for (auto &operation : operations_) {

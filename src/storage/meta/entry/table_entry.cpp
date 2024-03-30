@@ -211,6 +211,7 @@ void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
         compaction_alg_->AddSegmentNoCheck(new_segment.get());
     }
     next_segment_id_++;
+    row_count_ += new_segment->row_count_;
 }
 
 void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
