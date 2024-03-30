@@ -247,7 +247,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
         return iter.Value();
     else {
         SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(&posting_table_->byte_slice_pool_, &posting_table_->buffer_pool_, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
+            MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
         posting_store.Insert(term, posting);
         return posting;
     }
