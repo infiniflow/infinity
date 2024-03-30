@@ -86,7 +86,7 @@ public:
     inline TxnTimeStamp max_ts() const { return max_ts_; }
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
+    void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager* buffer_manager);
 
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
