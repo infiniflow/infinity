@@ -297,7 +297,7 @@ private: // TODO: remove this
     void MemIndexCommitLoop();
 
 public:
-    void MemIndexRecover(Txn *faked_txn);
+    void MemIndexRecover(BufferManager* buffer_manager);
 
     void PickCleanup(CleanupScanner *scanner);
 
