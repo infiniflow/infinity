@@ -26,7 +26,7 @@ module common_analyzer;
 namespace infinity {
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
     : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
-      extract_eng_stem_(false), extract_synonym_(false), chinese_(false), remove_stopwords_(false) {
+      extract_eng_stem_(true), extract_synonym_(false), chinese_(false), remove_stopwords_(false) {
     stemmer_->Init(STEM_LANG_ENGLISH);
 }
 

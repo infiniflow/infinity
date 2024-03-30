@@ -13,7 +13,7 @@ namespace infinity {
 PostingBuffer::PostingBuffer(MemoryPool *pool)
     : buffer_(nullptr), capacity_(0), size_(0), is_buffer_valid_(true), has_pool_(false), pool_(pool), posting_fields_(nullptr) {
     if (!pool) {
-        pool_ = new MemoryPool;
+        pool_ = new MemoryPool(1024);
         has_pool_ = true;
     }
 }
