@@ -139,6 +139,6 @@ public:
     void Cleanup() override;
 
     void MemIndexCommit();
-    void MemIndexRecover(Txn *faked_txn);
+    void MemIndexRecover(BufferManager* buffer_manager);
 };
 } // namespace infinity

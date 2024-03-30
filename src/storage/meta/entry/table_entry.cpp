@@ -564,7 +564,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
     for (SizeT i = 0; i < num_ranges; i++) {
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
-        segment_index_entry->MemIndexInsert(txn, block_entry, range.start_offset_, range.row_count_);
+        segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
         if (i == dump_idx) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
@@ -600,7 +600,7 @@ void TableEntry::MemIndexCommit() {
     }
 }
 
-void TableEntry::MemIndexRecover(Txn *faked_txn) {
+void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
@@ -637,11 +637,14 @@ void TableEntry::MemIndexRecover(Txn *faked_txn) {
             }
 
             // Insert block entries into MemIndexer
-            faked_txn->FakeCommit(segment_index_entry->max_ts());
             SizeT num_ranges = append_ranges.size();
             for (SizeT i = 0; i < num_ranges; i++) {
                 AppendRange &range = append_ranges[i];
-                segment_index_entry->MemIndexInsert(faked_txn, block_entries[range.block_id_], range.start_offset_, range.row_count_);
+                segment_index_entry->MemIndexInsert(block_entries[range.block_id_],
+                                                    range.start_offset_,
+                                                    range.row_count_,
+                                                    segment_index_entry->max_ts(),
+                                                    buffer_manager);
             }
             if (segment_id == unsealed_id_) {
                 table_index_entry->last_segment_ = segment_index_entry;
