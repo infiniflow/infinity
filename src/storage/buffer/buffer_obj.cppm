@@ -38,6 +38,23 @@ export enum class BufferType {
     kTemp,
 };
 
+export String BufferStatusToString(BufferStatus status) {
+    switch (status) {
+        case BufferStatus::kLoaded:
+            return "Loaded";
+        case BufferStatus::kUnloaded:
+            return "Unloaded";
+        case BufferStatus::kFreed:
+            return "Freed";
+        case BufferStatus::kClean:
+            return "Clean";
+        case BufferStatus::kNew:
+            return "New";
+        default:
+            return "Invalid";
+    }
+}
+
 export class BufferObj {
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate

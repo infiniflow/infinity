@@ -473,7 +473,7 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                 while (true) {
                     SizeT idx = create_index_idx.fetch_add(1);
                     if (idx % 10000 == 0) {
-                        LOG_INFO(fmt::format("Insert index: {}", idx));
+                        LOG_TRACE(fmt::format("Insert index: {}", idx));
                     }
                     if (idx >= vertex_n) {
                         break;
