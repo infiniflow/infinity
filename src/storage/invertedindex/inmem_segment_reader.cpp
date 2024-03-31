@@ -28,21 +28,13 @@ namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
     : posting_table_(memory_indexer->GetPostingTable()), base_row_id_(memory_indexer->GetBaseRowId()) {}
 
-PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
-    MemoryIndexer::PostingTable::Iterator iter = posting_table_->Find(term);
-    if (iter != posting_table_->End())
-        return iter.Value().get();
-    else
-        return nullptr;
-}
-
 bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const {
-    PostingWriter *posting_writer = GetPostingWriter(term);
-    if (posting_writer == nullptr) {
-        return false;
+    MemoryIndexer::PostingTableStore::Iterator iter = posting_table_->store_.Find(term);
+    if (iter != posting_table_->store_.End()) {
+        seg_posting.Init(base_row_id_, iter.Value());
+        return true;
     }
-    seg_posting.Init(base_row_id_, posting_writer);
-    return true;
+    return false;
 }
 
 } // namespace infinity

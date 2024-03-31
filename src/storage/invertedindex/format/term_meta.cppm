@@ -49,7 +49,6 @@ export struct TermMeta {
     u64 doc_start_ = 0;
     u64 pos_start_ = 0;
     u64 pos_end_ = 0;
-    u64 skip_start_ = 0;
 };
 
 export class TermMetaLoader {
