@@ -1895,13 +1895,6 @@ void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr
         optimize_header_str = "OPTIMIZE ";
     }
 
-    switch (optimize_node->optimize_type()) {
-        case OptimizeType::kIRS:
-            optimize_header_str += "DATA (";
-            optimize_header_str += std::to_string(optimize_node->node_id());
-            optimize_header_str += ")";
-            break;
-    }
     result->emplace_back(MakeShared<String>(optimize_header_str));
 }
 

@@ -107,10 +107,6 @@ public:
     // Populate index entirely for the segment
     SharedPtr<SegmentIndexEntry> PopulateEntirely(SegmentEntry *segment_entry, Txn *txn);
 
-    // MergeDiskIndexEntirely is blocking.
-    // Merge all disk index chunks into one for each SegmentIndexEntry
-    void MergeDiskIndexEntirely(Txn *txn);
-
     Tuple<Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 

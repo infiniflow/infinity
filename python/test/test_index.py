@@ -384,9 +384,12 @@ class TestIndex:
                                                       [])])
         assert res.error_code == ErrorCode.OK
 
-        for i in range(len(data["doctitle"])):
-            value = [{"doctitle": data["doctitle"][i],
-                      "docdate": data["docdate"][i], "body": data["body"][i]}]
+        # Create 99*300/8192 = 3.6 BlockEntry to test MemIndexRecover and OptimizeIndex
+        for it in range(10):
+            value = []
+            for i in range(len(data["doctitle"])):
+                value.append({"doctitle": data["doctitle"][i],
+                              "docdate": data["docdate"][i], "body": data["body"][i]})
             table_obj.insert(value)
         time.sleep(5)
         res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(

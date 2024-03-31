@@ -39,12 +39,7 @@ String LogicalOptimize::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
 
-    switch (optimize_type_) {
-        case OptimizeType::kIRS:
-            ss << String(space, ' ') << "-> "
-               << "Optimize Index: ";
-            break;
-    }
+    ss << String(space, ' ') << "-> " << "Optimize Table: ";
     space += arrow_str.size();
 
     return ss.str();

@@ -51,6 +51,7 @@ import block_entry;
 import segment_index_entry;
 import chunk_index_entry;
 import cleanup_scanner;
+import column_index_merger;
 
 namespace infinity {
 
@@ -271,7 +272,9 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         if (segment_index_entry.get() != nullptr) {
             Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
             txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
-            for (auto &chunk_index_entry : segment_index_entry->GetChunkIndexEntries()) {
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            for (auto &chunk_index_entry : chunk_index_entries) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             }
             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
@@ -610,7 +613,8 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
         for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
             SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, segment_index_entry->max_ts());
             assert(segment_entry.get() != nullptr);
-            Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries = segment_index_entry->GetChunkIndexEntries();
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
 
             // Determine block entries need to insert into MemIndexer
             Vector<AppendRange> append_ranges;
@@ -625,15 +629,19 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
                 RowID base_rowid = chunk_index_entry->base_rowid_ + chunk_index_entry->row_count_;
                 SizeT block_id = base_rowid.segment_offset_ / block_capacity;
                 assert(block_id <= block_entries.size());
+                if (block_id >= block_entries.size())
+                    continue;
                 SizeT start_offset = base_rowid.segment_offset_ % block_capacity;
-                SizeT row_count = block_entries[block_id]->row_count() - start_offset;
-                if (block_id < block_entries.size()) {
-                    append_ranges.emplace_back(segment_id, block_id, start_offset, row_count);
-                    for (SizeT i = block_id + 1; i < block_entries.size(); i++) {
-                        assert(block_entries[i - 1]->row_capacity() == block_capacity);
-                        assert(block_entries[i - 1]->GetAvailableCapacity() <= 0);
-                        append_ranges.emplace_back(segment_id, i, 0, block_entries[i]->row_count());
-                    }
+                SizeT last_block_row_count = block_entries[block_id]->row_count();
+                assert(last_block_row_count >= start_offset);
+                SizeT row_count = last_block_row_count - start_offset;
+                if (row_count == 0)
+                    continue;
+                append_ranges.emplace_back(segment_id, block_id, start_offset, row_count);
+                for (SizeT i = block_id + 1; i < block_entries.size(); i++) {
+                    assert(block_entries[i - 1]->row_capacity() == block_capacity);
+                    assert(block_entries[i - 1]->GetAvailableCapacity() <= 0);
+                    append_ranges.emplace_back(segment_id, i, 0, block_entries[i]->row_count());
                 }
             }
 
@@ -652,6 +660,63 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
             } else {
                 segment_index_entry->MemIndexDump();
             }
+        }
+    }
+}
+
+void TableEntry::OptimizeIndex(Txn *txn) {
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (!status.ok())
+            continue;
+        const IndexBase *index_base = table_index_entry->index_base();
+        if (index_base->index_type_ != IndexType::kFullText) {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_WARN(*err_msg);
+            continue;
+        }
+        const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+        for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            if (chunk_index_entries.size() <= 1) {
+                continue;
+            }
+
+            Vector<String> base_names;
+            Vector<RowID> base_rowids;
+            RowID base_rowid = chunk_index_entries[0]->base_rowid_;
+            u32 total_row_count = 0;
+            for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
+                auto &chunk_index_entry = chunk_index_entries[i];
+                base_names.push_back(chunk_index_entry->base_name_);
+                base_rowids.push_back(chunk_index_entry->base_rowid_);
+                total_row_count += chunk_index_entry->row_count_;
+            }
+            String dst_base_name = fmt::format("ft_{}_{}", base_rowid.ToUint64(), total_row_count);
+            ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
+                                                  index_fulltext->flag_,
+                                                  &table_index_entry->GetFulltextByteSlicePool(),
+                                                  &table_index_entry->GetFulltextBufferPool());
+            column_index_merger.Merge(base_names, base_rowids, dst_base_name);
+
+            for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
+                auto &chunk_index_entry = chunk_index_entries[i];
+                // TODO yzc: txn_store.cpp:87
+                // chunk_index_entry->deleted_ = true;
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+            }
+            SharedPtr<ChunkIndexEntry> chunk_index_entry =
+                MakeShared<ChunkIndexEntry>(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
+            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+            segment_index_entry->ReplaceChunkIndexEntries(chunk_index_entry);
+            // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
+            TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
+            assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
+            table_index_entry->UpdateFulltextSegmentTs(ts);
         }
     }
 }
