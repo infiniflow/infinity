@@ -51,16 +51,21 @@ import default_values;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
+Txn::Txn(TxnManager *txn_manager,
+         BufferManager *buffer_manager,
+         Catalog *catalog,
+         BGTaskProcessor *bg_task_processor,
+         TransactionID txn_id,
+         TxnTimeStamp begin_ts)
     : txn_store_(this, catalog), txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog),
-      txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
+      txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id)
-    : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
-      local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts)
+    : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), txn_context_(begin_ts),
+      wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
-    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id);
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, MAX_TIMESTAMP);
     return txn;
 }
 
@@ -383,19 +388,22 @@ void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
     wal_entry_->commit_ts_ = commit_ts;
 }
 
-WalEntry* Txn::GetWALEntry() const {
-    return wal_entry_.get();
-}
+WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 
 void Txn::Begin() {
     TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
-    txn_context_.BeginCommit(ts);
+    txn_context_.SetTxnBegin(ts);
+}
+
+void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
+    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
+    txn_context_.SetTxnBegin(begin_ts);
 }
 
 TxnTimeStamp Txn::Commit() {
-//    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
-//    txn_context_.SetTxnCommitting(commit_ts);
+    //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
+    //    txn_context_.SetTxnCommitting(commit_ts);
 
     if (wal_entry_->cmds_.empty()) {
         // Don't need to write empty WalEntry (read-only transactions).

@@ -63,9 +63,14 @@ enum class CompactSegmentsTaskType;
 
 export class Txn {
 public:
-    explicit Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id);
+    explicit Txn(TxnManager *txn_manager,
+                 BufferManager *buffer_manager,
+                 Catalog *catalog,
+                 BGTaskProcessor *bg_task_processor,
+                 TransactionID txn_id,
+                 TxnTimeStamp begin_ts);
 
-    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
@@ -79,6 +84,8 @@ public:
     // 3.4 Commit - multiple threads
 
     void Begin();
+
+    void SetBeginTS(TxnTimeStamp begin_ts);
 
     TxnTimeStamp Commit();
 
@@ -188,7 +195,7 @@ public:
     // Create txn store if not exists
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
-    WalEntry* GetWALEntry() const;
+    WalEntry *GetWALEntry() const;
 
 private:
     TxnTableStore *GetTxnTableStore(const String &table_name);
@@ -207,7 +214,7 @@ private:
     Catalog *catalog_{};
     TransactionID txn_id_{};
 
-    TxnContext txn_context_{};
+    TxnContext txn_context_;
 
     // Handled database
     String db_name_{};
