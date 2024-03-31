@@ -271,7 +271,9 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         if (segment_index_entry.get() != nullptr) {
             Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
             txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
-            for (auto &chunk_index_entry : segment_index_entry->GetChunkIndexEntries()) {
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            for (auto &chunk_index_entry : chunk_index_entries) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             }
             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
@@ -610,7 +612,8 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
         for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
             SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, segment_index_entry->max_ts());
             assert(segment_entry.get() != nullptr);
-            Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries = segment_index_entry->GetChunkIndexEntries();
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
 
             // Determine block entries need to insert into MemIndexer
             Vector<AppendRange> append_ranges;
@@ -676,7 +679,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
         }
         const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
         for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
-            Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries = segment_index_entry->GetChunkIndexEntries();
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
             if (chunk_index_entries.size() <= 1) {
                 continue;
             }
@@ -707,8 +711,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry =
                 MakeShared<ChunkIndexEntry>(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-            chunk_index_entries.clear();
-            chunk_index_entries.push_back(chunk_index_entry);
+            segment_index_entry->ReplaceChunkIndexEntries(chunk_index_entry);
             // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
             TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
             assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
