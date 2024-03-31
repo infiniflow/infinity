@@ -26,6 +26,7 @@ TEST_F(StandardAnalyzerTest, test1) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
+    analyzer.SetExtractEngStem(false);
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 3U);
@@ -43,6 +44,7 @@ TEST_F(StandardAnalyzerTest, test2) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
+    analyzer.SetExtractEngStem(false);
     analyzer.SetCaseSensitive(true, false);
     analyzer.Analyze(input, term_list);
 
@@ -61,7 +63,6 @@ TEST_F(StandardAnalyzerTest, test3) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
-    analyzer.SetExtractEngStem(true);
     analyzer.Analyze(input, term_list);
 
     ASSERT_EQ(term_list.size(), 4U);
@@ -81,6 +82,7 @@ TEST_F(StandardAnalyzerTest, test4) {
     StandardAnalyzer analyzer;
     TermList term_list;
     String input("Boost unit tests.");
+    analyzer.SetExtractEngStem(false);
     analyzer.SetCaseSensitive(true, true);
     analyzer.Analyze(input, term_list);
 
@@ -100,6 +102,7 @@ TEST_F(StandardAnalyzerTest, test4) {
 TEST_F(StandardAnalyzerTest, test5) {
     StandardAnalyzer analyzer;
     TermList term_list;
+    analyzer.SetExtractEngStem(false);
     String input("BoostBoostboostBoostboost unit tests.");
     analyzer.Analyze(input, term_list);
 

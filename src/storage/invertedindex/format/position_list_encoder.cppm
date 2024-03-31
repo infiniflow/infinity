@@ -40,8 +40,6 @@ public:
 
     const PositionListFormat *GetPositionListFormat() const { return pos_list_format_; }
 
-    SkipListWriter *GetSkipListWriter() const { return pos_skiplist_writer_; }
-
 private:
     void CreatePosSkipListWriter();
     void AddPosSkipListItem(u32 total_pos_count, u32 compressed_pos_size, bool need_flush);
@@ -53,7 +51,7 @@ private:
     u32 total_pos_count_;                             // 4byte
     PostingFormatOption format_option_;
     bool is_own_format_;                              // 1byte
-    SkipListWriter *pos_skiplist_writer_;
+    UniquePtr<SkipListWriter> pos_skiplist_writer_;
     const PositionListFormat *pos_list_format_;
     MemoryPool *byte_slice_pool_;
 };
