@@ -169,6 +169,8 @@ public:
 
     void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
 
+    void SetTxnCommitting(TxnTimeStamp commit_ts);
+
     // WAL and replay OPS
     // Dangerous! only used during replaying wal.
     void FakeCommit(TxnTimeStamp commit_ts);
@@ -185,6 +187,8 @@ public:
 
     // Create txn store if not exists
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
+
+    WalEntry* GetWALEntry() const;
 
 private:
     TxnTableStore *GetTxnTableStore(const String &table_name);
@@ -211,7 +215,6 @@ private:
     /// LOG
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
-
     // TODO: remove this
     UniquePtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
 

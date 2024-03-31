@@ -395,6 +395,7 @@ export struct WalEntry : WalEntryHeader {
     [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
 
     [[nodiscard]] String ToString() const;
+
 };
 
 export class WalEntryIterator {

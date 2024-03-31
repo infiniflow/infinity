@@ -128,16 +128,13 @@ void Storage::UnInit() {
     bg_processor_->Stop();
 
     wal_mgr_->Stop();
-
     txn_mgr_.reset();
     bg_processor_.reset();
     wal_mgr_.reset();
-
     // Buffer Manager need to be destroyed before catalog. since buffer manage hold the raw pointer owned by catalog:
     // such as index definition and index base of IndexFileWorker
     buffer_mgr_.reset();
     new_catalog_.reset();
-
     config_ptr_ = nullptr;
     fmt::print("Shutdown storage successfully\n");
 }

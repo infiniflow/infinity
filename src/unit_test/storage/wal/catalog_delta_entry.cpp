@@ -185,10 +185,14 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
 }
 
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
+    std::shared_ptr<std::string> config_path = nullptr;
+    InfinityContext::instance().Init(config_path);
+
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto local_catalog_delta_entry = std::make_unique<CatalogDeltaEntry>();
-    local_catalog_delta_entry->set_txn_ids({1});
-    local_catalog_delta_entry->set_commit_ts(1);
+//    local_catalog_delta_entry->set_txn_ids({1});
+//    local_catalog_delta_entry->set_commit_ts(1);
+    local_catalog_delta_entry->SaveState(1, 1, 1);
 
     auto db_name = MakeShared<String>("db_test");
     auto db_dir = MakeShared<String>("data");
@@ -375,4 +379,6 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     global_catalog_delta_entry->AddDeltaEntry(std::move(local_catalog_delta_entry), 0);
     // check ops
     EXPECT_EQ(global_catalog_delta_entry->OpSize(), 4u);
+
+    infinity::InfinityContext::instance().UnInit();
 }

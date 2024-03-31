@@ -106,7 +106,7 @@ void WalManager::Stop() {
     txn_mgr->Stop();
 
     // pop all the entries in the queue. and notify the condition variable.
-    blocking_queue_.Enqueue(nullptr);
+    blocking_queue_.Enqueue(nullptr, nullptr);
 
     // Wait for flush thread to stop
     LOG_TRACE("WalManager::Stop flush thread join");
@@ -118,12 +118,12 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-void WalManager::PutEntry(SharedPtr<WalEntry> entry) {
+void WalManager::PutEntry(WalEntry* entry, Txn* txn) {
     if (!running_.load()) {
         return;
     }
 
-    blocking_queue_.Enqueue(entry);
+    blocking_queue_.Enqueue(entry, txn);
 
     return ;
 }
@@ -145,7 +145,7 @@ i64 WalManager::GetLastCkpWalSize() {
 void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
-    Deque<SharedPtr<WalEntry>> log_batch{};
+    Deque<WalEntry*> log_batch{};
     while (running_.load()) {
         blocking_queue_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
@@ -189,7 +189,7 @@ void WalManager::Flush() {
                 break;
             }
             case FlushOption::kOnlyWrite: {
-                ofs_.flush(); // FIXME: not flush, only write
+//                ofs_.flush(); // FIXME: not flush, only write
                 break;
             }
             case FlushOption::kFlushPerSecond: {
@@ -225,11 +225,13 @@ void WalManager::Flush() {
         // Check if total wal is too large, do delta checkpoint
         i64 last_ckp_wal_size = GetLastCkpWalSize();
         if (wal_size_ - last_ckp_wal_size > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
+            LOG_TRACE("Reach the WAL limit trigger the DELTA checkpoint");
             auto checkpoint_task = MakeShared<CheckpointTask>(false /*delta checkpoint*/);
             if (!this->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
                 LOG_TRACE("Skip delta checkpoint(size) because there is already a checkpoint task running.");
             }
         }
+        LOG_TRACE("WAL flush is finished.");
     }
     LOG_TRACE("WalManager::Flush mainloop end");
 }
@@ -254,7 +256,6 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
     txn->Begin();
 
     this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
-
     txn_mgr->CommitTxn(txn);
 }
 
