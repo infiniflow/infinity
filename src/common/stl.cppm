@@ -213,6 +213,7 @@ export namespace std {
     using std::thread;
 
     using std::is_same_v;
+    using std::priority_queue;
 } // namespace std
 
 namespace infinity {

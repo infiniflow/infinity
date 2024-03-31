@@ -591,12 +591,13 @@ public:
 
     [[nodiscard]] String ToString() const;
 
-    void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts);
+    void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, u64 sequence);
 
     const Vector<TransactionID> &txn_ids() const { return txn_ids_; }
     void set_txn_ids(Vector<TransactionID> &&txn_ids) { txn_ids_ = std::move(txn_ids); }
     TxnTimeStamp commit_ts() const { return max_commit_ts_; }
     void set_commit_ts(TransactionID commit_ts) { max_commit_ts_ = commit_ts; }
+    u64 sequence() const { return sequence_; }
 
     void AddOperation(UniquePtr<CatalogDeltaOperation> operation) { operations_.emplace_back(std::move(operation)); }
 
@@ -605,10 +606,9 @@ public:
     Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
 private:
-    std::mutex mtx_{};
     Vector<TransactionID> txn_ids_{};         // txn id of the entry
     TxnTimeStamp max_commit_ts_{UNCOMMIT_TS}; // commit timestamp of the txn
-
+    u64 sequence_{};
     Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
 
@@ -620,6 +620,8 @@ public:
     void InitMaxCommitTS(TxnTimeStamp max_commit_ts) { max_commit_ts_ = max_commit_ts; }
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
+
+    void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts);
@@ -634,7 +636,9 @@ private:
     void PruneOpWithSamePrefix(const String &prefix, TxnTimeStamp current_commit_ts);
 
 private:
-    std::mutex mtx_{};
+    u64 last_sequence_{0};
+    std::priority_queue<u64> sequence_heap_;
+    Map<u64, UniquePtr<CatalogDeltaEntry>> delta_entry_map_;
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;

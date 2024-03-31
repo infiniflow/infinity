@@ -256,5 +256,6 @@ TEST_F(CatalogTest, concurrent_test) {
             auto [db_entry, status] = catalog->Catalog::GetDatabase(db_name, txn7->TxnID(), txn7->BeginTS());
             EXPECT_TRUE(!status.ok());
         }
+        txn_mgr->CommitTxn(txn7);
     }
 }

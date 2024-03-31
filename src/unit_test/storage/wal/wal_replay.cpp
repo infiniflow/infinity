@@ -811,6 +811,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
             auto block_entry = compact_segment->GetBlockEntryByID(0).get();
             EXPECT_NE(block_entry, nullptr);
             EXPECT_EQ(block_entry->row_count(), test_segment_n);
+            txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG

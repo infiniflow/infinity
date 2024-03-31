@@ -441,7 +441,7 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
         auto catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
         max_commit_ts = std::max(max_commit_ts, catalog_delta_entry->commit_ts());
-        catalog->AddDeltaEntry(std::move(catalog_delta_entry), 0 /*wal_size*/);
+        catalog->ReplayDeltaEntry(std::move(catalog_delta_entry));
     }
     catalog->LoadFromEntryDelta(max_commit_ts, buffer_mgr);
 
@@ -910,6 +910,8 @@ void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_si
     global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry), wal_size);
 }
 
+void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
+
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 
 void Catalog::MemIndexCommit() {
@@ -929,7 +931,7 @@ void Catalog::MemIndexCommitLoop() {
     }
 }
 
-void Catalog::MemIndexRecover(BufferManager* buffer_manager) {
+void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
     for (auto &[_, db_meta] : *db_meta_map_guard) {
         auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);

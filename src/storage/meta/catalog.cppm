@@ -238,6 +238,8 @@ public:
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
+    void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
+
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
 
     static UniquePtr<Catalog>
