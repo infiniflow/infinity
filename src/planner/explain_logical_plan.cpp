@@ -1436,7 +1436,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             }
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [path, size]";
+            output_columns_str += " - output columns: [id, status, size]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
@@ -1482,7 +1482,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             }
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [path, size]";
+            output_columns_str += " - output columns: [id, size, row_count]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }

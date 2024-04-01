@@ -743,6 +743,37 @@ curl --request GET \
 }
 ```
 
+## Show segments list
+
+Show segments list of specific table
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/ \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "error_code": 0,
+    "table_name": "test1",
+    "segments": [
+        {
+            "id": "0",
+            "size": "192.07KB",
+            "status": "Unsealed"
+        }
+    ]
+}
+```
+
+
 ## Show segment
 
 Show specific segment details
@@ -781,6 +812,36 @@ curl --request GET \
 {
     "error_code": 3070,
     "error_message": "Segment: {segment_id} doesn't exist."
+}
+```
+
+## Show blocks list
+
+Show blocks list of specific segment
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/ \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "error_code": 0,
+    "segment_id": 0,
+    "blocks": [
+        {
+            "id": "0",
+            "row_count": "2",
+            "size": "192.07KB"
+        }
+    ]
 }
 ```
 
