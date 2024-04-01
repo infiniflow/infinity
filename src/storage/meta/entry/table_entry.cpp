@@ -277,7 +277,6 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             for (auto &chunk_index_entry : chunk_index_entries) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             }
-            table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
         }
     }
 }
@@ -997,6 +996,10 @@ void TableEntry::Cleanup() {
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *table_entry_dir_));
     CleanupScanner::CleanupDir(*table_entry_dir_);
+}
+
+IndexReader TableEntry::GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    return fulltext_column_index_cache_.GetIndexReader(txn_id, begin_ts, this);
 }
 
 } // namespace infinity
