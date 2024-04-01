@@ -31,6 +31,8 @@ import logical_type;
 class CatalogDeltaEntryTest : public BaseTest {
 protected:
     void SetUp() override { system("rm -rf /tmp/infinity"); }
+
+    void TearDown() override { system("rm -rf /tmp/infinity"); }
 };
 
 using namespace infinity;

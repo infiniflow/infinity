@@ -41,7 +41,7 @@ protected:
 
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override {}
+    void TearDown() override { system("rm -rf /tmp/infinity"); }
 };
 
 TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
