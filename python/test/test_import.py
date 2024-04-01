@@ -14,12 +14,15 @@
 
 import os
 import pytest
+from infinity import index
+
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
-from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs
+from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
+    generate_commas_enwiki
 
 
 class TestImport:
@@ -388,4 +391,29 @@ class TestImport:
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    @pytest.mark.skip(reason="Cause service block")
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_9_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match(self, get_infinity_db, check_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar", })
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "segmentation")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_9.csv", "enwiki_9_commas.csv")
+            copy_data("enwiki_9_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_9_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = table_obj.output(["*"]).to_pl()
         print(res)
