@@ -28,16 +28,13 @@ namespace infinity {
 
 export class SegmentPosting {
 public:
-    bool operator==(const SegmentPosting &seg_posting) const {
-        return /*(slice_list_ == seg_posting.slice_list_) && */ (term_meta_ == seg_posting.term_meta_) &&
-               /*(posting_option_ == seg_posting.posting_option_) */ (base_row_id_ == seg_posting.base_row_id_) &&
-               (doc_count_ == seg_posting.doc_count_) && (posting_writer_ == seg_posting.posting_writer_);
-    }
+    SegmentPosting(){};
+    ~SegmentPosting(){};
 
     // for on disk segment posting
     void Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
     // for in memory segment posting
-    void Init(RowID base_row_id, PostingWriter *posting_writer);
+    void Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer);
 
     RowID GetBaseRowId() const { return base_row_id_; }
     void SetBaseRowId(RowID base_row_id) { base_row_id_ = base_row_id; }
@@ -45,8 +42,8 @@ public:
     u32 GetDocCount() const { return doc_count_; }
     void SetDocCount(const u32 doc_count) { doc_count_ = doc_count; }
 
-    const PostingWriter *GetInMemPostingWriter() const { return posting_writer_; }
-    bool IsInMemorySegment() const { return posting_writer_ != nullptr; }
+    const SharedPtr<PostingWriter> &GetInMemPostingWriter() const { return posting_writer_; }
+    bool IsInMemorySegment() const { return posting_writer_.get(); }
 
     void GetInMemTermMeta(TermMeta &tm) {
         df_t df = posting_writer_->GetDF();
@@ -64,6 +61,6 @@ private:
     RowID base_row_id_ = INVALID_ROWID;
     u32 doc_count_ = 0;
     TermMeta term_meta_;
-    PostingWriter *posting_writer_ = nullptr;
+    SharedPtr<PostingWriter> posting_writer_;
 };
 } // namespace infinity

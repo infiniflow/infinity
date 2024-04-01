@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "type/complex/row_id.h"
 #include "unit_test/base_test.h"
 
 import infinity_exception;
@@ -59,6 +60,9 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     auto index_base = IndexSecondary::Make(index_name, "file_name", Vector<String>{"col1", "col2"});
     String segment_filter_binary_data = "abcde";
     String block_filter_binary_data = "abcde";
+    String base_name = "chunk1";
+    RowID base_rowid = RowID::FromUint64(8192U);
+    u32 row_count = 123;
 
     UniquePtr<char[]> buffer;
     i32 buffer_size = 0;
@@ -130,6 +134,17 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
+            auto op = MakeUnique<AddChunkIndexEntryOp>();
+            op->db_name_ = db_name;
+            op->table_name_ = table_name;
+            op->index_name_ = index_name;
+            op->segment_id_ = segment_id;
+            op->base_name_ = base_name;
+            op->base_rowid_ = base_rowid;
+            op->row_count_ = row_count;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
             auto op = MakeUnique<SetSegmentStatusSealedOp>();
             op->db_name_ = db_name;
             op->table_name_ = table_name;
@@ -170,10 +185,14 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
 }
 
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
+    std::shared_ptr<std::string> config_path = nullptr;
+    InfinityContext::instance().Init(config_path);
+
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto local_catalog_delta_entry = std::make_unique<CatalogDeltaEntry>();
-    local_catalog_delta_entry->set_txn_ids({1});
-    local_catalog_delta_entry->set_commit_ts(1);
+//    local_catalog_delta_entry->set_txn_ids({1});
+//    local_catalog_delta_entry->set_commit_ts(1);
+    local_catalog_delta_entry->SaveState(1, 1, 1);
 
     auto db_name = MakeShared<String>("db_test");
     auto db_dir = MakeShared<String>("data");
@@ -360,4 +379,6 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     global_catalog_delta_entry->AddDeltaEntry(std::move(local_catalog_delta_entry), 0);
     // check ops
     EXPECT_EQ(global_catalog_delta_entry->OpSize(), 4u);
+
+    infinity::InfinityContext::instance().UnInit();
 }

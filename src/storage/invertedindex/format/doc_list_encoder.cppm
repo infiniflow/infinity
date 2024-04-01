@@ -74,12 +74,11 @@ private:
     tf_t current_tf_;
     tf_t total_tf_;
     df_t df_;
-
     // for skip list block
     tf_t block_max_tf_ = 0;
     float block_max_percentage_ = 0.0f;
 
-    SkipListWriter *doc_skiplist_writer_{nullptr};
+    UniquePtr<SkipListWriter> doc_skiplist_writer_;
     MemoryPool *byte_slice_pool_{nullptr};
     friend class InMemDocListDecoderTest;
 };

@@ -65,7 +65,7 @@ BufferHandle BufferObj::Load() {
             break;
         }
         case BufferStatus::kClean: {
-            UnrecoverableError("Invalid status when load buffer_obj.");
+            UnrecoverableError("Calling with invalid status: clean");
             break;
         }
     }
@@ -95,7 +95,7 @@ void BufferObj::UnloadInner() {
             break;
         }
         default: {
-            UnrecoverableError("Invalid call.");
+            UnrecoverableError(fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_)));
         }
     }
 }
@@ -127,19 +127,7 @@ bool BufferObj::Free() {
             break;
         }
         case BufferStatus::kClean: {
-            switch (type_) {
-                case BufferType::kTemp:
-                case BufferType::kPersistent: {
-                    // do nothing
-                    break;
-                }
-                case BufferType::kEphemeral: {
-                    file_worker_->WriteToFile(true);
-                    break;
-                }
-            }
             file_worker_->FreeInMemory();
-            file_worker_->CleanupFile();
             buffer_mgr_->RemoveBufferObj(this->GetFilename());
             break;
         }
@@ -166,7 +154,7 @@ bool BufferObj::Save() {
                 break;
             }
             default: {
-                UniquePtr<String> err_msg = MakeUnique<String>("Invalid buffer status.");
+                UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
                 LOG_ERROR(*err_msg);
                 UnrecoverableError(*err_msg);
             }
@@ -199,6 +187,7 @@ void BufferObj::SetAndTryCleanup() {
             if (!wait_for_gc_) {
                 UnrecoverableError("Assert: unloaded buffer object should in gc_queue.");
             }
+            file_worker_->CleanupFile();
             status_ = BufferStatus::kClean;
             break;
         }

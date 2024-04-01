@@ -47,7 +47,7 @@ import log_file;
 namespace infinity {
 
 class TxnManager;
-
+class Txn;
 class ProfileHistory {
 private:
     std::mutex lock_{};
@@ -238,6 +238,8 @@ public:
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
+    void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
+
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
 
     static UniquePtr<Catalog>
@@ -297,6 +299,8 @@ private: // TODO: remove this
     void MemIndexCommitLoop();
 
 public:
+    void MemIndexRecover(BufferManager* buffer_manager);
+
     void PickCleanup(CleanupScanner *scanner);
 
     // delta checkpoint info

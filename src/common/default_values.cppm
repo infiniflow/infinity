@@ -67,10 +67,8 @@ export {
     constexpr u32 INVALID_SEGMENT_ID = std::numeric_limits<u32>::max();
 
     // queue related constants, TODO: double check the necessary
-    constexpr SizeT DEFAULT_READER_PREPARE_QUEUE_SIZE = 1024;
-    constexpr SizeT DEFAULT_WRITER_PREPARE_QUEUE_SIZE = 1024;
-    constexpr SizeT DEFAULT_READER_COMMIT_QUEUE_SIZE = 1024;
-    constexpr SizeT DEFAULT_WRITER_COMMIT_QUEUE_SIZE = 1024;
+    constexpr SizeT BG_GROUND_TASK_QUEUE_SIZE = 65536;
+    constexpr SizeT EXECUTOR_TASK_QUEUE_SIZE = 1024;
     constexpr SizeT DEFAULT_BLOCKING_QUEUE_SIZE = 1024;
 
     // transaction related constants

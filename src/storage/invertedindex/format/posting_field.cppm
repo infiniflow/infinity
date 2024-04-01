@@ -43,8 +43,8 @@ struct ValueTypeTraits<u32> {
     static const PostingField::ValueType TYPE = PostingField::U32;
 };
 
-export typedef IntEncoder<u32, NewPForDeltaCompressor> Int32Encoder;
-// export typedef IntEncoder<u32, SIMDBitPacking> Int32Encoder;
+// export typedef IntEncoder<u32, NewPForDeltaCompressor> Int32Encoder;
+export typedef IntEncoder<u32, SIMDBitPacking> Int32Encoder;
 export typedef IntEncoder<u16, NewPForDeltaCompressor> Int16Encoder;
 export typedef NoCompressIntEncoder<u32> NoCompressEncoder;
 export typedef VByteIntEncoder<u32> VByteCompressEncoder;
@@ -60,8 +60,8 @@ struct EncoderTypeTraits<u16> {
 };
 template <>
 struct EncoderTypeTraits<u32> {
-    typedef IntEncoder<u32, NewPForDeltaCompressor> Encoder;
-    // typedef IntEncoder<u32, SIMDBitPacking> Encoder;
+    // typedef IntEncoder<u32, NewPForDeltaCompressor> Encoder;
+    typedef IntEncoder<u32, SIMDBitPacking> Encoder;
 };
 
 export const Int32Encoder *GetDocIDEncoder();

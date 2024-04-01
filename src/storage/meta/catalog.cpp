@@ -441,7 +441,7 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
         auto catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
         max_commit_ts = std::max(max_commit_ts, catalog_delta_entry->commit_ts());
-        catalog->AddDeltaEntry(std::move(catalog_delta_entry), 0 /*wal_size*/);
+        catalog->ReplayDeltaEntry(std::move(catalog_delta_entry));
     }
     catalog->LoadFromEntryDelta(max_commit_ts, buffer_mgr);
 
@@ -710,6 +710,34 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 }
                 break;
             }
+            case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+                auto add_chunk_index_entry_op = static_cast<AddChunkIndexEntryOp *>(op.get());
+                const auto &db_name = add_chunk_index_entry_op->db_name_;
+                const auto &table_name = add_chunk_index_entry_op->table_name_;
+                const auto &index_name = add_chunk_index_entry_op->index_name_;
+                auto segment_id = add_chunk_index_entry_op->segment_id_;
+                const auto &base_name = add_chunk_index_entry_op->base_name_;
+                auto base_rowid = add_chunk_index_entry_op->base_rowid_;
+                auto row_count = add_chunk_index_entry_op->row_count_;
+
+                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+
+                if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
+                    auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
+                    auto *segment_entry = iter->second.get();
+                    if (segment_entry->status() == SegmentStatus::kDeprecated) {
+                        UnrecoverableError(fmt::format("Segment {} is deprecated", segment_id));
+                    }
+                    auto iter2 = table_index_entry->index_by_segment().find(segment_id);
+                    if (iter2 == table_index_entry->index_by_segment().end()) {
+                        UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
+                    }
+                    auto *segment_index_entry = iter2->second.get();
+                    segment_index_entry->AddChunkIndexEntry(base_name, base_rowid, row_count);
+                }
+                break;
+            }
             case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
                 auto *set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
                 const auto &db_name = set_segment_status_sealed_op->db_name_;
@@ -882,6 +910,8 @@ void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_si
     global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry), wal_size);
 }
 
+void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
+
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 
 void Catalog::MemIndexCommit() {
@@ -898,6 +928,16 @@ void Catalog::MemIndexCommitLoop() {
     while (running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         MemIndexCommit();
+    }
+}
+
+void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
+    auto db_meta_map_guard = db_meta_map_.GetMetaMap();
+    for (auto &[_, db_meta] : *db_meta_map_guard) {
+        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
+        if (status.ok()) {
+            db_entry->MemIndexRecover(buffer_manager);
+        }
     }
 }
 

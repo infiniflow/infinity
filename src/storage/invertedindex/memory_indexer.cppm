@@ -40,7 +40,14 @@ public:
     };
 
     using PostingPtr = SharedPtr<PostingWriter>;
-    using PostingTable = SkipList<String, PostingPtr, KeyComp>;
+    using PostingTableStore = SkipList<String, PostingPtr, KeyComp>;
+
+    struct PostingTable {
+        PostingTable();
+        PostingTableStore store_;
+        MemoryPool byte_slice_pool_;
+        RecyclePool buffer_pool_;
+    };
 
     MemoryIndexer(const String &index_dir,
                   const String &base_name,
@@ -60,8 +67,8 @@ public:
                 SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
                 bool offline = false);
 
-    // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
-    // Other threads can also call this method.
+    // Commit(false) is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
+    // Commit(true) is blocking and thread-unsafe. There shall be onle one thread call this method at a time.
     void Commit(bool offline = false);
 
     // CommitSync wait at max 100ms to get a batch of insertions and commit them. Returens the size of the batch.
@@ -87,7 +94,7 @@ public:
 
     MemoryPool *GetPool() { return &byte_slice_pool_; }
 
-    PostingTable *GetPostingTable() { return posting_store_.get(); }
+    SharedPtr<PostingTable> GetPostingTable() { return posting_table_; }
 
     SharedPtr<PostingWriter> GetOrAddPosting(const String &term);
 
@@ -115,8 +122,7 @@ private:
     RecyclePool &buffer_pool_;
     ThreadPool &thread_pool_;
     u32 doc_count_{0};
-    UniquePtr<PostingTable> posting_store_;
-
+    SharedPtr<PostingTable> posting_table_;
     Ring<SharedPtr<ColumnInverter>> ring_inverted_;
     Ring<SharedPtr<ColumnInverter>> ring_sorted_;
     u64 seq_inserted_{0};

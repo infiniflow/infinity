@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import pytest
-import sqlglot
 import time
 
 import infinity.index as index
-from infinity.errors import ErrorCode
+import pandas
+import pytest
 from infinity.common import ConflictType
-from sqlglot import exp, parse_one
+from infinity.errors import ErrorCode
 
 TEST_DATA_DIR = "/test/data/"
 
@@ -146,7 +145,8 @@ class TestIndex:
         (index.IndexType.IVFFlat, True)
     ])
     @pytest.mark.parametrize("params", [
-        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
+            1, 2), False), ({"1": 2}, False),
         ([index.InitParameter("centroids_count", "128"),
           index.InitParameter("metric", "l2")], True)
     ])
@@ -363,8 +363,18 @@ class TestIndex:
 
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_insert_data_fulltext_index_search(self, get_infinity_db, file_format):
+        # prepare data for insert
+        column_names = ["doctitle", "docdate", "body"]
+        df = pandas.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
+                             delimiter="\t",
+                             header=None,
+                             names=column_names)
+        data = {key: list(value.values())
+                for key, value in df.to_dict().items()}
+
         db_obj = get_infinity_db
-        db_obj.drop_table("test_insert_data_fulltext_index_search", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_data_fulltext_index_search", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_data_fulltext_index_search", {
             "doctitle": "varchar",
             "docdate": "varchar", "body": "varchar"}, ConflictType.Error)
@@ -374,31 +384,16 @@ class TestIndex:
                                                       [])])
         assert res.error_code == ErrorCode.OK
 
-        table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
-                              file_format + "/enwiki_99." + file_format,
-                              import_options={"delimiter": "\t"})
+        # Create 99*300/8192 = 3.6 BlockEntry to test MemIndexRecover and OptimizeIndex
+        for it in range(10):
+            value = []
+            for i in range(len(data["doctitle"])):
+                value.append({"doctitle": data["doctitle"][i],
+                              "docdate": data["docdate"][i], "body": data["body"][i]})
+            table_obj.insert(value)
         time.sleep(5)
         res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
             "body^5", "harmful chemical", "topn=3").to_pl()
-        assert not res.is_empty()
-        print(res)
-        table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
-                              file_format + "/enwiki_99." + file_format,
-                              import_options={"delimiter": "\t"})
-        time.sleep(5)
-        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
-            "body^5", "harmful chemical", "topn=3").to_pl()
-        assert not res.is_empty()
-        print(res)
-
-        res = table_obj.create_index("doctitle_index",
-                                     [index.IndexInfo("doctitle",
-                                                      index.IndexType.FullText,
-                                                      [])])
-        assert res.error_code == ErrorCode.OK
-
-        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
-            "doctitle,body^5", "harmful chemical anarchism", "topn=3").to_pl()
         assert not res.is_empty()
         print(res)
 

@@ -48,6 +48,7 @@ import background_process;
 import base_table_ref;
 import compact_segments_task;
 import default_values;
+import chunk_index_entry;
 
 namespace infinity {
 
@@ -281,6 +282,13 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
 
     auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
     txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+    for (auto &segment_index_entry : segment_index_entries) {
+        Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+        segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+        for (auto &chunk_index_intry : chunk_index_entries) {
+            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
+        }
+    }
     return Status::OK();
 }
 
@@ -373,6 +381,15 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViews"};
 }
 
+void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
+    txn_context_.SetTxnCommitting(commit_ts);
+    wal_entry_->commit_ts_ = commit_ts;
+}
+
+WalEntry* Txn::GetWALEntry() const {
+    return wal_entry_.get();
+}
+
 void Txn::Begin() {
     TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
@@ -380,36 +397,37 @@ void Txn::Begin() {
 }
 
 TxnTimeStamp Txn::Commit() {
-    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
-    txn_context_.SetTxnCommitting(commit_ts);
-    // TODO: serializability validation. ASSUMES always valid for now.
-    bool valid = true;
-    if (!valid) {
-        txn_mgr_->Invalidate(commit_ts);
-        txn_context_.SetTxnRollbacked();
-        return commit_ts;
-    }
+//    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
+//    txn_context_.SetTxnCommitting(commit_ts);
 
     if (wal_entry_->cmds_.empty()) {
         // Don't need to write empty WalEntry (read-only transactions).
-        txn_mgr_->Invalidate(commit_ts);
-        txn_context_.SetTxnCommitted();
+        TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp();
+        this->SetTxnCommitting(commit_ts);
+        this->SetTxnCommitted();
         LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
         return commit_ts;
     }
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_id_;
-    wal_entry_->commit_ts_ = commit_ts;
-    txn_mgr_->PutWalEntry(wal_entry_);
+    txn_mgr_->SendToWAL(this);
 
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
-    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
-    return commit_ts;
+    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, this->CommitTS()));
+
+    // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+    if (!local_catalog_delta_ops_entry_->operations().empty()) {
+        // Snapshot the physical operations in one txn
+        txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
+    }
+    return this->CommitTS();
 }
 
 void Txn::CommitBottom() noexcept {
+    LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
+
     // prepare to commit txn local data into table
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
@@ -422,19 +440,15 @@ void Txn::CommitBottom() noexcept {
 
     txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
 
-    // Don't need to write empty CatalogDeltaEntry (read-only transactions).
-
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        // Snapshot the physical operations in one txn
-        local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
-        txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
+        local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
         txn_mgr_->AddWaitFlushTxn(txn_id_);
     }
-
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
+    LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_id_));
 }
 
 void Txn::CancelCommitBottom() {

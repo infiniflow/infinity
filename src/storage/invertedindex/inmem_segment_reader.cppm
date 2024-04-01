@@ -34,9 +34,7 @@ public:
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
 
 private:
-    PostingWriter *GetPostingWriter(const String &term) const;
-
-    MemoryIndexer::PostingTable *posting_table_{nullptr};
+    SharedPtr<MemoryIndexer::PostingTable> posting_table_;
     RowID base_row_id_{INVALID_ROWID};
 };
 

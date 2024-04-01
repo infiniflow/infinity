@@ -38,10 +38,6 @@ DocListEncoder::~DocListEncoder() {
         delete doc_list_format_;
         doc_list_format_ = nullptr;
     }
-    if (doc_skiplist_writer_) {
-        doc_skiplist_writer_->~SkipListWriter();
-        doc_skiplist_writer_ = nullptr;
-    }
 }
 
 void DocListEncoder::AddPosition() {
@@ -57,7 +53,7 @@ void DocListEncoder::EndDocument(docid_t doc_id, u32 doc_len, docpayload_t doc_p
 
 void DocListEncoder::Flush() {
     FlushDocListBuffer();
-    if (doc_skiplist_writer_) {
+    if (doc_skiplist_writer_.get()) {
         doc_skiplist_writer_->Flush();
     }
 }
@@ -96,7 +92,7 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     } else {
         Flush();
         u32 doc_skiplist_size = 0;
-        if (doc_skiplist_writer_) {
+        if (doc_skiplist_writer_.get()) {
             doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
         }
 
@@ -106,7 +102,7 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
         file->WriteVInt(doc_list_size);
     }
 
-    if (doc_skiplist_writer_) {
+    if (doc_skiplist_writer_.get()) {
         doc_skiplist_writer_->Dump(file, spill);
     }
 
@@ -129,7 +125,7 @@ void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
 
 u32 DocListEncoder::GetDumpLength() {
     u32 doc_skiplist_size = 0;
-    if (doc_skiplist_writer_) {
+    if (doc_skiplist_writer_.get()) {
         doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
     }
     u32 doc_list_size = doc_list_buffer_.EstimateDumpSize();
@@ -139,7 +135,7 @@ u32 DocListEncoder::GetDumpLength() {
 void DocListEncoder::FlushDocListBuffer() {
     u32 flush_size = doc_list_buffer_.Flush();
     if (flush_size > 0) {
-        if (doc_skiplist_writer_ == nullptr) {
+        if (!doc_skiplist_writer_.get()) {
             CreateDocSkipListWriter();
         }
         AddSkipListItem(flush_size);
@@ -149,11 +145,9 @@ void DocListEncoder::FlushDocListBuffer() {
 }
 
 void DocListEncoder::CreateDocSkipListWriter() {
-    void *buffer = byte_slice_pool_->Allocate(sizeof(SkipListWriter));
     RecyclePool *buffer_pool = dynamic_cast<RecyclePool *>(doc_list_buffer_.GetBufferPool());
-    SkipListWriter *doc_skiplist_writer = new (buffer) SkipListWriter(byte_slice_pool_, buffer_pool);
-    doc_skiplist_writer->Init(doc_list_format_->GetDocSkipListFormat());
-    doc_skiplist_writer_ = doc_skiplist_writer;
+    doc_skiplist_writer_ = MakeUnique<SkipListWriter>(byte_slice_pool_, buffer_pool);
+    doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
 }
 
 void DocListEncoder::AddSkipListItem(u32 item_size) {
@@ -177,7 +171,7 @@ InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_
         skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(SkipListReaderPostingByteSlice)))
                                              SkipListReaderPostingByteSlice(format_option_, session_pool)
                                        : new SkipListReaderPostingByteSlice(format_option_, session_pool);
-        skiplist_reader->Load(doc_skiplist_writer_);
+        skiplist_reader->Load(doc_skiplist_writer_.get());
     }
 
     PostingByteSlice *doc_list_buffer = session_pool ? new (session_pool->Allocate(sizeof(PostingByteSlice)))

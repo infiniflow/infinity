@@ -60,6 +60,8 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
     return ret < 0;
 }
 
+MemoryIndexer::PostingTable::PostingTable() : store_(KeyComp(), &byte_slice_pool_) {}
+
 MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &base_name,
                              RowID base_row_id,
@@ -70,7 +72,7 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
                              ThreadPool &thread_pool)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
       buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(10UL), ring_sorted_(10UL) {
-    posting_store_ = MakeUnique<PostingTable>(KeyComp(), &byte_slice_pool_);
+    posting_table_ = MakeShared<PostingTable>();
 
     Path path = Path(index_dir) / "tmp.merge";
     spill_full_path_ = path.string();
@@ -132,13 +134,12 @@ void MemoryIndexer::Commit(bool offline) {
         if (nullptr == spill_file_handle_) {
             PrepareSpillFile();
         }
+        SharedPtr<ColumnInverter> inverter;
         while (inflight_tasks_ != 0) {
-            sleep(1);
-            this->ring_sorted_.Iterate([this](SharedPtr<ColumnInverter> &inverter) {
-                inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
-                inflight_tasks_--;
-                num_runs_++;
-            });
+            this->ring_sorted_.Get(inverter);
+            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
+            inflight_tasks_--;
+            num_runs_++;
         }
     } else
         thread_pool_.push([this](int id) { this->CommitSync(); });
@@ -183,7 +184,6 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX + (spill ? SPILL_SUFFIX : "");
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
-    MemoryIndexer::PostingTable *posting_table = GetPostingTable();
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
     String fst_file = dict_file + ".fst";
@@ -194,8 +194,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     if (spill) {
         posting_file_writer->WriteVInt(i32(doc_count_));
     }
-    if (posting_store_.get() != nullptr) {
-        for (auto it = posting_table->Begin(); it != posting_table->End(); ++it) {
+    if (posting_table_.get() != nullptr) {
+        MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
+        for (auto it = posting_store.Begin(); it != posting_store.End(); ++it) {
             const MemoryIndexer::PostingPtr posting_writer = it.Value();
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta, spill);
@@ -240,23 +241,21 @@ void MemoryIndexer::Load() {
 }
 
 SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
-    MemoryIndexer::PostingTable::Iterator iter = posting_store_->Find(term);
-    if (iter != posting_store_->End())
+    MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
+    MemoryIndexer::PostingTableStore::Iterator iter = posting_store.Find(term);
+    if (iter != posting_store.End())
         return iter.Value();
     else {
         SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
-        posting_store_->Insert(term, posting);
+            MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
+        posting_store.Insert(term, posting);
         return posting;
     }
 }
 
 void MemoryIndexer::Reset() {
-    if (posting_store_.get()) {
-        for (auto it = posting_store_->Begin(); it != posting_store_->End(); ++it) {
-            // delete it.getData();
-        }
-        posting_store_->Clear();
+    if (posting_table_.get()) {
+        posting_table_->store_.Clear();
     }
 }
 

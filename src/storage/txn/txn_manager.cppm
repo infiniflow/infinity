@@ -57,13 +57,13 @@ public:
 
     BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
 
-    TxnTimeStamp GetTimestamp(bool prepare_wal = false);
+    TxnTimeStamp GetTimestamp();
 
-    TxnTimeStamp GetBeginTimestamp(TransactionID txn_id, bool prepare_wal = false);
+    TxnTimeStamp GetBeginTimestamp(TransactionID txn_id);
 
     void Invalidate(TxnTimeStamp commit_ts);
 
-    void PutWalEntry(SharedPtr<WalEntry> entry);
+    void SendToWAL(Txn *txn);
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
@@ -85,6 +85,8 @@ public:
 
     bool enable_compaction() const { return enable_compaction_; }
 
+    u64 NextSequence() { return ++ sequence_; }
+
 private:
     TransactionID GetNewTxnID();
 
@@ -98,16 +100,18 @@ private:
 
     TransactionID start_txn_id_{};
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
-    std::mutex mutex_;
-    TxnTimeStamp start_ts_{}; // The next txn ts
+//    std::mutex mutex_;
+    Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
     // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
     Map<TxnTimeStamp, TransactionID> ts_map_{};
     HashSet<TransactionID> wait_flush_txns_{};
 
-    Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
+//    Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};
     bool enable_compaction_{};
+
+    u64 sequence_{};
 };
 
 } // namespace infinity

@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <fstream>
 
 module catalog_delta_entry;
@@ -64,6 +65,10 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
         }
         case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
             operation = AddSegmentIndexEntryOp::ReadAdv(ptr);
+            break;
+        }
+        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+            operation = AddChunkIndexEntryOp::ReadAdv(ptr);
             break;
         }
         case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
@@ -208,6 +213,20 @@ UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
     return add_segment_index_op;
 }
 
+UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
+    auto add_chunk_index_op = MakeUnique<AddChunkIndexEntryOp>();
+    add_chunk_index_op->ReadAdvBase(ptr);
+
+    add_chunk_index_op->db_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_chunk_index_op->table_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_chunk_index_op->index_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_chunk_index_op->segment_id_ = ReadBufAdv<SegmentID>(ptr);
+    add_chunk_index_op->base_name_ = ReadBufAdv<String>(ptr);
+    add_chunk_index_op->base_rowid_ = RowID::FromUint64(ReadBufAdv<u64>(ptr));
+    add_chunk_index_op->row_count_ = ReadBufAdv<u32>(ptr);
+    return add_chunk_index_op;
+}
+
 UniquePtr<SetSegmentStatusSealedOp> SetSegmentStatusSealedOp::ReadAdv(char *&ptr) {
     auto set_segment_status_sealed_op = MakeUnique<SetSegmentStatusSealedOp>();
     set_segment_status_sealed_op->ReadAdvBase(ptr);
@@ -319,6 +338,17 @@ void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_ts_);
 }
 
+void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
+    WriteBufAdv(buf, *this->index_name_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->base_name_);
+    WriteBufAdv(buf, this->base_rowid_.ToUint64());
+    WriteBufAdv(buf, this->row_count_);
+}
+
 void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
@@ -419,6 +449,17 @@ const String AddSegmentIndexEntryOp::ToString() const {
                        max_ts_);
 }
 
+const String AddChunkIndexEntryOp::ToString() const {
+    return fmt::format("AddChunkIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} base_name: {} base_rowid: {} row_count: {}",
+                       *db_name_,
+                       *table_name_,
+                       *index_name_,
+                       segment_id_,
+                       base_name_,
+                       base_rowid_.ToUint64(),
+                       row_count_);
+}
+
 const String SetSegmentStatusSealedOp::ToString() const {
     return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", *db_name_, *table_name_, segment_id_);
 }
@@ -492,6 +533,13 @@ bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const 
            min_ts_ == rhs_op->min_ts_ && max_ts_ == rhs_op->max_ts_;
 }
 
+bool AddChunkIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddChunkIndexEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_) && segment_id_ == rhs_op->segment_id_ &&
+           base_name_ == rhs_op->base_name_ && base_rowid_ == rhs_op->base_rowid_ && row_count_ == rhs_op->row_count_;
+}
+
 bool SetSegmentStatusSealedOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const SetSegmentStatusSealedOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
@@ -556,6 +604,13 @@ void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
     *this = std::move(*static_cast<AddSegmentIndexEntryOp *>(other.get()));
+}
+
+void AddChunkIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddChunkIndexEntryOp *>(other.get()));
 }
 
 void SetSegmentStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other) { UnrecoverableError("SetSegmentStatusSealedOp::Merge not allowed"); }
@@ -676,11 +731,12 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) {
 }
 
 // called by wal thread
-void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
+void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, u64 sequence) {
     LOG_TRACE(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     if (max_commit_ts_ != UNCOMMIT_TS || !txn_ids_.empty()) {
         UnrecoverableError(fmt::format("CatalogDeltaEntry SaveState failed, max_commit_ts_ {} txn_ids_ size {}", max_commit_ts_, txn_ids_.size()));
     }
+    sequence_ = sequence;
     max_commit_ts_ = commit_ts;
     txn_ids_ = {txn_id};
     for (auto &operation : operations_) {
@@ -703,16 +759,68 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     //         LOG_INFO(fmt::format("Add delta entry: {}", delta_entry->ToString()));
     //     }
     // }
-    std::unique_lock w_lock(mtx_);
+    if (delta_entry->sequence() != last_sequence_ + 1) {
+        // Discontinuous
+        u64 entry_sequence = delta_entry->sequence();
+        sequence_heap_.push(entry_sequence);
+        delta_entry_map_.emplace(entry_sequence, std::move(delta_entry));
+    } else {
+        // Continuous
+        do {
+            TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
+
+            TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
+            if (max_commit_ts_ > max_commit_ts || wal_size_ > wal_size) {
+                UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {} or wal_size_ {} > wal_size {}",
+                                               max_commit_ts_,
+                                               max_commit_ts,
+                                               wal_size_,
+                                               wal_size));
+            }
+            max_commit_ts_ = max_commit_ts;
+            wal_size_ = wal_size;
+
+            for (auto &op : delta_entry->operations()) {
+                bool prune = PruneDeltaOp(op.get(), current_commit_ts);
+
+                String encode = op->EncodeIndex();
+                auto iter = delta_ops_.find(encode);
+                if (iter != delta_ops_.end()) {
+                    auto &delta_op = iter->second;
+                    if (!prune) {
+                        delta_op->Merge(std::move(op));
+                    } else {
+                        delta_ops_.erase(iter);
+                    }
+                } else {
+                    delta_ops_[encode] = std::move(op);
+                }
+            }
+            if (!delta_entry->txn_ids().empty()) {
+                txn_ids_.insert(delta_entry->txn_ids()[0]);
+            }
+
+            ++last_sequence_;
+
+            if (!sequence_heap_.empty() && sequence_heap_.top() == last_sequence_ + 1) {
+                delta_entry = std::move(delta_entry_map_[sequence_heap_.top()]);
+                sequence_heap_.pop();
+            } else {
+                break;
+            }
+        } while (true);
+    }
+}
+
+void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
+
     TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
 
     TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
-    if (max_commit_ts_ > max_commit_ts || wal_size_ > wal_size) {
-        UnrecoverableError(
-            fmt::format("max_commit_ts_ {} > max_commit_ts {} or wal_size_ {} > wal_size {}", max_commit_ts_, max_commit_ts, wal_size_, wal_size));
+    if (max_commit_ts_ > max_commit_ts) {
+        UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {} ", max_commit_ts_, max_commit_ts));
     }
     max_commit_ts_ = max_commit_ts;
-    wal_size_ = wal_size;
 
     for (auto &op : delta_entry->operations()) {
         bool prune = PruneDeltaOp(op.get(), current_commit_ts);
@@ -742,8 +850,6 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     }
 
     {
-        std::unique_lock w_lock(mtx_);
-
         for (auto &[_, delta_op] : delta_ops_) {
             if (delta_op->commit_ts_ < full_ckp_ts) {
                 continue;

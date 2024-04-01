@@ -35,6 +35,7 @@ import cleanup_scanner;
 namespace infinity {
 
 class TxnManager;
+class Txn;
 class DBMeta;
 
 export class DBEntry final : public BaseEntry, public EntryInterface {
@@ -138,5 +139,6 @@ public:
     void Cleanup() override;
 
     void MemIndexCommit();
+    void MemIndexRecover(BufferManager* buffer_manager);
 };
 } // namespace infinity

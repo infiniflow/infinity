@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module catalog_delta_entry;
 
 import table_def;
@@ -28,6 +30,7 @@ import block_entry;
 import block_column_entry;
 import table_index_entry;
 import segment_index_entry;
+import chunk_index_entry;
 import catalog;
 import serialize;
 import third_party;
@@ -55,6 +58,7 @@ export enum class CatalogDeltaOpType : i8 {
     // -----------------------------
     ADD_TABLE_INDEX_ENTRY = 11,
     ADD_SEGMENT_INDEX_ENTRY = 12,
+    ADD_CHUNK_INDEX_ENTRY = 13,
 
     // -----------------------------
     // SEGMENT STATUS
@@ -424,6 +428,61 @@ public:
     TxnTimeStamp max_ts_{0};
 };
 
+/// class AddSegmentColumnEntryOperation
+export class AddChunkIndexEntryOp : public CatalogDeltaOperation {
+public:
+    static UniquePtr<AddChunkIndexEntryOp> ReadAdv(char *&ptr);
+
+    AddChunkIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {}
+
+    explicit AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry),
+          db_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
+          table_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
+          index_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->index_name()),
+          segment_id_(chunk_index_entry->segment_index_entry_->segment_id()), base_name_(chunk_index_entry->base_name_),
+          base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_) {}
+
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_CHUNK_INDEX_ENTRY"; }
+    [[nodiscard]] SizeT GetSizeInBytes() const final {
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_->size();
+        total_size += sizeof(i32) + this->table_name_->size();
+        total_size += sizeof(i32) + this->index_name_->size();
+        total_size += sizeof(SegmentID);
+        total_size += sizeof(i32) + this->base_name_.size();
+        total_size += sizeof(RowID);
+        total_size += sizeof(u32);
+        return total_size;
+    }
+    void WriteAdv(char *&buf) const final;
+    const String ToString() const final;
+    const String EncodeIndex() const final {
+        return String(fmt::format("#{}#{}#{}#{}#{}#{}#{}@{}",
+                                  *db_name_,
+                                  *table_name_,
+                                  *index_name_,
+                                  segment_id_,
+                                  base_name_,
+                                  base_rowid_.ToUint64(),
+                                  row_count_,
+                                  (u8)(type_)));
+    }
+    void Flush(TxnTimeStamp max_commit_ts);
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+
+public:
+    SharedPtr<String> db_name_{};
+    SharedPtr<String> table_name_{};
+    SharedPtr<String> index_name_{};
+    SegmentID segment_id_{0};
+    String base_name_{};
+    RowID base_rowid_;
+    u32 row_count_{0};
+};
+
 // used when a segment is sealed (import, append, compact)
 // should always contain minmax filter data
 // maybe also contain bloom filter data for selected columns
@@ -532,12 +591,13 @@ public:
 
     [[nodiscard]] String ToString() const;
 
-    void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts);
+    void SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, u64 sequence);
 
     const Vector<TransactionID> &txn_ids() const { return txn_ids_; }
     void set_txn_ids(Vector<TransactionID> &&txn_ids) { txn_ids_ = std::move(txn_ids); }
     TxnTimeStamp commit_ts() const { return max_commit_ts_; }
     void set_commit_ts(TransactionID commit_ts) { max_commit_ts_ = commit_ts; }
+    u64 sequence() const { return sequence_; }
 
     void AddOperation(UniquePtr<CatalogDeltaOperation> operation) { operations_.emplace_back(std::move(operation)); }
 
@@ -546,10 +606,9 @@ public:
     Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
 private:
-    std::mutex mtx_{};
     Vector<TransactionID> txn_ids_{};         // txn id of the entry
     TxnTimeStamp max_commit_ts_{UNCOMMIT_TS}; // commit timestamp of the txn
-
+    u64 sequence_{};
     Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
 
@@ -561,6 +620,8 @@ public:
     void InitMaxCommitTS(TxnTimeStamp max_commit_ts) { max_commit_ts_ = max_commit_ts; }
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
+
+    void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts);
@@ -575,7 +636,9 @@ private:
     void PruneOpWithSamePrefix(const String &prefix, TxnTimeStamp current_commit_ts);
 
 private:
-    std::mutex mtx_{};
+    u64 last_sequence_{0};
+    std::priority_queue<u64> sequence_heap_;
+    Map<u64, UniquePtr<CatalogDeltaEntry>> delta_entry_map_;
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
