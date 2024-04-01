@@ -262,7 +262,7 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
     WalFile::RecycleWalFile(checkpoint_ts, wal_dir_);
     if (is_full_checkpoint) {
         const auto &catalog_dir = *storage_->catalog()->CatalogDir();
-        CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+        CatalogFile::RecycleCatalogFile(checkpoint_ts, catalog_dir);
     }
 }
 
@@ -270,7 +270,12 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_comm
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
     this->CheckpointInner(is_full_checkpoint, ckp_task->txn_, max_commit_ts, wal_size);
-    // TODO: now manual checkpoint will not recycle log file
+    // TODO: should recycle after txn commit
+    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
+    if (is_full_checkpoint) {
+        const auto &catalog_dir = *storage_->catalog()->CatalogDir();
+        CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+    }
 }
 
 void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size) {

@@ -66,19 +66,12 @@ String CatalogFile::DeltaCheckpointFilename(TxnTimeStamp max_commit_ts) { return
 
 void CatalogFile::RecycleCatalogFile(TxnTimeStamp full_ckp_ts, const String &catalog_dir) {
     auto [full_infos, delta_infos] = ParseCheckpointFilenames(catalog_dir);
-    bool found = false;
     for (const auto &full_info : full_infos) {
         if (full_info.max_commit_ts_ < full_ckp_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(full_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
-        } else if (full_info.max_commit_ts_ == full_ckp_ts) {
-            found = true;
         }
-    }
-    if (!found) {
-        UnrecoverableError(
-            fmt::format("Full catalog file {} not found in the catalog directory: {}", FullCheckpoingFilename(full_ckp_ts), catalog_dir));
     }
     for (const auto &delta_info : delta_infos) {
         if (delta_info.max_commit_ts_ <= full_ckp_ts) {
