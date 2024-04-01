@@ -79,10 +79,6 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     SharedPtr<ColumnVector> &child_output_col = child_state->OutputColumnVector();
     this->Execute(child_expr, child_state, child_output_col);
 
-    if (expr->aggregate_function_.argument_type_ != *child_output_col->data_type()) {
-        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.argument_type_.ToString(), child_output_col->data_type()->ToString()));
-    }
-
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
         RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString()));
     }
