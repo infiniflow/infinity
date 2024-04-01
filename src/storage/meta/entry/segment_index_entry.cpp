@@ -99,8 +99,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            TxnTimeStamp max_ts,
                                                                            TransactionID txn_id,
                                                                            TxnTimeStamp begin_ts,
-                                                                           TxnTimeStamp commit_ts,
-                                                                           bool is_delete) {
+                                                                           TxnTimeStamp commit_ts) {
 
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {

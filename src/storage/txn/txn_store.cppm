@@ -50,7 +50,7 @@ public:
 
     TxnSegmentStore() = default;
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, TxnTimeStamp commit_ts) const;
 
 public:
     SegmentEntry *const segment_entry_ = nullptr;
@@ -62,7 +62,9 @@ public:
     explicit TxnIndexStore(TableIndexEntry *table_index_entry);
     TxnIndexStore() = default;
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const;
+
+    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
 
 public:
     TableIndexEntry *const table_index_entry_{};
@@ -79,7 +81,7 @@ export struct TxnCompactStore {
     TxnCompactStore();
     TxnCompactStore(CompactSegmentsTaskType type);
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const;
 };
 
 export class TxnTableStore {
@@ -121,7 +123,11 @@ public:
 
     void AddSealedSegment(SegmentEntry *segment_entry);
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, bool enable_compaction, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
+                    bool enable_compaction,
+                    BGTaskProcessor *bg_task_processor,
+                    TxnManager *txn_mgr,
+                    TxnTimeStamp commit_ts) const;
 
 public: // Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
@@ -132,13 +138,14 @@ private:
     HashMap<SegmentID, TxnSegmentStore> txn_segments_{};
     Vector<SegmentEntry *> set_sealed_segments_{};
 
-    Set<TableIndexEntry *> txn_indexes_{};
+    int ptr_seq_n_;
+    Map<TableIndexEntry *, int> txn_indexes_{};
     HashMap<String, UniquePtr<TxnIndexStore>> txn_indexes_store_{};
 
     TxnCompactStore compact_state_;
 
 public:
-    Txn *txn_{}; // TODO: remove this
+    Txn *const txn_{};
     Vector<SharedPtr<DataBlock>> blocks_{};
 
     UniquePtr<AppendState> append_state_{};
@@ -177,8 +184,9 @@ private:
     // Txn store
     Txn *txn_{}; // TODO: remove this
     Catalog *catalog_{};
-    Set<DBEntry *> txn_dbs_{};
-    Set<TableEntry *> txn_tables_{};
+    int ptr_seq_n_{};
+    Map<DBEntry *, int> txn_dbs_{};
+    Map<TableEntry *, int> txn_tables_{};
     // Key: table name Value: TxnTableStore
     HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 };

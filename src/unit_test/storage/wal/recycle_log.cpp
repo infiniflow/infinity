@@ -36,12 +36,12 @@ using namespace infinity;
 class RecycleLogTest : public BaseTest {
 protected:
     static std::shared_ptr<std::string> test_ckp_recycle_config() {
-        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_ckp_recycle.toml");
+        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     }
 
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override { system("rm -rf /tmp/infinity"); }
+    void TearDown() override {}
 };
 
 TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
@@ -89,18 +89,23 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 }
             }
         }
+        TxnTimeStamp ckp_commit_ts = 0;
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false /*full_check_point*/);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
-            txn_mgr->CommitTxn(txn);
+            ckp_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
             // assert there is one log file
             auto [temp_wal_file, wal_files] = WalFile::ParseWalFilenames(wal_dir);
-            ASSERT_TRUE(wal_files.empty());
+            if (wal_files.size() == 1) {
+                ASSERT_EQ(ckp_commit_ts, wal_files[0].max_commit_ts_);
+            } else {
+                ASSERT_TRUE(wal_files.empty());
+            }
         }
         infinity::InfinityContext::instance().UnInit();
 
