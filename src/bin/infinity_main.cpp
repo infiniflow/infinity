@@ -46,10 +46,11 @@ bool server_running = false;
 infinity::Thread shutdown_thread;
 
 void ShutdownServer() {
-
-    std::unique_lock<std::mutex> lock(server_mutex);
-    server_running = true;
-    server_cv.wait(lock, [&] { return !server_running; });
+    {
+        std::unique_lock<std::mutex> lock(server_mutex);
+        server_running = true;
+        server_cv.wait(lock, [&] { return !server_running; });
+    }
 
     //            threaded_thrift_server.Shutdown();
     //            threaded_thrift_thread.join();
