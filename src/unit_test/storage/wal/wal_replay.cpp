@@ -71,8 +71,8 @@ protected:
     void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
 
     void TearDown() override {
-        system("tree  /tmp/infinity");
-        // system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        // system("tree  /tmp/infinity");
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
     }
 };
 
