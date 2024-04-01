@@ -28,12 +28,10 @@ import segment_index_entry;
 export module column_index_reader;
 
 namespace infinity {
+struct TableEntry;
 
 export class ColumnIndexReader {
 public:
-    ColumnIndexReader();
-    virtual ~ColumnIndexReader() = default;
-
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
     UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
@@ -53,32 +51,39 @@ public:
 };
 
 namespace detail {
-template <class T>
+export template <class T>
 struct Hash {
     inline SizeT operator()(const T &val) const { return val; }
 };
 } // namespace detail
 
 export struct IndexReader {
-    ColumnIndexReader *GetColumnIndexReader(u64 column_id) { return column_index_readers_[column_id].get(); }
+    ColumnIndexReader *GetColumnIndexReader(u64 column_id) const { return (*column_index_readers_)[column_id].get(); }
+    const Map<String, String> &GetColumn2Analyzer() const { return *column2analyzer_; }
 
-    bool NeedRefreshColumnIndexReader(u64 column_id, u64 ts) {
-        auto it = column_index_flags_.find(column_id);
-        if (it != column_index_flags_.end()) {
-            return it->second < ts;
-        }
-        return true;
-    }
-
-    void SetColumnIndexReader(u64 column_id, u64 ts, UniquePtr<ColumnIndexReader> column_index_reader) {
-        column_index_flags_[column_id] = ts;
-        column_index_readers_[column_id] = std::move(column_index_reader);
-    }
-
-    FlatHashMap<u64, u64, detail::Hash<u64>> column_index_flags_;
-    FlatHashMap<u64, UniquePtr<ColumnIndexReader>, detail::Hash<u64>> column_index_readers_;
-
+    SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> column_index_readers_;
+    SharedPtr<Map<String, String>> column2analyzer_;
     SharedPtr<MemoryPool> session_pool_;
+};
+
+export class TableIndexReaderCache {
+public:
+    void UpdateKnownUpdateTs(TxnTimeStamp ts) {
+        std::scoped_lock lock(mutex_);
+        first_known_update_ts_ = std::min(first_known_update_ts_, ts);
+        last_known_update_ts_ = std::max(last_known_update_ts_, ts);
+    }
+
+    IndexReader GetIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *table_entry_ptr);
+
+private:
+    std::mutex mutex_;
+    TxnTimeStamp first_known_update_ts_ = 0;
+    TxnTimeStamp last_known_update_ts_ = 0;
+    TxnTimeStamp cache_ts_ = 0;
+    FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts_;
+    SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> cache_column_readers_;
+    SharedPtr<Map<String, String>> column2analyzer_;
 };
 
 } // namespace infinity

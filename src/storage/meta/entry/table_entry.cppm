@@ -42,6 +42,7 @@ import random;
 import memory_pool;
 import meta_info;
 import block_entry;
+import column_index_reader;
 
 namespace infinity {
 
@@ -158,7 +159,7 @@ public:
     void MemIndexCommit();
 
     // Invoked once at init stage to recovery memory index.
-    void MemIndexRecover(BufferManager* buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager);
 
     void OptimizeIndex(Txn *txn);
 
@@ -207,6 +208,10 @@ public:
 
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
+    IndexReader GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void UpdateFullTextIndexReaderKnownUpdateTs(TxnTimeStamp ts) { return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts); }
+
 private:
     TableMeta *const table_meta_{};
 
@@ -230,6 +235,9 @@ private:
     SharedPtr<SegmentEntry> unsealed_segment_{};
     SegmentID unsealed_id_{};
     atomic_u32 next_segment_id_{};
+
+    // for full text search cache
+    TableIndexReaderCache fulltext_column_index_cache_;
 
 public:
     // set nullptr to close auto compaction

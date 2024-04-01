@@ -999,4 +999,8 @@ void TableEntry::Cleanup() {
     CleanupScanner::CleanupDir(*table_entry_dir_);
 }
 
+IndexReader TableEntry::GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    return fulltext_column_index_cache_.GetIndexReader(txn_id, begin_ts, this);
+}
+
 } // namespace infinity
