@@ -67,44 +67,68 @@ export enum class CatalogDeltaOpType : i8 {
     SET_BLOCK_STATUS_SEALED = 22,
 };
 
+export enum class MergeFlag : u8 {
+    kInvalid = 0,
+    kDelete = 1,
+    kNew = 2,
+    kUpdate = 3,
+    kDeleteAndNew = 4, // this is used in catalog file, should not initialize in catalog delta
+};
+
+enum class PruneFlag : u8 {
+    kInvalid = 0,
+    kPrune = 1,
+    kPruneSub = 2,
+    kKeep = 3,
+};
+
 /// class CatalogDeltaOperation
 export class CatalogDeltaOperation {
 public:
     explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}
-    explicit CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry)
-        : begin_ts_(base_entry->begin_ts_), txn_id_(base_entry->txn_id_), commit_ts_(base_entry->commit_ts_), is_delete_(base_entry->deleted_),
-          type_(type) {}
+    CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts);
     virtual ~CatalogDeltaOperation(){};
     virtual CatalogDeltaOpType GetType() const = 0;
     virtual String GetTypeStr() const = 0;
     [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
     virtual void WriteAdv(char *&ptr) const = 0;
     static UniquePtr<CatalogDeltaOperation> ReadAdv(char *&ptr, i32 max_bytes);
-    SizeT GetBaseSizeInBytes() const { return sizeof(TxnTimeStamp) + sizeof(bool) + sizeof(TransactionID) + sizeof(TxnTimeStamp); }
+    SizeT GetBaseSizeInBytes() const { return sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp); }
     void WriteAdvBase(char *&buf) const {
         WriteBufAdv(buf, this->type_);
         WriteBufAdv(buf, this->begin_ts_);
-        WriteBufAdv(buf, this->is_delete_);
+        WriteBufAdv(buf, this->merge_flag_);
         WriteBufAdv(buf, this->txn_id_);
         WriteBufAdv(buf, this->commit_ts_);
     }
     void ReadAdvBase(char *&ptr) {
         begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-        is_delete_ = ReadBufAdv<bool>(ptr);
+        merge_flag_ = ReadBufAdv<MergeFlag>(ptr);
         txn_id_ = ReadBufAdv<TransactionID>(ptr);
         commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     }
 
-    virtual const String ToString() const = 0;
+    virtual const String ToString() const {
+        return fmt::format("type: {}, begin_ts: {}, txn_id: {}, commit_ts: {}, merge_flag: {}",
+                           GetTypeStr(),
+                           begin_ts_,
+                           txn_id_,
+                           commit_ts_,
+                           (u8)merge_flag_);
+    }
     virtual const String EncodeIndex() const = 0;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
     virtual void Merge(UniquePtr<CatalogDeltaOperation> other) = 0;
+
+    static PruneFlag ToPrune(Optional<MergeFlag> old_merge_flag, MergeFlag new_merge_flag);
+
+    MergeFlag NextDeleteFlag(MergeFlag new_merge_flag) const;
 
 public:
     TxnTimeStamp begin_ts_{0};
     TransactionID txn_id_{0};
     TxnTimeStamp commit_ts_{0};
-    bool is_delete_{false};
+    MergeFlag merge_flag_{MergeFlag::kInvalid};
 
 public:
     bool is_saved_sate_{false};
@@ -118,8 +142,8 @@ public:
 
     AddDBEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY) {}
 
-    explicit AddDBEntryOp(DBEntry *db_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry), db_name_(db_entry->db_name_ptr()),
+    explicit AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_name_(db_entry->db_name_ptr()),
           db_entry_dir_(db_entry->db_entry_dir()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_DATABASE_ENTRY; }
@@ -148,11 +172,11 @@ public:
 
     AddTableEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY) {}
 
-    explicit AddTableEntryOp(TableEntry *table_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, table_entry), db_name_(table_entry->GetDBName()),
+    explicit AddTableEntryOp(TableEntry *table_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, table_entry, commit_ts), db_name_(table_entry->GetDBName()),
           table_name_(table_entry->GetTableName()), table_entry_dir_(table_entry->TableEntryDir()), column_defs_(table_entry->column_defs()),
           row_count_(table_entry->row_count()), // TODO: fix it
-          unsealed_id_(table_entry->unsealed_id()) {}
+          unsealed_id_(table_entry->unsealed_id()), next_segment_id_(table_entry->next_segment_id()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_ENTRY; }
     String GetTypeStr() const final { return "ADD_TABLE_ENTRY"; }
@@ -174,7 +198,7 @@ public:
         }
 
         total_size += sizeof(SizeT);
-        total_size += sizeof(SegmentID);
+        total_size += sizeof(SegmentID) * 2;
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -191,6 +215,7 @@ public:
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
     SizeT row_count_{0};
     SegmentID unsealed_id_{};
+    SegmentID next_segment_id_{0};
 };
 
 /// class AddSegmentEntryOp
@@ -200,11 +225,12 @@ public:
 
     AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY){};
 
-    explicit AddSegmentEntryOp(SegmentEntry *segment_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry), db_name_(segment_entry->GetTableEntry()->GetDBName()),
-          table_name_(segment_entry->GetTableEntry()->GetTableName()), segment_id_(segment_entry->segment_id()), status_(segment_entry->status()),
-          column_count_(segment_entry->column_count()), row_count_(segment_entry->row_count()), // FIXME: use append_state
-          actual_row_count_(segment_entry->actual_row_count()),                                 // FIXME: use append_state
+    explicit AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry, commit_ts),
+          db_name_(segment_entry->GetTableEntry()->GetDBName()), table_name_(segment_entry->GetTableEntry()->GetTableName()),
+          segment_id_(segment_entry->segment_id()), status_(segment_entry->status()), column_count_(segment_entry->column_count()),
+          row_count_(segment_entry->row_count()),               // FIXME: use append_state
+          actual_row_count_(segment_entry->actual_row_count()), // FIXME: use append_state
           row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()),
           deprecate_ts_(segment_entry->deprecate_ts()) {}
 
@@ -255,8 +281,8 @@ public:
 
     AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY){};
 
-    explicit AddBlockEntryOp(BlockEntry *block_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry), block_entry_(block_entry),
+    explicit AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry, commit_ts), block_entry_(block_entry),
           db_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetDBName()),
           table_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetTableName()), segment_id_(block_entry->GetSegmentEntry()->segment_id()),
           block_id_(block_entry->block_id()), row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()),
@@ -310,12 +336,13 @@ public:
 
     AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY){};
 
-    explicit AddColumnEntryOp(BlockColumnEntry *column_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry),
+    explicit AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts),
           db_name_(column_entry->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetDBName()),
           table_name_(column_entry->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetTableName()),
           segment_id_(column_entry->GetBlockEntry()->GetSegmentEntry()->segment_id()), block_id_(column_entry->GetBlockEntry()->block_id()),
-          column_id_(column_entry->column_id()), next_outline_idx_(column_entry->OutlineBufferCount()) {}
+          column_id_(column_entry->column_id()), next_outline_idx_(column_entry->OutlineBufferCount()),
+          last_chunk_offset_(column_entry->LastChunkOff()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_COLUMN_ENTRY; }
     String GetTypeStr() const final { return "ADD_COLUMN_ENTRY"; }
@@ -323,7 +350,7 @@ public:
         auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
         total_size += sizeof(i32) + this->db_name_->size();
         total_size += sizeof(i32) + this->table_name_->size();
-        total_size += sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(i32);
+        total_size += sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(i32) + sizeof(last_chunk_offset_);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -341,6 +368,7 @@ public:
     BlockID block_id_{};
     ColumnID column_id_{};
     i32 next_outline_idx_{0};
+    u64 last_chunk_offset_{};
 };
 
 /// class AddTableIndexEntryOp
@@ -350,8 +378,8 @@ public:
 
     AddTableIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {}
 
-    explicit AddTableIndexEntryOp(TableIndexEntry *table_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, table_index_entry),
+    explicit AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, table_index_entry, commit_ts),
           db_name_(table_index_entry->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(table_index_entry->table_index_meta()->index_name()), index_dir_(table_index_entry->index_dir()),
@@ -364,7 +392,7 @@ public:
         total_size += sizeof(i32) + this->db_name_->size();
         total_size += sizeof(i32) + this->table_name_->size();
         total_size += sizeof(i32) + this->index_name_->size();
-        if (!is_delete_) {
+        if (merge_flag_ != MergeFlag::kDelete) {
             total_size += sizeof(i32) + this->index_dir_->size();
             total_size += this->index_base_->GetSizeInBytes();
         }
@@ -391,8 +419,9 @@ public:
 
     AddSegmentIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {}
 
-    explicit AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY, segment_index_entry), segment_index_entry_(segment_index_entry),
+    explicit AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY, segment_index_entry, commit_ts),
+          segment_index_entry_(segment_index_entry),
           db_name_(segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(segment_index_entry->table_index_entry()->table_index_meta()->index_name()), segment_id_(segment_index_entry->segment_id()),
@@ -435,8 +464,8 @@ public:
 
     AddChunkIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {}
 
-    explicit AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry),
+    explicit AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts),
           db_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->index_name()),
@@ -492,10 +521,10 @@ public:
 
     explicit SetSegmentStatusSealedOp() : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED) {}
 
-    explicit SetSegmentStatusSealedOp(SegmentEntry *segment_entry, String &&segment_filter_binary_data)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, segment_entry), db_name_(segment_entry->GetTableEntry()->GetDBName()),
-          table_name_(segment_entry->GetTableEntry()->GetTableName()), segment_id_(segment_entry->segment_id()),
-          segment_filter_binary_data_(std::move(segment_filter_binary_data)) {}
+    explicit SetSegmentStatusSealedOp(SegmentEntry *segment_entry, String &&segment_filter_binary_data, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, segment_entry, commit_ts),
+          db_name_(segment_entry->GetTableEntry()->GetDBName()), table_name_(segment_entry->GetTableEntry()->GetTableName()),
+          segment_id_(segment_entry->segment_id()), segment_filter_binary_data_(std::move(segment_filter_binary_data)) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED; }
     String GetTypeStr() const final { return "SET_SEGMENT_STATUS_SEALED"; }
@@ -530,8 +559,8 @@ public:
 
     explicit SetBlockStatusSealedOp() : CatalogDeltaOperation(CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED) {}
 
-    explicit SetBlockStatusSealedOp(BlockEntry *block_entry, String &&block_filter_binary_data)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED, block_entry),
+    explicit SetBlockStatusSealedOp(BlockEntry *block_entry, String &&block_filter_binary_data, TxnTimeStamp commit_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED, block_entry, commit_ts),
           db_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetDBName()),
           table_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetTableName()), segment_id_(block_entry->GetSegmentEntry()->segment_id()),
           block_id_(block_entry->block_id()), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
@@ -599,7 +628,7 @@ public:
     void set_commit_ts(TransactionID commit_ts) { max_commit_ts_ = commit_ts; }
     u64 sequence() const { return sequence_; }
 
-    void AddOperation(UniquePtr<CatalogDeltaOperation> operation) { operations_.emplace_back(std::move(operation)); }
+    void AddOperation(UniquePtr<CatalogDeltaOperation> operation);
 
 public:
     // Attention: only use in unit test or thread safe context
@@ -631,9 +660,9 @@ public:
     SizeT OpSize() const { return delta_ops_.size(); }
 
 private:
-    bool PruneDeltaOp(CatalogDeltaOperation *delta_op, TxnTimeStamp current_commit_ts);
+    void AddDeltaEntryInner(CatalogDeltaEntry *delta_entry);
 
-    void PruneOpWithSamePrefix(const String &prefix, TxnTimeStamp current_commit_ts);
+    void PruneOpWithSamePrefix(const String &prefix);
 
 private:
     u64 last_sequence_{0};

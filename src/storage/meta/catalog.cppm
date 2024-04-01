@@ -230,7 +230,7 @@ public:
 
 public:
     // Serialization and Deserialization
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     void SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_path);
 
@@ -275,9 +275,11 @@ public:
     MetaMap<DBMeta> db_meta_map_{};
 
     TransactionID next_txn_id_{};
-    TxnTimeStamp full_ckp_commit_ts_{};
-    u64 catalog_version_{}; // TODO seems useless
 
+private:
+    TxnTimeStamp full_ckp_commit_ts_{};
+
+public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};

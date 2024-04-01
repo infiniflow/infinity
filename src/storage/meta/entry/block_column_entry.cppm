@@ -42,8 +42,12 @@ public:
 
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 
-    static UniquePtr<BlockColumnEntry>
-    NewReplayBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager, i32 next_outline_idx);
+    static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry,
+                                                                 ColumnID column_id,
+                                                                 BufferManager *buffer_manager,
+                                                                 i32 next_outline_idx,
+                                                                 u64 last_chunk_offset,
+                                                                 TxnTimeStamp commit_ts);
 
     nlohmann::json Serialize();
 
@@ -82,6 +86,10 @@ public:
         return outline_buffers_.size();
     }
 
+    u64 LastChunkOff() const { return last_chunk_offset_; }
+
+    void SetLastChunkOff(u64 offset) { last_chunk_offset_ = offset; }
+
 public:
     void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
 
@@ -100,6 +108,7 @@ private:
 
     mutable std::shared_mutex mutex_{};
     Vector<BufferObj *> outline_buffers_{};
+    u64 last_chunk_offset_{};
 };
 
 } // namespace infinity
