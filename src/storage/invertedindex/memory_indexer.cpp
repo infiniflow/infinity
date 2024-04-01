@@ -95,7 +95,6 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
     u32 doc_count(0);
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        inflight_tasks_++;
         seq_inserted = seq_inserted_++;
         doc_count = doc_count_;
         doc_count_ += row_count;
@@ -108,8 +107,8 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     if (offline) {
-        auto func = [this, task, provider, length_handler = std::move(update_length_job)](int id) {
-            auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+        auto func = [this, task, provider, length_handler = std::move(update_length_job), inverter](int id) {
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             inverter->GetTermListLength(length_handler->GetColumnLengthArray());
             length_handler->DumpToFile();
@@ -118,14 +117,18 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
         };
         thread_pool_.push(std::move(func));
     } else {
-        auto func = [this, task, provider, length_handler = std::move(update_length_job)](int id) {
-            auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+        auto func = [this, task, provider, length_handler = std::move(update_length_job), inverter](int id) {
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             inverter->GetTermListLength(length_handler->GetColumnLengthArray());
             length_handler->DumpToFile();
             this->ring_inverted_.Put(task->task_seq_, inverter);
         };
         thread_pool_.push(std::move(func));
+    }
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_++;
     }
 }
 

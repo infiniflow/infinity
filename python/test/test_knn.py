@@ -321,7 +321,7 @@ class TestKnn:
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
     def test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
-                        index_distance_type, knn_distance_type):
+                               index_distance_type, knn_distance_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index", {
@@ -374,8 +374,8 @@ class TestKnn:
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
     def test_with_index_after(self, get_infinity_db, check_data,
-                        index_column_name, knn_column_name,
-                        index_distance_type, knn_distance_type):
+                              index_column_name, knn_column_name,
+                              index_distance_type, knn_distance_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index", {
