@@ -117,7 +117,8 @@ bool CatalogDeltaOperation::operator==(const CatalogDeltaOperation &rhs) const {
 PruneFlag CatalogDeltaOperation::ToPrune(Optional<MergeFlag> old_merge_flag_opt, MergeFlag new_merge_flag) {
     if (!old_merge_flag_opt.has_value()) {
         switch (new_merge_flag) {
-            case MergeFlag::kDelete: {
+            case MergeFlag::kDelete:
+            case MergeFlag::kDeleteAndNew: {
                 return PruneFlag::kPruneSub;
             }
             case MergeFlag::kNew:
@@ -729,6 +730,9 @@ void AddTableEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     }
     auto *add_table_op = static_cast<AddTableEntryOp *>(other.get());
     MergeFlag flag = this->NextDeleteFlag(add_table_op->merge_flag_);
+    // if (*add_table_op->table_name_ == "test_csv_with_different_delimiter" && flag == MergeFlag::kDeleteAndNew) {
+    //     LOG_INFO("AAA");
+    // }
     *this = std::move(*add_table_op);
     this->merge_flag_ = flag;
 }
@@ -849,7 +853,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     }
     {
         for (const auto &operation : entry->operations_) {
-            LOG_TRACE(fmt::format("Read delta op: {}", operation->ToString()));
+            LOG_INFO(fmt::format("Read delta op: {}", operation->ToString()));
         }
     }
     return entry;
@@ -1007,6 +1011,9 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             }
         }
         String encode = new_op->EncodeIndex();
+        // if (encode == "#default#test_csv_with_different_delimiter@2") {
+        //     LOG_INFO("AAA");
+        // }
         auto iter = delta_ops_.find(encode);
         if (iter != delta_ops_.end()) {
             auto *op = iter->second.get();
