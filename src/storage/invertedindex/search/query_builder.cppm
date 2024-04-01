@@ -38,7 +38,7 @@ public:
 
     ~QueryBuilder();
 
-    Map<String, String> &GetColumn2Analyzer() { return column2analyzer_; }
+    const Map<String, String> &GetColumn2Analyzer() { return index_reader_.GetColumn2Analyzer(); }
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
@@ -52,6 +52,5 @@ private:
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     Scorer scorer_;
-    Map<String, String> column2analyzer_;
 };
 } // namespace infinity

@@ -28,7 +28,7 @@ struct QueryNode;
  */
 class SearchDriver {
 public:
-    SearchDriver(std::map<std::string, std::string> &field2analyzer, std::string &default_field)
+    SearchDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field)
         : field2analyzer_{field2analyzer}, default_field_{default_field} {}
 
     // used in PhysicalMatch
