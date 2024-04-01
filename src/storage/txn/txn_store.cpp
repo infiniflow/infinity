@@ -74,6 +74,12 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
     }
 }
 
+void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
+    for (auto chunk_index_entry : chunk_index_entries_) {
+        chunk_index_entry->Commit(commit_ts);
+    }
+}
+
 ///-----------------------------------------------------------------------------
 
 TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvalid) {}
@@ -261,6 +267,7 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
+        txn_index_store->Commit(txn_id, commit_ts);
     }
     for (auto [table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Commit(commit_ts);

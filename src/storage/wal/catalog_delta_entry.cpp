@@ -40,6 +40,8 @@ CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry 
         merge_flag_ = MergeFlag::kDelete;
     } else if (commit_ts == base_entry->commit_ts_) {
         merge_flag_ = MergeFlag::kNew;
+    } else if (!base_entry->Committed()) {
+        UnrecoverableError("Entry not committed.");
     } else {
         if (commit_ts < base_entry->commit_ts_) {
             UnrecoverableError(fmt::format("Invalid commit_ts: {} < {}", commit_ts, base_entry->commit_ts_));

@@ -263,6 +263,7 @@ TEST_F(RepeatReplayTest, import) {
             txn_mgr->CommitTxn(txn);
         }
         TestImport(txn_mgr, buffer_mgr);
+        CheckTable(txn_mgr, 1);
         infinity::InfinityContext::instance().UnInit();
     }
     {                                                            // replay with no checkpoint, only replay wal
@@ -273,6 +274,7 @@ TEST_F(RepeatReplayTest, import) {
         BufferManager *buffer_mgr = storage->buffer_manager();
         CheckTable(txn_mgr, 1);
         TestImport(txn_mgr, buffer_mgr);
+        CheckTable(txn_mgr, 2);
         infinity::InfinityContext::instance().UnInit();
     }
     {                                                            // replay with full checkpoint + wal
@@ -291,6 +293,7 @@ TEST_F(RepeatReplayTest, import) {
             txn_mgr->CommitTxn(txn_force_ckp);
         }
         TestImport(txn_mgr, buffer_mgr);
+        CheckTable(txn_mgr, 3);
         infinity::InfinityContext::instance().UnInit();
     }
     for (int i = 0; i < 2; ++i) {                                // replay with full checkpoint + delta checkpoint + wal

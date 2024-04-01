@@ -190,8 +190,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
 
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto local_catalog_delta_entry = std::make_unique<CatalogDeltaEntry>();
-//    local_catalog_delta_entry->set_txn_ids({1});
-//    local_catalog_delta_entry->set_commit_ts(1);
+    //    local_catalog_delta_entry->set_txn_ids({1});
+    //    local_catalog_delta_entry->set_commit_ts(1);
     local_catalog_delta_entry->SaveState(1, 1, 1);
 
     auto db_name = MakeShared<String>("db_test");
@@ -395,10 +395,18 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
     auto table_entry_dir = MakeShared<String>("data/db_test/table_test");
 
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
-    auto AddDeltaEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag) {
+    auto AddDBEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag) {
         auto op1 = MakeUnique<AddDBEntryOp>();
         op1->db_name_ = db_name;
         op1->db_entry_dir_ = db_dir;
+        op1->merge_flag_ = merge_flag;
+        delta_entry->operations().push_back(std::move(op1));
+    };
+    auto AddTableEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag) {
+        auto op1 = MakeUnique<AddTableEntryOp>();
+        op1->db_name_ = db_name;
+        op1->table_name_ = table_name;
+        op1->table_entry_dir_ = table_entry_dir;
         op1->merge_flag_ = merge_flag;
         delta_entry->operations().push_back(std::move(op1));
     };
@@ -407,8 +415,8 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
         auto delta_entry = std::make_unique<CatalogDeltaEntry>();
         delta_entry->set_txn_ids({1});
         delta_entry->set_commit_ts(commit_ts);
-        AddDeltaEntry(delta_entry.get(), MergeFlag::kNew);
-        AddDeltaEntry(delta_entry.get(), MergeFlag::kUpdate);
+        AddDBEntry(delta_entry.get(), MergeFlag::kNew);
+        AddDBEntry(delta_entry.get(), MergeFlag::kUpdate);
         global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry), 0 /*wal_size*/);
 
         auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
@@ -419,18 +427,89 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
         auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
         delta_entry1->set_txn_ids({1});
         delta_entry1->set_commit_ts(commit_ts);
-        AddDeltaEntry(delta_entry1.get(), MergeFlag::kNew);
-        AddDeltaEntry(delta_entry1.get(), MergeFlag::kUpdate);
+        AddDBEntry(delta_entry1.get(), MergeFlag::kNew);
+        AddDBEntry(delta_entry1.get(), MergeFlag::kUpdate);
         global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry1), 0 /*wal_size*/);
 
         auto delta_entry2 = std::make_unique<CatalogDeltaEntry>();
         delta_entry2->set_txn_ids({2});
         delta_entry2->set_commit_ts(commit_ts);
-        AddDeltaEntry(delta_entry2.get(), MergeFlag::kDelete);
-        AddDeltaEntry(delta_entry2.get(), MergeFlag::kNew);
+        AddDBEntry(delta_entry2.get(), MergeFlag::kDelete);
+        AddDBEntry(delta_entry2.get(), MergeFlag::kNew);
         global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry2), 0 /*wal_size*/);
 
         auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
         EXPECT_EQ(merged_entry->operations().size(), 1u);
+    }
+    {
+        Vector<UniquePtr<CatalogDeltaEntry>> merged_entries;
+        {
+            TxnTimeStamp commit_ts = 3;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({1});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kUpdate);
+            global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry1), 0 /*wal_size*/);
+
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+            merged_entries.push_back(std::move(merged_entry));
+        }
+        {
+            TxnTimeStamp commit_ts = 4;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({2});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kDelete);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew);
+            global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry1), 0 /*wal_size*/);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+            merged_entries.push_back(std::move(merged_entry));
+        }
+        {
+            for (auto &entry : merged_entries) {
+                global_catalog_delta_entry->AddDeltaEntry(std::move(entry), 0 /*wal_size*/);
+            }
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(0 /*full_ckp_ts*/, 5);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+        }
+    }
+    {
+        Vector<UniquePtr<CatalogDeltaEntry>> merged_entries;
+        {
+            TxnTimeStamp commit_ts = 5;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({1});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kUpdate);
+            AddTableEntry(delta_entry1.get(), MergeFlag::kNew);
+            AddTableEntry(delta_entry1.get(), MergeFlag::kUpdate);
+            global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry1), 0 /*wal_size*/);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 2u);
+            merged_entries.push_back(std::move(merged_entry));
+        }
+        {
+            TxnTimeStamp commit_ts = 6;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({2});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddTableEntry(delta_entry1.get(), MergeFlag::kUpdate);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kDelete);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew);
+            global_catalog_delta_entry->AddDeltaEntry(std::move(delta_entry1), 0 /*wal_size*/);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+        }
+        {
+            for (auto &entry : merged_entries) {
+                global_catalog_delta_entry->AddDeltaEntry(std::move(entry), 0 /*wal_size*/);
+            }
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(0 /*full_ckp_ts*/, 7);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+        }
     }
 }

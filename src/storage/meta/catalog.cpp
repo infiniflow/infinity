@@ -437,12 +437,11 @@ Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<De
     // Load catalogs delta checkpoints and merge.
     TxnTimeStamp max_commit_ts = 0;
 
-    auto global_catalog_delta_entry = MakeUnique<GlobalCatalogDeltaEntry>();
     for (const auto &delta_ckp_info : delta_ckp_infos) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", delta_ckp_info.path_));
         auto catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_info);
         max_commit_ts = std::max(max_commit_ts, catalog_delta_entry->commit_ts());
-        global_catalog_delta_entry->ReplayDeltaEntry(std::move(catalog_delta_entry));
+        catalog->ReplayDeltaEntry(std::move(catalog_delta_entry));
     }
     catalog->LoadFromEntryDelta(max_commit_ts, buffer_mgr);
 
@@ -917,6 +916,8 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
     global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry), wal_size);
 }
+
+void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 
