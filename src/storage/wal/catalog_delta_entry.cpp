@@ -535,7 +535,7 @@ const String AddTableEntryOp::ToString() const {
 
 const String AddSegmentEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddSegmentEntryOp {} db_name: {} table_name: {} segment_id: {}\n",
+    sstream << fmt::format("AddSegmentEntryOp {} db_name: {} table_name: {} segment_id: {} ",
                            CatalogDeltaOperation::ToString(),
                            *db_name_,
                            *table_name_,

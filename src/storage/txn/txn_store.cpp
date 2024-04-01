@@ -339,7 +339,9 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
         BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(sealed_segment, txn_->buffer_mgr(), commit_ts);
         // now have minmax filter and optional bloom filter
         // serialize filter
-        sealed_segment->SetSealed();
+        if (!sealed_segment->SetSealed()) {
+            UnrecoverableError(fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id()));
+        }
         local_delta_ops->AddOperation(
             MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, sealed_segment->GetFastRoughFilter()->SerializeToString(), commit_ts));
         // FIXME: hack here

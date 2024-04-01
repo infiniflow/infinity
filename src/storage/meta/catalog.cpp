@@ -756,7 +756,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
-                segment_entry->SetSealed();
+                segment_entry->SetSealed(); // ignore the return value.
                 segment_entry->LoadFilterBinaryData(segment_filter_binary);
                 break;
             }

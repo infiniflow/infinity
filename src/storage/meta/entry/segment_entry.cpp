@@ -92,12 +92,13 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
-void SegmentEntry::SetSealed() {
+bool SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("SetSealed failed");
+        return false;
     }
     status_ = SegmentStatus::kSealed;
+    return true;
 }
 
 void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id) {

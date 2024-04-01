@@ -83,7 +83,7 @@ public:
 public:
     void AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id);
 
-    void SetSealed();
+    bool SetSealed();
 
     bool TrySetCompacting(CompactSegmentsTask *compact_task);
 

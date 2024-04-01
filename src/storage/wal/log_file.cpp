@@ -211,7 +211,7 @@ String WalFile::TempWalFilename() { return String(WAL_FILE_TEMP_FILE); }
 void WalFile::RecycleWalFile(TxnTimeStamp ckp_ts, const String &wal_dir) {
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
-        if (wal_info.max_commit_ts_ <= ckp_ts) {
+        if (wal_info.max_commit_ts_ < ckp_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(wal_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));

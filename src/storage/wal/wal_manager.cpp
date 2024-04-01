@@ -51,6 +51,7 @@ import table_index_meta;
 import table_index_entry;
 import log_file;
 import default_values;
+import defer_op;
 
 module wal_manager;
 
@@ -118,14 +119,14 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-void WalManager::PutEntry(WalEntry* entry, Txn* txn) {
+void WalManager::PutEntry(WalEntry *entry, Txn *txn) {
     if (!running_.load()) {
         return;
     }
 
     blocking_queue_.Enqueue(entry, txn);
 
-    return ;
+    return;
 }
 
 void WalManager::SetLastCkpWalSize(i64 wal_size) {
@@ -145,7 +146,7 @@ i64 WalManager::GetLastCkpWalSize() {
 void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
-    Deque<WalEntry*> log_batch{};
+    Deque<WalEntry *> log_batch{};
     while (running_.load()) {
         blocking_queue_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
@@ -155,7 +156,7 @@ void WalManager::Flush() {
         // auto [max_commit_ts, wal_size] = GetWalState();
         for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
-            if(entry == nullptr) {
+            if (entry == nullptr) {
                 // terminate entry
                 running_ = false;
                 break;
@@ -179,7 +180,7 @@ void WalManager::Flush() {
             wal_size_ += act_size;
         }
 
-        if(!running_.load()) {
+        if (!running_.load()) {
             break;
         }
 
@@ -189,7 +190,7 @@ void WalManager::Flush() {
                 break;
             }
             case FlushOption::kOnlyWrite: {
-//                ofs_.flush(); // FIXME: not flush, only write
+                ofs_.flush(); // FIXME: not flush, only write
                 break;
             }
             case FlushOption::kFlushPerSecond: {
@@ -256,30 +257,33 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
     txn->Begin();
 
     this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
-    txn_mgr->CommitTxn(txn);
+    TxnTimeStamp checkpoint_ts = txn_mgr->CommitTxn(txn);
+
+    WalFile::RecycleWalFile(checkpoint_ts, wal_dir_);
+    if (is_full_checkpoint) {
+        const auto &catalog_dir = *storage_->catalog()->CatalogDir();
+        CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+    }
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
     this->CheckpointInner(is_full_checkpoint, ckp_task->txn_, max_commit_ts, wal_size);
+    // TODO: now manual checkpoint will not recycle log file
 }
 
 void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size) {
     try {
-
+        DeferFn defer([&] { checkpoint_in_progress_.store(false); });
         LOG_INFO(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
                              is_full_checkpoint ? "FULL" : "DELTA",
                              txn->TxnID(),
                              txn->BeginTS(),
                              max_commit_ts));
 
-        txn->Checkpoint(max_commit_ts, is_full_checkpoint);
-
-        WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
-        if (is_full_checkpoint) {
-            const auto &catalog_dir = *storage_->catalog()->CatalogDir();
-            CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+        if (!txn->Checkpoint(max_commit_ts, is_full_checkpoint)) {
+            return;
         }
         SetLastCkpWalSize(wal_size);
 
@@ -290,7 +294,6 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
         throw e;
     }
-    checkpoint_in_progress_.store(false);
 }
 
 /**
@@ -437,7 +440,7 @@ i64 WalManager::ReplayWalFile() {
         }
     }
 
-    if (catalog_dir == "") {
+    if (system_start_ts == 0) {
         // once wal is not empty, a checkpoint should always be found.
         UnrecoverableError(fmt::format("No checkpoint found in wal"));
     }
