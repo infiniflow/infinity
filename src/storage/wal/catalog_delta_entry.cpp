@@ -114,11 +114,25 @@ bool CatalogDeltaOperation::operator==(const CatalogDeltaOperation &rhs) const {
            this->merge_flag_ == rhs.merge_flag_ && this->type_ == rhs.type_;
 }
 
-PruneFlag CatalogDeltaOperation::ToPrune(MergeFlag new_merge_flag) const {
+PruneFlag CatalogDeltaOperation::ToPrune(Optional<MergeFlag> old_merge_flag_opt, MergeFlag new_merge_flag) {
+    if (!old_merge_flag_opt.has_value()) {
+        switch (new_merge_flag) {
+            case MergeFlag::kDelete: {
+                return PruneFlag::kPruneSub;
+            }
+            case MergeFlag::kNew:
+            case MergeFlag::kUpdate: {
+                return PruneFlag::kKeep;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(new_merge_flag)));
+            }
+        }
+    }
+    MergeFlag old_merge_flag = old_merge_flag_opt.value();
     switch (new_merge_flag) {
-        case MergeFlag::kDelete:
-        case MergeFlag::kDeleteAndNew: {
-            switch (this->merge_flag_) {
+        case MergeFlag::kDelete: {
+            switch (old_merge_flag) {
                 case MergeFlag::kNew: {
                     return PruneFlag::kPrune;
                 }
@@ -127,7 +141,7 @@ PruneFlag CatalogDeltaOperation::ToPrune(MergeFlag new_merge_flag) const {
                     return PruneFlag::kPruneSub;
                 }
                 default: {
-                    UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(this->merge_flag_)));
+                    UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(old_merge_flag)));
                 }
             }
             break;
@@ -135,6 +149,19 @@ PruneFlag CatalogDeltaOperation::ToPrune(MergeFlag new_merge_flag) const {
         case MergeFlag::kNew:
         case MergeFlag::kUpdate: {
             return PruneFlag::kKeep;
+        }
+        case MergeFlag::kDeleteAndNew: {
+            switch (old_merge_flag) {
+                case MergeFlag::kNew:
+                case MergeFlag::kUpdate:
+                case MergeFlag::kDeleteAndNew: {
+                    return PruneFlag::kPruneSub;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(old_merge_flag)));
+                }
+            }
+            break;
         }
         default: {
             UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(new_merge_flag)));
@@ -822,7 +849,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     }
     {
         for (const auto &operation : entry->operations_) {
-            LOG_INFO(fmt::format("Read delta op: {}", operation->ToString()));
+            LOG_TRACE(fmt::format("Read delta op: {}", operation->ToString()));
         }
     }
     return entry;
@@ -973,17 +1000,17 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
     max_commit_ts_ = max_commit_ts;
 
     for (auto &new_op : delta_entry->operations()) {
+        if (new_op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
+            auto *add_segment_op = static_cast<AddSegmentEntryOp *>(new_op.get());
+            if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
+                add_segment_op->merge_flag_ = MergeFlag::kDelete;
+            }
+        }
         String encode = new_op->EncodeIndex();
         auto iter = delta_ops_.find(encode);
         if (iter != delta_ops_.end()) {
             auto *op = iter->second.get();
-            PruneFlag prune_flag = op->ToPrune(new_op->merge_flag_);
-            if (op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
-                auto *add_segment_op = static_cast<AddSegmentEntryOp *>(op);
-                if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
-                    add_segment_op->merge_flag_ = MergeFlag::kDelete;
-                }
-            }
+            PruneFlag prune_flag = CatalogDeltaOperation::ToPrune(op->merge_flag_, new_op->merge_flag_);
             if (prune_flag == PruneFlag::kPrune) {
                 delta_ops_.erase(iter);
                 PruneOpWithSamePrefix(encode);
@@ -993,7 +1020,11 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             }
             op->Merge(std::move(new_op));
         } else {
+            PruneFlag prune_flag = CatalogDeltaOperation::ToPrune(None, new_op->merge_flag_);
             delta_ops_[encode] = std::move(new_op);
+            if (prune_flag == PruneFlag::kPruneSub) {
+                PruneOpWithSamePrefix(encode);
+            }
         }
     }
     if (!delta_entry->txn_ids().empty()) {

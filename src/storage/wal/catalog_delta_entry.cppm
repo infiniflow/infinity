@@ -120,7 +120,7 @@ public:
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
     virtual void Merge(UniquePtr<CatalogDeltaOperation> other) = 0;
 
-    PruneFlag ToPrune(MergeFlag new_merge_flag) const;
+    static PruneFlag ToPrune(Optional<MergeFlag> old_merge_flag, MergeFlag new_merge_flag);
 
     MergeFlag NextDeleteFlag(MergeFlag new_merge_flag) const;
 
