@@ -68,15 +68,13 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 }
                 // create and drop db to fill wal log
                 {
-                    auto *txn = txn_mgr->CreateTxn();
-                    txn->Begin();
+                    auto *txn = txn_mgr->BeginTxn();
                     auto status = txn->DropDatabase("db1", ConflictType::kIgnore);
                     ASSERT_TRUE(status.ok() || status.code() == ErrorCode::kIgnore);
                     txn_mgr->CommitTxn(txn);
                 }
                 { // put create after drop to prevent the merge delta result is empty
-                    auto *txn = txn_mgr->CreateTxn();
-                    txn->Begin();
+                    auto *txn = txn_mgr->BeginTxn();
                     auto status = txn->CreateDatabase("db1", ConflictType::kIgnore);
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
@@ -91,8 +89,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         }
         TxnTimeStamp ckp_commit_ts = 0;
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false /*full_check_point*/);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -125,8 +122,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             auto [db, status] = txn->GetDatabase("db1");
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -166,15 +162,13 @@ TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
                 }
                 // create and drop db to fill wal log
                 {
-                    auto *txn = txn_mgr->CreateTxn();
-                    txn->Begin();
+                    auto *txn = txn_mgr->BeginTxn();
                     auto status = txn->DropDatabase("db1", ConflictType::kIgnore);
                     ASSERT_TRUE(status.ok() || status.code() == ErrorCode::kIgnore);
                     txn_mgr->CommitTxn(txn);
                 }
                 { // put create after drop to prevent the merge delta result is empty
-                    auto *txn = txn_mgr->CreateTxn();
-                    txn->Begin();
+                    auto *txn = txn_mgr->BeginTxn();
                     auto status = txn->CreateDatabase("db1", ConflictType::kIgnore);
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
@@ -187,8 +181,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
                 }
             }
             {
-                auto *txn = txn_mgr->CreateTxn();
-                txn->Begin();
+                auto *txn = txn_mgr->BeginTxn();
                 SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false /*full_check_point*/);
                 bg_processor->Submit(force_ckp_task);
                 force_ckp_task->Wait();
@@ -201,8 +194,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
             ASSERT_EQ(delta_catalog_infos.size(), 2ul);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true /*full_check_point*/);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -232,8 +224,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             auto [db, status] = txn->GetDatabase("db1");
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);

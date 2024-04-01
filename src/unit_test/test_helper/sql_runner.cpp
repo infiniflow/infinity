@@ -78,7 +78,6 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
         UnrecoverableError(parsed_result->error_message_);
     }
 
-    query_context_ptr->CreateTxn();
     query_context_ptr->BeginTxn();
 
     //    LogicalPlanner logical_planner(query_context_ptr.get());

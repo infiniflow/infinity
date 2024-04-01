@@ -41,8 +41,6 @@ public:
 
     ~TxnManager() { Stop(); }
 
-    Txn *CreateTxn();
-
     Txn *BeginTxn();
 
     Txn *GetTxn(TransactionID txn_id);

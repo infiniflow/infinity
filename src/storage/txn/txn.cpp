@@ -393,16 +393,16 @@ void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
 
 WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 
-void Txn::Begin() {
-    TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
-    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
-    txn_context_.SetTxnBegin(ts);
-}
+//void Txn::Begin() {
+//    TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
+//    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+//    txn_context_.SetTxnBegin(ts);
+//}
 
-void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
-    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
-    txn_context_.SetTxnBegin(begin_ts);
-}
+//void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
+//    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
+//    txn_context_.SetTxnBegin(begin_ts);
+//}
 
 TxnTimeStamp Txn::Commit() {
     //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);

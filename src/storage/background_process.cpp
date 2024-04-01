@@ -86,7 +86,7 @@ void BGTaskProcessor::Process() {
                 case BGTaskType::kCompactSegments: {
                     LOG_INFO("Compact segments in background");
                     auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
-                    task->BeginTxn();
+//                    task->BeginTxn();
                     task->Execute();
                     task->CommitTxn();
                     LOG_INFO("Compact segments in background done");

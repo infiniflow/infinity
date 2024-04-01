@@ -83,9 +83,9 @@ public:
     // 3.3 PrepareWriteData - single thread
     // 3.4 Commit - multiple threads
 
-    void Begin();
+//    void Begin();
 
-    void SetBeginTS(TxnTimeStamp begin_ts);
+//    void SetBeginTS(TxnTimeStamp begin_ts);
 
     TxnTimeStamp Commit();
 
