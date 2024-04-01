@@ -34,6 +34,22 @@ import logger;
 
 namespace infinity {
 
+CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts)
+    : begin_ts_(base_entry->begin_ts_), txn_id_(base_entry->txn_id_), commit_ts_(base_entry->commit_ts_), type_(type) {
+    if (base_entry->deleted_) {
+        merge_flag_ = MergeFlag::kDelete;
+    } else if (commit_ts == base_entry->commit_ts_) {
+        merge_flag_ = MergeFlag::kNew;
+    } else if (!base_entry->Committed()) {
+        UnrecoverableError("Entry not committed.");
+    } else {
+        if (commit_ts < base_entry->commit_ts_) {
+            UnrecoverableError(fmt::format("Invalid commit_ts: {} < {}", commit_ts, base_entry->commit_ts_));
+        }
+        merge_flag_ = MergeFlag::kUpdate;
+    }
+}
+
 UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     UniquePtr<CatalogDeltaOperation> operation{nullptr};
@@ -95,8 +111,132 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
 
 bool CatalogDeltaOperation::operator==(const CatalogDeltaOperation &rhs) const {
     return this->begin_ts_ == rhs.begin_ts_ && this->txn_id_ == rhs.txn_id_ && this->commit_ts_ == rhs.commit_ts_ &&
-           this->is_delete_ == rhs.is_delete_ && this->type_ == rhs.type_;
+           this->merge_flag_ == rhs.merge_flag_ && this->type_ == rhs.type_;
 }
+
+PruneFlag CatalogDeltaOperation::ToPrune(Optional<MergeFlag> old_merge_flag_opt, MergeFlag new_merge_flag) {
+    if (!old_merge_flag_opt.has_value()) {
+        switch (new_merge_flag) {
+            case MergeFlag::kDelete:
+            case MergeFlag::kDeleteAndNew: {
+                return PruneFlag::kPruneSub;
+            }
+            case MergeFlag::kNew:
+            case MergeFlag::kUpdate: {
+                return PruneFlag::kKeep;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(new_merge_flag)));
+            }
+        }
+    }
+    MergeFlag old_merge_flag = old_merge_flag_opt.value();
+    switch (new_merge_flag) {
+        case MergeFlag::kDelete: {
+            switch (old_merge_flag) {
+                case MergeFlag::kNew: {
+                    return PruneFlag::kPrune;
+                }
+                case MergeFlag::kUpdate:
+                case MergeFlag::kDeleteAndNew: {
+                    return PruneFlag::kPruneSub;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(old_merge_flag)));
+                }
+            }
+            break;
+        }
+        case MergeFlag::kNew:
+        case MergeFlag::kUpdate: {
+            return PruneFlag::kKeep;
+        }
+        case MergeFlag::kDeleteAndNew: {
+            switch (old_merge_flag) {
+                case MergeFlag::kNew:
+                case MergeFlag::kUpdate:
+                case MergeFlag::kDeleteAndNew: {
+                    return PruneFlag::kPruneSub;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(old_merge_flag)));
+                }
+            }
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(new_merge_flag)));
+        }
+    }
+    return PruneFlag::kInvalid;
+}
+
+MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const {
+    switch (this->merge_flag_) {
+        case MergeFlag::kDelete: {
+            switch (new_merge_flag) {
+                case MergeFlag::kNew: {
+                    return MergeFlag::kDeleteAndNew;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag)));
+                }
+            }
+            break;
+        }
+        case MergeFlag::kNew: {
+            switch (new_merge_flag) {
+                case MergeFlag::kDelete: {
+                    UnrecoverableError("Should prune before reach this.");
+                    break;
+                }
+                case MergeFlag::kUpdate:
+                case MergeFlag::kDeleteAndNew: {
+                    return MergeFlag::kNew;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag)));
+                }
+            }
+            break;
+        }
+        case MergeFlag::kUpdate: {
+            switch (new_merge_flag) {
+                case MergeFlag::kDelete: {
+                    return MergeFlag::kDelete;
+                }
+                case MergeFlag::kUpdate: {
+                    return MergeFlag::kUpdate;
+                }
+                case MergeFlag::kDeleteAndNew: {
+                    return MergeFlag::kNew;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag)));
+                }
+            }
+            break;
+        }
+        case MergeFlag::kDeleteAndNew: {
+            switch (new_merge_flag) {
+                case MergeFlag::kDelete: {
+                    return MergeFlag::kDelete;
+                }
+                case MergeFlag::kUpdate:
+                case MergeFlag::kDeleteAndNew: {
+                    return MergeFlag::kDeleteAndNew;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag)));
+                }
+            }
+        }
+        default: {
+            UnrecoverableError(fmt::format("Invalid MergeFlag: {}", u8(this->merge_flag_)));
+        }
+    }
+    return MergeFlag::kInvalid;
+};
 
 UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
     auto add_db_op = MakeUnique<AddDBEntryOp>();
@@ -137,6 +277,7 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
     add_table_op->column_defs_ = std::move(columns);
     add_table_op->row_count_ = ReadBufAdv<SizeT>(ptr);
     add_table_op->unsealed_id_ = ReadBufAdv<SegmentID>(ptr);
+    add_table_op->next_segment_id_ = ReadBufAdv<SegmentID>(ptr);
     return add_table_op;
 }
 
@@ -185,6 +326,7 @@ UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(char *&ptr) {
     add_column_op->block_id_ = ReadBufAdv<BlockID>(ptr);
     add_column_op->column_id_ = ReadBufAdv<ColumnID>(ptr);
     add_column_op->next_outline_idx_ = ReadBufAdv<i32>(ptr);
+    add_column_op->last_chunk_offset_ = ReadBufAdv<u64>(ptr);
     return add_column_op;
 }
 
@@ -195,8 +337,10 @@ UniquePtr<AddTableIndexEntryOp> AddTableIndexEntryOp::ReadAdv(char *&ptr, char *
     add_table_index_op->db_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
     add_table_index_op->table_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
     add_table_index_op->index_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
-    add_table_index_op->index_dir_ = add_table_index_op->is_delete_ ? nullptr : MakeShared<String>(ReadBufAdv<String>(ptr));
-    add_table_index_op->index_base_ = add_table_index_op->is_delete_ ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
+    if (add_table_index_op->merge_flag_ != MergeFlag::kDelete) {
+        add_table_index_op->index_dir_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+        add_table_index_op->index_base_ = IndexBase::ReadAdv(ptr, ptr_end - ptr);
+    }
     return add_table_index_op;
 }
 
@@ -276,6 +420,7 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
     }
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->unsealed_id_);
+    WriteBufAdv(buf, this->next_segment_id_);
 }
 
 void AddSegmentEntryOp::WriteAdv(char *&buf) const {
@@ -315,6 +460,7 @@ void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->block_id_);
     WriteBufAdv(buf, this->column_id_);
     WriteBufAdv(buf, this->next_outline_idx_);
+    WriteBufAdv(buf, this->last_chunk_offset_);
 }
 
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
@@ -322,7 +468,7 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
-    if (!is_delete_) {
+    if (merge_flag_ != MergeFlag::kDelete) {
         WriteBufAdv(buf, *this->index_dir_);
         index_base_->WriteAdv(buf);
     }
@@ -367,27 +513,31 @@ void SetBlockStatusSealedOp::WriteAdv(char *&buf) const {
 }
 
 const String AddDBEntryOp::ToString() const {
-    return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", *db_name_, db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr");
+    return fmt::format("AddDBEntryOp {}  db_name: {} db_entry_dir: {}",
+                       CatalogDeltaOperation::ToString(),
+                       *db_name_,
+                       db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr");
 }
 
 const String AddTableEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}",
+    sstream << fmt::format("AddTableEntryOp {} db_name: {} table_name: {} table_entry_dir: {}",
+                           CatalogDeltaOperation::ToString(),
                            *db_name_,
                            *table_name_,
                            table_entry_dir_.get() != nullptr ? *table_entry_dir_ : "nullptr");
     for (const auto &column_def : column_defs_) {
         sstream << fmt::format(" column_def: {}", column_def->ToString());
     }
-    sstream << fmt::format(" row_count: {}", row_count_);
+    sstream << fmt::format(" row_count: {}", row_count_) << fmt::format(" unsealed_id: {}", unsealed_id_)
+            << fmt::format(" next_segment_id: {}", next_segment_id_);
     return sstream.str();
 }
 
 const String AddSegmentEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddSegmentEntryOp begin_ts: {}, commit_ts: {}, db_name: {} table_name: {} segment_id: {}\n",
-                           begin_ts_,
-                           commit_ts_,
+    sstream << fmt::format("AddSegmentEntryOp {} db_name: {} table_name: {} segment_id: {} ",
+                           CatalogDeltaOperation::ToString(),
                            *db_name_,
                            *table_name_,
                            segment_id_);
@@ -404,8 +554,9 @@ const String AddSegmentEntryOp::ToString() const {
 
 const String AddBlockEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddBlockEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} row_count: {} row_capacity: {} min_row_ts: {} "
+    sstream << fmt::format("AddBlockEntryOp {} db_name: {} table_name: {} segment_id: {} block_id: {} row_count: {} row_capacity: {} min_row_ts: {} "
                            "max_row_ts: {}",
+                           CatalogDeltaOperation::ToString(),
                            *db_name_,
                            *table_name_,
                            segment_id_,
@@ -421,17 +572,21 @@ const String AddBlockEntryOp::ToString() const {
 }
 
 const String AddColumnEntryOp::ToString() const {
-    return fmt::format("AddColumnEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} column_id: {} next_outline_idx: {}",
-                       *db_name_,
-                       *table_name_,
-                       segment_id_,
-                       block_id_,
-                       column_id_,
-                       next_outline_idx_);
+    return fmt::format(
+        "AddColumnEntryOp {} db_name: {} table_name: {} segment_id: {} block_id: {} column_id: {} next_outline_idx: {}, last_chunk_offset: {}",
+        CatalogDeltaOperation::ToString(),
+        *db_name_,
+        *table_name_,
+        segment_id_,
+        block_id_,
+        column_id_,
+        next_outline_idx_,
+        last_chunk_offset_);
 }
 
 const String AddTableIndexEntryOp::ToString() const {
-    return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",
+    return fmt::format("AddTableIndexEntryOp {} db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",
+                       CatalogDeltaOperation::ToString(),
                        *db_name_,
                        *table_name_,
                        *index_name_,
@@ -440,7 +595,8 @@ const String AddTableIndexEntryOp::ToString() const {
 }
 
 const String AddSegmentIndexEntryOp::ToString() const {
-    return fmt::format("AddSegmentIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} min_ts: {} max_ts: {}",
+    return fmt::format("AddSegmentIndexEntryOp {} db_name: {} table_name: {} index_name: {} segment_id: {} min_ts: {} max_ts: {}",
+                       CatalogDeltaOperation::ToString(),
                        *db_name_,
                        *table_name_,
                        *index_name_,
@@ -461,11 +617,16 @@ const String AddChunkIndexEntryOp::ToString() const {
 }
 
 const String SetSegmentStatusSealedOp::ToString() const {
-    return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", *db_name_, *table_name_, segment_id_);
+    return fmt::format("SetSegmentStatusSealedOp {} db_name: {} table_name: {} segment_id: {}",
+                       CatalogDeltaOperation::ToString(),
+                       *db_name_,
+                       *table_name_,
+                       segment_id_);
 }
 
 const String SetBlockStatusSealedOp::ToString() const {
-    return fmt::format("SetBlockStatusSealedOp db_name: {} table_name: {} segment_id: {} block_id: {}",
+    return fmt::format("SetBlockStatusSealedOp {} db_name: {} table_name: {} segment_id: {} block_id: {}",
+                       CatalogDeltaOperation::ToString(),
                        *db_name_,
                        *table_name_,
                        segment_id_,
@@ -483,7 +644,7 @@ bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
                IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*table_entry_dir_, *rhs_op->table_entry_dir_) &&
                table_entry_type_ == rhs_op->table_entry_type_ && row_count_ == rhs_op->row_count_ && unsealed_id_ == rhs_op->unsealed_id_ &&
-               column_defs_.size() == rhs_op->column_defs_.size();
+               next_segment_id_ == rhs_op->next_segment_id_ && column_defs_.size() == rhs_op->column_defs_.size();
     if (!res) {
         return false;
     }
@@ -516,7 +677,7 @@ bool AddColumnEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddColumnEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
            IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ && block_id_ == rhs_op->block_id_ &&
-           column_id_ == rhs_op->column_id_ && next_outline_idx_ == rhs_op->next_outline_idx_;
+           column_id_ == rhs_op->column_id_ && next_outline_idx_ == rhs_op->next_outline_idx_ && last_chunk_offset_ == rhs_op->last_chunk_offset_;
 }
 
 bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
@@ -558,7 +719,9 @@ void AddDBEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     if (other->type_ != CatalogDeltaOpType::ADD_DATABASE_ENTRY) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
+    MergeFlag flag = this->NextDeleteFlag(other->merge_flag_);
     *this = std::move(*static_cast<AddDBEntryOp *>(other.get()));
+    this->merge_flag_ = flag;
 }
 
 void AddTableEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
@@ -566,7 +729,12 @@ void AddTableEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
     auto *add_table_op = static_cast<AddTableEntryOp *>(other.get());
+    MergeFlag flag = this->NextDeleteFlag(add_table_op->merge_flag_);
+    // if (*add_table_op->table_name_ == "test_csv_with_different_delimiter" && flag == MergeFlag::kDeleteAndNew) {
+    //     LOG_INFO("AAA");
+    // }
     *this = std::move(*add_table_op);
+    this->merge_flag_ = flag;
 }
 
 void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
@@ -574,7 +742,9 @@ void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
     auto *add_segment_op = static_cast<AddSegmentEntryOp *>(other.get());
+    MergeFlag flag = this->NextDeleteFlag(add_segment_op->merge_flag_);
     *this = std::move(*add_segment_op);
+    this->merge_flag_ = flag;
 }
 
 void AddBlockEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
@@ -596,7 +766,10 @@ void AddTableIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     if (other->type_ != CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
-    *this = std::move(*static_cast<AddTableIndexEntryOp *>(other.get()));
+    auto *add_table_index_op = static_cast<AddTableIndexEntryOp *>(other.get());
+    MergeFlag flag = this->NextDeleteFlag(add_table_index_op->merge_flag_);
+    *this = std::move(*add_table_index_op);
+    this->merge_flag_ = flag;
 }
 
 void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
@@ -628,6 +801,7 @@ void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { segment_index_e
 i32 CatalogDeltaEntry::GetSizeInBytes() const {
     i32 size = CatalogDeltaEntryHeader::GetSizeInBytes();
 
+    size += sizeof(max_commit_ts_);
     size += sizeof(i32); // number of operations
     SizeT operations_size = operations_.size();
     for (SizeT idx = 0; idx < operations_size; ++idx) {
@@ -662,6 +836,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
             UnrecoverableError(fmt::format("checksum failed, checksum: {}, checksum2: {}", header.checksum_, checksum2));
         }
     }
+    entry->max_commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     i32 cnt = ReadBufAdv<i32>(ptr);
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
@@ -702,6 +877,7 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) {
     char *const saved_ptr = ptr;
     ptr += CatalogDeltaEntryHeader::GetSizeInBytes();
 
+    WriteBufAdv(ptr, max_commit_ts_);
     SizeT operation_count = operations_.size();
     WriteBufAdv(ptr, static_cast<i32>(operation_count));
     for (SizeT idx = 0; idx < operation_count; ++idx) {
@@ -740,7 +916,6 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, 
     max_commit_ts_ = commit_ts;
     txn_ids_ = {txn_id};
     for (auto &operation : operations_) {
-        operation->begin_ts_ = txn_id;
         operation->commit_ts_ = commit_ts;
     }
 }
@@ -752,6 +927,8 @@ String CatalogDeltaEntry::ToString() const {
     }
     return sstream.str();
 }
+
+void CatalogDeltaEntry::AddOperation(UniquePtr<CatalogDeltaOperation> operation) { operations_.emplace_back(std::move(operation)); }
 
 void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
     // {
@@ -767,38 +944,11 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     } else {
         // Continuous
         do {
-            TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
-
-            TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
-            if (max_commit_ts_ > max_commit_ts || wal_size_ > wal_size) {
-                UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {} or wal_size_ {} > wal_size {}",
-                                               max_commit_ts_,
-                                               max_commit_ts,
-                                               wal_size_,
-                                               wal_size));
+            if (wal_size_ > wal_size) {
+                UnrecoverableError(fmt::format("wal_size_ {} > wal_size {}", wal_size_, wal_size));
             }
-            max_commit_ts_ = max_commit_ts;
             wal_size_ = wal_size;
-
-            for (auto &op : delta_entry->operations()) {
-                bool prune = PruneDeltaOp(op.get(), current_commit_ts);
-
-                String encode = op->EncodeIndex();
-                auto iter = delta_ops_.find(encode);
-                if (iter != delta_ops_.end()) {
-                    auto &delta_op = iter->second;
-                    if (!prune) {
-                        delta_op->Merge(std::move(op));
-                    } else {
-                        delta_ops_.erase(iter);
-                    }
-                } else {
-                    delta_ops_[encode] = std::move(op);
-                }
-            }
-            if (!delta_entry->txn_ids().empty()) {
-                txn_ids_.insert(delta_entry->txn_ids()[0]);
-            }
+            this->AddDeltaEntryInner(delta_entry.get());
 
             ++last_sequence_;
 
@@ -812,46 +962,14 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     }
 }
 
-void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
-
-    TxnTimeStamp current_commit_ts = delta_entry->commit_ts();
-
-    TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
-    if (max_commit_ts_ > max_commit_ts) {
-        UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {} ", max_commit_ts_, max_commit_ts));
-    }
-    max_commit_ts_ = max_commit_ts;
-
-    for (auto &op : delta_entry->operations()) {
-        bool prune = PruneDeltaOp(op.get(), current_commit_ts);
-
-        String encode = op->EncodeIndex();
-        auto iter = delta_ops_.find(encode);
-        if (iter != delta_ops_.end()) {
-            auto &delta_op = iter->second;
-            if (!prune) {
-                delta_op->Merge(std::move(op));
-            } else {
-                delta_ops_.erase(iter);
-            }
-        } else {
-            delta_ops_[encode] = std::move(op);
-        }
-    }
-    if (!delta_entry->txn_ids().empty()) {
-        txn_ids_.insert(delta_entry->txn_ids()[0]);
-    }
-}
+void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { this->AddDeltaEntryInner(delta_entry.get()); }
 
 UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
-    if (max_commit_ts != max_commit_ts_) {
-        UnrecoverableError(fmt::format("max_commit_ts {} != max_commit_ts_ {}", max_commit_ts, max_commit_ts_));
-    }
 
     {
         for (auto &[_, delta_op] : delta_ops_) {
-            if (delta_op->commit_ts_ < full_ckp_ts) {
+            if (delta_op->commit_ts_ <= full_ckp_ts) { // skip the delta op that is before full checkpoint
                 continue;
             }
             flush_delta_entry->AddOperation(std::move(delta_op));
@@ -865,9 +983,8 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     flush_delta_entry->set_commit_ts(max_commit_ts);
 
     // write delta op from top to bottom.
-    std::sort(flush_delta_entry->operations().begin(), flush_delta_entry->operations().end(), [](const auto &lhs, const auto &rhs) {
-        return lhs->type_ < rhs->type_;
-    });
+    auto &operations = flush_delta_entry->operations();
+    std::sort(operations.begin(), operations.end(), [](const auto &lhs, const auto &rhs) { return lhs->type_ < rhs->type_; });
     // {
     //     for (const auto &operation : flush_delta_entry->operations()) {
     //         LOG_INFO(fmt::format("Flush delta op: {}", operation->ToString()));
@@ -876,49 +993,53 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     return flush_delta_entry;
 }
 
-bool GlobalCatalogDeltaEntry::PruneDeltaOp(CatalogDeltaOperation *delta_op, TxnTimeStamp current_commit_ts) {
-    bool prune = false;
-    switch (delta_op->type_) {
-        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
-            auto *op = static_cast<AddDBEntryOp *>(delta_op);
-            if (op->is_delete_) {
-                prune = true;
+void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry) {
+    TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
+    if (max_commit_ts == UNCOMMIT_TS) {
+        UnrecoverableError("max_commit_ts == UNCOMMIT_TS");
+    }
+    if (max_commit_ts_ > max_commit_ts) {
+        UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {}", max_commit_ts_, max_commit_ts));
+    }
+    max_commit_ts_ = max_commit_ts;
+
+    for (auto &new_op : delta_entry->operations()) {
+        if (new_op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
+            auto *add_segment_op = static_cast<AddSegmentEntryOp *>(new_op.get());
+            if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
+                add_segment_op->merge_flag_ = MergeFlag::kDelete;
             }
-            break;
         }
-        case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
-            auto *op = static_cast<AddTableEntryOp *>(delta_op);
-            if (op->is_delete_) {
-                prune = true;
+        String encode = new_op->EncodeIndex();
+        // if (encode == "#default#test_csv_with_different_delimiter@2") {
+        //     LOG_INFO("AAA");
+        // }
+        auto iter = delta_ops_.find(encode);
+        if (iter != delta_ops_.end()) {
+            auto *op = iter->second.get();
+            PruneFlag prune_flag = CatalogDeltaOperation::ToPrune(op->merge_flag_, new_op->merge_flag_);
+            if (prune_flag == PruneFlag::kPrune) {
+                delta_ops_.erase(iter);
+                PruneOpWithSamePrefix(encode);
+                continue;
+            } else if (prune_flag == PruneFlag::kPruneSub) {
+                PruneOpWithSamePrefix(encode);
             }
-            break;
-        }
-        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
-            auto *op = static_cast<AddTableIndexEntryOp *>(delta_op);
-            if (op->is_delete_) {
-                prune = true;
+            op->Merge(std::move(new_op));
+        } else {
+            PruneFlag prune_flag = CatalogDeltaOperation::ToPrune(None, new_op->merge_flag_);
+            delta_ops_[encode] = std::move(new_op);
+            if (prune_flag == PruneFlag::kPruneSub) {
+                PruneOpWithSamePrefix(encode);
             }
-            break;
-        }
-        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
-            auto *op = static_cast<AddSegmentEntryOp *>(delta_op);
-            if (op->status_ == SegmentStatus::kDeprecated) {
-                prune = true;
-            }
-            break;
-        }
-        default: {
-            // skip
         }
     }
-    if (prune) {
-        String encode = delta_op->EncodeIndex();
-        PruneOpWithSamePrefix(encode, current_commit_ts);
+    if (!delta_entry->txn_ids().empty()) {
+        txn_ids_.insert(delta_entry->txn_ids()[0]);
     }
-    return prune;
 }
 
-void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1, TxnTimeStamp current_commit_ts) {
+void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
     SizeT end_i = encode1.rfind('@');
     if (end_i == String::npos) {
         UnrecoverableError(fmt::format("encode1 {} not found '@'", encode1));

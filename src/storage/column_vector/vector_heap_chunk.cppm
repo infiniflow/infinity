@@ -25,7 +25,8 @@ import infinity_exception;
 
 namespace infinity {
 
-export using ChunkId = u64;
+export using ChunkId = i64;
+export constexpr ChunkId INVALID_CHUNK_ID = -1;
 
 export struct VectorHeapChunk {
 public:

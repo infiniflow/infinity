@@ -52,8 +52,8 @@ SegmentEntry::SegmentEntry(TableEntry *table_entry,
                            SizeT row_capacity,
                            SizeT column_count,
                            SegmentStatus status)
-    : BaseEntry(EntryType::kSegment, false), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
-      column_count_(column_count), status_(status) {}
+    : BaseEntry(EntryType::kSegment, false), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id),
+      row_capacity_(row_capacity), column_count_(column_count), status_(status) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
@@ -92,12 +92,13 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
-void SegmentEntry::SetSealed() {
+bool SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
-    if (status_ != SegmentStatus::kUnsealed && status_ != SegmentStatus::kSealed) {
-        UnrecoverableError("SetSealed failed");
+    if (status_ != SegmentStatus::kUnsealed) {
+        return false;
     }
     status_ = SegmentStatus::kSealed;
+    return true;
 }
 
 void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id) {
@@ -315,6 +316,7 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
 }
 
 void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    std::unique_lock w_lock(rw_locker_);
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
         UnrecoverableError(fmt::format("SegmentEntry commit_ts {} is less than max_row_ts {}", commit_ts, max_row_ts_));
@@ -351,7 +353,7 @@ SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
     return block_entries_[block_id];
 }
 
-nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
     // const field
@@ -379,6 +381,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         }
         for (auto &block_entry : this->block_entries_) {
             if (block_entry->commit_ts_ <= max_commit_ts) {
+                block_entry->Flush(max_commit_ts);
                 json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
             }
         }
@@ -424,13 +427,6 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     LOG_TRACE(fmt::format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
 
     return segment_entry;
-}
-
-void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
-    auto block_entry_iter = BlockEntryIter(this);
-    for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-        block_entry->Flush(max_commit_ts);
-    }
 }
 
 void SegmentEntry::FlushNewData(TxnTimeStamp flush_ts) {

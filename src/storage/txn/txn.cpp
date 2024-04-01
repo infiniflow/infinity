@@ -386,9 +386,7 @@ void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
     wal_entry_->commit_ts_ = commit_ts;
 }
 
-WalEntry* Txn::GetWALEntry() const {
-    return wal_entry_.get();
-}
+WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 
 void Txn::Begin() {
     TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
@@ -397,8 +395,8 @@ void Txn::Begin() {
 }
 
 TxnTimeStamp Txn::Commit() {
-//    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
-//    txn_context_.SetTxnCommitting(commit_ts);
+    //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
+    //    txn_context_.SetTxnCommitting(commit_ts);
 
     if (wal_entry_->cmds_.empty()) {
         // Don't need to write empty WalEntry (read-only transactions).
@@ -478,24 +476,26 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
-void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+bool Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {
         FullCheckpoint(max_commit_ts);
+        return true;
     } else {
-        DeltaCheckpoint(max_commit_ts);
+        return DeltaCheckpoint(max_commit_ts);
     }
 }
 
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
-void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
+bool Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
     String delta_path;
     // only save the catalog delta entry
     bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path);
     if (skip) {
         LOG_INFO("No delta catalog file is written");
-        // should not skip wal write.
+        return false;
     }
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
+    return true;
 }
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
