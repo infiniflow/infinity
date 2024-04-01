@@ -145,7 +145,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Append(const SharedPtr<DataBlock
     return {nullptr, Status::OK()};
 }
 
-void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) { txn_indexes_.insert(table_index_entry); }
+void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) { txn_indexes_.emplace(table_index_entry, ptr_seq_n_++); }
 
 void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries) {
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
@@ -168,7 +168,7 @@ void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
         txn_indexes_.erase(table_index_entry);
         txn_indexes_store_.erase(*table_index_entry->GetIndexName());
     } else {
-        txn_indexes_.insert(table_index_entry);
+        txn_indexes_.emplace(table_index_entry, ptr_seq_n_++);
     }
 }
 
@@ -262,7 +262,7 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
     }
-    for (auto *table_index_entry : txn_indexes_) {
+    for (auto [table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Commit(commit_ts);
     }
 }
@@ -315,7 +315,9 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
                                TxnTimeStamp commit_ts) const {
     local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
 
-    for (auto *table_index_entry : txn_indexes_) {
+    Vector<Pair<TableIndexEntry *, int>> txn_indexes_vec(txn_indexes_.begin(), txn_indexes_.end());
+    std::sort(txn_indexes_vec.begin(), txn_indexes_vec.end(), [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
+    for (auto [table_index_entry, ptr_seq_n] : txn_indexes_vec) {
         local_delta_ops->AddOperation(MakeUnique<AddTableIndexEntryOp>(table_index_entry, commit_ts));
     }
     for (const auto &[index_name, index_store] : txn_indexes_store_) {
@@ -349,18 +351,18 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
 
 TxnStore::TxnStore(Txn *txn, Catalog *catalog) : txn_(txn), catalog_(catalog) {}
 
-void TxnStore::AddDBStore(DBEntry *db_entry) { txn_dbs_.insert(db_entry); }
+void TxnStore::AddDBStore(DBEntry *db_entry) { txn_dbs_.emplace(db_entry, ptr_seq_n_++); }
 
 void TxnStore::DropDBStore(DBEntry *dropped_db_entry) {
     if (txn_dbs_.contains(dropped_db_entry)) {
         dropped_db_entry->Cleanup();
         txn_dbs_.erase(dropped_db_entry);
     } else {
-        txn_dbs_.insert(dropped_db_entry);
+        txn_dbs_.emplace(dropped_db_entry, ptr_seq_n_++);
     }
 }
 
-void TxnStore::AddTableStore(TableEntry *table_entry) { txn_tables_.insert(table_entry); }
+void TxnStore::AddTableStore(TableEntry *table_entry) { txn_tables_.emplace(table_entry, ptr_seq_n_++); }
 
 void TxnStore::DropTableStore(TableEntry *dropped_table_entry) {
     if (txn_tables_.contains(dropped_table_entry)) {
@@ -368,7 +370,7 @@ void TxnStore::DropTableStore(TableEntry *dropped_table_entry) {
         dropped_table_entry->Cleanup();
         txn_tables_store_.erase(*dropped_table_entry->GetTableName());
     } else {
-        txn_tables_.insert(dropped_table_entry);
+        txn_tables_.emplace(dropped_table_entry, ptr_seq_n_++);
     }
 }
 
@@ -388,10 +390,15 @@ TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
 
 void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const {
     TxnTimeStamp commit_ts = txn_->CommitTS();
-    for (auto *db_entry : txn_dbs_) {
+    Vector<Pair<DBEntry *, int>> txn_dbs_vec(txn_dbs_.begin(), txn_dbs_.end());
+    std::sort(txn_dbs_vec.begin(), txn_dbs_vec.end(), [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
+    for (auto [db_entry, ptr_seq_n] : txn_dbs_vec) {
         local_delta_ops->AddOperation(MakeUnique<AddDBEntryOp>(db_entry, commit_ts));
     }
-    for (auto *table_entry : txn_tables_) {
+
+    Vector<Pair<TableEntry *, int>> txn_tables_vec(txn_tables_.begin(), txn_tables_.end());
+    std::sort(txn_tables_vec.begin(), txn_tables_vec.end(), [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
+    for (auto [table_entry, ptr_seq_n] : txn_tables_vec) {
         local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry, commit_ts));
     }
     bool enable_compaction = txn_->txn_mgr()->enable_compaction();
@@ -413,12 +420,12 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTask
     }
 
     // Commit databases to memory catalog
-    for (auto *db_entry : txn_dbs_) {
+    for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
         db_entry->Commit(commit_ts);
     }
 
     // Commit tables to memory catalog
-    for (auto *table_entry : txn_tables_) {
+    for (auto [table_entry, ptr_seq_n] : txn_tables_) {
         table_entry->Commit(commit_ts);
     }
 }
@@ -430,12 +437,12 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         table_local_store->Rollback(txn_id, abort_ts);
     }
 
-    for (auto *table_entry : txn_tables_) {
+    for (auto [table_entry, ptr_seq_n] : txn_tables_) {
         table_entry->Cleanup();
         Catalog::RemoveTableEntry(table_entry, txn_id);
     }
 
-    for (auto *db_entry : txn_dbs_) {
+    for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
         db_entry->Cleanup();
         catalog_->RemoveDBEntry(db_entry, txn_id);
     }
