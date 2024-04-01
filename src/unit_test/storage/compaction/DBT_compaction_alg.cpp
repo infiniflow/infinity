@@ -58,7 +58,12 @@ public:
 
 SegmentID MockSegmentEntry::cur_segment_id_ = 0;
 
-class DBTCompactionTest : public BaseTest {};
+class DBTCompactionTest : public BaseTest {
+public:
+    void SetUp() override { system("rm -rf /tmp/infinity"); }
+
+    void TearDown() override { system("rm -rf /tmp/infinity"); }
+};
 
 TEST_F(DBTCompactionTest, AddSegments) {
     std::shared_ptr<std::string> config_path = nullptr;

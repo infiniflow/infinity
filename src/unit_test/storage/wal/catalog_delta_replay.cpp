@@ -57,7 +57,7 @@ class CatalogDeltaReplayTest : public BaseTest {
 protected:
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override {}
+    void TearDown() override { system("rm -rf /tmp/infinity"); }
 
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
         // TxnTimeStamp visible_ts = 0;
