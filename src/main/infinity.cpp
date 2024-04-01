@@ -55,6 +55,7 @@ import query_options;
 import extra_ddl_info;
 import drop_index_info;
 import drop_table_info;
+#include "statement/show_statement.h"
 
 namespace infinity {
 
@@ -422,6 +423,21 @@ QueryResult Infinity::ShowSegment(const String &db_name,const String &table_name
     return result;
 }
 
+QueryResult Infinity::ShowSegments(const String &db_name,const String &table_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    show_statement->table_name_ = table_name;
+    show_statement->show_type_ = ShowStmtType::kSegments;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 QueryResult Infinity::ShowBlock(const String &db_name,const String &table_name, const SegmentID &segment_id, const BlockID &block_id) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -435,6 +451,22 @@ QueryResult Infinity::ShowBlock(const String &db_name,const String &table_name, 
     show_statement->segment_id_ = segment_id;
     show_statement->block_id_ = block_id;
     show_statement->show_type_ = ShowStmtType::kBlock;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ShowBlocks(const String &db_name,const String &table_name, const SegmentID &segment_id) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    show_statement->table_name_ = table_name;
+    show_statement->segment_id_ = segment_id;
+    show_statement->show_type_ = ShowStmtType::kBlocks;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
