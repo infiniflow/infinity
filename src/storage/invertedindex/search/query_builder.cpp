@@ -14,7 +14,6 @@
 
 module;
 
-#include <utility>
 #include <vector>
 module query_builder;
 
@@ -24,16 +23,9 @@ import doc_iterator;
 import column_index_reader;
 import match_data;
 import table_entry;
-import table_index_meta;
-import table_index_entry;
-import create_index_info;
 import segment_index_entry;
-import memory_indexer;
-import index_defines;
 import internal_types;
 import index_base;
-import index_full_text;
-import posting_iterator;
 import infinity_exception;
 import query_node;
 import base_table_ref;

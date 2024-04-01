@@ -51,7 +51,7 @@ public:
 };
 
 namespace detail {
-export template <class T>
+template <class T>
 struct Hash {
     inline SizeT operator()(const T &val) const { return val; }
 };
@@ -68,11 +68,7 @@ export struct IndexReader {
 
 export class TableIndexReaderCache {
 public:
-    void UpdateKnownUpdateTs(TxnTimeStamp ts) {
-        std::scoped_lock lock(mutex_);
-        first_known_update_ts_ = std::min(first_known_update_ts_, ts);
-        last_known_update_ts_ = std::max(last_known_update_ts_, ts);
-    }
+    void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
 
     IndexReader GetIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *table_entry_ptr);
 

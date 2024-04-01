@@ -277,7 +277,6 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             for (auto &chunk_index_entry : chunk_index_entries) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             }
-            table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
         }
     }
 }

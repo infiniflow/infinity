@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <vector>
 
 module column_index_reader;
@@ -98,6 +99,15 @@ float ColumnIndexReader::GetAvgColumnLength() const {
     return static_cast<float>(column_len_sum) / column_len_cnt;
 }
 
+void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
+    std::scoped_lock lock1(mutex_);
+    std::unique_lock lock2(segment_update_ts_mutex);
+    assert(ts >= segment_update_ts);
+    segment_update_ts = ts;
+    first_known_update_ts_ = std::min(first_known_update_ts_, ts);
+    last_known_update_ts_ = std::max(last_known_update_ts_, ts);
+}
+
 IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *self_table_entry_ptr) {
     IndexReader result;
     result.session_pool_ = MakeShared<MemoryPool>();
@@ -147,9 +157,9 @@ IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeS
         }
         if (begin_ts >= last_known_update_ts_) {
             // need to update cache
+            cache_ts_ = last_known_update_ts_;
             first_known_update_ts_ = std::numeric_limits<TxnTimeStamp>::max();
             last_known_update_ts_ = 0;
-            cache_ts_ = begin_ts;
             cache_column_ts_ = std::move(cache_column_ts);
             cache_column_readers_ = result.column_index_readers_;
             column2analyzer_ = result.column2analyzer_;

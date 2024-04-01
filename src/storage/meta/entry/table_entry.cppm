@@ -210,7 +210,9 @@ public:
 
     IndexReader GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void UpdateFullTextIndexReaderKnownUpdateTs(TxnTimeStamp ts) { return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts); }
+    void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
+        return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
+    }
 
 private:
     TableMeta *const table_meta_{};
