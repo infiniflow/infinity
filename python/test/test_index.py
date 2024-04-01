@@ -18,6 +18,7 @@ import infinity.index as index
 import pandas
 import pytest
 from common import common_values
+from utils import copy_data
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 
@@ -398,10 +399,7 @@ class TestIndex:
         assert not res.is_empty()
         print(res)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_9.csv", "data_dir": common_values.TEST_TMP_DIR,}],
-                             indirect=True,
-                             )
-    @pytest.mark.xfail(reason="ERROR:7011, Unexpected error: Invalid analyzer")
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_9.csv", "data_dir": common_values.TEST_TMP_DIR,}], indirect=True)
     def test_fulltext_match_with_invalid_analyzer(self, get_infinity_db, check_data):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_fulltext_match", ConflictType.Ignore)
@@ -418,7 +416,8 @@ class TestIndex:
         if not check_data:
             copy_data("enwiki_9.csv")
         test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_9.csv"
-        table_obj.import_data(test_csv_dir, {"delimiter": "\t"})
+        with pytest.raises(Exception, match="ERROR:7011, Unexpected error: Invalid analyzer"):
+            table_obj.import_data(test_csv_dir, {"delimiter": "\t"})
         res = table_obj.output(["*"]).to_pl()
         print(res)
 
