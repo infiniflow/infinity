@@ -577,11 +577,7 @@ void ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vec
 }
 
 void ExplainAST::BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
-    switch (optimize_statement->type_) {
-        case OptimizeType::kIRS:
-            result->emplace_back(MakeShared<String>("OPTIMIZE FULLTEXT"));
-            break;
-    }
+    result->emplace_back(MakeShared<String>("OPTIMIZE TSABLE"));
 }
 
 void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

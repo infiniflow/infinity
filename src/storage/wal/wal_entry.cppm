@@ -69,11 +69,7 @@ export struct WalBlockInfo {
     BlockID block_id_{};
     u16 row_count_{};
     u16 row_capacity_{};
-    TxnTimeStamp min_row_ts_{0};
-    TxnTimeStamp max_row_ts_{0};
-    TxnTimeStamp checkpoint_ts_{};
-    u16 checkpoint_row_count_{0};
-    Vector<i32> next_outline_idxes_;
+    Vector<Pair<i32, u64>> outline_infos_;
 
     WalBlockInfo() = default;
 
@@ -96,12 +92,6 @@ export struct WalSegmentInfo {
     SizeT row_count_{0};
     SizeT actual_row_count_{0};
     SizeT row_capacity_{0};
-    TxnTimeStamp min_row_ts_{0};
-    TxnTimeStamp max_row_ts_{0};
-    TxnTimeStamp commit_ts_{0};
-    TxnTimeStamp deprecate_ts_{0};
-    TxnTimeStamp begin_ts_{0};
-    TransactionID txn_id_{0};
     Vector<WalBlockInfo> block_infos_;
 
     WalSegmentInfo() = default;

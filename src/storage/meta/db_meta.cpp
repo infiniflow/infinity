@@ -111,7 +111,7 @@ SharedPtr<String> DBMeta::ToString() {
     return res;
 }
 
-nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
     Vector<DBEntry *> db_candidates;
     {
@@ -128,7 +128,7 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkp
         }
     }
     for (DBEntry *db_entry : db_candidates) {
-        json_res["db_entries"].emplace_back(db_entry->Serialize(max_commit_ts, is_full_checkpoint));
+        json_res["db_entries"].emplace_back(db_entry->Serialize(max_commit_ts));
     }
     return json_res;
 }

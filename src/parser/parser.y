@@ -1655,7 +1655,6 @@ flush_statement: FLUSH DATA {
  */
 optimize_statement: OPTIMIZE table_name {
     $$ = new infinity::OptimizeStatement();
-    $$->type_ = infinity::OptimizeType::kIRS;
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
         free($2->schema_name_ptr_);

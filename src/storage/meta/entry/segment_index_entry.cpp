@@ -99,8 +99,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            TxnTimeStamp max_ts,
                                                                            TransactionID txn_id,
                                                                            TxnTimeStamp begin_ts,
-                                                                           TxnTimeStamp commit_ts,
-                                                                           bool is_delete) {
+                                                                           TxnTimeStamp commit_ts) {
 
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
@@ -191,6 +190,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             UnrecoverableError(*err_msg);
         }
     }
+    assert(commit_ts >= min_ts_);
     max_ts_ = commit_ts;
 }
 
@@ -286,7 +286,10 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             UnrecoverableError(*err_msg);
         }
     }
-    max_ts_ = txn->CommitTS();
+    // IMPORT invokes this func at upper half at which the txn hasn't been commited yet.
+    TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
+    assert(ts >= min_ts_);
+    max_ts_ = ts;
 }
 
 Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, Txn *txn, bool prepare, bool check_ts) {
@@ -469,7 +472,7 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                 while (true) {
                     SizeT idx = create_index_idx.fetch_add(1);
                     if (idx % 10000 == 0) {
-                        LOG_INFO(fmt::format("Insert index: {}", idx));
+                        LOG_TRACE(fmt::format("Insert index: {}", idx));
                     }
                     if (idx >= vertex_n) {
                         break;
@@ -623,6 +626,7 @@ void SegmentIndexEntry::SaveIndexFile() {
         }
     }
 }
+
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
     assert(chunk_index_entries_.empty() || base_rowid == chunk_index_entries_.back()->base_rowid_ + chunk_index_entries_.back()->row_count_);

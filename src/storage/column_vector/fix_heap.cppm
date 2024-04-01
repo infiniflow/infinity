@@ -60,9 +60,17 @@ public:
 
     [[nodiscard]] inline u64 current_chunk_size() const { return current_chunk_size_; }
 
-    [[nodiscard]] inline u64 total_size() const { return current_chunk_size_ * current_chunk_idx_ + current_chunk_offset_; }
+    [[nodiscard]] inline u64 total_size() const {
+        if (current_chunk_idx_ == INVALID_CHUNK_ID)
+            return 0;
+        return current_chunk_size_ * current_chunk_idx_ + current_chunk_offset_;
+    }
 
-    [[nodiscard]] inline u64 total_mem() const { return current_chunk_size_ * (current_chunk_idx_ + 1); }
+    [[nodiscard]] inline u64 total_mem() const {
+        if (current_chunk_idx_ == INVALID_CHUNK_ID)
+            return 0;
+        return current_chunk_size_ * (current_chunk_idx_ + 1);
+    }
 
 public:
     // Used when comparing two VarcharT variables.
@@ -83,7 +91,7 @@ private:
 private:
     HashMap<ChunkId, VectorHeapChunk> chunks_{};
     u64 current_chunk_size_{DEFAULT_FIXLEN_CHUNK_SIZE};
-    ChunkId current_chunk_idx_{0};
+    ChunkId current_chunk_idx_{INVALID_CHUNK_ID};
     u64 current_chunk_offset_{0};
 
     BufferManager *buffer_mgr_{nullptr};

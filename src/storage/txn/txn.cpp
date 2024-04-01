@@ -48,6 +48,7 @@ import background_process;
 import base_table_ref;
 import compact_segments_task;
 import default_values;
+import chunk_index_entry;
 
 namespace infinity {
 
@@ -287,7 +288,9 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
     auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
     txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
     for (auto &segment_index_entry : segment_index_entries) {
-        for (auto &chunk_index_intry : segment_index_entry->GetChunkIndexEntries()) {
+        Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+        segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+        for (auto &chunk_index_intry : chunk_index_entries) {
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
         }
     }
@@ -483,24 +486,26 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
-void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+bool Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {
         FullCheckpoint(max_commit_ts);
+        return true;
     } else {
-        DeltaCheckpoint(max_commit_ts);
+        return DeltaCheckpoint(max_commit_ts);
     }
 }
 
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
-void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
+bool Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
     String delta_path;
     // only save the catalog delta entry
     bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path);
     if (skip) {
         LOG_INFO("No delta catalog file is written");
-        // should not skip wal write.
+        return false;
     }
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
+    return true;
 }
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {

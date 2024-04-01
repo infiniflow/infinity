@@ -184,11 +184,11 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    bool Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
-    void DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
+    bool DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
@@ -205,7 +205,7 @@ private:
     void CheckTxn(const String &db_name);
 
 private:
-    TxnStore txn_store_;
+    TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
 
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal

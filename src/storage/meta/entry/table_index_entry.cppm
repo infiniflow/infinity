@@ -107,10 +107,6 @@ public:
     // Populate index entirely for the segment
     SharedPtr<SegmentIndexEntry> PopulateEntirely(SegmentEntry *segment_entry, Txn *txn);
 
-    // MergeDiskIndexEntirely is blocking.
-    // Merge all disk index chunks into one for each SegmentIndexEntry
-    void MergeDiskIndexEntirely(Txn *txn);
-
     Tuple<Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
@@ -125,9 +121,12 @@ public:
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
     ThreadPool &GetFulltextThreadPool() { return thread_pool_; }
-    TxnTimeStamp GetFulltexSegmentUpdateTs() { return segment_update_ts_; }
+    TxnTimeStamp GetFulltexSegmentUpdateTs() {
+        std::shared_lock lock(segment_update_ts_mutex_);
+        return segment_update_ts_;
+    }
 
-    void UpdateFulltextSegmentTs(TxnTimeStamp ts) { segment_update_ts_ = ts; }
+    void UpdateFulltextSegmentTs(TxnTimeStamp ts);
 
     void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
 
@@ -143,6 +142,7 @@ private:
     MemoryPool byte_slice_pool_{};
     RecyclePool buffer_pool_{};
     ThreadPool thread_pool_{};
+    std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 
     std::shared_mutex rw_locker_{};

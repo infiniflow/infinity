@@ -1213,14 +1213,9 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindCo
 
 Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
-    switch (statement->type()) {
-        case OptimizeType::kIRS: {
-            SharedPtr<LogicalNode> logical_optimize =
-                MakeShared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(), query_context_ptr_->schema_name(), statement->table_name_);
-            this->logical_plan_ = logical_optimize;
-            break;
-        }
-    }
+    SharedPtr<LogicalNode> logical_optimize =
+        MakeShared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(), query_context_ptr_->schema_name(), statement->table_name_);
+    this->logical_plan_ = logical_optimize;
     return Status::OK();
 }
 

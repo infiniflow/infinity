@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "function_expr.h"
+#include "expr/column_expr.h"
 #include <sstream>
 
 namespace infinity {
@@ -38,8 +39,14 @@ std::string FunctionExpr::ToString() const {
 
     if (arguments_->size() == 1) {
         // Unary argument function
-        ss << func_name_ << '(' << arguments_->at(0)->ToString() << ")";
-        return ss.str();
+        ColumnExpr *column_expr = dynamic_cast<ColumnExpr *>(arguments_->at(0));
+        if (column_expr && column_expr->star_) {
+            ss << func_name_ << "(star)";
+            return ss.str();
+        } else {
+            ss << func_name_ << '(' << arguments_->at(0)->ToString() << ")";
+            return ss.str();
+        }
     }
     if (arguments_->size() == 2) {
         // Binary argument function
