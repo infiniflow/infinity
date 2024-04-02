@@ -207,13 +207,15 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowType::kShowSegments: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
+            output_names_->reserve(3);
+            output_types_->reserve(3);
 
-            output_names_->emplace_back("path");
+            output_names_->emplace_back("id");
+            output_names_->emplace_back("status");
             output_names_->emplace_back("size");
 
             output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             break;
         }
@@ -246,14 +248,16 @@ void PhysicalShow::Init() {
         }
 
         case ShowType::kShowBlocks: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
+            output_names_->reserve(3);
+            output_types_->reserve(3);
 
-            output_names_->emplace_back("path");
+            output_names_->emplace_back("id");
             output_names_->emplace_back("size");
+            output_names_->emplace_back("row_count");
 
+            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
             break;
         }
 
@@ -1148,7 +1152,6 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
 
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
@@ -1158,70 +1161,39 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     }
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "path", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "size", HashSet<ConstraintType>()),
-    };
-
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    auto chuck_filling = [&](const std::function<u64(const String &)> &file_size_func, const String &path) {
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        varchar_type,
+        varchar_type,
+    };
+    output_block_ptr->Init(column_types);
+
+    for (auto &[_, segment_entry] : table_entry->segment_map()) {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar(path);
+            Value value = Value::MakeBigInt(segment_entry->segment_id());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(Utility::FormatByteSize(file_size_func(path)));
-
+            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_entry->status()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
-    };
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-    };
-    output_block_ptr->Init(column_types);
 
-    if (segment_id_.has_value() && block_id_.has_value()) {
-        if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
-            auto *block_entry = segment_entry->GetBlockEntryByID(*block_id_).get();
-            if (block_entry != nullptr) {
-                auto version_path = block_entry->VersionFilePath();
-
-                chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
-                SizeT column_count = table_entry->ColumnCount();
-                for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                    auto block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                    auto col_file_path = block_column_entry->FilePath();
-
-                    chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
-                    for (auto &outline : block_column_entry->OutlinePaths()) {
-                        chuck_filling(LocalFileSystem::GetFileSizeByPath, outline);
-                    }
-                }
-            }
-        }
-    } else if (segment_id_.has_value()) {
-        if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
-            auto block_entry_iter = BlockEntryIter(segment_entry.get());
-            for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                const auto &dir_path = *block_entry->base_dir();
-
-                chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
-            }
-        }
-    } else {
-        for (auto &[_, segment] : table_entry->segment_map()) { // FIXME: use table_ref here.
-            const auto &dir_path = *segment->segment_dir();
-
-            chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
+        ++column_id;
+        {
+            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*segment_entry->segment_dir()));
+            Value value = Value::MakeVarchar(seg_size);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
+
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
@@ -1347,42 +1319,43 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         return;
     }
 
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "path", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "size", HashSet<ConstraintType>()),
-    };
-
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    auto chuck_filling = [&](const std::function<u64(const String &)> &file_size_func, const String &path) {
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        varchar_type,
+        bigint_type,
+    };
+    output_block_ptr->Init(column_types);
+
+    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
+    if (!segment_entry) {
+        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        return;
+    }
+    auto block_entry_iter = BlockEntryIter(segment_entry.get());
+    for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar(path);
+            Value value = Value::MakeBigInt(block_entry->block_id());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(Utility::FormatByteSize(file_size_func(path)));
-
+            const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*block_entry->base_dir()));
+            Value value = Value::MakeVarchar(blk_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
-    };
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-    };
-    output_block_ptr->Init(column_types);
 
-    if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
-        auto block_entry_iter = BlockEntryIter(segment_entry.get());
-        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-            const auto& dir_path = *block_entry->base_dir();
-
-            chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
+        ++column_id;
+        {
+            Value value = Value::MakeBigInt(block_entry->row_count());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
 
