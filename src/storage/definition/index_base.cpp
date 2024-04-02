@@ -36,10 +36,10 @@ namespace infinity {
 
 String MetricTypeToString(MetricType metric_type) {
     switch (metric_type) {
-        case MetricType::kMerticInnerProduct: {
+        case MetricType::kMetricInnerProduct: {
             return "ip";
         }
-        case MetricType::kMerticL2: {
+        case MetricType::kMetricL2: {
             return "l2";
         }
         case MetricType::kInvalid: {
@@ -50,9 +50,9 @@ String MetricTypeToString(MetricType metric_type) {
 
 MetricType StringToMetricType(const String &str) {
     if (str == "ip") {
-        return MetricType::kMerticInnerProduct;
+        return MetricType::kMetricInnerProduct;
     } else if (str == "l2") {
-        return MetricType::kMerticL2;
+        return MetricType::kMetricL2;
     } else {
         return MetricType::kInvalid;
     }

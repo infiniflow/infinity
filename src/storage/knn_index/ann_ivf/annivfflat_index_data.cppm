@@ -60,7 +60,7 @@ struct AnnIVFFlatIndexData {
         if (dimension != dimension_) {
             UnrecoverableError("Dimension not match");
         }
-        if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
+        if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
                 RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
@@ -99,7 +99,7 @@ struct AnnIVFFlatIndexData {
         if (dimension != dimension_) {
             UnrecoverableError("Dimension not match");
         }
-        if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
+        if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
                 RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
