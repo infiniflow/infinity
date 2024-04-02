@@ -1389,6 +1389,98 @@ public:
     }
 };
 
+class ShowSegmentsListHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto result = infinity->ShowSegments(database_name, table_name);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            auto column_cnt = result.result_table_->ColumnCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+
+                    nlohmann::json json_segment;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_segment[column_name] = column_value;
+                    }
+                    json_response["segments"].push_back(json_segment);
+
+                }
+            }
+            json_response["table_name"] = table_name;
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowBlocksListHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto segment_id = std::atoi(request->getPathVariable("segment_id").get()->c_str());
+        auto result = infinity->ShowBlocks(database_name, table_name, segment_id);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            auto column_cnt = result.result_table_->ColumnCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+
+                    nlohmann::json json_block;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_block[column_name] = column_value;
+                    }
+                    json_response["blocks"].push_back(json_block);
+
+                }
+            }
+
+            json_response["segment_id"] = segment_id;
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class ShowBlockDetailHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -1469,9 +1561,11 @@ void HTTPServer::Start(u16 port) {
 
     // segment
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}", MakeShared<ShowSegmentDetailHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments", MakeShared<ShowSegmentsListHandler>());
 
     // block
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}", MakeShared<ShowBlockDetailHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks", MakeShared<ShowBlocksListHandler>());
 
     // variable
     router->route("GET", "/variables/{variable_name}", MakeShared<ShowVariableHandler>());
