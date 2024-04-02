@@ -1573,7 +1573,7 @@ show_statement: SHOW DATABASES {
 }
 | SHOW TABLE table_name SEGMENT LONG_VALUE {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kSegments;
+    $$->show_type_ = infinity::ShowStmtType::kSegment;
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
         free($3->schema_name_ptr_);
@@ -1597,7 +1597,7 @@ show_statement: SHOW DATABASES {
 }
 | SHOW TABLE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kBlocks;
+    $$->show_type_ = infinity::ShowStmtType::kBlock;
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
         free($3->schema_name_ptr_);

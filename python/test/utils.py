@@ -1,3 +1,4 @@
+import csv
 import functools
 import os
 import subprocess
@@ -83,3 +84,21 @@ def generate_fvecs(num, dim, filename):
             fvec = np.random.random(dim).astype(np.float32)
             fvec.tofile(fvecs_file)
     fvecs_file.close()
+
+
+def generate_commas_enwiki(in_filename, out_filename, is_embedding):
+    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + in_filename, "r") as infile, \
+         open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + out_filename, "w") as outfile:
+            reader = csv.reader(infile, delimiter='\t')
+            writer = csv.writer(outfile, delimiter=',')
+
+            if is_embedding:
+                i = 0
+                for row in reader:
+                    suffix = [i, "[{},{},{},{}]".format(
+                         i, i, i, i)]
+                    writer.writerow(row + suffix)
+                    i += 1
+            else:
+                for row in reader:
+                    writer.writerow(row)
