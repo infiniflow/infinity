@@ -1125,8 +1125,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         TxnTimeStamp last_commit_ts = 0;
         {
             // create table
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -1137,8 +1136,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         }
         {
             // insert datas
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -1180,8 +1178,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->CreateTxn();
-                txn_idx->Begin();
+                auto *txn_idx = txn_mgr->BeginTxn();
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -1247,8 +1244,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
             this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
             {
 
-                auto txn_cpt = txn_mgr->CreateTxn();
-                txn_cpt->Begin();
+                auto txn_cpt = txn_mgr->BeginTxn();
 
                 auto [table_entry, status] = txn_cpt->GetTableByName(*db_name, *table_name);
                 EXPECT_NE(table_entry, nullptr);
@@ -1263,8 +1259,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->CreateTxn();
-                txn_idx_drop->Begin();
+                auto *txn_idx_drop = txn_mgr->BeginTxn();
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
