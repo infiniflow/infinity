@@ -43,7 +43,7 @@ public:
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    void PutEntry(WalEntry* entry, Txn* txn);
+    void PutEntry(WalEntry *entry, Txn *txn);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -72,7 +72,6 @@ private:
     // Checkpoint Helper
     void CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size);
 
-private:
     void SetLastCkpWalSize(i64 wal_size);
     i64 GetLastCkpWalSize();
 
@@ -124,6 +123,8 @@ private:
     Atomic<bool> checkpoint_in_progress_{false};
 
     // Only Checkpoint thread access following members
+    TxnTimeStamp last_ckp_ts_{};
+    TxnTimeStamp last_full_ckp_ts_{};
 };
 
 } // namespace infinity
