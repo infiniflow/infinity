@@ -148,6 +148,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
 
     const IndexBase *index_base = table_index_entry_->index_base();
     const ColumnDef *column_def = table_index_entry_->column_def().get();
+    ColumnID column_id = column_def->id();
+
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
@@ -169,7 +171,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
             auto column_length_file_handler =
                 MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, this);
-            u64 column_id = column_def->id();
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_manager));
             memory_indexer_->Insert(column_vector, row_offset, row_count, std::move(column_length_file_handler), false);
@@ -362,14 +363,14 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                     switch (index_hnsw->encode_type_) {
                         case HnswEncodeType::kPlain: {
                             switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
+                                case MetricType::kMetricInnerProduct: {
                                     auto hnsw_index = static_cast<
                                         KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainIPDist<float, SegmentOffset>> *>(
                                         buffer_handle.GetDataMut());
                                     InsertHnsw(hnsw_index);
                                     break;
                                 }
-                                case MetricType::kMerticL2: {
+                                case MetricType::kMetricL2: {
                                     auto hnsw_index = static_cast<
                                         KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainL2Dist<float, SegmentOffset>> *>(
                                         buffer_handle.GetDataMut());
@@ -384,7 +385,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                         }
                         case HnswEncodeType::kLVQ: {
                             switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
+                                case MetricType::kMetricInnerProduct: {
                                     // too long type. fix it.
                                     auto hnsw_index = static_cast<KnnHnsw<float,
                                                                           SegmentOffset,
@@ -393,7 +394,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                                     InsertHnsw(hnsw_index);
                                     break;
                                 }
-                                case MetricType::kMerticL2: {
+                                case MetricType::kMetricL2: {
                                     auto hnsw_index = static_cast<KnnHnsw<float,
                                                                           SegmentOffset,
                                                                           LVQStore<float, SegmentOffset, i8, LVQL2Cache<float, i8>>,
@@ -494,14 +495,14 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                     switch (index_hnsw->encode_type_) {
                         case HnswEncodeType::kPlain: {
                             switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
+                                case MetricType::kMetricInnerProduct: {
                                     auto *hnsw_index = static_cast<
                                         KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainIPDist<float, SegmentOffset>> *>(
                                         buffer_handle.GetDataMut());
                                     InsertHnswDo(hnsw_index, create_index_idx);
                                     break;
                                 }
-                                case MetricType::kMerticL2: {
+                                case MetricType::kMetricL2: {
                                     auto *hnsw_index = static_cast<
                                         KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainL2Dist<float, SegmentOffset>> *>(
                                         buffer_handle.GetDataMut());
@@ -516,7 +517,7 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                         }
                         case HnswEncodeType::kLVQ: {
                             switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
+                                case MetricType::kMetricInnerProduct: {
                                     auto *hnsw_index = static_cast<KnnHnsw<float,
                                                                            SegmentOffset,
                                                                            LVQStore<float, SegmentOffset, i8, LVQIPCache<float, i8>>,
@@ -524,7 +525,7 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                                     InsertHnswDo(hnsw_index, create_index_idx);
                                     break;
                                 }
-                                case MetricType::kMerticL2: {
+                                case MetricType::kMetricL2: {
                                     auto *hnsw_index = static_cast<KnnHnsw<float,
                                                                            SegmentOffset,
                                                                            LVQStore<float, SegmentOffset, i8, LVQL2Cache<float, i8>>,

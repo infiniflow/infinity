@@ -8,8 +8,8 @@
 
 #include "base_profiler.h"
 #include "helper.h"
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 import stl;
 import index_base;
@@ -143,12 +143,12 @@ int main() {
     std::cin >> choose_metric;
     switch (choose_metric) {
         case 1: {
-            metric = MetricType::kMerticL2;
+            metric = MetricType::kMetricL2;
             metric_str = "L2";
             break;
         }
         case 2: {
-            metric = MetricType::kMerticInnerProduct;
+            metric = MetricType::kMetricInnerProduct;
             metric_str = "IP";
             break;
         }
@@ -231,12 +231,12 @@ int main() {
             }
             profiler.Begin();
             switch (metric) {
-                case MetricType::kMerticL2: {
+                case MetricType::kMetricL2: {
                     ann_index_data =
                         AnnIVFFlatL2<f32>::CreateIndex(dimension, train_count, input_train_ptr, base_counts, input_embeddings.get(), centroids);
                     break;
                 }
-                case MetricType::kMerticInnerProduct: {
+                case MetricType::kMetricInnerProduct: {
                     ann_index_data =
                         AnnIVFFlatIP<f32>::CreateIndex(dimension, train_count, input_train_ptr, base_counts, input_embeddings.get(), centroids);
                     break;
@@ -320,11 +320,11 @@ int main() {
             }
         };
         switch (metric) {
-            case MetricType::kMerticL2: {
+            case MetricType::kMetricL2: {
                 search_f.operator()<AnnIVFFlatL2<f32>>();
                 break;
             }
-            case MetricType::kMerticInnerProduct: {
+            case MetricType::kMetricInnerProduct: {
                 search_f.operator()<AnnIVFFlatIP<f32>>();
                 break;
             }
