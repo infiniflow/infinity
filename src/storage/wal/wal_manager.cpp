@@ -60,7 +60,7 @@ namespace infinity {
 WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0),
-      checkpoint_in_progress_(false) {}
+      checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {}
 
 WalManager::~WalManager() {
     if (running_.load()) {
@@ -257,30 +257,40 @@ void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts,
     txn->Begin();
 
     this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
-    TxnTimeStamp checkpoint_ts = txn_mgr->CommitTxn(txn);
-
-    WalFile::RecycleWalFile(checkpoint_ts, wal_dir_);
-    if (is_full_checkpoint) {
-        const auto &catalog_dir = *storage_->catalog()->CatalogDir();
-        CatalogFile::RecycleCatalogFile(checkpoint_ts, catalog_dir);
-    }
+    txn_mgr->CommitTxn(txn);
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
     this->CheckpointInner(is_full_checkpoint, ckp_task->txn_, max_commit_ts, wal_size);
-    // TODO: should recycle after txn commit
-    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
-    if (is_full_checkpoint) {
-        const auto &catalog_dir = *storage_->catalog()->CatalogDir();
-        CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
-    }
 }
 
 void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size) {
+    DeferFn defer([&] { checkpoint_in_progress_.store(false); });
+
+    if (is_full_checkpoint) {
+        if (max_commit_ts == last_full_ckp_ts_) {
+            LOG_TRACE(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
+            return;
+        }
+        if (last_full_ckp_ts_ != UNCOMMIT_TS && last_full_ckp_ts_ >= max_commit_ts) {
+            UnrecoverableError(
+                fmt::format("WalManager::UpdateLastFullMaxCommitTS last_full_ckp_ts_ {} >= max_commit_ts {}", last_full_ckp_ts_, max_commit_ts));
+        }
+        if (last_ckp_ts_ != UNCOMMIT_TS && last_ckp_ts_ > max_commit_ts) {
+            UnrecoverableError(fmt::format("WalManager::UpdateLastFullMaxCommitTS last_ckp_ts_ {} >= max_commit_ts {}", last_ckp_ts_, max_commit_ts));
+        }
+    } else {
+        if (max_commit_ts == last_ckp_ts_) {
+            LOG_TRACE(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
+            return;
+        }
+        if (last_ckp_ts_ >= max_commit_ts) {
+            UnrecoverableError(fmt::format("WalManager::UpdateLastMaxCommitTS last_ckp_ts_ {} >= max_commit_ts {}", last_ckp_ts_, max_commit_ts));
+        }
+    }
     try {
-        DeferFn defer([&] { checkpoint_in_progress_.store(false); });
         LOG_INFO(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
                              is_full_checkpoint ? "FULL" : "DELTA",
                              txn->TxnID(),
@@ -298,6 +308,13 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
     } catch (UnrecoverableException &e) {
         LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
         throw e;
+    }
+    last_ckp_ts_ = max_commit_ts;
+    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
+    if (is_full_checkpoint) {
+        last_full_ckp_ts_ = max_commit_ts;
+        const auto &catalog_dir = *storage_->catalog()->CatalogDir();
+        CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
     }
 }
 

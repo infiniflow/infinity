@@ -64,17 +64,23 @@ String CatalogFile::TempFullCheckpointFilename(TxnTimeStamp max_commit_ts) { ret
 
 String CatalogFile::DeltaCheckpointFilename(TxnTimeStamp max_commit_ts) { return fmt::format("DELTA.{}", max_commit_ts); }
 
-void CatalogFile::RecycleCatalogFile(TxnTimeStamp full_ckp_ts, const String &catalog_dir) {
+void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &catalog_dir) {
     auto [full_infos, delta_infos] = ParseCheckpointFilenames(catalog_dir);
+    bool found = false;
     for (const auto &full_info : full_infos) {
-        if (full_info.max_commit_ts_ < full_ckp_ts) {
+        if (full_info.max_commit_ts_ < max_commit_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(full_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
+        } else if (full_info.max_commit_ts_ == max_commit_ts) {
+            found = true;
         }
     }
+    if (!found) {
+        UnrecoverableError(fmt::format("Full catalog file {} not found in the catalog directory: {}", max_commit_ts, catalog_dir));
+    }
     for (const auto &delta_info : delta_infos) {
-        if (delta_info.max_commit_ts_ <= full_ckp_ts) {
+        if (delta_info.max_commit_ts_ <= max_commit_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(delta_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
@@ -201,10 +207,10 @@ String WalFile::TempWalFilename() { return String(WAL_FILE_TEMP_FILE); }
 //  * Check if the wal.log.* files are too old.
 //  * if * is little than the max_commit_ts, we will delete it.
 //  */
-void WalFile::RecycleWalFile(TxnTimeStamp ckp_ts, const String &wal_dir) {
+void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir) {
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
-        if (wal_info.max_commit_ts_ < ckp_ts) {
+        if (wal_info.max_commit_ts_ <= max_commit_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(wal_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
