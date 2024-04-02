@@ -16,6 +16,7 @@ import skiplist_reader;
 import posting_list_format;
 import third_party;
 import byte_slice_reader;
+import random;
 
 using namespace infinity;
 
@@ -103,21 +104,45 @@ TEST_F(SkiplistReaderTest, SkipListReaderByteSliceTest) {
 
     PostingFormatOption format_option(of_term_frequency);
     auto doc_list_format_option = format_option.GetDocListFormatOption();
-    auto skiplist_reader = MakeShared<SkipListReaderByteSlice>(doc_list_format_option);
 
-    skiplist_reader->Load(byte_slice_list, static_cast<u32>(0), static_cast<u32>(byte_slice_list->GetTotalSize()));
     u32 res_doc_id = -1;
     u32 res_prev_doc_id = -1;
     u32 res_offset = -1;
     u32 res_delta = -1;
-    for (auto query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
-        skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
-        EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
-        EXPECT_EQ(res_offset, offsets[query_doc_id]);
-        EXPECT_EQ(res_delta, deltas[query_doc_id]);
+
+    {
+        auto skiplist_reader = MakeShared<SkipListReaderByteSlice>(doc_list_format_option);
+        skiplist_reader->Load(byte_slice_list, static_cast<u32>(0), static_cast<u32>(byte_slice_list->GetTotalSize()));
+        for (auto query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
+            skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
+            EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
+            EXPECT_EQ(res_offset, offsets[query_doc_id]);
+            EXPECT_EQ(res_delta, deltas[query_doc_id]);
+        }
+    }
+
+    {
+        auto skiplist_reader = MakeShared<SkipListReaderByteSlice>(doc_list_format_option);
+        skiplist_reader->Load(byte_slice_list, static_cast<u32>(0), static_cast<u32>(byte_slice_list->GetTotalSize()));
+        for (auto query_doc_id = 0; query_doc_id < doc_num; query_doc_id += 3) {
+            skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
+            EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
+            EXPECT_EQ(res_offset, offsets[query_doc_id]);
+            EXPECT_EQ(res_delta, deltas[query_doc_id]);
+        }
+    }
+
+    {
+        auto skiplist_reader = MakeShared<SkipListReaderByteSlice>(doc_list_format_option);
+        skiplist_reader->Load(byte_slice_list, static_cast<u32>(0), static_cast<u32>(byte_slice_list->GetTotalSize()));
+        for (auto query_doc_id = 0; query_doc_id < doc_num; query_doc_id += random() % doc_num + 1) {
+            skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
+            EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
+            EXPECT_EQ(res_offset, offsets[query_doc_id]);
+            EXPECT_EQ(res_delta, deltas[query_doc_id]);
+        }
     }
 }
-
 
 TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     PostingFields posting_fields;
@@ -131,18 +156,40 @@ TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
 
     PostingFormatOption format_option(of_term_frequency);
     auto doc_list_format_option = format_option.GetDocListFormatOption();
-    auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option, session_pool_);
-
-    skiplist_reader->Load(skiplist_writer_.get());
     u32 res_doc_id = -1;
     u32 res_prev_doc_id = -1;
     u32 res_offset = -1;
     u32 res_delta = -1;
-    for (SizeT query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
-        skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
-        EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
-        EXPECT_EQ(res_offset, offsets[query_doc_id]);
-        EXPECT_EQ(res_delta, deltas[query_doc_id]);
+    {
+        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option, session_pool_);
+        skiplist_reader->Load(skiplist_writer_.get());
+        for (SizeT query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
+            skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
+            EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
+            EXPECT_EQ(res_offset, offsets[query_doc_id]);
+            EXPECT_EQ(res_delta, deltas[query_doc_id]);
+        }
+    }
+
+    {
+        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option, session_pool_);
+        skiplist_reader->Load(skiplist_writer_.get());
+        for (SizeT query_doc_id = 0; query_doc_id < doc_num; query_doc_id += 3) {
+            skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
+            EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
+            EXPECT_EQ(res_offset, offsets[query_doc_id]);
+            EXPECT_EQ(res_delta, deltas[query_doc_id]);
+        }
+    }
+
+    {
+        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option, session_pool_);
+        skiplist_reader->Load(skiplist_writer_.get());
+        for (SizeT query_doc_id = 0; query_doc_id < doc_num; query_doc_id += random() % doc_num + 1) {
+            skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
+            EXPECT_EQ(res_doc_id, doc_ids[query_doc_id]);
+            EXPECT_EQ(res_offset, offsets[query_doc_id]);
+            EXPECT_EQ(res_delta, deltas[query_doc_id]);
+        }
     }
 }
-

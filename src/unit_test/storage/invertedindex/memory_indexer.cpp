@@ -36,6 +36,7 @@ import column_length_io;
 import internal_types;
 import logical_type;
 import column_index_merger;
+import third_party;
 
 using namespace infinity;
 
@@ -158,4 +159,61 @@ TEST_F(MemoryIndexerTest, test2) {
     ColumnIndexReader reader;
     reader.Open(flag_, "/tmp/infinity/fulltext_tbl1_col1", std::move(index_by_segment));
     Check(reader);
+}
+
+TEST_F(MemoryIndexerTest, SpillLoadTest) {
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    String column_length_file_path = String("/tmp/infinity/fulltext_tbl1_col1/chunk1") + LENGTH_SUFFIX;
+    auto column_length_file_handler =
+        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, fake_segment_index_entry_1.get());
+    MemoryIndexer
+        indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    bool offline = false;
+    bool spill = true;
+    indexer1.Insert(column_, 0, 2, column_length_file_handler, offline);
+    indexer1.Insert(column_, 2, 2, column_length_file_handler, offline);
+    indexer1.Insert(column_, 4, 1, std::move(column_length_file_handler), offline);
+    indexer1.Dump(offline, spill);
+
+    MemoryIndexer
+        loaded_indexer("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    loaded_indexer.Load();
+
+    for (SizeT i = 0; i < expected_postings_.size(); ++i) {
+        const ExpectedPosting &expected = expected_postings_[i];
+        const String &term = expected.term;
+        auto posting_writer = loaded_indexer.GetOrAddPosting(term);
+        auto total_df = posting_writer->GetDF();
+        auto total_tf = posting_writer->GetTotalTF();
+
+        const auto& expected_doc_ids = expected.doc_ids;
+        const auto& expected_tfs = expected.tfs;
+
+        u32 expected_df = expected_doc_ids.size();
+        u32 expected_tf = 0;
+
+        for (auto tf : expected_tfs) {
+            expected_tf += tf;
+        }
+        ASSERT_EQ(total_df, expected_df);
+        ASSERT_EQ(total_tf, expected_tf);
+
+        auto posting_decoder = posting_writer->CreateInMemPostingDecoder(&byte_slice_pool_);
+        auto doc_list_decoder = posting_decoder->GetInMemDocListDecoder();
+
+        docid_t doc_buffer[1024];
+        ASSERT_TRUE(doc_list_decoder->DecodeCurrentTFBuffer(doc_buffer));
+        docid_t doc_id = 0;
+        for (SizeT j = 0; j < expected_doc_ids.size(); ++j) {
+            doc_id += doc_buffer[j];
+            ASSERT_EQ(doc_id, static_cast<docid_t>(expected_doc_ids[j].ToUint64()));
+        }
+
+        tf_t tf_buf[1024];
+        ASSERT_TRUE(doc_list_decoder->DecodeCurrentTFBuffer(tf_buf));
+        for (SizeT j = 0; j < expected_tfs.size(); ++j) {
+            ASSERT_EQ(tf_buf[j], expected_tfs[j]);
+        }
+    }
+
 }
