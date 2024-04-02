@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
+import inspect
 import os
 import numpy as np
 from abc import ABC
@@ -24,7 +26,7 @@ from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
-from infinity.remote_thrift.utils import traverse_conditions, check_valid_name, select_res_to_polars
+from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType
 
@@ -37,9 +39,24 @@ class RemoteTable(Table, ABC):
         self._table_name = table_name
         self.query_builder = InfinityThriftQueryBuilder(table=self)
 
+    def params_type_check(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            sig = inspect.signature(func)
+            params = sig.parameters
+            for arg, param in zip(args, params.values()):
+                if param.annotation is not param.empty and not isinstance(arg, param.annotation):
+                    raise TypeError(f"TypeError: Argument {param.name} must be {param.annotation}")
+            for kwarg, value in kwargs.items():
+                if params[kwarg].annotation is not params[kwarg].empty and not isinstance(value,
+                                                                                          params[kwarg].annotation):
+                    raise TypeError(f"TypeError: Argument {kwarg} must be {params[kwarg].annotation}")
+            return func(*args, **kwargs)
+        return wrapper
+
+    @name_validity_check("index_name", "Index")
     def create_index(self, index_name: str, index_infos: list[IndexInfo],
                      conflict_type: ConflictType = ConflictType.Error):
-        check_valid_name(index_name, "Index")
         index_name = index_name.strip()
 
         index_info_list_to_use: list[ttypes.IndexInfo] = []
@@ -73,8 +90,8 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
+    @name_validity_check("index_name", "Index")
     def drop_index(self, index_name: str, conflict_type: ConflictType = ConflictType.Error):
-
         drop_index_conflict: ttypes.DropConflict
         if conflict_type == ConflictType.Error:
             drop_index_conflict = ttypes.DropConflict.Error
@@ -83,7 +100,6 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"Error:3036, invalid conflict type")
 
-        check_valid_name(index_name, "Index")
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
         if res.error_code == ErrorCode.OK:
@@ -91,9 +107,8 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
+    @name_validity_check("index_name", "Index")
     def show_index(self, index_name: str):
-
-        check_valid_name(index_name, "Index")
         res = self._conn.show_index(db_name=self._db_name, table_name=self._table_name, index_name=index_name)
 
         if res.error_code == ErrorCode.OK:
@@ -161,7 +176,6 @@ class RemoteTable(Table, ABC):
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def import_data(self, file_path: str, import_options: {} = None):
-
         options = ttypes.ImportOption()
         options.has_header = False
         options.delimiter = ','
@@ -303,10 +317,12 @@ class RemoteTable(Table, ABC):
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
+    @params_type_check
     def match(self, fields: str, matching_text: str, options_text: str = ''):
         self.query_builder.match(fields, matching_text, options_text)
         return self
 
+    @params_type_check
     def fusion(self, method: str, options_text: str = ''):
         self.query_builder.fusion(method, options_text)
         return self

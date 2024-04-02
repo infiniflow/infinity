@@ -21,7 +21,7 @@ import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
-from utils import copy_data
+from utils import copy_data, generate_commas_enwiki
 
 
 class TestKnn:
@@ -412,4 +412,122 @@ class TestKnn:
 
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.parametrize("match_param_1", [pytest.param(1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param(1.1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param([], marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param({}, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param((), marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param("invalid column name",
+                                                            marks=pytest.mark.xfail(
+                                                                reason="ERROR:3024, Column: invalid column name doesn't exist")),
+                                               "doctitle,num,body^5"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_columns(self, get_infinity_db, check_data, match_param_1):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_columns", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_columns",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
 
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*"])
+               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match(match_param_1, "black", "topn=1")
+               .fusion('rrf')
+               .to_pl())
+        print(res)
+
+    @pytest.mark.parametrize("match_param_2", [pytest.param(1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param(1.1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param([], marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param({}, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param((), marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param("@#$!#@$SDasdf3!@#$",
+                                                            marks=pytest.mark.xfail(
+                                                                reason="ERROR:3052, Trying to match failed.")),
+                                               "a word a segment",
+                                               "body=Greek"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_words(self, get_infinity_db, check_data, match_param_2):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_words", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_words",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*"])
+               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match("doctitle,num,body^5", match_param_2, "topn=1")
+               .fusion('rrf')
+               .to_pl())
+        print(res)
+
+    @pytest.mark.parametrize("match_param_3", [pytest.param(1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param(1.1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param([], marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param({}, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param((), marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param("@#$!#@$SDa^sdf3!@#$"),
+                                               "topn=1",
+                                               "1"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_options(self, get_infinity_db, check_data, match_param_3):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_options", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_options",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*"])
+               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match("doctitle,num,body^5", "word", match_param_3)
+               .fusion('rrf')
+               .to_pl())
+        print(res)
