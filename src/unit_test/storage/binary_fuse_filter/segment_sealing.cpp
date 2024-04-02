@@ -54,8 +54,7 @@ class SealingTaskTest : public BaseTest {
 
 protected:
     void AppendBlocks(TxnManager *txn_mgr, const String &table_name, u32 row_cnt_input, BufferManager *buffer_mgr) {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto [table_entry, status] = txn->GetTableByName("default", table_name);
         auto column_count = table_entry->ColumnCount();
         EXPECT_EQ(column_count, u32(1));
@@ -107,8 +106,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
         {
             // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -118,8 +116,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
         u32 input_row_cnt = 8'192 * 1'024 * 3 + 1; // one full segment
         this->AppendBlocks(txn_mgr, table_name, input_row_cnt, buffer_manager);
         {
-            auto txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto txn = txn_mgr->BeginTxn();
             auto [table_entry, status] = txn->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
             // 8'192 * 1'024 * 3 + 1
@@ -163,8 +160,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
         // BufferManager *buffer_manager = storage->buffer_manager();
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto txn = txn_mgr->BeginTxn();
             auto [table_entry, status] = txn->GetTableEntry("default", table_name);
             EXPECT_NE(table_entry, nullptr);
             // 8'192 * 1'024 * 3 + 1

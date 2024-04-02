@@ -97,7 +97,7 @@ public:
 
     String ToString() const override { return "Compact segments task"; }
 
-    void BeginTxn() { txn_->Begin(); }
+//    void BeginTxn() { txn_->Begin(); }
 
     void CommitTxn() { txn_->txn_mgr()->CommitTxn(txn_); }
 

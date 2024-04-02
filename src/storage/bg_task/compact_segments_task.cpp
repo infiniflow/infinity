@@ -142,6 +142,7 @@ bool CompactSegmentsTask::Execute() {
         }
     }
     if (table_entry->commit_ts_ != commit_ts_) {
+        // If the table is compacted, the table will be removed.
         return false;
     }
     CompactSegmentsTaskState state(table_entry);
