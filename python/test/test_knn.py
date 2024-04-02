@@ -412,11 +412,11 @@ class TestKnn:
 
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("match_param_1", [pytest.param(1, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param(1.1, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param([], marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param({}, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param((), marks=pytest.mark.skip(reason="teardown error")),
+    @pytest.mark.parametrize("match_param_1", [pytest.param(1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param(1.1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param([], marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param({}, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param((), marks=pytest.mark.xfail(reason="TypeError")),
                                                pytest.param("invalid column name",
                                                             marks=pytest.mark.xfail(
                                                                 reason="ERROR:3024, Column: invalid column name doesn't exist")),
@@ -452,11 +452,11 @@ class TestKnn:
                .to_pl())
         print(res)
 
-    @pytest.mark.parametrize("match_param_2", [pytest.param(1, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param(1.1, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param([], marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param({}, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param((), marks=pytest.mark.skip(reason="teardown error")),
+    @pytest.mark.parametrize("match_param_2", [pytest.param(1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param(1.1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param([], marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param({}, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param((), marks=pytest.mark.xfail(reason="TypeError")),
                                                pytest.param("@#$!#@$SDasdf3!@#$",
                                                             marks=pytest.mark.xfail(
                                                                 reason="ERROR:3052, Trying to match failed.")),
@@ -493,11 +493,11 @@ class TestKnn:
                .to_pl())
         print(res)
 
-    @pytest.mark.parametrize("match_param_3", [pytest.param(1, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param(1.1, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param([], marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param({}, marks=pytest.mark.skip(reason="teardown error")),
-                                               pytest.param((), marks=pytest.mark.skip(reason="teardown error")),
+    @pytest.mark.parametrize("match_param_3", [pytest.param(1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param(1.1, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param([], marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param({}, marks=pytest.mark.xfail(reason="TypeError")),
+                                               pytest.param((), marks=pytest.mark.xfail(reason="TypeError")),
                                                pytest.param("@#$!#@$SDa^sdf3!@#$"),
                                                "topn=1",
                                                "1"])
