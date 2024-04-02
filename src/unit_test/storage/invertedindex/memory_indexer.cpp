@@ -37,6 +37,10 @@ import internal_types;
 import logical_type;
 import column_index_merger;
 import third_party;
+import inmem_posting_decoder;
+import inmem_position_list_decoder;
+import inmem_index_segment_reader;
+import segment_posting;
 
 using namespace infinity;
 
@@ -55,7 +59,7 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
-
+    UniquePtr<MemoryPool> memory_pool_ = MakeUnique<MemoryPool>(1024);
 public:
     void SetUp() override {
         system("rm -rf /tmp/infinity/fulltext_tbl1_col1");
@@ -162,58 +166,54 @@ TEST_F(MemoryIndexerTest, test2) {
 }
 
 TEST_F(MemoryIndexerTest, SpillLoadTest) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
     String column_length_file_path = String("/tmp/infinity/fulltext_tbl1_col1/chunk1") + LENGTH_SUFFIX;
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
     auto column_length_file_handler =
         MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, fake_segment_index_entry_1.get());
-    MemoryIndexer
-        indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    auto indexer1 = MakeUnique<MemoryIndexer>("/tmp/infinity/fulltext_tbl1_col1",
+                                              "chunk1",
+                                              RowID(0U, 0U),
+                                              flag_,
+                                              "standard",
+                                              byte_slice_pool_,
+                                              buffer_pool_,
+                                              thread_pool_);
     bool offline = false;
     bool spill = true;
-    indexer1.Insert(column_, 0, 2, column_length_file_handler, offline);
-    indexer1.Insert(column_, 2, 2, column_length_file_handler, offline);
-    indexer1.Insert(column_, 4, 1, std::move(column_length_file_handler), offline);
-    indexer1.Dump(offline, spill);
+    indexer1->Insert(column_, 0, 2, column_length_file_handler, offline);
+    indexer1->Insert(column_, 2, 2, column_length_file_handler, offline);
+    indexer1->Insert(column_, 4, 1, std::move(column_length_file_handler), offline);
+    while (indexer1->GetInflightTasks() > 0) {
+        sleep(1);
+        indexer1->CommitSync();
+    }
 
-    MemoryIndexer
-        loaded_indexer("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    loaded_indexer.Load();
-
+    indexer1->Dump(offline, spill);
+    UniquePtr<MemoryIndexer>
+        loaded_indexer = MakeUnique<MemoryIndexer>("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    loaded_indexer->Load();
+    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(loaded_indexer.get());
     for (SizeT i = 0; i < expected_postings_.size(); ++i) {
         const ExpectedPosting &expected = expected_postings_[i];
         const String &term = expected.term;
-        auto posting_writer = loaded_indexer.GetOrAddPosting(term);
-        auto total_df = posting_writer->GetDF();
-        auto total_tf = posting_writer->GetTotalTF();
+        SegmentPosting seg_posting;
+        SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
 
-        const auto& expected_doc_ids = expected.doc_ids;
-        const auto& expected_tfs = expected.tfs;
-
-        u32 expected_df = expected_doc_ids.size();
-        u32 expected_tf = 0;
-
-        for (auto tf : expected_tfs) {
-            expected_tf += tf;
-        }
-        ASSERT_EQ(total_df, expected_df);
-        ASSERT_EQ(total_tf, expected_tf);
-
-        auto posting_decoder = posting_writer->CreateInMemPostingDecoder(&byte_slice_pool_);
-        auto doc_list_decoder = posting_decoder->GetInMemDocListDecoder();
-
-        docid_t doc_buffer[1024];
-        ASSERT_TRUE(doc_list_decoder->DecodeCurrentTFBuffer(doc_buffer));
-        docid_t doc_id = 0;
-        for (SizeT j = 0; j < expected_doc_ids.size(); ++j) {
-            doc_id += doc_buffer[j];
-            ASSERT_EQ(doc_id, static_cast<docid_t>(expected_doc_ids[j].ToUint64()));
+        auto ret = segment_reader->GetSegmentPosting(term, seg_posting, &byte_slice_pool_);
+        if (ret) {
+            seg_postings->push_back(seg_posting);
         }
 
-        tf_t tf_buf[1024];
-        ASSERT_TRUE(doc_list_decoder->DecodeCurrentTFBuffer(tf_buf));
-        for (SizeT j = 0; j < expected_tfs.size(); ++j) {
-            ASSERT_EQ(tf_buf[j], expected_tfs[j]);
+        auto posting_iter = MakeUnique<PostingIterator>(flag_, &byte_slice_pool_);
+        u32 state_pool_size = 0;
+        posting_iter->Init(seg_postings, state_pool_size);
+        RowID doc_id = INVALID_ROWID;
+        for (SizeT j = 0; j < expected.doc_ids.size(); ++j) {
+            doc_id = posting_iter->SeekDoc(expected.doc_ids[j]);
+            ASSERT_EQ(doc_id, expected.doc_ids[j]);
+            u32 tf = posting_iter->GetCurrentTF();
+            ASSERT_EQ(tf, expected.tfs[j]);
         }
     }
-
 }
+
