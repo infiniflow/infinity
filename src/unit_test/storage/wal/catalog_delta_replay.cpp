@@ -1102,3 +1102,178 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         infinity::InfinityContext::instance().UnInit();
     }
 }
+
+TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
+    // this test is for single index,not for joint index
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
+    std::shared_ptr<std::string> db_entry_dir;
+    auto db_name = std::make_shared<std::string>("default");
+
+    auto table_name = std::make_shared<std::string>("db1");
+    // auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+
+    HashSet<ConstraintType> constraints;
+    auto column_def1 = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "col1", constraints);
+    auto table_def = TableDef::Make(db_name, table_name, {column_def1});
+
+    {
+        InfinityContext::instance().Init(config_path);
+        Storage *storage = InfinityContext::instance().storage();
+        BufferManager *buffer_manager = storage->buffer_manager();
+
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp last_commit_ts = 0;
+        {
+            // create table
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            txn->CreateTable(*db_name, table_def, ConflictType::kError);
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+        {
+            // insert datas
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
+            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            {
+                BlockID block_id = 0;
+                UniquePtr<BlockEntry> block_entry =
+                    BlockEntry::NewBlockEntry(segment_entry.get(), block_id, 0 /*checkpoint_ts*/, table_entry->ColumnCount(), txn);
+                {
+                    Vector<ColumnVector> column_vectors;
+                    for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
+                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                    }
+
+                    {
+                        int v1 = 1;
+                        column_vectors[0].AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
+                    }
+                    block_entry->IncreaseRowCount(1);
+                }
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+            }
+
+            TxnTimeStamp flush_ts = txn->BeginTS();
+            segment_entry->FlushNewData(flush_ts);
+            txn->Import(*db_name, *table_name, segment_entry);
+
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+
+        String idx_name = "test_full_idx";
+        const String idx_file_name = "test_full_idx.json";
+        String analyzer{};
+        Vector<String> col_name_list{"col1"};
+
+        {
+            {
+                // create index def
+                auto *txn_idx = txn_mgr->CreateTxn();
+                txn_idx->Begin();
+
+                auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
+                EXPECT_TRUE(status1.ok());
+
+                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer);
+                std::shared_ptr<IndexBase> fullIdxBasePtr = std::make_shared<IndexFullText>(fullIdxBase);
+
+                auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, fullIdxBasePtr, ConflictType::kInvalid);
+                EXPECT_TRUE(status2.ok());
+                {
+                    auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
+                    EXPECT_TRUE(status3.ok());
+
+                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    EXPECT_TRUE(status4.ok());
+                    auto col_cnt = (*tInfo).column_count_;
+
+                    String alias = "tb1";
+                    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
+                    SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
+                    Vector<SizeT> columns;
+
+                    for (i64 idx = 0; idx < col_cnt; idx++) {
+                        const ColumnDef *column_def = table_entry->GetColumnDefByID(idx);
+                        types_ptr->emplace_back(column_def->column_type_);
+                        names_ptr->emplace_back(column_def->name_);
+                        columns.emplace_back(idx);
+                    }
+
+                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+
+                    u64 table_idx = 0;
+                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+
+                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    EXPECT_TRUE(status5.ok());
+
+                    // do create index
+                    {
+                        HashMap<SegmentID, atomic_u64> create_index_idxes;
+                        create_index_idxes[0] = 1;
+
+                        auto status6 = txn_idx->CreateIndexDo(table_ref.get(), idx_name, create_index_idxes);
+                        EXPECT_TRUE(status6.ok());
+                    }
+
+                    // finish create index
+                    {
+                        auto [table_entry, status7] = txn_idx->GetTableByName(*db_name, *table_name);
+                        EXPECT_TRUE(status7.ok());
+
+                        auto status8 = txn_idx->CreateIndexFinish(table_entry, table_idx_entry);
+                        EXPECT_TRUE(status8.ok());
+                    }
+                    last_commit_ts = txn_mgr->CommitTxn(txn_idx);
+                }
+            }
+
+            // compact
+            Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
+
+            this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
+            {
+
+                auto txn_cpt = txn_mgr->CreateTxn();
+                txn_cpt->Begin();
+
+                auto [table_entry, status] = txn_cpt->GetTableByName(*db_name, *table_name);
+                EXPECT_NE(table_entry, nullptr);
+
+                {
+                    auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn_cpt);
+                    compact_task->Execute();
+                }
+
+                last_commit_ts = txn_mgr->CommitTxn(txn_cpt);
+            }
+
+            {
+                // Drop index (by Name)
+                auto *txn_idx_drop = txn_mgr->CreateTxn();
+                txn_idx_drop->Begin();
+                {
+
+                    auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
+                    EXPECT_TRUE(status9.ok());
+                }
+                last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
+            }
+        }
+        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        infinity::InfinityContext::instance().UnInit();
+    }
+}
