@@ -44,7 +44,7 @@ static u32 Align(u32 unaligned) {
 ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider)
     : analyzer_(AnalyzerPool::instance().Get(analyzer)), posting_writer_provider_(posting_writer_provider) {
     if (analyzer_.get() == nullptr) {
-        UnrecoverableError(fmt::format("Invalid analyzer: {}", analyzer));
+        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer)));
     }
 }
 

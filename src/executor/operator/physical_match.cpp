@@ -73,10 +73,10 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     QueryBuilder query_builder(txn_id, begin_ts, base_table_ref_);
-    Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
+    const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
-    String &default_field = search_ops.options_["default_field"];
+    const String &default_field = search_ops.options_["default_field"];
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);

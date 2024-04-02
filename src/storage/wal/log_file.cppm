@@ -52,7 +52,8 @@ public:
 
     static String DeltaCheckpointFilename(TxnTimeStamp max_commit_ts);
 
-    static void RecycleCatalogFile(TxnTimeStamp full_ckp_ts, const String &catalog_dir);
+    // max_commit_ts is the largest commit ts before the latest full checkpoint
+    static void RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &catalog_dir);
 
     static Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> ParseCheckpointFilenames(const String &catalog_dir);
 };
@@ -65,7 +66,8 @@ public:
 
     static String TempWalFilename();
 
-    static void RecycleWalFile(TxnTimeStamp ckp_ts, const String &wal_dir);
+    // max_commit_ts is the largest commit ts before the latest checkpoint
+    static void RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir);
 };
 
 } // namespace infinity

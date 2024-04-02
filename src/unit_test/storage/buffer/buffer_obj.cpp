@@ -62,8 +62,10 @@ class BufferObjTest : public BaseTest {
     }
 
     void TearDown() override {
-#ifdef INFINITY_DEBUG
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
         infinity::InfinityContext::instance().UnInit();
+
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();

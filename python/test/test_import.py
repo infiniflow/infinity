@@ -14,12 +14,15 @@
 
 import os
 import pytest
+from infinity import index
+
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
-from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs
+from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
+    generate_commas_enwiki
 
 
 class TestImport:
@@ -389,3 +392,4 @@ class TestImport:
 
         res = table_obj.output(["*"]).to_df()
         print(res)
+

@@ -65,14 +65,14 @@ using namespace infinity;
 class WalReplayTest : public BaseTest {
 protected:
     static std::shared_ptr<std::string> config_path() {
-        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_wal_replay.toml");
+        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     }
 
     void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
 
     void TearDown() override {
-        system("tree  /tmp/infinity");
-        // system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        // system("tree  /tmp/infinity");
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
     }
 };
 

@@ -578,14 +578,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
-
-    if (index_name_map.contains(*index_name)) {
-        if (create_index_info->conflict_type_ == ConflictType::kError) {
-            RecoverableError(Status::DuplicateIndex(fmt::format("Duplicated index name: {}", *index_name)));
-        }
-    }
-
     if (create_index_info->index_info_list_->size() != 1) {
         RecoverableError(Status::InvalidIndexDefinition(
             fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size())));

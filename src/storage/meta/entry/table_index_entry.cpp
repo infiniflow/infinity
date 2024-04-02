@@ -40,6 +40,7 @@ import secondary_index_file_worker;
 import embedding_info;
 import block_entry;
 import segment_entry;
+import table_entry;
 
 namespace infinity {
 
@@ -138,6 +139,9 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
         if (!Committed()) {
             commit_ts_.store(commit_ts);
         }
+    }
+    if (index_base()->index_type_ == IndexType::kFullText) {
+        UpdateFulltextSegmentTs(commit_ts);
     }
 }
 
@@ -409,6 +413,10 @@ void TableIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segm
             ++iter;
         }
     }
+}
+
+void TableIndexEntry::UpdateFulltextSegmentTs(TxnTimeStamp ts) {
+    return table_index_meta()->GetTableEntry()->UpdateFullTextSegmentTs(ts, segment_update_ts_mutex_, segment_update_ts_);
 }
 
 } // namespace infinity
