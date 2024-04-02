@@ -29,14 +29,16 @@ export class TxnContext {
 public:
     friend class Txn;
 
-    inline void BeginCommit(TxnTimeStamp begin_ts) {
-        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kNotStarted) {
-            UnrecoverableError("Transaction isn't in NOT_STARTED status.");
-        }
-        begin_ts_ = begin_ts;
-        state_ = TxnState::kStarted;
-    }
+    TxnContext(TxnTimeStamp begin_ts): begin_ts_(begin_ts) {}
+
+//    inline void SetTxnBegin(TxnTimeStamp begin_ts) {
+//        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+//        if (state_ != TxnState::kNotStarted) {
+//            UnrecoverableError("Transaction isn't in NOT_STARTED status.");
+//        }
+//        begin_ts_ = begin_ts;
+//        state_ = TxnState::kStarted;
+//    }
 
     inline TxnTimeStamp GetBeginTS() {
         std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
@@ -91,7 +93,7 @@ private:
     std::shared_mutex rw_locker_{};
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
-    TxnState state_{TxnState::kNotStarted};
+    TxnState state_{TxnState::kStarted};
 };
 
 } // namespace infinity

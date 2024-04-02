@@ -82,22 +82,19 @@ TEST_F(CleanupTaskTest, test_delete_db_simple) {
 
     auto db_name = MakeShared<String>("db1");
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         txn->CreateDatabase(*db_name, ConflictType::kError);
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
     WaitCleanup(catalog, txn_mgr, last_commit_ts);
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto [db_entry, status] = txn->GetDatabase(*db_name);
         EXPECT_EQ(db_entry, nullptr);
         txn_mgr->CommitTxn(txn);
@@ -119,41 +116,35 @@ TEST_F(CleanupTaskTest, test_delete_db_complex) {
 
     auto db_name = MakeShared<String>("db1");
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         txn->CreateDatabase(*db_name, ConflictType::kError);
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         txn->CreateDatabase(*db_name, ConflictType::kError);
         txn_mgr->RollBackTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         txn->CreateDatabase(*db_name, ConflictType::kError);
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         WaitCleanup(catalog, txn_mgr, last_commit_ts);
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto [db_entry, status] = txn->GetDatabase(*db_name);
         EXPECT_EQ(db_entry, nullptr);
         txn_mgr->CommitTxn(txn);
@@ -184,15 +175,13 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
     {
 
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
 
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -202,8 +191,7 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
 
     WaitCleanup(catalog, txn_mgr, last_commit_ts);
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_EQ(table_entry, nullptr);
 
@@ -236,15 +224,13 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
     {
 
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
 
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -253,24 +239,21 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
     }
     {
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->RollBackTxn(txn);
     }
     {
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
 
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -278,8 +261,7 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_EQ(table_entry, nullptr);
 
@@ -316,15 +298,13 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
     {
 
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
         table_entry->SetCompactionAlg(nullptr);
@@ -364,8 +344,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto txn = txn_mgr->BeginTxn();
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
@@ -411,15 +390,13 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     }
     {
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
         table_entry->SetCompactionAlg(nullptr);
@@ -459,8 +436,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
 
         SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name});
 
@@ -479,8 +455,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto txn = txn_mgr->BeginTxn();
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);

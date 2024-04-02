@@ -253,8 +253,7 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size) {
     TxnManager *txn_mgr = storage_->txn_manager();
-    Txn *txn = txn_mgr->CreateTxn();
-    txn->Begin();
+    Txn *txn = txn_mgr->BeginTxn();
 
     this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
     txn_mgr->CommitTxn(txn);

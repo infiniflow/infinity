@@ -92,8 +92,7 @@ protected:
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName("default", table_name);
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
@@ -142,8 +141,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
         TxnTimeStamp last_commit_ts = 0;
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateDatabase(*db_name1, ConflictType::kError);
             txn->CreateDatabase(*db_name2, ConflictType::kError);
@@ -156,8 +154,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             txn->CreateDatabase(*db_name3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
@@ -172,8 +169,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [db_entry, status] = txn->GetDatabase(*db_name1);
                 EXPECT_TRUE(status.ok());
@@ -220,8 +216,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
         TxnTimeStamp last_commit_ts = 0;
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def1, ConflictType::kError);
             txn->CreateTable(*db_name, table_def2, ConflictType::kError);
@@ -234,8 +229,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
@@ -251,8 +245,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name1);
                 EXPECT_TRUE(status.ok());
@@ -293,8 +286,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -304,8 +296,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -353,8 +344,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status.ok());
@@ -402,8 +392,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -413,8 +402,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -447,8 +435,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
 
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -497,8 +484,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -508,8 +494,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
         }
         {
 
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -533,8 +518,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -576,8 +560,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         TxnTimeStamp last_commit_ts = 0;
         // create table and insert two records
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -587,8 +570,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -612,8 +594,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -640,13 +621,13 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         // 1. remain some uncommitted txn before force full checkpoint
         // 2. wait delta checkpoint
         {
-            auto *txn_uncommitted = txn_mgr->CreateTxn();
-            txn_uncommitted->Begin();
+            auto *txn_uncommitted = txn_mgr->BeginTxn();
+
             txn_uncommitted->CreateTable(*db_name, table_def_uncommitted, ConflictType::kError);
 
             LOG_INFO("BEFORE FULL CKP");
-            auto *txn_force_ckp = txn_mgr->CreateTxn();
-            txn_force_ckp->Begin();
+            auto *txn_force_ckp = txn_mgr->BeginTxn();
+
             auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn_force_ckp, true);
             storage->bg_processor()->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -656,13 +637,13 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             txn_mgr->CommitTxn(txn_uncommitted);
 
             // some txn in delta checkpoint
-            auto *txn_committed = txn_mgr->CreateTxn();
-            txn_committed->Begin();
+            auto *txn_committed = txn_mgr->BeginTxn();
+
             txn_committed->CreateTable(*db_name, table_def_committed, ConflictType::kError);
             txn_mgr->CommitTxn(txn_committed);
 
-            auto *txn_record3 = txn_mgr->CreateTxn();
-            txn_record3->Begin();
+            auto *txn_record3 = txn_mgr->BeginTxn();
+
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def_committed->columns().size(); ++i) {
                 SharedPtr<DataType> data_type = table_def_committed->columns()[i]->type();
@@ -685,9 +666,8 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 
             last_commit_ts = txn_mgr->CommitTxn(txn_record3);
             WaitFlushDeltaOp(txn_mgr, last_commit_ts);
-
-            infinity::InfinityContext::instance().UnInit();
         }
+        infinity::InfinityContext::instance().UnInit();
     }
 
     // now restart and the table `tb_uncommitted` should exist
@@ -698,8 +678,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [table_uncommitted, uncommitted_status] = txn->GetTableByName(*db_name, *table_name_uncommitted);
                 EXPECT_TRUE(uncommitted_status.ok());
@@ -755,8 +734,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     {
         // create table
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
 
         Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -768,8 +746,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
 
     {
         // add compact
-        auto txn4 = txn_mgr->CreateTxn();
-        txn4->Begin();
+        auto txn4 = txn_mgr->BeginTxn();
 
         auto [table_entry, status] = txn4->GetTableByName("default", table_name);
         EXPECT_NE(table_entry, nullptr);
@@ -783,8 +760,8 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     }
 
     {
-        auto txn5 = txn_mgr->CreateTxn();
-        txn5->Begin();
+        auto txn5 = txn_mgr->BeginTxn();
+
         TxnTimeStamp begin_ts = txn5->BeginTS();
 
         auto [table_entry, status] = txn5->GetTableByName("default", table_name);
@@ -828,8 +805,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
         TxnTimeStamp last_commit_ts = 0;
         {
             // create table
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -840,8 +816,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
         }
         {
             // insert datas
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -887,8 +862,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->CreateTxn();
-                txn_idx->Begin();
+                auto *txn_idx = txn_mgr->BeginTxn();
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -949,8 +923,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
             }
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->CreateTxn();
-                txn_idx_drop->Begin();
+                auto *txn_idx_drop = txn_mgr->BeginTxn();
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
@@ -986,8 +959,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         TxnTimeStamp last_commit_ts = 0;
         {
             // create database
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateDatabase(*db_name, ConflictType::kError);
 
@@ -999,8 +971,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         }
         {
             // create table
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -1011,8 +982,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         }
         {
             // insert datas
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -1058,8 +1028,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->CreateTxn();
-                txn_idx->Begin();
+                auto *txn_idx = txn_mgr->BeginTxn();
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -1120,8 +1089,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             }
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->CreateTxn();
-                txn_idx_drop->Begin();
+                auto *txn_idx_drop = txn_mgr->BeginTxn();
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
@@ -1157,8 +1125,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         TxnTimeStamp last_commit_ts = 0;
         {
             // create table
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -1169,8 +1136,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         }
         {
             // insert datas
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -1212,8 +1178,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->CreateTxn();
-                txn_idx->Begin();
+                auto *txn_idx = txn_mgr->BeginTxn();
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -1279,8 +1244,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
             this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
             {
 
-                auto txn_cpt = txn_mgr->CreateTxn();
-                txn_cpt->Begin();
+                auto txn_cpt = txn_mgr->BeginTxn();
 
                 auto [table_entry, status] = txn_cpt->GetTableByName(*db_name, *table_name);
                 EXPECT_NE(table_entry, nullptr);
@@ -1295,8 +1259,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->CreateTxn();
-                txn_idx_drop->Begin();
+                auto *txn_idx_drop = txn_mgr->BeginTxn();
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);

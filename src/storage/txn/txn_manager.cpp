@@ -47,18 +47,29 @@ TxnManager::TxnManager(Catalog *catalog,
     catalog_->SetTxnMgr(this);
 }
 
-Txn *TxnManager::CreateTxn() {
+Txn *TxnManager::BeginTxn() {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("TxnManager is not running, cannot create txn");
     }
+
     rw_locker_.lock();
-    TransactionID new_txn_id = GetNewTxnID();
-    // LOG_INFO(fmt::format("Create new txn: {}", new_txn_id));
-    UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id);
+
+    // Assign a new txn id
+    u64 new_txn_id = ++catalog_->next_txn_id_;
+
+    // Record the start ts of the txn
+    TxnTimeStamp ts = ++start_ts_;
+
+    // Create txn instance
+    UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts);
+
+    // Storage txn in txn manager
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
     rw_locker_.unlock();
+
+    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
     return res;
 }
 

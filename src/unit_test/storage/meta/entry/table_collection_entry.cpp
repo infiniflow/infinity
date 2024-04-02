@@ -117,10 +117,7 @@ TEST_F(TableEntryTest, test2) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->CreateTxn();
-
-    // Txn1: Begin, OK
-    new_txn->Begin();
+    Txn *new_txn = txn_mgr->BeginTxn();
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
@@ -163,10 +160,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr->CreateTxn();
-
-        // Txn2: Begin, OK
-        new_txn->Begin();
+        new_txn = txn_mgr->BeginTxn();
 
         // Txn2: Get db1, OK
         auto [table_entry, s2] = new_txn->GetTableByName("db1", "tbl1");
@@ -207,10 +201,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr->CreateTxn();
-
-        // Txn2: Begin, OK
-        new_txn->Begin();
+        new_txn = txn_mgr->BeginTxn();
 
         //        {
         //            // Get column 0 and column 2 from global storage;
@@ -362,10 +353,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn3: Create, OK
-        new_txn = txn_mgr->CreateTxn();
-
-        // Txn3: Begin, OK
-        new_txn->Begin();
+        new_txn = txn_mgr->BeginTxn();
 
         //        {
         //            // Get column 0 and column 2 from global storage;

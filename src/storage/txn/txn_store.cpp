@@ -275,7 +275,7 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
 }
 
 void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const {
-    std::function<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->CreateTxn(); };
+    std::function<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->BeginTxn(); };
 
     // FIXME OPT: trigger compaction one time for all segments
     for (auto *sealed_segment : set_sealed_segments_) {
