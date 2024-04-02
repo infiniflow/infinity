@@ -62,6 +62,7 @@ class BufferObjTest : public BaseTest {
     }
 
     void TearDown() override {
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
         infinity::InfinityContext::instance().UnInit();
 
 #ifdef INFINITY_DEBUG

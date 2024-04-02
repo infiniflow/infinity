@@ -41,7 +41,7 @@ protected:
 
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override {}
+    void TearDown() override { system("rm -rf /tmp/infinity"); }
 };
 
 TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
@@ -101,6 +101,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         {
             // assert there is one log file
             auto [temp_wal_file, wal_files] = WalFile::ParseWalFilenames(wal_dir);
+            ASSERT_TRUE(temp_wal_file.has_value());
             if (wal_files.size() == 1) {
                 ASSERT_EQ(ckp_commit_ts, wal_files[0].max_commit_ts_);
             } else {
