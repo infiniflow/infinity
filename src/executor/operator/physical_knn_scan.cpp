@@ -54,10 +54,6 @@ import expression_state;
 import index_hnsw;
 import status;
 import hnsw_alg;
-import plain_store;
-import lvq_store;
-import dist_func_l2;
-import dist_func_ip;
 import knn_expression;
 import value;
 import status;
@@ -68,6 +64,7 @@ import knn_expr;
 import block_entry;
 import segment_index_entry;
 import segment_entry;
+import abstract_hnsw;
 
 namespace infinity {
 
@@ -423,13 +420,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 break;
             }
             case IndexType::kHnsw: {
-                BufferHandle index_handle = segment_index_entry->GetIndex();
-                auto index_hnsw = static_cast<const IndexHnsw *>(segment_index_entry->table_index_entry()->index_base());
-                auto KnnScan = [&](auto *index) {
+                    BufferHandle index_handle = segment_index_entry->GetIndex();
+                    const auto *index_hnsw = static_cast<const IndexHnsw *>(segment_index_entry->table_index_entry()->index_base());
+                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(index_handle.GetDataMut(), index_hnsw);
+
                     for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                         if (opt_param.param_name_ == "ef") {
                             u64 ef = std::stoull(opt_param.param_value_);
-                            index->SetEf(ef);
+                            abstract_hnsw.SetEf(ef);
                         }
                     }
 
@@ -444,17 +442,20 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         if (use_bitmask) {
                             if (segment_entry->CheckAnyDelete(begin_ts)) {
                                 DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
-                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                                std::tie(result_n1, d_ptr, l_ptr) =
+                                    abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
                             } else {
                                 BitmaskFilter<SegmentOffset> filter(bitmask);
-                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                                std::tie(result_n1, d_ptr, l_ptr) =
+                                    abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
                             }
                         } else {
                             if (segment_entry->CheckAnyDelete(begin_ts)) {
                                 DeleteFilter filter(segment_entry, begin_ts);
-                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                                std::tie(result_n1, d_ptr, l_ptr) =
+                                    abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
                             } else {
-                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_);
+                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_);
                             }
                         }
 
@@ -487,61 +488,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         }
                         merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                     }
-                };
-                switch (index_hnsw->encode_type_) {
-                    case HnswEncodeType::kPlain: {
-                        switch (index_hnsw->metric_type_) {
-                            case MetricType::kMetricInnerProduct: {
-                                using HnswIP = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
-                                // Fixme: const_cast here. may have bug.
-                                KnnScan(const_cast<HnswIP *>(static_cast<const HnswIP *>(index_handle.GetData())));
-                                break;
-                            }
-                            case MetricType::kMetricL2: {
-                                using HnswL2 = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
-                                KnnScan(const_cast<HnswL2 *>(static_cast<const HnswL2 *>(index_handle.GetData())));
-                                break;
-                            }
-                            default: {
-                                RecoverableError(Status::NotSupport("Not implemented"));
-                            }
-                        }
-                        break;
-                    }
-                    case HnswEncodeType::kLVQ: {
-                        switch (index_hnsw->metric_type_) {
-                            case MetricType::kMetricInnerProduct: {
-                                using HnswLVQIP = KnnHnsw<f32,
-                                                          SegmentOffset,
-                                                          LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>,
-                                                          LVQIPDist<f32, SegmentOffset, i8>>;
-                                KnnScan(const_cast<HnswLVQIP *>(static_cast<const HnswLVQIP *>(index_handle.GetData())));
-                                break;
-                            }
-                            case MetricType::kMetricL2: {
-                                using HnswLVQL2 = KnnHnsw<f32,
-                                                          SegmentOffset,
-                                                          LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>,
-                                                          LVQL2Dist<f32, SegmentOffset, i8>>;
-                                KnnScan(const_cast<HnswLVQL2 *>(static_cast<const HnswLVQL2 *>(index_handle.GetData())));
-                                break;
-                            }
-                            default: {
-                                RecoverableError(Status::NotSupport("Not implemented"));
-                            }
-                        }
-                        break;
-                    }
-                    default: {
-                        RecoverableError(Status::NotSupport("Not implemented"));
-                    }
+                    break;
                 }
-                break;
+                default: {
+                    RecoverableError(Status::NotSupport("Not implemented"));
+                }
             }
-            default: {
-                RecoverableError(Status::NotSupport("Not implemented"));
-            }
-        }
         }
     }
     if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {

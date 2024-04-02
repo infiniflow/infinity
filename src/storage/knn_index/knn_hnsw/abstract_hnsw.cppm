@@ -71,6 +71,7 @@ public:
                         UnrecoverableError("HNSW supports inner product and L2 distance.");
                     }
                 }
+                break;
             }
             default: {
                 UnrecoverableError("Invalid metric type");
@@ -79,8 +80,42 @@ public:
     }
 
 public:
+    void Make(SizeT max_element, SizeT dimension, SizeT M, SizeT ef_c) {
+        std::visit(
+            [max_element, dimension, M, ef_c, this](auto &&arg) {
+                using T = std::decay_t<decltype(*arg)>;
+                if constexpr (std::is_same_v<T, Hnsw1> || std::is_same_v<T, Hnsw2>) {
+                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c, {}).release();
+                } else if constexpr (std::is_same_v<T, Hnsw3> || std::is_same_v<T, Hnsw4>) {
+                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c, {}).release();
+                } else {
+                    UnrecoverableError("Invalid type");
+                }
+            },
+            knn_hnsw_ptr_);
+    }
+
+    void Load(FileHandler &file_handler) {
+        std::visit(
+            [&file_handler, this](auto &&arg) {
+                using T = std::decay_t<decltype(*arg)>;
+                if constexpr (std::is_same_v<T, Hnsw1> || std::is_same_v<T, Hnsw2>) {
+                    knn_hnsw_ptr_ = T::Load(file_handler, {}).release();
+                } else if constexpr (std::is_same_v<T, Hnsw3> || std::is_same_v<T, Hnsw4>) {
+                    knn_hnsw_ptr_ = T::Load(file_handler, {}).release();
+                } else {
+                    UnrecoverableError("Invalid type");
+                }
+            },
+            knn_hnsw_ptr_);
+    }
+
     void Save(FileHandler &file_handler) {
         std::visit([&file_handler](auto &&arg) { arg->Save(file_handler); }, knn_hnsw_ptr_);
+    }
+
+    void Free() {
+        std::visit([](auto &&arg) { delete arg; }, knn_hnsw_ptr_);
     }
 
     SizeT GetVertexNum() const {
@@ -89,6 +124,34 @@ public:
 
     void Build(SizeT idx) {
         std::visit([idx](auto &&arg) { arg->Build(idx); }, knn_hnsw_ptr_);
+    }
+
+    void *RawPtr() const {
+        return std::visit([](auto &&arg) { return reinterpret_cast<void *>(arg); }, knn_hnsw_ptr_);
+    }
+
+    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
+    void InsertVecs(Iterator &&iter, SizeT insert_n) {
+        std::visit([&iter, insert_n](auto &&arg) { arg->InsertVecs(std::move(iter), insert_n); }, knn_hnsw_ptr_);
+    }
+
+    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
+    void StoreData(Iterator &&iter, SizeT insert_n) {
+        std::visit([&iter, insert_n](auto &&arg) { arg->StoreData(std::move(iter), insert_n); }, knn_hnsw_ptr_);
+    }
+
+    void SetEf(SizeT ef) {
+        std::visit([ef](auto &&arg) { arg->SetEf(ef); }, knn_hnsw_ptr_);
+    }
+
+    template <bool WithLock, FilterConcept<LabelType> Filter>
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, const Filter &filter) const {
+        return std::visit([q, k, &filter](auto &&arg) { return arg->template KnnSearch<WithLock, Filter>(q, k, filter); }, knn_hnsw_ptr_);
+    }
+
+    template <bool WithLock>
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k) const {
+        return std::visit([q, k](auto &&arg) { return arg->template KnnSearch<WithLock>(q, k); }, knn_hnsw_ptr_);
     }
 
 private:
