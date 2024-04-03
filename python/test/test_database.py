@@ -402,32 +402,27 @@ class TestDatabase:
         assert res.error_code == ErrorCode.OK
 
     # one thread get db, another thread drop this db
-    @pytest.mark.xfail
     def test_get_drop_db_with_two_threads(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj.drop_database("test_get_drop_db_with_two_thread", ConflictType.Ignore)
         infinity_obj.create_database("test_get_drop_db_with_two_thread")
 
         thread1 = threading.Thread(target=infinity_obj.drop_database("test_get_drop_db_with_two_thread"), args=(1,))
-        thread2 = threading.Thread(target=infinity_obj.get_database("test_get_drop_db_with_two_thread"), args=(2,))
+        with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
+            thread2 = threading.Thread(target=infinity_obj.get_database("test_get_drop_db_with_two_thread"), args=(2,))
 
-        thread1.start()
-        thread2.start()
+            thread1.start()
+            thread2.start()
 
-        thread1.join()
-        thread2.join()
+            thread1.join()
+            thread2.join()
 
-        try:
-            res = infinity_obj.get_database("test_get_drop_db_with_two_thread")
-            print(res)
-        except Exception as e:
-            print(e)
+        with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
+            infinity_obj.get_database("test_get_drop_db_with_two_thread")
 
-        try:
-            res = infinity_obj.drop_database("test_get_drop_db_with_two_thread")
-            print(res)
-        except Exception as e:
-            print(e)
+        with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
+            infinity_obj.drop_database("test_get_drop_db_with_two_thread")
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -477,13 +472,8 @@ class TestDatabase:
                                                0,
                                                1,
                                                2,
-                                               pytest.param(1.1, marks=pytest.mark.xfail),
-                                               pytest.param("#@$@!%string", marks=pytest.mark.xfail),
-                                               pytest.param([], marks=pytest.mark.xfail),
-                                               pytest.param({}, marks=pytest.mark.xfail),
-                                               pytest.param((), marks=pytest.mark.xfail),
                                                ])
-    def test_create_option(self, conflict_type):
+    def test_create_with_valid_option(self, conflict_type):
         # create db
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_obj.drop_database("test_create_option", ConflictType.Ignore)
@@ -495,20 +485,32 @@ class TestDatabase:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
+                                               pytest.param("#@$@!%string"),
+                                               pytest.param([]),
+                                               pytest.param({}),
+                                               pytest.param(()),
+                                               ])
+    def test_create_with_invalid_option(self, conflict_type):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj.drop_database("test_create_option", ConflictType.Ignore)
+
+        with pytest.raises(Exception, match="ERROR:3066, Invalid conflict type"):
+            infinity_obj.create_database("test_create_option", conflict_type)
+
+        # infinity_obj.drop_database("test_create_option")
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("conflict_type", [
-        pytest.param(ConflictType.Replace, marks=pytest.mark.xfail),
-        pytest.param(2, marks=pytest.mark.xfail),
-        pytest.param(1.1, marks=pytest.mark.xfail),
-        pytest.param("#@$@!%string", marks=pytest.mark.xfail),
-        pytest.param([], marks=pytest.mark.xfail),
-        pytest.param({}, marks=pytest.mark.xfail),
-        pytest.param((), marks=pytest.mark.xfail),
         ConflictType.Error,
         ConflictType.Ignore,
         0,
         1,
     ])
-    def test_drop_option(self, conflict_type):
+    def test_drop_option_with_valid_option(self, conflict_type):
         # create db
 
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -517,6 +519,29 @@ class TestDatabase:
         infinity_obj.drop_database("test_drop_option", conflict_type)
 
         infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("conflict_type", [
+        pytest.param(ConflictType.Replace),
+        pytest.param(2),
+        pytest.param(1.1),
+        pytest.param("#@$@!%string"),
+        pytest.param([]),
+        pytest.param({}),
+        pytest.param(()),
+    ])
+    def test_drop_option(self, conflict_type):
+        # create db
+
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
+        infinity_obj.create_database("test_drop_option")
+        with pytest.raises(Exception, match="Error:3036, invalid conflict type"):
+            infinity_obj.drop_database("test_drop_option", conflict_type)
+
+        infinity_obj.drop_database("test_drop_option", ConflictType.Error)
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
