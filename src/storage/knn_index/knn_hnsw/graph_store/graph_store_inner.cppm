@@ -14,36 +14,31 @@
 
 module;
 #include <cassert>
-#include <new>
-#include <vector>
+#include <fstream>
 
 import stl;
 import hnsw_common;
 import file_system;
 
-export module graph_store;
+export module graph_store_inner;
 
 namespace infinity {
 
-export class GraphStore {
+export class GraphStoreInner {
 private:
     constexpr static SizeT layer_n_offset_ = 0;
     constexpr static SizeT layers_p_offset_ = AlignTo(layer_n_offset_ + sizeof(LayerSize), sizeof(char *));
     constexpr static SizeT l0_neighbor_n_offset_ = AlignTo(layers_p_offset_ + sizeof(char *), sizeof(VertexListSize));
     constexpr static SizeT l0_neighbors_offset_ = AlignTo(l0_neighbor_n_offset_ + sizeof(VertexListSize), sizeof(VertexType));
-    const SizeT level0_size_;
+    SizeT level0_size_;
 
     constexpr static SizeT lx_neighbor_n_offset_ = 0;
     constexpr static SizeT lx_neighbors_offset_ = AlignTo(lx_neighbor_n_offset_ + sizeof(VertexListSize), sizeof(VertexType));
-    const SizeT levelx_size_;
+    SizeT levelx_size_;
 
-    const SizeT max_vertex_num_;
-    char *const graph_;
-    const SizeT loaded_vertex_n_;
-    char *const loaded_layers_;
-
-    i32 max_layer_{};
-    VertexType enterpoint_{};
+    UniquePtr<char[]> graph_;
+    SizeT loaded_vertex_n_;
+    UniquePtr<char[]> loaded_layers_;
 
 private:
     class VertexL0Mut {
@@ -90,67 +85,32 @@ private:
                     *reinterpret_cast<const VertexListSize *>(ptr_ + lx_neighbor_n_offset_)};
         }
     };
-    VertexL0Mut GetLevel0Mut(VertexType vertex_i) { return VertexL0Mut(graph_ + level0_size_ * vertex_i); }
+    VertexL0Mut GetLevel0Mut(VertexType vertex_i) { return VertexL0Mut(graph_.get() + level0_size_ * vertex_i); }
     VertexLXMut GetLevelXMut(VertexL0Mut &level0, LayerSize layer_i) { return VertexLXMut(*level0.GetLayers().first + levelx_size_ * (layer_i - 1)); }
-    VertexL0 GetLevel0(VertexType vertex_i) const { return VertexL0(graph_ + level0_size_ * vertex_i); }
+    VertexL0 GetLevel0(VertexType vertex_i) const { return VertexL0(graph_.get() + level0_size_ * vertex_i); }
     VertexLX GetLevelX(const VertexL0 &level0, LayerSize layer_i) const { return VertexLX(level0.GetLayers().first + levelx_size_ * (layer_i - 1)); }
 
 private:
-    GraphStore(SizeT max_vertex, SizeT Mmax, SizeT Mmax0, SizeT loaded_vertex_n, char *loaded_layers)
-        : level0_size_(AlignTo(l0_neighbors_offset_ + sizeof(VertexType) * Mmax0, 8)),                 //
-          levelx_size_(AlignTo(lx_neighbors_offset_ + sizeof(VertexType) * Mmax, 8)),                  //
-          max_vertex_num_(max_vertex),                                                                 //
-          graph_(static_cast<char *>(operator new[](max_vertex * level0_size_, std::align_val_t(8)))), //
-          loaded_vertex_n_(loaded_vertex_n),                                                           //
-          loaded_layers_(loaded_layers)                                                                //
-                                                                                                       //
-    {}
-
-    void Init() {
-        max_layer_ = -1;
-        enterpoint_ = -1;
-        std::fill(graph_, graph_ + max_vertex_num_ * level0_size_, 0);
-        // for (VertexType vertex_i = 0; vertex_i < max_vertex_num_; ++vertex_i) {
-        //     VertexL0Mut vertex = GetLevel0Mut(vertex_i);
-        //     *vertex.GetNeighbors().second = 0;
-        //     *vertex.GetLayers().first = nullptr;
-        // }
+    GraphStoreInner(SizeT max_vertex, SizeT Mmax, SizeT Mmax0, SizeT loaded_vertex_n) {
+        level0_size_ = AlignTo(l0_neighbors_offset_ + sizeof(VertexType) * Mmax0, 8);
+        levelx_size_ = AlignTo(lx_neighbors_offset_ + sizeof(VertexType) * Mmax, 8);
+        graph_ = MakeUnique<char[]>(max_vertex * level0_size_);
+        loaded_vertex_n_ = loaded_vertex_n;
     }
 
 public:
-    static GraphStore Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) {
-        auto ret = GraphStore(max_vertex, Mmax, Mmax0, 0, nullptr);
-        ret.Init();
-        return ret;
+    GraphStoreInner(GraphStoreInner &&) = default;
+    ~GraphStoreInner() = default;
+
+    static GraphStoreInner Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) {
+        auto graph_store = GraphStoreInner(max_vertex, Mmax, Mmax0, 0);
+        std::fill(graph_store.graph_.get(), graph_store.graph_.get() + max_vertex * graph_store.level0_size_, 0);
+        return graph_store;
     }
 
-    GraphStore(const GraphStore &) = delete;
-    GraphStore &operator=(const GraphStore &) = delete;
-    GraphStore &operator=(GraphStore &&) = delete;
-
-    GraphStore(GraphStore &&other)
-        : level0_size_(other.level0_size_),         //
-          levelx_size_(other.levelx_size_),         //
-          max_vertex_num_(other.max_vertex_num_),   //
-          graph_(other.graph_),                     //
-          loaded_vertex_n_(other.loaded_vertex_n_), //
-          loaded_layers_(other.loaded_layers_),     //
-          max_layer_(other.max_layer_),             //
-          enterpoint_(other.enterpoint_)            //
-    {
-        const_cast<char *&>(other.graph_) = nullptr;
-        const_cast<char *&>(other.loaded_layers_) = nullptr;
-    }
-
-    ~GraphStore() {
-        if (graph_) {
-            for (VertexType vertex_i = loaded_vertex_n_; vertex_i < VertexType(max_vertex_num_); ++vertex_i) {
-                delete[] GetLevel0(vertex_i).GetLayers().first;
-            }
-            operator delete[](graph_, std::align_val_t(8));
-        }
-        if (loaded_layers_) {
-            delete[] loaded_layers_;
+    void Free(SizeT current_vertex_num) {
+        for (VertexType vertex_i = loaded_vertex_n_; vertex_i < VertexType(current_vertex_num); ++vertex_i) {
+            delete[] GetLevel0(vertex_i).GetLayers().first;
         }
     }
 
@@ -166,15 +126,7 @@ public:
                 *GetLevelXMut(vertex, layer_i).GetNeighbors().second = 0;
             }
         }
-        if (layer_n > max_layer_) {
-            max_layer_ = layer_n;
-            enterpoint_ = vertex_i;
-        }
     }
-
-    i32 max_layer() const { return max_layer_; }
-
-    VertexType enterpoint() const { return enterpoint_; }
 
     Pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_i, i32 layer_i) const {
         VertexL0 vertex = GetLevel0(vertex_i);
@@ -191,16 +143,14 @@ public:
         return GetLevelXMut(vertex, layer_i).GetNeighbors();
     }
 
-    void SaveGraph(FileHandler &file_handler, VertexType cur_vertex_n) const {
-        file_handler.Write(&max_layer_, sizeof(max_layer_));
-        file_handler.Write(&enterpoint_, sizeof(enterpoint_));
+    void SaveGraph(FileHandler &file_handler, SizeT cur_vertex_n) const {
         SizeT layer_sum = 0;
-        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
             layer_sum += GetLevel0(vertex_i).GetLayers().second;
         }
         file_handler.Write(&layer_sum, sizeof(layer_sum));
-        file_handler.Write(graph_, cur_vertex_n * level0_size_);
-        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+        file_handler.Write(graph_.get(), cur_vertex_n * level0_size_);
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
             VertexL0 vertex = GetLevel0(vertex_i);
             auto [layers, layer_n] = vertex.GetLayers();
             if (layer_n) {
@@ -209,21 +159,16 @@ public:
         }
     }
 
-    static GraphStore LoadGraph(FileHandler &file_handler, SizeT max_vertex, SizeT Mmax, SizeT Mmax0, VertexType cur_vertex_n) {
-        i32 max_layer;
-        file_handler.Read(&max_layer, sizeof(max_layer));
-        VertexType enterpoint;
-        file_handler.Read(&enterpoint, sizeof(enterpoint));
+    static GraphStoreInner LoadGraph(FileHandler &file_handler, SizeT max_vertex, SizeT Mmax, SizeT Mmax0, SizeT cur_vertex_n) {
         SizeT layer_sum;
         file_handler.Read(&layer_sum, sizeof(layer_sum));
-        GraphStore graph_store(max_vertex, Mmax, Mmax0, cur_vertex_n, nullptr);
-        const_cast<char *&>(graph_store.loaded_layers_) = new char[graph_store.levelx_size_ * layer_sum];
 
-        graph_store.max_layer_ = max_layer;
-        graph_store.enterpoint_ = enterpoint;
-        file_handler.Read(graph_store.graph_, cur_vertex_n * graph_store.level0_size_);
-        char *loaded_layers_p = graph_store.loaded_layers_;
-        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+        GraphStoreInner graph_store(max_vertex, Mmax, Mmax0, cur_vertex_n);
+        graph_store.loaded_layers_ = MakeUnique<char[]>(graph_store.levelx_size_ * layer_sum);
+
+        file_handler.Read(graph_store.graph_.get(), cur_vertex_n * graph_store.level0_size_);
+        char *loaded_layers_p = graph_store.loaded_layers_.get();
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
             VertexL0Mut vertex = graph_store.GetLevel0Mut(vertex_i);
             LayerSize layer_n = *vertex.GetLayers().second;
             if (layer_n) {
@@ -240,22 +185,22 @@ public:
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 
     // check invariant of graph
-    void CheckGraph(VertexType cur_vertex_n, SizeT Mmax0, SizeT Mmax) const {
-        assert(cur_vertex_n <= VertexType(max_vertex_num_));
+    void CheckGraph(SizeT Mmax0, SizeT Mmax, VertexType cur_vertex_n, VertexType vertex_i_offset, VertexType max_vertex_i, i32 &max_l) const {
         int max_layer = -1;
         for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
             VertexL0 vertex = GetLevel0(vertex_i);
+            VertexType out_vertex_i = vertex_i + vertex_i_offset;
             int cur_max_layer = vertex.GetLayers().second;
             max_layer = std::max(cur_max_layer, max_layer);
-            assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
+            assert(cur_max_layer >= 0 && cur_max_layer <= max_layer);
             auto [neighbors, neighbor_n] = vertex.GetNeighbors();
             assert(neighbor_n <= int(Mmax0));
             for (int i = 0; i < neighbor_n; ++i) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
                 VertexType neighbor_idx = neighbors[i];
-                assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
-                assert(neighbor_idx != vertex_i);
+                assert(neighbor_idx <= max_vertex_i && neighbor_idx >= 0);
+                assert(neighbor_idx != out_vertex_i);
 #pragma clang diagnostic pop
             }
             for (int layer_i = 1; layer_i <= cur_max_layer; ++layer_i) {
@@ -265,31 +210,35 @@ public:
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
                     VertexType neighbor_idx = neighbors[i];
-                    assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
-                    assert(neighbor_idx != vertex_i);
+                    assert(neighbor_idx <= max_vertex_i && neighbor_idx >= 0);
+                    assert(neighbor_idx != out_vertex_i);
 
-                    int n_layer = GetLevel0(neighbor_idx).GetLayers().second;
-                    assert(n_layer >= layer_i);
+                    // int n_layer = GetLevel0(neighbor_idx).GetLayers().second;
+                    // assert(n_layer >= layer_i);
 #pragma clang diagnostic pop
                 }
             }
         }
-        assert(max_layer == max_layer_);
+        max_l = max_layer;
     }
 
     void Dump(std::ostream &os, VertexType cur_vertex_n) {
-
-        os << "max layer: " << max_layer_ << std::endl;
-        os << std::endl;
-
-        Vector<Vector<VertexType>> layer2vertex(max_layer_ + 1);
+        if (cur_vertex_n == 0) {
+            return;
+        }
+        i32 max_layer = 0;
+        Vector<Vector<VertexType>> layer2vertex;
         for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
             int layer_n = GetLevel0(vertex_i).GetLayers().second;
+            max_layer = std::max(max_layer, layer_n);
+            if (max_layer >= i32(layer2vertex.size())) {
+                layer2vertex.resize(max_layer + 1);
+            }
             for (i32 layer_i = 0; layer_i <= layer_n; ++layer_i) {
                 layer2vertex[layer_i].emplace_back(vertex_i);
             }
         }
-        for (i32 layer = max_layer_; layer >= 0; --layer) {
+        for (i32 layer = max_layer; layer >= 0; --layer) {
             os << "layer " << layer << std::endl;
             for (VertexType vertex_i : layer2vertex[layer]) {
                 os << vertex_i << ": ";

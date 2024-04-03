@@ -15,6 +15,7 @@
 module;
 
 #include <random>
+#include <fstream>
 
 export module hnsw_alg;
 
@@ -27,7 +28,8 @@ import bitmask;
 
 import hnsw_common;
 import plain_store;
-import graph_store;
+// import graph_store;
+import linked_graph_store;
 import lvq_store;
 
 // Fixme: some variable has implicit type conversion.
@@ -43,6 +45,9 @@ namespace infinity {
 export template <typename DataType, typename LabelType, typename DataStore, typename Distance>
     requires DataStoreConcept<DataStore, DataType> && DistanceConcept<Distance, DataType> && std::same_as<typename Distance::DataStore, DataStore>
 class KnnHnsw {
+    using GraphStore = LinkedGraphStore;
+    constexpr static SizeT chunk_size = 100;
+
 public:
     using This = KnnHnsw<DataType, LabelType, DataStore, Distance>;
     using StoreType = typename DataStore::StoreType;
@@ -102,12 +107,12 @@ public:
     static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, SizeT M, SizeT ef_construction, DataStore::InitArgs args) {
         auto [Mmax, Mmax0] = This::GetMmax(M);
         auto data_store = DataStore::Make(max_vertex, dim, std::move(args));
-        auto graph_store = GraphStore::Make(max_vertex, Mmax, Mmax0);
+        auto graph_store = GraphStore::Make(chunk_size, Mmax, Mmax0);
         Distance distance(data_store.dim());
         return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), 0, 0));
     }
 
-    ~KnnHnsw() = default;
+    ~KnnHnsw() { graph_store_.Free(data_store_.cur_vec_num()); }
 
 private:
     // >= 0
@@ -410,14 +415,14 @@ public:
         auto [Mmax, Mmax0] = This::GetMmax(M);
 
         auto data_store = DataStore::Load(file_handler, 0, args);
-        auto graph_store = GraphStore::LoadGraph(file_handler, data_store.max_vec_num(), Mmax, Mmax0, data_store.cur_vec_num());
+        auto graph_store = GraphStore::LoadGraph(file_handler, chunk_size, Mmax, Mmax0, data_store.cur_vec_num());
         Distance distance(data_store.dim());
 
         return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), 0, 0));
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
-    void Check() const { graph_store_.CheckGraph(data_store_.cur_vec_num(), Mmax0_, Mmax_); }
+    void Check() const { graph_store_.CheckGraph(Mmax0_, Mmax_, data_store_.cur_vec_num()); }
 
     void Dump(std::ostream &os) {
         os << std::endl << "---------------------------------------------" << std::endl;
