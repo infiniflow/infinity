@@ -344,8 +344,10 @@ class TestIndex:
                                                          index.InitParameter("metric", "l2")])], ConflictType.Error)
 
     # create index then insert / import data
-    @pytest.mark.xfail(reason="ERROR:3009, Attempt to create IVFFLAT/full-text index on column: c2, data type")
-    @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat, index.IndexType.FullText])
+    @pytest.mark.parametrize("index_type", [
+        index.IndexType.IVFFlat,
+        pytest.param(index.IndexType.FullText, marks=pytest.mark.xfail(reason="ERROR:3009, Attempt to create IVFFLAT/full-text index on column: c2, data type"))
+    ])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_create_index_import_data(self, get_infinity_db, index_type, file_format):
         # connect
