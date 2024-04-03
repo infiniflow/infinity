@@ -346,15 +346,8 @@ class TestDelete:
         "c1 < 0.1 and c2 < 1.0",
         "c1 < 0.1 and c1 > 1.0",
         "c1 = 0",
-        pytest.param("c1", marks=pytest.mark.xfail),
-        pytest.param("_row_id", marks=pytest.mark.xfail),
-        pytest.param("*", marks=pytest.mark.xfail),
-        pytest.param("#@$%@#f", marks=pytest.mark.xfail),
-        pytest.param("c1 + 0.1 and c2 - 1.0", marks=pytest.mark.xfail),
-        pytest.param("c1 * 0.1 and c2 / 1.0", marks=pytest.mark.xfail),
-        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
     ])
-    def test_filter_expression(self,get_infinity_db, filter_list):
+    def test_filter_with_valid_expression(self,get_infinity_db, filter_list):
         # connect
         db_obj = get_infinity_db
         db_obj.drop_table("test_filter_expression")
@@ -369,5 +362,34 @@ class TestDelete:
 
         # delete
         table_obj.delete(filter_list)
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+    @pytest.mark.parametrize("filter_list", [
+        pytest.param("c1"),
+        pytest.param("_row_id"),
+        pytest.param("*"),
+        pytest.param("#@$%@#f"),
+        pytest.param("c1 + 0.1 and c2 - 1.0"),
+        pytest.param("c1 * 0.1 and c2 / 1.0"),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
+    ])
+    def test_filter_with_invalid_expression(self, get_infinity_db, filter_list):
+        # connect
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_filter_expression")
+        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int", "c2": "float"}, ConflictType.Error)
+
+        # insert
+        for i in range(10):
+            values = [{"c1": i, "c2": 3.0} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        # TODO: Detailed error information check
+        with pytest.raises(Exception):
+            table_obj.delete(filter_list)
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
