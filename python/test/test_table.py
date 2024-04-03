@@ -406,18 +406,17 @@ class TestTable:
 
     # create/drop table with different invalid options
     @pytest.mark.parametrize("invalid_option_array", [
-        pytest.param([], marks=pytest.mark.xfail),
-        pytest.param((), marks=pytest.mark.xfail),
-        pytest.param({}, marks=pytest.mark.xfail),
-        pytest.param(1, marks=pytest.mark.xfail),
-        pytest.param(1.1, marks=pytest.mark.xfail),
-        pytest.param('', marks=pytest.mark.xfail),
-        pytest.param(' ', marks=pytest.mark.xfail),
-        pytest.param('12', marks=pytest.mark.xfail),
-        pytest.param('name-12', marks=pytest.mark.xfail),
-        pytest.param('12name', marks=pytest.mark.xfail),
-        pytest.param('数据库名', marks=pytest.mark.xfail),
-        pytest.param(''.join('x' for i in range(65536 + 1)), marks=pytest.mark.xfail),
+        pytest.param([]),
+        pytest.param(()),
+        pytest.param({}),
+        pytest.param(1.1),
+        pytest.param(''),
+        pytest.param(' '),
+        pytest.param('12'),
+        pytest.param('name-12'),
+        pytest.param('12name'),
+        pytest.param('数据库名'),
+        pytest.param(''.join('x' for i in range(65536 + 1))),
         None,
     ])
     def test_table_with_different_invalid_options(self, get_infinity_db, invalid_option_array):
