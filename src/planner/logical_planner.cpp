@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -586,6 +587,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<IndexBase> base_index_ptr{nullptr};
     switch (index_info->index_type_) {
         case IndexType::kFullText: {
+            assert(index_info->index_param_list_ != nullptr);
             IndexFullText::ValidateColumnDataType(base_table_ref, index_info->column_name_);
             base_index_ptr = IndexFullText::Make(index_name,
                                                  fmt::format("{}_{}", create_index_info->table_name_, *index_name),
@@ -594,6 +596,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             break;
         }
         case IndexType::kHnsw: {
+            assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
             IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexHnsw::Make(index_name,
@@ -603,6 +606,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             break;
         }
         case IndexType::kIVFFlat: {
+            assert(index_info->index_param_list_ != nullptr);
             IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexIVFFlat::Make(index_name,
                                                 fmt::format("{}_{}", create_index_info->table_name_, *index_name),

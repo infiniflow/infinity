@@ -162,6 +162,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                                             table_index_entry_->GetFulltextBufferPool(),
                                                             table_index_entry_->GetFulltextThreadPool());
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
+            } else {
+                assert(begin_row_id == memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount());
             }
             Path column_length_file_base = Path(*table_index_entry_->index_dir()) / (memory_indexer_->GetBaseName());
             String column_length_file_path_prefix = column_length_file_base.string();

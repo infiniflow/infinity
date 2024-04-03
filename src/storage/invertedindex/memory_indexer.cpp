@@ -79,7 +79,10 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
 }
 
 MemoryIndexer::~MemoryIndexer() {
-    WaitInflightTasks();
+    while (GetInflightTasks() > 0) {
+        usleep(10000);
+        CommitSync();
+    }
     Reset();
 }
 
@@ -151,19 +154,28 @@ void MemoryIndexer::Commit(bool offline) {
 SizeT MemoryIndexer::CommitSync() {
     Vector<SharedPtr<ColumnInverter>> inverters;
     u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
-    SizeT num = inverters.size();
-    if (num == 0)
+    if (!inverters.empty()) {
+        ColumnInverter::Merge(inverters);
+        inverters[0]->Sort();
+        this->ring_sorted_.Put(seq_commit, inverters[0]);
+    };
+
+    bool generating = false;
+    bool changed = generating_.compare_exchange_strong(generating, true);
+    if (!changed)
         return 0;
-    ColumnInverter::Merge(inverters);
-    inverters[0]->Sort();
-    this->ring_sorted_.Put(seq_commit, inverters[0]);
-    this->ring_sorted_.Iterate([](SharedPtr<ColumnInverter> &inverter) { inverter->GeneratePosting(); });
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        inflight_tasks_ -= num;
-        if (inflight_tasks_ == 0) {
-            cv_.notify_all();
-        }
+    generating = true;
+    this->ring_sorted_.GetBatch(inverters);
+    SizeT num = 0;
+    for (auto &inverter : inverters) {
+        inverter->GeneratePosting();
+        num += inverter->GetMerged();
+    }
+    generating_.compare_exchange_strong(generating, false);
+    std::unique_lock<std::mutex> lock(mutex_);
+    inflight_tasks_ -= num;
+    if (inflight_tasks_ == 0) {
+        cv_.notify_all();
     }
     return num;
 }
@@ -181,7 +193,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     while (GetInflightTasks() > 0) {
-        sleep(1);
+        usleep(10000);
         CommitSync();
     }
     Path path = Path(index_dir_) / base_name_;

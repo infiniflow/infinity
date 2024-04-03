@@ -387,7 +387,7 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
         # Create 99*300/8192 = 3.6 BlockEntry to test MemIndexRecover and OptimizeIndex
-        for it in range(10):
+        for it in range(300):
             value = []
             for i in range(len(data["doctitle"])):
                 value.append({"doctitle": data["doctitle"][i],
@@ -399,7 +399,7 @@ class TestIndex:
         assert not res.is_empty()
         print(res)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_9.csv", "data_dir": common_values.TEST_TMP_DIR,}], indirect=True)
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_9.csv", "data_dir": common_values.TEST_TMP_DIR, }], indirect=True)
     def test_fulltext_match_with_invalid_analyzer(self, get_infinity_db, check_data):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_fulltext_match", ConflictType.Ignore)
