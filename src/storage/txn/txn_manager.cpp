@@ -67,6 +67,7 @@ Txn *TxnManager::BeginTxn() {
     // Storage txn in txn manager
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
+    ts_map_.emplace(ts, new_txn_id);
     rw_locker_.unlock();
 
     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
@@ -92,12 +93,12 @@ TxnTimeStamp TxnManager::GetTimestamp() {
     return ts;
 }
 
-TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id) {
-    TxnTimeStamp ts = GetTimestamp();
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    ts_map_.emplace(ts, txn_id);
-    return ts;
-}
+// TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id) {
+//     TxnTimeStamp ts = GetTimestamp();
+//     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+//     ts_map_.emplace(ts, txn_id);
+//     return ts;
+// }
 
 void TxnManager::SendToWAL(Txn *txn) {
     // Check if the is_running_ is true
@@ -196,6 +197,7 @@ void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
 TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     std::shared_lock r_locker(rw_locker_);
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
+        LOG_ERROR("GetMinUnflushedTS");
         auto &[ts, txn_id] = *iter;
         if (txn_map_.find(txn_id) != txn_map_.end()) {
             LOG_TRACE(fmt::format("Txn: {} not found in txn map", txn_id));
