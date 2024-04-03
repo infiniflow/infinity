@@ -93,13 +93,6 @@ TxnTimeStamp TxnManager::GetTimestamp() {
     return ts;
 }
 
-// TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id) {
-//     TxnTimeStamp ts = GetTimestamp();
-//     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-//     ts_map_.emplace(ts, txn_id);
-//     return ts;
-// }
-
 void TxnManager::SendToWAL(Txn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
