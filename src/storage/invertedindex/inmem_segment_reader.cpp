@@ -29,9 +29,10 @@ InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
     : posting_table_(memory_indexer->GetPostingTable()), base_row_id_(memory_indexer->GetBaseRowId()) {}
 
 bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const {
-    MemoryIndexer::PostingTableStore::Iterator iter = posting_table_->store_.Find(term);
-    if (iter != posting_table_->store_.End()) {
-        seg_posting.Init(base_row_id_, iter.Value());
+    SharedPtr<PostingWriter> writer;
+    bool found = posting_table_->store_.Get(term, writer);
+    if (found) {
+        seg_posting.Init(base_row_id_, writer);
         return true;
     }
     return false;
