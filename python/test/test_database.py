@@ -546,17 +546,8 @@ class TestDatabase:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("table_name", ["test_show_table",
-                                             pytest.param("Invalid name", marks=pytest.mark.xfail),
-                                             pytest.param("not_exist_name", marks=pytest.mark.xfail),
-                                             pytest.param(1, marks=pytest.mark.xfail),
-                                             pytest.param(1.1, marks=pytest.mark.xfail),
-                                             pytest.param(True, marks=pytest.mark.xfail),
-                                             pytest.param([], marks=pytest.mark.xfail),
-                                             pytest.param((), marks=pytest.mark.xfail),
-                                             pytest.param({}, marks=pytest.mark.xfail),
-                                             ])
-    def test_show_table(self, get_infinity_db, table_name):
+    @pytest.mark.parametrize("table_name", ["test_show_table"])
+    def test_show_valid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"})
@@ -564,17 +555,33 @@ class TestDatabase:
         res = db_obj.show_table(table_name)
         print(res)
 
-    @pytest.mark.parametrize("column_name", ["test_show_table_columns",
-                                             pytest.param("Invalid name", marks=pytest.mark.xfail),
-                                             pytest.param("not_exist_name", marks=pytest.mark.xfail),
-                                             pytest.param(1, marks=pytest.mark.xfail),
-                                             pytest.param(1.1, marks=pytest.mark.xfail),
-                                             pytest.param(True, marks=pytest.mark.xfail),
-                                             pytest.param([], marks=pytest.mark.xfail),
-                                             pytest.param((), marks=pytest.mark.xfail),
-                                             pytest.param({}, marks=pytest.mark.xfail),
-                                             ])
-    def test_show_table_columns(self, get_infinity_db, column_name):
+    @pytest.mark.parametrize("table_name", [pytest.param("Invalid name"),
+                                            pytest.param(1),
+                                            pytest.param(1.1),
+                                            pytest.param(True),
+                                            pytest.param([]),
+                                            pytest.param(()),
+                                            pytest.param({}),
+                                            ])
+    def test_show_invalid_table(self, get_infinity_db, table_name):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_show_table", ConflictType.Ignore)
+        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"})
+
+        with pytest.raises(Exception):
+            db_obj.show_table(table_name)
+
+    @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
+    def test_show_not_exist_table(self, get_infinity_db, table_name):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_show_table", ConflictType.Ignore)
+        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"})
+
+        with pytest.raises(Exception, match=f"ERROR:3022, Table {table_name} doesn't exist"):
+            db_obj.show_table(table_name)
+
+    @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
+    def test_show_table_columns_with_valid_name(self, get_infinity_db, column_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
@@ -582,3 +589,22 @@ class TestDatabase:
 
         res = db_obj.show_columns(column_name)
         print(res)
+
+    @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
+                                             pytest.param("not_exist_name"),
+                                             pytest.param(1),
+                                             pytest.param(1.1),
+                                             pytest.param(True),
+                                             pytest.param([]),
+                                             pytest.param(()),
+                                             pytest.param({}),
+                                             ])
+    def test_show_table_columns_with_invalid_name(self, get_infinity_db, column_name):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
+
+        db_obj.create_table("test_show_table_columns", {"c1": "int", "c2": "vector,3,int"})
+
+        with pytest.raises(Exception):
+            db_obj.show_columns(column_name)
+
