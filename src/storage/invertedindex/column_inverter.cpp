@@ -33,6 +33,7 @@ import posting_writer;
 import infinity_exception;
 import third_party;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -54,6 +55,7 @@ bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) co
 
 void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id) {
     begin_doc_id_ = begin_doc_id;
+    doc_count_ = row_count;
     for (SizeT i = 0; i < row_count; ++i) {
         String data = column_vector->ToString(row_offset + i);
         InvertColumn(begin_doc_id + i, data);
@@ -96,6 +98,7 @@ void ColumnInverter::MergePrepare() {
 }
 
 void ColumnInverter::Merge(ColumnInverter &rhs) {
+    assert(begin_doc_id_ + doc_count_ == rhs.begin_doc_id_);
     MergePrepare();
     for (auto &doc_terms : rhs.terms_per_doc_) {
         u32 doc_id = doc_terms.first;
@@ -106,7 +109,11 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
             positions_.emplace_back(term_ref, doc_id, it->word_offset_);
         }
     }
+    doc_count_ += rhs.doc_count_;
+    merged_++;
     rhs.terms_per_doc_.clear();
+    rhs.doc_count_ = 0;
+    rhs.merged_ = 0;
 }
 
 void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
@@ -184,6 +191,7 @@ void ColumnInverter::GeneratePosting() {
     u32 last_doc_id = INVALID_DOCID;
     StringRef last_term, term;
     SharedPtr<PostingWriter> posting = nullptr;
+    // printf("GeneratePosting() begin begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_) {
             if (last_doc_id != INVALID_DOCID) {
@@ -194,6 +202,10 @@ void ColumnInverter::GeneratePosting() {
             term = GetTermFromNum(i.term_num_);
             posting = posting_writer_provider_(String(term.data()));
             // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
+            if (last_term_num != (u32)(-1)) {
+                assert(last_term_num < i.term_num_);
+                assert(last_term < term);
+            }
             last_term_num = i.term_num_;
             assert(last_term < term);
             last_term = term;
@@ -212,6 +224,7 @@ void ColumnInverter::GeneratePosting() {
         posting->EndDocument(last_doc_id, 0);
         // printf(" EndDocument3-%u\n", last_doc_id);
     }
+    // printf("GeneratePosting() end begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
 }
 
 void ColumnInverter::SortForOfflineDump() {
