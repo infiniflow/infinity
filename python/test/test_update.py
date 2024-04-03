@@ -393,7 +393,6 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update new value type is not match with table
-    # @pytest.mark.xfail(reason="Invalid constant expression.")
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         1,
