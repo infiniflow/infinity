@@ -26,6 +26,7 @@ module;
 
 #include <cassert>
 #include <filesystem>
+#include <iostream>
 #include <string.h>
 #include <unistd.h>
 module memory_indexer;
@@ -51,7 +52,7 @@ import posting_list_format;
 import dict_reader;
 import file_reader;
 import column_length_io;
-
+import profiler;
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
 
@@ -112,10 +113,17 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
     if (offline) {
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
         auto func = [this, task, provider, length_handler = std::move(update_length_job), inverter](int id) {
+            BaseProfiler profiler;
+            profiler.Begin();
+            std::cout << "Profiler inverter for thread id " << id << ", begin " << profiler.GetBegin() << std::endl;
+
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             inverter->GetTermListLength(length_handler->GetColumnLengthArray());
             length_handler->DumpToFile();
             inverter->SortForOfflineDump();
+            profiler.End();
+            std::cout << "Profiler inverter for thread id " << id << ", end " << profiler.GetEnd() << ", elapsed " << profiler.ElapsedToString()
+                      << std::endl;
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
         thread_pool_.push(std::move(func));
@@ -133,22 +141,48 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_++;
     }
+    std::cout << "MemoryIndexer::Insert inflight_tasks_ " << inflight_tasks_ << std::endl;
 }
 
 void MemoryIndexer::Commit(bool offline) {
     if (offline) {
-        if (nullptr == spill_file_handle_) {
-            PrepareSpillFile();
-        }
-        SharedPtr<ColumnInverter> inverter;
-        while (inflight_tasks_ != 0) {
-            this->ring_sorted_.Get(inverter);
-            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
-            inflight_tasks_--;
-            num_runs_++;
-        }
+        thread_pool_.push([this](int id) { this->CommitOffline(); });
     } else
         thread_pool_.push([this](int id) { this->CommitSync(); });
+}
+
+SizeT MemoryIndexer::CommitOffline() {
+    bool generating = false;
+    bool changed = generating_.compare_exchange_strong(generating, true);
+    if (!changed)
+        return 0;
+    generating = true;
+    if (nullptr == spill_file_handle_) {
+        PrepareSpillFile();
+    }
+    Vector<SharedPtr<ColumnInverter>> inverters;
+    this->ring_sorted_.GetBatch(inverters);
+    SizeT num = inverters.size();
+    if (num > 0) {
+        std::cout << "MemoryIndexer::CommitOffline begin" << std::endl;
+        BaseProfiler profiler;
+        profiler.Begin();
+
+        for (auto &inverter : inverters) {
+            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
+            num_runs_++;
+        }
+        profiler.End();
+        std::cout << "MemoryIndexer::CommitOffline done " << num << " inverters, inflight_tasks_ is " << inflight_tasks_ << ", cost "
+                  << profiler.ElapsedToString() << std::endl;
+    }
+    generating_.compare_exchange_strong(generating, false);
+    std::unique_lock<std::mutex> lock(mutex_);
+    inflight_tasks_ -= num;
+    if (inflight_tasks_ == 0) {
+        cv_.notify_all();
+    }
+    return num;
 }
 
 SizeT MemoryIndexer::CommitSync() {
@@ -177,13 +211,17 @@ SizeT MemoryIndexer::CommitSync() {
     if (inflight_tasks_ == 0) {
         cv_.notify_all();
     }
+
     return num;
 }
 
 void MemoryIndexer::Dump(bool offline, bool spill) {
     if (offline) {
         assert(!spill);
-        Commit(true);
+        while (GetInflightTasks() > 0) {
+            usleep(10000);
+            CommitOffline();
+        }
         OfflineDump();
         return;
     }
@@ -281,7 +319,11 @@ void MemoryIndexer::OfflineDump() {
     // 1. External sort merge
     // 2. Generate posting
     // 3. Dump disk segment data
+    std::cout << "MemoryIndexer::OfflineDump begin" << std::endl;
+    BaseProfiler profiler;
+    profiler.Begin();
     FinalSpillFile();
+    std::cout << "num_runs_ " << num_runs_ << std::endl;
     SortMerger<TermTuple, u16> *merger = new SortMerger<TermTuple, u16>(spill_full_path_.c_str(), num_runs_, 100000000, 2);
     merger->Run();
     delete merger;
@@ -364,6 +406,7 @@ void MemoryIndexer::OfflineDump() {
     fs.AppendFile(dict_file, fst_file);
     fs.DeleteFile(fst_file);
 
+    std::cout << "MemoryIndexer::OfflineDump done, num_runs_ " << num_runs_ << ", cost " << profiler.ElapsedToString() << std::endl;
     num_runs_ = 0;
     std::filesystem::remove(spill_full_path_);
 }
