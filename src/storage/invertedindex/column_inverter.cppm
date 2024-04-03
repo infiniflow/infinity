@@ -56,6 +56,10 @@ public:
 
     void GetTermListLength(u32 *term_list_length_ptr) const;
 
+    u32 GetDocCount() { return doc_count_; }
+
+    u32 GetMerged() { return merged_; }
+
     struct PosInfo {
         u32 term_num_{0};
         u32 doc_id_{0};
@@ -111,6 +115,8 @@ private:
 
     UniquePtr<Analyzer> analyzer_{nullptr};
     u32 begin_doc_id_{0};
+    u32 doc_count_{0};
+    u32 merged_{1};
     TermBuffer terms_;
     PosInfoVec positions_;
     U32Vec term_refs_;

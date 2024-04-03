@@ -63,8 +63,7 @@ u64 Infinity::GetSessionId() { return session_->session_id(); }
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
     if (!fs.Exists(path)) {
-        std::cerr << path << " doesn't exist." << std::endl;
-        return;
+        fs.CreateDirectory(path);
     }
 
     SharedPtr<String> config_path = MakeShared<String>(path + "/infinity_conf.toml");
