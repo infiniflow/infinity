@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import threading
 import time
 
 import infinity.index as index
@@ -398,6 +399,66 @@ class TestIndex:
             "body^5", "harmful chemical", "topn=3").to_pl()
         assert not res.is_empty()
         print(res)
+
+    @pytest.mark.xfail(reason="Concurrent reads and writes of the fulltext index causes it to be empty")
+    @pytest.mark.parametrize("file_format", ["csv"])
+    def test_insert_data_fulltext_index_search_parallel(self, get_infinity_db, file_format):
+        def insert_data_thread(table_obj, data, start_time, return_val, warm_time, run_time):
+            while True:
+                for i in range(len(data["doctitle"])):
+                    table_obj.insert([{"doctitle": data["doctitle"][i],
+                                    "docdate": data["docdate"][i], "body": data["body"][i]}])
+                if(time.time() - start_time > run_time - warm_time or return_val[0] == 0):
+                    return 
+
+        def fulltext_index_search_thread(table_obj, start_time, return_val, warm_time, run_time):
+            while (time.time() - start_time < run_time):
+                res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
+                    "body^5", "harmful chemical", "topn=1").to_pl()
+                if(res.is_empty() or return_val[0] == 0):
+                    return_val[0] = 0
+                    return
+
+        # prepare data for insert
+        column_names = ["doctitle", "docdate", "body"]
+        df = pandas.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
+                                delimiter="\t",
+                                header=None,
+                                names=column_names)
+        data = {key: list(value.values())
+                for key, value in df.to_dict().items()}
+
+        db_obj = get_infinity_db
+        db_obj.drop_table(
+            "test_insert_data_fulltext_index_search", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_data_fulltext_index_search", {
+            "doctitle": "varchar",
+            "docdate": "varchar", "body": "varchar"}, ConflictType.Error)
+        res = table_obj.create_index("body_index",
+                                        [index.IndexInfo("body",
+                                                        index.IndexType.FullText,
+                                                        [])])
+        assert res.error_code == ErrorCode.OK
+
+        start_time = time.time()
+        insert_thread_num = 4
+        read_thread_num = 4
+        run_time = 5
+        warm_time = 0
+        return_val = [1]
+        threads = []
+        for i in range(insert_thread_num):
+            thread = threading.Thread(target=insert_data_thread, args=(table_obj, data, start_time, return_val, warm_time, run_time))
+            threads.append(thread)
+            thread.start()
+        time.sleep(warm_time)
+        for i in range(read_thread_num):
+            thread = threading.Thread(target=fulltext_index_search_thread, args=(table_obj, start_time, return_val, warm_time, run_time))
+            threads.append(thread)
+            thread.start()
+        for i in range(len(threads)):
+            threads[i].join()
+        assert return_val[0]
 
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_9.csv", "data_dir": common_values.TEST_TMP_DIR,}], indirect=True)
     def test_fulltext_match_with_invalid_analyzer(self, get_infinity_db, check_data):
