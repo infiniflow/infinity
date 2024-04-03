@@ -67,6 +67,7 @@ Txn *TxnManager::BeginTxn() {
     // Storage txn in txn manager
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
+    ts_map_.emplace(ts, new_txn_id);
     rw_locker_.unlock();
 
     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
@@ -89,13 +90,6 @@ u64 TxnManager::GetNewTxnID() {
 
 TxnTimeStamp TxnManager::GetTimestamp() {
     TxnTimeStamp ts = ++start_ts_;
-    return ts;
-}
-
-TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id) {
-    TxnTimeStamp ts = GetTimestamp();
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    ts_map_.emplace(ts, txn_id);
     return ts;
 }
 

@@ -59,8 +59,6 @@ public:
 
     TxnTimeStamp GetTimestamp();
 
-    TxnTimeStamp GetBeginTimestamp(TransactionID txn_id);
-
     void Invalidate(TxnTimeStamp commit_ts);
 
     void SendToWAL(Txn *txn);
