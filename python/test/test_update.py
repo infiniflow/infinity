@@ -393,9 +393,14 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update new value type is not match with table
-    @pytest.mark.xfail(reason="Invalid constant expression.")
+    # @pytest.mark.xfail(reason="Invalid constant expression.")
     @pytest.mark.parametrize("types", ["int", "float"])
-    @pytest.mark.parametrize("types_example", [1, 1.333, "1", [1, 2, 3]])
+    @pytest.mark.parametrize("types_example", [
+        1,
+        1.333,
+        "1",
+        pytest.param([1, 2, 3], marks=pytest.mark.xfail(reason="Invalid constant expression."))
+    ])
     def test_update_new_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
