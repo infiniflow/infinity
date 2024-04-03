@@ -30,7 +30,7 @@ export struct CreateHnswLVQParam : public CreateIndexParam {
     const SizeT max_element_{};
 
     CreateHnswLVQParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, SizeT max_element)
-            : CreateIndexParam(index_base, column_def), max_element_(max_element) {}
+        : CreateIndexParam(index_base, column_def), max_element_(max_element) {}
 };
 
 export struct CreateHnswParam : public CreateIndexParam {
@@ -66,7 +66,6 @@ private:
     EmbeddingDataType GetType() const;
 
     SizeT GetDimension() const;
-
 };
 
 } // namespace infinity

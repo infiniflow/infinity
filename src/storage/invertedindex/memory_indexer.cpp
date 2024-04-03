@@ -176,6 +176,10 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         return;
     }
 
+    if (spill) {
+        assert(!offline);
+    }
+
     while (GetInflightTasks() > 0) {
         sleep(1);
         CommitSync();

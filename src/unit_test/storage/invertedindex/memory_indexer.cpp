@@ -36,6 +36,11 @@ import column_length_io;
 import internal_types;
 import logical_type;
 import column_index_merger;
+import third_party;
+import inmem_posting_decoder;
+import inmem_position_list_decoder;
+import inmem_index_segment_reader;
+import segment_posting;
 
 using namespace infinity;
 
@@ -54,7 +59,7 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
-
+    UniquePtr<MemoryPool> memory_pool_ = MakeUnique<MemoryPool>(1024);
 public:
     void SetUp() override {
         system("rm -rf /tmp/infinity/fulltext_tbl1_col1");
@@ -159,3 +164,56 @@ TEST_F(MemoryIndexerTest, test2) {
     reader.Open(flag_, "/tmp/infinity/fulltext_tbl1_col1", std::move(index_by_segment));
     Check(reader);
 }
+
+TEST_F(MemoryIndexerTest, SpillLoadTest) {
+    String column_length_file_path = String("/tmp/infinity/fulltext_tbl1_col1/chunk1") + LENGTH_SUFFIX;
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    auto column_length_file_handler =
+        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, fake_segment_index_entry_1.get());
+    auto indexer1 = MakeUnique<MemoryIndexer>("/tmp/infinity/fulltext_tbl1_col1",
+                                              "chunk1",
+                                              RowID(0U, 0U),
+                                              flag_,
+                                              "standard",
+                                              byte_slice_pool_,
+                                              buffer_pool_,
+                                              thread_pool_);
+    bool offline = false;
+    bool spill = true;
+    indexer1->Insert(column_, 0, 2, column_length_file_handler, offline);
+    indexer1->Insert(column_, 2, 2, column_length_file_handler, offline);
+    indexer1->Insert(column_, 4, 1, std::move(column_length_file_handler), offline);
+    while (indexer1->GetInflightTasks() > 0) {
+        sleep(1);
+        indexer1->CommitSync();
+    }
+
+    indexer1->Dump(offline, spill);
+    UniquePtr<MemoryIndexer>
+        loaded_indexer = MakeUnique<MemoryIndexer>("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    loaded_indexer->Load();
+    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(loaded_indexer.get());
+    for (SizeT i = 0; i < expected_postings_.size(); ++i) {
+        const ExpectedPosting &expected = expected_postings_[i];
+        const String &term = expected.term;
+        SegmentPosting seg_posting;
+        SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
+
+        auto ret = segment_reader->GetSegmentPosting(term, seg_posting, &byte_slice_pool_);
+        if (ret) {
+            seg_postings->push_back(seg_posting);
+        }
+
+        auto posting_iter = MakeUnique<PostingIterator>(flag_, &byte_slice_pool_);
+        u32 state_pool_size = 0;
+        posting_iter->Init(seg_postings, state_pool_size);
+        RowID doc_id = INVALID_ROWID;
+        for (SizeT j = 0; j < expected.doc_ids.size(); ++j) {
+            doc_id = posting_iter->SeekDoc(expected.doc_ids[j]);
+            ASSERT_EQ(doc_id, expected.doc_ids[j]);
+            u32 tf = posting_iter->GetCurrentTF();
+            ASSERT_EQ(tf, expected.tfs[j]);
+        }
+    }
+}
+
