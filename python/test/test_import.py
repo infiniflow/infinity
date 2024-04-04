@@ -179,8 +179,7 @@ class TestImport:
     @pytest.mark.parametrize("delimiter", [["blankspace", " "],
                                            ["commas", ","],
                                            ["semicolons", ";"],
-                                           pytest.param(["tabular", "\t"],
-                                                        marks=pytest.mark.skip(reason="Not supported yet."))
+                                           pytest.param(["tabular", "\t"])
                                            ])
     @pytest.mark.parametrize("types", [
         "int", "int8", "int16", "int32", "int64", "integer",
@@ -204,7 +203,7 @@ class TestImport:
         if not isinstance(types, tuple):
             table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": types, "c2": types},
                                             ConflictType.Error)
-            table_obj.import_data(common_values.TEST_TMP_DIR + "/pysdk_test_" + delimiter[0] + ".csv",
+            table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_" + delimiter[0] + ".csv",
                                 import_options={
                                     "delimiter": delimiter[1]
                                 })
