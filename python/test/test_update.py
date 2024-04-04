@@ -398,7 +398,6 @@ class TestUpdate:
         1,
         1.333,
         "1",
-        pytest.param([1, 2, 3], marks=pytest.mark.xfail(reason="Invalid constant expression."))
     ])
     def test_update_new_value(self, types, types_example):
         # connect
@@ -416,6 +415,27 @@ class TestUpdate:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.parametrize("types", ["int", "float"])
+    @pytest.mark.parametrize("types_example", [
+        pytest.param([1, 2, 3])
+    ])
+    def test_update_invalid_value(self, types, types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
+
+        # update
+        with pytest.raises(Exception, match="ERROR:3049, Not support to convert Embedding to*"):
+            table_obj.update("c1 = 1", [{"c2": types_example}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
         "c2 > 1",
@@ -424,16 +444,9 @@ class TestUpdate:
         "c1 < 0.1 and c2 < 1.0",
         "c1 < 0.1 and c1 > 1.0",
         "c1 = 0",
-        pytest.param("c1", marks=pytest.mark.xfail),
-        pytest.param("_row_id", marks=pytest.mark.xfail),
-        pytest.param("*", marks=pytest.mark.xfail),
-        pytest.param("#@$%@#f", marks=pytest.mark.xfail),
-        pytest.param("c1 + 0.1 and c2 - 1.0", marks=pytest.mark.xfail),
-        pytest.param("c1 * 0.1 and c2 / 1.0", marks=pytest.mark.xfail),
-        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
-    def test_filter_expression(self, get_infinity_db, filter_list, types_example):
+    def test_valid_filter_expression(self, get_infinity_db, filter_list, types_example):
         # connect
         db_obj = get_infinity_db
         db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
@@ -448,5 +461,35 @@ class TestUpdate:
 
         # delete
         table_obj.update(filter_list, [{"c2": types_example}])
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+    @pytest.mark.parametrize("filter_list", [
+        pytest.param("c1"),
+        pytest.param("_row_id"),
+        pytest.param("*"),
+        pytest.param("#@$%@#f"),
+        pytest.param("c1 + 0.1 and c2 - 1.0"),
+        pytest.param("c1 * 0.1 and c2 / 1.0"),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
+    ])
+    @pytest.mark.parametrize("types_example", [1, 1.333])
+    def test_invalid_filter_expression(self, get_infinity_db, filter_list, types_example):
+        # connect
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int", "c2": "float"}, ConflictType.Error)
+
+        # insert
+        for i in range(10):
+            values = [{"c1": i, "c2": 3.0} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        with pytest.raises(Exception):
+            table_obj.update(filter_list, [{"c2": types_example}])
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
