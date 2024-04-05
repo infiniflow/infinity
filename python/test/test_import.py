@@ -159,9 +159,8 @@ class TestImport:
 
     # import format unrecognized data
     @pytest.mark.parametrize("file_format", [
-        pytest.param("json", marks=pytest.mark.xfail(reason="ERROR:3032, Import JSON is not implemented yet")),
-        pytest.param("txt", marks=pytest.mark.xfail(reason="Unrecognized import file type")),
-        "csv"])
+        pytest.param("json"),
+        pytest.param("txt")])
     def test_import_format_unrecognized_data(self, get_infinity_db, file_format):
         db_obj = get_infinity_db
 
@@ -169,8 +168,9 @@ class TestImport:
         table_obj = db_obj.create_table("test_import_format_unrecognized_data", {"c1": "int", "c2": "vector,3,int"},
                                         ConflictType.Error)
 
-        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
-                              {"file_type": file_format})
+        with pytest.raises(Exception):
+            table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
+                                  {"file_type": file_format})
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -276,13 +276,9 @@ class TestImport:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("types", ["vector, 3, int",
                                        "vector, 128, int",
-                                       pytest.param("vector, 2, int", marks=pytest.mark.xfail),
                                        "vector, 3, float",
                                        "vector, 128, float",
-                                       "vector, 3, double",
-                                       pytest.param("vector, 3, bool", marks=pytest.mark.xfail),
-                                       pytest.param("vector, 3, varchar", marks=pytest.mark.xfail)
-                                       ])
+                                       "vector, 3, double"])
     def test_import_embedding_with_not_match_definition(self, get_infinity_db, check_data, types):
         if not check_data:
             copy_data("embedding_int_dim3.csv")
@@ -296,6 +292,42 @@ class TestImport:
 
         res = table_obj.output(["*"]).to_df()
         print(res)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("types", [pytest.param("vector, 2, int")])
+    def test_import_embedding_with_dimension_unmatch(self, get_infinity_db, check_data, types):
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_embedding_with_not_match_definition")
+        table_obj = db_obj.create_table("test_import_embedding_with_not_match_definition", {"c1": "int", "c2": types})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
+        with pytest.raises(Exception, match="ERROR:3037, Import file format error:*"):
+            res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
+            assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("types", [pytest.param("vector, 3, bool"),
+                                       pytest.param("vector, 3, varchar")
+                                       ])
+    def test_import_embedding_with_unmatched_elem_type(self, get_infinity_db, check_data, types):
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_embedding_with_not_match_definition")
+        with pytest.raises(Exception):
+            table_obj = db_obj.create_table("test_import_embedding_with_not_match_definition", {"c1": "int", "c2": types})
+            test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
+            res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
+            assert res.error_code == ErrorCode.OK
+            res = table_obj.output(["*"]).to_df()
+            print(res)
 
     # import table with varchar not match with the table definition.
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_varchar.csv",
@@ -337,8 +369,8 @@ class TestImport:
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("columns", [
-        pytest.param({"c1": "int"}, marks=pytest.mark.xfail),
-        pytest.param({"c1": "int", "c2": "int", "c3": "int"}, marks=pytest.mark.xfail)
+        pytest.param({"c1": "int"}),
+        pytest.param({"c1": "int", "c2": "int", "c3": "int"})
     ])
     def test_table_with_not_matched_columns(self, get_infinity_db, columns, check_data):
         if not check_data:
@@ -348,8 +380,9 @@ class TestImport:
         table_obj = db_obj.create_table("test_table_with_not_matched_columns", columns)
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_commas.csv"
-        res = table_obj.import_data(test_csv_dir)
-        assert res.error_code == ErrorCode.OK
+        with pytest.raises(Exception, match="ERROR:3039, Column count mismatch: CSV file row count isn't match with table schema*"):
+            res = table_obj.import_data(test_csv_dir)
+            assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -392,3 +425,4 @@ class TestImport:
         res = table_obj.output(["*"]).to_df()
         print(res)
 
+    # TODO: JSON file type import test
