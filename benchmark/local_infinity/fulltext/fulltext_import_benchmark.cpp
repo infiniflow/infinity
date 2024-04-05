@@ -127,7 +127,7 @@ void BenchmarkImport(SharedPtr<Infinity> infinity,
     ImportOptions import_options;
     import_options.copy_file_type_ = CopyFileType::kJSONL;
     infinity->Import(db_name, table_name, import_from, std::move(import_options));
-    std::cout << "Import data cost: " << profiler.ElapsedToString();
+    LOG_INFO(fmt::format("Import data cost: {}", profiler.ElapsedToString()));
 
     profiler.Begin();
     auto index_info_list = new Vector<IndexInfo *>();
