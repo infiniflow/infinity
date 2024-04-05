@@ -215,7 +215,7 @@ int main() {
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
     BenchmarkImport(infinity, db_name, table_name, index_name, srcfile);
     BenchmarkInsert(infinity, db_name, table_name, srcfile);
-    usleep(5000000);
+    sleep(10);
 
     Infinity::LocalUnInit();
 }
