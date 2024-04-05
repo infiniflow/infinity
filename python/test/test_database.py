@@ -538,7 +538,7 @@ class TestDatabase:
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
         infinity_obj.create_database("test_drop_option")
-        with pytest.raises(Exception, match="Error:3036, invalid conflict type"):
+        with pytest.raises(Exception, match="ERROR:3066, invalid conflict type"):
             infinity_obj.drop_database("test_drop_option", conflict_type)
 
         infinity_obj.drop_database("test_drop_option", ConflictType.Error)

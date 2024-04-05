@@ -76,7 +76,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_database_conflict = ttypes.DropConflict.Ignore
         else:
-            raise Exception(f"Error:3036, invalid conflict type")
+            raise Exception(f"ERROR:3066, invalid conflict type")
 
         res = self._client.drop_database(db_name=db_name, conflict_type = drop_database_conflict)
         if res.error_code == ErrorCode.OK:

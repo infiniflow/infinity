@@ -98,7 +98,7 @@ class RemoteTable(Table, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_index_conflict = ttypes.DropConflict.Ignore
         else:
-            raise Exception(f"Error:3036, invalid conflict type")
+            raise Exception(f"ERROR:3066, invalid conflict type")
 
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
