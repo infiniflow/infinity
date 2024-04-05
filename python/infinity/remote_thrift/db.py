@@ -159,7 +159,7 @@ class RemoteDatabase(Database, ABC):
             return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
                                          conflict_type=ttypes.DropConflict.Ignore)
         else:
-            raise Exception(f"Error:3036, invalid conflict type")
+            raise Exception(f"ERROR:3066, invalid conflict type")
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
