@@ -23,8 +23,6 @@ module column_inverter;
 import stl;
 import analyzer;
 import analyzer_pool;
-import memory_pool;
-import pool_allocator;
 import string_ref;
 import term;
 import radix_sort;
@@ -42,7 +40,7 @@ static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);
 }
 
-ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider)
+ColumnInverter::ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider)
     : analyzer_(AnalyzerPool::instance().Get(analyzer)), posting_writer_provider_(posting_writer_provider) {
     if (analyzer_.get() == nullptr) {
         RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer)));

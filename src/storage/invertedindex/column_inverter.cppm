@@ -22,8 +22,6 @@ import stl;
 import analyzer;
 
 import column_vector;
-import memory_pool;
-import pool_allocator;
 import term;
 import string_ref;
 import internal_types;
@@ -33,7 +31,7 @@ namespace infinity {
 
 export class ColumnInverter {
 public:
-    ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider);
+    ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
