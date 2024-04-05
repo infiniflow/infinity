@@ -60,7 +60,7 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
     return ret < 0;
 }
 
-MemoryIndexer::PostingTable::PostingTable() : store_(KeyComp(), &byte_slice_pool_) {}
+MemoryIndexer::PostingTable::PostingTable() {}
 
 MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &base_name,
@@ -73,7 +73,7 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
       buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(10UL), ring_sorted_(10UL) {
     posting_table_ = MakeShared<PostingTable>();
-
+    prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
     Path path = Path(index_dir) / "tmp.merge";
     spill_full_path_ = path.string();
 }
@@ -215,13 +215,13 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     if (posting_table_.get() != nullptr) {
         MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
-        for (auto it = posting_store.Begin(); it != posting_store.End(); ++it) {
-            const MemoryIndexer::PostingPtr posting_writer = it.Value();
+        for (auto it = posting_store.UnsafeBegin(); it != posting_store.UnsafeEnd(); ++it) {
+            const MemoryIndexer::PostingPtr posting_writer = it->second;
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta, spill);
             SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
-            const String &term = it.Key();
+            const String &term = it->first;
             fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
         }
         posting_file_writer->Sync();
@@ -260,16 +260,14 @@ void MemoryIndexer::Load() {
 }
 
 SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
+    assert(posting_table_.get() != nullptr);
     MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
-    MemoryIndexer::PostingTableStore::Iterator iter = posting_store.Find(term);
-    if (iter != posting_store.End())
-        return iter.Value();
-    else {
-        SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
-        posting_store.Insert(term, posting);
-        return posting;
+    PostingPtr posting;
+    bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
+    if (!found) {
+        prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
     }
+    return posting;
 }
 
 void MemoryIndexer::Reset() {
