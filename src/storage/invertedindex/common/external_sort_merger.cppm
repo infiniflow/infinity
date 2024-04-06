@@ -161,23 +161,6 @@ struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyTy
             return 1;
         else
             return -1;
-
-        LenType len1 = LEN() / sizeof(KeyType);
-        LenType len2 = p.LEN() / sizeof(KeyType);
-
-        for (LenType i = 1; i < len1 && i < len2; ++i) {
-            if (((KeyType *)(data + sizeof(LenType)))[i] > ((KeyType *)(p.data + sizeof(LenType)))[i])
-                return 1;
-            if (((KeyType *)(data + sizeof(LenType)))[i] < ((KeyType *)(p.data + sizeof(LenType)))[i])
-                return -1;
-        }
-
-        if (len1 == len2)
-            return 0;
-
-        if (len1 > len2)
-            return 1;
-        return -1;
     }
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }

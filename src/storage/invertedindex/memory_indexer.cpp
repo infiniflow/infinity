@@ -168,10 +168,12 @@ SizeT MemoryIndexer::CommitOffline(bool wait_if_empty) {
     }
     LOG_INFO(fmt::format("MemoryIndexer::CommitOffline done {} inverters, inflight_tasks_ was {}", num, inflight_tasks_));
     generating_.compare_exchange_strong(generating, false);
-    std::unique_lock<std::mutex> lock(mutex_);
-    inflight_tasks_ -= num;
-    if (inflight_tasks_ == 0) {
-        cv_.notify_all();
+    if (num > 0) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_ -= num;
+        if (inflight_tasks_ == 0) {
+            cv_.notify_all();
+        }
     }
     return num;
 }
