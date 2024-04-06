@@ -108,7 +108,7 @@ private:
     }
 
     // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
-    SizeT CommitOffline();
+    SizeT CommitOffline(bool wait_if_empty = false);
 
     void OfflineDump();
 
