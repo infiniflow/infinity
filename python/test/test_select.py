@@ -501,16 +501,9 @@ class TestSelect:
         "c1 > 0.1 and c2 < 1.0",
         "c1 < 0.1 and c2 < 1.0",
         "c1 < 0.1 and c1 > 1.0",
-        pytest.param("c1", marks=pytest.mark.xfail),
         "c1 = 0",
-        pytest.param("_row_id", marks=pytest.mark.xfail),
-        pytest.param("*", marks=pytest.mark.xfail),
-        pytest.param("#@$%@#f", marks=pytest.mark.xfail),
-        pytest.param("c1 + 0.1 and c2 - 1.0", marks=pytest.mark.xfail),
-        pytest.param("c1 * 0.1 and c2 / 1.0", marks=pytest.mark.xfail),
-        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
     ])
-    def test_filter_expression(self, filter_list):
+    def test_valid_filter_expression(self, filter_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
@@ -523,8 +516,38 @@ class TestSelect:
                           {"c1": 1000, "c2": 2.0},
                           {"c1": 10000, "c2": 2.0}])
         # TODO add more filter function
-        insert_res_df = table_obj.output(["*"]).filter(filter_list).to_pl()
-        print(str(insert_res_df))
+        select_res_df = table_obj.output(["*"]).filter(filter_list).to_pl()
+        print(str(select_res_df))
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("filter_list", [
+        pytest.param("c1"),
+        pytest.param("_row_id"),
+        pytest.param("*"),
+        pytest.param("#@$%@#f"),
+        pytest.param("c1 + 0.1 and c2 - 1.0"),
+        pytest.param("c1 * 0.1 and c2 / 1.0"),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
+    ])
+    def test_invalid_filter_expression(self, filter_list):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_output_filter_function", True)
+        table_obj = db_obj.create_table("test_output_filter_function", {
+            "c1": "int", "c2": "float"}, ConflictType.Error)
+        table_obj.insert([{"c1": 1, "c2": 2.0},
+                          {"c1": 10, "c2": 2.0},
+                          {"c1": 100, "c2": 2.0},
+                          {"c1": 1000, "c2": 2.0},
+                          {"c1": 10000, "c2": 2.0}])
+        # TODO add more filter function
+        with pytest.raises(Exception):
+            select_res_df = table_obj.output(["*"]).filter(filter_list).to_pl()
+            print(str(select_res_df))
 
         # disconnect
         res = infinity_obj.disconnect()
