@@ -344,12 +344,9 @@ class TestIndex:
                                                          index.InitParameter("metric", "l2")])], ConflictType.Error)
 
     # create index then insert / import data
-    @pytest.mark.parametrize("index_type", [
-        index.IndexType.IVFFlat,
-        pytest.param(index.IndexType.FullText, marks=pytest.mark.xfail(reason="ERROR:3009, Attempt to create IVFFLAT/full-text index on column: c2, data type"))
-    ])
+    @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat])
     @pytest.mark.parametrize("file_format", ["csv"])
-    def test_create_index_import_data(self, get_infinity_db, index_type, file_format):
+    def test_create_vector_index_import_data(self, get_infinity_db, index_type, file_format):
         # connect
         db_obj = get_infinity_db
         db_obj.drop_table("test_import_data_create_index", ConflictType.Ignore)
@@ -362,6 +359,29 @@ class TestIndex:
                                                       [index.InitParameter("centroids_count", "128"),
                                                        index.InitParameter("metric", "l2")])], ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
+                              file_format + "/pysdk_test." + file_format)
+
+
+    @pytest.mark.parametrize("index_type", [
+        pytest.param(index.IndexType.FullText)
+    ])
+    @pytest.mark.parametrize("file_format", ["csv"])
+    def test_create_index_import_data(self, get_infinity_db, index_type, file_format):
+        # connect
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_data_create_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_import_data_create_index", {
+            "c1": "int",
+            "c2": "vector,3,float"}, ConflictType.Error)
+
+        with pytest.raises(Exception, match="ERROR:3009, Attempt to create full-text index on column: c2, data type: Embedding*"):
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c2",
+                                                          index_type,
+                                                          [index.InitParameter("centroids_count", "128"),
+                                                           index.InitParameter("metric", "l2")])], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
                               file_format + "/pysdk_test." + file_format)
 
