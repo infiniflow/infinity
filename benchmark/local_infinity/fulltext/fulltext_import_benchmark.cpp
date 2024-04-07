@@ -123,12 +123,12 @@ void BenchmarkImport(SharedPtr<Infinity> infinity,
 
     BaseProfiler profiler;
 
-    profiler.Begin();
-    ImportOptions import_options;
-    import_options.copy_file_type_ = CopyFileType::kJSONL;
-    infinity->Import(db_name, table_name, import_from, std::move(import_options));
-    LOG_INFO(fmt::format("Import data cost: {}", profiler.ElapsedToString()));
-
+    /*     profiler.Begin();
+        ImportOptions import_options;
+        import_options.copy_file_type_ = CopyFileType::kJSONL;
+        infinity->Import(db_name, table_name, import_from, std::move(import_options));
+        LOG_INFO(fmt::format("Import data cost: {}", profiler.ElapsedToString()));
+     */
     profiler.Begin();
     auto index_info_list = new Vector<IndexInfo *>();
     auto index_info = new IndexInfo();
@@ -214,8 +214,8 @@ int main() {
 
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
     BenchmarkImport(infinity, db_name, table_name, index_name, srcfile);
-    // BenchmarkInsert(infinity, db_name, table_name, srcfile);
-    // sleep(10);
+    BenchmarkInsert(infinity, db_name, table_name, srcfile);
+    sleep(10);
 
     Infinity::LocalUnInit();
 }

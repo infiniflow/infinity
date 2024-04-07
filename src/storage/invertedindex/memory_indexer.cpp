@@ -113,23 +113,25 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
     if (offline) {
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, nullptr);
         auto func = [this, task, length_handler = std::move(update_length_job), inverter](int id) {
-            LOG_INFO(fmt::format("inverter {} begin", id));
+            LOG_INFO(fmt::format("offline inverter {} begin", id));
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             inverter->GetTermListLength(length_handler->GetColumnLengthArray());
             length_handler->DumpToFile();
             inverter->SortForOfflineDump();
             this->ring_sorted_.Put(task->task_seq_, inverter);
-            LOG_INFO(fmt::format("inverter {} end", id));
+            LOG_INFO(fmt::format("offline inverter {} end", id));
         };
         thread_pool_.push(std::move(func));
     } else {
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, provider);
         auto func = [this, task, length_handler = std::move(update_length_job), inverter](int id) {
+            // LOG_INFO(fmt::format("online inverter {} begin", id));
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             inverter->GetTermListLength(length_handler->GetColumnLengthArray());
             length_handler->DumpToFile();
             this->ring_inverted_.Put(task->task_seq_, inverter);
+            // LOG_INFO(fmt::format("online inverter {} end", id));
         };
         thread_pool_.push(std::move(func));
     }
@@ -137,7 +139,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_++;
     }
-    LOG_INFO(fmt::format("MemoryIndexer::Insert inflight_tasks_ {}", inflight_tasks_));
+    // LOG_INFO(fmt::format("MemoryIndexer::Insert inflight_tasks_ {}", inflight_tasks_));
 }
 
 void MemoryIndexer::Commit(bool offline) {
@@ -188,6 +190,7 @@ SizeT MemoryIndexer::CommitSync() {
     };
 
     bool generating = false;
+    LOG_INFO("MemoryIndexer::CommitSync begin");
     bool changed = generating_.compare_exchange_strong(generating, true);
     if (!changed)
         return 0;
@@ -198,6 +201,7 @@ SizeT MemoryIndexer::CommitSync() {
         inverter->GeneratePosting();
         num += inverter->GetMerged();
     }
+    LOG_INFO(fmt::format("MemoryIndexer::CommitSync done {} inverters, inflight_tasks_ was {}", num, inflight_tasks_));
     generating_.compare_exchange_strong(generating, false);
     std::unique_lock<std::mutex> lock(mutex_);
     inflight_tasks_ -= num;
@@ -226,6 +230,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         usleep(1000000);
         CommitSync();
     }
+    LOG_INFO("MemoryIndexer::Dump begin");
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -262,6 +267,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     is_spilled_ = spill;
     Reset();
+    LOG_INFO("MemoryIndexer::Dump end");
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting
