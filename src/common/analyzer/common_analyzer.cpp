@@ -24,6 +24,8 @@ import analyzer;
 module common_analyzer;
 
 namespace infinity {
+constexpr int MAX_TUPLE_LENGTH = 1024;
+
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
     : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
       extract_eng_stem_(true), extract_synonym_(false), chinese_(false), remove_stopwords_(false) {
@@ -41,6 +43,9 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
 
     while (NextToken()) {
         if (len_ == 0)
+            continue;
+
+        if (len_ >= MAX_TUPLE_LENGTH)
             continue;
 
         if (remove_stopwords_ && IsStopword())
