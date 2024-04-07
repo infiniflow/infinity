@@ -132,6 +132,23 @@ void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
                                   begin_ts);
 }
 
+void DBEntry::UpdateTableReplay(const SharedPtr<String> &table_name,
+                                std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                                TransactionID txn_id,
+                                TxnTimeStamp begin_ts) {
+    auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(*table_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    table_meta->UpdateEntryReplay(
+        [&](SharedPtr<TableEntry> dst_table_entry, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            auto src_table_entry = init_entry(table_meta, table_name, txn_id, begin_ts);
+            dst_table_entry->UpdateEntryReplay(src_table_entry);
+        },
+        txn_id,
+        begin_ts);
+}
+
 void DBEntry::DropTableReplay(const String &table_name,
                               std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                               TransactionID txn_id,
@@ -286,7 +303,7 @@ void DBEntry::MemIndexCommit() {
     }
 }
 
-void DBEntry::MemIndexRecover(BufferManager* buffer_manager) {
+void DBEntry::MemIndexRecover(BufferManager *buffer_manager) {
     auto table_meta_map_guard = table_meta_map_.GetMetaMap();
     for (auto &[_, table_meta] : *table_meta_map_guard) {
         auto [table_entry, status] = table_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
