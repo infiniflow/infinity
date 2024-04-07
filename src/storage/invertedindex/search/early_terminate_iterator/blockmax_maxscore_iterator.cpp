@@ -52,10 +52,12 @@ bool BlockMaxMaxscoreIterator::BlockSkipTo(RowID doc_id, float threshold) {
     while (true) {
         RowID next_candidate = INVALID_ROWID;
         float sum_block_max_bm25_score = 0.0f;
+        bool match_any = false;
         for (u32 i = 0; i < sorted_iterators_.size(); ++i) {
             if (const auto &it = sorted_iterators_[i]; it->BlockSkipTo(doc_id, 0)) {
                 // success in block skip
                 if (const RowID lowest_possible = it->BlockMinPossibleDocID(); lowest_possible <= doc_id) {
+                    match_any = true;
                     sum_block_max_bm25_score += it->BlockMaxBM25Score();
                     next_candidate = std::min(next_candidate, it->BlockLastDocID() + 1);
                 } else {
@@ -64,7 +66,7 @@ bool BlockMaxMaxscoreIterator::BlockSkipTo(RowID doc_id, float threshold) {
             }
             common_block_max_bm25_score_until_[i] = sum_block_max_bm25_score;
         }
-        if (sum_block_max_bm25_score >= threshold) {
+        if (match_any and sum_block_max_bm25_score >= threshold) {
             common_block_min_possible_doc_id_ = doc_id;
             common_block_last_doc_id_ = next_candidate - 1;
             common_block_max_bm25_score_ = sum_block_max_bm25_score;
@@ -77,27 +79,27 @@ bool BlockMaxMaxscoreIterator::BlockSkipTo(RowID doc_id, float threshold) {
     }
 }
 
-Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_id, float threshold) {
+Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) {
     if (threshold > BlockMaxBM25Score()) [[unlikely]] {
         return {false, 0.0F, INVALID_ROWID};
     }
-    const RowID block_end = BlockLastDocID();
-    if (doc_id > block_end) [[unlikely]] {
-        return {false, 0.0F, INVALID_ROWID};
-    }
+    const RowID block_end = std::min(doc_id_no_beyond, BlockLastDocID());
     assert((doc_id >= BlockMinPossibleDocID()));
     while (true) {
+        if (doc_id > block_end) [[unlikely]] {
+            return {false, 0.0F, INVALID_ROWID};
+        }
         RowID next_candidate = INVALID_ROWID;
         float leftover_threshold = threshold;
         for (u32 j = sorted_iterators_.size(); j > pivot; --j) {
             const auto &it = sorted_iterators_[j - 1];
             // TODO: does not need score if id != doc_id
-            auto [success, score, id] = it->SeekInBlockRange(doc_id, 0);
+            auto [success, score, id] = it->SeekInBlockRange(doc_id, 0, block_end);
             if (success) {
                 if (id == doc_id) {
                     leftover_threshold -= score;
                     // TODO: does not need score here
-                    auto [success2, score2, id2] = it->SeekInBlockRange(doc_id + 1, 0);
+                    auto [success2, score2, id2] = it->SeekInBlockRange(doc_id + 1, 0, block_end);
                     if (success2) {
                         next_candidate = std::min(next_candidate, id2);
                     }
@@ -112,7 +114,7 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
                 break;
             }
             // TODO: add a "SeekTrue" method
-            auto [success, score, id] = sorted_iterators_[i - 1]->SeekInBlockRange(doc_id, 0);
+            auto [success, score, id] = sorted_iterators_[i - 1]->SeekInBlockRange(doc_id, 0, block_end);
             if (success and id == doc_id) {
                 leftover_threshold -= score;
             }
@@ -120,9 +122,6 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
         if (leftover_threshold <= 0) {
             doc_id_ = doc_id;
             return {true, threshold - leftover_threshold, doc_id};
-        }
-        if (next_candidate > block_end) {
-            return {false, 0.0F, INVALID_ROWID};
         }
         doc_id = next_candidate;
     }
@@ -139,7 +138,7 @@ Pair<RowID, float> BlockMaxMaxscoreIterator::BlockNextWithThreshold(float thresh
             return {INVALID_ROWID, 0.0F};
         }
         next_skip = std::max(next_skip, BlockMinPossibleDocID());
-        auto [success, score, id] = SeekInBlockRange(next_skip, threshold);
+        auto [success, score, id] = SeekInBlockRange(next_skip, threshold, BlockLastDocID());
         if (success) {
             // success in SeekInBlockRange, inner doc_id_ is updated
             return {id, score};

@@ -32,7 +32,7 @@ export class BlockMaxTermDocIterator final : public EarlyTerminateIterator {
 public:
     BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool);
 
-    bool InitPostingIterator(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32 state_pool_size);
+    bool InitPostingIterator(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size);
 
     void MultiplyWeight(float factor) { weight_ *= factor; }
 
@@ -50,17 +50,14 @@ public:
 
     void InitBM25Info(u64 total_df, float avg_column_len, FullTextColumnLengthReader *column_length_reader);
 
-    RowID BlockMinPossibleDocID() const override {
-        const RowID prev_end = iter_.PrevBlockLastDocID();
-        return prev_end == 0 ? 0 : prev_end + 1;
-    }
+    RowID BlockMinPossibleDocID() const override { return iter_.BlockLowestPossibleDocID(); }
 
     RowID BlockLastDocID() const override { return iter_.BlockLastDocID(); }
 
     // weight included
     float BlockMaxBM25Score() override;
 
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold) override;
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) override;
 
     // weight included
     float BM25Score();

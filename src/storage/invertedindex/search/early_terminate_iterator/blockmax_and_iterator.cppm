@@ -42,7 +42,7 @@ public:
 
     float BlockMaxBM25Score() override { return common_block_max_bm25_score_; }
 
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold) override;
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) override;
 
 private:
     // block max info

@@ -26,7 +26,7 @@ public:
 
     inline void MoveToCurrentDocPosition(ttf_t current_ttf) { in_doc_state_keeper_.MoveToDoc(current_ttf); }
 
-    bool SkipTo(RowID start_row_id, RowID &prev_last_row_id, RowID &last_row_id, ttf_t &current_ttf);
+    bool SkipTo(RowID start_row_id, RowID &prev_last_row_id, RowID &lowest_possible_doc_id, RowID &last_row_id, ttf_t &current_ttf);
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
@@ -43,7 +43,7 @@ public:
     u32 InnerGetSeekedDocCount() const { return index_decoder_->InnerGetSeekedDocCount(); }
 
 private:
-    bool SkipInOneSegment(RowID start_row_id, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
+    bool SkipInOneSegment(RowID start_row_id, RowID &prev_last_row_id, RowID &lowest_possible_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
 
     IndexDecoder *CreateIndexDecoder(u32 doc_list_begin_pos);
 

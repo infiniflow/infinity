@@ -31,8 +31,8 @@ import infinity_exception;
 namespace infinity {
 BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool) : iter_(flag, session_pool) {}
 
-bool BlockMaxTermDocIterator::InitPostingIterator(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32 state_pool_size) {
-    if (iter_.Init(seg_postings, state_pool_size)) {
+bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size) {
+    if (iter_.Init(std::move(seg_postings), state_pool_size)) {
         doc_freq_ = iter_.GetDocFreq();
         return true;
     }
@@ -90,15 +90,16 @@ float BlockMaxTermDocIterator::BM25Score() {
     return bm25_common_score_ * tf / (tf + k1 * (1.0F - b + b * doc_len / avg_column_len_));
 }
 
-Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id, float threshold) {
+Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) {
     if (threshold > BlockMaxBM25Score()) [[unlikely]] {
         return {false, 0.0F, INVALID_ROWID};
     }
+    RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
     while (true) {
         RowID next_doc = iter_.SeekDoc(doc_id);
         // always update inner doc_id_
         doc_id_ = next_doc;
-        if (next_doc > BlockLastDocID()) {
+        if (next_doc > seek_end) {
             return {false, 0.0F, INVALID_ROWID};
         }
         if (const float score = BM25Score(); score >= threshold) {
@@ -133,7 +134,7 @@ Pair<RowID, float> BlockMaxTermDocIterator::BlockNextWithThreshold(float thresho
         }
         next_skip = std::max(next_skip, BlockMinPossibleDocID());
         assert((next_skip <= BlockLastDocID()));
-        auto [success, score, id] = SeekInBlockRange(next_skip, threshold);
+        auto [success, score, id] = SeekInBlockRange(next_skip, threshold, BlockLastDocID());
         if (success) {
             // success in SeekInBlockRange, inner doc_id_ is updated
             return {id, score};

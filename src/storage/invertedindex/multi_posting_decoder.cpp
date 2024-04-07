@@ -40,9 +40,9 @@ void MultiPostingDecoder::Init(SharedPtr<Vector<SegmentPosting>> &seg_postings) 
     MoveToSegment(0UL);
 }
 
-bool MultiPostingDecoder::SkipTo(RowID start_row_id, RowID &prev_last_doc_id, RowID &last_doc_id, ttf_t &current_ttf) {
+bool MultiPostingDecoder::SkipTo(RowID start_row_id, RowID &prev_last_doc_id, RowID &lowest_possible_doc_id, RowID &last_doc_id, ttf_t &current_ttf) {
     while (true) {
-        if (SkipInOneSegment(start_row_id, prev_last_doc_id, last_doc_id, current_ttf)) {
+        if (SkipInOneSegment(start_row_id, prev_last_doc_id, lowest_possible_doc_id, last_doc_id, current_ttf)) {
             return true;
         }
         if (!MoveToSegment(start_row_id)) {
@@ -81,7 +81,11 @@ void MultiPostingDecoder::DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payloa
     }
 }
 
-bool MultiPostingDecoder::SkipInOneSegment(RowID start_row_id, RowID &prev_last_row_id, RowID &last_row_id, ttf_t &current_ttf) {
+bool MultiPostingDecoder::SkipInOneSegment(RowID start_row_id,
+                                           RowID &prev_last_row_id,
+                                           RowID &lowest_possible_row_id,
+                                           RowID &last_row_id,
+                                           ttf_t &current_ttf) {
     RowID next_seg_base_row_id = GetSegmentBaseRowId(segment_cursor_);
     if (next_seg_base_row_id != INVALID_ROWID && start_row_id >= next_seg_base_row_id) {
         // start docid not in current segment
@@ -97,6 +101,7 @@ bool MultiPostingDecoder::SkipInOneSegment(RowID start_row_id, RowID &prev_last_
     need_decode_doc_payload_ = format_option_.HasDocPayload();
 
     prev_last_row_id = base_row_id_ + prev_last_doc_id;
+    lowest_possible_row_id = prev_last_doc_id == 0 ? prev_last_row_id : prev_last_row_id + 1;
     last_row_id = base_row_id_ + last_doc_id;
     return true;
 }

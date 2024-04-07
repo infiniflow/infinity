@@ -22,7 +22,7 @@ public:
 
     ~PostingIterator();
 
-    bool Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32 state_pool_size);
+    bool Init(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size);
 
     void Reset();
 
@@ -31,6 +31,8 @@ public:
     bool SkipTo(RowID doc_id);
 
     RowID PrevBlockLastDocID() const { return last_doc_id_in_prev_block_; }
+
+    RowID BlockLowestPossibleDocID() const { return lowest_possible_doc_id_in_current_block_; }
 
     RowID BlockLastDocID() const { return last_doc_id_in_current_block_; }
 
@@ -115,6 +117,7 @@ private:
 
     // info for skiplist, block max
     RowID last_doc_id_in_prev_block_ = INVALID_ROWID;
+    RowID lowest_possible_doc_id_in_current_block_ = INVALID_ROWID;
     RowID last_doc_id_in_current_block_ = INVALID_ROWID;
     ttf_t current_ttf_ = 0;
 

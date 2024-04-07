@@ -26,7 +26,7 @@ struct HeapCompare {
     static constexpr ScoreType MinValue() { return std::numeric_limits<ScoreType>::lowest(); }
 };
 
-class FullTextScoreResultHeap {
+export class FullTextScoreResultHeap {
     using ScoreType = float;
     using ID = RowID;
     using Compare = HeapCompare<ScoreType, ID>;
@@ -63,10 +63,10 @@ public:
 
     [[nodiscard]] u32 GetResultSize() const { return size_; }
 
-    [[nodiscard]] ScoreType GetScoreThreshold() const { return size_ < top_k_ ? Compare::MinValue() : score_[1]; }
+    [[nodiscard]] ScoreType GetScoreThreshold() const { return size_ < top_k_ ? 0 : score_[1]; }
 
     // return true if the threshold is updated
-    [[nodiscard]] bool AddResult(ScoreType d, ID i) {
+    bool AddResult(ScoreType d, ID i) {
         if (size_ < top_k_) {
             ++size_;
             score_[size_] = d;

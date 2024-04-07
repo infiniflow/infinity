@@ -38,8 +38,8 @@ PostingIterator::~PostingIterator() {
     }
 }
 
-bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32) {
-    segment_postings_ = seg_postings;
+bool PostingIterator::Init(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32) {
+    segment_postings_ = std::move(seg_postings);
     for (auto &seg_posting : *segment_postings_) {
         doc_freq_ += seg_posting.GetTermMeta().GetDocFreq();
     }
@@ -48,10 +48,14 @@ bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings
 }
 
 bool PostingIterator::SkipTo(RowID doc_id) {
-    assert(doc_id >= last_doc_id_in_prev_block_ or last_doc_id_in_prev_block_ == INVALID_ROWID);
+    // assert(doc_id >= last_doc_id_in_prev_block_ or last_doc_id_in_prev_block_ == INVALID_ROWID);
     if (doc_id > last_doc_id_in_current_block_ or last_doc_id_in_current_block_ == INVALID_ROWID) {
         finish_decode_docid_ = false;
-        return posting_decoder_->SkipTo(doc_id, last_doc_id_in_prev_block_, last_doc_id_in_current_block_, current_ttf_);
+        return posting_decoder_->SkipTo(doc_id,
+                                        last_doc_id_in_prev_block_,
+                                        lowest_possible_doc_id_in_current_block_,
+                                        last_doc_id_in_current_block_,
+                                        current_ttf_);
     }
     return true;
 }
@@ -63,6 +67,9 @@ Pair<u32, u16> PostingIterator::GetBlockMaxInfo() const { return posting_decoder
 RowID PostingIterator::SeekDoc(RowID row_id) {
     RowID current_row_id = finish_decode_docid_ ? current_row_id_ : INVALID_ROWID;
     if (row_id == current_row_id) [[unlikely]] {
+        return current_row_id;
+    }
+    if (current_row_id != INVALID_ROWID and row_id < current_row_id) {
         return current_row_id;
     }
     assert(row_id > current_row_id or current_row_id == INVALID_ROWID);

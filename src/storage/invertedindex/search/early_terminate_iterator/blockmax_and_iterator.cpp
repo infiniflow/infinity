@@ -39,20 +39,21 @@ BlockMaxAndIterator::BlockMaxAndIterator(Vector<UniquePtr<EarlyTerminateIterator
     bm25_score_upper_bound_ = leftover_scores_upper_bound_[0] + sorted_iterators_[0]->BM25ScoreUpperBound();
 }
 
-/*
 // simple case code for Term and "AND"
 Pair<RowID, float> BlockMaxAndIterator::NextWithThreshold(float threshold) {
-    while (true) {
-        RowID next_doc = Next();
-        if (next_doc == INVALID_ROWID) [[unlikely]] {
-            return {INVALID_ROWID, 0.0F};
+    return {};
+    /*
+        while (true) {
+            RowID next_doc = Next();
+            if (next_doc == INVALID_ROWID) [[unlikely]] {
+                return {INVALID_ROWID, 0.0F};
+            }
+            if (float score = BM25Score(); score >= threshold) {
+                return {next_doc, score};
+            }
         }
-        if (float score = BM25Score(); score >= threshold) {
-            return {next_doc, score};
-        }
-    }
+    */
 }
-*/
 
 // simple case code for Term and "AND"
 Pair<RowID, float> BlockMaxAndIterator::BlockNextWithThreshold(float threshold) {
@@ -61,7 +62,7 @@ Pair<RowID, float> BlockMaxAndIterator::BlockNextWithThreshold(float threshold) 
             return {INVALID_ROWID, 0.0F};
         }
         next_skip = std::max(next_skip, BlockMinPossibleDocID());
-        auto [success, score, id] = SeekInBlockRange(next_skip, threshold);
+        auto [success, score, id] = SeekInBlockRange(next_skip, threshold, BlockLastDocID());
         if (success) {
             // success in SeekInBlockRange, inner doc_id_ is updated
             return {id, score};
@@ -84,71 +85,80 @@ bool BlockMaxAndIterator::BlockSkipTo(RowID doc_id, float threshold) {
     while (true) {
         RowID common_block_last_doc_id = INVALID_ROWID;
         u32 i = 0;
-        for (float leftover_threshold = threshold; i < sorted_iterators_.size(); ++i) {
+        for (; i < sorted_iterators_.size(); ++i) {
             const auto &it = sorted_iterators_[i];
-            if (!it->BlockSkipTo(doc_id, leftover_threshold - leftover_scores_upper_bound_[i])) {
-                if (i == 0) [[unlikely]] {
-                    // no more possible results
-                    doc_id_ = INVALID_ROWID;
-                    return false;
-                }
-                // invalid block skip, need to restart from the first iterator
+            if (!it->BlockSkipTo(doc_id, 0)) {
+                // no more possible results
+                return false;
+            }
+            // success in block skip
+            const RowID lowest_possible = it->BlockMinPossibleDocID();
+            if (lowest_possible > common_block_last_doc_id) {
+                // need to update doc_id, restart from the first iterator
                 doc_id = common_block_last_doc_id + 1;
                 break;
             }
-            // success in block skip
-            if (const RowID lowest_possible = it->BlockMinPossibleDocID(); lowest_possible > doc_id) {
-                // need to update doc_id, restart from the first iterator
-                doc_id = i == 0 ? lowest_possible : std::min(common_block_last_doc_id + 1, lowest_possible);
-                break;
+            // now lowest_possible <= common_block_last_doc_id
+            if (lowest_possible > doc_id) {
+                doc_id = lowest_possible;
             }
-            const float block_score = it->BlockMaxBM25Score();
-            leftover_threshold -= block_score;
-            common_block_max_bm25_score_parts_[i] = block_score;
             common_block_last_doc_id = std::min(common_block_last_doc_id, it->BlockLastDocID());
             assert((doc_id <= common_block_last_doc_id));
         }
         if (i == sorted_iterators_.size()) {
-            common_block_min_possible_doc_id_ = doc_id;
-            common_block_last_doc_id_ = common_block_last_doc_id;
             float sum_score = 0.0f;
             for (u32 j = sorted_iterators_.size(); j > 0; --j) {
                 const float prev_sum_score = sum_score;
-                sum_score += common_block_max_bm25_score_parts_[j - 1];
+                sum_score += sorted_iterators_[j - 1]->BlockMaxBM25Score();
                 common_block_max_bm25_score_parts_[j - 1] = prev_sum_score;
             }
-            common_block_max_bm25_score_ = sum_score;
-            assert((sum_score >= threshold));
             assert((sum_score <= bm25_score_upper_bound_));
-            return true;
+            if (sum_score >= threshold) {
+                common_block_max_bm25_score_ = sum_score;
+                common_block_min_possible_doc_id_ = doc_id;
+                common_block_last_doc_id_ = common_block_last_doc_id;
+                return true;
+            }
+            // continue loop
+            doc_id = common_block_last_doc_id + 1;
         }
     }
 }
 
-Tuple<bool, float, RowID> BlockMaxAndIterator::SeekInBlockRange(RowID doc_id, float threshold) {
+Tuple<bool, float, RowID> BlockMaxAndIterator::SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) {
     if (threshold > BlockMaxBM25Score()) [[unlikely]] {
         return {false, 0.0F, INVALID_ROWID};
     }
-    const RowID block_end = common_block_last_doc_id_;
-    if (doc_id > block_end) [[unlikely]] {
-        return {false, 0.0F, INVALID_ROWID};
-    }
+    const RowID block_end = std::min(doc_id_no_beyond, BlockLastDocID());
     while (true) {
-        u32 i = 0;
+        if (doc_id > block_end) [[unlikely]] {
+            return {false, 0.0F, INVALID_ROWID};
+        }
         float leftover_threshold = threshold;
+        // special case: first iterator, threshold will not change
+        auto [success1, score1, id1] =
+            sorted_iterators_[0]->SeekInBlockRange(doc_id, leftover_threshold - common_block_max_bm25_score_parts_[0], block_end);
+        if (!success1) {
+            return {false, 0.0F, INVALID_ROWID};
+        }
+        assert((id1 <= block_end));
+        assert((id1 >= doc_id));
+        if (id1 > doc_id) {
+            // need to update doc_id
+            doc_id = id1;
+        }
+        leftover_threshold -= score1;
+        u32 i = 1;
         for (; i < sorted_iterators_.size(); ++i) {
-            auto [success, score, id] = sorted_iterators_[i]->SeekInBlockRange(doc_id, leftover_threshold - common_block_max_bm25_score_parts_[i]);
-            if (!success or id > block_end) {
-                return {false, 0.0F, INVALID_ROWID};
-            }
-            assert((id >= doc_id));
-            if (id > doc_id) {
+            auto [success2, score2, id2] =
+                sorted_iterators_[i]->SeekInBlockRange(doc_id, leftover_threshold - common_block_max_bm25_score_parts_[i], doc_id);
+            if (!success2) {
                 // need to update doc_id, restart from the first iterator
-                doc_id = id;
+                ++doc_id;
                 break;
             }
-            assert((id == doc_id));
-            leftover_threshold -= score;
+            assert((id2 == doc_id));
+            leftover_threshold -= score2;
         }
         if (i == sorted_iterators_.size()) {
             doc_id_ = doc_id;

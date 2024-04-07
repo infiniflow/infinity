@@ -14,8 +14,9 @@
 
 module;
 
-#include <iostream>
 #include <cassert>
+#include <chrono>
+#include <iostream>
 #include <string>
 
 module physical_match;
@@ -50,11 +51,21 @@ import search_driver;
 import query_node;
 import query_builder;
 import doc_iterator;
-import knn_result_handler;
 import logger;
 import analyzer_pool;
 import analyzer;
 import term;
+import early_terminate_iterator;
+import fulltext_score_result_heap;
+
+void ASSERT_FLOAT_EQ6(float a, float b) {
+    std::cerr << "a: " << a << " b: " << b << std::endl;
+    float diff_abs = std::abs(a - b);
+    float max_abs = std::max(std::abs(a), std::abs(b));
+    float err_percent = diff_abs / max_abs;
+    std::cerr << "diff_abs: " << diff_abs << " max_abs: " << max_abs << " err_percent: " << err_percent << std::endl;
+    assert((err_percent < 1e-6));
+}
 
 namespace infinity {
 
@@ -86,6 +97,10 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
     }
+#ifdef INFINITY_DEBUG
+    LOG_TRACE("Query tree created successfully:");
+    query_tree->PrintTree(std::cerr);
+#endif
 
     // 2 build DocIterator
     FullTextQueryContext full_text_query_context;
@@ -96,9 +111,14 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     UniquePtr<RowID[]> row_id_result;
 #ifdef INFINITY_DEBUG
     if (doc_iterator.get() != nullptr) {
-        LOG_TRACE("DocIterator created successfully");
+        LOG_TRACE("DocIterator created successfully:");
         full_text_query_context.query_tree_->PrintTree(std::cerr);
     }
+    UniquePtr<EarlyTerminateIterator> et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+    UniquePtr<float[]> et_score_result;
+    UniquePtr<RowID[]> et_row_id_result;
+    u32 old_loop_cnt = 0;
+    u32 et_loop_cnt = 0;
 #endif
 
     // 3 full text search
@@ -116,20 +136,52 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         }
         score_result = MakeUniqueForOverwrite<float[]>(top_n);
         row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n);
-        using ResultHandler = ReservoirResultHandler<CompareMin<float, RowID>>;
-        ResultHandler result_handler(1, top_n, score_result.get(), row_id_result.get());
-        result_handler.Begin();
-        // prepare query_builder
-        query_builder.LoadScorerColumnLength(iter_row_id);
+        FullTextScoreResultHeap result_heap(top_n, score_result.get(), row_id_result.get());
+#ifdef INFINITY_DEBUG
+        et_score_result = MakeUniqueForOverwrite<float[]>(top_n);
+        et_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n);
+        FullTextScoreResultHeap et_result_heap(top_n, et_score_result.get(), et_row_id_result.get());
+        auto old_begin_ts = std::chrono::high_resolution_clock::now();
+#endif
         do {
             // call scorer
             float score = query_builder.Score(iter_row_id);
-            result_handler.AddResult(0, score, iter_row_id);
+            result_heap.AddResult(score, iter_row_id);
             // get next row_id
             iter_row_id = doc_iterator->Next();
+#ifdef INFINITY_DEBUG
+            ++old_loop_cnt;
+#endif
         } while (iter_row_id != INVALID_ROWID);
-        result_handler.End();
-        result_count = result_handler.GetSize(0);
+        result_heap.Sort();
+        result_count = result_heap.GetResultSize();
+#ifdef INFINITY_DEBUG
+        auto old_end_ts = std::chrono::high_resolution_clock::now();
+        auto old_duration = std::chrono::duration_cast<std::chrono::microseconds>(old_end_ts - old_begin_ts).count();
+        auto et_begin_ts = std::chrono::high_resolution_clock::now();
+        while (true) {
+            ++et_loop_cnt;
+            auto [id, et_score] = et_iter->BlockNextWithThreshold(et_result_heap.GetScoreThreshold());
+            if (id == INVALID_ROWID) {
+                break;
+            }
+            if (et_result_heap.AddResult(et_score, id)) {
+                // update threshold
+                et_iter->UpdateScoreThreshold(et_result_heap.GetScoreThreshold());
+            }
+        }
+        et_result_heap.Sort();
+        auto et_end_ts = std::chrono::high_resolution_clock::now();
+        auto et_duration = std::chrono::duration_cast<std::chrono::microseconds>(et_end_ts - et_begin_ts).count();
+        std::cerr << "old_duration: " << old_duration << " et_duration: " << et_duration << std::endl;
+        std::cerr << "duration ratio: " << (float)et_duration / old_duration << std::endl;
+        std::cerr << "old_loop_cnt: " << old_loop_cnt << " et_loop_cnt: " << et_loop_cnt << std::endl;
+        assert((result_count == et_result_heap.GetResultSize()));
+        for (u32 i = 0; i < result_count; ++i) {
+            // assert((row_id_result[i] == et_row_id_result[i]));
+            ASSERT_FLOAT_EQ6(score_result[i], et_score_result[i]);
+        }
+#endif
     }
     LOG_TRACE(fmt::format("Full text search result count: {}", result_count));
 
