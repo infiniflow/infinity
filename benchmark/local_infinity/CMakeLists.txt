@@ -97,26 +97,6 @@ target_link_libraries(
     atomic.a
 )
 
-# optimize benchmark
-add_executable(fulltext_optimize_benchmark
-        fulltext/fulltext_optimize_benchmark.cpp
-)
-
-target_include_directories(fulltext_optimize_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        fulltext_optimize_benchmark
-        infinity_core
-        benchmark_profiler
-        sql_parser
-        onnxruntime_mlas
-        zsv_parser
-        newpfor
-        fastpfor
-        lz4.a
-        atomic.a
-)
-
-
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
