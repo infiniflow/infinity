@@ -286,6 +286,6 @@ int main(int argc, char* argv[]) {
     if (is_merge) {
         BenchmarkOptimize(infinity, db_name, table_name);
     }
-
+    sleep(10);
     Infinity::LocalUnInit();
 }
