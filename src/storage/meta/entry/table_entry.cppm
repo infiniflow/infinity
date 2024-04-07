@@ -109,12 +109,19 @@ public:
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
 
     // replay
+    void UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry);
+
     TableIndexEntry *CreateIndexReplay(const SharedPtr<String> &index_name,
                                        std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts);
 
-    void DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    void UpdateIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    void DropIndexReplay(const String &index_name,
+                         std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 

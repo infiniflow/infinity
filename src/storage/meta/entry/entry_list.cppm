@@ -72,6 +72,9 @@ public:
     Tuple<Entry *, Status>
     AddEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Status
+    UpdateEntryReplay(std::function<void(SharedPtr<Entry>, TransactionID, TxnTimeStamp)> &&update_func, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     Tuple<Entry *, Status>
     DropEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -381,6 +384,26 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<
         }
         default: {
             return {nullptr, Status::InvalidEntry()};
+        }
+    }
+}
+
+template <EntryConcept Entry>
+Status EntryList<Entry>::UpdateEntryReplay(std::function<void(SharedPtr<Entry>, TransactionID, TxnTimeStamp)> &&update_func,
+                                           TransactionID txn_id,
+                                           TxnTimeStamp begin_ts) {
+    FindResult find_res = FindEntryReplay(txn_id, begin_ts);
+    switch (find_res) {
+        case FindResult::kNotFound: {
+            return Status::NotFoundEntry();
+        }
+        case FindResult::kFound: {
+            SharedPtr<Entry> src = entry_list_.front();
+            update_func(src, txn_id, begin_ts);
+            return Status::OK();
+        }
+        default: {
+            return Status::InvalidEntry();
         }
     }
 }

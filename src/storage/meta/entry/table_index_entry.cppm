@@ -132,6 +132,9 @@ public:
 
     void RollbackCreateIndex(TxnIndexStore *txn_index_store);
 
+    // replay
+    void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
         return DetermineRandomString(parent_dir, fmt::format("index_{}", index_name));

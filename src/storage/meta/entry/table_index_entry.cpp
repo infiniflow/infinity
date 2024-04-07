@@ -419,4 +419,10 @@ void TableIndexEntry::UpdateFulltextSegmentTs(TxnTimeStamp ts) {
     return table_index_meta()->GetTableEntry()->UpdateFullTextSegmentTs(ts, segment_update_ts_mutex_, segment_update_ts_);
 }
 
+void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    commit_ts_.store(commit_ts);
+    begin_ts_ = begin_ts;
+    txn_id_ = txn_id;
+}
+
 } // namespace infinity
