@@ -16,7 +16,6 @@ module;
 
 #include <filesystem>
 #include <queue>
-
 export module external_sort_merger;
 
 import stl;
@@ -79,7 +78,7 @@ export struct TermTuple {
 
     bool operator<(const TermTuple &other) const { return Compare(other) < 0; }
 
-    TermTuple(char *p, u16 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
+    TermTuple(char *p, u32 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
         doc_id_ = *((u32 *)(p + term_.size() + 1));
         term_pos_ = *((u32 *)(p + term_.size() + 1 + sizeof(doc_id_)));
     }

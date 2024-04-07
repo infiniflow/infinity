@@ -243,7 +243,7 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
 
     // size of this Run in bytes
     u32 data_size = 0;
-    u32 data_size_pos = ftell(spill_file);
+    u64 data_size_pos = ftell(spill_file);
     fwrite(&data_size, sizeof(u32), 1, spill_file);
     // number of tuples
     u32 num_of_tuples = positions_.size();
@@ -253,11 +253,11 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
     u64 next_start_offset = 0;
     u64 next_start_offset_pos = ftell(spill_file);
     fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
-    u32 data_start_offset = ftell(spill_file);
+    u64 data_start_offset = ftell(spill_file);
     // sorted data
     u32 last_term_num = std::numeric_limits<u32>::max();
     StringRef term;
-    u16 record_length = 0;
+    u32 record_length = 0;
     char str_null = '\0';
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_) {
@@ -265,7 +265,7 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
             term = GetTermFromNum(last_term_num);
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
-        fwrite(&record_length, sizeof(u16), 1, spill_file);
+        fwrite(&record_length, sizeof(u32), 1, spill_file);
         fwrite(term.data(), term.size(), 1, spill_file);
         fwrite(&str_null, sizeof(char), 1, spill_file);
         fwrite(&i.doc_id_, sizeof(docid_t), 1, spill_file);
