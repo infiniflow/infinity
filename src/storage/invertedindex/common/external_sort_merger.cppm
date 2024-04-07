@@ -16,7 +16,6 @@ module;
 
 #include <filesystem>
 #include <queue>
-
 export module external_sort_merger;
 
 import stl;
@@ -79,7 +78,7 @@ export struct TermTuple {
 
     bool operator<(const TermTuple &other) const { return Compare(other) < 0; }
 
-    TermTuple(char *p, u16 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
+    TermTuple(char *p, u32 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
         doc_id_ = *((u32 *)(p + term_.size() + 1));
         term_pos_ = *((u32 *)(p + term_.size() + 1 + sizeof(doc_id_)));
     }
@@ -161,23 +160,6 @@ struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyTy
             return 1;
         else
             return -1;
-
-        LenType len1 = LEN() / sizeof(KeyType);
-        LenType len2 = p.LEN() / sizeof(KeyType);
-
-        for (LenType i = 1; i < len1 && i < len2; ++i) {
-            if (((KeyType *)(data + sizeof(LenType)))[i] > ((KeyType *)(p.data + sizeof(LenType)))[i])
-                return 1;
-            if (((KeyType *)(data + sizeof(LenType)))[i] < ((KeyType *)(p.data + sizeof(LenType)))[i])
-                return -1;
-        }
-
-        if (len1 == len2)
-            return 0;
-
-        if (len1 > len2)
-            return 1;
-        return -1;
     }
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }

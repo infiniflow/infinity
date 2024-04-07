@@ -99,8 +99,8 @@ TEST_F(ColumnInverterTest, Invert) {
     auto update_length_job_2 =
         MakeShared<FullTextColumnLengthUpdateJob>(std::move(column_length_file_handler), 2, 3, column_length_mutex_, column_length_array_);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-    ColumnInverter inverter1("standard", &byte_slice_pool_, provider);
-    ColumnInverter inverter2("standard", &byte_slice_pool_, provider);
+    ColumnInverter inverter1("standard", provider);
+    ColumnInverter inverter2("standard", provider);
     inverter1.InvertColumn(column, 0, 3, 0);
     inverter2.InvertColumn(column, 3, 2, 3);
     inverter1.GetTermListLength(update_length_job_1->GetColumnLengthArray());
