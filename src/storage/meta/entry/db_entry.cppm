@@ -100,6 +100,11 @@ public:
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts);
 
+    void UpdateTableReplay(const SharedPtr<String> &table_name,
+                           std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts);
+
     void DropTableReplay(const String &table_name,
                          std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                          TransactionID txn_id,
@@ -139,6 +144,6 @@ public:
     void Cleanup() override;
 
     void MemIndexCommit();
-    void MemIndexRecover(BufferManager* buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager);
 };
 } // namespace infinity

@@ -505,7 +505,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         txn_id,
                         begin_ts);
                 }
-                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDeleteAndNew) {
+                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
                     this->CreateDatabaseReplay(
                         db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -513,6 +513,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         },
                         txn_id,
                         begin_ts);
+                }
+                if (merge_flag == MergeFlag::kUpdate) {
+                    UnrecoverableError("Update database entry is not supported.");
                 }
                 break;
             }
@@ -529,6 +532,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
+                    // Actually the table entry replayed doesn't have full information cause index entry are lacked, but that is ok for now.
                     db_entry->DropTableReplay(
                         *table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -548,8 +552,28 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         txn_id,
                         begin_ts);
                 }
-                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDeleteAndNew) {
+                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
                     db_entry->CreateTableReplay(
+                        table_name,
+                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return TableEntry::ReplayTableEntry(false,
+                                                                table_meta,
+                                                                table_entry_dir,
+                                                                table_name,
+                                                                column_defs,
+                                                                entry_type,
+                                                                txn_id,
+                                                                begin_ts,
+                                                                commit_ts,
+                                                                row_count,
+                                                                unsealed_id,
+                                                                next_segment_id);
+                        },
+                        txn_id,
+                        begin_ts);
+                }
+                if (merge_flag == MergeFlag::kUpdate) {
+                    db_entry->UpdateTableReplay(
                         table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                             return TableEntry::ReplayTableEntry(false,
@@ -671,9 +695,17 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
-                    table_entry->DropIndexReplay(*index_name, txn_id, begin_ts);
+                    table_entry->DropIndexReplay(
+                        *index_name,
+                        [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            auto index_entry = TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, index_meta, txn_id, begin_ts);
+                            index_entry->commit_ts_.store(commit_ts);
+                            return index_entry;
+                        },
+                        txn_id,
+                        begin_ts);
                 }
-                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDeleteAndNew) {
+                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
                     table_entry->CreateIndexReplay(
                         index_name,
                         [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -681,6 +713,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         },
                         txn_id,
                         begin_ts);
+                }
+                if (merge_flag == MergeFlag::kUpdate) {
+                    table_entry->UpdateIndexReplay(*index_name, txn_id, begin_ts, commit_ts);
                 }
                 break;
             }

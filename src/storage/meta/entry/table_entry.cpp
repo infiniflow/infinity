@@ -185,6 +185,16 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     return index_meta->DeleteEntry(txn_id);
 }
 
+/// replay
+void TableEntry::UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry) {
+    txn_id_.store(table_entry->txn_id_);
+    begin_ts_ = table_entry->begin_ts_;
+    commit_ts_.store(table_entry->commit_ts_);
+    row_count_ = table_entry->row_count();
+    unsealed_id_ = table_entry->unsealed_id();
+    next_segment_id_ = table_entry->next_segment_id();
+}
+
 TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_name,
                                                std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
                                                TransactionID txn_id,
@@ -194,12 +204,23 @@ TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_na
     return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
 }
 
-void TableEntry::DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+void TableEntry::UpdateIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    index_meta->DropEntryReplay(txn_id, begin_ts);
+    index_meta->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
+}
+
+void TableEntry::DropIndexReplay(const String &index_name,
+                                 std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                 TransactionID txn_id,
+                                 TxnTimeStamp begin_ts) {
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
 }
 
 TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {

@@ -653,7 +653,15 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
     Catalog *catalog = storage_->catalog();
     auto *db_entry = catalog->GetDatabaseReplay(cmd.db_name_, txn_id, begin_ts);
     auto *table_entry = db_entry->GetTableReplay(cmd.table_name_, txn_id, begin_ts);
-    table_entry->DropIndexReplay(cmd.index_name_, txn_id, begin_ts);
+    table_entry->DropIndexReplay(
+        cmd.index_name_,
+        [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            auto index_entry = TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, index_meta, txn_id, begin_ts);
+            index_entry->commit_ts_.store(commit_ts);
+            return index_entry;
+        },
+        txn_id,
+        begin_ts);
 }
 
 // use by import and compact, add a new segment
