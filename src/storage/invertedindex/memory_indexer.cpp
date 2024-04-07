@@ -195,7 +195,7 @@ SizeT MemoryIndexer::CommitSync() {
         inverter->GeneratePosting();
         num += inverter->GetMerged();
     }
-    LOG_INFO(fmt::format("MemoryIndexer::CommitSync done {} inverters, inflight_tasks_ was {}", num, inflight_tasks_));
+    // LOG_INFO(fmt::format("MemoryIndexer::CommitSync done {} inverters, inflight_tasks_ was {}", num, inflight_tasks_));
     generating_.compare_exchange_strong(generating, false);
     std::unique_lock<std::mutex> lock(mutex_);
     inflight_tasks_ -= num;
@@ -224,7 +224,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         usleep(1000000);
         CommitSync();
     }
-    LOG_INFO("MemoryIndexer::Dump begin");
+    // LOG_INFO("MemoryIndexer::Dump begin");
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -261,7 +261,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     is_spilled_ = spill;
     Reset();
-    LOG_INFO("MemoryIndexer::Dump end");
+    // LOG_INFO("MemoryIndexer::Dump end");
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting
