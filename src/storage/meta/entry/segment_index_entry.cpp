@@ -232,6 +232,8 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
     memory_indexer_->Load();
 }
 
+u32 SegmentIndexEntry::MemIndexRowCount() { return memory_indexer_.get() == nullptr ? 0 : memory_indexer_->GetDocCount(); }
+
 void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn) {
     auto *buffer_mgr = txn->buffer_mgr();
     const IndexBase *index_base = table_index_entry_->index_base();

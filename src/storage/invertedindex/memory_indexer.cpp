@@ -28,7 +28,6 @@ module;
 #include <filesystem>
 #include <iostream>
 #include <string.h>
-#include <unistd.h>
 module memory_indexer;
 
 import stl;
@@ -73,7 +72,7 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
                              RecyclePool &buffer_pool,
                              ThreadPool &thread_pool)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
-      buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(10UL), ring_sorted_(10UL) {
+      buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(13UL), ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
     Path path = Path(index_dir) / "tmp.merge";
@@ -82,8 +81,7 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
 
 MemoryIndexer::~MemoryIndexer() {
     while (GetInflightTasks() > 0) {
-        usleep(1000000);
-        CommitSync();
+        CommitSync(100);
     }
     Reset();
 }
@@ -146,7 +144,7 @@ void MemoryIndexer::Commit(bool offline) {
         thread_pool_.push([this](int id) { this->CommitSync(); });
 }
 
-SizeT MemoryIndexer::CommitOffline(bool wait_if_empty) {
+SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     bool generating = false;
     bool changed = generating_.compare_exchange_strong(generating, true);
     if (!changed)
@@ -156,7 +154,7 @@ SizeT MemoryIndexer::CommitOffline(bool wait_if_empty) {
         PrepareSpillFile();
     }
     Vector<SharedPtr<ColumnInverter>> inverters;
-    this->ring_sorted_.GetBatch(inverters, wait_if_empty);
+    this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
     SizeT num = inverters.size();
     if (num > 0) {
         for (auto &inverter : inverters) {
@@ -175,10 +173,14 @@ SizeT MemoryIndexer::CommitOffline(bool wait_if_empty) {
     return num;
 }
 
-SizeT MemoryIndexer::CommitSync() {
+SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
     Vector<SharedPtr<ColumnInverter>> inverters;
+    // LOG_INFO("MemoryIndexer::CommitSync begin");
     u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
-    if (!inverters.empty()) {
+    SizeT num_sorted = inverters.size();
+    SizeT num_generated = 0;
+    // SizeT num_merged = 0;
+    if (num_sorted > 0) {
         ColumnInverter::Merge(inverters);
         inverters[0]->Sort();
         this->ring_sorted_.Put(seq_commit, inverters[0]);
@@ -187,30 +189,38 @@ SizeT MemoryIndexer::CommitSync() {
     bool generating = false;
     bool changed = generating_.compare_exchange_strong(generating, true);
     if (!changed)
-        return 0;
+        goto QUIT;
     generating = true;
-    this->ring_sorted_.GetBatch(inverters);
-    SizeT num = 0;
+    this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
+    // num_merged = inverters.size();
     for (auto &inverter : inverters) {
         inverter->GeneratePosting();
-        num += inverter->GetMerged();
+        num_generated += inverter->GetMerged();
     }
-    // LOG_INFO(fmt::format("MemoryIndexer::CommitSync done {} inverters, inflight_tasks_ was {}", num, inflight_tasks_));
     generating_.compare_exchange_strong(generating, false);
-    std::unique_lock<std::mutex> lock(mutex_);
-    inflight_tasks_ -= num;
-    if (inflight_tasks_ == 0) {
-        cv_.notify_all();
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_ -= num_generated;
+        if (inflight_tasks_ == 0) {
+            cv_.notify_all();
+        }
     }
 
-    return num;
+QUIT:
+    // LOG_INFO(fmt::format("MemoryIndexer::CommitSync sorted {} inverters, generated posting for {} inverters(merged to {}), inflight_tasks_ is {}",
+    //                      num_sorted,
+    //                      num_generated,
+    //                      num_merged,
+    //                      inflight_tasks_));
+
+    return num_generated;
 }
 
 void MemoryIndexer::Dump(bool offline, bool spill) {
     if (offline) {
         assert(!spill);
         while (GetInflightTasks() > 0) {
-            CommitOffline(true);
+            CommitOffline(100);
         }
         OfflineDump();
         return;
@@ -221,8 +231,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     while (GetInflightTasks() > 0) {
-        usleep(1000000);
-        CommitSync();
+        CommitSync(100);
     }
     // LOG_INFO("MemoryIndexer::Dump begin");
     Path path = Path(index_dir_) / base_name_;

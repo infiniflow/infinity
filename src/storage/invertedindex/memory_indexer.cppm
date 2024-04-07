@@ -72,8 +72,9 @@ public:
     // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
 
-    // CommitSync is for online case. It gets a batch of ColumnInverter and commit them. Returns the size of the batch.
-    SizeT CommitSync();
+    // CommitSync is for online case. It sort a batch of inverters, then generate posting for a batch of inverters.
+    // Returns the batch size of generated posting.
+    SizeT CommitSync(SizeT wait_if_empty_ms = 0);
 
     // Dump is blocking and shall be called only once after inserting all documents.
     // WARN: Don't reuse MemoryIndexer after calling Dump!
@@ -108,7 +109,7 @@ private:
     }
 
     // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
-    SizeT CommitOffline(bool wait_if_empty = false);
+    SizeT CommitOffline(SizeT wait_if_empty_ms = 0);
 
     void OfflineDump();
 

@@ -86,7 +86,7 @@ export {
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
-    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 8 * 1024;
+    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * GB;
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 30;          // 30 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 5;         // 5 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024;

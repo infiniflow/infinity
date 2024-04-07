@@ -101,6 +101,8 @@ public:
     // Populate index entirely for the segment
     void PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn);
 
+    u32 MemIndexRowCount();
+
     Status CreateIndexPrepare(const SegmentEntry *segment_entry, Txn *txn, bool prepare, bool check_ts);
 
     Status CreateIndexDo(atomic_u64 &create_index_idx);
