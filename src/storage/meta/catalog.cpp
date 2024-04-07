@@ -505,7 +505,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         txn_id,
                         begin_ts);
                 }
-                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDeleteAndNew) {
+                if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
                     this->CreateDatabaseReplay(
                         db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
