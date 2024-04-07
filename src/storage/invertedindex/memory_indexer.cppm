@@ -69,11 +69,10 @@ public:
                 SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
                 bool offline = false);
 
-    // Commit(false) is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
-    // Commit(true) is blocking and thread-unsafe. There shall be onle one thread call this method at a time.
+    // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
 
-    // CommitSync wait at max 100ms to get a batch of insertions and commit them. Returens the size of the batch.
+    // CommitSync is for online case. It gets a batch of ColumnInverter and commit them. Returns the size of the batch.
     SizeT CommitSync();
 
     // Dump is blocking and shall be called only once after inserting all documents.
@@ -107,6 +106,9 @@ private:
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
     }
+
+    // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
+    SizeT CommitOffline(bool wait_if_empty = false);
 
     void OfflineDump();
 

@@ -143,6 +143,8 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         size_micro_run_[i] = ret;
         size_loaded_run_[i] = ret;
         run_curr_addr_[i] = io_stream.Tell();
+        // std::cout << "num_run_[" << i << "] " << num_run_[i] << " size_run_ " << size_run_[i] << " size_micro_run " << size_micro_run_[i]
+        //           << std::endl;
 
         /// it is not needed for compression, validation will be made within IOStream in that case
         // if a record can fit in microrun buffer
@@ -183,6 +185,7 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         while (size_micro_run_[i]) {
             LenType len = *(LenType *)(micro_buf_[i] + pos);
             if (pos + sizeof(LenType) + len > size_micro_run_[i]) {
+                // std::cout << "len " << len << " size_micro_run_[" << i << "] " << size_micro_run_[i] << std::endl;
                 assert(last_pos != (u32)-1); // buffer too small that can't hold one record
 
                 len = *(LenType *)(micro_buf_[i] + last_pos) + sizeof(LenType);
@@ -416,5 +419,5 @@ void SortMerger<KeyType, LenType>::Run() {
 }
 
 template class SortMerger<u32, u8>;
-template class SortMerger<TermTuple, u16>;
+template class SortMerger<TermTuple, u32>;
 } // namespace infinity

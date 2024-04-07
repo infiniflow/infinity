@@ -139,10 +139,10 @@ protected:
                 buffer[str.size()] = '\0';
                 memcpy(buffer + str.size() + 1, &doc_id, sizeof(u32));
                 memcpy(buffer + str.size() + 1 + sizeof(u32), &term_pos, sizeof(u32));
-                u16 len = str.size() + 1 + sizeof(u32) + sizeof(u32);
-                fwrite(&len, sizeof(u16), 1, f);
+                u32 len = str.size() + 1 + sizeof(u32) + sizeof(u32);
+                fwrite(&len, sizeof(u32), 1, f);
                 fwrite(buffer, len, 1, f);
-                s += len + sizeof(u16);
+                s += len + sizeof(u32);
             }
             u64 next_run_pos = ftell(f);
             fseek(f, pos, SEEK_SET);
@@ -154,7 +154,7 @@ protected:
         }
         fclose(f);
 
-        SortMerger<TermTuple, u16> merger("./tt", run_num, bs, 2);
+        SortMerger<TermTuple, u32> merger("./tt", run_num, bs, 2);
         merger.Run();
 
         f = fopen("./tt", "r");
@@ -163,8 +163,8 @@ protected:
         fread(&count, sizeof(u64), 1, f);
         EXPECT_EQ(count, SIZE);
         for (u32 i = 0; i < count; ++i) {
-            u16 len = 0;
-            fread(&len, sizeof(u16), 1, f);
+            u32 len = 0;
+            fread(&len, sizeof(u32), 1, f);
             char *buf = new char[len];
             fread(buf, len, 1, f);
             TermTuple tuple(buf, len);
