@@ -162,7 +162,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     profiler.Begin();
 
     SizeT num_rows = 0;
-    const int batch_size = 1;
+    const int batch_size = 100;
     Vector<Tuple<char *, char *, char *>> batch;
     batch.reserve(batch_size);
 
@@ -170,7 +170,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     bool done = false;
     ConstantExpr *const_expr = nullptr;
     while (!done) {
-        ReadJsonl(input_file, 1, batch);
+        ReadJsonl(input_file, batch_size, batch);
         if (batch.empty()) {
             done = true;
             break;
