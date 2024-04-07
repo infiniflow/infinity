@@ -311,9 +311,9 @@ void MemoryIndexer::OfflineDump() {
     // 1. External sort merge
     // 2. Generate posting
     // 3. Dump disk segment data
-    LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}", num_runs_));
+    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}", num_runs_));
     FinalSpillFile();
-    constexpr u32 buffer_size_of_each_run = 1024 * 1024;
+    constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
     SortMerger<TermTuple, u32> *merger = new SortMerger<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     merger->Run();
     delete merger;
@@ -396,7 +396,7 @@ void MemoryIndexer::OfflineDump() {
     fs.AppendFile(dict_file, fst_file);
     fs.DeleteFile(fst_file);
 
-    LOG_INFO(fmt::format("MemoryIndexer::OfflineDump done, num_runs_ {}", num_runs_));
+    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump done, num_runs_ {}", num_runs_));
     num_runs_ = 0;
     std::filesystem::remove(spill_full_path_);
 }

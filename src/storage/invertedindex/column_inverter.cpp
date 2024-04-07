@@ -18,6 +18,7 @@ module;
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <vector>
 module column_inverter;
 import stl;
@@ -265,6 +266,8 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
             term = GetTermFromNum(last_term_num);
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
+        if (record_length > 1024)
+            std::cout << "!!!!!! record_length " << record_length << std::endl;
         fwrite(&record_length, sizeof(u32), 1, spill_file);
         fwrite(term.data(), term.size(), 1, spill_file);
         fwrite(&str_null, sizeof(char), 1, spill_file);
