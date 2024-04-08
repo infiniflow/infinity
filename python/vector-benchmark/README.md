@@ -44,19 +44,19 @@ Usage: run_benchmark.py [OPTIONS]
 
 Options:
 	-- engines
-		all(default), Qdrant, ElasticSearch, Infinity
-  	-- hardware
+		all(default), qdrant, elasticSearch, infinity
+  -- hardware
 		8c_16g(default)
 		4c_32g
 	-- mode
 		test mode:  all(default)
-                    vector_gist,
-                    vector_sift,
-                    vector_cohere_1M,
-                    vector_cohere_10M,
-                    fulltext_PMC,
-                    fulltext_wiki,
-                    hybrid
+                vector_gist,
+                vector_sift,
+                vector_cohere_1M,
+                vector_cohere_10M,
+                fulltext_PMC,
+                fulltext_wiki,
+                hybrid
   -- limit_ram
     25Gb(default)
   -- limit_cpus
@@ -65,4 +65,4 @@ Options:
     show this message.
 ```
 
-The hardware and mode configurations are saved as JSON files in the "configs" folder. The hardware configuration is for setting up the database server's hardware parameters, while the mode configuration is for setting up the benchmark being used, which includes the dataset, index parameters, queries, and query parameters. Users can customize these configurations, saving them as JSON files, for example, "vector_c4.json". To run a test, simply use `--mode vector_c4`.
+The hardware and mode configurations are saved as JSON files in the "configs" folder. The hardware configuration is for setting up the database server's hardware parameters, while the mode configuration is for setting up the benchmark being used, which includes the dataset, index parameters, queries, and query parameters. Users can customize these configurations, saving them as JSON files, for example, "qdrant_vector_c4.json". To run a test, simply use `-- engines qdrant --mode vector_c4`.
