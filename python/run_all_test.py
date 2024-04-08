@@ -13,12 +13,17 @@
 # limitations under the License.
 
 import os
+import pytest 
+import apibase
+from test_http_api.httpapibase import HttpTest
+
+# def run():
+#     os.system("cd test")
+#     os.system("python3 -m pytest -m 'not complex and not slow' test")
 
 
-def run():
-    os.system("cd test")
-    os.system("python3 -m pytest -m 'not complex and not slow' test")
-
+def run_all():
+    apibase.test_database(HttpTest)
 
 if __name__ == '__main__':
-    run()
+    run_all()

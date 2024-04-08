@@ -1,11 +1,6 @@
 from infinity import NetworkAddress
 import numpy as np
 
-TEST_REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)
-# TEST_REMOTE_HOST = NetworkAddress("192.168.200.151", 23817)
-# infinity thrift server port
-infinity_server_port = 23817
-
 identifier_limit = 65536
 database_count_limit = 65536
 table_count_limit = 65536
@@ -56,8 +51,8 @@ invalid_name_array = [
     'name-12',
     '12name',
     '数据库名',
-    #''.join('x' for i in range(identifier_limit + 1)),
-    #None,
+    # ''.join('x' for i in range(11)),
+    None,
 ]
 
 invalid_vector_array = []

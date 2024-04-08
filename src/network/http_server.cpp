@@ -96,6 +96,10 @@ public:
         String option = body_info_json["create_option"];
         CreateDatabaseOptions create_option;
 
+        if (option == "ignore_if_exists") {
+            create_option.conflict_type_ = ConflictType::kIgnore;
+        }
+
         // create database
         auto result = infinity->CreateDatabase(database_name, create_option);
 
@@ -127,6 +131,10 @@ public:
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
         String option = body_info_json["drop_option"];
         DropDatabaseOptions drop_option;
+
+        if (option == "ignore_if_not_exists") {
+            drop_option.conflict_type_ = ConflictType::kIgnore;
+        }
 
         auto result = infinity->DropDatabase(database_name, drop_option);
 
@@ -211,34 +219,36 @@ public:
         Vector<ColumnDef *> column_definitions;
         i64 id = 0;
 
-        for (auto &field : fields) {
-            for (auto &field_element : field.items()) {
-                String column_name = field_element.key();
-                auto values = field_element.value();
-                String value_type = values["type"];
-                ToLower(value_type);
-                SharedPtr<DataType> column_type = DataType::StringDeserialize(value_type);
-                if (column_type) {
-                    HashSet<ConstraintType> constraints;
-                    for (auto &constraint_json : values["constraints"]) {
-                        String constraint = constraint_json;
-                        ToLower(constraint);
-                        constraints.insert(StringToConstraintType(constraint));
-                    }
-                    ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints);
-                    column_definitions.emplace_back(col_def);
-                } else {
-                    infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", values["type"]));
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    HTTPStatus http_status;
-                    http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
+        for (auto &field : fields.items()) {
+            String column_name = field.key();
+            auto field_element = field.value();
+            String value_type = field_element["type"];
+            ToLower(value_type);
+            SharedPtr<DataType> column_type = DataType::StringDeserialize(value_type);
+            if (column_type) {
+                HashSet<ConstraintType> constraints;
+                for (auto &constraint_json : field_element["constraints"]) {
+                    String constraint = constraint_json;
+                    ToLower(constraint);
+                    constraints.insert(StringToConstraintType(constraint));
                 }
+                ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints);
+                column_definitions.emplace_back(col_def);
+            } else {
+                infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
+                json_response["error_code"] = status.code();
+                json_response["error_message"] = status.message();
+                HTTPStatus http_status;
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
             }
         }
         Vector<TableConstraint *> table_constraint;
+        String option = body_info_json["create_option"];
         CreateTableOptions create_table_opts;
+        if (option == "ignore_if_exists") {
+            create_table_opts.conflict_type_ = ConflictType::kIgnore;
+        }
 
         auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, create_table_opts);
 
@@ -262,7 +272,15 @@ public:
 
         String database_name = request->getPathVariable("database_name");
         String table_name = request->getPathVariable("table_name");
+        String body_info = request->readBodyToString();
+
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        String option = body_info_json["drop_option"];
         DropTableOptions drop_table_opts;
+        if (option == "ignore_if_not_exists") {
+            drop_table_opts.conflict_type_ = ConflictType::kIgnore;
+        }
+
         auto result = infinity->DropTable(database_name, table_name, drop_table_opts);
 
         HTTPStatus http_status;
