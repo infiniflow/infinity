@@ -403,8 +403,8 @@ class TestImport:
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
-        print(res)
+        res = table_obj.output(["count(*)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == data_size
 
     # import table with column value exceeding invalid value range
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_varchar_rows.csv",
