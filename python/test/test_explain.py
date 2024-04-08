@@ -35,7 +35,7 @@ class TestExplain:
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_explain_default", True)
+        db_obj.drop_table("test_explain_default", ConflictType.Ignore)
         table = db_obj.create_table("test_explain_default", {
             "c1": "varchar, primary key", "c2": "float"}, ConflictType.Error)
         assert table
@@ -69,3 +69,5 @@ class TestExplain:
             with pytest.raises(Exception, match=r".*Not implement*"):
                 res = table.output(["*"]).explain(ExplainType.Analyze)
                 print(res)
+
+        db_obj.drop_table("test_explain_default", ConflictType.Error)
