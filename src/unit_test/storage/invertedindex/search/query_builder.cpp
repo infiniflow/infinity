@@ -30,6 +30,7 @@ import query_builder;
 import query_node;
 import search_driver;
 import table_entry;
+import early_terminate_iterator;
 
 namespace infinity {
 
@@ -59,6 +60,7 @@ struct MockQueryNode : public QueryNode {
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, Scorer *) const final {
         return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_));
     }
+    std::unique_ptr<EarlyTerminateIterator> CreateEarlyTerminateSearch(const TableEntry *, IndexReader &, Scorer *) const final { return nullptr; }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
         os << prefix;
         os << (is_final ? "└──" : "├──");
