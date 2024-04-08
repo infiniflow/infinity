@@ -22,13 +22,27 @@ public:
 
     ~PostingIterator();
 
-    bool Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32 state_pool_size);
+    bool Init(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size);
 
     void Reset();
 
     u32 GetDocFreq() const { return doc_freq_; }
 
+    bool SkipTo(RowID doc_id);
+
+    RowID PrevBlockLastDocID() const { return last_doc_id_in_prev_block_; }
+
+    RowID BlockLowestPossibleDocID() const { return lowest_possible_doc_id_in_current_block_; }
+
+    RowID BlockLastDocID() const { return last_doc_id_in_current_block_; }
+
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const;
+
     RowID SeekDoc(RowID docId);
+
+    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond);
 
     void SeekPosition(pos_t pos, pos_t &result);
 
@@ -100,22 +114,29 @@ private:
 private:
     SharedPtr<Vector<SegmentPosting>> segment_postings_;
     PostingFormatOption posting_option_;
-    MemoryPool *session_pool_;
+    MemoryPool *session_pool_ = nullptr;
     u32 doc_freq_ = 0;
-    RowID last_doc_id_in_buffer_;
-    RowID current_row_id_;
-    docid_t *doc_buffer_cursor_;
-    docid_t doc_buffer_[MAX_DOC_PER_RECORD];
-    docid_t *doc_buffer_base_;
-    ttf_t current_ttf_;
-    i32 tf_buffer_cursor_;
-    tf_t *tf_buffer_;
-    docpayload_t *doc_payload_buffer_;
-    MultiPostingDecoder *posting_decoder_;
-    bool need_move_to_current_doc_;
-    bool in_doc_pos_iter_inited_;
-    InDocPositionState state_;
-    InDocPositionIterator *in_doc_pos_iterator_;
+
+    // info for skiplist, block max
+    RowID last_doc_id_in_prev_block_ = INVALID_ROWID;
+    RowID lowest_possible_doc_id_in_current_block_ = INVALID_ROWID;
+    RowID last_doc_id_in_current_block_ = INVALID_ROWID;
+    ttf_t current_ttf_ = 0;
+
+    // info for decode buffer
+    RowID current_row_id_ = INVALID_ROWID;
+    docid_t *doc_buffer_cursor_ = nullptr;
+    docid_t doc_buffer_[MAX_DOC_PER_RECORD] = {};
+    docid_t *doc_buffer_base_ = nullptr;
+    i32 tf_buffer_cursor_ = 0;
+    tf_t *tf_buffer_ = nullptr;
+    docpayload_t *doc_payload_buffer_ = nullptr;
+    MultiPostingDecoder *posting_decoder_ = nullptr;
+    bool finish_decode_docid_ = false;
+    bool need_move_to_current_doc_ = false;
+    bool in_doc_pos_iter_inited_ = false;
+    InDocPositionState state_ = posting_option_.GetPosListFormatOption();
+    InDocPositionIterator *in_doc_pos_iterator_ = nullptr;
 };
 
 } // namespace infinity

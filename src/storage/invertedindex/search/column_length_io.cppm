@@ -69,7 +69,7 @@ public:
 
     inline u32 GetColumnLength(RowID row_id) {
         // assume that there is a file which contains row_id
-        if (row_id >= next_base_rowid_) [[unlikely]] {
+        if (row_id >= next_base_rowid_ or row_id < current_base_rowid_) [[unlikely]] {
             SeekFile(row_id);
         }
         return column_length_array_[row_id - current_base_rowid_];
@@ -84,7 +84,7 @@ private:
     const Vector<RowID> &base_row_ids_; // must in ascending order, have an INVALID_ROWID at the end
     RowID current_base_rowid_ = INVALID_ROWID;
     RowID next_base_rowid_ = INVALID_ROWID;
-    u32 next_base_rowid_index_ = 1;
+    u32 current_index_ = 0;
     UniquePtr<u32[]> column_length_array_;
     u32 column_length_array_capacity_ = 0;
 };
@@ -93,7 +93,9 @@ export class ColumnLengthReader {
     Vector<FullTextColumnLengthReader> column_length_vector_;
 
 public:
-    void LoadColumnLength(RowID first_doc_id, IndexReader &index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length);
+    void AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length);
+
+    FullTextColumnLengthReader *GetColumnLengthReader(u32 scorer_column_idx) { return &column_length_vector_[scorer_column_idx]; }
 
     inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx].GetColumnLength(row_id); }
 };

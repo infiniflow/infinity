@@ -38,6 +38,7 @@ import create_index_info;
 import index_base;
 import index_full_text;
 import third_party;
+import blockmax_term_doc_iterator;
 
 namespace infinity {
 void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment) {
@@ -81,8 +82,26 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryP
         return nullptr;
     auto iter = MakeUnique<PostingIterator>(flag_, session_pool);
     u32 state_pool_size = 0; // TODO
-    iter->Init(seg_postings, state_pool_size);
+    iter->Init(std::move(seg_postings), state_pool_size);
     return iter;
+}
+
+UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight) {
+    SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
+    for (u32 i = 0; i < segment_readers_.size(); ++i) {
+        SegmentPosting seg_posting;
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool);
+        if (ret) {
+            seg_postings->push_back(seg_posting);
+        }
+    }
+    if (seg_postings->empty())
+        return nullptr;
+    auto result = MakeUnique<BlockMaxTermDocIterator>(flag_, session_pool);
+    result->MultiplyWeight(weight);
+    u32 state_pool_size = 0; // TODO
+    result->InitPostingIterator(std::move(seg_postings), state_pool_size);
+    return result;
 }
 
 float ColumnIndexReader::GetAvgColumnLength() const {

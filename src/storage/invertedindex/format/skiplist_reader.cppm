@@ -48,6 +48,10 @@ public:
 
     u32 GetLastKeyInBuffer() const;
 
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const { return {current_block_max_tf_, current_block_max_tf_percentage_}; }
+
 protected:
     virtual Pair<int, bool> LoadBuffer() = 0;
 

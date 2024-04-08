@@ -14,6 +14,7 @@
 
 module;
 
+#include <vector>
 module match_data;
 
 import stl;
@@ -22,13 +23,20 @@ import index_defines;
 import bm25_ranker;
 import internal_types;
 import column_index_reader;
+import blockmax_term_doc_iterator;
 
 namespace infinity {
+
+void Scorer::Init(u64 num_of_docs, IndexReader *index_reader) {
+    total_df_ = num_of_docs;
+    index_reader_ = index_reader;
+}
 
 u32 Scorer::GetOrSetColumnIndex(u64 column_id) {
     if (auto iter = column_index_map_.find(column_id); iter == column_index_map_.end()) {
         column_index_map_[column_id] = column_counter_;
         column_ids_.push_back(column_id);
+        column_length_reader_.AppendColumnLength(index_reader_, column_ids_, avg_column_length_);
         return column_counter_++;
     } else {
         return iter->second;
@@ -41,8 +49,11 @@ void Scorer::AddDocIterator(TermDocIterator *iter, u64 column_id) {
     iterators_[column_index].push_back(iter);
 }
 
-void Scorer::LoadColumnLength(RowID first_doc_id, IndexReader &index_reader) {
-    column_length_reader_.LoadColumnLength(first_doc_id, index_reader, column_ids_, avg_column_length_);
+void Scorer::AddBlockMaxDocIterator(BlockMaxTermDocIterator *iter, u64 column_id) {
+    u32 column_index = GetOrSetColumnIndex(column_id);
+    block_max_iterators_.resize(column_index + 1);
+    block_max_iterators_[column_index].push_back(iter);
+    iter->InitBM25Info(total_df_, avg_column_length_[column_index], column_length_reader_.GetColumnLengthReader(column_index));
 }
 
 float Scorer::Score(RowID doc_id) {
