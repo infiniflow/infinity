@@ -89,7 +89,7 @@ export {
     constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * GB;
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 30;          // 30 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 5;         // 5 seconds
-    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024;
+    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * MB;
     constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
     constexpr std::string_view WAL_FILE_PREFIX = "wal.log";
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
