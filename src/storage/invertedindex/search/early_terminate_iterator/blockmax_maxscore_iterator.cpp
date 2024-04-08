@@ -91,12 +91,14 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
         }
         RowID next_candidate = INVALID_ROWID;
         float leftover_threshold = threshold;
+        bool match_any = false;
         for (u32 j = sorted_iterators_.size(); j > pivot; --j) {
             const auto &it = sorted_iterators_[j - 1];
             // TODO: does not need score if id != doc_id
             auto [success, score, id] = it->SeekInBlockRange(doc_id, 0, block_end);
             if (success) {
                 if (id == doc_id) {
+                    match_any = true;
                     leftover_threshold -= score;
                     // TODO: does not need score here
                     auto [success2, score2, id2] = it->SeekInBlockRange(doc_id + 1, 0, block_end);
@@ -108,21 +110,23 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
                 }
             }
         }
-        for (u32 i = pivot; i > 0; --i) {
-            if (leftover_threshold > common_block_max_bm25_score_until_[i - 1]) {
-                // switch to next candidate
-                break;
+        if (match_any) {
+            for (u32 i = pivot; i > 0; --i) {
+                if (leftover_threshold > common_block_max_bm25_score_until_[i - 1]) {
+                    // switch to next candidate
+                    break;
+                }
+                auto [success, score, id] = sorted_iterators_[i - 1]->SeekInBlockRange(doc_id, 0, doc_id);
+                if (success) {
+                    leftover_threshold -= score;
+                }
             }
-            // TODO: add a "SeekTrue" method
-            auto [success, score, id] = sorted_iterators_[i - 1]->SeekInBlockRange(doc_id, 0, block_end);
-            if (success and id == doc_id) {
-                leftover_threshold -= score;
+            if (leftover_threshold <= 0) {
+                doc_id_ = doc_id;
+                return {true, threshold - leftover_threshold, doc_id};
             }
         }
-        if (leftover_threshold <= 0) {
-            doc_id_ = doc_id;
-            return {true, threshold - leftover_threshold, doc_id};
-        }
+        assert((doc_id < next_candidate));
         doc_id = next_candidate;
     }
 }
