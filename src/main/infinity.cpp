@@ -46,6 +46,7 @@ import table_reference;
 import insert_statement;
 import copy_statement;
 import delete_statement;
+import optimize_statement;
 
 import create_schema_info;
 import drop_schema_info;
@@ -591,6 +592,23 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     select_statement->search_expr_ = search_expr;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
+    return result;
+}
+
+QueryResult
+Infinity::Optimize(const String &db_name, const String &table_name) {
+    UniquePtr<QueryContext> optimize_context_ptr = MakeUnique<QueryContext>(session_.get());
+    optimize_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<OptimizeStatement> optimize_statement = MakeUnique<OptimizeStatement>();
+
+    optimize_statement->schema_name_ = db_name;
+    optimize_statement->table_name_ = table_name;
+
+    QueryResult result = optimize_context_ptr->QueryStatement(optimize_statement.get());
     return result;
 }
 

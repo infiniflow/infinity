@@ -17,6 +17,7 @@
 #include <string>
 #include <tuple>
 #include <unistd.h>
+#include <getopt.h>
 
 import stl;
 import third_party;
@@ -113,7 +114,6 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
 void BenchmarkImport(SharedPtr<Infinity> infinity,
                      const String &db_name,
                      const String &table_name,
-                     const String &index_name,
                      const String &import_from) {
     LocalFileSystem fs;
     if (!fs.Exists(import_from)) {
@@ -123,30 +123,11 @@ void BenchmarkImport(SharedPtr<Infinity> infinity,
 
     BaseProfiler profiler;
 
-    /*     profiler.Begin();
-        ImportOptions import_options;
-        import_options.copy_file_type_ = CopyFileType::kJSONL;
-        infinity->Import(db_name, table_name, import_from, std::move(import_options));
-        LOG_INFO(fmt::format("Import data cost: {}", profiler.ElapsedToString()));
-     */
     profiler.Begin();
-    auto index_info_list = new Vector<IndexInfo *>();
-    auto index_info = new IndexInfo();
-    index_info->index_type_ = IndexType::kFullText;
-    index_info->column_name_ = "text";
-    index_info->index_param_list_ = new Vector<InitParameter *>();
-    index_info_list->push_back(index_info);
-
-    auto r = infinity->CreateIndex(db_name, table_name, index_name, index_info_list, CreateIndexOptions());
-    if (r.IsOk()) {
-        r = infinity->Flush();
-    } else {
-        LOG_ERROR(fmt::format("Fail to create index {}", r.ToString()));
-        return;
-    }
-
-    // NOTE: ~CreateStatement() has already deleated or freed index_info_list, index_info, index_info->index_param_list_.
-    LOG_INFO(fmt::format("Create index cost: {}", profiler.ElapsedToString()));
+    ImportOptions import_options;
+    import_options.copy_file_type_ = CopyFileType::kJSONL;
+    infinity->Import(db_name, table_name, import_from, std::move(import_options));
+    LOG_INFO(fmt::format("Import data cost: {}", profiler.ElapsedToString()));
     profiler.End();
 }
 
@@ -160,7 +141,6 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     BaseProfiler profiler;
 
     profiler.Begin();
-
     SizeT num_rows = 0;
     const int batch_size = 100;
     Vector<Tuple<char *, char *, char *>> batch;
@@ -205,7 +185,82 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     profiler.End();
 }
 
-int main() {
+void BenchmarkCreateIndex(SharedPtr<Infinity> infinity,
+                          const String &db_name,
+                          const String &table_name,
+                          const String &index_name) {
+    BaseProfiler profiler;
+    profiler.Begin();
+    auto index_info_list = new Vector<IndexInfo *>();
+    auto index_info = new IndexInfo();
+    index_info->index_type_ = IndexType::kFullText;
+    index_info->column_name_ = "text";
+    index_info->index_param_list_ = new Vector<InitParameter *>();
+    index_info_list->push_back(index_info);
+
+    auto r = infinity->CreateIndex(db_name, table_name, index_name, index_info_list, CreateIndexOptions());
+    if (r.IsOk()) {
+        r = infinity->Flush();
+    } else {
+        LOG_ERROR(fmt::format("Fail to create index {}", r.ToString()));
+        return;
+    }
+
+    // NOTE: ~CreateStatement() has already deleated or freed index_info_list, index_info, index_info->index_param_list_.
+    LOG_INFO(fmt::format("Create index cost: {}", profiler.ElapsedToString()));
+    profiler.End();
+}
+
+void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
+    BaseProfiler profiler;
+    profiler.Begin();
+    infinity->Optimize(db_name, table_name);
+    LOG_INFO(fmt::format("Merge index cost: {}", profiler.ElapsedToString()));
+    profiler.End();
+}
+
+bool Parse(int argc, char* argv[], bool& is_import, bool& is_insert, bool& is_merge) {
+    if (argc < 2) {
+        return true;
+    }
+
+    is_import = false;
+    is_insert = false;
+    is_merge = false;
+
+    int opt;
+    static struct option long_options[] = {
+        {"import", no_argument, 0, 'i'},
+        {"insert", no_argument, 0, 'r'},
+        {"merge", no_argument, 0, 'm'},
+        {0, 0, 0, 0}
+    };
+
+    int option_index = 0;
+
+    while ((opt = getopt_long(argc, argv, "irm", long_options, &option_index)) != -1) {
+        switch (opt) {
+            case 'i':
+                is_import = true;
+                break;
+            case 'r':
+                is_insert = true;
+                break;
+            case 'm':
+                is_insert = true;
+                is_merge = true;
+                break;
+            default:
+                LOG_ERROR(fmt::format("Usage: {} [--import | -i] [--insert | -r] [--merge | -m]", argv[0]));
+                return false;
+        }
+    }
+    return true;
+}
+
+int main(int argc, char* argv[]) {
+    // Usage: ./fulltext_import_benchmark [--import | -i] [--insert | -r] [--merge | -m]
+    // No arguments will run all tests for debugging
     String db_name = "default";
     String table_name = "ft_dbpedia_benchmark";
     String index_name = "ft_dbpedia_index";
@@ -213,9 +268,24 @@ int main() {
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
-    BenchmarkImport(infinity, db_name, table_name, index_name, srcfile);
-    BenchmarkInsert(infinity, db_name, table_name, srcfile);
-    sleep(10);
+    bool is_import = true;
+    bool is_insert = true;
+    bool is_merge = true;
 
+    if (!Parse(argc, argv, is_import, is_insert, is_merge)) {
+        return 1;
+    }
+
+    if (is_import) {
+        BenchmarkImport(infinity, db_name, table_name, srcfile);
+    }
+    if (is_insert) {
+        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+        BenchmarkInsert(infinity, db_name, table_name, srcfile);
+    }
+    if (is_merge) {
+        BenchmarkOptimize(infinity, db_name, table_name);
+    }
+    sleep(10);
     Infinity::LocalUnInit();
 }
