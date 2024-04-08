@@ -19,7 +19,13 @@ public:
 
     virtual ~IndexDecoder() = default;
 
-    virtual bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf) = 0;
+    virtual bool DecodeSkipList(docid_t start_doc_id, docid_t &prev_last_doc_id, docid_t &last_doc_id, ttf_t &current_ttf) = 0;
+
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    virtual Pair<u32, u16> GetBlockMaxInfo() const = 0;
+
+    virtual bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer) = 0;
 
     virtual bool DecodeCurrentTFBuffer(tf_t *tf_buffer) = 0;
 
@@ -32,7 +38,12 @@ public:
     u32 InnerGetSeekedDocCount() const { return skiped_item_count_ << MAX_DOC_PER_RECORD_BIT_NUM; }
 
 protected:
-    u32 skiped_item_count_ = {0};
+    u32 offset_ = 0;
+    u32 record_len_ = 0;
+    u32 last_doc_id_in_prev_record_ = 0;
+    u32 last_doc_id_ = 0;
+    u32 current_ttf_ = 0;
+    u32 skiped_item_count_ = 0;
     DocListFormatOption doc_list_format_option_;
 };
 
@@ -73,22 +84,27 @@ public:
         skiplist_reader_->Load(posting_list, start, end);
     }
 
-    bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf) {
-        u32 offset;
-        u32 record_len;
-        u32 last_doc_id_in_prev_record;
-
-        auto ret = skiplist_reader_->SkipTo(start_doc_id, last_doc_id, last_doc_id_in_prev_record, offset, record_len);
+    bool DecodeSkipList(docid_t start_doc_id, docid_t &prev_last_doc_id, docid_t &last_doc_id, ttf_t &current_ttf) {
+        auto ret = skiplist_reader_->SkipTo(start_doc_id, last_doc_id_, last_doc_id_in_prev_record_, offset_, record_len_);
         if (!ret) {
             return false;
         }
-        current_ttf = skiplist_reader_->GetPrevTTF();
         skiped_item_count_ = skiplist_reader_->GetSkippedItemCount();
+        prev_last_doc_id = last_doc_id_in_prev_record_;
+        last_doc_id = last_doc_id_;
+        current_ttf = current_ttf_ = skiplist_reader_->GetPrevTTF();
+        return true;
+    }
 
-        doc_list_reader_->Seek(offset + this->doc_list_begin_pos_);
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const {
+        return skiplist_reader_->GetBlockMaxInfo();
+    }
+
+    bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer) {
+        doc_list_reader_->Seek(offset_ + doc_list_begin_pos_);
         doc_id_encoder_->Decode((u32 *)doc_buffer, MAX_DOC_PER_RECORD, *doc_list_reader_);
-
-        first_doc_id = doc_buffer[0] + last_doc_id_in_prev_record;
         return true;
     }
 

@@ -29,12 +29,15 @@ export module column_index_reader;
 
 namespace infinity {
 struct TableEntry;
+class BlockMaxTermDocIterator;
 
 export class ColumnIndexReader {
 public:
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
     UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
+
+    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, MemoryPool *session_pool, float weight);
 
     float GetAvgColumnLength() const;
 

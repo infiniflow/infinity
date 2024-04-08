@@ -27,8 +27,6 @@ export class AndNotIterator : public MultiQueryDocIterator {
 public:
     AndNotIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    virtual ~AndNotIterator();
-
     bool IsAndNot() const override { return true; }
 
     void DoSeek(RowID doc_id) override;

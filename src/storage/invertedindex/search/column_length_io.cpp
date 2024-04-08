@@ -94,13 +94,16 @@ FullTextColumnLengthReader::FullTextColumnLengthReader(UniquePtr<FileSystem> fil
     : file_system_(std::move(file_system)), index_dir_(index_dir), base_names_(base_names), base_row_ids_(base_row_ids) {}
 
 void FullTextColumnLengthReader::SeekFile(RowID row_id) {
-    while (base_row_ids_[next_base_rowid_index_] <= row_id) {
-        ++next_base_rowid_index_;
+    while (base_row_ids_[current_index_ + 1] <= row_id) {
+        ++current_index_;
     }
-    current_base_rowid_ = base_row_ids_[next_base_rowid_index_ - 1];
-    next_base_rowid_ = base_row_ids_[next_base_rowid_index_];
+    while (base_row_ids_[current_index_] > row_id) {
+        --current_index_;
+    }
+    current_base_rowid_ = base_row_ids_[current_index_];
+    next_base_rowid_ = base_row_ids_[current_index_ + 1];
     // load file
-    Path column_length_file_base = Path(index_dir_) / base_names_[next_base_rowid_index_ - 1];
+    Path column_length_file_base = Path(index_dir_) / base_names_[current_index_];
     String column_length_file_path_prefix = column_length_file_base.string();
     String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
     UniquePtr<FileHandler> file_handler = file_system_->OpenFile(column_length_file_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
@@ -116,20 +119,11 @@ void FullTextColumnLengthReader::SeekFile(RowID row_id) {
     }
 }
 
-void ColumnLengthReader::LoadColumnLength(RowID first_doc_id,
-                                          IndexReader &index_reader,
-                                          const Vector<u64> &column_ids,
-                                          Vector<float> &avg_column_length) {
-    column_length_vector_.clear();
-    column_length_vector_.reserve(column_ids.size());
-    avg_column_length.resize(column_ids.size());
-    for (u32 i = 0; i < column_ids.size(); i++) {
-        u64 column_id = column_ids[i];
-        ColumnIndexReader *reader = index_reader.GetColumnIndexReader(column_id);
-        column_length_vector_.emplace_back(MakeUnique<LocalFileSystem>(), reader->index_dir_, reader->base_names_, reader->base_row_ids_);
-        column_length_vector_.back().SeekFile(first_doc_id);
-        avg_column_length[i] = reader->GetAvgColumnLength();
-    }
+void ColumnLengthReader::AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length) {
+    u64 column_id = column_ids.back();
+    ColumnIndexReader *reader = index_reader->GetColumnIndexReader(column_id);
+    column_length_vector_.emplace_back(MakeUnique<LocalFileSystem>(), reader->index_dir_, reader->base_names_, reader->base_row_ids_);
+    avg_column_length.emplace_back(reader->GetAvgColumnLength());
 }
 
 } // namespace infinity
