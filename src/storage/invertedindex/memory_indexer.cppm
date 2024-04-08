@@ -28,6 +28,7 @@ import internal_types;
 import ring;
 import skiplist;
 import internal_types;
+import map_with_lock;
 
 namespace infinity {
 
@@ -40,7 +41,8 @@ public:
     };
 
     using PostingPtr = SharedPtr<PostingWriter>;
-    using PostingTableStore = SkipList<String, PostingPtr, KeyComp>;
+    // using PostingTableStore = SkipList<String, PostingPtr, KeyComp>;
+    using PostingTableStore = MapWithLock<String, PostingPtr>;
 
     struct PostingTable {
         PostingTable();
@@ -67,11 +69,10 @@ public:
                 SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
                 bool offline = false);
 
-    // Commit(false) is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
-    // Commit(true) is blocking and thread-unsafe. There shall be onle one thread call this method at a time.
+    // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
 
-    // CommitSync wait at max 100ms to get a batch of insertions and commit them. Returens the size of the batch.
+    // CommitSync is for online case. It gets a batch of ColumnInverter and commit them. Returns the size of the batch.
     SizeT CommitSync();
 
     // Dump is blocking and shall be called only once after inserting all documents.
@@ -106,6 +107,9 @@ private:
         cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
     }
 
+    // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
+    SizeT CommitOffline(bool wait_if_empty = false);
+
     void OfflineDump();
 
     void FinalSpillFile();
@@ -123,10 +127,12 @@ private:
     ThreadPool &thread_pool_;
     u32 doc_count_{0};
     SharedPtr<PostingTable> posting_table_;
+    PostingPtr prepared_posting_{nullptr};
     Ring<SharedPtr<ColumnInverter>> ring_inverted_;
     Ring<SharedPtr<ColumnInverter>> ring_sorted_;
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};
+    Atomic<bool> generating_{false};
 
     std::condition_variable cv_;
     std::mutex mutex_;

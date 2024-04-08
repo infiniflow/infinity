@@ -84,8 +84,7 @@ void Storage::Init() {
 
     bg_processor_->Start();
 
-    auto txn = txn_mgr_->CreateTxn();
-    txn->Begin();
+    auto txn = txn_mgr_->BeginTxn();
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
@@ -140,10 +139,6 @@ void Storage::UnInit() {
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
-    LOG_TRACE(fmt::format("Full catalog file: {}", full_ckp_info.path_));
-    for (const auto &delta_ckp_info : delta_ckp_infos) {
-        LOG_TRACE(fmt::format("Delta catalog file: {}", delta_ckp_info.path_));
-    }
     new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 

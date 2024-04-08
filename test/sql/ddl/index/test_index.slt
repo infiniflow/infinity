@@ -33,3 +33,12 @@ DROP INDEX idx1 ON test_index;
 
 statement ok
 DROP INDEX IF EXISTS idx1 ON test_index;
+
+statement ok
+CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement ok
+DROP INDEX idx1 ON test_index;
+
+statement ok
+CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);

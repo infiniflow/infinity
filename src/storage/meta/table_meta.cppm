@@ -51,7 +51,7 @@ public:
 
     SharedPtr<String> ToString();
 
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
 
@@ -93,6 +93,10 @@ private:
     // replay
     void
     CreateEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void UpdateEntryReplay(std::function<void(SharedPtr<TableEntry>, TransactionID, TxnTimeStamp)> &&update_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts);
 
     void DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 

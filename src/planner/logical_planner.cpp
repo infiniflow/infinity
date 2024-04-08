@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -578,14 +579,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
-
-    if (index_name_map.contains(*index_name)) {
-        if (create_index_info->conflict_type_ == ConflictType::kError) {
-            RecoverableError(Status::DuplicateIndex(fmt::format("Duplicated index name: {}", *index_name)));
-        }
-    }
-
     if (create_index_info->index_info_list_->size() != 1) {
         RecoverableError(Status::InvalidIndexDefinition(
             fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size())));
@@ -594,6 +587,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<IndexBase> base_index_ptr{nullptr};
     switch (index_info->index_type_) {
         case IndexType::kFullText: {
+            assert(index_info->index_param_list_ != nullptr);
             IndexFullText::ValidateColumnDataType(base_table_ref, index_info->column_name_);
             base_index_ptr = IndexFullText::Make(index_name,
                                                  fmt::format("{}_{}", create_index_info->table_name_, *index_name),
@@ -602,6 +596,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             break;
         }
         case IndexType::kHnsw: {
+            assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
             IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexHnsw::Make(index_name,
@@ -611,6 +606,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             break;
         }
         case IndexType::kIVFFlat: {
+            assert(index_info->index_param_list_ != nullptr);
             IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexIVFFlat::Make(index_name,
                                                 fmt::format("{}_{}", create_index_info->table_name_, *index_name),
@@ -1024,9 +1020,7 @@ Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedP
                                                                   ShowType::kShowSegments,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->table_name_,
-                                                                  bind_context_ptr->GenerateTableIndex(),
-                                                                  statement->segment_id_,
-                                                                  statement->block_id_);
+                                                                  bind_context_ptr->GenerateTableIndex());
 
     this->logical_plan_ = logical_show;
     return Status::OK();

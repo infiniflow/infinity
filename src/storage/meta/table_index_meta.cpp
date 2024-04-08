@@ -86,13 +86,21 @@ TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(Table
     return entry;
 }
 
-void TableIndexMeta::DropEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [dropped_entry, status] = index_entry_list_.DropEntryReplay(
-        [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-            return TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, this, txn_id, begin_ts);
-        },
-        txn_id,
-        begin_ts);
+void TableIndexMeta::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto [entry, status] = index_entry_list_.GetEntryReplay(txn_id, begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    entry->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
+}
+
+void TableIndexMeta::DropEntryReplay(std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                     TransactionID txn_id,
+                                     TxnTimeStamp begin_ts) {
+    auto [dropped_entry, status] =
+        index_entry_list_.DropEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, txn_id, begin_ts); },
+                                          txn_id,
+                                          begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

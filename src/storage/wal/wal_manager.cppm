@@ -29,6 +29,7 @@ class Storage;
 class BGTaskProcessor;
 class TableEntry;
 class Txn;
+class SegmentEntry;
 
 export class WalManager {
 public:
@@ -42,7 +43,7 @@ public:
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    void PutEntry(WalEntry* entry, Txn* txn);
+    void PutEntry(WalEntry *entry, Txn *txn);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -71,7 +72,6 @@ private:
     // Checkpoint Helper
     void CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size);
 
-private:
     void SetLastCkpWalSize(i64 wal_size);
     i64 GetLastCkpWalSize();
 
@@ -83,7 +83,8 @@ private:
     void WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+    // import and compact helper
+    SharedPtr<SegmentEntry> ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
@@ -122,6 +123,8 @@ private:
     Atomic<bool> checkpoint_in_progress_{false};
 
     // Only Checkpoint thread access following members
+    TxnTimeStamp last_ckp_ts_{};
+    TxnTimeStamp last_full_ckp_ts_{};
 };
 
 } // namespace infinity

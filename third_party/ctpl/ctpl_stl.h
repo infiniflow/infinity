@@ -116,6 +116,7 @@ namespace ctpl {
                     this->flags.resize(nThreads);  // safe to delete because the threads have copies of shared_ptr of the flags, not originals
                 }
             }
+            unpin();
         }
 
         // empty the queue
@@ -234,6 +235,18 @@ namespace ctpl {
         }
 
         void init() { this->nWaiting = 0; this->isStop = false; this->isDone = false; }
+
+        void unpin() {
+            int num_cores = std::thread::hardware_concurrency();
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            for (int i = 0; i < num_cores; ++i) {
+                CPU_SET(i, &cpuset);
+            }
+            for (int i = 0; i < static_cast<int>(this->threads.size()); ++i) {
+                pthread_setaffinity_np(this->threads[i]->native_handle(), sizeof(cpu_set_t), &cpuset);
+            }
+        }
 
         std::vector<std::unique_ptr<std::thread>> threads;
         std::vector<std::shared_ptr<std::atomic<bool>>> flags;

@@ -21,7 +21,7 @@ import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
-from utils import copy_data
+from utils import copy_data, generate_commas_enwiki
 
 
 class TestKnn:
@@ -113,15 +113,9 @@ class TestKnn:
     # knn various column name
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("column_name", [pytest.param("variant_id", marks=pytest.mark.xfail),
-                                             "gender_vector",
-                                             "color_vector",
-                                             pytest.param("query_price", marks=pytest.mark.xfail),
-                                             # pytest.param(1, marks=pytest.mark.xfail),
-                                             # pytest.param(2.2, marks=pytest.mark.xfail),
-                                             # pytest.param("!@#/\#$ ## #$%  @#$^", marks=pytest.mark.xfail),
-                                             ])
-    def test_various_vector_column_name(self, get_infinity_db, check_data, column_name):
+    @pytest.mark.parametrize("column_name", ["gender_vector",
+                                             "color_vector"])
+    def test_knn_on_vector_column(self, get_infinity_db, check_data, column_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_various_vector_column_name", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_vector_column_name", {
@@ -145,18 +139,42 @@ class TestKnn:
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("column_name", [pytest.param("variant_id"),
+                                             pytest.param("query_price"),
+                                             # pytest.param(1, marks=pytest.mark.xfail),
+                                             # pytest.param(2.2, marks=pytest.mark.xfail),
+                                             # pytest.param("!@#/\#$ ## #$%  @#$^", marks=pytest.mark.xfail),
+                                             ])
+    def test_knn_on_non_vector_column(self, get_infinity_db, check_data, column_name):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_various_vector_column_name", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_various_vector_column_name", {
+            "variant_id": "varchar",
+            "gender_vector": "vector,4,float",
+            "color_vector": "vector,4,float",
+            "category_vector": "vector,4,float",
+            "tag_vector": "vector,4,float",
+            "other_vector": "vector,4,float",
+            "query_is_recommend": "varchar",
+            "query_gender": "varchar",
+            "query_color": "varchar",
+            "query_price": "float"
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("tmp_20240116.csv")
+        test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
+        table_obj.import_data(test_csv_dir, None)
+        with pytest.raises(Exception, match="ERROR:3013, Expect the column search is an embedding column*"):
+            res = table_obj.output(["variant_id", "_row_id"]).knn(column_name, [1.0] * 4, "float", "ip", 2).to_pl()
+            print(res)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
-        pytest.param("variant_id", marks=pytest.mark.xfail(reason="Invalid embedding data")),
-        pytest.param("gender_vector", marks=pytest.mark.xfail(reason="Invalid embedding data")),
-        pytest.param(1, marks=pytest.mark.xfail(reason="Invalid embedding data")),
-        pytest.param(2.4, marks=pytest.mark.xfail(reason="Invalid embedding data")),
-        pytest.param([1] * 3, marks=pytest.mark.xfail(reason="Invalid embedding data")),
-        pytest.param((1, 2, 3), marks=pytest.mark.xfail(reason="Invalid embedding data")),
-        pytest.param({"c": "12"}, marks=pytest.mark.xfail(reason="Invalid embedding data")),
         [1] * 4,
         (1, 2, 3, 4),
     ])
-    def test_various_embedding_data(self, get_infinity_db, check_data, embedding_data):
+    def test_valid_embedding_data(self, get_infinity_db, check_data, embedding_data):
         db_obj = get_infinity_db
         db_obj.drop_table("test_various_embedding_data", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_embedding_data", {
@@ -181,17 +199,47 @@ class TestKnn:
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
+        pytest.param("variant_id"),
+        pytest.param("gender_vector"),
+        pytest.param(1),
+        pytest.param(2.4),
+        pytest.param([1] * 3),
+        pytest.param((1, 2, 3)),
+        pytest.param({"c": "12"}),
+    ])
+    def test_invalid_embedding_data(self, get_infinity_db, check_data, embedding_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_various_embedding_data", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_various_embedding_data", {
+            "variant_id": "varchar",
+            "gender_vector": "vector,4,float",
+            "color_vector": "vector,4,float",
+            "category_vector": "vector,4,float",
+            "tag_vector": "vector,4,float",
+            "other_vector": "vector,4,float",
+            "query_is_recommend": "varchar",
+            "query_gender": "varchar",
+            "query_color": "varchar",
+            "query_price": "float"
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("tmp_20240116.csv")
+        test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
+        table_obj.import_data(test_csv_dir, None)
+        with pytest.raises(Exception):
+            res = table_obj.output(["variant_id", "_row_id"]).knn("gender_vector", embedding_data, "float", "ip", 2).to_pl()
+            print(res)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("embedding_data", [
         [1] * 4,
         [1.0] * 4,
     ])
     @pytest.mark.parametrize("embedding_data_type", [
-        ("int", False),
         ("float", True),
-        pytest.param(1, marks=pytest.mark.xfail(reason="Invalid embedding 1.0 type")),
-        pytest.param(2.2, marks=pytest.mark.xfail(reason="Invalid embedding 1.0 type")),
-        pytest.param("#@!$!@", marks=pytest.mark.xfail(reason="Invalid embedding 1.0 type")),
     ])
-    def test_various_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
+    def test_valid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_various_embedding_data_type", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_embedding_data_type", {
@@ -211,11 +259,54 @@ class TestKnn:
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if embedding_data_type[1]:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0], "ip",
+            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                       "l2",
                                                        2).to_pl()
             print(res)
         else:
-            with pytest.raises(Exception, match="ERROR:3032*"):
+            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                       "ip",
+                                                       2).to_pl()
+
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("embedding_data", [
+        [1] * 4,
+        [1.0] * 4,
+    ])
+    @pytest.mark.parametrize("embedding_data_type", [
+        ("int", False),
+        pytest.param(1),
+        pytest.param(2.2),
+        pytest.param("#@!$!@"),
+    ])
+    def test_invalid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_various_embedding_data_type", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_various_embedding_data_type", {
+            "variant_id": "varchar",
+            "gender_vector": "vector,4,float",
+            "color_vector": "vector,4,float",
+            "category_vector": "vector,4,float",
+            "tag_vector": "vector,4,float",
+            "other_vector": "vector,4,float",
+            "query_is_recommend": "varchar",
+            "query_gender": "varchar",
+            "query_color": "varchar",
+            "query_price": "float"
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("tmp_20240116.csv")
+        test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
+        table_obj.import_data(test_csv_dir, None)
+        with pytest.raises(Exception):
+            if embedding_data_type[1]:
+                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                           "l2",
+                                                           2).to_pl()
+                print(res)
+            else:
                 res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
                                                            "ip",
                                                            2).to_pl()
@@ -321,7 +412,7 @@ class TestKnn:
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
     def test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
-                        index_distance_type, knn_distance_type):
+                               index_distance_type, knn_distance_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index", {
@@ -374,8 +465,8 @@ class TestKnn:
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
     def test_with_index_after(self, get_infinity_db, check_data,
-                        index_column_name, knn_column_name,
-                        index_distance_type, knn_distance_type):
+                              index_column_name, knn_column_name,
+                              index_distance_type, knn_distance_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index", {
@@ -412,4 +503,217 @@ class TestKnn:
 
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_valid_columns(self, get_infinity_db, check_data, match_param_1):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_columns", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_columns",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
 
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*"])
+               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match(match_param_1, "black", "topn=1")
+               .fusion('rrf')
+               .to_pl())
+        print(res)
+
+    @pytest.mark.parametrize("match_param_1", [pytest.param(1),
+                                               pytest.param(1.1),
+                                               pytest.param([]),
+                                               pytest.param({}),
+                                               pytest.param(()),
+                                               pytest.param("invalid column name")])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_invalid_columns(self, get_infinity_db, check_data, match_param_1):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_columns", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_columns",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        with pytest.raises(Exception):
+            res = (table_obj
+                   .output(["*"])
+                   .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+                   .match(match_param_1, "black", "topn=1")
+                   .fusion('rrf')
+                   .to_pl())
+            print(res)
+
+    @pytest.mark.parametrize("match_param_2", ["a word a segment",
+                                               "body=Greek"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_valid_words(self, get_infinity_db, check_data, match_param_2):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_words", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_words",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*"])
+               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match("doctitle,num,body^5", match_param_2, "topn=1")
+               .fusion('rrf')
+               .to_pl())
+        print(res)
+
+    @pytest.mark.parametrize("match_param_2", [pytest.param(1),
+                                               pytest.param(1.1),
+                                               pytest.param([]),
+                                               pytest.param({}),
+                                               pytest.param(()),
+                                               pytest.param("@#$!#@$SDasdf3!@#$")])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_invalid_words(self, get_infinity_db, check_data, match_param_2):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_words", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_words",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+        with pytest.raises(Exception):
+            res = (table_obj
+                   .output(["*"])
+                   .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+                   .match("doctitle,num,body^5", match_param_2, "topn=1")
+                   .fusion('rrf')
+                   .to_pl())
+            print(res)
+
+    @pytest.mark.parametrize("match_param_3", [pytest.param("@#$!#@$SDa^sdf3!@#$"),
+                                               "topn=1",
+                                               "1"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_options(self, get_infinity_db, check_data, match_param_3):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_options", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_options",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*"])
+               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match("doctitle,num,body^5", "word", match_param_3)
+               .fusion('rrf')
+               .to_pl())
+        print(res)
+
+
+    @pytest.mark.parametrize("match_param_3", [pytest.param(1),
+                                               pytest.param(1.1),
+                                               pytest.param([]),
+                                               pytest.param({}),
+                                               pytest.param(()),])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_fulltext_match_with_options", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_options",
+                                        {"doctitle": "varchar",
+                                         "docdate": "varchar",
+                                         "body": "varchar",
+                                         "num": "int",
+                                         "vec": "vector, 4, float"})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+        with pytest.raises(Exception):
+            res = (table_obj
+                   .output(["*"])
+                   .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+                   .match("doctitle,num,body^5", "word", match_param_3)
+                   .fusion('rrf')
+                   .to_pl())
+            print(res)

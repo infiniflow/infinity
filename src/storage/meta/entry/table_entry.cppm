@@ -42,6 +42,7 @@ import random;
 import memory_pool;
 import meta_info;
 import block_entry;
+import column_index_reader;
 
 namespace infinity {
 
@@ -67,7 +68,8 @@ public:
                         TableMeta *table_meta,
                         TransactionID txn_id,
                         TxnTimeStamp begin_ts,
-                        SegmentID unsealed_id);
+                        SegmentID unsealed_id,
+                        SegmentID next_segment_id);
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
                                                const SharedPtr<String> &db_entry_dir,
@@ -88,7 +90,8 @@ public:
                                                   TxnTimeStamp begin_ts,
                                                   TxnTimeStamp commit_ts,
                                                   SizeT row_count,
-                                                  SegmentID unsealed_id) noexcept;
+                                                  SegmentID unsealed_id,
+                                                  SegmentID next_segment_id) noexcept;
 
 public:
     Tuple<TableIndexEntry *, Status>
@@ -106,19 +109,32 @@ public:
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
 
     // replay
+    void UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry);
+
     TableIndexEntry *CreateIndexReplay(const SharedPtr<String> &index_name,
                                        std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts);
 
-    void DropIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    void UpdateIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    void DropIndexReplay(const String &index_name,
+                         std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    void AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry);
+
+    void AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry);
+
+private:
     void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);
 
+public:
     void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id);
-    //
+
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }
 
@@ -144,6 +160,8 @@ public:
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 
+    SegmentID next_segment_id() const { return next_segment_id_; }
+
     static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name) {
         return DetermineRandomString(parent_dir, fmt::format("table_{}", table_name));
     }
@@ -158,7 +176,7 @@ public:
     void MemIndexCommit();
 
     // Invoked once at init stage to recovery memory index.
-    void MemIndexRecover(BufferManager* buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager);
 
     void OptimizeIndex(Txn *txn);
 
@@ -194,7 +212,7 @@ public:
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
 public:
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
@@ -206,6 +224,12 @@ public:
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
+
+    IndexReader GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
+        return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
+    }
 
 private:
     TableMeta *const table_meta_{};
@@ -229,7 +253,10 @@ private:
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
     SharedPtr<SegmentEntry> unsealed_segment_{};
     SegmentID unsealed_id_{};
-    atomic_u32 next_segment_id_{};
+    Atomic<SegmentID> next_segment_id_{};
+
+    // for full text search cache
+    TableIndexReaderCache fulltext_column_index_cache_;
 
 public:
     // set nullptr to close auto compaction

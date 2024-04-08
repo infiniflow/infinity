@@ -47,18 +47,30 @@ TxnManager::TxnManager(Catalog *catalog,
     catalog_->SetTxnMgr(this);
 }
 
-Txn *TxnManager::CreateTxn() {
+Txn *TxnManager::BeginTxn() {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("TxnManager is not running, cannot create txn");
     }
+
     rw_locker_.lock();
-    TransactionID new_txn_id = GetNewTxnID();
-    // LOG_INFO(fmt::format("Create new txn: {}", new_txn_id));
-    UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id);
+
+    // Assign a new txn id
+    u64 new_txn_id = ++catalog_->next_txn_id_;
+
+    // Record the start ts of the txn
+    TxnTimeStamp ts = ++start_ts_;
+
+    // Create txn instance
+    UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts);
+
+    // Storage txn in txn manager
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
+    ts_map_.emplace(ts, new_txn_id);
     rw_locker_.unlock();
+
+    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
     return res;
 }
 
@@ -78,13 +90,6 @@ u64 TxnManager::GetNewTxnID() {
 
 TxnTimeStamp TxnManager::GetTimestamp() {
     TxnTimeStamp ts = ++start_ts_;
-    return ts;
-}
-
-TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id) {
-    TxnTimeStamp ts = GetTimestamp();
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    ts_map_.emplace(ts, txn_id);
     return ts;
 }
 
@@ -127,7 +132,7 @@ void TxnManager::Stop() {
     auto it = txn_map_.begin();
     while (it != txn_map_.end()) {
         // remove and notify the wal manager condition variable
-        Txn* txn_ptr = it->second.get();
+        Txn *txn_ptr = it->second.get();
         if (txn_ptr != nullptr) {
             txn_ptr->CancelCommitBottom();
         }

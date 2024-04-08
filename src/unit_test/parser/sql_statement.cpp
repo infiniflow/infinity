@@ -263,7 +263,7 @@ TEST_F(StatementParsingTest, good_test1) {
         BaseStatement *statement = (*result->statements_ptr_)[0];
         EXPECT_EQ(statement->type_, StatementType::kShow);
         auto *show_statement = (ShowStatement *)(statement);
-        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kSegments);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kSegment);
         EXPECT_EQ(show_statement->table_name_, "t1");
         EXPECT_EQ(show_statement->schema_name_, "");
         EXPECT_EQ(show_statement->index_name_.has_value(), false);
@@ -301,7 +301,7 @@ TEST_F(StatementParsingTest, good_test1) {
         BaseStatement *statement = (*result->statements_ptr_)[0];
         EXPECT_EQ(statement->type_, StatementType::kShow);
         auto *show_statement = (ShowStatement *)(statement);
-        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kBlocks);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kBlock);
         EXPECT_EQ(show_statement->table_name_, "t1");
         EXPECT_EQ(show_statement->schema_name_, "");
         EXPECT_EQ(show_statement->index_name_.has_value(), false);

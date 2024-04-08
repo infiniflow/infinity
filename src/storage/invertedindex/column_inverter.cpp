@@ -18,13 +18,12 @@ module;
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <vector>
 module column_inverter;
 import stl;
 import analyzer;
 import analyzer_pool;
-import memory_pool;
-import pool_allocator;
 import string_ref;
 import term;
 import radix_sort;
@@ -33,6 +32,7 @@ import posting_writer;
 import infinity_exception;
 import third_party;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -41,10 +41,10 @@ static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);
 }
 
-ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider)
+ColumnInverter::ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider)
     : analyzer_(AnalyzerPool::instance().Get(analyzer)), posting_writer_provider_(posting_writer_provider) {
     if (analyzer_.get() == nullptr) {
-        UnrecoverableError(fmt::format("Invalid analyzer: {}", analyzer));
+        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer)));
     }
 }
 
@@ -54,6 +54,7 @@ bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) co
 
 void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id) {
     begin_doc_id_ = begin_doc_id;
+    doc_count_ = row_count;
     for (SizeT i = 0; i < row_count; ++i) {
         String data = column_vector->ToString(row_offset + i);
         InvertColumn(begin_doc_id + i, data);
@@ -96,6 +97,7 @@ void ColumnInverter::MergePrepare() {
 }
 
 void ColumnInverter::Merge(ColumnInverter &rhs) {
+    assert(begin_doc_id_ + doc_count_ == rhs.begin_doc_id_);
     MergePrepare();
     for (auto &doc_terms : rhs.terms_per_doc_) {
         u32 doc_id = doc_terms.first;
@@ -106,7 +108,11 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
             positions_.emplace_back(term_ref, doc_id, it->word_offset_);
         }
     }
+    doc_count_ += rhs.doc_count_;
+    merged_++;
     rhs.terms_per_doc_.clear();
+    rhs.doc_count_ = 0;
+    rhs.merged_ = 0;
 }
 
 void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
@@ -184,6 +190,7 @@ void ColumnInverter::GeneratePosting() {
     u32 last_doc_id = INVALID_DOCID;
     StringRef last_term, term;
     SharedPtr<PostingWriter> posting = nullptr;
+    // printf("GeneratePosting() begin begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_) {
             if (last_doc_id != INVALID_DOCID) {
@@ -194,6 +201,10 @@ void ColumnInverter::GeneratePosting() {
             term = GetTermFromNum(i.term_num_);
             posting = posting_writer_provider_(String(term.data()));
             // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
+            if (last_term_num != (u32)(-1)) {
+                assert(last_term_num < i.term_num_);
+                assert(last_term < term);
+            }
             last_term_num = i.term_num_;
             assert(last_term < term);
             last_term = term;
@@ -212,6 +223,7 @@ void ColumnInverter::GeneratePosting() {
         posting->EndDocument(last_doc_id, 0);
         // printf(" EndDocument3-%u\n", last_doc_id);
     }
+    // printf("GeneratePosting() end begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
 }
 
 void ColumnInverter::SortForOfflineDump() {
@@ -232,7 +244,7 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
 
     // size of this Run in bytes
     u32 data_size = 0;
-    u32 data_size_pos = ftell(spill_file);
+    u64 data_size_pos = ftell(spill_file);
     fwrite(&data_size, sizeof(u32), 1, spill_file);
     // number of tuples
     u32 num_of_tuples = positions_.size();
@@ -242,11 +254,11 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
     u64 next_start_offset = 0;
     u64 next_start_offset_pos = ftell(spill_file);
     fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
-    u32 data_start_offset = ftell(spill_file);
+    u64 data_start_offset = ftell(spill_file);
     // sorted data
     u32 last_term_num = std::numeric_limits<u32>::max();
     StringRef term;
-    u16 record_length = 0;
+    u32 record_length = 0;
     char str_null = '\0';
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_) {
@@ -254,7 +266,9 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
             term = GetTermFromNum(last_term_num);
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
-        fwrite(&record_length, sizeof(u16), 1, spill_file);
+        if (record_length > 1024)
+            std::cout << "!!!!!! record_length " << record_length << std::endl;
+        fwrite(&record_length, sizeof(u32), 1, spill_file);
         fwrite(term.data(), term.size(), 1, spill_file);
         fwrite(&str_null, sizeof(char), 1, spill_file);
         fwrite(&i.doc_id_, sizeof(docid_t), 1, spill_file);

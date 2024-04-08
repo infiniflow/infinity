@@ -121,13 +121,19 @@ public:
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
     ThreadPool &GetFulltextThreadPool() { return thread_pool_; }
-    TxnTimeStamp GetFulltexSegmentUpdateTs() { return segment_update_ts_; }
+    TxnTimeStamp GetFulltexSegmentUpdateTs() {
+        std::shared_lock lock(segment_update_ts_mutex_);
+        return segment_update_ts_;
+    }
 
-    void UpdateFulltextSegmentTs(TxnTimeStamp ts) { segment_update_ts_ = ts; }
+    void UpdateFulltextSegmentTs(TxnTimeStamp ts);
 
     void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
 
     void RollbackCreateIndex(TxnIndexStore *txn_index_store);
+
+    // replay
+    void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
@@ -139,6 +145,7 @@ private:
     MemoryPool byte_slice_pool_{};
     RecyclePool buffer_pool_{};
     ThreadPool thread_pool_{};
+    std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 
     std::shared_mutex rw_locker_{};

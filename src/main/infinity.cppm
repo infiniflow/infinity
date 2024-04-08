@@ -107,7 +107,11 @@ public:
 
     QueryResult ShowSegment(const String &db_name,const String &table_name, const SegmentID &segment_id);
 
+    QueryResult ShowSegments(const String &db_name,const String &table_name);
+
     QueryResult ShowBlock(const String &db_name,const String &table_name, const SegmentID &segment_id, const BlockID &block_id);
+
+    QueryResult ShowBlocks(const String &db_name,const String &table_name, const SegmentID &segment_id);
 
     QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
 
@@ -127,6 +131,7 @@ public:
     QueryResult
     Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 
+    QueryResult Optimize(const String &db_name, const String &table_name);
 private:
     SharedPtr<BaseSession> session_{};
 };

@@ -22,8 +22,6 @@ import stl;
 import analyzer;
 
 import column_vector;
-import memory_pool;
-import pool_allocator;
 import term;
 import string_ref;
 import internal_types;
@@ -33,7 +31,7 @@ namespace infinity {
 
 export class ColumnInverter {
 public:
-    ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider);
+    ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
@@ -55,6 +53,10 @@ public:
     void GeneratePosting();
 
     void GetTermListLength(u32 *term_list_length_ptr) const;
+
+    u32 GetDocCount() { return doc_count_; }
+
+    u32 GetMerged() { return merged_; }
 
     struct PosInfo {
         u32 term_num_{0};
@@ -111,6 +113,8 @@ private:
 
     UniquePtr<Analyzer> analyzer_{nullptr};
     u32 begin_doc_id_{0};
+    u32 doc_count_{0};
+    u32 merged_{1};
     TermBuffer terms_;
     PosInfoVec positions_;
     U32Vec term_refs_;

@@ -56,7 +56,7 @@ void UpdateSegmentBloomFilterTask::Execute() {
 // deprecated temporary
 void UpdateSegmentBloomFilterTask::ExecuteInner(SegmentEntry *segment, TxnManager *txn_mgr) {
     // create txn
-    // auto update_bloom_filter_txn = txn_mgr->CreateTxn();
+    // auto update_bloom_filter_txn = txn_mgr->BeginTxn();
     // // begin txn
     // // need a txn to keep segment from being deleted
     // update_bloom_filter_txn->Begin();

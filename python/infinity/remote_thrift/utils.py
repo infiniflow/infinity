@@ -13,7 +13,8 @@
 # limitations under the License.
 
 import re
-
+import functools
+import inspect
 import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
@@ -108,8 +109,9 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
     else:
         raise Exception(f"unknown condition type: {cons}")
 
+
 def parse_expr(expr) -> ttypes.ParsedExpr:
-    try :
+    try:
         return traverse_conditions(expr, parse_expr)
     except:
         if isinstance(expr, exp.Func):
@@ -134,6 +136,7 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
             return parsed_expr
         else:
             raise Exception(f"unknown expression type: {expr}")
+
 
 # invalid_name_array = [
 #     [],
@@ -171,8 +174,27 @@ def check_valid_name(name, name_type: str = "Table"):
         raise ValueError(f"invalid name: {name}")
     if name.isdigit():
         raise ValueError(f"invalid name: {name}")
-    else:
-        return True
+
+
+def name_validity_check(arg_name: str, name_type: str = "Table"):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if arg_name in kwargs:
+                name = kwargs[arg_name]
+            else:
+                arg_names = list(inspect.signature(func).parameters.keys())
+                name = args[arg_names.index(arg_name)]
+
+            try:
+                check_valid_name(name, name_type)
+                return func(*args, **kwargs)
+            except ValueError as e:
+                raise
+
+        return wrapper
+
+    return decorator
 
 
 def select_res_to_polars(res) -> pl.DataFrame:

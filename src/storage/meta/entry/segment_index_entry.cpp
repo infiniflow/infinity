@@ -33,11 +33,7 @@ import status;
 import index_base;
 import index_hnsw;
 import hnsw_common;
-import dist_func_l2;
-import dist_func_ip;
 import hnsw_alg;
-import lvq_store;
-import plain_store;
 import catalog_delta_entry;
 import column_vector;
 import annivfflat_index_data;
@@ -59,6 +55,7 @@ import block_entry;
 import local_file_system;
 import column_length_io;
 import chunk_index_entry;
+import abstract_hnsw;
 
 namespace infinity {
 
@@ -99,8 +96,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            TxnTimeStamp max_ts,
                                                                            TransactionID txn_id,
                                                                            TxnTimeStamp begin_ts,
-                                                                           TxnTimeStamp commit_ts,
-                                                                           bool is_delete) {
+                                                                           TxnTimeStamp commit_ts) {
 
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
@@ -149,6 +145,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
 
     const IndexBase *index_base = table_index_entry_->index_base();
     const ColumnDef *column_def = table_index_entry_->column_def().get();
+    ColumnID column_id = column_def->id();
+
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
@@ -164,13 +162,14 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                                             table_index_entry_->GetFulltextBufferPool(),
                                                             table_index_entry_->GetFulltextThreadPool());
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
+            } else {
+                assert(begin_row_id == memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount());
             }
             Path column_length_file_base = Path(*table_index_entry_->index_dir()) / (memory_indexer_->GetBaseName());
             String column_length_file_path_prefix = column_length_file_base.string();
             String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
             auto column_length_file_handler =
                 MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, this);
-            u64 column_id = column_def->id();
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_manager));
             memory_indexer_->Insert(column_vector, row_offset, row_count, std::move(column_length_file_handler), false);
@@ -337,80 +336,25 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
 
             BufferHandle buffer_handle = GetIndex();
-
-            auto InsertHnsw = [&](auto &hnsw_index) {
-                auto InsertHnswInner = [&](auto &iter) {
-                    if (!prepare) {
-                        // Single thread insert
-                        hnsw_index->InsertVecs(iter, segment_entry->row_count()); // estimate insert count
-                    } else {
-                        // Multi thread insert data, write file in the physical create index finish stage.
-                        hnsw_index->StoreData(iter, segment_entry->row_count());
-                    }
-                };
-                if (check_ts) {
-                    OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                    InsertHnswInner(iter);
-                } else {
-                    // Not check ts in uncommitted segment when compact segment
-                    OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                    InsertHnswInner(iter);
-                }
-            };
-
             switch (embedding_info->Type()) {
                 case kElemFloat: {
-                    switch (index_hnsw->encode_type_) {
-                        case HnswEncodeType::kPlain: {
-                            switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
-                                    auto hnsw_index = static_cast<
-                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainIPDist<float, SegmentOffset>> *>(
-                                        buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                case MetricType::kMerticL2: {
-                                    auto hnsw_index = static_cast<
-                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainL2Dist<float, SegmentOffset>> *>(
-                                        buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                default: {
-                                    UnrecoverableError("Invalid metric type.");
-                                }
-                            }
-                            break;
+                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
+                    auto InsertHnswInner = [&](auto &iter) {
+                        if (!prepare) {
+                            // Single thread insert
+                            abstract_hnsw.InsertVecs(std::move(iter), segment_entry->row_count()); // estimate insert count
+                        } else {
+                            // Multi thread insert data, write file in the physical create index finish stage.
+                            abstract_hnsw.StoreData(std::move(iter), segment_entry->row_count());
                         }
-                        case HnswEncodeType::kLVQ: {
-                            switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
-                                    // too long type. fix it.
-                                    auto hnsw_index = static_cast<KnnHnsw<float,
-                                                                          SegmentOffset,
-                                                                          LVQStore<float, SegmentOffset, i8, LVQIPCache<float, i8>>,
-                                                                          LVQIPDist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                case MetricType::kMerticL2: {
-                                    auto hnsw_index = static_cast<KnnHnsw<float,
-                                                                          SegmentOffset,
-                                                                          LVQStore<float, SegmentOffset, i8, LVQL2Cache<float, i8>>,
-                                                                          LVQL2Dist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                default: {
-                                    UnrecoverableError("Invalid metric type.");
-                                }
-                            }
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid HNSW encode type.");
-                        }
+                    };
+                    if (check_ts) {
+                        OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                        InsertHnswInner(iter);
+                    } else {
+                        // Not check ts in uncommitted segment when compact segment
+                        OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                        InsertHnswInner(iter);
                     }
                     break;
                 }
@@ -468,19 +412,6 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
     const ColumnDef *column_def = table_index_entry_->column_def().get();
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            auto InsertHnswDo = [&](auto *hnsw_index, atomic_u64 &create_index_idx) {
-                SizeT vertex_n = hnsw_index->GetVertexNum();
-                while (true) {
-                    SizeT idx = create_index_idx.fetch_add(1);
-                    if (idx % 10000 == 0) {
-                        LOG_TRACE(fmt::format("Insert index: {}", idx));
-                    }
-                    if (idx >= vertex_n) {
-                        break;
-                    }
-                    hnsw_index->Build(idx);
-                }
-            };
             auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 UnrecoverableError("HNSW supports embedding type.");
@@ -492,56 +423,17 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
 
             switch (embedding_info->Type()) {
                 case kElemFloat: {
-                    switch (index_hnsw->encode_type_) {
-                        case HnswEncodeType::kPlain: {
-                            switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
-                                    auto *hnsw_index = static_cast<
-                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainIPDist<float, SegmentOffset>> *>(
-                                        buffer_handle.GetDataMut());
-                                    InsertHnswDo(hnsw_index, create_index_idx);
-                                    break;
-                                }
-                                case MetricType::kMerticL2: {
-                                    auto *hnsw_index = static_cast<
-                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainL2Dist<float, SegmentOffset>> *>(
-                                        buffer_handle.GetDataMut());
-                                    InsertHnswDo(hnsw_index, create_index_idx);
-                                    break;
-                                }
-                                default: {
-                                    RecoverableError(Status::NotSupport("Not implemented"));
-                                }
-                            }
+                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
+                    SizeT vertex_n = abstract_hnsw.GetVertexNum();
+                    while (true) {
+                        SizeT idx = create_index_idx.fetch_add(1);
+                        if (idx % 10000 == 0) {
+                            LOG_TRACE(fmt::format("Insert index: {}", idx));
+                        }
+                        if (idx >= vertex_n) {
                             break;
                         }
-                        case HnswEncodeType::kLVQ: {
-                            switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
-                                    auto *hnsw_index = static_cast<KnnHnsw<float,
-                                                                           SegmentOffset,
-                                                                           LVQStore<float, SegmentOffset, i8, LVQIPCache<float, i8>>,
-                                                                           LVQIPDist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
-                                    InsertHnswDo(hnsw_index, create_index_idx);
-                                    break;
-                                }
-                                case MetricType::kMerticL2: {
-                                    auto *hnsw_index = static_cast<KnnHnsw<float,
-                                                                           SegmentOffset,
-                                                                           LVQStore<float, SegmentOffset, i8, LVQL2Cache<float, i8>>,
-                                                                           LVQL2Dist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
-                                    InsertHnswDo(hnsw_index, create_index_idx);
-                                    break;
-                                }
-                                default: {
-                                    RecoverableError(Status::NotSupport("Not implemented"));
-                                }
-                            }
-                            break;
-                        }
-                        default: {
-                            RecoverableError(Status::NotSupport("Not implemented"));
-                        }
+                        abstract_hnsw.Build(idx);
                     }
                     break;
                 }

@@ -83,8 +83,6 @@ public:
 
     inline u64 GetNextNodeID() { return ++current_max_node_id_; }
 
-    void CreateTxn();
-
     void BeginTxn();
 
     void CommitTxn();

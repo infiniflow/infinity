@@ -406,18 +406,17 @@ class TestTable:
 
     # create/drop table with different invalid options
     @pytest.mark.parametrize("invalid_option_array", [
-        pytest.param([], marks=pytest.mark.xfail),
-        pytest.param((), marks=pytest.mark.xfail),
-        pytest.param({}, marks=pytest.mark.xfail),
-        pytest.param(1, marks=pytest.mark.xfail),
-        pytest.param(1.1, marks=pytest.mark.xfail),
-        pytest.param('', marks=pytest.mark.xfail),
-        pytest.param(' ', marks=pytest.mark.xfail),
-        pytest.param('12', marks=pytest.mark.xfail),
-        pytest.param('name-12', marks=pytest.mark.xfail),
-        pytest.param('12name', marks=pytest.mark.xfail),
-        pytest.param('数据库名', marks=pytest.mark.xfail),
-        pytest.param(''.join('x' for i in range(65536 + 1)), marks=pytest.mark.xfail),
+        pytest.param([]),
+        pytest.param(()),
+        pytest.param({}),
+        pytest.param(1.1),
+        pytest.param(''),
+        pytest.param(' '),
+        pytest.param('12'),
+        pytest.param('name-12'),
+        pytest.param('12name'),
+        pytest.param('数据库名'),
+        pytest.param(''.join('x' for i in range(65536 + 1))),
         None,
     ])
     def test_table_with_different_invalid_options(self, get_infinity_db, invalid_option_array):
@@ -807,34 +806,50 @@ class TestTable:
                                                0,
                                                1,
                                                2,
-                                               pytest.param(1.1, marks=pytest.mark.xfail),
-                                               pytest.param("#@$@!%string", marks=pytest.mark.xfail),
-                                               pytest.param([], marks=pytest.mark.xfail),
-                                               pytest.param({}, marks=pytest.mark.xfail),
-                                               pytest.param((), marks=pytest.mark.xfail),
                                                ])
-    def test_various_table_create_option(self, get_infinity_db, conflict_type):
+    def test_table_create_valid_option(self, get_infinity_db, conflict_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_various_table_create_option", ConflictType.Ignore)
         db_obj.create_table("test_various_table_create_option", {"c1": "int"}, conflict_type)
 
+
+    @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
+                                               pytest.param("#@$@!%string"),
+                                               pytest.param([]),
+                                               pytest.param({}),
+                                               pytest.param(()),
+                                               ])
+    def test_table_create_invalid_option(self, get_infinity_db, conflict_type):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_various_table_create_option", ConflictType.Ignore)
+        with pytest.raises(Exception, match=f"ERROR:3066, Invalid conflict type"):
+            db_obj.create_table("test_various_table_create_option", {"c1": "int"}, conflict_type)
+
     @pytest.mark.parametrize("conflict_type",
                              [ConflictType.Error,
                               ConflictType.Ignore,
-                              pytest.param(ConflictType.Replace,marks=pytest.mark.xfail(reason="ERROR:3066, Invalid conflict type")),
                               0,
                               1,
-                              pytest.param(2,marks=pytest.mark.xfail(reason="ERROR:3066, Invalid conflict type")),
-                              pytest.param(1.1, marks=pytest.mark.xfail(reason="ERROR:3066, Invalid conflict type")),
-                              pytest.param("#@$@!%string", marks=pytest.mark.xfail),
-                              pytest.param([], marks=pytest.mark.xfail),
-                              pytest.param({}, marks=pytest.mark.xfail),
-                              pytest.param((), marks=pytest.mark.xfail),
                               ])
-    def test_various_table_drop_option(self, get_infinity_db, conflict_type):
+    def test_table_drop_valid_option(self, get_infinity_db, conflict_type):
         db_obj = get_infinity_db
         db_obj.create_table("test_various_table_drop_option", {"c1": "int"}, ConflictType.Ignore)
         db_obj.drop_table("test_various_table_drop_option", conflict_type)
+
+    @pytest.mark.parametrize("conflict_type",
+                             [pytest.param(ConflictType.Replace),
+                              pytest.param(2),
+                              pytest.param(1.1),
+                              pytest.param("#@$@!%string"),
+                              pytest.param([]),
+                              pytest.param({}),
+                              pytest.param(()),
+                              ])
+    def test_table_drop_invalid_option(self, get_infinity_db, conflict_type):
+        db_obj = get_infinity_db
+        db_obj.create_table("test_various_table_drop_option", {"c1": "int"}, ConflictType.Ignore)
+        with pytest.raises(Exception, match=f"ERROR:3066, invalid conflict type"):
+            db_obj.drop_table("test_various_table_drop_option", conflict_type)
 
     def test_create_duplicated_table_with_ignore_option(self, get_infinity_db):
         db_obj = get_infinity_db

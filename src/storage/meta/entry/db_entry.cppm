@@ -67,7 +67,7 @@ public:
 public:
     SharedPtr<String> ToString();
 
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr);
 
@@ -96,6 +96,11 @@ public:
 
     // replay
     void CreateTableReplay(const SharedPtr<String> &table_name,
+                           std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts);
+
+    void UpdateTableReplay(const SharedPtr<String> &table_name,
                            std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts);
@@ -139,6 +144,6 @@ public:
     void Cleanup() override;
 
     void MemIndexCommit();
-    void MemIndexRecover(BufferManager* buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager);
 };
 } // namespace infinity

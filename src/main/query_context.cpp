@@ -110,7 +110,6 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 //    BaseProfiler profiler;
 //    profiler.Begin();
     try {
-        this->CreateTxn();
         this->BeginTxn();
 //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
 //                        session_ptr_->GetTxn()->TxnID(),
@@ -191,14 +190,12 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     return query_result;
 }
 
-void QueryContext::CreateTxn() {
+void QueryContext::BeginTxn() {
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn* new_txn = storage_->txn_manager()->CreateTxn();
+        Txn* new_txn = storage_->txn_manager()->BeginTxn();
         session_ptr_->SetTxn(new_txn);
     }
 }
-
-void QueryContext::BeginTxn() { session_ptr_->GetTxn()->Begin(); }
 
 void QueryContext::CommitTxn() {
     Txn* txn = session_ptr_->GetTxn();

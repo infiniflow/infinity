@@ -26,6 +26,7 @@ module;
 
 #include <cassert>
 #include <filesystem>
+#include <iostream>
 #include <string.h>
 #include <unistd.h>
 module memory_indexer;
@@ -51,6 +52,7 @@ import posting_list_format;
 import dict_reader;
 import file_reader;
 import column_length_io;
+import logger;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -60,7 +62,7 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
     return ret < 0;
 }
 
-MemoryIndexer::PostingTable::PostingTable() : store_(KeyComp(), &byte_slice_pool_) {}
+MemoryIndexer::PostingTable::PostingTable() {}
 
 MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &base_name,
@@ -73,13 +75,16 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
       buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(10UL), ring_sorted_(10UL) {
     posting_table_ = MakeShared<PostingTable>();
-
+    prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
     Path path = Path(index_dir) / "tmp.merge";
     spill_full_path_ = path.string();
 }
 
 MemoryIndexer::~MemoryIndexer() {
-    WaitInflightTasks();
+    while (GetInflightTasks() > 0) {
+        usleep(1000000);
+        CommitSync();
+    }
     Reset();
 }
 
@@ -95,7 +100,6 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
     u32 doc_count(0);
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        inflight_tasks_++;
         seq_inserted = seq_inserted_++;
         doc_count = doc_count_;
         doc_count_ += row_count;
@@ -106,10 +110,9 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
                                                                        column_length_mutex_,
                                                                        column_length_array_);
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
-    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     if (offline) {
-        auto func = [this, task, provider, length_handler = std::move(update_length_job)](int id) {
-            auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, nullptr);
+        auto func = [this, task, length_handler = std::move(update_length_job), inverter](int id) {
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             inverter->GetTermListLength(length_handler->GetColumnLengthArray());
             length_handler->DumpToFile();
@@ -118,44 +121,51 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector,
         };
         thread_pool_.push(std::move(func));
     } else {
-        auto func = [this, task, provider, length_handler = std::move(update_length_job)](int id) {
-            auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+        PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
+        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, provider);
+        auto func = [this, task, length_handler = std::move(update_length_job), inverter](int id) {
+            // LOG_INFO(fmt::format("online inverter {} begin", id));
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             inverter->GetTermListLength(length_handler->GetColumnLengthArray());
             length_handler->DumpToFile();
             this->ring_inverted_.Put(task->task_seq_, inverter);
+            // LOG_INFO(fmt::format("online inverter {} end", id));
         };
         thread_pool_.push(std::move(func));
+    }
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_++;
     }
 }
 
 void MemoryIndexer::Commit(bool offline) {
     if (offline) {
-        if (nullptr == spill_file_handle_) {
-            PrepareSpillFile();
-        }
-        SharedPtr<ColumnInverter> inverter;
-        while (inflight_tasks_ != 0) {
-            this->ring_sorted_.Get(inverter);
-            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
-            inflight_tasks_--;
-            num_runs_++;
-        }
+        thread_pool_.push([this](int id) { this->CommitOffline(); });
     } else
         thread_pool_.push([this](int id) { this->CommitSync(); });
 }
 
-SizeT MemoryIndexer::CommitSync() {
-    Vector<SharedPtr<ColumnInverter>> inverters;
-    u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
-    SizeT num = inverters.size();
-    if (num == 0)
+SizeT MemoryIndexer::CommitOffline(bool wait_if_empty) {
+    bool generating = false;
+    bool changed = generating_.compare_exchange_strong(generating, true);
+    if (!changed)
         return 0;
-    ColumnInverter::Merge(inverters);
-    inverters[0]->Sort();
-    this->ring_sorted_.Put(seq_commit, inverters[0]);
-    this->ring_sorted_.Iterate([](SharedPtr<ColumnInverter> &inverter) { inverter->GeneratePosting(); });
-    {
+    generating = true;
+    if (nullptr == spill_file_handle_) {
+        PrepareSpillFile();
+    }
+    Vector<SharedPtr<ColumnInverter>> inverters;
+    this->ring_sorted_.GetBatch(inverters, wait_if_empty);
+    SizeT num = inverters.size();
+    if (num > 0) {
+        for (auto &inverter : inverters) {
+            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
+            num_runs_++;
+        }
+    }
+    generating_.compare_exchange_strong(generating, false);
+    if (num > 0) {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_ -= num;
         if (inflight_tasks_ == 0) {
@@ -165,18 +175,56 @@ SizeT MemoryIndexer::CommitSync() {
     return num;
 }
 
+SizeT MemoryIndexer::CommitSync() {
+    Vector<SharedPtr<ColumnInverter>> inverters;
+    u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
+    if (!inverters.empty()) {
+        ColumnInverter::Merge(inverters);
+        inverters[0]->Sort();
+        this->ring_sorted_.Put(seq_commit, inverters[0]);
+    };
+
+    bool generating = false;
+    bool changed = generating_.compare_exchange_strong(generating, true);
+    if (!changed)
+        return 0;
+    generating = true;
+    this->ring_sorted_.GetBatch(inverters);
+    SizeT num = 0;
+    for (auto &inverter : inverters) {
+        inverter->GeneratePosting();
+        num += inverter->GetMerged();
+    }
+    // LOG_INFO(fmt::format("MemoryIndexer::CommitSync done {} inverters, inflight_tasks_ was {}", num, inflight_tasks_));
+    generating_.compare_exchange_strong(generating, false);
+    std::unique_lock<std::mutex> lock(mutex_);
+    inflight_tasks_ -= num;
+    if (inflight_tasks_ == 0) {
+        cv_.notify_all();
+    }
+
+    return num;
+}
+
 void MemoryIndexer::Dump(bool offline, bool spill) {
     if (offline) {
         assert(!spill);
-        Commit(true);
+        while (GetInflightTasks() > 0) {
+            CommitOffline(true);
+        }
         OfflineDump();
         return;
     }
 
+    if (spill) {
+        assert(!offline);
+    }
+
     while (GetInflightTasks() > 0) {
-        sleep(1);
+        usleep(1000000);
         CommitSync();
     }
+    // LOG_INFO("MemoryIndexer::Dump begin");
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -196,13 +244,13 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     if (posting_table_.get() != nullptr) {
         MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
-        for (auto it = posting_store.Begin(); it != posting_store.End(); ++it) {
-            const MemoryIndexer::PostingPtr posting_writer = it.Value();
+        for (auto it = posting_store.UnsafeBegin(); it != posting_store.UnsafeEnd(); ++it) {
+            const MemoryIndexer::PostingPtr posting_writer = it->second;
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta, spill);
             SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
-            const String &term = it.Key();
+            const String &term = it->first;
             fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
         }
         posting_file_writer->Sync();
@@ -213,6 +261,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
     is_spilled_ = spill;
     Reset();
+    // LOG_INFO("MemoryIndexer::Dump end");
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting
@@ -241,16 +290,14 @@ void MemoryIndexer::Load() {
 }
 
 SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
+    assert(posting_table_.get() != nullptr);
     MemoryIndexer::PostingTableStore &posting_store = posting_table_->store_;
-    MemoryIndexer::PostingTableStore::Iterator iter = posting_store.Find(term);
-    if (iter != posting_store.End())
-        return iter.Value();
-    else {
-        SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
-        posting_store.Insert(term, posting);
-        return posting;
+    PostingPtr posting;
+    bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
+    if (!found) {
+        prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_length_mutex_, column_length_array_);
     }
+    return posting;
 }
 
 void MemoryIndexer::Reset() {
@@ -264,8 +311,10 @@ void MemoryIndexer::OfflineDump() {
     // 1. External sort merge
     // 2. Generate posting
     // 3. Dump disk segment data
+    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}", num_runs_));
     FinalSpillFile();
-    SortMerger<TermTuple, u16> *merger = new SortMerger<TermTuple, u16>(spill_full_path_.c_str(), num_runs_, 100000000, 2);
+    constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
+    SortMerger<TermTuple, u32> *merger = new SortMerger<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     merger->Run();
     delete merger;
     FILE *f = fopen(spill_full_path_.c_str(), "r");
@@ -284,7 +333,7 @@ void MemoryIndexer::OfflineDump() {
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
-    u16 record_length;
+    u32 record_length;
     char buf[MAX_TUPLE_LENGTH];
     String last_term_str;
     std::string_view last_term;
@@ -292,7 +341,7 @@ void MemoryIndexer::OfflineDump() {
     UniquePtr<PostingWriter> posting;
 
     for (u64 i = 0; i < count; ++i) {
-        fread(&record_length, sizeof(u16), 1, f);
+        fread(&record_length, sizeof(u32), 1, f);
         if (record_length >= MAX_TUPLE_LENGTH) {
             // rubbish tuple, abandoned
             char *buffer = new char[record_length];
@@ -347,6 +396,7 @@ void MemoryIndexer::OfflineDump() {
     fs.AppendFile(dict_file, fst_file);
     fs.DeleteFile(fst_file);
 
+    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump done, num_runs_ {}", num_runs_));
     num_runs_ = 0;
     std::filesystem::remove(spill_full_path_);
 }

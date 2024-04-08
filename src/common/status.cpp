@@ -338,7 +338,7 @@ Status Status::MultipleFunctionMatched(const String &function, const String &fun
 
 Status Status::InsertWithoutValues() { return Status(ErrorCode::kInsertWithoutValues, MakeUnique<String>("Insert into table without any values")); }
 
-Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, MakeUnique<String>("Invalid conflict type")); }
+Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, MakeUnique<String>("invalid conflict type")); }
 
 Status Status::InvalidJsonFormat(const String &error_message) {
     return Status(ErrorCode::kInvalidJsonFormat, MakeUnique<String>(fmt::format("Invalid format json: {}", error_message)));

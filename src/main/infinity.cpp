@@ -46,6 +46,7 @@ import table_reference;
 import insert_statement;
 import copy_statement;
 import delete_statement;
+import optimize_statement;
 
 import create_schema_info;
 import drop_schema_info;
@@ -63,8 +64,7 @@ u64 Infinity::GetSessionId() { return session_->session_id(); }
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
     if (!fs.Exists(path)) {
-        std::cerr << path << " doesn't exist." << std::endl;
-        return;
+        fs.CreateDirectory(path);
     }
 
     SharedPtr<String> config_path = MakeShared<String>(path + "/infinity_conf.toml");
@@ -422,6 +422,21 @@ QueryResult Infinity::ShowSegment(const String &db_name,const String &table_name
     return result;
 }
 
+QueryResult Infinity::ShowSegments(const String &db_name,const String &table_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    show_statement->table_name_ = table_name;
+    show_statement->show_type_ = ShowStmtType::kSegments;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 QueryResult Infinity::ShowBlock(const String &db_name,const String &table_name, const SegmentID &segment_id, const BlockID &block_id) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -435,6 +450,22 @@ QueryResult Infinity::ShowBlock(const String &db_name,const String &table_name, 
     show_statement->segment_id_ = segment_id;
     show_statement->block_id_ = block_id;
     show_statement->show_type_ = ShowStmtType::kBlock;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ShowBlocks(const String &db_name,const String &table_name, const SegmentID &segment_id) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    show_statement->table_name_ = table_name;
+    show_statement->segment_id_ = segment_id;
+    show_statement->show_type_ = ShowStmtType::kBlocks;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
@@ -561,6 +592,23 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     select_statement->search_expr_ = search_expr;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
+    return result;
+}
+
+QueryResult
+Infinity::Optimize(const String &db_name, const String &table_name) {
+    UniquePtr<QueryContext> optimize_context_ptr = MakeUnique<QueryContext>(session_.get());
+    optimize_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<OptimizeStatement> optimize_statement = MakeUnique<OptimizeStatement>();
+
+    optimize_statement->schema_name_ = db_name;
+    optimize_statement->table_name_ = table_name;
+
+    QueryResult result = optimize_context_ptr->QueryStatement(optimize_statement.get());
     return result;
 }
 

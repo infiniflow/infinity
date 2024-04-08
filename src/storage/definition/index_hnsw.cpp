@@ -76,9 +76,15 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
             RecoverableError(Status::InvalidIndexParam(para->param_name_));
         }
     }
-    if (metric_type == MetricType::kInvalid || encode_type == HnswEncodeType::kInvalid) {
-        RecoverableError(Status::LackIndexParam());
+
+    if (metric_type == MetricType::kInvalid) {
+        RecoverableError(Status::InvalidIndexParam("Metric type"));
     }
+
+    if (encode_type == HnswEncodeType::kInvalid) {
+        RecoverableError(Status::InvalidIndexParam("Encode type"));
+    }
+
     return MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
 }
 
@@ -119,8 +125,8 @@ String IndexHnsw::ToString() const {
 
 String IndexHnsw::BuildOtherParamsString() const {
     std::stringstream ss;
-    ss << "metric = " << MetricTypeToString(metric_type_) << ", encode_type = " << HnswEncodeTypeToString(encode_type_)
-       << ", M = " << M_ << ", ef_construction = " << ef_construction_ << ", ef = " << ef_;
+    ss << "metric = " << MetricTypeToString(metric_type_) << ", encode_type = " << HnswEncodeTypeToString(encode_type_) << ", M = " << M_
+       << ", ef_construction = " << ef_construction_ << ", ef = " << ef_;
     return ss.str();
 }
 

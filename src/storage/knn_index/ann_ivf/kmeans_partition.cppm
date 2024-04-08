@@ -76,7 +76,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
                                      u32 min_points_per_centroid = 32,
                                      u32 max_points_per_centroid = 256) {
     constexpr int default_iteration_max = 10;
-    if (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
+    if (metric != MetricType::kMetricL2 && metric != MetricType::kMetricInnerProduct) {
         UnrecoverableError("metric type not implemented");
     }
     if (dimension <= 0 || vector_count <= 0) {
@@ -161,7 +161,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
             }
         }
         // normalize centroids if inner product metric is used
-        if (metric == MetricType::kMerticInnerProduct) {
+        if (metric == MetricType::kMetricInnerProduct) {
             NormalizeCentroids(dimension, partition_num, centroids);
         }
     }
@@ -212,7 +212,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
             }
             // For L2 metric, divide the count. If there is no vector in a partition, the centroid of this partition will not be updated.
             // For IP metric, normalize centroids.
-            if (metric == MetricType::kMerticL2) {
+            if (metric == MetricType::kMetricL2) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     if (auto cnt = partition_element_count[i]; cnt > 0) {
                         f32 inv = 1.0f / (f32)cnt;
@@ -221,7 +221,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
                         }
                     }
                 }
-            } else if (metric == MetricType::kMerticInnerProduct) {
+            } else if (metric == MetricType::kMetricInnerProduct) {
                 NormalizeCentroids(dimension, partition_num, centroids);
             }
         }
@@ -260,7 +260,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
         }
 
         // TODO:stop condition?
-        if (metric == MetricType::kMerticL2 && this_iter_distance >= previous_total_distance)
+        if (metric == MetricType::kMetricL2 && this_iter_distance >= previous_total_distance)
             break;
         previous_total_distance = this_iter_distance;
 

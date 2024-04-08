@@ -57,7 +57,7 @@ class CatalogDeltaReplayTest : public BaseTest {
 protected:
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override {}
+    void TearDown() override { system("rm -rf /tmp/infinity"); }
 
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
         // TxnTimeStamp visible_ts = 0;
@@ -92,8 +92,7 @@ protected:
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName("default", table_name);
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
@@ -142,8 +141,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
         TxnTimeStamp last_commit_ts = 0;
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateDatabase(*db_name1, ConflictType::kError);
             txn->CreateDatabase(*db_name2, ConflictType::kError);
@@ -156,8 +154,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             txn->CreateDatabase(*db_name3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
@@ -172,8 +169,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [db_entry, status] = txn->GetDatabase(*db_name1);
                 EXPECT_TRUE(status.ok());
@@ -220,8 +216,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
         TxnTimeStamp last_commit_ts = 0;
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def1, ConflictType::kError);
             txn->CreateTable(*db_name, table_def2, ConflictType::kError);
@@ -234,8 +229,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
@@ -251,8 +245,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name1);
                 EXPECT_TRUE(status.ok());
@@ -293,8 +286,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -304,8 +296,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -353,8 +344,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status.ok());
@@ -402,8 +392,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -413,8 +402,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -447,8 +435,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
 
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
         {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -497,8 +484,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -508,8 +494,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
         }
         {
 
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -533,8 +518,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -576,8 +560,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         TxnTimeStamp last_commit_ts = 0;
         // create table and insert two records
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -587,8 +570,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -612,8 +594,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -640,13 +621,13 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         // 1. remain some uncommitted txn before force full checkpoint
         // 2. wait delta checkpoint
         {
-            auto *txn_uncommitted = txn_mgr->CreateTxn();
-            txn_uncommitted->Begin();
+            auto *txn_uncommitted = txn_mgr->BeginTxn();
+
             txn_uncommitted->CreateTable(*db_name, table_def_uncommitted, ConflictType::kError);
 
             LOG_INFO("BEFORE FULL CKP");
-            auto *txn_force_ckp = txn_mgr->CreateTxn();
-            txn_force_ckp->Begin();
+            auto *txn_force_ckp = txn_mgr->BeginTxn();
+
             auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn_force_ckp, true);
             storage->bg_processor()->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -656,13 +637,13 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             txn_mgr->CommitTxn(txn_uncommitted);
 
             // some txn in delta checkpoint
-            auto *txn_committed = txn_mgr->CreateTxn();
-            txn_committed->Begin();
+            auto *txn_committed = txn_mgr->BeginTxn();
+
             txn_committed->CreateTable(*db_name, table_def_committed, ConflictType::kError);
             txn_mgr->CommitTxn(txn_committed);
 
-            auto *txn_record3 = txn_mgr->CreateTxn();
-            txn_record3->Begin();
+            auto *txn_record3 = txn_mgr->BeginTxn();
+
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def_committed->columns().size(); ++i) {
                 SharedPtr<DataType> data_type = table_def_committed->columns()[i]->type();
@@ -685,9 +666,8 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 
             last_commit_ts = txn_mgr->CommitTxn(txn_record3);
             WaitFlushDeltaOp(txn_mgr, last_commit_ts);
-
-            infinity::InfinityContext::instance().UnInit();
         }
+        infinity::InfinityContext::instance().UnInit();
     }
 
     // now restart and the table `tb_uncommitted` should exist
@@ -698,8 +678,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
             {
                 auto [table_uncommitted, uncommitted_status] = txn->GetTableByName(*db_name, *table_name_uncommitted);
                 EXPECT_TRUE(uncommitted_status.ok());
@@ -722,7 +701,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
                         ASSERT_EQ(block_entry->columns().size(), 2ul);
                         {
                             auto &col2 = block_entry->columns()[1];
-                            EXPECT_EQ(col2->OutlineBufferCount(), 3ul);
+                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
                         }
                     }
                 }
@@ -755,8 +734,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     {
         // create table
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
+        auto *txn = txn_mgr->BeginTxn();
 
         Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -768,8 +746,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
 
     {
         // add compact
-        auto txn4 = txn_mgr->CreateTxn();
-        txn4->Begin();
+        auto txn4 = txn_mgr->BeginTxn();
 
         auto [table_entry, status] = txn4->GetTableByName("default", table_name);
         EXPECT_NE(table_entry, nullptr);
@@ -783,8 +760,8 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     }
 
     {
-        auto txn5 = txn_mgr->CreateTxn();
-        txn5->Begin();
+        auto txn5 = txn_mgr->BeginTxn();
+
         TxnTimeStamp begin_ts = txn5->BeginTS();
 
         auto [table_entry, status] = txn5->GetTableByName("default", table_name);
@@ -828,8 +805,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
         TxnTimeStamp last_commit_ts = 0;
         {
             // create table
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -840,8 +816,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
         }
         {
             // insert datas
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn();
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -887,8 +862,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->CreateTxn();
-                txn_idx->Begin();
+                auto *txn_idx = txn_mgr->BeginTxn();
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -949,8 +923,343 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
             }
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->CreateTxn();
-                txn_idx_drop->Begin();
+                auto *txn_idx_drop = txn_mgr->BeginTxn();
+                {
+
+                    auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
+                    EXPECT_TRUE(status9.ok());
+                }
+                last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
+            }
+        }
+        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        infinity::InfinityContext::instance().UnInit();
+    }
+}
+
+TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
+    // this test is for single index,not for joint index
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
+    std::shared_ptr<std::string> db_entry_dir;
+    auto db_name = std::make_shared<std::string>("db1");
+
+    auto column_def1 =
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+    auto column_def2 =
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+
+    {
+        InfinityContext::instance().Init(config_path);
+        Storage *storage = InfinityContext::instance().storage();
+
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp last_commit_ts = 0;
+        {
+            // create database
+            auto *txn = txn_mgr->BeginTxn();
+
+            txn->CreateDatabase(*db_name, ConflictType::kError);
+
+            auto [db_entry, status] = txn->GetDatabase(*db_name);
+            EXPECT_TRUE(status.ok());
+            db_entry_dir = db_entry->db_entry_dir();
+
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+        {
+            // create table
+            auto *txn = txn_mgr->BeginTxn();
+
+            txn->CreateTable(*db_name, table_def, ConflictType::kError);
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+        {
+            // insert datas
+            auto *txn = txn_mgr->BeginTxn();
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
+            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            {
+                BlockID block_id = 0;
+                UniquePtr<BlockEntry> block_entry =
+                    BlockEntry::NewBlockEntry(segment_entry.get(), block_id, 0 /*checkpoint_ts*/, table_entry->ColumnCount(), txn);
+                {
+                    Vector<ColumnVector> column_vectors;
+                    for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
+                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                    }
+
+                    {
+                        int v1 = 1;
+                        column_vectors[0].AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
+                    }
+                    {
+                        std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
+                        column_vectors[1].AppendByStringView(v2, ',');
+                    }
+                    block_entry->IncreaseRowCount(1);
+                }
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+            }
+
+            TxnTimeStamp flush_ts = txn->BeginTS();
+            segment_entry->FlushNewData(flush_ts);
+            txn->Import(*db_name, *table_name, segment_entry);
+
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+
+        String idx_name = "test_full_idx";
+        const String idx_file_name = "test_full_idx.json";
+        String analyzer{};
+        Vector<String> col_name_list{"col1"};
+
+        {
+            {
+                // create index def
+                auto *txn_idx = txn_mgr->BeginTxn();
+
+                auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
+                EXPECT_TRUE(status1.ok());
+
+                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer);
+                std::shared_ptr<IndexBase> fullIdxBasePtr = std::make_shared<IndexFullText>(fullIdxBase);
+
+                auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, fullIdxBasePtr, ConflictType::kInvalid);
+                EXPECT_TRUE(status2.ok());
+                {
+                    auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
+                    EXPECT_TRUE(status3.ok());
+
+                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    EXPECT_TRUE(status4.ok());
+                    auto col_cnt = (*tInfo).column_count_;
+
+                    String alias = "tb1";
+                    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
+                    SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
+                    Vector<SizeT> columns;
+
+                    for (i64 idx = 0; idx < col_cnt; idx++) {
+                        const ColumnDef *column_def = table_entry->GetColumnDefByID(idx);
+                        types_ptr->emplace_back(column_def->column_type_);
+                        names_ptr->emplace_back(column_def->name_);
+                        columns.emplace_back(idx);
+                    }
+
+                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+
+                    u64 table_idx = 0;
+                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+
+                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    EXPECT_TRUE(status5.ok());
+
+                    // do create index
+                    {
+                        HashMap<SegmentID, atomic_u64> create_index_idxes;
+                        create_index_idxes[0] = 1;
+
+                        auto status6 = txn_idx->CreateIndexDo(table_ref.get(), idx_name, create_index_idxes);
+                        EXPECT_TRUE(status6.ok());
+                    }
+
+                    // finish create index
+                    {
+                        auto [table_entry, status7] = txn_idx->GetTableByName(*db_name, *table_name);
+                        EXPECT_TRUE(status7.ok());
+
+                        auto status8 = txn_idx->CreateIndexFinish(table_entry, table_idx_entry);
+                        EXPECT_TRUE(status8.ok());
+                    }
+                    last_commit_ts = txn_mgr->CommitTxn(txn_idx);
+                }
+            }
+            {
+                // Drop index (by Name)
+                auto *txn_idx_drop = txn_mgr->BeginTxn();
+                {
+
+                    auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
+                    EXPECT_TRUE(status9.ok());
+                }
+                last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
+            }
+        }
+        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        infinity::InfinityContext::instance().UnInit();
+    }
+}
+
+TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
+    // this test is for single index,not for joint index
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
+    std::shared_ptr<std::string> db_entry_dir;
+    auto db_name = std::make_shared<std::string>("default");
+
+    auto table_name = std::make_shared<std::string>("db1");
+    // auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
+
+    HashSet<ConstraintType> constraints;
+    auto column_def1 = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "col1", constraints);
+    auto table_def = TableDef::Make(db_name, table_name, {column_def1});
+
+    {
+        InfinityContext::instance().Init(config_path);
+        Storage *storage = InfinityContext::instance().storage();
+        BufferManager *buffer_manager = storage->buffer_manager();
+
+        TxnManager *txn_mgr = storage->txn_manager();
+        TxnTimeStamp last_commit_ts = 0;
+        {
+            // create table
+            auto *txn = txn_mgr->BeginTxn();
+
+            txn->CreateTable(*db_name, table_def, ConflictType::kError);
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+        {
+            // insert datas
+            auto *txn = txn_mgr->BeginTxn();
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
+            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            {
+                BlockID block_id = 0;
+                UniquePtr<BlockEntry> block_entry =
+                    BlockEntry::NewBlockEntry(segment_entry.get(), block_id, 0 /*checkpoint_ts*/, table_entry->ColumnCount(), txn);
+                {
+                    Vector<ColumnVector> column_vectors;
+                    for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
+                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                    }
+
+                    {
+                        int v1 = 1;
+                        column_vectors[0].AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
+                    }
+                    block_entry->IncreaseRowCount(1);
+                }
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+            }
+
+            TxnTimeStamp flush_ts = txn->BeginTS();
+            segment_entry->FlushNewData(flush_ts);
+            txn->Import(*db_name, *table_name, segment_entry);
+
+            last_commit_ts = txn_mgr->CommitTxn(txn);
+        }
+
+        String idx_name = "test_full_idx";
+        const String idx_file_name = "test_full_idx.json";
+        String analyzer{};
+        Vector<String> col_name_list{"col1"};
+
+        {
+            {
+                // create index def
+                auto *txn_idx = txn_mgr->BeginTxn();
+
+                auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
+                EXPECT_TRUE(status1.ok());
+
+                IndexFullText fullIdxBase(std::make_shared<String>(idx_name), idx_file_name, col_name_list, analyzer);
+                std::shared_ptr<IndexBase> fullIdxBasePtr = std::make_shared<IndexFullText>(fullIdxBase);
+
+                auto [table_idx_entry, status2] = txn_idx->CreateIndexDef(table_entry, fullIdxBasePtr, ConflictType::kInvalid);
+                EXPECT_TRUE(status2.ok());
+                {
+                    auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
+                    EXPECT_TRUE(status3.ok());
+
+                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    EXPECT_TRUE(status4.ok());
+                    auto col_cnt = (*tInfo).column_count_;
+
+                    String alias = "tb1";
+                    SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
+                    SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
+                    Vector<SizeT> columns;
+
+                    for (i64 idx = 0; idx < col_cnt; idx++) {
+                        const ColumnDef *column_def = table_entry->GetColumnDefByID(idx);
+                        types_ptr->emplace_back(column_def->column_type_);
+                        names_ptr->emplace_back(column_def->name_);
+                        columns.emplace_back(idx);
+                    }
+
+                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+
+                    u64 table_idx = 0;
+                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+
+                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    EXPECT_TRUE(status5.ok());
+
+                    // do create index
+                    {
+                        HashMap<SegmentID, atomic_u64> create_index_idxes;
+                        create_index_idxes[0] = 1;
+
+                        auto status6 = txn_idx->CreateIndexDo(table_ref.get(), idx_name, create_index_idxes);
+                        EXPECT_TRUE(status6.ok());
+                    }
+
+                    // finish create index
+                    {
+                        auto [table_entry, status7] = txn_idx->GetTableByName(*db_name, *table_name);
+                        EXPECT_TRUE(status7.ok());
+
+                        auto status8 = txn_idx->CreateIndexFinish(table_entry, table_idx_entry);
+                        EXPECT_TRUE(status8.ok());
+                    }
+                    last_commit_ts = txn_mgr->CommitTxn(txn_idx);
+                }
+            }
+
+            // compact
+            Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
+
+            this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
+            {
+
+                auto txn_cpt = txn_mgr->BeginTxn();
+
+                auto [table_entry, status] = txn_cpt->GetTableByName(*db_name, *table_name);
+                EXPECT_NE(table_entry, nullptr);
+
+                {
+                    auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn_cpt);
+                    compact_task->Execute();
+                }
+
+                last_commit_ts = txn_mgr->CommitTxn(txn_cpt);
+            }
+
+            {
+                // Drop index (by Name)
+                auto *txn_idx_drop = txn_mgr->BeginTxn();
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);

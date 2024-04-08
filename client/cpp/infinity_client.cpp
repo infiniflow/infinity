@@ -58,7 +58,7 @@ ClientStatus Client::CreateDatabase(const std::string &db_name, CreateOption cre
             break;
         }
         default: {
-            return ClientStatus{ClientErrorCode::kInvalidConflictType, "Invalid conflict type"};
+            return ClientStatus{ClientErrorCode::kInvalidConflictType, "invalid conflict type"};
         }
     }
 
@@ -84,7 +84,7 @@ ClientStatus Client::DropDatabase(const std::string &db_name, DropOption drop_op
             break;
         }
         default: {
-            return ClientStatus{ClientErrorCode::kInvalidConflictType, "Invalid conflict type"};
+            return ClientStatus{ClientErrorCode::kInvalidConflictType, "invalid conflict type"};
         }
     }
 

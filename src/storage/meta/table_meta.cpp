@@ -118,6 +118,15 @@ void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(Transactio
     }
 }
 
+void TableMeta::UpdateEntryReplay(std::function<void(SharedPtr<TableEntry>, TransactionID, TxnTimeStamp)> &&update_entry,
+                                  TransactionID txn_id,
+                                  TxnTimeStamp begin_ts) {
+    auto status = table_entry_list_.UpdateEntryReplay(std::move(update_entry), txn_id, begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
 void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry,
                                 TransactionID txn_id,
                                 TxnTimeStamp begin_ts) {
@@ -144,7 +153,7 @@ SharedPtr<String> TableMeta::ToString() {
     return res;
 }
 
-nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
     Vector<TableEntry *> table_candidates;
     {
@@ -161,7 +170,7 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_che
         }
     }
     for (TableEntry *table_entry : table_candidates) {
-        json_res["table_entries"].emplace_back(table_entry->Serialize(max_commit_ts, is_full_checkpoint));
+        json_res["table_entries"].emplace_back(table_entry->Serialize(max_commit_ts));
     }
     return json_res;
 }
