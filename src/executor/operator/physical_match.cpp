@@ -96,9 +96,9 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     bool use_block_max_iter = false;
     if (block_max_option == "true") {
         use_block_max_iter = true;
-    } else if (block_max_option == "false") {
+    } else if (block_max_option == "false" or block_max_option.empty()) {
         use_ordinary_iter = true;
-    } else if (block_max_option == "compare" or block_max_option.empty()) {
+    } else if (block_max_option == "compare") {
         use_ordinary_iter = true;
         use_block_max_iter = true;
     } else {
