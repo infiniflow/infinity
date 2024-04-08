@@ -21,6 +21,7 @@ import inmem_posting_decoder;
 import inmem_position_list_decoder;
 import skiplist_reader;
 import internal_types;
+import third_party;
 
 namespace infinity {
 
@@ -113,6 +114,7 @@ IndexDecoder *MultiPostingDecoder::CreateIndexDecoder(u32 doc_list_begin_pos) {
 
 bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     u32 locate_seg_cursor = LocateSegment(segment_cursor_, start_row_id);
+    fmt::print("Move to segment: {}\n", start_row_id.ToUint64());
     if (locate_seg_cursor >= segment_count_) {
         return false;
     }
@@ -121,61 +123,85 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     base_row_id_ = cur_segment_posting.GetBaseRowId();
     const SharedPtr<PostingWriter> &posting_writer = cur_segment_posting.GetInMemPostingWriter();
     if (posting_writer) {
-        InMemPostingDecoder *posting_decoder = posting_writer->CreateInMemPostingDecoder(session_pool_);
-        if (index_decoder_) {
-            if (session_pool_) {
-                index_decoder_->~IndexDecoder();
-                session_pool_->Deallocate((void *)index_decoder_, sizeof(index_decoder_));
-            } else
-                delete index_decoder_;
-            index_decoder_ = nullptr;
-        }
-        index_decoder_ = posting_decoder->GetInMemDocListDecoder();
-        if (format_option_.HasPositionList()) {
-            InMemPositionListDecoder *pos_decoder = posting_decoder->GetInMemPositionListDecoder();
-            in_doc_state_keeper_.MoveToSegment(pos_decoder);
-            if (in_doc_pos_iterator_) {
-                if (session_pool_) {
-                    in_doc_pos_iterator_->~InDocPositionIterator();
-                    session_pool_->Deallocate((void *)in_doc_pos_iterator_, sizeof(in_doc_pos_iterator_));
-                } else
-                    delete in_doc_pos_iterator_;
-                in_doc_pos_iterator_ = nullptr;
-            }
-            in_doc_pos_iterator_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(InDocPositionIterator)))
-                                                        InDocPositionIterator(format_option_.GetPosListFormatOption()))
-                                                 : new InDocPositionIterator(format_option_.GetPosListFormatOption());
-        }
-        if (posting_decoder) {
-            if (session_pool_) {
-                posting_decoder->~InMemPostingDecoder();
-                session_pool_->Deallocate((void *)posting_decoder, sizeof(posting_decoder));
-            } else
-                delete posting_decoder;
-        }
-        ++segment_cursor_;
-        return true;
+        return MemSegMoveToSegment(posting_writer);
+    } else {
+        return SplitDiskSegMoveToSegment(cur_segment_posting);
+//        return DiskSegMoveToSegment(cur_segment_posting);
     }
+}
+
+bool MultiPostingDecoder::MemSegMoveToSegment(const SharedPtr<PostingWriter> &posting_writer) {
+    InMemPostingDecoder *posting_decoder = posting_writer->CreateInMemPostingDecoder(session_pool_);
+    if (index_decoder_) {
+        if (session_pool_) {
+            index_decoder_->~IndexDecoder();
+            session_pool_->Deallocate((void *)index_decoder_, sizeof(index_decoder_));
+        } else {
+            delete index_decoder_;
+        }
+        index_decoder_ = nullptr;
+    }
+    index_decoder_ = posting_decoder->GetInMemDocListDecoder();
+    if (format_option_.HasPositionList()) {
+        InMemPositionListDecoder *pos_decoder = posting_decoder->GetInMemPositionListDecoder();
+        in_doc_state_keeper_.MoveToSegment(pos_decoder);
+        if (in_doc_pos_iterator_) {
+            if (session_pool_) {
+                in_doc_pos_iterator_->~InDocPositionIterator();
+                session_pool_->Deallocate((void *)in_doc_pos_iterator_, sizeof(in_doc_pos_iterator_));
+            } else {
+                delete in_doc_pos_iterator_;
+            }
+            in_doc_pos_iterator_ = nullptr;
+        }
+        in_doc_pos_iterator_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(InDocPositionIterator)))
+                                                    InDocPositionIterator(format_option_.GetPosListFormatOption()))
+                                             : new InDocPositionIterator(format_option_.GetPosListFormatOption());
+    }
+    if (posting_decoder) {
+        if (session_pool_) {
+            posting_decoder->~InMemPostingDecoder();
+            session_pool_->Deallocate((void *)posting_decoder, sizeof(posting_decoder));
+        } else {
+            delete posting_decoder;
+        }
+    }
+    ++segment_cursor_;
+    return true;
+}
+
+bool MultiPostingDecoder::DiskSegMoveToSegment(SegmentPosting &cur_segment_posting) {
     ByteSliceReader doc_list_reader;
     ByteSliceList *posting_list = cur_segment_posting.GetSliceListPtr().get();
     doc_list_reader.Open(posting_list);
     doc_list_reader_.Open(posting_list);
     const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
+
+    auto doc_begin = doc_list_reader.Tell();
     u32 doc_skiplist_size = doc_list_reader.ReadVUInt32();
     u32 doc_list_size = doc_list_reader.ReadVUInt32();
+    fmt::print("In DiskSegMoveToSegment\n");
+    fmt::print("doc_skiplist_size: {}\n", doc_skiplist_size);
+    fmt::print("doc_list_size: {}\n", doc_list_size);
 
     u32 doc_list_begin_pos = doc_list_reader.Tell() + doc_skiplist_size;
+    fmt::print("doc_list_begin_pos: {}\n", doc_list_begin_pos);
     if (index_decoder_) {
         if (session_pool_) {
             index_decoder_->~IndexDecoder();
             session_pool_->Deallocate((void *)index_decoder_, sizeof(index_decoder_));
-        } else
+        } else {
             delete index_decoder_;
+        }
         index_decoder_ = nullptr;
     }
     index_decoder_ = CreateIndexDecoder(doc_list_begin_pos);
     u32 doc_skiplist_start = doc_list_reader.Tell();
     u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
+
+    auto doc_end = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
+    auto doc_size = doc_end - doc_begin;
+    fmt::print("doc_size: {}\n", doc_size);
     index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, posting_list, term_meta.GetDocFreq());
     if (format_option_.HasPositionList()) {
         u32 pos_list_begin = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
@@ -184,8 +210,85 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
             if (session_pool_) {
                 in_doc_pos_iterator_->~InDocPositionIterator();
                 session_pool_->Deallocate((void *)in_doc_pos_iterator_, sizeof(in_doc_pos_iterator_));
-            } else
+            } else {
                 delete in_doc_pos_iterator_;
+            }
+            in_doc_pos_iterator_ = nullptr;
+        }
+        in_doc_pos_iterator_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(InDocPositionIterator)))
+                                                    InDocPositionIterator(format_option_.GetPosListFormatOption()))
+                                             : new InDocPositionIterator(format_option_.GetPosListFormatOption());
+    }
+
+    ++segment_cursor_;
+    return true;
+}
+
+IndexDecoder* MultiPostingDecoder::CreateDocIndexDecoder(u32 doc_list_begin_pos) {
+    return session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipIndexDecoder<SkipListReaderByteSlice>)))
+                                SkipIndexDecoder<SkipListReaderByteSlice>(session_pool_,
+                                                                          &doc_reader_,
+                                                                          doc_list_begin_pos,
+                                                                          format_option_.GetDocListFormatOption()))
+                         : new SkipIndexDecoder<SkipListReaderByteSlice>(session_pool_,
+                                                                         &doc_reader_,
+                                                                         doc_list_begin_pos,
+                                                                         format_option_.GetDocListFormatOption());
+}
+
+bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_posting) {
+    fmt::print("In SplitDiskSegMoveToSegment\n");
+    ByteSliceReader doc_reader;
+    // ByteSliceList *posting_list = cur_segment_posting.GetSliceListPtr().get();
+
+    ByteSliceList *doc_slice_list = cur_segment_posting.GetDocSliceListPtr().get();
+    ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
+
+    doc_reader.Open(doc_slice_list);
+    doc_reader_.Open(doc_slice_list);
+    pos_reader_.Open(pos_slice_list);
+
+    const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
+    u32 doc_skiplist_size = doc_reader.ReadVUInt32();
+    u32 doc_list_size = doc_reader.ReadVUInt32();
+
+    u32 doc_list_begin_pos = doc_reader.Tell() + doc_skiplist_size;
+    fmt::print("doc_skiplist_size: {}\n", doc_skiplist_size);
+    fmt::print("doc_list_size: {}\n", doc_list_size);
+    fmt::print("doc_list_begin_pos: {}\n", doc_list_begin_pos);
+
+    if (index_decoder_) {
+        if (session_pool_) {
+            index_decoder_->~IndexDecoder();
+            session_pool_->Deallocate((void *)index_decoder_, sizeof(index_decoder_));
+        } else {
+            delete index_decoder_;
+        }
+        index_decoder_ = nullptr;
+    }
+    fmt::print("CreateDocIndexDecoder\n");
+    index_decoder_ = CreateDocIndexDecoder(doc_list_begin_pos);
+    u32 doc_skiplist_start = doc_reader.Tell();
+    u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
+    fmt::print("doc_skiplist_start: {}\n", doc_skiplist_start);
+    fmt::print("doc_skip_list_end: {}\n", doc_skip_list_end);
+
+    index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, doc_slice_list, term_meta.GetDocFreq());
+    if (format_option_.HasPositionList()) {
+        u32 pos_list_begin = pos_reader_.Tell();
+        auto pos_skiplist_size = pos_reader_.ReadVUInt32();
+        auto pos_list_size = pos_reader_.ReadVUInt32();
+        fmt::print("pos_skiplist_size: {}, pos_list_size: {}\n", pos_skiplist_size, pos_list_size);
+        in_doc_state_keeper_.MoveToSegment(pos_slice_list, term_meta.GetTotalTermFreq(), pos_list_begin, format_option_);
+        fmt::print("pos_list_begin: {}\n", pos_list_begin);
+
+        if (in_doc_pos_iterator_) {
+            if (session_pool_) {
+                in_doc_pos_iterator_->~InDocPositionIterator();
+                session_pool_->Deallocate((void *)in_doc_pos_iterator_, sizeof(in_doc_pos_iterator_));
+            } else {
+                delete in_doc_pos_iterator_;
+            }
             in_doc_pos_iterator_ = nullptr;
         }
         in_doc_pos_iterator_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(InDocPositionIterator)))

@@ -55,8 +55,9 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
     RowID current_row_id = current_row_id_;
     row_id = std::max(current_row_id + 1, row_id);
     if (unlikely(last_doc_id_in_buffer_ == INVALID_ROWID || row_id > last_doc_id_in_buffer_)) {
-        if (!posting_decoder_->DecodeDocBuffer(row_id, doc_buffer_, current_row_id, last_doc_id_in_buffer_, current_ttf_))
+        if (!posting_decoder_->DecodeDocBuffer(row_id, doc_buffer_, current_row_id, last_doc_id_in_buffer_, current_ttf_)) {
             return ret;
+        }
         doc_buffer_cursor_ = doc_buffer_ + 1;
     }
     docid_t *cursor = doc_buffer_cursor_;

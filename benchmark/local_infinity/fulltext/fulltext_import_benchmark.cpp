@@ -18,6 +18,7 @@
 #include <tuple>
 #include <unistd.h>
 #include <getopt.h>
+#include <vector>
 
 import stl;
 import third_party;
@@ -37,6 +38,10 @@ import statement_common;
 import parsed_expr;
 import constant_expr;
 import logger;
+import match_expr;
+import function_expr;
+import search_expr;
+import column_expr;
 
 using namespace infinity;
 
@@ -258,6 +263,59 @@ bool Parse(int argc, char* argv[], bool& is_import, bool& is_insert, bool& is_me
     return true;
 }
 
+void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
+    std::string fields = "text";
+    std::vector<std::string> query_vec = {"Animalia", "Algorithms"};
+    BaseProfiler profiler;
+    profiler.Begin();
+    for (auto match_text : query_vec) {
+        LOG_INFO(fmt::format("query text: {}\n", match_text));
+        auto *search_expr = new SearchExpr();
+        {
+            auto exprs = new std::vector<ParsedExpr *>();
+
+            auto *match_expr = new MatchExpr();
+            match_expr->fields_ = fields;
+            match_expr->matching_text_ = match_text;
+            LOG_INFO(fmt::format("match expr fields: {}, matching_text: {}\n", match_expr->fields_, match_expr->matching_text_));
+            exprs->push_back(match_expr);
+
+            search_expr->SetExprs(exprs);
+        }
+
+        auto output_columns = new std::vector<ParsedExpr *>();
+        {
+            ColumnExpr *col1 = new ColumnExpr();
+            col1->names_.emplace_back("col1");
+            output_columns->emplace_back(col1);
+            ColumnExpr *col2 = new ColumnExpr();
+            col2->names_.emplace_back("col2");
+            output_columns->emplace_back(col2);
+        }
+
+//        auto output_columns = new std::vector<ParsedExpr *>();
+//        {
+//            auto select_rowid_expr = new FunctionExpr();
+//            select_rowid_expr->func_name_ = "id";
+//            output_columns->emplace_back(select_rowid_expr);
+//        }
+//        infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
+        auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
+        {
+            LOG_INFO(fmt::format("Search result: {}\n", result.ToString()));
+//            auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
+//            auto &column = *cv[0];
+//            auto result_id = reinterpret_cast<const std::string *>(column.data());
+//
+//            for (size_t i = 0; i < column.Size(); ++i) {
+//                LOG_INFO(fmt::format("result_id[{}] = {}\n", i, result_id[i]));
+//            }
+        }
+    }
+    LOG_INFO(fmt::format("Query data cost: {}", profiler.ElapsedToString()));
+    profiler.End();
+}
+
 int main(int argc, char* argv[]) {
     // Usage: ./fulltext_import_benchmark [--import | -i] [--insert | -r] [--merge | -m]
     // No arguments will run all tests for debugging
@@ -284,8 +342,14 @@ int main(int argc, char* argv[]) {
         BenchmarkInsert(infinity, db_name, table_name, srcfile);
     }
     if (is_merge) {
-        BenchmarkOptimize(infinity, db_name, table_name);
+        // BenchmarkOptimize(infinity, db_name, table_name);
     }
     sleep(10);
+
+    BenchmarkQuery(infinity, db_name, table_name);
     Infinity::LocalUnInit();
+
+    // SharedPtr<Infinity> infinity_query = Infinity::LocalConnect();
+    // BenchmarkQuery(infinity_query, db_name, table_name);
+
 }

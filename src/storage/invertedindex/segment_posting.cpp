@@ -41,4 +41,17 @@ void SegmentPosting::Init(RowID base_row_id, const SharedPtr<PostingWriter> &pos
     GetInMemTermMeta(term_meta_);
 }
 
+void SegmentPosting::Init(SharedPtr<ByteSliceList> doc_slice_list,
+                          SharedPtr<ByteSliceList> pos_slice_list,
+                          RowID base_row_id,
+                          u64 doc_count,
+                          TermMeta &term_meta) {
+    doc_slice_list_ = std::move(doc_slice_list);
+    pos_slice_list_ = std::move(pos_slice_list);
+    base_row_id_ = base_row_id;
+    doc_count_ = doc_count;
+    term_meta_ = term_meta;
+    posting_writer_ = nullptr;
+}
+
 } // namespace infinity

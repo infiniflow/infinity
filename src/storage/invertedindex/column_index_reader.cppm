@@ -34,7 +34,7 @@ export class ColumnIndexReader {
 public:
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
-    UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
+    UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool, bool fetch_position = true);
 
     float GetAvgColumnLength() const;
 
