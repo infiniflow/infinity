@@ -14,34 +14,31 @@
 
 #include <fstream>
 
+import stl;
 import hnsw_alg;
 import file_system;
 import file_system_type;
 import local_file_system;
 import file_system_type;
-import plain_store;
-import lvq_store;
+import data_store;
 import dist_func_l2;
 import dist_func_ip;
 import compilation_config;
-import stl;
+import vec_store_type;
 
 using namespace infinity;
 
-int main() {
-    using LabelT = u64;
+using LabelT = u64;
 
+template <typename Hnsw>
+void Test() {
     String save_dir = tmp_data_path();
 
     int dim = 16;
     int element_size = 1000;
-    int M = 16;
+    int M = 8;
     int ef_construction = 200;
-
-    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float, LabelT>, PlainL2Dist<float, LabelT>>;
-    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, LabelT, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, LabelT, int8_t>>;
-
-    // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
+    int chunk_size = 128;
 
     std::mt19937 rng;
     rng.seed(0);
@@ -55,13 +52,12 @@ int main() {
     LocalFileSystem fs;
 
     {
-        auto hnsw_index = Hnsw::Make(element_size, dim, M, ef_construction, {});
+        auto hnsw_index = Hnsw::Make(chunk_size, dim, M, ef_construction);
 
         hnsw_index->InsertVecsRaw(data.get(), element_size);
         std::ofstream os("tmp/dump.txt");
         hnsw_index->Dump(os);
         hnsw_index->Check();
-        return 0;
 
         hnsw_index->SetEf(10);
         int correct = 0;
@@ -75,19 +71,20 @@ int main() {
         std::printf("correct rage: %f\n", float(correct) / element_size);
 
         u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kWriteLock);
+        UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
         hnsw_index->Save(*file_handler);
         file_handler->Close();
     }
 
     {
         u8 file_flags = FileFlags::READ_FLAG;
-        UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kReadLock);
+        UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
 
-        auto hnsw_index = Hnsw::Load(*file_handler, {});
+        auto hnsw_index = Hnsw::Load(*file_handler);
         hnsw_index->SetEf(10);
 
-        // hnsw_index->Dump(std::cout);
+        std::ofstream os("tmp/dump2.txt");
+        hnsw_index->Dump(os);
         hnsw_index->Check();
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
@@ -99,5 +96,17 @@ int main() {
         }
         std::printf("correct rage: %f\n", float(correct) / element_size);
         file_handler->Close();
+    }
+}
+
+int main() {
+    // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
+    {
+        using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+        Test<Hnsw>();
+    }
+    {
+        using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+        Test<Hnsw>();
     }
 }

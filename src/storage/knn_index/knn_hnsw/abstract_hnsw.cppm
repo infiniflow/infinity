@@ -18,10 +18,10 @@ export module abstract_hnsw;
 
 import stl;
 import hnsw_alg;
+import data_store;
+import vec_store_type;
 import dist_func_l2;
 import dist_func_ip;
-import lvq_store;
-import plain_store;
 import file_system;
 import hnsw_common;
 import column_def;
@@ -33,10 +33,10 @@ namespace infinity {
 
 export template <typename DataType, typename LabelType>
 class AbstractHnsw {
-    using Hnsw1 = KnnHnsw<DataType, LabelType, PlainStore<DataType, LabelType>, PlainIPDist<DataType, LabelType>>;
-    using Hnsw2 = KnnHnsw<DataType, LabelType, PlainStore<DataType, LabelType>, PlainL2Dist<DataType, LabelType>>;
-    using Hnsw3 = KnnHnsw<DataType, LabelType, LVQStore<DataType, LabelType, i8, LVQIPCache<DataType, i8>>, LVQIPDist<DataType, LabelType, i8>>;
-    using Hnsw4 = KnnHnsw<DataType, LabelType, LVQStore<DataType, LabelType, i8, LVQL2Cache<DataType, i8>>, LVQL2Dist<DataType, LabelType, i8>>;
+    using Hnsw1 = KnnHnsw<PlainIPVecStoreType<DataType>, LabelType>;
+    using Hnsw2 = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
+    using Hnsw3 = KnnHnsw<LVQIPVecStoreType<DataType, i8>, LabelType>;
+    using Hnsw4 = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
 
 public:
     AbstractHnsw(void *ptr, const IndexHnsw *index_hnsw) {
@@ -85,9 +85,9 @@ public:
             [max_element, dimension, M, ef_c, this](auto &&arg) {
                 using T = std::decay_t<decltype(*arg)>;
                 if constexpr (std::is_same_v<T, Hnsw1> || std::is_same_v<T, Hnsw2>) {
-                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c, {}).release();
+                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c).release();
                 } else if constexpr (std::is_same_v<T, Hnsw3> || std::is_same_v<T, Hnsw4>) {
-                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c, {}).release();
+                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c).release();
                 } else {
                     UnrecoverableError("Invalid type");
                 }
@@ -100,9 +100,9 @@ public:
             [&file_handler, this](auto &&arg) {
                 using T = std::decay_t<decltype(*arg)>;
                 if constexpr (std::is_same_v<T, Hnsw1> || std::is_same_v<T, Hnsw2>) {
-                    knn_hnsw_ptr_ = T::Load(file_handler, {}).release();
+                    knn_hnsw_ptr_ = T::Load(file_handler).release();
                 } else if constexpr (std::is_same_v<T, Hnsw3> || std::is_same_v<T, Hnsw4>) {
-                    knn_hnsw_ptr_ = T::Load(file_handler, {}).release();
+                    knn_hnsw_ptr_ = T::Load(file_handler).release();
                 } else {
                     UnrecoverableError("Invalid type");
                 }
@@ -131,13 +131,13 @@ public:
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void InsertVecs(Iterator &&iter, SizeT insert_n) {
-        std::visit([&iter, insert_n](auto &&arg) { arg->InsertVecs(std::move(iter), insert_n); }, knn_hnsw_ptr_);
+    void InsertVecs(Iterator &&iter) {
+        std::visit([&iter](auto &&arg) { arg->InsertVecs(std::move(iter)); }, knn_hnsw_ptr_);
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void StoreData(Iterator &&iter, SizeT insert_n) {
-        std::visit([&iter, insert_n](auto &&arg) { arg->StoreData(std::move(iter), insert_n); }, knn_hnsw_ptr_);
+    void StoreData(Iterator &&iter) {
+        std::visit([&iter](auto &&arg) { arg->StoreData(std::move(iter)); }, knn_hnsw_ptr_);
     }
 
     void SetEf(SizeT ef) {

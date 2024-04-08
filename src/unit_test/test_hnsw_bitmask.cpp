@@ -14,8 +14,8 @@
 
 import stl;
 import bitmask;
-import plain_store;
-import lvq_store;
+import data_store;
+import vec_store_type;
 import dist_func_l2;
 import dist_func_ip;
 import hnsw_alg;
@@ -72,10 +72,10 @@ int main() {
     }
 
     using LabelT = u64;
-    using Hnsw = KnnHnsw<f32, LabelT, LVQStore<f32, LabelT, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, LabelT, i8>>;
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<f32, i8>, LabelT>;
     int M = 16;
     int ef_construction = 200;
-    auto hnsw_index = Hnsw::Make(base_embedding_count, dimension, M, ef_construction, {});
+    auto hnsw_index = Hnsw::Make(base_embedding_count, dimension, M, ef_construction);
 
     hnsw_index->InsertVecsRaw(base_embedding.get(), base_embedding_count);
 

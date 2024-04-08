@@ -14,8 +14,8 @@
 
 module;
 
-#include <random>
 #include <fstream>
+#include <random>
 
 export module hnsw_alg;
 
@@ -27,10 +27,7 @@ import knn_result_handler;
 import bitmask;
 
 import hnsw_common;
-import plain_store;
-// import graph_store;
-import linked_graph_store;
-import lvq_store;
+import data_store;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -42,15 +39,14 @@ import lvq_store;
 
 namespace infinity {
 
-export template <typename DataType, typename LabelType, typename DataStore, typename Distance>
-    requires DataStoreConcept<DataStore, DataType> && DistanceConcept<Distance, DataType> && std::same_as<typename Distance::DataStore, DataStore>
+export template <typename VecStoreType, typename LabelType>
 class KnnHnsw {
-    using GraphStore = LinkedGraphStore;
-    constexpr static SizeT chunk_size = 100;
-
 public:
-    using This = KnnHnsw<DataType, LabelType, DataStore, Distance>;
-    using StoreType = typename DataStore::StoreType;
+    using This = KnnHnsw<VecStoreType, LabelType>;
+    using DataType = typename VecStoreType::DataType;
+    using StoreType = typename VecStoreType::StoreType;
+    using DataStore = DataStore<VecStoreType, LabelType>;
+    using Distance = typename VecStoreType::Distance;
 
     using PDV = Pair<DataType, VertexType>;
     using CMP = CompareByFirst<DataType, VertexType>;
@@ -61,39 +57,9 @@ public:
     constexpr static int prefetch_step_ = 2;
 
 private:
-    const SizeT M_;
-    const SizeT Mmax_;
-    const SizeT Mmax0_;
-    const SizeT ef_construction_;
-    SizeT ef_;
-
-    // 1 / log(1.0 * M_)
-    const double mult_;
-    std::default_random_engine level_rng_{};
-
-    DataStore data_store_;
-    GraphStore graph_store_;
-    Distance distance_;
-
-    std::mutex global_mutex_;
-    mutable Vector<std::shared_mutex> vertex_mutex_;
-
-private:
-    KnnHnsw(SizeT M,
-            SizeT Mmax,
-            SizeT Mmax0,
-            SizeT ef_construction,
-            DataStore data_store,
-            GraphStore graph_store,
-            Distance distance,
-            SizeT ef,
-            SizeT random_seed)
-        : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(std::max(M_, ef_construction)), //
-          mult_(1 / std::log(1.0 * M_)),                                                      //
-          data_store_(std::move(data_store)),                                                 //
-          graph_store_(std::move(graph_store)),                                               //
-          distance_(std::move(distance)),                                                     //
-          vertex_mutex_(data_store_.max_vec_num()) {
+    KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance, SizeT ef, SizeT random_seed)
+        : M_(M), ef_construction_(std::max(M_, ef_construction)), mult_(1 / std::log(1.0 * M_)), data_store_(std::move(data_store)),
+          distance_(std::move(distance)) {
         if (ef == 0) {
             ef = ef_construction_;
         }
@@ -101,18 +67,38 @@ private:
         level_rng_.seed(random_seed);
     }
 
-    static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {M, 2 * M}; }
+    static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {2 * M, M}; }
 
 public:
-    static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, SizeT M, SizeT ef_construction, DataStore::InitArgs args) {
-        auto [Mmax, Mmax0] = This::GetMmax(M);
-        auto data_store = DataStore::Make(max_vertex, dim, std::move(args));
-        auto graph_store = GraphStore::Make(chunk_size, Mmax, Mmax0);
+    KnnHnsw(This &&other)
+        : M_(other.M_), ef_construction_(other.ef_construction_), ef_(other.ef_), mult_(other.mult_), level_rng_(std::move(other.level_rng_)),
+          data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)) {}
+    ~KnnHnsw() = default;
+
+    static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, SizeT M, SizeT ef_construction) {
+        auto [Mmax0, Mmax] = This::GetMmax(M);
+        auto data_store = DataStore::Make(max_vertex, dim, Mmax0, Mmax);
         Distance distance(data_store.dim());
-        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), 0, 0));
+        return UniquePtr<This>(new This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0));
     }
 
-    ~KnnHnsw() { graph_store_.Free(data_store_.cur_vec_num()); }
+    void Save(FileHandler &file_handler) {
+        file_handler.Write(&M_, sizeof(M_));
+        file_handler.Write(&ef_construction_, sizeof(ef_construction_));
+        data_store_.Save(file_handler);
+    }
+
+    static UniquePtr<This> Load(FileHandler &file_handler) {
+        SizeT M;
+        file_handler.Read(&M, sizeof(M));
+        SizeT ef_construction;
+        file_handler.Read(&ef_construction, sizeof(ef_construction));
+
+        auto data_store = DataStore::Load(file_handler);
+        Distance distance(data_store.dim());
+
+        return UniquePtr<This>(new This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0));
+    }
 
 private:
     // >= 0
@@ -135,7 +121,7 @@ private:
 
         data_store_.Prefetch(enter_point);
         // enter_point will not be added to result_handler, the distance is not used
-        auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
+        auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_.vec_store_meta());
         candidate.emplace(-dist, enter_point);
         if constexpr (!std::is_same_v<Filter, NoneType>) {
             if (filter(GetLabel(enter_point))) {
@@ -157,10 +143,10 @@ private:
 
             std::shared_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = std::shared_lock<std::shared_mutex>(vertex_mutex_[c_idx]);
+                lock = data_store_.SharedLock(c_idx);
             }
 
-            const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
+            const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(c_idx, layer_idx);
             int prefetch_start = neighbor_size - 1 - prefetch_offset_;
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
@@ -175,7 +161,7 @@ private:
                     }
                     prefetch_start -= prefetch_step_;
                 }
-                auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
+                auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_.vec_store_meta());
                 if (result_handler.GetSize(0) < result_n || dist < result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
                     if constexpr (!std::is_same_v<Filter, NoneType>) {
@@ -195,20 +181,20 @@ private:
     template <bool WithLock = false>
     VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
-        DataType cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_);
+        DataType cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_.vec_store_meta());
         bool check = true;
         while (check) {
             check = false;
 
             std::shared_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = std::shared_lock<std::shared_mutex>(vertex_mutex_[cur_p]);
+                lock = data_store_.SharedLock(cur_p);
             }
 
-            const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(cur_p, layer_idx);
+            const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-                DataType n_dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
+                DataType n_dist = distance_(query, data_store_.GetVec(n_idx), data_store_.vec_store_meta());
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
                     cur_dist = n_dist;
@@ -236,7 +222,7 @@ private:
                 bool check = true;
                 for (SizeT i = 0; i < SizeT(result_size); ++i) {
                     VertexType r_idx = result_p[i];
-                    DataType cr_dist = distance_(c_data, data_store_.GetVec(r_idx), data_store_);
+                    DataType cr_dist = distance_(c_data, data_store_.GetVec(r_idx), data_store_.vec_store_meta());
                     if (cr_dist < c_dist) {
                         check = false;
                         break;
@@ -259,25 +245,25 @@ private:
 
             std::unique_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = std::unique_lock<std::shared_mutex>(vertex_mutex_[n_idx]);
+                lock = data_store_.UniqueLock(n_idx);
             }
 
-            auto [n_neighbors_p, n_neighbor_size_p] = graph_store_.GetNeighborsMut(n_idx, layer_idx);
+            auto [n_neighbors_p, n_neighbor_size_p] = data_store_.GetNeighborsMut(n_idx, layer_idx);
             VertexListSize n_neighbor_size = *n_neighbor_size_p;
-            SizeT Mmax = layer_idx == 0 ? Mmax0_ : Mmax_;
+            SizeT Mmax = layer_idx == 0 ? data_store_.Mmax0() : data_store_.Mmax();
             if (n_neighbor_size < VertexListSize(Mmax)) {
                 *(n_neighbors_p + n_neighbor_size) = vertex_i;
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
             StoreType n_data = data_store_.GetVec(n_idx);
-            DataType n_dist = distance_(n_data, data_store_.GetVec(vertex_i), data_store_);
+            DataType n_dist = distance_(n_data, data_store_.GetVec(vertex_i), data_store_.vec_store_meta());
 
             Vector<PDV> candidates;
             candidates.reserve(n_neighbor_size + 1);
             candidates.emplace_back(n_dist, vertex_i);
             for (int i = 0; i < n_neighbor_size; ++i) {
-                candidates.emplace_back(distance_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_), n_neighbors_p[i]);
+                candidates.emplace_back(distance_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_.vec_store_meta()), n_neighbors_p[i]);
             }
 
             SelectNeighborsHeuristic(std::move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
@@ -289,8 +275,8 @@ private:
     template <bool WithLock = false, FilterConcept<LabelType> Filter = NoneType>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const DataType *q, SizeT k, const Filter &filter) const {
         auto query = data_store_.MakeQuery(q);
-        VertexType ep = graph_store_.enterpoint();
-        for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
+        VertexType ep = data_store_.enterpoint();
+        for (i32 cur_layer = data_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
         return SearchLayer<WithLock, Filter>(ep, query, 0, std::max(k, ef_), filter);
@@ -298,28 +284,28 @@ private:
 
 public:
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void InsertVecs(Iterator &&iter, SizeT insert_n) {
-        VertexType start_i = StoreData(std::move(iter), insert_n);
-        for (VertexType vertex_i = start_i; vertex_i < VertexType(start_i + insert_n); ++vertex_i) {
+    void InsertVecs(Iterator &&iter) {
+        auto [start_i, end_i] = StoreData(std::move(iter));
+        for (VertexType vertex_i = start_i; vertex_i < end_i; ++vertex_i) {
             Build(vertex_i);
         }
     }
 
     // This function for test
     void InsertVecsRaw(const DataType *query, SizeT insert_n) {
-        VertexType start_i = StoreDataRaw(query, insert_n);
-        for (VertexType vertex_i = start_i; vertex_i < VertexType(start_i + insert_n); ++vertex_i) {
+        auto [start_i, end_i] = StoreDataRaw(query, insert_n);
+        for (VertexType vertex_i = start_i; vertex_i < end_i; ++vertex_i) {
             Build(vertex_i);
         }
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    VertexType StoreData(Iterator &&iter, SizeT insert_n) {
-        return data_store_.AddVec(std::move(iter), insert_n);
+    Pair<VertexType, VertexType> StoreData(Iterator &&iter) {
+        return data_store_.OptAddVec(std::move(iter)); // TODO: fix me
     }
 
-    VertexType StoreDataRaw(const DataType *query, SizeT insert_n) {
-        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n), insert_n);
+    Pair<VertexType, VertexType> StoreDataRaw(const DataType *query, SizeT insert_n) {
+        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n));
     }
 
     template <bool WithLock = true>
@@ -330,7 +316,7 @@ public:
         }
 
         i32 q_layer = GenerateRandomLayer();
-        i32 max_layer = graph_store_.max_layer();
+        i32 max_layer = data_store_.max_layer();
         if constexpr (WithLock) {
             if (q_layer <= max_layer) {
                 global_lock.unlock();
@@ -339,12 +325,12 @@ public:
 
         std::unique_lock<std::shared_mutex> lock;
         if constexpr (WithLock) {
-            lock = std::unique_lock<std::shared_mutex>(vertex_mutex_[vertex_i]);
+            lock = data_store_.UniqueLock(vertex_i);
         }
         StoreType query = data_store_.GetVec(vertex_i);
 
-        VertexType ep = graph_store_.enterpoint();
-        graph_store_.AddVertex(vertex_i, q_layer);
+        VertexType ep = data_store_.enterpoint();
+        data_store_.AddVertex(vertex_i, q_layer);
 
         for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
@@ -356,7 +342,7 @@ public:
                 search_result[i] = {d_ptr[i], v_ptr[i]};
             }
 
-            const auto [q_neighbors_p, q_neighbor_size_p] = graph_store_.GetNeighborsMut(vertex_i, cur_layer);
+            const auto [q_neighbors_p, q_neighbor_size_p] = data_store_.GetNeighborsMut(vertex_i, cur_layer);
             SelectNeighborsHeuristic(std::move(search_result), M_, q_neighbors_p, q_neighbor_size_p);
             ep = q_neighbors_p[0];
             ConnectNeighbors<WithLock>(vertex_i, q_neighbors_p, *q_neighbor_size_p, cur_layer);
@@ -400,34 +386,27 @@ public:
 
     SizeT GetVertexNum() const { return data_store_.cur_vec_num(); }
 
-    void Save(FileHandler &file_handler) {
-        file_handler.Write(&M_, sizeof(M_));
-        file_handler.Write(&ef_construction_, sizeof(ef_construction_));
-        data_store_.Save(file_handler);
-        graph_store_.SaveGraph(file_handler, data_store_.cur_vec_num());
-    }
+private:
+    SizeT M_;
+    SizeT ef_construction_;
+    SizeT ef_;
 
-    static UniquePtr<This> Load(FileHandler &file_handler, DataStore::InitArgs args) {
-        SizeT M;
-        file_handler.Read(&M, sizeof(M));
-        SizeT ef_construction;
-        file_handler.Read(&ef_construction, sizeof(ef_construction));
-        auto [Mmax, Mmax0] = This::GetMmax(M);
+    // 1 / log(1.0 * M_)
+    double mult_;
+    std::default_random_engine level_rng_{};
 
-        auto data_store = DataStore::Load(file_handler, 0, args);
-        auto graph_store = GraphStore::LoadGraph(file_handler, chunk_size, Mmax, Mmax0, data_store.cur_vec_num());
-        Distance distance(data_store.dim());
+    DataStore data_store_;
+    Distance distance_;
 
-        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), 0, 0));
-    }
+    std::mutex global_mutex_;
 
-    //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
-    void Check() const { graph_store_.CheckGraph(Mmax0_, Mmax_, data_store_.cur_vec_num()); }
+    // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
+public:
+    void Check() const { data_store_.Check(); }
 
-    void Dump(std::ostream &os) {
+    void Dump(std::ostream &os) const {
         os << std::endl << "---------------------------------------------" << std::endl;
-        os << "max_vec_n: " << data_store_.max_vec_num() << std::endl;
-        graph_store_.Dump(os, data_store_.cur_vec_num());
+        data_store_.Dump(os);
         os << "---------------------------------------------" << std::endl;
     }
 };

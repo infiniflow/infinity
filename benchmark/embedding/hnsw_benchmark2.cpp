@@ -11,8 +11,8 @@ import hnsw_common;
 import local_file_system;
 import file_system_type;
 import file_system;
-import plain_store;
-import lvq_store;
+import data_store;
+import vec_store_type;
 import dist_func_l2;
 import dist_func_ip;
 import compilation_config;
@@ -41,20 +41,16 @@ int main() {
 
     using LabelT = uint64_t;
 
-    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
-    // std::tuple<> init_args = {};
+    // using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
     // std::string save_place = save_dir + "/my_sift_plain_l2.hnsw";
 
-    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, LabelT, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, LabelT, int8_t>>;
-    SizeT init_args = {0};
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     std::string save_place = save_dir + "/my_sift_lvq8_l2_1.hnsw";
 
-    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainIPDist<float>>;
-    // std::tuple<> init_args = {};
+    // using Hnsw = KnnHnsw<PlainIPVecStoreType<float>, LabelT>;
     // std::string save_place = save_dir + "/my_sift_plain_ip.hnsw";
 
-    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQIPCache<float, int8_t>>, LVQIPDist<float, int8_t>>;
-    // SizeT init_args = {0};
+    // using Hnsw = KnnHnsw<LVQIPVecStoreType<float, int8_t>, LabelT>;
     // std::string save_place = save_dir + "/my_sift_lvq8_ip.hnsw";
 
     std::unique_ptr<Hnsw> knn_hnsw = nullptr;
@@ -69,7 +65,7 @@ int main() {
         assert(dimension == dim || !"embedding dimension isn't correct");
         assert(embedding_count == eb_cnt || !"embedding size isn't correct");
 
-        knn_hnsw = Hnsw::Make(embedding_count, dimension, M, ef_construction, init_args);
+        knn_hnsw = Hnsw::Make(embedding_count, dimension, M, ef_construction);
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() << "B" << std::endl;
@@ -78,7 +74,7 @@ int main() {
         {
             std::cout << "Build thread number: " << build_thread_n << std::endl;
 
-            VertexType start_i = knn_hnsw->StoreDataRaw(input_embeddings, embedding_count);
+            auto [start_i, end_i] = knn_hnsw->StoreDataRaw(input_embeddings, embedding_count);
             delete[] input_embeddings;
             Atomic<VertexType> next_i = start_i;
             std::vector<std::thread> threads;
@@ -114,7 +110,7 @@ int main() {
         uint8_t file_flags = FileFlags::READ_FLAG;
         std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_place, file_flags, FileLockType::kReadLock);
 
-        knn_hnsw = Hnsw::Load(*file_handler, init_args);
+        knn_hnsw = Hnsw::Load(*file_handler);
         std::cout << "Loaded" << std::endl;
 
         // std::ofstream out("dump.txt");

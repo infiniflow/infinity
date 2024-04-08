@@ -19,19 +19,19 @@ module;
 
 import stl;
 import hnsw_common;
-import plain_store;
-import lvq_store;
 import hnsw_simd_func;
+import plain_vec_store;
+import lvq_vec_store;
 
 export module dist_func_l2;
 
 namespace infinity {
 
-export template <typename DataType, typename LabelType>
+export template <typename DataType>
 class PlainL2Dist {
 public:
-    using DataStore = PlainStore<DataType, LabelType>;
-    using StoreType = typename DataStore::StoreType;
+    using VecStoreMeta = PlainVecStoreMeta<DataType>;
+    using StoreType = typename VecStoreMeta::StoreType;
 
 private:
     using SIMDFuncType = DataType (*)(const DataType *, const DataType *, SizeT);
@@ -65,7 +65,9 @@ public:
         }
     }
 
-    DataType operator()(const StoreType &v1, const StoreType &v2, const DataStore &data_store) const { return SIMDFunc(v1, v2, data_store.dim()); }
+    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+        return SIMDFunc(v1, v2, vec_store_meta.dim());
+    }
 };
 
 export template <typename DataType, typename CompressType>
@@ -88,12 +90,12 @@ public:
     static GlobalCacheType MakeGlobalCache(const MeanType *, SizeT) { return {}; }
 };
 
-export template <typename DataType, typename LabelType, typename CompressType>
+export template <typename DataType, typename CompressType>
 class LVQL2Dist {
 public:
-    using This = LVQL2Dist<DataType, CompressType, LabelType>;
-    using DataStore = LVQStore<DataType, LabelType, CompressType, LVQL2Cache<DataType, CompressType>>;
-    using StoreType = typename DataStore::StoreType;
+    using This = LVQL2Dist<DataType, CompressType>;
+    using VecStoreMeta = LVQVecStoreMeta<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
+    using StoreType = typename VecStoreMeta::StoreType;
 
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);
@@ -127,14 +129,15 @@ public:
         }
     }
 
-    DataType operator()(const StoreType &v1, const StoreType &v2, const DataStore &data_store) const {
-        SizeT dim = data_store.dim();
-        i32 c1c2_ip = SIMDFunc(v1.GetCompressVec(), v2.GetCompressVec(), dim);
-        auto [scale1, bias1] = v1.GetScalar();
-        auto [scale2, bias2] = v2.GetScalar();
-        auto beta = bias1 - bias2;
-        auto [norm1_scale_1, norm2sq_scalesq_1] = v1.GetLocalCache();
-        auto [norm1_scale_2, norm2sq_scalesq_2] = v2.GetLocalCache();
+    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+        SizeT dim = vec_store_meta.dim();
+        i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
+        auto scale1 = v1->scale_;
+        auto scale2 = v2->scale_;
+        auto beta = v1->bias_ - v2->bias_;
+
+        auto [norm1_scale_1, norm2sq_scalesq_1] = v1->local_cache_;
+        auto [norm1_scale_2, norm2sq_scalesq_2] = v2->local_cache_;
         return norm2sq_scalesq_1 + norm2sq_scalesq_2 + beta * beta * dim - 2 * scale1 * scale2 * c1c2_ip + 2 * beta * norm1_scale_1 -
                2 * beta * norm1_scale_2;
     }
