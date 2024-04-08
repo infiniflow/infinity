@@ -322,7 +322,8 @@ class TestImport:
         db_obj = get_infinity_db
         db_obj.drop_table("test_import_embedding_with_not_match_definition")
         with pytest.raises(Exception):
-            table_obj = db_obj.create_table("test_import_embedding_with_not_match_definition", {"c1": "int", "c2": types})
+            table_obj = db_obj.create_table("test_import_embedding_with_not_match_definition",
+                                            {"c1": "int", "c2": types})
             test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
             res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
             assert res.error_code == ErrorCode.OK
@@ -383,6 +384,24 @@ class TestImport:
         with pytest.raises(Exception, match="ERROR:3039, Column count mismatch: CSV file row count isn't match with table schema*"):
             res = table_obj.import_data(test_csv_dir)
             assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_import_with_different_size.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("data_size", [1, 8191, 8192, 8193])
+    def test_import_with_different_size(self, get_infinity_db, check_data, data_size):
+        generate_big_rows_csv(data_size, "pysdk_test_import_with_different_size.csv")
+        copy_data("pysdk_test_import_with_different_size.csv")
+
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_with_different_size")
+        table_obj = db_obj.create_table("test_import_with_different_size", {"c1": "int", "c2": "varchar"})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_import_with_different_size.csv"
+        res = table_obj.import_data(test_csv_dir)
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         print(res)
