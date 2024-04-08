@@ -42,6 +42,8 @@ public:
 
     RowID SeekDoc(RowID docId);
 
+    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond);
+
     void SeekPosition(pos_t pos, pos_t &result);
 
     docpayload_t GetCurrentDocPayload() {

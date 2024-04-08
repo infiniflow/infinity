@@ -109,6 +109,24 @@ Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id
     }
 }
 
+Pair<bool, RowID> BlockMaxTermDocIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+    RowID current_doc = doc_id_;
+    RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
+    if (doc_id > seek_end) {
+        return {false, INVALID_ROWID};
+    }
+    if (current_doc != INVALID_ROWID and current_doc >= doc_id) {
+        // use current doc_id_
+        if (current_doc <= seek_end) {
+            return {true, current_doc};
+        } else {
+            return {false, INVALID_ROWID};
+        }
+    }
+    // need to decode
+    return iter_.PeekInBlockRange(doc_id, seek_end);
+}
+
 // simple case code for Term and "AND"
 Pair<RowID, float> BlockMaxTermDocIterator::NextWithThreshold(float threshold) {
     /*

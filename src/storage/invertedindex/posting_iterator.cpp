@@ -94,6 +94,27 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
     return current_row_id;
 }
 
+Pair<bool, RowID> PostingIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+    if (doc_id > last_doc_id_in_current_block_) {
+        return {false, INVALID_ROWID};
+    }
+    if (!finish_decode_docid_) {
+        posting_decoder_->DecodeCurrentDocIDBuffer(doc_buffer_);
+        current_row_id_ = last_doc_id_in_prev_block_ + doc_buffer_[0];
+        doc_buffer_cursor_ = doc_buffer_ + 1;
+        finish_decode_docid_ = true;
+    }
+    RowID current_row_id = current_row_id_;
+    docid_t *cursor = doc_buffer_cursor_;
+    while (current_row_id < doc_id) {
+        current_row_id += *(cursor++);
+    }
+    if (current_row_id <= doc_id_no_beyond) {
+        return {true, current_row_id};
+    }
+    return {false, INVALID_ROWID};
+}
+
 void PostingIterator::MoveToCurrentDoc(bool fetch_position) {
     need_move_to_current_doc_ = false;
     in_doc_pos_iter_inited_ = false;

@@ -168,4 +168,38 @@ Tuple<bool, float, RowID> BlockMaxAndIterator::SeekInBlockRange(RowID doc_id, fl
     }
 }
 
+// TODO: simplify this
+Pair<bool, RowID> BlockMaxAndIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+    RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
+    while (true) {
+        if (doc_id > seek_end) [[unlikely]] {
+            return {false, INVALID_ROWID};
+        }
+        // special case: first iterator, threshold will not change
+        auto [success1, id1] = sorted_iterators_[0]->PeekInBlockRange(doc_id, seek_end);
+        if (!success1) {
+            return {false, INVALID_ROWID};
+        }
+        assert((id1 <= seek_end));
+        assert((id1 >= doc_id));
+        if (id1 > doc_id) {
+            // need to update doc_id
+            doc_id = id1;
+        }
+        u32 i = 1;
+        for (; i < sorted_iterators_.size(); ++i) {
+            auto [success2, id2] = sorted_iterators_[i]->PeekInBlockRange(doc_id, doc_id);
+            if (!success2) {
+                // need to update doc_id, restart from the first iterator
+                ++doc_id;
+                break;
+            }
+            assert((id2 == doc_id));
+        }
+        if (i == sorted_iterators_.size()) {
+            return {true, doc_id};
+        }
+    }
+}
+
 } // namespace infinity

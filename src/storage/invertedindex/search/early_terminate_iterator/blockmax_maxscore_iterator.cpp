@@ -94,20 +94,15 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
         bool match_any = false;
         for (u32 j = sorted_iterators_.size(); j > pivot; --j) {
             const auto &it = sorted_iterators_[j - 1];
-            // TODO: does not need score if id != doc_id
-            auto [success, score, id] = it->SeekInBlockRange(doc_id, 0, block_end);
+            auto [success, score, id] = it->SeekInBlockRange(doc_id, 0, doc_id);
             if (success) {
-                if (id == doc_id) {
-                    match_any = true;
-                    leftover_threshold -= score;
-                    // TODO: does not need score here
-                    auto [success2, score2, id2] = it->SeekInBlockRange(doc_id + 1, 0, block_end);
-                    if (success2) {
-                        next_candidate = std::min(next_candidate, id2);
-                    }
-                } else {
-                    next_candidate = std::min(next_candidate, id);
-                }
+                assert((id == doc_id));
+                match_any = true;
+                leftover_threshold -= score;
+            }
+            auto [success2, id2] = it->PeekInBlockRange(doc_id + 1, block_end);
+            if (success2) {
+                next_candidate = std::min(next_candidate, id2);
             }
         }
         if (match_any) {
@@ -129,6 +124,23 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
         assert((doc_id < next_candidate));
         doc_id = next_candidate;
     }
+}
+
+Pair<bool, RowID> BlockMaxMaxscoreIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+    RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
+    if (doc_id > seek_end) {
+        return {false, INVALID_ROWID};
+    }
+    RowID next_candidate = INVALID_ROWID;
+    bool match_any = false;
+    for (u32 j = sorted_iterators_.size(); j > pivot; --j) {
+        const auto &it = sorted_iterators_[j - 1];
+        if (auto [success, id] = it->PeekInBlockRange(doc_id, seek_end); success) {
+            match_any = true;
+            next_candidate = std::min(next_candidate, id);
+        }
+    }
+    return {match_any, next_candidate};
 }
 
 Pair<RowID, float> BlockMaxMaxscoreIterator::NextWithThreshold(float threshold) {

@@ -71,4 +71,8 @@ Tuple<bool, float, RowID> BlockMaxAndNotIterator::SeekInBlockRange(RowID doc_id,
     }
 }
 
+Pair<bool, RowID> BlockMaxAndNotIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+    return inner_iterators_[0]->PeekInBlockRange(doc_id, doc_id_no_beyond);
+}
+
 } // namespace infinity

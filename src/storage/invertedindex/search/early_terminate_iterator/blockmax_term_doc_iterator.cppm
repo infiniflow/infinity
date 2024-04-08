@@ -59,6 +59,8 @@ public:
 
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) override;
 
+    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
+
     // weight included
     float BM25Score();
 

@@ -45,6 +45,8 @@ public:
 
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) override;
 
+    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
+
 private:
     // block max info
     u32 pivot = 0;                                           // seperate the iterators into two parts: [0, pivot) and [pivot, n)

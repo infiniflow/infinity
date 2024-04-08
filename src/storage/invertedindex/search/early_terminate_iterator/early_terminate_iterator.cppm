@@ -60,6 +60,8 @@ public:
     // if seek succeed in current block, return true, doc_id_ is updated
     virtual Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) = 0;
 
+    virtual Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) = 0;
+
     // TODO: implement this function
     bool Seek(RowID doc_id) { return false; }
 };
