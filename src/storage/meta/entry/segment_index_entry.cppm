@@ -140,19 +140,16 @@ public:
         chunk_index_entries_.erase(chunk_index_entries_.begin() + idx_first + 1, chunk_index_entries_.begin() + idx_last + 1);
     }
 
-    Tuple<Vector<String>, Vector<RowID>, MemoryIndexer *> GetFullTextIndexSnapshot() {
-        Vector<String> base_names;
-        Vector<RowID> base_rowids;
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<MemoryIndexer>> GetFullTextIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        for (SizeT i = 0; i < chunk_index_entries_.size(); i++) {
-            auto &chunk_index_entry = chunk_index_entries_[i];
-            base_names.push_back(chunk_index_entry->base_name_);
-            base_rowids.push_back(chunk_index_entry->base_rowid_);
-        }
-        return {base_names, base_rowids, memory_indexer_.get()};
+        return {chunk_index_entries_, memory_indexer_};
     }
+
     Pair<u64, u32> GetFulltextColumnLenInfo() {
         std::shared_lock lock(rw_locker_);
+        if (ft_column_len_sum_ == 0 && memory_indexer_.get() != nullptr) {
+            return {memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount()};
+        }
         return {ft_column_len_sum_, ft_column_len_cnt_};
     }
     void UpdateFulltextColumnLenInfo(u64 column_len_sum, u32 column_len_cnt) {
@@ -187,7 +184,7 @@ private:
     TxnTimeStamp checkpoint_ts_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
-    UniquePtr<MemoryIndexer> memory_indexer_{};
+    SharedPtr<MemoryIndexer> memory_indexer_{};
 
     u64 ft_column_len_sum_{}; // increase only
     u32 ft_column_len_cnt_{}; // increase only

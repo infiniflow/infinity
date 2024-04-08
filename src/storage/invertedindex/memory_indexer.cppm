@@ -29,10 +29,9 @@ import ring;
 import skiplist;
 import internal_types;
 import map_with_lock;
+import vector_with_lock;
 
 namespace infinity {
-
-class FullTextColumnLengthFileHandler;
 
 export class MemoryIndexer {
 public:
@@ -63,11 +62,7 @@ public:
     ~MemoryIndexer();
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void Insert(SharedPtr<ColumnVector> column_vector,
-                u32 row_offset,
-                u32 row_count,
-                SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
-                bool offline = false);
+    void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
     // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
@@ -93,6 +88,10 @@ public:
     RowID GetBaseRowId() const { return base_row_id_; }
 
     u32 GetDocCount() const { return doc_count_; }
+
+    u32 GetColumnLengthSum() const { return column_length_sum_.load(); }
+
+    u32 GetColumnLength(u32 doc_id) { return column_lengths_.Get(doc_id); }
 
     MemoryPool *GetPool() { return &byte_slice_pool_; }
 
@@ -146,7 +145,7 @@ private:
     bool is_spilled_{false};
 
     // for column length info
-    std::shared_mutex column_length_mutex_;
-    Vector<u32> column_length_array_;
+    VectorWithLock<u32> column_lengths_;
+    Atomic<u32> column_length_sum_{0};
 };
 } // namespace infinity

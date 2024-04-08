@@ -12,17 +12,14 @@ import term_meta;
 import column_index_iterator;
 import segment_term_posting;
 import internal_types;
+import vector_with_lock;
 
 namespace infinity {
 
 class PostingDumper;
 export class PostingMerger {
 public:
-    PostingMerger(MemoryPool *memory_pool,
-                  RecyclePool *buffer_pool,
-                  optionflag_t flag,
-                  std::shared_mutex &column_length_mutex,
-                  Vector<u32> &column_length_array);
+    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, optionflag_t flag, VectorWithLock<u32> &column_length_array);
 
     ~PostingMerger();
 
@@ -42,7 +39,6 @@ private:
     df_t df_;
     ttf_t ttf_;
     // for column length info
-    std::shared_mutex &column_length_mutex_;
-    Vector<u32> &column_length_array_;
+    VectorWithLock<u32> &column_lengths_;
 };
 } // namespace infinity

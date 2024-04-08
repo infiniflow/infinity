@@ -47,26 +47,25 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
     index_by_segment_ = std::move(index_by_segment);
     // need to ensure that segment_id is in ascending order
     for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-        auto [base_names, base_row_ids, memory_indexer] = segment_index_entry->GetFullTextIndexSnapshot();
+        auto [chunk_index_entries, memory_indexer] = segment_index_entry->GetFullTextIndexSnapshot();
         // segment_readers
-        for (u32 i = 0; i < base_names.size(); ++i) {
-            SharedPtr<DiskIndexSegmentReader> segment_reader = MakeShared<DiskIndexSegmentReader>(index_dir_, base_names[i], base_row_ids[i], flag);
+        for (u32 i = 0; i < chunk_index_entries.size(); ++i) {
+            SharedPtr<DiskIndexSegmentReader> segment_reader =
+                MakeShared<DiskIndexSegmentReader>(index_dir_, chunk_index_entries[i]->base_name_, chunk_index_entries[i]->base_rowid_, flag);
             segment_readers_.push_back(std::move(segment_reader));
         }
-        // for loading column length files
-        base_names_.insert(base_names_.end(), std::move_iterator(base_names.begin()), std::move_iterator(base_names.end()));
-        base_row_ids_.insert(base_row_ids_.end(), base_row_ids.begin(), base_row_ids.end());
-        if (memory_indexer and memory_indexer->GetDocCount() != 0) {
+        chunk_index_entries_.insert(chunk_index_entries_.end(),
+                                    std::move_iterator(chunk_index_entries.begin()),
+                                    std::move_iterator(chunk_index_entries.end()));
+        if (memory_indexer.get() != nullptr && memory_indexer->GetDocCount() != 0) {
             // segment_reader
-            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(memory_indexer);
+            SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(memory_indexer.get());
             segment_readers_.push_back(std::move(segment_reader));
             // for loading column length file
-            base_names_.push_back(memory_indexer->GetBaseName());
-            base_row_ids_.push_back(memory_indexer->GetBaseRowId());
+            assert(memory_indexer_.get() == nullptr);
+            memory_indexer_ = memory_indexer;
         }
     }
-    // put an INVALID_ROWID at the end of base_row_ids_
-    base_row_ids_.emplace_back(INVALID_ROWID);
 }
 
 UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {

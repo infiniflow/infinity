@@ -32,7 +32,6 @@ import posting_iterator;
 import column_inverter;
 import segment_index_entry;
 import local_file_system;
-import column_length_io;
 import internal_types;
 import logical_type;
 import column_index_merger;
@@ -111,18 +110,12 @@ public:
 TEST_F(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    String column_length_file_path_1 = String("/tmp/infinity/fulltext_tbl1_col1/chunk1") + LENGTH_SUFFIX;
-    auto column_length_file_handler_1 =
-        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path_1, fake_segment_index_entry_1.get());
     MemoryIndexer
         indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer1.Insert(column_, 0, 1, column_length_file_handler_1);
-    indexer1.Insert(column_, 1, 3, std::move(column_length_file_handler_1));
+    indexer1.Insert(column_, 0, 1);
+    indexer1.Insert(column_, 1, 3);
     indexer1.Dump();
 
-    String column_length_file_path_2 = String("/tmp/infinity/fulltext_tbl1_col1/chunk2") + LENGTH_SUFFIX;
-    auto column_length_file_handler_2 =
-        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path_2, fake_segment_index_entry_1.get());
     auto indexer2 = MakeUnique<MemoryIndexer>("/tmp/infinity/fulltext_tbl1_col1",
                                               "chunk2",
                                               RowID(0U, 4U),
@@ -131,7 +124,7 @@ TEST_F(MemoryIndexerTest, Insert) {
                                               byte_slice_pool_,
                                               buffer_pool_,
                                               thread_pool_);
-    indexer2->Insert(column_, 4, 1, std::move(column_length_file_handler_2));
+    indexer2->Insert(column_, 4, 1);
     while (indexer2->GetInflightTasks() > 0) {
         sleep(1);
         indexer2->CommitSync();
@@ -147,14 +140,11 @@ TEST_F(MemoryIndexerTest, Insert) {
 
 TEST_F(MemoryIndexerTest, test2) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    String column_length_file_path = String("/tmp/infinity/fulltext_tbl1_col1/chunk1") + LENGTH_SUFFIX;
-    auto column_length_file_handler =
-        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, fake_segment_index_entry_1.get());
     MemoryIndexer
         indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer1.Insert(column_, 0, 2, column_length_file_handler, true);
-    indexer1.Insert(column_, 2, 2, column_length_file_handler, true);
-    indexer1.Insert(column_, 4, 1, std::move(column_length_file_handler), true);
+    indexer1.Insert(column_, 0, 2, true);
+    indexer1.Insert(column_, 2, 2, true);
+    indexer1.Insert(column_, 4, 1, true);
     indexer1.Dump(true);
     fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
 
@@ -168,8 +158,6 @@ TEST_F(MemoryIndexerTest, test2) {
 TEST_F(MemoryIndexerTest, SpillLoadTest) {
     String column_length_file_path = String("/tmp/infinity/fulltext_tbl1_col1/chunk1") + LENGTH_SUFFIX;
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    auto column_length_file_handler =
-        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, fake_segment_index_entry_1.get());
     auto indexer1 = MakeUnique<MemoryIndexer>("/tmp/infinity/fulltext_tbl1_col1",
                                               "chunk1",
                                               RowID(0U, 0U),
@@ -180,9 +168,9 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
                                               thread_pool_);
     bool offline = false;
     bool spill = true;
-    indexer1->Insert(column_, 0, 2, column_length_file_handler, offline);
-    indexer1->Insert(column_, 2, 2, column_length_file_handler, offline);
-    indexer1->Insert(column_, 4, 1, std::move(column_length_file_handler), offline);
+    indexer1->Insert(column_, 0, 2, offline);
+    indexer1->Insert(column_, 2, 2, offline);
+    indexer1->Insert(column_, 4, 1, offline);
     while (indexer1->GetInflightTasks() > 0) {
         sleep(1);
         indexer1->CommitSync();

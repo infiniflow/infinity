@@ -26,6 +26,7 @@ import column_index_merger;
 import internal_types;
 import logical_type;
 import infinity_exception;
+import vector_with_lock;
 
 using namespace infinity;
 
@@ -83,18 +84,12 @@ void PostingMergerTest::CreateIndex() {
     }
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    String column_length_file_path_1 = String("/tmp/infinity/posting_merger/chunk1") + LENGTH_SUFFIX;
-    auto column_length_file_handler_1 =
-        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path_1, fake_segment_index_entry_1.get());
     MemoryIndexer
         indexer1("/tmp/infinity/posting_merger", "chunk1", RowID(0U, 0U), flag_, "standard", *byte_slice_pool_, *buffer_pool_, thread_pool_);
-    indexer1.Insert(column, 0, 1, column_length_file_handler_1);
+    indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    String column_length_file_path_2 = String("/tmp/infinity/posting_merger/chunk2") + LENGTH_SUFFIX;
-    auto column_length_file_handler_2 =
-        MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path_2, fake_segment_index_entry_1.get());
     auto indexer2 = MakeUnique<MemoryIndexer>("/tmp/infinity/posting_merger",
                                               "chunk2",
                                               RowID(0U, 1U),
@@ -103,7 +98,7 @@ void PostingMergerTest::CreateIndex() {
                                               *byte_slice_pool_,
                                               *buffer_pool_,
                                               thread_pool_);
-    indexer2->Insert(column, 1, 1, std::move(column_length_file_handler_2));
+    indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }
 
@@ -160,15 +155,14 @@ TEST_F(PostingMergerTest, Basic) {
         merge_base_rowid = std::min(merge_base_rowid, row_id);
     }
 
-    std::shared_mutex column_length_mutex;
-    Vector<u32> column_length_array;
+    VectorWithLock<u32> column_length_array;
+    Vector<u32> &unsafe_column_length_array = column_length_array.UnsafeVec();
     {
         LocalFileSystem fs;
         // prepare column length info
         // the indexes to be merged should be from the same segment
         // otherwise the range of row_id will be very large ( >= 2^32)
-        std::unique_lock<std::shared_mutex> lock(column_length_mutex);
-        column_length_array.clear();
+        unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
             String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
             RowID base_row_id = row_ids[i];
@@ -176,8 +170,8 @@ TEST_F(PostingMergerTest, Basic) {
             UniquePtr<FileHandler> file_handler = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
             const u32 file_size = fs.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
-            column_length_array.resize(id_offset + file_read_array_len);
-            const i64 read_count = fs.Read(*file_handler, column_length_array.data() + id_offset, file_size);
+            unsafe_column_length_array.resize(id_offset + file_read_array_len);
+            const i64 read_count = fs.Read(*file_handler, unsafe_column_length_array.data() + id_offset, file_size);
             file_handler->Close();
             if (read_count != file_size) {
                 UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
@@ -185,7 +179,7 @@ TEST_F(PostingMergerTest, Basic) {
         }
     }
 
-    auto posting_merger = MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_length_mutex, column_length_array);
+    auto posting_merger = MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_length_array);
 
     posting_merger->Merge(segment_term_postings, merge_base_rowid);
     EXPECT_EQ(posting_merger->GetDF(), static_cast<u32>(2));
