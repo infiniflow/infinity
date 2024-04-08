@@ -32,7 +32,11 @@ public:
     DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
     virtual ~DiskIndexSegmentReader();
 
+    bool GetSegmentPostingBack(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const;
+
+    // get doc segment posting
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
+    bool GetPosSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const;
 
 private:
     RowID base_row_id_{INVALID_ROWID};

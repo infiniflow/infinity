@@ -33,6 +33,7 @@ public:
 
     // for on disk segment posting
     void Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
+    void Init(SharedPtr<ByteSliceList> doc_slice_list, SharedPtr<ByteSliceList> pos_slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
     // for in memory segment posting
     void Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer);
 
@@ -56,8 +57,14 @@ public:
 
     const SharedPtr<ByteSliceList> &GetSliceListPtr() const { return slice_list_; }
 
+    const SharedPtr<ByteSliceList> &GetDocSliceListPtr() const { return doc_slice_list_; }
+
+    const SharedPtr<ByteSliceList> &GetPosSliceListPtr() const { return pos_slice_list_; }
+
 private:
     SharedPtr<ByteSliceList> slice_list_;
+    SharedPtr<ByteSliceList> doc_slice_list_;
+    SharedPtr<ByteSliceList> pos_slice_list_;
     RowID base_row_id_ = INVALID_ROWID;
     u32 doc_count_ = 0;
     TermMeta term_meta_;
