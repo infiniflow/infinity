@@ -235,11 +235,15 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
         auto &block_entry = parser_context->block_entry_;
         if (block_entry->row_count() > 0) {
             segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
         } else {
             parser_context->column_vectors_.clear();
             std::move(*block_entry).Cleanup();
+        }
+        if (segment_entry->row_count() == 0) {
+            parser_context->column_vectors_.clear();
             std::move(*segment_entry).Cleanup();
+        } else {
+            SaveSegmentData(table_entry_, txn, segment_entry);
         }
     }
     fclose(fp);
