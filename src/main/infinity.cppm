@@ -131,6 +131,7 @@ public:
     QueryResult
     Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 
+    QueryResult Optimize(const String &db_name, const String &table_name);
 private:
     SharedPtr<BaseSession> session_{};
 };
