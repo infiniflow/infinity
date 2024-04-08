@@ -100,6 +100,7 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
                 match_any = true;
                 leftover_threshold -= score;
             }
+            //TODO: speed up the skip
             auto [success2, id2] = it->PeekInBlockRange(doc_id + 1, block_end);
             if (success2) {
                 next_candidate = std::min(next_candidate, id2);
