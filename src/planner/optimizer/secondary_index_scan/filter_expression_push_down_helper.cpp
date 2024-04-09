@@ -137,7 +137,7 @@ inline bool IntegralContinueUnwind(DoubleT right_val_double, FilterCompareType &
         case FilterCompareType::kEqual: {
             // TODO: does not allow expression like "(cast to double)(c1 (int type)) == 3.0" ?
             compare_type = FilterCompareType::kInvalid;
-            UnrecoverableError("IntegralContinueUnwind(): should not cast int type column to double in equality comparison.");
+            // UnrecoverableError("IntegralContinueUnwind(): should not cast int type column to double in equality comparison.");
             return false;
         }
         default: {
@@ -357,7 +357,8 @@ FilterExpressionPushDownHelper::UnwindCast(SharedPtr<BaseExpression> &cast_expr,
                     }
                 }
                 default: {
-                    UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
+                    // possible case: cast varchar column to bigint and compare with bigint value
+                    // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
                     return {0, Value::MakeNull(), FilterCompareType::kInvalid};
                 }
             }
@@ -408,12 +409,14 @@ FilterExpressionPushDownHelper::UnwindCast(SharedPtr<BaseExpression> &cast_expr,
                     return UnwindCast(source_expr, std::move(right_val), compare_type);
                 }
                 default: {
-                    UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
+                    // possible case: cast varchar column to double and compare with double value
+                    // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
                     return {0, Value::MakeNull(), FilterCompareType::kInvalid};
                 }
             }
         }
-        UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
+        // possible case: cast column to varchar and compare with varchar value
+        // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
         return {0, Value::MakeNull(), FilterCompareType::kInvalid};
     } else {
         UnrecoverableError(fmt::format("UnwindCast(): expression type error: {}.", cast_expr->Name()));

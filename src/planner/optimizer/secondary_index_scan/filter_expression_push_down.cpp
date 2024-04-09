@@ -568,6 +568,7 @@ public:
                             case FilterCompareType::kGreaterEqual: {
                                 return MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, std::move(value), compare_type);
                             }
+                            case FilterCompareType::kInvalid: // special cast expression, e.g., cast varchar column to int and compare with int
                             case FilterCompareType::kAlwaysTrue: {
                                 return ReturnAlwaysTrue();
                             }
@@ -633,6 +634,7 @@ public:
                                     }
                                 }
                             }
+                            case FilterCompareType::kInvalid: // special cast expression, e.g., cast varchar column to int and compare with int
                             case FilterCompareType::kAlwaysTrue: {
                                 return ReturnAlwaysTrue();
                             }
