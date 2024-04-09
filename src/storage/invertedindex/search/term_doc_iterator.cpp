@@ -26,8 +26,9 @@ void TermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_
     os << (is_final ? "└──" : "├──");
     os << "TermDocIterator";
     os << " (weight: " << weight_ << ")";
-    os << " (column: " << column_id_ << ")";
+    os << " (column: " << *column_name_ptr_ << ")";
     os << " (term: " << *term_ptr_ << ")";
+    os << " (doc_freq: " << GetDF() << ")";
     os << '\n';
 }
 

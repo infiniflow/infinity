@@ -45,6 +45,10 @@ public:
 
     bool Seek(RowID doc_id) override;
 
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
+        return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxMaxscoreIterator", sorted_iterators_, os, prefix, is_final);
+    }
+
 private:
     // block max info
     u32 pivot = 0;                                           // seperate the iterators into two parts: [0, pivot) and [pivot, n)

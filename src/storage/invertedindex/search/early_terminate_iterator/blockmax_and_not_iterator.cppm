@@ -47,6 +47,10 @@ public:
 
     bool Seek(RowID doc_id) override;
 
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
+        return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxAndNotIterator", inner_iterators_, os, prefix, is_final);
+    }
+
 private:
     Vector<UniquePtr<EarlyTerminateIterator>> inner_iterators_; // first: iter, others: "not" part
 };

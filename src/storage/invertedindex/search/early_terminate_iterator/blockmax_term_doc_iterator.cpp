@@ -16,6 +16,7 @@ module;
 
 #include <cassert>
 #include <cmath>
+#include <iostream>
 #include <tuple>
 module blockmax_term_doc_iterator;
 
@@ -138,6 +139,18 @@ bool BlockMaxTermDocIterator::Seek(RowID doc_id) {
     const RowID seek_result = iter_.SeekDoc(doc_id);
     doc_id_ = seek_result;
     return seek_result == doc_id;
+}
+
+void BlockMaxTermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << "BlockMaxTermDocIterator";
+    os << " (weight: " << weight_ << ")";
+    os << " (column: " << *column_name_ptr_ << ")";
+    os << " (term: " << *term_ptr_ << ")";
+    os << " (doc_freq: " << DocFreq() << ")";
+    os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
+    os << '\n';
 }
 
 } // namespace infinity

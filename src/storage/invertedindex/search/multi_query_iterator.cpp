@@ -35,6 +35,7 @@ void MultiQueryDocIterator::PrintTree(std::ostream &os, const String &prefix, bo
         UnrecoverableError("Unknown query type");
     }
     os << " (children count: " << children_.size() << ")";
+    os << " (doc_freq: " << GetDF() << ")";
     os << '\n';
     std::string next_prefix = prefix + (is_final ? "    " : "│   ");
     for (u32 i = 0; i + 1 < children_.size(); ++i) {

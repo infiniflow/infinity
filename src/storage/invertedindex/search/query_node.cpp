@@ -344,6 +344,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     }
     auto search = MakeUnique<TermDocIterator>(std::move(posting_iterator), column_id, GetWeight());
     search->term_ptr_ = &term_;
+    search->column_name_ptr_ = &column_;
     if (scorer) {
         // nodes under "not" will not be added to scorer
         scorer->AddDocIterator(search.get(), column_id);
@@ -362,6 +363,7 @@ TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRe
         return nullptr;
     }
     search->term_ptr_ = &term_;
+    search->column_name_ptr_ = &column_;
     if (scorer) {
         // nodes under "not" will not be added to scorer
         scorer->AddBlockMaxDocIterator(search.get(), column_id);

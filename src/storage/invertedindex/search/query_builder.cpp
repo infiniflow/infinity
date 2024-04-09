@@ -77,6 +77,18 @@ UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullT
     }
     // Create the iterator from the query tree.
     UniquePtr<EarlyTerminateIterator> result = context.optimized_query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_);
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "EarlyTerminateIterator:\n";
+        if (result) {
+            result->PrintTree(oss);
+        } else {
+            oss << "Empty tree!\n";
+        }
+        LOG_INFO(std::move(oss).str());
+    }
+#endif
     return result;
 }
 

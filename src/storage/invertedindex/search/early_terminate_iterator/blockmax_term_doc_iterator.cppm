@@ -62,7 +62,11 @@ public:
     // weight included
     float BM25Score();
 
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+
+    // debug info
     const String *term_ptr_ = nullptr;
+    const String *column_name_ptr_ = nullptr;
 
 private:
     // similar to TermDocIterator

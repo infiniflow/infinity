@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <iostream>
 #include <tuple>
 module early_terminate_iterator;
 import internal_types;
@@ -54,6 +55,26 @@ Pair<RowID, float> EarlyTerminateIterator::BlockNextWithThreshold(float threshol
         }
         next_skip = BlockLastDocID() + 1;
     }
+}
+
+void MultiQueryEarlyTerminateIteratorCommonPrintTree(const EarlyTerminateIterator *this_iter,
+                                                     std::string_view iter_type_name,
+                                                     const Vector<UniquePtr<EarlyTerminateIterator>> &children,
+                                                     std::ostream &os,
+                                                     const String &prefix,
+                                                     bool is_final) {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << iter_type_name;
+    os << " (children count: " << children.size() << ")";
+    os << " (doc_freq: " << this_iter->DocFreq() << ")";
+    os << " (bm25_score_upper_bound: " << this_iter->BM25ScoreUpperBound() << ")";
+    os << '\n';
+    const String next_prefix = prefix + (is_final ? "    " : "│   ");
+    for (u32 i = 0; i + 1 < children.size(); ++i) {
+        children[i]->PrintTree(os, next_prefix, false);
+    }
+    children.back()->PrintTree(os, next_prefix, true);
 }
 
 } // namespace infinity

@@ -63,6 +63,16 @@ public:
     // return true: inner doc_id_ is updated
     // return false: may not find the next valid inner doc_id_
     virtual bool Seek(RowID doc_id) = 0;
+
+    // print the query tree, for debugging
+    virtual void PrintTree(std::ostream &os, const String &prefix = "", bool is_final = true) const = 0;
 };
+
+export void MultiQueryEarlyTerminateIteratorCommonPrintTree(const EarlyTerminateIterator *this_iter,
+                                                            std::string_view iter_type_name,
+                                                            const Vector<UniquePtr<EarlyTerminateIterator>> &children,
+                                                            std::ostream &os,
+                                                            const String &prefix,
+                                                            bool is_final);
 
 } // namespace infinity
