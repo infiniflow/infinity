@@ -135,9 +135,14 @@ inline bool IntegralContinueUnwind(DoubleT right_val_double, FilterCompareType &
             }
         }
         case FilterCompareType::kEqual: {
-            // TODO: does not allow expression like "(cast to double)(c1 (int type)) == 3.0" ?
-            compare_type = FilterCompareType::kInvalid;
-            // UnrecoverableError("IntegralContinueUnwind(): should not cast int type column to double in equality comparison.");
+            if (right_val_double >= lowest_val and right_val_double <= max_val) {
+                FromT int_val = static_cast<FromT>(right_val_double);
+                if (static_cast<DoubleT>(int_val) == right_val_double) {
+                    prev = int_val;
+                    return true;
+                }
+            }
+            compare_type = FilterCompareType::kAlwaysFalse;
             return false;
         }
         default: {
