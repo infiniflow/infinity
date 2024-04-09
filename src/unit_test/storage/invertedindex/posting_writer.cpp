@@ -26,6 +26,7 @@ import term_meta;
 import internal_types;
 import segment_posting;
 import posting_iterator;
+import vector_with_lock;
 
 using namespace infinity;
 
@@ -49,11 +50,10 @@ protected:
 
 TEST_F(PostingWriterTest, test1) {
     Vector<docid_t> expected = {1, 3, 5, 7, 9};
-    std::shared_mutex column_length_mutex;
-    Vector<u32> column_length_array(20, 10);
+    VectorWithLock<u32> column_length_array(20, 10);
     {
         SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_mutex, column_length_array);
+            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_array);
 
         for (u32 i = 0; i < expected.size(); ++i) {
             posting->AddPosition(1);
@@ -69,7 +69,7 @@ TEST_F(PostingWriterTest, test1) {
     }
     {
         SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_mutex, column_length_array);
+            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_array);
         SharedPtr<FileReader> file_reader = MakeShared<FileReader>(fs_, file_, 128000);
         posting->Load(file_reader);
 

@@ -53,7 +53,6 @@ import index_defines;
 import column_inverter;
 import block_entry;
 import local_file_system;
-import column_length_io;
 import chunk_index_entry;
 import abstract_hnsw;
 
@@ -165,14 +164,9 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             } else {
                 assert(begin_row_id == memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount());
             }
-            Path column_length_file_base = Path(*table_index_entry_->index_dir()) / (memory_indexer_->GetBaseName());
-            String column_length_file_path_prefix = column_length_file_base.string();
-            String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
-            auto column_length_file_handler =
-                MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, this);
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_manager));
-            memory_indexer_->Insert(column_vector, row_offset, row_count, std::move(column_length_file_handler), false);
+            memory_indexer_->Insert(column_vector, row_offset, row_count, false);
             break;
         }
         case IndexType::kIVFFlat:
@@ -209,6 +203,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
     memory_indexer_->Dump(false, spill);
     if (!spill) {
         chunk_index_entry = AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
+        this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());
         memory_indexer_.reset();
     }
     return chunk_index_entry;
@@ -232,6 +227,8 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
     memory_indexer_->Load();
 }
 
+u32 SegmentIndexEntry::MemIndexRowCount() { return memory_indexer_.get() == nullptr ? 0 : memory_indexer_->GetDocCount(); }
+
 void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn) {
     auto *buffer_mgr = txn->buffer_mgr();
     const IndexBase *index_base = table_index_entry_->index_base();
@@ -251,24 +248,17 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                                                         table_index_entry_->GetFulltextBufferPool(),
                                                         table_index_entry_->GetFulltextThreadPool());
             u64 column_id = column_def->id();
-            Path column_length_file_base = Path(*table_index_entry_->index_dir()) / base_name;
-            String column_length_file_path_prefix = column_length_file_base.string();
-            String column_length_file_path = column_length_file_path_prefix + LENGTH_SUFFIX;
-            auto column_length_file_handler =
-                MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, this);
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
-                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), column_length_file_handler, true);
+                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), true);
                 memory_indexer_->Commit(true);
             }
-            column_length_file_handler.reset();
             memory_indexer_->Dump(true);
-            {
-                AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
-                memory_indexer_.reset();
-            }
+            AddChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
+            this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());
+            memory_indexer_.reset();
             break;
         }
         case IndexType::kIVFFlat:
