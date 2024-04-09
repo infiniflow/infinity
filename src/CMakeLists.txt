@@ -404,28 +404,3 @@ else()
         add_definitions(-msse4.2 -mfma)
         target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
 endif()
-
-add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
-
-target_link_libraries(test_hnsw
-    infinity_core
-)
-
-add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
-
-target_link_directories(test_hnsw_bitmask PUBLIC "${CMAKE_BINARY_DIR}/lib")
-
-target_link_libraries(test_hnsw_bitmask
-    infinity_core
-    sql_parser
-    onnxruntime_mlas
-    zsv_parser
-    roaring
-    newpfor
-    fastpfor
-    thrift.a
-    thriftnb.a
-    lz4.a
-    atomic.a
-    event.a
-)

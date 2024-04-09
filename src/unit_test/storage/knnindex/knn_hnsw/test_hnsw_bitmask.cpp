@@ -12,6 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+#include "unit_test/base_test.h"
+
 import stl;
 import bitmask;
 import data_store;
@@ -24,12 +26,12 @@ import hnsw_common;
 
 using namespace infinity;
 
-#define EXPECT_VALUE_EQ(a, b)                                                                                                                        \
-    if (auto f = f64(a) - f64(b); std::max(f, -f) > 1e-4) {                                                                                          \
-        std::cerr << "values aren't equal at line\t" << __LINE__ << "\tvalues: " << a << " != " << b << std::endl;                                   \
-    }
+class HnswAlgBitmaskTest : public BaseTest {
+public:
+    static constexpr float error = 1e-4;
+};
 
-int main() {
+TEST_F(HnswAlgBitmaskTest, test1) {
     i64 dimension = 4;
     i64 top_k = 4;
     i64 base_embedding_count = 4;
@@ -84,17 +86,17 @@ int main() {
     {
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k);
 
-        EXPECT_VALUE_EQ(result[0].first, 0);
-        EXPECT_VALUE_EQ(result[0].second, 0);
+        EXPECT_NEAR(result[0].first, 0, error);
+        EXPECT_NEAR(result[0].second, 0, error);
 
-        EXPECT_VALUE_EQ(result[1].first, 0.02);
-        EXPECT_VALUE_EQ(result[1].second, 1);
+        EXPECT_NEAR(result[1].first, 0.02, error);
+        EXPECT_NEAR(result[1].second, 1, error);
 
-        EXPECT_VALUE_EQ(result[2].first, 0.08);
-        EXPECT_VALUE_EQ(result[2].second, 2);
+        EXPECT_NEAR(result[2].first, 0.08, error);
+        EXPECT_NEAR(result[2].second, 2, error);
 
-        EXPECT_VALUE_EQ(result[3].first, 0.2);
-        EXPECT_VALUE_EQ(result[3].second, 3);
+        EXPECT_NEAR(result[3].first, 0.2, error);
+        EXPECT_NEAR(result[3].second, 3, error);
     }
 
     auto p_bitmask = Bitmask::Make(64);
@@ -104,14 +106,14 @@ int main() {
         BitmaskFilter<LabelT> filter(*p_bitmask);
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
-        EXPECT_VALUE_EQ(result[0].first, 0);
-        EXPECT_VALUE_EQ(result[0].second, 0);
+        EXPECT_NEAR(result[0].first, 0, error);
+        EXPECT_NEAR(result[0].second, 0, error);
 
-        EXPECT_VALUE_EQ(result[1].first, 0.08);
-        EXPECT_VALUE_EQ(result[1].second, 2);
+        EXPECT_NEAR(result[1].first, 0.08, error);
+        EXPECT_NEAR(result[1].second, 2, error);
 
-        EXPECT_VALUE_EQ(result[2].first, 0.2);
-        EXPECT_VALUE_EQ(result[2].second, 3);
+        EXPECT_NEAR(result[2].first, 0.2, error);
+        EXPECT_NEAR(result[2].second, 3, error);
     }
 
     p_bitmask->SetFalse(0);
@@ -120,11 +122,11 @@ int main() {
         BitmaskFilter<LabelT> filter(*p_bitmask);
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
-        EXPECT_VALUE_EQ(result[0].first, 0.08);
-        EXPECT_VALUE_EQ(result[0].second, 2);
+        EXPECT_NEAR(result[0].first, 0.08, error);
+        EXPECT_NEAR(result[0].second, 2, error);
 
-        EXPECT_VALUE_EQ(result[1].first, 0.2);
-        EXPECT_VALUE_EQ(result[1].second, 3);
+        EXPECT_NEAR(result[1].first, 0.2, error);
+        EXPECT_NEAR(result[1].second, 3, error);
     }
 
     p_bitmask->SetFalse(2);
@@ -133,7 +135,7 @@ int main() {
         BitmaskFilter<LabelT> filter(*p_bitmask);
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
-        EXPECT_VALUE_EQ(result[0].first, 0.2);
-        EXPECT_VALUE_EQ(result[0].second, 3);
+        EXPECT_NEAR(result[0].first, 0.2, error);
+        EXPECT_NEAR(result[0].second, 3, error);
     }
 }
