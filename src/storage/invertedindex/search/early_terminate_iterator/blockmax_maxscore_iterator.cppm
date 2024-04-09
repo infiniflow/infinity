@@ -43,6 +43,8 @@ public:
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 
+    bool Seek(RowID doc_id) override;
+
 private:
     // block max info
     u32 pivot = 0;                                           // seperate the iterators into two parts: [0, pivot) and [pivot, n)

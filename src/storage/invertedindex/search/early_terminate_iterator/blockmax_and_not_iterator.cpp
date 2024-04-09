@@ -58,4 +58,23 @@ Pair<bool, RowID> BlockMaxAndNotIterator::PeekInBlockRange(RowID doc_id, RowID d
     return inner_iterators_[0]->PeekInBlockRange(doc_id, doc_id_no_beyond);
 }
 
+bool BlockMaxAndNotIterator::Seek(RowID doc_id) {
+    if (doc_id_ > doc_id) {
+        return false;
+    }
+    if (doc_id_ == doc_id) {
+        return true;
+    }
+    if (!inner_iterators_[0]->Seek(doc_id)) {
+        return false;
+    }
+    for (u32 i = 1; i < inner_iterators_.size(); ++i) {
+        if (inner_iterators_[i]->Seek(doc_id)) {
+            return false;
+        }
+    }
+    doc_id_ = doc_id;
+    return true;
+}
+
 } // namespace infinity

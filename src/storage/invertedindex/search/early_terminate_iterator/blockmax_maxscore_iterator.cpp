@@ -150,4 +150,19 @@ void BlockMaxMaxscoreIterator::UpdateScoreThreshold(float threshold) {
     }
 }
 
+bool BlockMaxMaxscoreIterator::Seek(RowID doc_id) {
+    if (doc_id_ > doc_id) {
+        return false;
+    }
+    if (doc_id_ == doc_id) {
+        return true;
+    }
+    for (const auto &it : sorted_iterators_) {
+        if (it->Seek(doc_id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace infinity

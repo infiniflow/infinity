@@ -134,4 +134,10 @@ Pair<bool, RowID> BlockMaxTermDocIterator::PeekInBlockRange(RowID doc_id, RowID 
     return result;
 }
 
+bool BlockMaxTermDocIterator::Seek(RowID doc_id) {
+    const RowID seek_result = iter_.SeekDoc(doc_id);
+    doc_id_ = seek_result;
+    return seek_result == doc_id;
+}
+
 } // namespace infinity

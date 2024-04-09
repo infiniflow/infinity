@@ -147,7 +147,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         if (doc_iterator.get() != nullptr) {
             OStringStream oss;
             oss << "DocIterator created successfully:\n";
-            full_text_query_context.query_tree_->PrintTree(oss);
+            full_text_query_context.optimized_query_tree_->PrintTree(oss);
             LOG_INFO(std::move(oss).str());
         }
 #endif
@@ -158,7 +158,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         if (et_iter.get() != nullptr) {
             OStringStream oss;
             oss << "EarlyTerminateIterator created successfully:\n";
-            full_text_query_context.query_tree_->PrintTree(oss);
+            full_text_query_context.optimized_query_tree_->PrintTree(oss);
             LOG_INFO(std::move(oss).str());
         }
 #endif
@@ -227,14 +227,14 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         blockmax_duration = std::chrono::duration_cast<std::chrono::microseconds>(blockmax_end_ts - blockmax_begin_ts).count();
 #endif
     }
-    if (use_block_max_iter) {
-        result_count = blockmax_result_count;
-        score_result = blockmax_score_result.get();
-        row_id_result = blockmax_row_id_result.get();
-    } else {
+    if (use_ordinary_iter) {
         result_count = ordinary_result_count;
         score_result = ordinary_score_result.get();
         row_id_result = ordinary_row_id_result.get();
+    } else {
+        result_count = blockmax_result_count;
+        score_result = blockmax_score_result.get();
+        row_id_result = blockmax_row_id_result.get();
     }
 #ifdef INFINITY_DEBUG
     if (use_ordinary_iter) {

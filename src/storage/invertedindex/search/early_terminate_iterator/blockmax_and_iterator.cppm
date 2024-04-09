@@ -42,6 +42,8 @@ public:
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 
+    bool Seek(RowID doc_id) override;
+
 private:
     // block max info
     RowID common_block_min_possible_doc_id_{}; // not always exist

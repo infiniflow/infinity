@@ -32,8 +32,6 @@ protected:
 public:
     virtual ~EarlyTerminateIterator() = default;
 
-    // inline RowID Doc() const { return doc_id_; }
-
     inline u32 DocFreq() const { return doc_freq_; }
 
     inline float BM25ScoreUpperBound() const { return bm25_score_upper_bound_; }
@@ -62,8 +60,9 @@ public:
 
     virtual Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) = 0;
 
-    // TODO: implement this function
-    bool Seek(RowID doc_id) { return false; }
+    // return true: inner doc_id_ is updated
+    // return false: may not find the next valid inner doc_id_
+    virtual bool Seek(RowID doc_id) = 0;
 };
 
 } // namespace infinity

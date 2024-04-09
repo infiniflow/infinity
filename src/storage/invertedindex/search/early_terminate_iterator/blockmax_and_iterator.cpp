@@ -163,4 +163,20 @@ Pair<bool, RowID> BlockMaxAndIterator::PeekInBlockRange(RowID doc_id, RowID doc_
     }
 }
 
+bool BlockMaxAndIterator::Seek(RowID doc_id) {
+    if (doc_id_ > doc_id) {
+        return false;
+    }
+    if (doc_id_ == doc_id) {
+        return true;
+    }
+    for (const auto &it : sorted_iterators_) {
+        if (!it->Seek(doc_id)) {
+            return false;
+        }
+    }
+    doc_id_ = doc_id;
+    return true;
+}
+
 } // namespace infinity
