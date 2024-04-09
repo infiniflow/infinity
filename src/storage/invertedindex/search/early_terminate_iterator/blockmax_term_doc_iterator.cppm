@@ -62,6 +62,8 @@ public:
     // weight included
     float BM25Score();
 
+    const String *term_ptr_ = nullptr;
+
 private:
     // similar to TermDocIterator
     PostingIterator iter_; // initialized in constructor and InitPostingIterator() function

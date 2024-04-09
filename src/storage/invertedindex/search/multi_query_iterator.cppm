@@ -41,6 +41,8 @@ public:
 
     const Vector<UniquePtr<DocIterator>> &GetChildren() { return children_; }
 
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+
 protected:
     Vector<UniquePtr<DocIterator>> children_;
 };

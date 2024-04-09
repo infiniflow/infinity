@@ -111,14 +111,6 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
     }
-#ifdef INFINITY_DEBUG
-    {
-        OStringStream oss;
-        oss << "Query tree created successfully:\n";
-        query_tree->PrintTree(oss);
-        LOG_INFO(std::move(oss).str());
-    }
-#endif
 
     // 2 build query iterator
     // result
@@ -143,25 +135,9 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     full_text_query_context.query_tree_ = std::move(query_tree);
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context);
-#ifdef INFINITY_DEBUG
-        if (doc_iterator.get() != nullptr) {
-            OStringStream oss;
-            oss << "DocIterator created successfully:\n";
-            full_text_query_context.optimized_query_tree_->PrintTree(oss);
-            LOG_INFO(std::move(oss).str());
-        }
-#endif
     }
     if (use_block_max_iter) {
         et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
-#ifdef INFINITY_DEBUG
-        if (et_iter.get() != nullptr) {
-            OStringStream oss;
-            oss << "EarlyTerminateIterator created successfully:\n";
-            full_text_query_context.optimized_query_tree_->PrintTree(oss);
-            LOG_INFO(std::move(oss).str());
-        }
-#endif
     }
 
     // 3 full text search
@@ -237,17 +213,25 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         row_id_result = blockmax_row_id_result.get();
     }
 #ifdef INFINITY_DEBUG
-    if (use_ordinary_iter) {
-        std::cerr << "ordinary_duration: " << ordinary_duration << std::endl;
-        std::cerr << "ordinary_loop_cnt: " << ordinary_loop_cnt << std::endl;
-    }
-    if (use_block_max_iter) {
-        std::cerr << "blockmax_duration: " << blockmax_duration << std::endl;
-        std::cerr << "blockmax_loop_cnt: " << blockmax_loop_cnt << std::endl;
+    {
+        OStringStream stat_info;
+        stat_info << "Full text search stat:\n";
+        if (use_ordinary_iter) {
+            stat_info << "ordinary_duration: " << ordinary_duration << std::endl;
+            stat_info << "ordinary_loop_cnt: " << ordinary_loop_cnt << std::endl;
+        }
+        if (use_block_max_iter) {
+            stat_info << "blockmax_duration: " << blockmax_duration << std::endl;
+            stat_info << "blockmax_loop_cnt: " << blockmax_loop_cnt << std::endl;
+        }
+        LOG_INFO(std::move(stat_info).str());
     }
     if (use_ordinary_iter and use_block_max_iter) {
-        std::cerr << "duration ratio: " << (static_cast<float>(blockmax_duration) / ordinary_duration) << std::endl;
-        std::cerr << "loop count ratio: " << (static_cast<float>(blockmax_loop_cnt) / ordinary_loop_cnt) << std::endl;
+        OStringStream compare_info;
+        compare_info << "Compare ordinary and blockmax:\n";
+        compare_info << "duration ratio: " << (static_cast<float>(blockmax_duration) / ordinary_duration) << std::endl;
+        compare_info << "loop count ratio: " << (static_cast<float>(blockmax_loop_cnt) / ordinary_loop_cnt) << std::endl;
+        LOG_INFO(std::move(compare_info).str());
         if (ordinary_result_count != blockmax_result_count) {
             OStringStream oss;
             oss << "result count mismatch: ordinary: " << ordinary_result_count << ", blockmax: " << blockmax_result_count << '\n';

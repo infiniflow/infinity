@@ -14,6 +14,7 @@
 
 module;
 
+#include <iostream>
 #include <vector>
 module query_builder;
 
@@ -31,6 +32,7 @@ import query_node;
 import base_table_ref;
 import segment_entry;
 import blockmax_term_doc_iterator;
+import logger;
 
 namespace infinity {
 
@@ -53,6 +55,18 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
     }
     // Create the iterator from the query tree.
     UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "DocIterator:\n";
+        if (result) {
+            result->PrintTree(oss);
+        } else {
+            oss << "Empty tree!\n";
+        }
+        LOG_INFO(std::move(oss).str());
+    }
+#endif
     return result;
 }
 
