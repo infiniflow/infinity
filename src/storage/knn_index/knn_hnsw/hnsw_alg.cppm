@@ -266,6 +266,9 @@ private:
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const DataType *q, SizeT k, const Filter &filter) const {
         auto query = data_store_.MakeQuery(q);
         auto [max_layer, ep] = data_store_.GetEnterPoint();
+        if (ep == -1) {
+            return {0, nullptr, nullptr};
+        }
         for (i32 cur_layer = max_layer; cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);
         }
@@ -282,8 +285,8 @@ public:
     }
 
     // This function for test
-    void InsertVecsRaw(const DataType *query, SizeT insert_n, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        InsertVecs(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n), config);
+    void InsertVecsRaw(const DataType *query, SizeT insert_n, LabelType offset = 0, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+        InsertVecs(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n, offset), config);
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
@@ -294,8 +297,9 @@ public:
         return data_store_.AddVec(std::move(iter));
     }
 
-    Pair<VertexType, VertexType> StoreDataRaw(const DataType *query, SizeT insert_n, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n), config);
+    Pair<VertexType, VertexType>
+    StoreDataRaw(const DataType *query, SizeT insert_n, LabelType offset = 0, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n, offset), config);
     }
 
     void Build(VertexType vertex_i) {

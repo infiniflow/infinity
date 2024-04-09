@@ -14,6 +14,7 @@
 
 #include "unit_test/base_test.h"
 #include <fstream>
+#include <thread>
 
 import stl;
 import hnsw_alg;
@@ -26,6 +27,7 @@ import dist_func_l2;
 import dist_func_ip;
 import compilation_config;
 import vec_store_type;
+import hnsw_common;
 
 using namespace infinity;
 
@@ -34,15 +36,15 @@ public:
     using LabelT = u64;
 
     template <typename Hnsw>
-    void Test() {
+    void TestSimple() {
         String save_dir = tmp_data_path();
 
         int dim = 16;
-        int element_size = 1000;
         int M = 8;
         int ef_construction = 200;
         int chunk_size = 128;
         int max_chunk_n = 10;
+        int element_size = max_chunk_n * chunk_size;
 
         std::mt19937 rng;
         rng.seed(0);
@@ -54,7 +56,6 @@ public:
         }
 
         LocalFileSystem fs;
-
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
@@ -107,16 +108,95 @@ public:
             file_handler->Close();
         }
     }
+
+    template <typename Hnsw>
+    void TestParallel() {
+        int dim = 16;
+        int M = 8;
+        int ef_construction = 200;
+        int chunk_size = 128;
+        int max_chunk_n = 10;
+
+        int element_size = max_chunk_n * chunk_size;
+
+        std::mt19937 rng;
+        rng.seed(0);
+        std::uniform_real_distribution<float> distrib_real;
+
+        auto data = MakeUnique<float[]>(dim * element_size);
+        for (int i = 0; i < dim * element_size; ++i) {
+            data[i] = distrib_real(rng);
+        }
+
+        LocalFileSystem fs;
+        auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
+
+        std::atomic<bool> stop = false;
+        auto write_thread = std::thread([&] {
+            HnswInsertConfig config;
+            config.optimize_ = true;
+
+            auto [start_i, end_i] = hnsw_index->StoreDataRaw(data.get(), element_size / 2, 0 /*offset*/, config);
+            {
+                std::atomic<i32> idx = start_i;
+                std::vector<std::jthread> worker_threads;
+                for (int i = 0; i < 4; ++i) {
+                    worker_threads.emplace_back([&] {
+                        while (true) {
+                            i32 i = idx.fetch_add(1);
+                            if (i >= end_i) {
+                                break;
+                            }
+                            hnsw_index->Build(i);
+                        }
+                    });
+                }
+            }
+            for (int i = element_size / 2; i < element_size; ++i) {
+                hnsw_index->InsertVecsRaw(data.get() + i * dim, 1 /*offset*/, i);
+            }
+            stop.store(true);
+        });
+        std::vector<std::thread> read_threads;
+        for (int i = 0; i < 4; ++i) {
+            read_threads.emplace_back([&] {
+                while (stop.load() == false) {
+                    for (int i = 0; i < element_size; ++i) {
+                        const float *query = data.get() + i * dim;
+                        auto result = hnsw_index->KnnSearchSorted(query, 1);
+                        // if (!result.empty()) {
+                        //     EXPECT_EQ(result[0].second, (LabelT)i);
+                        // }
+                    }
+                }
+            });
+        }
+        write_thread.join();
+        for (auto &t : read_threads) {
+            t.join();
+        }
+    }
 };
 
 TEST_F(HnswAlgTest, test1) {
     // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
     {
         using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
-        Test<Hnsw>();
+        TestSimple<Hnsw>();
     }
     {
         using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
-        Test<Hnsw>();
+        TestSimple<Hnsw>();
+    }
+}
+
+TEST_F(HnswAlgTest, test2) {
+    {
+        using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+        TestParallel<Hnsw>();
+    }
+    {
+        using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+        TestParallel<Hnsw>();
     }
 }
