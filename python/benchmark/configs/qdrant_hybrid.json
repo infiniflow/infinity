@@ -1,13 +1,13 @@
-[
 {
  "name": "qdrant_hybrid",
  "app": "qdrant",
+ "app_path": "servers/qdrant/",
  "connection_url": "http://localhost:6333",
  "vector_size": 1536,
  "distance": "cosine",
  "data_type": "json",
  "data_path": "datasets/dbpedia/dbpedia.json",
- "link": "to_be_set",
+ "data_link": "to_be_set",
  "vector_index": {
     "type": "HNSW",
     "index_params":{
@@ -17,7 +17,7 @@
  },
  "query_type": "json",
  "query_path": "datasets/dbpedia/queries.json",
-
+ "query_link": "to_be_set",
  "insert_batch_size": 1024,
  "payload_index_schema": {
     "_id": "keyword",
@@ -30,4 +30,3 @@
     }
  }
 }
-]
