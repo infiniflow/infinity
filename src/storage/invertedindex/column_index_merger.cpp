@@ -26,6 +26,7 @@ import third_party;
 import file_system;
 import file_system_type;
 import infinity_exception;
+import vector_with_lock;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool)
@@ -34,7 +35,7 @@ ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag,
 ColumnIndexMerger::~ColumnIndexMerger() {}
 
 SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() {
-    return MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_length_mutex_, column_length_array_);
+    return MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_lengths_);
 }
 
 void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name) {
@@ -69,8 +70,8 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
         // prepare column length info
         // the indexes to be merged should be from the same segment
         // otherwise the range of row_id will be very large ( >= 2^32)
-        std::unique_lock<std::shared_mutex> lock(column_length_mutex_);
-        column_length_array_.clear();
+        Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
+        unsafe_column_lengths.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
             String column_len_file = (Path(index_dir_) / base_names[i]).string() + LENGTH_SUFFIX;
             RowID base_row_id = base_rowids[i];
@@ -78,8 +79,8 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             UniquePtr<FileHandler> file_handler = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
             const u32 file_size = fs_.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
-            column_length_array_.resize(id_offset + file_read_array_len);
-            const i64 read_count = fs_.Read(*file_handler, column_length_array_.data() + id_offset, file_size);
+            unsafe_column_lengths.resize(id_offset + file_read_array_len);
+            const i64 read_count = fs_.Read(*file_handler, unsafe_column_lengths.data() + id_offset, file_size);
             file_handler->Close();
             if (read_count != file_size) {
                 UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");

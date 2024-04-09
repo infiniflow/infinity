@@ -74,13 +74,16 @@ public:
         return seq;
     }
 
-    u64 GetBatch(Vector<T> &batch, bool wait_if_empty = false) {
+    u64 GetBatch(Vector<T> &batch, SizeT wait_if_empty_ms = 0) {
         batch.clear();
         std::unique_lock<std::mutex> lock(mutex_);
         if (off_ground_ == off_filled_) {
-            if (!wait_if_empty)
+            if (wait_if_empty_ms == 0)
                 return 0;
-            cv_empty_.wait(lock, [this] { return off_ground_ < off_filled_; });
+            bool pred = cv_empty_.wait_for(lock, std::chrono::milliseconds(wait_if_empty_ms), [this] { return off_ground_ < off_filled_; });
+            if (!pred) {
+                return 0;
+            }
         }
         for (u64 off = off_ground_; off < off_filled_; off++) {
             T &obj = ring_buf_[off & cap_mask_];

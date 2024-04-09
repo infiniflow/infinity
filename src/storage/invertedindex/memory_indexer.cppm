@@ -29,10 +29,9 @@ import ring;
 import skiplist;
 import internal_types;
 import map_with_lock;
+import vector_with_lock;
 
 namespace infinity {
-
-class FullTextColumnLengthFileHandler;
 
 export class MemoryIndexer {
 public:
@@ -63,17 +62,14 @@ public:
     ~MemoryIndexer();
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void Insert(SharedPtr<ColumnVector> column_vector,
-                u32 row_offset,
-                u32 row_count,
-                SharedPtr<FullTextColumnLengthFileHandler> fulltext_length_handler,
-                bool offline = false);
+    void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
     // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
 
-    // CommitSync is for online case. It gets a batch of ColumnInverter and commit them. Returns the size of the batch.
-    SizeT CommitSync();
+    // CommitSync is for online case. It sort a batch of inverters, then generate posting for a batch of inverters.
+    // Returns the batch size of generated posting.
+    SizeT CommitSync(SizeT wait_if_empty_ms = 0);
 
     // Dump is blocking and shall be called only once after inserting all documents.
     // WARN: Don't reuse MemoryIndexer after calling Dump!
@@ -93,6 +89,10 @@ public:
 
     u32 GetDocCount() const { return doc_count_; }
 
+    u32 GetColumnLengthSum() const { return column_length_sum_.load(); }
+
+    u32 GetColumnLength(u32 doc_id) { return column_lengths_.Get(doc_id); }
+
     MemoryPool *GetPool() { return &byte_slice_pool_; }
 
     SharedPtr<PostingTable> GetPostingTable() { return posting_table_; }
@@ -108,7 +108,7 @@ private:
     }
 
     // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
-    SizeT CommitOffline(bool wait_if_empty = false);
+    SizeT CommitOffline(SizeT wait_if_empty_ms = 0);
 
     void OfflineDump();
 
@@ -145,7 +145,7 @@ private:
     bool is_spilled_{false};
 
     // for column length info
-    std::shared_mutex column_length_mutex_;
-    Vector<u32> column_length_array_;
+    VectorWithLock<u32> column_lengths_;
+    Atomic<u32> column_length_sum_{0};
 };
 } // namespace infinity
