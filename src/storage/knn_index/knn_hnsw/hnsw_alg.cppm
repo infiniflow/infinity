@@ -131,7 +131,8 @@ private:
             result_handler.AddResult(0, dist, enter_point);
         }
 
-        Vector<bool> visited(data_store_.cur_vec_num(), false);
+        SizeT cur_vec_num = data_store_.cur_vec_num();
+        Vector<bool> visited(cur_vec_num, false);
         visited[enter_point] = true;
 
         while (!candidate.empty()) {
@@ -150,7 +151,7 @@ private:
             int prefetch_start = neighbor_size - 1 - prefetch_offset_;
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-                if (visited[n_idx]) {
+                if (n_idx >= (VertexType)cur_vec_num || visited[n_idx]) {
                     continue;
                 }
                 visited[n_idx] = true;

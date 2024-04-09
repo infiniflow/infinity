@@ -136,8 +136,8 @@ public:
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void StoreData(Iterator &&iter) {
-        std::visit([&iter](auto &&arg) { arg->StoreData(std::move(iter)); }, knn_hnsw_ptr_);
+    Pair<SizeT, SizeT> StoreData(Iterator &&iter) {
+        return std::visit([&iter](auto &&arg) { return arg->StoreData(std::move(iter)); }, knn_hnsw_ptr_);
     }
 
     void SetEf(SizeT ef) {

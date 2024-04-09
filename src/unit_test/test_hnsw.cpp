@@ -55,8 +55,8 @@ void Test() {
         auto hnsw_index = Hnsw::Make(chunk_size, dim, M, ef_construction);
 
         hnsw_index->InsertVecsRaw(data.get(), element_size);
-        std::ofstream os("tmp/dump.txt");
-        hnsw_index->Dump(os);
+        // std::ofstream os("tmp/dump.txt");
+        // hnsw_index->Dump(os);
         hnsw_index->Check();
 
         hnsw_index->SetEf(10);
@@ -83,8 +83,8 @@ void Test() {
         auto hnsw_index = Hnsw::Load(*file_handler);
         hnsw_index->SetEf(10);
 
-        std::ofstream os("tmp/dump2.txt");
-        hnsw_index->Dump(os);
+        // std::ofstream os("tmp/dump2.txt");
+        // hnsw_index->Dump(os);
         hnsw_index->Check();
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {

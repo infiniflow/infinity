@@ -335,7 +335,8 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                             abstract_hnsw.InsertVecs(std::move(iter)); // estimate insert count
                         } else {
                             // Multi thread insert data, write file in the physical create index finish stage.
-                            abstract_hnsw.StoreData(std::move(iter));
+                            auto [start_i, end_i] = abstract_hnsw.StoreData(std::move(iter));
+                            LOG_TRACE(fmt::format("Insert index: {} - {}", start_i, end_i));
                         }
                     };
                     if (check_ts) {

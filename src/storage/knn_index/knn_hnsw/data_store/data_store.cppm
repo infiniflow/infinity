@@ -41,20 +41,27 @@ public:
 
 private:
     DataStore(SizeT chunk_size, VecStoreMeta vec_store_meta, GraphStoreMeta graph_store_meta)
-        : chunk_size_(chunk_size), vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)), chunk_num_(0) {
+        : chunk_size_(chunk_size), vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)) {
         assert(chunk_size > 0);
         assert((chunk_size & (chunk_size - 1)) == 0);
         chunk_shift_ = __builtin_ctzll(chunk_size);
+        inners_ = MakeUnique<Inner[]>(kMaxChunkNum);
     }
 
 public:
-    DataStore(This &&other) = default;
-    This &operator=(This &&other) = default;
+    DataStore(This &&other)
+        : chunk_size_(other.chunk_size_), chunk_shift_(other.chunk_shift_), cur_vec_num_(other.cur_vec_num_.load()),
+          vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)),
+          inners_(std::move(other.inners_)) {}
 
     ~DataStore() {
-        SizeT chunk_n = chunk_num_;
-        for (SizeT i = 0; i < chunk_n; ++i) {
-            SizeT chunk_size = (i < chunk_n - 1) ? chunk_size_ : LastChunkSize();
+        if (!inners_) {
+            return;
+        }
+        SizeT cur_vec_num = this->cur_vec_num();
+        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+        for (SizeT i = 0; i < chunk_num; ++i) {
+            SizeT chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
             inners_[i].Free(chunk_size, graph_store_meta_);
         }
     }
@@ -64,21 +71,22 @@ public:
         GraphStoreMeta graph_store_meta = GraphStoreMeta::Make(Mmax0, Mmax);
         This ret(chunk_size, std::move(vec_store_meta), std::move(graph_store_meta));
         ret.cur_vec_num_ = 0;
+        ret.inners_[0] = Inner::Make(chunk_size, ret.vec_store_meta_, ret.graph_store_meta_);
         return ret;
     }
 
     void Save(FileHandler &file_handler) const {
+        SizeT cur_vec_num = this->cur_vec_num();
+        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+
         file_handler.Write(&chunk_size_, sizeof(chunk_size_));
 
-        file_handler.Write(&cur_vec_num_, sizeof(cur_vec_num_));
+        file_handler.Write(&cur_vec_num, sizeof(cur_vec_num));
         vec_store_meta_.Save(file_handler);
         graph_store_meta_.Save(file_handler);
-        SizeT chunk_num = chunk_num_;
         for (SizeT i = 0; i < chunk_num; ++i) {
-            SizeT chunk_size = (i < chunk_num - 1) ? chunk_size_ : LastChunkSize();
-            if (chunk_size > 0) {
-                inners_[i].Save(file_handler, chunk_size, vec_store_meta_, graph_store_meta_);
-            }
+            SizeT chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
+            inners_[i].Save(file_handler, chunk_size, vec_store_meta_, graph_store_meta_);
         }
     }
 
@@ -94,9 +102,9 @@ public:
         This ret = This(chunk_size, std::move(vec_store_meta), std::move(graph_store_meta));
         ret.cur_vec_num_ = cur_vec_num;
 
-        SizeT chunk_num = (cur_vec_num + chunk_size - 1) / chunk_size;
+        auto [chunk_num, last_chunk_size] = ret.ChunkInfo(cur_vec_num);
         for (SizeT i = 0; i < chunk_num; ++i) {
-            SizeT cur_chunk_size = (i < chunk_num - 1) ? ret.chunk_size_ : ret.LastChunkSize();
+            SizeT cur_chunk_size = (i < chunk_num - 1) ? chunk_size : last_chunk_size;
             ret.inners_[i] = Inner::Load(file_handler, cur_chunk_size, chunk_size, vec_store_meta, graph_store_meta);
         }
         return ret;
@@ -107,22 +115,29 @@ public:
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     Pair<SizeT, SizeT> AddVec(Iterator &&query_iter) {
-        // std::unique_lock w_lck(mtx_, std::adopt_lock);
-        SizeT start_idx = cur_vec_num_;
+        SizeT cur_vec_num = this->cur_vec_num();
+        SizeT start_idx = cur_vec_num;
+        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
         while (true) {
-            SizeT last_chunk_size = LastChunkSize();
+            SizeT remain_size = chunk_size_ - last_chunk_size;
+            assert(remain_size > 0);
+            auto [insert_n, used_up] = inners_[chunk_num - 1].AddVec(std::move(query_iter), last_chunk_size, remain_size, vec_store_meta_);
+            cur_vec_num += insert_n;
+            last_chunk_size += insert_n;
+            if (cur_vec_num == kMaxChunkNum * chunk_size_) {
+                assert(used_up);
+                break;
+            }
             if (last_chunk_size == chunk_size_) {
-                inners_[chunk_num_++] = Inner::Make(chunk_size_, vec_store_meta_, graph_store_meta_);
+                inners_[chunk_num++] = Inner::Make(chunk_size_, vec_store_meta_, graph_store_meta_);
                 last_chunk_size = 0;
             }
-            SizeT remain_size = chunk_size_ - last_chunk_size;
-            auto [insert_n, used_up] = inners_[chunk_num_ - 1].AddVec(std::move(query_iter), last_chunk_size, remain_size, vec_store_meta_);
-            cur_vec_num_ += insert_n;
             if (used_up) {
                 break;
             }
         }
-        return {start_idx, cur_vec_num_};
+        cur_vec_num_.store(cur_vec_num);
+        return {start_idx, cur_vec_num};
     }
 
     Pair<SizeT, SizeT> OptAddVec(const DataType *vec, SizeT vec_num) { return OptAddVec(DenseVectorIter<DataType, LabelType>(vec, dim(), vec_num)); }
@@ -130,14 +145,16 @@ public:
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     Pair<SizeT, SizeT> OptAddVec(Iterator &&query_iter) {
         if constexpr (!This::IsPlain()) {
-            SizeT chunk_n = chunk_num_;
-            if (chunk_n > 0) {
+            SizeT cur_vec_num = this->cur_vec_num();
+            auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+            if (chunk_num > 0) {
                 Vector<Pair<VecStoreInner *, SizeT>> vec_inners;
-                for (SizeT i = 0; i < chunk_n; ++i) {
-                    SizeT chunk_size = (i < chunk_n - 1) ? chunk_size_ : LastChunkSize();
+                for (SizeT i = 0; i < chunk_num; ++i) {
+                    SizeT chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
                     vec_inners.emplace_back(inners_[i].vec_store_inner(), chunk_size);
                 }
-                vec_store_meta_.template Optimize<LabelType, Iterator>(std::move(query_iter), vec_inners);
+                Iterator query_iter_copy = query_iter;
+                vec_store_meta_.template Optimize<LabelType, Iterator>(std::move(query_iter_copy), vec_inners);
             }
         }
         return AddVec(std::move(query_iter));
@@ -205,7 +222,7 @@ public:
         return inner.UniqueLock(idx);
     }
 
-    SizeT cur_vec_num() const { return cur_vec_num_; }
+    SizeT cur_vec_num() const { return cur_vec_num_.load(); }
 
 private:
     constexpr static bool IsPlain() {
@@ -216,47 +233,46 @@ private:
 
     Pair<const Inner &, SizeT> GetInner(SizeT vec_i) const { return {inners_[vec_i >> chunk_shift_], vec_i & (chunk_size_ - 1)}; }
 
-    SizeT LastChunkSize() const {
-        if (cur_vec_num_ == 0) {
-            return chunk_size_;
-        }
-        return ((cur_vec_num_ - 1) & (chunk_size_ - 1)) + 1;
-    }
+    // return chunk_num & last chunk size
+    Pair<SizeT, SizeT> ChunkInfo(SizeT cur_vec_num) const {
+        SizeT chunk_num = (cur_vec_num >> chunk_shift_) + 1;
+        assert(chunk_num > 0);
+        SizeT last_chunk_size = cur_vec_num - ((chunk_num - 1) << chunk_shift_);
+        return {chunk_num, last_chunk_size};
+    };
 
 private:
     SizeT chunk_size_;
     SizeT chunk_shift_;
 
-    SizeT cur_vec_num_;
+    Atomic<SizeT> cur_vec_num_;
     VecStoreMeta vec_store_meta_;
     GraphStoreMeta graph_store_meta_;
 
     constexpr static SizeT kMaxChunkNum = 1 << 10;
-    Array<Inner, kMaxChunkNum> inners_;
-    SizeT chunk_num_;
+    UniquePtr<Inner[]> inners_;
 
 public:
     void Check() const {
         i32 max_l = -1;
         SizeT i;
-        SizeT chunk_n = chunk_num_;
-        for (i = 0; i < chunk_n; ++i) {
+        SizeT cur_vec_num = this->cur_vec_num();
+        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+        for (i = 0; i < chunk_num; ++i) {
             i32 max_l1 = -1;
-            SizeT chunk_size = i < chunk_n - 1 ? chunk_size_ : LastChunkSize();
-            inners_[i].Check(chunk_size, graph_store_meta_, i * chunk_size_, cur_vec_num_, max_l1);
+            SizeT chunk_size = i < chunk_num - 1 ? chunk_size_ : last_chunk_size;
+            inners_[i].Check(chunk_size, graph_store_meta_, i * chunk_size_, cur_vec_num, max_l1);
             max_l = std::max(max_l, max_l1);
         }
         assert(max_l == max_layer());
     }
 
     void Dump(std::ostream &os) const {
-        SizeT chunk_n = chunk_num_;
-        if (chunk_n == 0) {
-            return;
-        }
-        for (SizeT i = 0; i < chunk_n; ++i) {
+        SizeT cur_vec_num = this->cur_vec_num();
+        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+        for (SizeT i = 0; i < chunk_num; ++i) {
             os << "-------chunk " << i << std::endl;
-            SizeT cur_chunk_size = (i < chunk_n - 1) ? chunk_size_ : LastChunkSize();
+            SizeT cur_chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
             inners_[i].Dump(os, cur_chunk_size, graph_store_meta_);
         }
     }
