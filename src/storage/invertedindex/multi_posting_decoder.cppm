@@ -17,7 +17,8 @@ import internal_types;
 namespace infinity {
 export class MultiPostingDecoder {
 public:
-    MultiPostingDecoder(const PostingFormatOption &format_option, InDocPositionState *state, MemoryPool *pool);
+    MultiPostingDecoder(const PostingFormatOption &format_option, InDocPositionState *state, MemoryPool *pool)
+        : format_option_(format_option), session_pool_(pool), in_doc_state_keeper_(state, pool) {}
 
     ~MultiPostingDecoder();
 
@@ -25,7 +26,13 @@ public:
 
     inline void MoveToCurrentDocPosition(ttf_t current_ttf) { in_doc_state_keeper_.MoveToDoc(current_ttf); }
 
-    bool DecodeDocBuffer(RowID start_row_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
+    bool SkipTo(RowID start_row_id, RowID &prev_last_row_id, RowID &lowest_possible_doc_id, RowID &last_row_id, ttf_t &current_ttf);
+
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const;
+
+    bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer);
 
     bool DecodeCurrentTFBuffer(tf_t *tf_buffer);
 
@@ -36,7 +43,7 @@ public:
     u32 InnerGetSeekedDocCount() const { return index_decoder_->InnerGetSeekedDocCount(); }
 
 private:
-    bool DecodeDocBufferInOneSegment(RowID start_row_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
+    bool SkipInOneSegment(RowID start_row_id, RowID &prev_last_row_id, RowID &lowest_possible_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
 
     IndexDecoder *CreateIndexDecoder(u32 doc_list_begin_pos);
 
@@ -66,8 +73,9 @@ private:
 
 private:
     PostingFormatOption format_option_;
-    bool need_decode_tf_;
-    bool need_decode_doc_payload_;
+    bool need_decode_doc_id_ = false;
+    bool need_decode_tf_ = false;
+    bool need_decode_doc_payload_ = false;
     RowID base_row_id_ = 0;
     IndexDecoder *index_decoder_ = nullptr;
     u32 segment_cursor_ = 0;

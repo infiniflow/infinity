@@ -30,15 +30,16 @@ export struct TermColumnMatchData {
 };
 
 class TermDocIterator;
+class BlockMaxTermDocIterator;
 struct IndexReader;
 
 export class Scorer {
 public:
-    void Init(u64 num_of_docs) { total_df_ = num_of_docs; }
+    void Init(u64 num_of_docs, IndexReader *index_reader);
 
     void AddDocIterator(TermDocIterator *iter, u64 column_id);
 
-    void LoadColumnLength(RowID first_doc_id, IndexReader &index_reader);
+    void AddBlockMaxDocIterator(BlockMaxTermDocIterator *iter, u64 column_id);
 
     float Score(RowID doc_id);
 
@@ -54,8 +55,10 @@ private:
     FlatHashMap<u64, u32, Hash> column_index_map_;
     Vector<u64> column_ids_;
     Vector<Vector<TermDocIterator *>> iterators_;
+    Vector<Vector<BlockMaxTermDocIterator *>> block_max_iterators_;
     Vector<float> avg_column_length_;
     ColumnLengthReader column_length_reader_;
+    IndexReader *index_reader_ = nullptr;
 };
 
 } // namespace infinity
