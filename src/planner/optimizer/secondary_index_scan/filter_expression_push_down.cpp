@@ -20,6 +20,7 @@ module filter_expression_push_down;
 import stl;
 import internal_types;
 import data_type;
+import logical_type;
 import query_context;
 import infinity_exception;
 import base_expression;
@@ -90,6 +91,49 @@ public:
                                     "{} has more than 1 argument.",
                                     sub_expr_depth,
                                     expression->Name()));
+                    return false;
+                }
+                // check unwind compatibility
+                // support:
+                // case 1. cast "smaller ints" to BigIntT
+                // case 2. cast "ints" or "floats" to DoubleT
+                bool valid_cast = false;
+                switch (expression->Type().type()) {
+                    case LogicalType::kBigInt: {
+                        switch (expression->arguments()[0]->Type().type()) {
+                            case LogicalType::kTinyInt:
+                            case LogicalType::kSmallInt:
+                            case LogicalType::kInteger: {
+                                valid_cast = true;
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                    case LogicalType::kDouble: {
+                        switch (expression->arguments()[0]->Type().type()) {
+                            case LogicalType::kTinyInt:
+                            case LogicalType::kSmallInt:
+                            case LogicalType::kInteger:
+                            case LogicalType::kBigInt:
+                            case LogicalType::kFloat: {
+                                valid_cast = true;
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+                if (!valid_cast) {
                     return false;
                 }
                 return IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_valid_column_expression);
