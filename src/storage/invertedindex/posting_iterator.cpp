@@ -95,9 +95,6 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
 }
 
 Pair<bool, RowID> PostingIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
-    if (doc_id > last_doc_id_in_current_block_) {
-        return {false, INVALID_ROWID};
-    }
     if (!finish_decode_docid_) {
         posting_decoder_->DecodeCurrentDocIDBuffer(doc_buffer_);
         current_row_id_ = last_doc_id_in_prev_block_ + doc_buffer_[0];

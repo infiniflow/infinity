@@ -36,10 +36,6 @@ public:
 
     void MultiplyWeight(float factor) { weight_ *= factor; }
 
-    Pair<RowID, float> NextWithThreshold(float threshold) override;
-
-    Pair<RowID, float> BlockNextWithThreshold(float threshold) override;
-
     void UpdateScoreThreshold(float threshold) override {} // do nothing
 
     bool BlockSkipTo(RowID doc_id, float threshold) override;
@@ -57,7 +53,7 @@ public:
     // weight included
     float BlockMaxBM25Score() override;
 
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) override;
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 
@@ -74,5 +70,10 @@ private:
     float bm25_common_score_ = 0; // include: weight * smooth_idf * (k1 + 1.0F)
     float block_max_bm25_score_cache_ = 0;
     RowID block_max_bm25_score_cache_end_id_ = INVALID_ROWID;
+    // cache for PeekInBlockRange
+    RowID peek_doc_id_range_start_ = INVALID_ROWID;
+    RowID peek_doc_id_range_end_ = INVALID_ROWID;
+    RowID peek_doc_id_val_ = INVALID_ROWID;
 };
+
 } // namespace infinity

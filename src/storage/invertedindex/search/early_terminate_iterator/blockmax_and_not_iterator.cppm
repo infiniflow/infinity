@@ -29,10 +29,6 @@ public:
         bm25_score_upper_bound_ = inner_iterators_[0]->BM25ScoreUpperBound();
     }
 
-    Pair<RowID, float> NextWithThreshold(float threshold) override;
-
-    Pair<RowID, float> BlockNextWithThreshold(float threshold) override;
-
     void UpdateScoreThreshold(float threshold) override { return inner_iterators_[0]->UpdateScoreThreshold(threshold); }
 
     bool BlockSkipTo(RowID doc_id, float threshold) override { return inner_iterators_[0]->BlockSkipTo(doc_id, threshold); }
@@ -45,7 +41,7 @@ public:
 
     float BlockMaxBM25Score() override { return inner_iterators_[0]->BlockMaxBM25Score(); }
 
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) override;
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 

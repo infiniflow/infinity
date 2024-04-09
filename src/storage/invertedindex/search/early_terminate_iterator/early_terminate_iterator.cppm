@@ -38,9 +38,9 @@ public:
 
     inline float BM25ScoreUpperBound() const { return bm25_score_upper_bound_; }
 
-    virtual Pair<RowID, float> NextWithThreshold(float threshold) = 0;
+    Pair<RowID, float> NextWithThreshold(float threshold);
 
-    virtual Pair<RowID, float> BlockNextWithThreshold(float threshold) = 0;
+    Pair<RowID, float> BlockNextWithThreshold(float threshold);
 
     virtual void UpdateScoreThreshold(float threshold) = 0;
 
@@ -58,7 +58,7 @@ public:
 
     // if seek failed in current block, return false, doc_id_ may be unchanged or changed
     // if seek succeed in current block, return true, doc_id_ is updated
-    virtual Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) = 0;
+    virtual Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) = 0;
 
     virtual Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) = 0;
 
