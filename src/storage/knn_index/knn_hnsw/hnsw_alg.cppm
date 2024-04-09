@@ -119,7 +119,7 @@ private:
         result_handler.Begin();
         DistHeap candidate;
 
-        data_store_.Prefetch(enter_point);
+        data_store_.PrefetchVec(enter_point);
         // enter_point will not be added to result_handler, the distance is not used
         auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_.vec_store_meta());
         candidate.emplace(-dist, enter_point);
@@ -157,7 +157,8 @@ private:
                 if (prefetch_start >= 0) {
                     int lower = std::max(0, prefetch_start - prefetch_step_);
                     for (int i = prefetch_start; i >= lower; --i) {
-                        data_store_.Prefetch(neighbors_p[i]);
+                        VertexType prefetch_idx = neighbors_p[i];
+                        data_store_.PrefetchVec(prefetch_idx);
                     }
                     prefetch_start -= prefetch_step_;
                 }

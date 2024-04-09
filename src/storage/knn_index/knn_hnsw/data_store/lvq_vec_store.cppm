@@ -193,6 +193,8 @@ private:
     LVQVecStoreInner(SizeT max_vec_num, const Meta &meta) : ptr_(MakeUnique<char[]>(max_vec_num * meta.compress_data_size())) {}
 
 public:
+    LVQVecStoreInner() = default;
+
     static This Make(SizeT max_vec_num, const Meta &meta) { return This(max_vec_num, meta); }
 
     void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {

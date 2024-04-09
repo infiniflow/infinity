@@ -104,14 +104,13 @@ private:
         : graph_(MakeUnique<char[]>(max_vertex * meta.level0_size())), loaded_vertex_n_(loaded_vertex_n) {}
 
 public:
+    GraphStoreInner() = default;
+
     void Free(SizeT current_vertex_num, const GraphStoreMeta &meta) {
         for (VertexType vertex_i = loaded_vertex_n_; vertex_i < VertexType(current_vertex_num); ++vertex_i) {
             delete[] GetLevel0(vertex_i, meta)->layers_p_;
         }
     }
-
-    GraphStoreInner(GraphStoreInner &&) = default;
-    ~GraphStoreInner() = default;
 
     static GraphStoreInner Make(SizeT max_vertex, const GraphStoreMeta &meta) {
         GraphStoreInner graph_store(max_vertex, meta, 0);

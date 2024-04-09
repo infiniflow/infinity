@@ -41,15 +41,18 @@ public:
 
 private:
     DataStore(SizeT chunk_size, VecStoreMeta vec_store_meta, GraphStoreMeta graph_store_meta)
-        : chunk_size_(chunk_size), vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)) {}
+        : chunk_size_(chunk_size), vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)), chunk_num_(0) {
+        assert(chunk_size > 0);
+        assert((chunk_size & (chunk_size - 1)) == 0);
+        chunk_shift_ = __builtin_ctzll(chunk_size);
+    }
 
 public:
-    DataStore(This &&other)
-        : chunk_size_(other.chunk_size_), cur_vec_num_(other.cur_vec_num_), vec_store_meta_(std::move(other.vec_store_meta_)),
-          graph_store_meta_(std::move(other.graph_store_meta_)), inners_(std::move(other.inners_)) {}
+    DataStore(This &&other) = default;
+    This &operator=(This &&other) = default;
 
     ~DataStore() {
-        SizeT chunk_n = inners_.size();
+        SizeT chunk_n = chunk_num_;
         for (SizeT i = 0; i < chunk_n; ++i) {
             SizeT chunk_size = (i < chunk_n - 1) ? chunk_size_ : LastChunkSize();
             inners_[i].Free(chunk_size, graph_store_meta_);
@@ -70,7 +73,7 @@ public:
         file_handler.Write(&cur_vec_num_, sizeof(cur_vec_num_));
         vec_store_meta_.Save(file_handler);
         graph_store_meta_.Save(file_handler);
-        SizeT chunk_num = inners_.size();
+        SizeT chunk_num = chunk_num_;
         for (SizeT i = 0; i < chunk_num; ++i) {
             SizeT chunk_size = (i < chunk_num - 1) ? chunk_size_ : LastChunkSize();
             if (chunk_size > 0) {
@@ -94,7 +97,7 @@ public:
         SizeT chunk_num = (cur_vec_num + chunk_size - 1) / chunk_size;
         for (SizeT i = 0; i < chunk_num; ++i) {
             SizeT cur_chunk_size = (i < chunk_num - 1) ? ret.chunk_size_ : ret.LastChunkSize();
-            ret.inners_.push_back(Inner::Load(file_handler, cur_chunk_size, chunk_size, vec_store_meta, graph_store_meta));
+            ret.inners_[i] = Inner::Load(file_handler, cur_chunk_size, chunk_size, vec_store_meta, graph_store_meta);
         }
         return ret;
     }
@@ -104,16 +107,16 @@ public:
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     Pair<SizeT, SizeT> AddVec(Iterator &&query_iter) {
-        std::unique_lock w_lck(mtx_);
+        // std::unique_lock w_lck(mtx_, std::adopt_lock);
         SizeT start_idx = cur_vec_num_;
         while (true) {
             SizeT last_chunk_size = LastChunkSize();
             if (last_chunk_size == chunk_size_) {
-                inners_.push_back(Inner::Make(chunk_size_, vec_store_meta_, graph_store_meta_));
+                inners_[chunk_num_++] = Inner::Make(chunk_size_, vec_store_meta_, graph_store_meta_);
                 last_chunk_size = 0;
             }
             SizeT remain_size = chunk_size_ - last_chunk_size;
-            auto [insert_n, used_up] = inners_.back().AddVec(std::move(query_iter), last_chunk_size, remain_size, vec_store_meta_);
+            auto [insert_n, used_up] = inners_[chunk_num_ - 1].AddVec(std::move(query_iter), last_chunk_size, remain_size, vec_store_meta_);
             cur_vec_num_ += insert_n;
             if (used_up) {
                 break;
@@ -127,13 +130,13 @@ public:
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     Pair<SizeT, SizeT> OptAddVec(Iterator &&query_iter) {
         if constexpr (!This::IsPlain()) {
-            std::unique_lock w_lck(mtx_);
-            if (!inners_.empty()) {
+            SizeT chunk_n = chunk_num_;
+            if (chunk_n > 0) {
                 Vector<Pair<VecStoreInner *, SizeT>> vec_inners;
-                for (SizeT i = 0; i < inners_.size() - 1; ++i) {
-                    vec_inners.emplace_back(inners_[i].vec_store_inner(), chunk_size_);
+                for (SizeT i = 0; i < chunk_n; ++i) {
+                    SizeT chunk_size = (i < chunk_n - 1) ? chunk_size_ : LastChunkSize();
+                    vec_inners.emplace_back(inners_[i].vec_store_inner(), chunk_size);
                 }
-                vec_inners.emplace_back(inners_.back().vec_store_inner(), LastChunkSize());
                 vec_store_meta_.template Optimize<LabelType, Iterator>(std::move(query_iter), vec_inners);
             }
         }
@@ -148,11 +151,17 @@ public:
         AddVec(std::move(empty_iter));
     }
 
-    typename VecStoreT::StoreType GetVec(SizeT vec_i) const { return GetInner(vec_i).GetVec(vec_i % chunk_size_, vec_store_meta_); }
+    typename VecStoreT::StoreType GetVec(SizeT vec_i) const {
+        const auto &[inner, idx] = GetInner(vec_i);
+        return inner.GetVec(idx, vec_store_meta_);
+    }
 
     typename VecStoreT::QueryType MakeQuery(const DataType *vec) const { return vec_store_meta_.MakeQuery(vec); }
 
-    void Prefetch(SizeT vec_i) const { GetInner(vec_i).Prefetch(vec_i % chunk_size_, vec_store_meta_); }
+    void PrefetchVec(SizeT vec_i) const {
+        const auto &[inner, idx] = GetInner(vec_i);
+        inner.PrefetchVec(idx, vec_store_meta_);
+    }
 
     const VecStoreMeta &vec_store_meta() const { return vec_store_meta_; }
 
@@ -160,15 +169,18 @@ public:
 
     // Graph store
     void AddVertex(VertexType vec_i, i32 layer_n) {
-        GetInner(vec_i).AddVertex(vec_i % chunk_size_, layer_n, graph_store_meta_);
+        auto [inner, idx] = GetInner(vec_i);
+        inner.AddVertex(idx, layer_n, graph_store_meta_);
         graph_store_meta_.UpdateMaxLayer(layer_n, vec_i);
     }
 
     Pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_i, i32 layer_i) const {
-        return GetInner(vertex_i).GetNeighbors(vertex_i % chunk_size_, layer_i, graph_store_meta_);
+        const auto &[inner, idx] = GetInner(vertex_i);
+        return inner.GetNeighbors(idx, layer_i, graph_store_meta_);
     }
     Pair<VertexType *, VertexListSize *> GetNeighborsMut(VertexType vertex_i, i32 layer_i) {
-        return GetInner(vertex_i).GetNeighborsMut(vertex_i % chunk_size_, layer_i, graph_store_meta_);
+        auto [inner, idx] = GetInner(vertex_i);
+        return inner.GetNeighborsMut(idx, layer_i, graph_store_meta_);
     }
 
     i32 max_layer() const { return graph_store_meta_.max_layer(); }
@@ -178,11 +190,20 @@ public:
     SizeT Mmax() const { return graph_store_meta_.Mmax(); }
 
     // other
-    LabelType GetLabel(SizeT vec_i) const { return GetInner(vec_i).GetLabel(vec_i % chunk_size_); }
+    LabelType GetLabel(SizeT vec_i) const {
+        const auto &[inner, idx] = GetInner(vec_i);
+        return inner.GetLabel(idx);
+    }
 
-    std::shared_lock<std::shared_mutex> SharedLock(SizeT vec_i) const { return GetInner(vec_i).SharedLock(vec_i % chunk_size_); }
+    std::shared_lock<std::shared_mutex> SharedLock(SizeT vec_i) const {
+        const auto &[inner, idx] = GetInner(vec_i);
+        return inner.SharedLock(idx);
+    }
 
-    std::unique_lock<std::shared_mutex> UniqueLock(SizeT vec_i) { return GetInner(vec_i).UniqueLock(vec_i % chunk_size_); }
+    std::unique_lock<std::shared_mutex> UniqueLock(SizeT vec_i) {
+        const auto &[inner, idx] = GetInner(vec_i);
+        return inner.UniqueLock(idx);
+    }
 
     SizeT cur_vec_num() const { return cur_vec_num_; }
 
@@ -191,39 +212,37 @@ private:
         return std::is_same_v<VecStoreT, PlainL2VecStoreType<DataType>> || std::is_same_v<VecStoreT, PlainIPVecStoreType<DataType>>;
     }
 
-    Inner &GetInner(SizeT vec_i) {
-        std::shared_lock r_lck(mtx_);
-        return inners_[vec_i / chunk_size_];
-    }
+    Pair<Inner &, SizeT> GetInner(SizeT vec_i) { return {inners_[vec_i >> chunk_shift_], vec_i & (chunk_size_ - 1)}; }
 
-    const Inner &GetInner(SizeT vec_i) const {
-        std::shared_lock r_lck(mtx_);
-        return inners_[vec_i / chunk_size_];
-    }
+    Pair<const Inner &, SizeT> GetInner(SizeT vec_i) const { return {inners_[vec_i >> chunk_shift_], vec_i & (chunk_size_ - 1)}; }
 
     SizeT LastChunkSize() const {
         if (cur_vec_num_ == 0) {
             return chunk_size_;
         }
-        return (cur_vec_num_ - 1) % chunk_size_ + 1;
+        return ((cur_vec_num_ - 1) & (chunk_size_ - 1)) + 1;
     }
 
 private:
     SizeT chunk_size_;
+    SizeT chunk_shift_;
 
-    mutable std::shared_mutex mtx_;
     SizeT cur_vec_num_;
     VecStoreMeta vec_store_meta_;
     GraphStoreMeta graph_store_meta_;
-    Deque<Inner> inners_;
+
+    constexpr static SizeT kMaxChunkNum = 1 << 10;
+    Array<Inner, kMaxChunkNum> inners_;
+    SizeT chunk_num_;
 
 public:
     void Check() const {
         i32 max_l = -1;
         SizeT i;
-        for (i = 0; i < inners_.size(); ++i) {
+        SizeT chunk_n = chunk_num_;
+        for (i = 0; i < chunk_n; ++i) {
             i32 max_l1 = -1;
-            SizeT chunk_size = i < inners_.size() - 1 ? chunk_size_ : LastChunkSize();
+            SizeT chunk_size = i < chunk_n - 1 ? chunk_size_ : LastChunkSize();
             inners_[i].Check(chunk_size, graph_store_meta_, i * chunk_size_, cur_vec_num_, max_l1);
             max_l = std::max(max_l, max_l1);
         }
@@ -231,13 +250,13 @@ public:
     }
 
     void Dump(std::ostream &os) const {
-        if (inners_.empty()) {
+        SizeT chunk_n = chunk_num_;
+        if (chunk_n == 0) {
             return;
         }
-        SizeT chunk_num = inners_.size();
-        for (SizeT i = 0; i < chunk_num; ++i) {
+        for (SizeT i = 0; i < chunk_n; ++i) {
             os << "-------chunk " << i << std::endl;
-            SizeT cur_chunk_size = (i < chunk_num - 1) ? chunk_size_ : LastChunkSize();
+            SizeT cur_chunk_size = (i < chunk_n - 1) ? chunk_size_ : LastChunkSize();
             inners_[i].Dump(os, cur_chunk_size, graph_store_meta_);
         }
     }
@@ -259,11 +278,7 @@ private:
           labels_(MakeUnique<LabelType[]>(chunk_size)), vertex_mutex_(MakeUnique<std::shared_mutex[]>(chunk_size)) {}
 
 public:
-    DataStoreInner(This &&other)
-        : vec_store_inner_(std::move(other.vec_store_inner_)), graph_store_inner_(std::move(other.graph_store_inner_)),
-          labels_(std::move(other.labels_)), vertex_mutex_(std::move(other.vertex_mutex_)) {}
-
-    ~DataStoreInner() = default;
+    DataStoreInner() = default;
 
     static This Make(SizeT chunk_size, VecStoreMeta &vec_store_meta, GraphStoreMeta &graph_store_meta) {
         auto plain_store_inner = VecStoreInner::Make(chunk_size, vec_store_meta);
@@ -308,7 +323,7 @@ public:
 
     typename VecStoreT::StoreType GetVec(VertexType vec_i, const VecStoreMeta &meta) const { return vec_store_inner_.GetVec(vec_i, meta); }
 
-    void Prefetch(VertexType vec_i, const VecStoreMeta &meta) const { vec_store_inner_.Prefetch(vec_i, meta); }
+    void PrefetchVec(VertexType vec_i, const VecStoreMeta &meta) const { vec_store_inner_.Prefetch(vec_i, meta); }
 
     // graph store
     void AddVertex(VertexType vec_i, i32 layer_n, const GraphStoreMeta &meta) { graph_store_inner_.AddVertex(vec_i, layer_n, meta); }

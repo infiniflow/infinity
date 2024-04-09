@@ -64,6 +64,8 @@ private:
     PlainVecStoreInner(SizeT max_vec_num, const Meta &meta) : ptr_(MakeUnique<DataType[]>(max_vec_num * meta.dim())) {}
 
 public:
+    PlainVecStoreInner() = default;
+
     static This Make(SizeT max_vec_num, const Meta &meta) { return This(max_vec_num, meta); }
 
     void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
