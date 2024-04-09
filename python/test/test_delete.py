@@ -286,7 +286,6 @@ class TestDelete:
             db_obj.drop_table("test_delete_dropped_table")
 
     # various expression will be given in where clause, and check result correctness
-    @pytest.mark.slow
     @trace_expected_exceptions
     @pytest.mark.parametrize('column_types', ["int", "int8", "int16", "int32", "int64", "integer",
                                               "float", "float32", "double", "float64",
