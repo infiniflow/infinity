@@ -40,17 +40,18 @@ public:
     using VecStoreInner = typename VecStoreT::Inner;
 
 private:
-    DataStore(SizeT chunk_size, VecStoreMeta vec_store_meta, GraphStoreMeta graph_store_meta)
-        : chunk_size_(chunk_size), vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)) {
+    DataStore(SizeT chunk_size, SizeT max_chunk_n, VecStoreMeta vec_store_meta, GraphStoreMeta graph_store_meta)
+        : chunk_size_(chunk_size), max_chunk_n_(max_chunk_n), vec_store_meta_(std::move(vec_store_meta)),
+          graph_store_meta_(std::move(graph_store_meta)) {
         assert(chunk_size > 0);
         assert((chunk_size & (chunk_size - 1)) == 0);
         chunk_shift_ = __builtin_ctzll(chunk_size);
-        inners_ = MakeUnique<Inner[]>(kMaxChunkNum);
+        inners_ = MakeUnique<Inner[]>(max_chunk_n);
     }
 
 public:
     DataStore(This &&other)
-        : chunk_size_(other.chunk_size_), chunk_shift_(other.chunk_shift_), cur_vec_num_(other.cur_vec_num_.load()),
+        : chunk_size_(other.chunk_size_), max_chunk_n_(other.max_chunk_n_), chunk_shift_(other.chunk_shift_), cur_vec_num_(other.cur_vec_num_.load()),
           vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)),
           inners_(std::move(other.inners_)) {}
 
@@ -66,10 +67,10 @@ public:
         }
     }
 
-    static This Make(SizeT chunk_size, SizeT dim, SizeT Mmax0, SizeT Mmax) {
+    static This Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT Mmax0, SizeT Mmax) {
         VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim);
         GraphStoreMeta graph_store_meta = GraphStoreMeta::Make(Mmax0, Mmax);
-        This ret(chunk_size, std::move(vec_store_meta), std::move(graph_store_meta));
+        This ret(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta));
         ret.cur_vec_num_ = 0;
         ret.inners_[0] = Inner::Make(chunk_size, ret.vec_store_meta_, ret.graph_store_meta_);
         return ret;
@@ -80,6 +81,7 @@ public:
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
 
         file_handler.Write(&chunk_size_, sizeof(chunk_size_));
+        file_handler.Write(&max_chunk_n_, sizeof(max_chunk_n_));
 
         file_handler.Write(&cur_vec_num, sizeof(cur_vec_num));
         vec_store_meta_.Save(file_handler);
@@ -90,16 +92,22 @@ public:
         }
     }
 
-    static This Load(FileHandler &file_handler) {
+    static This Load(FileHandler &file_handler, SizeT max_chunk_n = 0) {
         SizeT chunk_size;
         file_handler.Read(&chunk_size, sizeof(chunk_size));
+        SizeT max_chunk_n1;
+        file_handler.Read(&max_chunk_n1, sizeof(max_chunk_n1));
+        if (max_chunk_n == 0) {
+            max_chunk_n = max_chunk_n1;
+        }
+        assert(max_chunk_n >= max_chunk_n1);
 
         SizeT cur_vec_num;
         file_handler.Read(&cur_vec_num, sizeof(cur_vec_num));
         VecStoreMeta vec_store_meta = VecStoreMeta::Load(file_handler);
         GraphStoreMeta graph_store_meta = GraphStoreMeta::Load(file_handler);
 
-        This ret = This(chunk_size, std::move(vec_store_meta), std::move(graph_store_meta));
+        This ret = This(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta));
         ret.cur_vec_num_ = cur_vec_num;
 
         auto [chunk_num, last_chunk_size] = ret.ChunkInfo(cur_vec_num);
@@ -120,12 +128,10 @@ public:
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
         while (true) {
             SizeT remain_size = chunk_size_ - last_chunk_size;
-            assert(remain_size > 0);
             auto [insert_n, used_up] = inners_[chunk_num - 1].AddVec(std::move(query_iter), last_chunk_size, remain_size, vec_store_meta_);
             cur_vec_num += insert_n;
             last_chunk_size += insert_n;
-            if (cur_vec_num == kMaxChunkNum * chunk_size_) {
-                assert(used_up);
+            if (cur_vec_num == max_chunk_n_ * chunk_size_) {
                 break;
             }
             if (last_chunk_size == chunk_size_) {
@@ -235,7 +241,7 @@ private:
 
     // return chunk_num & last chunk size
     Pair<SizeT, SizeT> ChunkInfo(SizeT cur_vec_num) const {
-        SizeT chunk_num = (cur_vec_num >> chunk_shift_) + 1;
+        SizeT chunk_num = std::min(max_chunk_n_, (cur_vec_num >> chunk_shift_) + 1);
         assert(chunk_num > 0);
         SizeT last_chunk_size = cur_vec_num - ((chunk_num - 1) << chunk_shift_);
         return {chunk_num, last_chunk_size};
@@ -243,16 +249,18 @@ private:
 
 private:
     SizeT chunk_size_;
+    SizeT max_chunk_n_;
     SizeT chunk_shift_;
 
     Atomic<SizeT> cur_vec_num_;
     VecStoreMeta vec_store_meta_;
     GraphStoreMeta graph_store_meta_;
 
-    constexpr static SizeT kMaxChunkNum = 1 << 10;
     UniquePtr<Inner[]> inners_;
 
 public:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
     void Check() const {
         i32 max_l = -1;
         SizeT i;
@@ -264,8 +272,10 @@ public:
             inners_[i].Check(chunk_size, graph_store_meta_, i * chunk_size_, cur_vec_num, max_l1);
             max_l = std::max(max_l, max_l1);
         }
-        assert(max_l == max_layer());
+        auto [max_layer, ep] = GetEnterPoint();
+        assert(max_l == max_layer);
     }
+#pragma clang diagnostic pop
 
     void Dump(std::ostream &os) const {
         SizeT cur_vec_num = this->cur_vec_num();

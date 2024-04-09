@@ -35,6 +35,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     i64 dimension = 4;
     i64 top_k = 4;
     i64 base_embedding_count = 4;
+    int max_chunk_n = 1;
     UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
     UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension);
 
@@ -77,7 +78,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     using Hnsw = KnnHnsw<LVQL2VecStoreType<f32, i8>, LabelT>;
     int M = 16;
     int ef_construction = 200;
-    auto hnsw_index = Hnsw::Make(base_embedding_count, dimension, M, ef_construction);
+    auto hnsw_index = Hnsw::Make(base_embedding_count, max_chunk_n, dimension, M, ef_construction);
 
     hnsw_index->InsertVecsRaw(base_embedding.get(), base_embedding_count);
 

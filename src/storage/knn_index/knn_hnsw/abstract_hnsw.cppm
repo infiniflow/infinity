@@ -80,17 +80,11 @@ public:
     }
 
 public:
-    void Make(SizeT max_element, SizeT dimension, SizeT M, SizeT ef_c) {
+    void Make(SizeT chunk_sizes, SizeT max_chunk_n, SizeT dimension, SizeT M, SizeT ef_c) {
         std::visit(
-            [max_element, dimension, M, ef_c, this](auto &&arg) {
+            [chunk_sizes, max_chunk_n, dimension, M, ef_c, this](auto &&arg) {
                 using T = std::decay_t<decltype(*arg)>;
-                if constexpr (std::is_same_v<T, Hnsw1> || std::is_same_v<T, Hnsw2>) {
-                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c).release();
-                } else if constexpr (std::is_same_v<T, Hnsw3> || std::is_same_v<T, Hnsw4>) {
-                    knn_hnsw_ptr_ = T::Make(max_element, dimension, M, ef_c).release();
-                } else {
-                    UnrecoverableError("Invalid type");
-                }
+                knn_hnsw_ptr_ = T::Make(chunk_sizes, max_chunk_n, dimension, M, ef_c).release();
             },
             knn_hnsw_ptr_);
     }
@@ -99,13 +93,7 @@ public:
         std::visit(
             [&file_handler, this](auto &&arg) {
                 using T = std::decay_t<decltype(*arg)>;
-                if constexpr (std::is_same_v<T, Hnsw1> || std::is_same_v<T, Hnsw2>) {
-                    knn_hnsw_ptr_ = T::Load(file_handler).release();
-                } else if constexpr (std::is_same_v<T, Hnsw3> || std::is_same_v<T, Hnsw4>) {
-                    knn_hnsw_ptr_ = T::Load(file_handler).release();
-                } else {
-                    UnrecoverableError("Invalid type");
-                }
+                knn_hnsw_ptr_ = T::Load(file_handler).release();
             },
             knn_hnsw_ptr_);
     }

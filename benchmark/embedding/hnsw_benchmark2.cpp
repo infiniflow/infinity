@@ -65,7 +65,7 @@ int main() {
         assert(dimension == dim || !"embedding dimension isn't correct");
         assert(embedding_count == eb_cnt || !"embedding size isn't correct");
 
-        knn_hnsw = Hnsw::Make(embedding_count, dimension, M, ef_construction);
+        knn_hnsw = Hnsw::Make(embedding_count, 1 /*chunk_n*/, dimension, M, ef_construction);
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() << "B" << std::endl;

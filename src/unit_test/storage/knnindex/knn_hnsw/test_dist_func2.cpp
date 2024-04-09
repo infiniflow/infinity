@@ -42,6 +42,7 @@ TEST_F(DistFuncTest2, test2) {
 
     size_t dim = 128;
     size_t vec_n = 8192;
+    size_t max_chunk_size = 1;
 
     auto vecs1 = std::make_unique<float[]>(dim * vec_n);
     auto vecs2 = std::make_unique<float[]>(dim * vec_n);
@@ -56,7 +57,7 @@ TEST_F(DistFuncTest2, test2) {
         }
     }
 
-    auto lvq_store = DataStore::Make(vec_n, dim, 0 /*Mmax0*/, 0 /*Mmax*/);
+    auto lvq_store = DataStore::Make(vec_n, max_chunk_size, dim, 0 /*Mmax0*/, 0 /*Mmax*/);
     Distance distance(lvq_store.dim());
 
     auto [start_i, end_i] = lvq_store.AddVec(vecs1.get(), vec_n);

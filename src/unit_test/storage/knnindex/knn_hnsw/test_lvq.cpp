@@ -96,7 +96,7 @@ TEST_F(HnswLVQTest, test1) {
 
     // dump_ = true;
     {
-        auto lvq_store = DataStore::Make(vec_n_, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
+        auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         auto [start_i, end_i] = lvq_store.OptAddVec(data.get(), vec_n_);
         EXPECT_EQ(start_i, 0u);
         EXPECT_EQ(end_i, vec_n_);
@@ -105,7 +105,7 @@ TEST_F(HnswLVQTest, test1) {
 
     {
         size_t idx = 0;
-        auto lvq_store = DataStore::Make(vec_n_, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
+        auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
             auto [start_i, end_i] = lvq_store.OptAddVec(data.get(), vec_n_ / 2);
             EXPECT_EQ(start_i, 0u);
@@ -125,7 +125,7 @@ TEST_F(HnswLVQTest, test1) {
 
     {
         size_t idx = 0;
-        auto lvq_store = DataStore::Make(vec_n_, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
+        auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
             auto [start_i, end_i] = lvq_store.AddVec(data.get(), vec_n_ / 2);
             EXPECT_EQ(start_i, 0u);
@@ -142,7 +142,7 @@ TEST_F(HnswLVQTest, test1) {
     }
 
     {
-        auto lvq_store = DataStore::Make(vec_n_, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
+        auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
             for (SizeT i = 0; i < vec_n_; ++i) {
                 auto [start_i, end_i] = lvq_store.OptAddVec(data.get() + i * dim_, 1);
@@ -166,7 +166,7 @@ TEST_F(HnswLVQTest, test1) {
             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
 
-            auto lvq_store = DataStore::Make(vec_n_, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
+            auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
             auto [start_i, end_i] = lvq_store.OptAddVec(data.get(), vec_n_ / 2);
             EXPECT_EQ(start_i, 0u);
             EXPECT_EQ(end_i, vec_n_ / 2);

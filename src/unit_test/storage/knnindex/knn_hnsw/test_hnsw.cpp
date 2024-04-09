@@ -42,6 +42,7 @@ public:
         int M = 8;
         int ef_construction = 200;
         int chunk_size = 128;
+        int max_chunk_n = 10;
 
         std::mt19937 rng;
         rng.seed(0);
@@ -55,7 +56,7 @@ public:
         LocalFileSystem fs;
 
         {
-            auto hnsw_index = Hnsw::Make(chunk_size, dim, M, ef_construction);
+            auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
             hnsw_index->InsertVecsRaw(data.get(), element_size);
             // std::ofstream os("tmp/dump.txt");

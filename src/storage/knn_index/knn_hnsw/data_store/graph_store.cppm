@@ -239,10 +239,10 @@ private:
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 
 public:
-    // check invariant of graph
-    void Check(VertexType cur_vertex_n, const GraphStoreMeta &meta, VertexType vertex_i_offset, SizeT cur_vec_num, i32 &max_l) const {
+// check invariant of graph
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
+    void Check(VertexType cur_vertex_n, const GraphStoreMeta &meta, VertexType vertex_i_offset, SizeT cur_vec_num, i32 &max_l) const {
         int max_layer = -1;
         for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
             const VertexL0 *v = GetLevel0(vertex_i, meta);
@@ -264,8 +264,8 @@ public:
             }
         }
         max_l = max_layer;
-#pragma clang diagnostic pop
     }
+#pragma clang diagnostic pop
 
     void Dump(std::ostream &os, VertexType cur_vertex_n, const GraphStoreMeta &meta) const {
         if (cur_vertex_n == 0) {

@@ -74,9 +74,9 @@ public:
           data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)) {}
     ~KnnHnsw() = default;
 
-    static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, SizeT M, SizeT ef_construction) {
+    static UniquePtr<This> Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT M, SizeT ef_construction) {
         auto [Mmax0, Mmax] = This::GetMmax(M);
-        auto data_store = DataStore::Make(max_vertex, dim, Mmax0, Mmax);
+        auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
         Distance distance(data_store.dim());
         return UniquePtr<This>(new This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0));
     }

@@ -81,6 +81,7 @@ TEST_F(DistFuncTest, test2) {
 
     size_t dim = 200;
     size_t vec_n = 8192;
+    size_t max_chunk_size = 1;
 
     auto vecs1 = std::make_unique<float[]>(dim * vec_n);
     auto vecs2 = std::make_unique<float[]>(dim * vec_n);
@@ -95,7 +96,7 @@ TEST_F(DistFuncTest, test2) {
         }
     }
 
-    auto lvq_store = DataStore::Make(vec_n, dim, 0 /*Mmax0*/, 0 /*Mmax*/);
+    auto lvq_store = DataStore::Make(vec_n, max_chunk_size, dim, 0 /*Mmax0*/, 0 /*Mmax*/);
     Distance distance(lvq_store.dim());
     DenseVectorIter iter(vecs1.get(), dim, vec_n, 0);
     auto [start_i, end_i] = lvq_store.AddVec(std::move(iter));
