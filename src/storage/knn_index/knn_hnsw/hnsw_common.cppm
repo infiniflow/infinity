@@ -71,4 +71,12 @@ public:
 export template <typename Filter, typename LabelType>
 concept FilterConcept = requires(LabelType label) { std::is_same_v<Filter, NoneType> || std::is_base_of_v<FilterBase<LabelType>, Filter>; };
 
+export struct HnswInsertConfig {
+    bool optimize_;
+};
+
+export constexpr HnswInsertConfig kDefaultHnswInsertConfig = {
+    .optimize_ = false,
+};
+
 } // namespace infinity

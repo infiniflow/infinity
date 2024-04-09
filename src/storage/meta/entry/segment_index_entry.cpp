@@ -330,12 +330,14 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                 case kElemFloat: {
                     AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
                     auto InsertHnswInner = [&](auto &iter) {
+                        HnswInsertConfig insert_config;
+                        insert_config.optimize_ = true;
                         if (!prepare) {
                             // Single thread insert
-                            abstract_hnsw.InsertVecs(std::move(iter)); // estimate insert count
+                            abstract_hnsw.InsertVecs(std::move(iter), insert_config);
                         } else {
                             // Multi thread insert data, write file in the physical create index finish stage.
-                            auto [start_i, end_i] = abstract_hnsw.StoreData(std::move(iter));
+                            auto [start_i, end_i] = abstract_hnsw.StoreData(std::move(iter), insert_config);
                             LOG_TRACE(fmt::format("Insert index: {} - {}", start_i, end_i));
                         }
                     };

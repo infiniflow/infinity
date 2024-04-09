@@ -35,7 +35,6 @@ import data_store;
 
 // Todo: make more embedding type.
 // Todo: make module partition.
-// Todo: make the constructor of `KnnHnsw` with less confusing template
 
 namespace infinity {
 
@@ -275,28 +274,28 @@ private:
 
 public:
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void InsertVecs(Iterator &&iter) {
-        auto [start_i, end_i] = StoreData(std::move(iter));
+    void InsertVecs(Iterator &&iter, const HnswInsertConfig &config) {
+        auto [start_i, end_i] = StoreData(std::move(iter), config);
         for (VertexType vertex_i = start_i; vertex_i < end_i; ++vertex_i) {
             Build(vertex_i);
         }
     }
 
     // This function for test
-    void InsertVecsRaw(const DataType *query, SizeT insert_n) {
-        auto [start_i, end_i] = StoreDataRaw(query, insert_n);
-        for (VertexType vertex_i = start_i; vertex_i < end_i; ++vertex_i) {
-            Build(vertex_i);
-        }
+    void InsertVecsRaw(const DataType *query, SizeT insert_n, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+        InsertVecs(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n), config);
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    Pair<VertexType, VertexType> StoreData(Iterator &&iter) {
-        return data_store_.OptAddVec(std::move(iter)); // TODO: fix me
+    Pair<VertexType, VertexType> StoreData(Iterator &&iter, const HnswInsertConfig &config) {
+        if (config.optimize_) {
+            return data_store_.OptAddVec(std::move(iter));
+        }
+        return data_store_.AddVec(std::move(iter));
     }
 
-    Pair<VertexType, VertexType> StoreDataRaw(const DataType *query, SizeT insert_n) {
-        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n));
+    Pair<VertexType, VertexType> StoreDataRaw(const DataType *query, SizeT insert_n, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n), config);
     }
 
     void Build(VertexType vertex_i) {
