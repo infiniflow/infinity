@@ -265,8 +265,8 @@ private:
     template <FilterConcept<LabelType> Filter = NoneType>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const DataType *q, SizeT k, const Filter &filter) const {
         auto query = data_store_.MakeQuery(q);
-        VertexType ep = data_store_.enterpoint();
-        for (i32 cur_layer = data_store_.max_layer(); cur_layer > 0; --cur_layer) {
+        auto [max_layer, ep] = data_store_.GetEnterPoint();
+        for (i32 cur_layer = max_layer; cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);
         }
         return SearchLayer<Filter>(ep, query, 0, std::max(k, ef_), filter);
@@ -299,18 +299,13 @@ public:
     }
 
     void Build(VertexType vertex_i) {
-        std::unique_lock<std::mutex> global_lock = std::unique_lock<std::mutex>(global_mutex_);
-
         i32 q_layer = GenerateRandomLayer();
-        i32 max_layer = data_store_.max_layer();
-        if (q_layer <= max_layer) {
-            global_lock.unlock();
-        }
 
         std::unique_lock<std::shared_mutex> lock = data_store_.UniqueLock(vertex_i);
+        auto [max_layer, ep] = data_store_.TryUpdateEnterPoint(q_layer, vertex_i);
+
         StoreType query = data_store_.GetVec(vertex_i);
 
-        VertexType ep = data_store_.enterpoint();
         data_store_.AddVertex(vertex_i, q_layer);
 
         for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
@@ -375,7 +370,7 @@ private:
     DataStore data_store_;
     Distance distance_;
 
-    std::mutex global_mutex_;
+    // std::mutex global_mutex_;
 
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:

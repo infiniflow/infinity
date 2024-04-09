@@ -43,6 +43,15 @@ private:
           levelx_size_(sizeof(VertexLX) + sizeof(VertexType) * Mmax) {}
 
 public:
+    GraphStoreMeta(GraphStoreMeta &&other) {
+        Mmax0_ = other.Mmax0_;
+        Mmax_ = other.Mmax_;
+        level0_size_ = other.level0_size_;
+        levelx_size_ = other.levelx_size_;
+        max_layer_ = other.max_layer_;
+        enterpoint_ = other.enterpoint_;
+    }
+
     static GraphStoreMeta Make(SizeT Mmax0, SizeT Mmax) {
         GraphStoreMeta meta(Mmax0, Mmax);
         meta.max_layer_ = -1;
@@ -78,8 +87,23 @@ public:
     SizeT level0_size() const { return level0_size_; }
     SizeT levelx_size() const { return levelx_size_; }
 
-    i32 max_layer() const { return max_layer_; }
-    VertexType enterpoint() const { return enterpoint_; }
+    Pair<i32, VertexType> GetEnterPoint() const {
+        std::unique_lock lck(mtx_);
+        return {max_layer_, enterpoint_};
+    }
+
+    Pair<i32, VertexType> TryUpdateEnterPoint(i32 layer, VertexType vertex_i) {
+        std::unique_lock lck(mtx_);
+        if (layer > max_layer_) {
+            i32 old_max_layer = max_layer_;
+            VertexType old_enterpoint = enterpoint_;
+            max_layer_ = layer;
+            enterpoint_ = vertex_i;
+            return {old_max_layer, old_enterpoint};
+        } else {
+            return {max_layer_, enterpoint_};
+        }
+    }
 
     void UpdateMaxLayer(i32 layer_n, VertexType vec_i) {
         if (layer_n > max_layer_) {
@@ -94,6 +118,7 @@ private:
     SizeT level0_size_;
     SizeT levelx_size_;
 
+    mutable std::mutex mtx_;
     i32 max_layer_;
     VertexType enterpoint_;
 };

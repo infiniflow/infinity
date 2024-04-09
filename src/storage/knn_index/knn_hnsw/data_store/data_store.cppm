@@ -188,7 +188,6 @@ public:
     void AddVertex(VertexType vec_i, i32 layer_n) {
         auto [inner, idx] = GetInner(vec_i);
         inner.AddVertex(idx, layer_n, graph_store_meta_);
-        graph_store_meta_.UpdateMaxLayer(layer_n, vec_i);
     }
 
     Pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_i, i32 layer_i) const {
@@ -200,8 +199,9 @@ public:
         return inner.GetNeighborsMut(idx, layer_i, graph_store_meta_);
     }
 
-    i32 max_layer() const { return graph_store_meta_.max_layer(); }
-    VertexType enterpoint() const { return graph_store_meta_.enterpoint(); }
+    Pair<i32, VertexType> GetEnterPoint() const { return graph_store_meta_.GetEnterPoint(); }
+
+    Pair<i32, VertexType> TryUpdateEnterPoint(i32 layer, VertexType vertex_i) { return graph_store_meta_.TryUpdateEnterPoint(layer, vertex_i); }
 
     SizeT Mmax0() const { return graph_store_meta_.Mmax0(); }
     SizeT Mmax() const { return graph_store_meta_.Mmax(); }
