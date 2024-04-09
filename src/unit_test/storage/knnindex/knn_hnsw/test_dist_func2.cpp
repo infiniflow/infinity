@@ -34,16 +34,14 @@ float F32IPTest(const float *v1, const float *v2, size_t dim) {
 }
 
 TEST_F(DistFuncTest2, test2) {
-    GTEST_SKIP();
-
     using LabelT = int;
-    using VecStoreType = LVQL2VecStoreType<float, int8_t>;
+    using VecStoreType = LVQIPVecStoreType<float, int8_t>;
     using DataStore = DataStore<VecStoreType, LabelT>;
     using Distance = typename VecStoreType::Distance;
     using LVQ8Data = typename VecStoreType::StoreType;
 
     size_t dim = 128;
-    size_t vec_n = 10000;
+    size_t vec_n = 8192;
 
     auto vecs1 = std::make_unique<float[]>(dim * vec_n);
     auto vecs2 = std::make_unique<float[]>(dim * vec_n);
@@ -63,6 +61,7 @@ TEST_F(DistFuncTest2, test2) {
 
     auto [start_i, end_i] = lvq_store.AddVec(vecs1.get(), vec_n);
     EXPECT_EQ(start_i, 0u);
+    EXPECT_EQ(end_i, vec_n);
 
     for (size_t i = 0; i < vec_n; ++i) {
         const float *v2 = vecs2.get() + i * dim;

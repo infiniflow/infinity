@@ -85,7 +85,7 @@ int main() {
                         if (cur_i >= VertexType(start_i + embedding_count)) {
                             break;
                         }
-                        knn_hnsw->Build<true>(cur_i);
+                        knn_hnsw->Build(cur_i);
                         if (cur_i && cur_i % 10000 == 0) {
                             std::cout << "Inserted " << cur_i << " / " << embedding_count << std::endl;
                         }
@@ -166,7 +166,7 @@ int main() {
                             break;
                         }
                         const float *query = queries + cur_idx * dimension;
-                        auto result = knn_hnsw->KnnSearchSorted<false>(query, test_top);
+                        auto result = knn_hnsw->KnnSearchSorted(query, test_top);
                         results[cur_idx] = std::move(result);
                     }
                 });

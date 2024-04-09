@@ -46,8 +46,6 @@ float F32L2Test(const float *v1, const float *v2, size_t dim) {
 }
 
 TEST_F(DistFuncTest, test1) {
-    GTEST_SKIP();
-
     size_t dim = 200;
     size_t vec_n = 10000;
 
@@ -75,8 +73,6 @@ TEST_F(DistFuncTest, test1) {
 }
 
 TEST_F(DistFuncTest, test2) {
-    GTEST_SKIP();
-
     using LabelT = int;
     using VecStoreType = LVQL2VecStoreType<float, int8_t>;
     using DataStore = DataStore<VecStoreType, LabelT>;
@@ -84,7 +80,7 @@ TEST_F(DistFuncTest, test2) {
     using LVQ8Data = typename VecStoreType::StoreType;
 
     size_t dim = 200;
-    size_t vec_n = 10000;
+    size_t vec_n = 8192;
 
     auto vecs1 = std::make_unique<float[]>(dim * vec_n);
     auto vecs2 = std::make_unique<float[]>(dim * vec_n);
@@ -104,6 +100,7 @@ TEST_F(DistFuncTest, test2) {
     DenseVectorIter iter(vecs1.get(), dim, vec_n, 0);
     auto [start_i, end_i] = lvq_store.AddVec(std::move(iter));
     EXPECT_EQ(start_i, 0u);
+    EXPECT_EQ(end_i, vec_n);
 
     for (size_t i = 0; i < vec_n; ++i) {
         // const float *v1 = vecs1.get() + i * dim;

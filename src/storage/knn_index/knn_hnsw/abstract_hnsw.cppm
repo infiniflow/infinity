@@ -144,14 +144,13 @@ public:
         std::visit([ef](auto &&arg) { arg->SetEf(ef); }, knn_hnsw_ptr_);
     }
 
-    template <bool WithLock, FilterConcept<LabelType> Filter>
+    template <FilterConcept<LabelType> Filter>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, const Filter &filter) const {
-        return std::visit([q, k, &filter](auto &&arg) { return arg->template KnnSearch<WithLock, Filter>(q, k, filter); }, knn_hnsw_ptr_);
+        return std::visit([q, k, &filter](auto &&arg) { return arg->template KnnSearch<Filter>(q, k, filter); }, knn_hnsw_ptr_);
     }
 
-    template <bool WithLock>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k) const {
-        return std::visit([q, k](auto &&arg) { return arg->template KnnSearch<WithLock>(q, k); }, knn_hnsw_ptr_);
+        return std::visit([q, k](auto &&arg) { return arg->KnnSearch(q, k); }, knn_hnsw_ptr_);
     }
 
 private:
