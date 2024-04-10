@@ -17,7 +17,6 @@
 #include <string>
 #include <tuple>
 #include <unistd.h>
-#include <getopt.h>
 
 import stl;
 import third_party;
@@ -111,10 +110,7 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     return infinity;
 }
 
-void BenchmarkImport(SharedPtr<Infinity> infinity,
-                     const String &db_name,
-                     const String &table_name,
-                     const String &import_from) {
+void BenchmarkImport(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &import_from) {
     LocalFileSystem fs;
     if (!fs.Exists(import_from)) {
         LOG_ERROR(fmt::format("Data file doesn't exist: {}", import_from));
@@ -131,7 +127,7 @@ void BenchmarkImport(SharedPtr<Infinity> infinity,
     profiler.End();
 }
 
-void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &insert_from) {
+void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &insert_from, SizeT insert_batch) {
     std::ifstream input_file(insert_from);
     if (!input_file.is_open()) {
         LOG_ERROR(fmt::format("Failed to open file {}", insert_from));
@@ -142,15 +138,14 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
 
     profiler.Begin();
     SizeT num_rows = 0;
-    const int batch_size = 1;
     Vector<Tuple<char *, char *, char *>> batch;
-    batch.reserve(batch_size);
+    batch.reserve(insert_batch);
 
     Vector<String> orig_columns{"id", "title", "text"};
     bool done = false;
     ConstantExpr *const_expr = nullptr;
     while (!done) {
-        ReadJsonl(input_file, batch_size, batch);
+        ReadJsonl(input_file, insert_batch, batch);
         if (batch.empty()) {
             done = true;
             break;
@@ -159,7 +154,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
         Vector<String> *columns = new Vector<String>(orig_columns);
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         for (auto &t : batch) {
-            values->reserve(batch_size);
+            values->reserve(insert_batch);
             auto value_list = new Vector<ParsedExpr *>(columns->size());
             const_expr = new ConstantExpr(LiteralType::kString);
             const_expr->str_value_ = std::get<0>(t);
@@ -180,10 +175,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     profiler.End();
 }
 
-void BenchmarkCreateIndex(SharedPtr<Infinity> infinity,
-                          const String &db_name,
-                          const String &table_name,
-                          const String &index_name) {
+void BenchmarkCreateIndex(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, const String &index_name) {
     BaseProfiler profiler;
     profiler.Begin();
     auto index_info_list = new Vector<IndexInfo *>();
@@ -214,48 +206,24 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
     profiler.End();
 }
 
-bool Parse(int argc, char* argv[], bool& is_import, bool& is_insert, bool& is_merge) {
-    if (argc < 2) {
-        return true;
+int main(int argc, char *argv[]) {
+    CLI::App app{"fulltext_benchmark"};
+    // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
+    // Using enumerations in an option
+    enum class Mode : u8 { kInsert, kImport, kMerge };
+    Map<String, Mode> mode_map{{"insert", Mode::kInsert}, {"import", Mode::kImport}, {"merge", Mode::kMerge}};
+    Mode mode(Mode::kInsert);
+    SizeT insert_batch = 500;
+    app.add_option("--mode", mode, "Bencmark mode, one of insert, import, merge")
+        ->required()
+        ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
+    app.add_option("--insert-batch", insert_batch, "batch size of each insert, valid only at insert and merge mode, default value 500");
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+        return app.exit(e);
     }
 
-    is_import = false;
-    is_insert = false;
-    is_merge = false;
-
-    int opt;
-    static struct option long_options[] = {
-        {"import", no_argument, 0, 'i'},
-        {"insert", no_argument, 0, 'r'},
-        {"merge", no_argument, 0, 'm'},
-        {0, 0, 0, 0}
-    };
-
-    int option_index = 0;
-
-    while ((opt = getopt_long(argc, argv, "irm", long_options, &option_index)) != -1) {
-        switch (opt) {
-            case 'i':
-                is_import = true;
-                break;
-            case 'r':
-                is_insert = true;
-                break;
-            case 'm':
-                is_insert = true;
-                is_merge = true;
-                break;
-            default:
-                LOG_ERROR(fmt::format("Usage: {} [--import | -i] [--insert | -r] [--merge | -m]", argv[0]));
-                return false;
-        }
-    }
-    return true;
-}
-
-int main(int argc, char* argv[]) {
-    // Usage: ./fulltext_import_benchmark [--import | -i] [--insert | -r] [--merge | -m]
-    // No arguments will run all tests for debugging
     String db_name = "default";
     String table_name = "ft_dbpedia_benchmark";
     String index_name = "ft_dbpedia_index";
@@ -263,26 +231,23 @@ int main(int argc, char* argv[]) {
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
-    bool is_import = true;
-    bool is_insert = true;
-    bool is_merge = true;
 
-    if (!Parse(argc, argv, is_import, is_insert, is_merge)) {
-        return 1;
-    }
-
-    if (is_import) {
-        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
-        BenchmarkImport(infinity, db_name, table_name, srcfile);
-    }
-    if (is_insert) {
-        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
-        BenchmarkInsert(infinity, db_name, table_name, srcfile);
-    }
-    if (is_merge) {
-        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
-        BenchmarkInsert(infinity, db_name, table_name, srcfile);
-        BenchmarkOptimize(infinity, db_name, table_name);
+    switch (mode) {
+        case Mode::kInsert: {
+            BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+            BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
+            break;
+        }
+        case Mode::kImport: {
+            BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+            BenchmarkImport(infinity, db_name, table_name, srcfile);
+            break;
+        }
+        case Mode::kMerge: {
+            BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+            BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
+            BenchmarkOptimize(infinity, db_name, table_name);
+        }
     }
     sleep(10);
     Infinity::LocalUnInit();
