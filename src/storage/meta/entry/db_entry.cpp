@@ -289,8 +289,9 @@ void DBEntry::Cleanup() {
     }
     table_meta_map_.Cleanup();
 
-    LOG_INFO(fmt::format("Cleanup dir: {}", *db_entry_dir_));
+    LOG_TRACE(fmt::format("Cleaning up dir: {}", *db_entry_dir_));
     CleanupScanner::CleanupDir(*db_entry_dir_);
+    LOG_TRACE(fmt::format("Cleaned dir: {}", *db_entry_dir_));
 }
 
 void DBEntry::MemIndexCommit() {

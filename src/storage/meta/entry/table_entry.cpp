@@ -1028,8 +1028,9 @@ void TableEntry::Cleanup() {
     }
     index_meta_map_.Cleanup();
 
-    LOG_INFO(fmt::format("Cleanup dir: {}", *table_entry_dir_));
+    LOG_TRACE(fmt::format("Cleaning up dir: {}", *table_entry_dir_));
     CleanupScanner::CleanupDir(*table_entry_dir_);
+    LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
 }
 
 IndexReader TableEntry::GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts) {

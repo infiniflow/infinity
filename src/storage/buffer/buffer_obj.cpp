@@ -60,8 +60,10 @@ BufferHandle BufferObj::Load() {
             break;
         }
         case BufferStatus::kNew: {
+            LOG_TRACE(fmt::format("Request memory {}", GetBufferSize()));
             buffer_mgr_->RequestSpace(GetBufferSize(), this);
             file_worker_->AllocateInMemory();
+            LOG_TRACE(fmt::format("Allocated memory {}", GetBufferSize()));
             break;
         }
         case BufferStatus::kClean: {
@@ -128,7 +130,7 @@ bool BufferObj::Free() {
         }
         case BufferStatus::kClean: {
             file_worker_->FreeInMemory();
-            buffer_mgr_->RemoveBufferObj(this->GetFilename());
+//            buffer_mgr_->RemoveBufferObj(this->GetFilename());
             break;
         }
         case BufferStatus::kNew: {
@@ -161,17 +163,12 @@ bool BufferObj::Save() {
         }
         type_ = BufferType::kPersistent;
     }
-    if (!write) {
-        rw_locker_.unlock();
+    if(write) {
+        file_worker_->Sync();
+        file_worker_->CloseFile();
     }
-    return write;
-}
-
-void BufferObj::Sync() { file_worker_->Sync(); }
-
-void BufferObj::CloseFile() {
-    file_worker_->CloseFile();
     rw_locker_.unlock();
+    return write;
 }
 
 void BufferObj::SetAndTryCleanup() {
@@ -195,8 +192,11 @@ void BufferObj::SetAndTryCleanup() {
             if (wait_for_gc_) {
                 UnrecoverableError("Assert: freed buffer object shouldn't in gc_queue.");
             }
+            String file_name = this->GetFilename();
+            LOG_TRACE(fmt::format("Remove file and buffer: {}", file_name));
             file_worker_->CleanupFile();
-            buffer_mgr_->RemoveBufferObj(this->GetFilename());
+//            buffer_mgr_->RemoveBufferObj(file_name);
+            LOG_TRACE(fmt::format("Removed file and buffer: {}", file_name));
             break;
         }
         default: {
