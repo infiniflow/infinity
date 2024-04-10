@@ -401,7 +401,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
                                                       std::move(task_operator_state->data_block_array_[idx]),
                                                       queue_sink_state->task_id_,
-                                                      task_operator_state->Complete() && !fragment_context->IsMaterialize());
+                                                      task_operator_state->Complete());
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             // when the Enqueue returns false,
             // it means that the downstream has collected enough data,
