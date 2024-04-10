@@ -163,7 +163,7 @@ Pair<bool, RowID> BlockMaxAndIterator::PeekInBlockRange(RowID doc_id, RowID doc_
     }
 }
 
-bool BlockMaxAndIterator::Seek(RowID doc_id) {
+bool BlockMaxAndIterator::NotPartCheckExist(RowID doc_id) {
     if (doc_id_ > doc_id) {
         return false;
     }
@@ -171,7 +171,7 @@ bool BlockMaxAndIterator::Seek(RowID doc_id) {
         return true;
     }
     for (const auto &it : sorted_iterators_) {
-        if (!it->Seek(doc_id)) {
+        if (!it->NotPartCheckExist(doc_id)) {
             return false;
         }
     }

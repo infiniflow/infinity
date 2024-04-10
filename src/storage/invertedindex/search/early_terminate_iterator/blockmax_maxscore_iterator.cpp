@@ -150,7 +150,7 @@ void BlockMaxMaxscoreIterator::UpdateScoreThreshold(float threshold) {
     }
 }
 
-bool BlockMaxMaxscoreIterator::Seek(RowID doc_id) {
+bool BlockMaxMaxscoreIterator::NotPartCheckExist(RowID doc_id) {
     if (doc_id_ > doc_id) {
         return false;
     }
@@ -158,7 +158,7 @@ bool BlockMaxMaxscoreIterator::Seek(RowID doc_id) {
         return true;
     }
     for (const auto &it : sorted_iterators_) {
-        if (it->Seek(doc_id)) {
+        if (it->NotPartCheckExist(doc_id)) {
             return true;
         }
     }

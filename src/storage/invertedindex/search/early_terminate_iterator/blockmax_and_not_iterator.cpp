@@ -41,7 +41,7 @@ Tuple<bool, float, RowID> BlockMaxAndNotIterator::SeekInBlockRange(RowID doc_id,
         doc_id = id;
         bool all_match = true;
         for (u32 i = 1; i < inner_iterators_.size(); ++i) {
-            if (inner_iterators_[i]->Seek(doc_id)) {
+            if (inner_iterators_[i]->NotPartCheckExist(doc_id)) {
                 all_match = false;
                 break;
             }
@@ -58,18 +58,18 @@ Pair<bool, RowID> BlockMaxAndNotIterator::PeekInBlockRange(RowID doc_id, RowID d
     return inner_iterators_[0]->PeekInBlockRange(doc_id, doc_id_no_beyond);
 }
 
-bool BlockMaxAndNotIterator::Seek(RowID doc_id) {
+bool BlockMaxAndNotIterator::NotPartCheckExist(RowID doc_id) {
     if (doc_id_ > doc_id) {
         return false;
     }
     if (doc_id_ == doc_id) {
         return true;
     }
-    if (!inner_iterators_[0]->Seek(doc_id)) {
+    if (!inner_iterators_[0]->NotPartCheckExist(doc_id)) {
         return false;
     }
     for (u32 i = 1; i < inner_iterators_.size(); ++i) {
-        if (inner_iterators_[i]->Seek(doc_id)) {
+        if (inner_iterators_[i]->NotPartCheckExist(doc_id)) {
             return false;
         }
     }
