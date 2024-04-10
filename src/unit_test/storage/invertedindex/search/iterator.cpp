@@ -42,6 +42,8 @@ public:
         doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_ROWID;
     }
 
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {}
+
     Vector<RowID> doc_ids_;
     u32 idx_ = 0;
 };
