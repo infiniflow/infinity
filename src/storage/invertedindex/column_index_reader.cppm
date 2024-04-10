@@ -24,6 +24,7 @@ import index_defines;
 import memory_indexer;
 import internal_types;
 import segment_index_entry;
+import chunk_index_entry;
 
 export module column_index_reader;
 
@@ -49,8 +50,8 @@ private:
 public:
     // for loading column length files
     String index_dir_;
-    Vector<String> base_names_;
-    Vector<RowID> base_row_ids_;
+    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_;
+    SharedPtr<MemoryIndexer> memory_indexer_{nullptr};
 };
 
 namespace detail {

@@ -142,7 +142,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
 
     profiler.Begin();
     SizeT num_rows = 0;
-    const int batch_size = 100;
+    const int batch_size = 1;
     Vector<Tuple<char *, char *, char *>> batch;
     batch.reserve(batch_size);
 
@@ -173,12 +173,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
             values->push_back(value_list);
         }
         infinity->Insert(db_name, table_name, columns, values);
-
         // NOTE: ~InsertStatement() has deleted or freed columns, values, value_list, const_expr, const_expr->str_value_
-        if (batch.size() < batch_size) {
-            done = true;
-            break;
-        }
     }
     input_file.close();
     LOG_INFO(fmt::format("Insert data {} rows cost: {}", num_rows, profiler.ElapsedToString()));
@@ -277,6 +272,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (is_import) {
+        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
         BenchmarkImport(infinity, db_name, table_name, srcfile);
     }
     if (is_insert) {
@@ -284,6 +280,8 @@ int main(int argc, char* argv[]) {
         BenchmarkInsert(infinity, db_name, table_name, srcfile);
     }
     if (is_merge) {
+        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+        BenchmarkInsert(infinity, db_name, table_name, srcfile);
         BenchmarkOptimize(infinity, db_name, table_name);
     }
     sleep(10);

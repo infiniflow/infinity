@@ -131,6 +131,7 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
+find_package(jemalloc REQUIRED)
 
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)

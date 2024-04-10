@@ -12,15 +12,12 @@ import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
+import vector_with_lock;
 
 namespace infinity {
 export class PostingWriter {
 public:
-    PostingWriter(MemoryPool *byte_slice_pool,
-                  RecyclePool *buffer_pool,
-                  PostingFormatOption posting_option,
-                  std::shared_mutex &column_length_mutex,
-                  Vector<u32> &column_length_array);
+    PostingWriter(MemoryPool *byte_slice_pool, RecyclePool *buffer_pool, PostingFormatOption posting_option, VectorWithLock<u32> &column_lengths);
 
     ~PostingWriter();
 
@@ -48,10 +45,7 @@ public:
 
     InMemPostingDecoder *CreateInMemPostingDecoder(MemoryPool *session_pool) const;
 
-    u32 GetDocColumnLength(docid_t doc_id) {
-        std::shared_lock lock(column_length_mutex_);
-        return column_length_array_[doc_id];
-    }
+    u32 GetDocColumnLength(docid_t doc_id) { return column_lengths_.Get(doc_id); }
 
 private:
     MemoryPool *byte_slice_pool_;
@@ -61,8 +55,7 @@ private:
     DocListEncoder *doc_list_encoder_{nullptr};
     PositionListEncoder *position_list_encoder_{nullptr};
     // for column length info
-    std::shared_mutex &column_length_mutex_;
-    Vector<u32> &column_length_array_;
+    VectorWithLock<u32> &column_lengths_;
 };
 
 export using PostingWriterProvider = std::function<SharedPtr<PostingWriter>(const String &)>;
