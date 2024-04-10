@@ -311,6 +311,8 @@ public:
         return data_store_.AddVec(std::move(iter));
     }
 
+    void Optimize() { data_store_.Optimize(); }
+
     Pair<VertexType, VertexType>
     StoreDataRaw(const DataType *query, SizeT insert_n, LabelType offset = 0, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n, offset), config);

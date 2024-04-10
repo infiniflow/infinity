@@ -140,12 +140,49 @@ public:
         auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
         std::atomic<bool> stop = false;
-        auto write_thread = std::thread([&] {
-            HnswInsertConfig config;
-            config.optimize_ = true;
 
-            auto [start_i, end_i] = hnsw_index.StoreDataRaw(data.get(), element_size / 2, 0 /*offset*/, config);
+        std::atomic<bool> starve = false;
+        std::shared_mutex opt_mtx;
+
+        auto SharedOptLck = [&]() {
+            if (starve.load()) {
+                starve.wait(true);
+            }
+            return std::shared_lock(opt_mtx);
+        };
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+        auto UniqueOptLck = [&]() {
+            bool old = false;
+            bool success = starve.compare_exchange_strong(old, true);
+            assert(success);
+            auto ret = std::unique_lock(opt_mtx);
+            starve.store(false);
+            starve.notify_all();
+            return ret;
+        };
+#pragma clang diagnostic pop
+
+        auto write_thread = std::thread([&] {
+            int start_i = 0, end_i = 0;
             {
+                auto w_lck = UniqueOptLck();
+                HnswInsertConfig config;
+                config.optimize_ = true;
+                std::tie(start_i, end_i) = hnsw_index.StoreDataRaw(data.get(), element_size / 2, 0 /*offset*/, config);
+            }
+            {
+                auto write_thread2 = std::jthread([&] {
+                    int insert_n = element_size - element_size / 2;
+                    for (int i = element_size / 2; i < element_size; ++i) {
+                        hnsw_index.InsertVecsRaw(data.get() + i * dim, 1 /*offset*/, i);
+                        if ((i + 1) % (insert_n / 4) == 0) {
+                            auto w_lck = UniqueOptLck();
+                            hnsw_index.Optimize();
+                        }
+                    }
+                });
+
                 std::atomic<i32> idx = start_i;
                 std::vector<std::jthread> worker_threads;
                 for (int i = 0; i < 4; ++i) {
@@ -155,22 +192,21 @@ public:
                             if (i >= end_i) {
                                 break;
                             }
+                            auto r_lck = SharedOptLck();
                             hnsw_index.Build(i);
                         }
                     });
                 }
             }
-            for (int i = element_size / 2; i < element_size; ++i) {
-                hnsw_index.InsertVecsRaw(data.get() + i * dim, 1 /*offset*/, i);
-            }
             stop.store(true);
         });
         std::vector<std::thread> read_threads;
-        for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
             read_threads.emplace_back([&] {
                 while (stop.load() == false) {
                     for (int i = 0; i < element_size; ++i) {
                         const float *query = data.get() + i * dim;
+                        auto r_lck = SharedOptLck();
                         auto result = hnsw_index.KnnSearchSorted(query, 1);
                         // if (!result.empty()) {
                         //     EXPECT_EQ(result[0].second, (LabelT)i);
@@ -188,23 +224,21 @@ public:
 
 TEST_F(HnswAlgTest, test1) {
     // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
-    {
-        using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
-        TestSimple<Hnsw>();
-    }
-    {
-        using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
-        TestSimple<Hnsw>();
-    }
+    using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+    TestSimple<Hnsw>();
 }
 
 TEST_F(HnswAlgTest, test2) {
-    {
-        using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
-        TestParallel<Hnsw>();
-    }
-    {
-        using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
-        TestParallel<Hnsw>();
-    }
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+    TestSimple<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test3) {
+    using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+    TestParallel<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test4) {
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+    TestParallel<Hnsw>();
 }

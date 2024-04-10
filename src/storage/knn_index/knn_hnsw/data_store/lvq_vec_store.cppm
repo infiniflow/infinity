@@ -54,8 +54,8 @@ public:
         operator const LVQData *() const { return inner_.get(); }
 
         LVQQuery(SizeT compress_data_size) : inner_(new(new char[compress_data_size]) LVQData) {}
-        ~LVQQuery() { delete[] reinterpret_cast<char *>(inner_.release()); }
         LVQQuery(LVQQuery &&other) = default;
+        ~LVQQuery() { delete[] reinterpret_cast<char *>(inner_.release()); }
     };
     using QueryType = LVQQuery;
 
@@ -132,17 +132,6 @@ public:
         dest->local_cache_ = LVQCache::MakeLocalCache(compress, scale, dim_, mean_.get());
     }
 
-    void DecompressByMeanTo(const LVQData *src, const MeanType *mean, DataType *dest) const {
-        const CompressType *compress = src->compress_vec_;
-        DataType scale = src->scale_;
-        DataType bias = src->bias_;
-        for (SizeT i = 0; i < dim_; ++i) {
-            dest[i] = scale * compress[i] + bias + mean[i];
-        }
-    }
-
-    void DecompressTo(const LVQData *src, DataType *dest) const { DecompressByMeanTo(src, mean_.get(), dest); };
-
     template <typename LabelType, DataIteratorConcept<const DataType *, LabelType> Iterator>
     void Optimize(Iterator &&query_iter, const Vector<Pair<Inner *, SizeT>> &inners) {
         auto new_mean = MakeUnique<MeanType[]>(dim_);
@@ -184,8 +173,23 @@ public:
 
     SizeT dim() const { return dim_; }
     SizeT compress_data_size() const { return compress_data_size_; }
-    const MeanType *mean() const { return mean_.get(); }
+
     const GlobalCacheType &global_cache() const { return global_cache_; }
+
+    // for unit test
+    const MeanType *mean() const { return mean_.get(); }
+
+private:
+    void DecompressByMeanTo(const LVQData *src, const MeanType *mean, DataType *dest) const {
+        const CompressType *compress = src->compress_vec_;
+        DataType scale = src->scale_;
+        DataType bias = src->bias_;
+        for (SizeT i = 0; i < dim_; ++i) {
+            dest[i] = scale * compress[i] + bias + mean[i];
+        }
+    }
+
+    void DecompressTo(const LVQData *src, DataType *dest) const { DecompressByMeanTo(src, mean_.get(), dest); };
 
 private:
     SizeT dim_;
