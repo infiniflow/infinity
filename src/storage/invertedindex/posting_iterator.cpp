@@ -48,7 +48,6 @@ bool PostingIterator::Init(SharedPtr<Vector<SegmentPosting>> seg_postings, const
 }
 
 bool PostingIterator::SkipTo(RowID doc_id) {
-    // assert(doc_id >= last_doc_id_in_prev_block_ or last_doc_id_in_prev_block_ == INVALID_ROWID);
     if (doc_id > last_doc_id_in_current_block_ or last_doc_id_in_current_block_ == INVALID_ROWID) {
         finish_decode_docid_ = false;
         return posting_decoder_->SkipTo(doc_id,
@@ -73,7 +72,6 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
         return current_row_id;
     }
     assert(row_id > current_row_id or current_row_id == INVALID_ROWID);
-    assert(row_id >= last_doc_id_in_prev_block_ or last_doc_id_in_prev_block_ == INVALID_ROWID);
     if (!SkipTo(row_id)) {
         current_row_id_ = INVALID_ROWID;
         return INVALID_ROWID;
