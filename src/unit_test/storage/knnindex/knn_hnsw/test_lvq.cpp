@@ -20,7 +20,6 @@ import local_file_system;
 import file_system;
 import file_system_type;
 import dist_func_l2;
-import compilation_config;
 import data_store;
 import vec_store_type;
 import stl;
@@ -29,6 +28,14 @@ using namespace infinity;
 
 class HnswLVQTest : public BaseTest {
 public:
+    void SetUp() override {
+        system(("rm -rf " + file_dir_).c_str());
+        system(("mkdir -p " + file_dir_).c_str());
+    }
+
+    void TearDown() override { system(("rm -rf " + file_dir_).c_str()); }
+
+public:
     using LabelT = int;
     using VecStoreType = LVQL2VecStoreType<float, int8_t>;
     using DataStore = DataStore<VecStoreType, LabelT>;
@@ -36,7 +43,7 @@ public:
 
     static constexpr size_t dim_ = 16;
     static constexpr size_t vec_n_ = 32;
-    const std::string file_dir_ = tmp_data_path();
+    const std::string file_dir_ = "/tmp/infinity";
 
     bool dump_ = false;
 

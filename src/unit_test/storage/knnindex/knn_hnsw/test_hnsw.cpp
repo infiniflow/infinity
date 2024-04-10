@@ -25,7 +25,6 @@ import file_system_type;
 import data_store;
 import dist_func_l2;
 import dist_func_ip;
-import compilation_config;
 import vec_store_type;
 import hnsw_common;
 
@@ -33,11 +32,20 @@ using namespace infinity;
 
 class HnswAlgTest : public BaseTest {
 public:
+    void SetUp() override {
+        system(("rm -rf " + save_dir_).c_str());
+        system(("mkdir -p " + save_dir_).c_str());
+    }
+
+    void TearDown() override { system(("rm -rf " + save_dir_).c_str()); }
+
+public:
     using LabelT = u64;
+
+    const std::string save_dir_ = "/tmp/infinity";
 
     template <typename Hnsw>
     void TestSimple() {
-        String save_dir = tmp_data_path();
 
         int dim = 16;
         int M = 8;
@@ -78,14 +86,14 @@ public:
             EXPECT_GE(correct_rate, 0.95);
 
             u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-            UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
             hnsw_index->Save(*file_handler);
             file_handler->Close();
         }
 
         {
             u8 file_flags = FileFlags::READ_FLAG;
-            UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
 
             auto hnsw_index = Hnsw::Load(*file_handler);
             hnsw_index->SetEf(10);
