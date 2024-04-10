@@ -15,6 +15,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jemalloc.a
 )
 
 # ########################################
@@ -36,6 +37,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jemalloc.a
 )
 
 # query benchmark
@@ -55,6 +57,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jemalloc.a
 )
 
 # ########################################
@@ -76,6 +79,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jemalloc.a
 )
 
 # query benchmark
@@ -95,6 +99,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jemalloc.a
 )
 
 # add_definitions(-march=native)

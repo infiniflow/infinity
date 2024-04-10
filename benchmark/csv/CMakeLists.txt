@@ -7,6 +7,7 @@ add_executable(csv_benchmark
 
 target_link_libraries(csv_benchmark
         zsv_parser
+        jemalloc.a
 )
 
 target_include_directories(csv_benchmark

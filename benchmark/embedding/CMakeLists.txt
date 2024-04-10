@@ -9,6 +9,7 @@ target_link_libraries(
     infinity_core
     sql_parser
     benchmark_profiler
+    jemalloc.a
 )
 
 add_executable(ann_ivfflat_benchmark
@@ -28,6 +29,7 @@ target_link_libraries(
         fastpfor
         atomic.a
         lz4.a
+        jemalloc.a
 )
 
 # add_definitions(-march=native)
