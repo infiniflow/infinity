@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <ostream>
 #include <xmmintrin.h>
 
 export module lvq_vec_store;
@@ -197,6 +198,17 @@ private:
 
     UniquePtr<MeanType[]> mean_;
     GlobalCacheType global_cache_;
+
+public:
+    void Dump(std::ostream &os) const {
+        os << "[CONST] dim: " << dim_ << ", compress_data_size: " << compress_data_size_ << std::endl;
+        os << "mean: ";
+        for (SizeT i = 0; i < dim_; ++i) {
+            os << mean_[i] << " ";
+        }
+        os << std::endl;
+        LVQCache::DumpGlobalCache(os, global_cache_);
+    }
 };
 
 export template <typename DataType, typename CompressType, typename LVQCache>
@@ -240,6 +252,21 @@ private:
 
 private:
     UniquePtr<char[]> ptr_;
+
+public:
+    void Dump(std::ostream &os, SizeT offset, SizeT chunk_size, const Meta &meta) const {
+        for (int i = 0; i < (int)chunk_size; ++i) {
+            os << "vec " << i << "(" << offset + i << "): ";
+            const LVQData *vec = GetVec(i, meta);
+            os << "scale: " << vec->scale_ << ", bias: " << vec->bias_ << std::endl;
+            os << "compress_vec: ";
+            for (SizeT j = 0; j < meta.dim(); ++j) {
+                os << static_cast<int>(vec->compress_vec_[j]) << " ";
+            }
+            os << std::endl;
+            LVQCache::DumpLocalCache(os, vec->local_cache_);
+        }
+    }
 };
 
 } // namespace infinity

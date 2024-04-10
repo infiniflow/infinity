@@ -14,6 +14,8 @@
 
 module;
 
+#include <ostream>
+
 export module abstract_hnsw;
 
 import stl;
@@ -126,6 +128,10 @@ public:
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     Pair<SizeT, SizeT> StoreData(Iterator &&iter, const HnswInsertConfig &config) {
         return std::visit([&iter, &config](auto &&arg) { return arg->StoreData(std::move(iter), config); }, knn_hnsw_ptr_);
+    }
+
+    void Dump(std::ostream &os) const {
+        std::visit([&os](auto &&arg) { arg->Dump(os); }, knn_hnsw_ptr_);
     }
 
     void SetEf(SizeT ef) {

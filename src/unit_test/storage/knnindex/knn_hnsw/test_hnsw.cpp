@@ -75,6 +75,7 @@ public:
             hnsw_index.InsertVecsRaw(data.get(), element_size);
             // std::ofstream os("tmp/dump.txt");
             // hnsw_index.Dump(os);
+            // os.flush();
             hnsw_index.Check();
 
             hnsw_index.SetEf(10);
@@ -105,6 +106,7 @@ public:
 
             // std::ofstream os("tmp/dump2.txt");
             // hnsw_index.Dump(os);
+            // os.flush();
             hnsw_index.Check();
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {

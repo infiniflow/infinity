@@ -14,7 +14,7 @@
 
 module;
 
-#include <fstream>
+#include <ostream>
 #include <random>
 
 export module hnsw_alg;
@@ -396,6 +396,8 @@ public:
 
     void Dump(std::ostream &os) const {
         os << std::endl << "---------------------------------------------" << std::endl;
+        os << "[CONST] M: " << M_ << ", ef_construction: " << ef_construction_ << ", mult: " << mult_ << std::endl;
+        os << "ef: " << ef_ << std::endl;
         data_store_.Dump(os);
         os << "---------------------------------------------" << std::endl;
     }
