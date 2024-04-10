@@ -263,7 +263,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
         }
         case IndexType::kIVFFlat:
         case IndexType::kHnsw:
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary: { // TODO
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("{} PopulateEntirely is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_WARN(*err_msg);
@@ -330,12 +330,15 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                 case kElemFloat: {
                     AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
                     auto InsertHnswInner = [&](auto &iter) {
+                        HnswInsertConfig insert_config;
+                        insert_config.optimize_ = true;
                         if (!prepare) {
                             // Single thread insert
-                            abstract_hnsw.InsertVecs(std::move(iter), segment_entry->row_count()); // estimate insert count
+                            abstract_hnsw.InsertVecs(std::move(iter), insert_config);
                         } else {
                             // Multi thread insert data, write file in the physical create index finish stage.
-                            abstract_hnsw.StoreData(std::move(iter), segment_entry->row_count());
+                            auto [start_i, end_i] = abstract_hnsw.StoreData(std::move(iter), insert_config);
+                            LOG_TRACE(fmt::format("Insert index: {} - {}", start_i, end_i));
                         }
                     };
                     if (check_ts) {

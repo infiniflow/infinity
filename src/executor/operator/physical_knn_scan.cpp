@@ -293,7 +293,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         }
         block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
-        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+            ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
 
         auto data = reinterpret_cast<const DataType *>(column_vector.data());
         merge_heap->Search(query,
@@ -442,20 +442,17 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         if (use_bitmask) {
                             if (segment_entry->CheckAnyDelete(begin_ts)) {
                                 DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
-                                std::tie(result_n1, d_ptr, l_ptr) =
-                                    abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
                             } else {
                                 BitmaskFilter<SegmentOffset> filter(bitmask);
-                                std::tie(result_n1, d_ptr, l_ptr) =
-                                    abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
                             }
                         } else {
                             if (segment_entry->CheckAnyDelete(begin_ts)) {
                                 DeleteFilter filter(segment_entry, begin_ts);
-                                std::tie(result_n1, d_ptr, l_ptr) =
-                                    abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
                             } else {
-                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.template KnnSearch<false>(query, knn_scan_shared_data->topk_);
+                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_);
                             }
                         }
 
