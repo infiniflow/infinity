@@ -26,21 +26,20 @@ import term;
 import string_ref;
 import internal_types;
 import posting_writer;
+import vector_with_lock;
 
 namespace infinity {
 
 export class ColumnInverter {
 public:
-    ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider);
+    ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider, VectorWithLock<u32> &column_lengths);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
     ~ColumnInverter();
 
-    void InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
-
-    void InvertColumn(u32 doc_id, const String &val);
+    SizeT InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
 
     void SortForOfflineDump();
 
@@ -51,8 +50,6 @@ public:
     void Sort();
 
     void GeneratePosting();
-
-    void GetTermListLength(u32 *term_list_length_ptr) const;
 
     u32 GetDocCount() { return doc_count_; }
 
@@ -91,6 +88,8 @@ private:
         bool operator()(const u32 lhs, const u32 rhs) const;
     };
 
+    SizeT InvertColumn(u32 doc_id, const String &val);
+
     const char *GetTermFromRef(u32 term_ref) const { return &terms_[term_ref << 2]; }
 
     const char *GetTermFromNum(u32 term_num) const { return GetTermFromRef(term_refs_[term_num]); }
@@ -120,5 +119,6 @@ private:
     U32Vec term_refs_;
     Vector<Pair<u32, UniquePtr<TermList>>> terms_per_doc_;
     PostingWriterProvider posting_writer_provider_{};
+    VectorWithLock<u32> &column_lengths_;
 };
 } // namespace infinity

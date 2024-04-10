@@ -30,6 +30,7 @@ import infinity_exception;
 import query_node;
 import base_table_ref;
 import segment_entry;
+import blockmax_term_doc_iterator;
 
 namespace infinity {
 
@@ -40,7 +41,7 @@ QueryBuilder::QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPt
     for (SegmentEntry *segment_entry : base_table_ref->block_index_->segments_) {
         total_row_count += segment_entry->row_count();
     }
-    scorer_.Init(total_row_count);
+    scorer_.Init(total_row_count, &index_reader_);
 }
 
 QueryBuilder::~QueryBuilder() {}
@@ -49,7 +50,16 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
     // Optimize the query tree.
     context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
     // Create the iterator from the query tree.
-    return context.query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+    UniquePtr<DocIterator> result = context.query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+    return result;
+}
+
+UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullTextQueryContext &context) {
+    // Optimize the query tree.
+    context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    // Create the iterator from the query tree.
+    UniquePtr<EarlyTerminateIterator> result = context.query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_);
+    return result;
 }
 
 } // namespace infinity

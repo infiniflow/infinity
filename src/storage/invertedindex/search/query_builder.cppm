@@ -32,6 +32,8 @@ export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_;
 };
 
+class EarlyTerminateIterator;
+
 export class QueryBuilder {
 public:
     QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<BaseTableRef> &base_table_ref);
@@ -42,7 +44,7 @@ public:
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
-    void LoadScorerColumnLength(RowID first_doc_id) { scorer_.LoadColumnLength(first_doc_id, index_reader_); }
+    UniquePtr<EarlyTerminateIterator> CreateEarlyTerminateSearch(FullTextQueryContext &context);
 
     inline float Score(RowID doc_id) { return scorer_.Score(doc_id); }
 

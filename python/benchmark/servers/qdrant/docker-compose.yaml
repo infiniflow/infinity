@@ -1,0 +1,19 @@
+version: '3.7'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.8.2
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '${CPUS_LIMIT:-8}'
+          memory: '${MEMORY_LIMIT:-25Gb}'

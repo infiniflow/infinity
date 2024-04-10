@@ -15,6 +15,7 @@ import column_index_iterator;
 import segment_term_posting;
 import local_file_system;
 import internal_types;
+import vector_with_lock;
 
 namespace infinity {
 export class ColumnIndexMerger {
@@ -37,7 +38,6 @@ private:
     LocalFileSystem fs_;
 
     // for column length info
-    std::shared_mutex column_length_mutex_;
-    Vector<u32> column_length_array_;
+    VectorWithLock<u32> column_lengths_;
 };
 } // namespace infinity

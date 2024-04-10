@@ -32,7 +32,7 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 - Achieves 0.1 milliseconds query latency on million-scale vector datasets.
 - Up to 15K QPS on million-scale vector datasets.
 
-> See the [Benchmark report](./docs/benchmark.md) for more information.
+> See the [Benchmark report](./docs/references/benchmark.md) for more information.
 
 
 ### 🔮 Fused search
@@ -45,7 +45,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### 🎁 Ease-of-use
 
-- Intuitive Python API. See the [Python API](docs/pysdk_api_reference.md)
+- Intuitive Python API. See the [Python API](docs/references/pysdk_api_reference.md)
 - A single-binary architecture with no dependencies, making deployment a breeze.
 
 ## 🎮 Get Started
@@ -136,7 +136,7 @@ res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_
 print(res)
 ```
 
-> 💡 For more information about the Python API, see the [Python API Reference](docs/pysdk_api_reference.md).
+> 💡 For more information about the Python API, see the [Python API Reference](docs/references/pysdk_api_reference.md).
 
 
 ## 📜 Roadmap
