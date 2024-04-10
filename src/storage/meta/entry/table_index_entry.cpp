@@ -314,7 +314,7 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
         }
         case IndexType::kHnsw: {
             auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
-            file_worker = MakeUnique<HnswFileWorker>(this->index_dir(), file_name, index_base, column_def, create_hnsw_param->max_element_);
+            file_worker = MakeUnique<HnswFileWorker>(this->index_dir(), file_name, create_hnsw_param);
             break;
         }
         case IndexType::kFullText: {
@@ -354,33 +354,6 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
         UnrecoverableError(*err_msg);
     }
     return vector_file_worker;
-}
-
-UniquePtr<CreateIndexParam>
-TableIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def) {
-    switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);
-        }
-        case IndexType::kHnsw: {
-            SizeT max_element = seg_row_count;
-            return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
-        }
-        case IndexType::kFullText: {
-            return MakeUnique<CreateIndexParam>(index_base, column_def);
-        }
-        case IndexType::kSecondary: {
-            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
-        }
-        default: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
-        }
-    }
-    return nullptr;
 }
 
 void TableIndexEntry::Cleanup() {

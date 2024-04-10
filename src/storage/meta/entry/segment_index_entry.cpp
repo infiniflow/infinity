@@ -481,8 +481,9 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
             return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);
         }
         case IndexType::kHnsw: {
-            SizeT max_element = seg_row_count;
-            return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
+            SizeT chunk_size = 8192; // TODO
+            SizeT max_chunk_num = 1024;
+            return MakeUnique<CreateHnswParam>(index_base, column_def, chunk_size, max_chunk_num);
         }
         case IndexType::kFullText: {
             return MakeUnique<CreateIndexParam>(index_base, column_def);

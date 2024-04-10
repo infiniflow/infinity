@@ -116,8 +116,6 @@ public:
 
     static String IndexFileName(u32 segment_id) { return fmt::format("seg{}.idx", segment_id); }
 
-    static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
-
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
     ThreadPool &GetFulltextThreadPool() { return thread_pool_; }
