@@ -8,6 +8,7 @@ target_link_libraries(
     fst
     infinity_core
     benchmark_profiler
+    jemalloc.a
 )
 
 # add_definitions(-march=native)
