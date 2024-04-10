@@ -407,7 +407,7 @@ class TestImport:
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_import_with_different_size.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("data_size", [1, 8191, 8192, 8193])
+    @pytest.mark.parametrize("data_size", [1, 8191, 8192, 8193, 16*8192])
     def test_import_with_different_size(self, get_infinity_db, check_data, data_size):
         generate_big_rows_csv(data_size, "pysdk_test_import_with_different_size.csv")
         copy_data("pysdk_test_import_with_different_size.csv")
@@ -440,8 +440,8 @@ class TestImport:
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
-        print(res)
+        res = table_obj.output(["count(*)"]).to_pl()
+        assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192
         db_obj.drop_table("test_import_exceeding_rows", ConflictType.Error)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_columns.csv",

@@ -47,12 +47,10 @@ export struct FragmentError : public FragmentDataBase {
 export struct FragmentData : public FragmentDataBase {
     UniquePtr<DataBlock> data_block_{};
     i64 task_id_{-1};
-    Optional<SizeT> data_idx_{};
-    SizeT data_count_{std::numeric_limits<u64>::max()};
+    bool is_last_{false};
 
-    FragmentData(u64 fragment_id, UniquePtr<DataBlock> data_block, i64 task_id, SizeT data_idx, SizeT data_count)
-        : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(std::move(data_block)), task_id_(task_id), data_idx_(data_idx),
-          data_count_(data_count) {}
+    FragmentData(u64 fragment_id, UniquePtr<DataBlock> data_block, i64 task_id, bool is_last)
+        : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(std::move(data_block)), task_id_(task_id), is_last_(is_last) {}
 };
 
 export struct FragmentNone : public FragmentDataBase {
