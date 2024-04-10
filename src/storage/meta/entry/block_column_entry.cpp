@@ -142,24 +142,23 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
         case kEmbedding:
         case kRowID: {
             //            SizeT buffer_size = row_count * column_type->Size();
-            if (block_column_entry->buffer_->Save()) {
-                block_column_entry->buffer_->Sync();
-                block_column_entry->buffer_->CloseFile();
-            }
+            i64 address = (i64)(block_column_entry->buffer_);
+            LOG_TRACE(fmt::format("Saving {} {}", block_column_entry->column_id(), address));
+            block_column_entry->buffer_->Save();
+            LOG_TRACE(fmt::format("Saved {}", block_column_entry->column_id()));
 
             break;
         }
         case kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
-            if (block_column_entry->buffer_->Save()) {
-                block_column_entry->buffer_->Sync();
-                block_column_entry->buffer_->CloseFile();
-            }
+            LOG_TRACE(fmt::format("Saving varchar {}", block_column_entry->column_id()));
+            block_column_entry->buffer_->Save();
+            LOG_TRACE(fmt::format("Saved varchar {}", block_column_entry->column_id()));
+
             std::shared_lock lock(block_column_entry->mutex_);
             for (auto *outline_buffer : block_column_entry->outline_buffers_) {
-                if (outline_buffer && outline_buffer->Save()) {
-                    outline_buffer->Sync();
-                    outline_buffer->CloseFile();
+                if(outline_buffer != nullptr) {
+                    outline_buffer->Save();
                 }
             }
             break;

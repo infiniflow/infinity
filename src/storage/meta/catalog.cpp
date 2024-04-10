@@ -904,12 +904,14 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
                 auto *block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
                 LOG_TRACE(fmt::format("Flush block entry: {}", block_entry_op->ToString()));
                 block_entry_op->FlushDataToDisk(max_commit_ts);
+                LOG_TRACE(fmt::format("Flush block entry done"));
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
                 auto add_segment_index_entry_op = static_cast<AddSegmentIndexEntryOp *>(op.get());
                 LOG_TRACE(fmt::format("Flush segment index entry: {}", add_segment_index_entry_op->ToString()));
                 add_segment_index_entry_op->Flush(max_commit_ts);
+                LOG_TRACE(fmt::format("Flush segment index entry done"));
                 break;
             }
             default:

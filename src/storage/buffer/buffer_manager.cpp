@@ -53,7 +53,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
 
 BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
-
+    LOG_TRACE(fmt::format("Get buffer object: {}", file_path));
     rw_locker_.lock_shared();
     auto iter1 = buffer_map_.find(file_path);
     rw_locker_.unlock_shared();
@@ -75,10 +75,10 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
 
 // return false if buffer_obj is not loaded
 void BufferManager::RemoveBufferObj(const String &file_path) {
+    LOG_TRACE(fmt::format("Erasing buffer object: {}", file_path));
     std::unique_lock w_lock(rw_locker_);
-    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-        buffer_map_.erase(iter);
-    }
+    buffer_map_.erase(file_path);
+    LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
 }
 
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
@@ -99,9 +99,11 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
                 UnrecoverableError("buffer object duplicated in gc_queue.");
             }
             auto size = buffer_obj1->GetBufferSize();
+            LOG_TRACE(fmt::format("Free buffer object: {}", buffer_obj1->GetFilename()));
             if (buffer_obj1->Free()) {
                 current_memory_size_ -= size;
             }
+            LOG_TRACE("Freed buffer object");
         } else {
             UnrecoverableError("Out of memory.");
         }
