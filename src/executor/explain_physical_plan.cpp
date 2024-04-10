@@ -68,6 +68,7 @@ import physical_merge_sort;
 import physical_merge_knn;
 import physical_match;
 import physical_fusion;
+import physical_merge_aggregate;
 import status;
 import physical_operator_type;
 
@@ -276,6 +277,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kFusion: {
             Explain((PhysicalFusion *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMergeAggregate: {
+            Explain((PhysicalMergeAggregate *)op, result, intent_size);
             break;
         }
         default: {
@@ -1990,5 +1995,30 @@ void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node, SharedPtr<V
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 }
+
+void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> Merge aggregate ";
+    } else {
+        explain_header_str = "Merge aggregate ";
+    }
+    explain_header_str += "(" + std::to_string(merge_aggregate_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = merge_aggregate_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        UnrecoverableError("No column in merge aggregate node.");
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += merge_aggregate_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += merge_aggregate_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+}
+
 
 } // namespace infinity
