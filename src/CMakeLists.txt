@@ -252,8 +252,12 @@ target_link_libraries(infinity
         atomic.a
         event.a
         oatpp.a
-        jemalloc.a
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(infinity jemalloc.a)
+endif()
+
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 

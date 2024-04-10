@@ -131,7 +131,12 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
-find_package(jemalloc REQUIRED)
+
+# You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
+option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
+if(ENABLE_JEMALLOC)
+    find_package(jemalloc REQUIRED)
+endif()
 
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
