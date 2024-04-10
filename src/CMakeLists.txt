@@ -252,7 +252,7 @@ target_link_libraries(infinity
         atomic.a
         event.a
         oatpp.a
-#        profiler
+        jemalloc.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -369,7 +369,6 @@ target_link_libraries(unit_test
         fastpfor
         lz4.a
         atomic.a
-#        profiler
         thrift.a
 )
 
@@ -429,5 +428,4 @@ target_link_libraries(test_hnsw_bitmask
     lz4.a
     atomic.a
     event.a
-    #        profiler
 )

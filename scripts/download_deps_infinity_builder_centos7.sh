@@ -34,7 +34,8 @@ https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.ta
 https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
 https://github.com/axboe/liburing/archive/refs/tags/liburing-2.5.tar.gz
 https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
-https://github.com/lz4/lz4/releases/download/v1.9.4/lz4-1.9.4.tar.gz"
+https://github.com/lz4/lz4/releases/download/v1.9.4/lz4-1.9.4.tar.gz
+https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2"
 
 SAVEIFS=$IFS   # Save current IFS (Internal Field Separator)
 IFS=$'\n'      # Change IFS to newline char
