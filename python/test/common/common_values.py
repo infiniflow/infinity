@@ -60,6 +60,25 @@ invalid_name_array = [
     #None,
 ]
 
+types = [
+            "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+             "double", "varchar", "boolean"
+        ]
+
+
+create_valid_option = [
+    "kError","kIgnore","kReplace"
+]
+create_invalid_option = [
+    1.1,"#@$@!%string",[],{},()
+]
+drop_valid_option = [
+     "kError","kIgnore"
+]
+drop_invalid_option = [
+    "kReplace",1.1,"#@$@!%string",[],{},()
+]
+
 invalid_vector_array = []
 invalid_int_array = []
 invalid_float_array = []

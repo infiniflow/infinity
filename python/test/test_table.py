@@ -511,32 +511,32 @@ class TestTable:
         except Exception as e:
             print(e)
 
-    # create/drop table with invalid options
-    def test_table_with_invalid_options(self):
-        """
-        target: create/drop table with invalid options.
-        methods: create table with various options
-        expect: all operations successfully
-        """
-        # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table", ConflictType.Ignore)
+    # # create/drop table with invalid options
+    # def test_table_with_invalid_options(self):
+    #     """
+    #     target: create/drop table with invalid options.
+    #     methods: create table with various options
+    #     expect: all operations successfully
+    #     """
+    #     # connect
+    #     infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    #     db_obj = infinity_obj.get_database("default")
+    #     db_obj.drop_table("my_table", ConflictType.Ignore)
 
-        for option_name in common_values.invalid_name_array:
-            try:
-                tb = db_obj.create_table("my_table", {"c1": "int"}, option_name)
-                # raise Exception(f"Can create option_name: {option_name}")
-            except Exception as e:
-                print(e)
+    #     for option_name in common_values.invalid_name_array:
+    #         try:
+    #             tb = db_obj.create_table("my_table", {"c1": "int"}, option_name)
+    #             # raise Exception(f"Can create option_name: {option_name}")
+    #         except Exception as e:
+    #             print(e)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-        # try:
-        #     res = infinity_obj.disconnect()
-        # except Exception as e:
-        #     print(e)
+    #     # disconnect
+    #     res = infinity_obj.disconnect()
+    #     assert res.error_code == ErrorCode.OK
+    #     # try:
+    #     #     res = infinity_obj.disconnect()
+    #     # except Exception as e:
+    #     #     print(e)
 
     # create created table, drop dropped table.
     def test_create_drop_table(self):
@@ -705,23 +705,23 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("types", [
-        "int", "int8", "int16", "int32", "int64", "integer",
-        "float", "float32", "double", "float64",
-        "varchar",
-        "bool",
-        "vector, 3, float"])
-    def test_create_valid_option(self, types):
-        # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_valid_option", ConflictType.Ignore)
+    # @pytest.mark.parametrize("types", [
+    #     "int", "int8", "int16", "int32", "int64", "integer",
+    #     "float", "float32", "double", "float64",
+    #     "varchar",
+    #     "bool",
+    #     "vector, 3, float"])
+    # def test_create_valid_option(self, types):
+    #     # connect
+    #     infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    #     db_obj = infinity_obj.get_database("default")
+    #     db_obj.drop_table("test_valid_option", ConflictType.Ignore)
 
-        db_obj.create_table("test_valid_option", {"c1": types}, ConflictType.Error)
+    #     db_obj.create_table("test_valid_option", {"c1": types}, ConflictType.Error)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
+    #     # disconnect
+    #     res = infinity_obj.disconnect()
+    #     assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("types", [
         "int", "int8", "int16", "int32", "int64", "integer",

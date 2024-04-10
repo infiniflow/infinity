@@ -5,28 +5,165 @@ from httpapibase import HttpTest
 from common.common_values import * 
 
 class TestIndex(HttpTest):
-    def test_create_index_IVFFlat(self, get_infinity_db):
+    def test_create_index_IVFFlat(self):
+        dbname = "default"
+        tbname = "test_create_index_HMSW"
+        idxname = "my_index"
+        self.dropTable(dbname,tbname)
+        self.createTable(
+            dbname,
+            tbname,
+            {
+                "c1":{
+                    "type":["vector","1024","float"],
+                }
+            }
+        )
+        self.createIdx(dbname,tbname,idxname,
+        [
+            "c1",
+        ],
+        {
+            "type": "IVFFlat",
+            "centroids_count": "128",
+            "metric":"l2",
+            
+        })
+
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
         return
-    def test_create_index_HNSW(self, get_infinity_db):
+       
+    
+    def test_create_index_HNSW(self):
+        dbname = "default"
+        tbname = "test_create_index_HMSW"
+        idxname = "my_index"
+        self.dropTable(dbname,tbname)
+        self.createTable(
+            dbname,
+            tbname,
+            {
+                "c1":{
+                    "type":["vector,1024,integer"]
+                }
+            }
+        )
+        self.createIdx(dbname,tbname,idxname,
+        [
+            "c1",
+        ],
+        {
+            "type": "HNSW",
+            "M": "16",
+            "ef_construction": "50",
+            "ef": "50",
+            "metric": "l2"
+        })
+
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
         return
-    def test_create_index_fulltext(self, get_infinity_db):
+    #PASS
+    def test_create_index_fulltext(self):
+        dbname = "default"
+        tbname = "test_create_index_fulltext"
+        idxname = "my_index"
+        self.dropTable(dbname,tbname)
+        self.createTable(
+            dbname,
+            tbname,
+            {
+                "doctitle":{
+                    "type":"varchar",
+                },
+                "docdate":{
+                    "type":"varchar",
+                },
+                "body":{
+                    "type":"varchar",
+                }
+            }
+        )
+        self.createIdx(dbname,tbname,idxname,
+        [
+            "body",
+        ],
+        {
+            "type": "FULLTEXT",
+        })
+
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
         return
-    def test_drop_non_existent_index(self, get_infinity_db):
+    #PASS
+    def test_drop_non_existent_index(self):
+        dbname = "default"
+        tbname = "test_drop_non_existent_index"
+        idxname = "my_index"
+        self.dropTable(dbname,tbname)
+        self.createTable(
+            dbname,
+            tbname,
+            {
+                "doctitle":{
+                    "type":"varchar",
+                }
+            }
+        )
+        self.dropIdx(dbname,tbname,idxname,{
+            "status_code": 500,
+            "error_code":3023,
+        })
         return
-    def test_create_created_index(self, get_infinity_db):
+    
+    def test_create_created_index(self):
+        dbname = "default"
+        tbname = "test_create_index_fulltext"
+        idxname = "my_index"
+        self.dropTable(dbname,tbname)
+        self.createTable(
+            dbname,
+            tbname,
+            {"doctitle":{"type":"varchar",},"docdate":{"type":"varchar",},"body":{"type":"varchar",}}
+        )
+        self.createIdx(dbname,tbname,idxname,["body",],{"type": "FULLTEXT",})
+        self.createIdx(dbname,tbname,idxname,["body",],{"type": "FULLTEXT",})
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
         return
-    def test_create_drop_vector_index_invalid_options(self, get_infinity_db, column_name, index_type, params, types):
+     # create / drop index with invalid options
+    @pytest.mark.parametrize("column_name",
+                             [(1, False), (2.2, False), ((1, 2), False), ([1, 2, 3], False), ("c1", True)])
+    @pytest.mark.parametrize("index_type", [
+        (1, False),
+        (2.2, False),
+        ([1, 2], False),
+        ("$#%dfva", False),
+        ((1, 2), False),
+        ({"1": 2}, False),
+        (index.IndexType.Hnsw, False),
+        (index.IndexType.IVFFlat, True)
+    ])
+    @pytest.mark.parametrize("params", [
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
+                                                                                1, 2), False), ({"1": 2}, False),
+        ([index.InitParameter("centroids_count", "128"),
+          index.InitParameter("metric", "l2")], True)
+    ])
+    @pytest.mark.parametrize("types", ["vector, 3, float"])
+    def test_create_drop_vector_index_invalid_options(self):
+        
         return
-    def test_create_drop_different_fulltext_index_invalid_options(self, get_infinity_db, column_name, index_type,
-                                                                  params, types):
+    def test_create_drop_different_fulltext_index_invalid_options(self):
         return
-    def test_create_index_on_dropped_table(self, get_infinity_db):
+    def test_create_index_on_dropped_table(self):
         return
-    def test_create_index_show_index(self, get_infinity_db):
+    def test_create_index_show_index(self):
         return
-    def test_drop_index_show_index(self, get_infinity_db):
+    def test_drop_index_show_index(self):
         return
-    def test_create_index_on_different_type_of_column(self, get_infinity_db, types, index_type):
+    def test_create_index_on_different_type_of_column(self):
         return
     def test_insert_data_create_index(self, get_infinity_db, index_type):
         return 
@@ -56,37 +193,3 @@ class TestIndex(HttpTest):
         return
     def test_same_column_with_different_parameters(self, get_infinity_db, index_distance_type):
         return
-    
-    def createIdx(self,dbname,tbname,idxname,fields,index,expect):
-        url = f"databases/{dbname}/tables/{tbname}/indexes/{idxname}"
-        create_option = {
-            "ignore_if_exists":True,
-        }
-        h = super().SetUpHeader(['accept'],)
-        d = super().SetUpData([],{fields,index,create_option})
-        r = super().Request(url,"post",h)
-        super().TearDown(r,expect)
-        return 
-    
-    def dropIdx(self,dbname,tbname,idxname,expect={
-        "error_code":0,
-    }):
-        url = f"databases/{dbname}/tables/{tbname}/indexes/{idxname}"
-        h = super().SetUpHeader(['accept'])
-        r = super().Request(url,"delete",h)
-        super().TearDown(r,expect)
-        return 
-    def showIdx(self,dbname,tbname,idxname,expect):
-        url = f"databases/{dbname}/tables/{tbname}/indexes/{idxname}"
-        h = super().SetUpHeader(['accept'])
-        r = super().Request(url,"get",h)
-        super().TearDown(r,expect)
-        return 
-    def listIdx(self,dbname,tbname,idxname,expect):
-        url = f"databases/{dbname}/tables/{tbname}/indexes"
-        h = super().SetUpHeader(['accept'])
-        r = super().Request(url,"get",h)
-        super().TearDown(r,expect)
-        return 
-
-        

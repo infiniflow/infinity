@@ -13,6 +13,8 @@ sys.path.append("/home/yyk/work/infinity/python/test_http_api")
 from test_http_api.httpapibase import HttpTest
 from test_http_api.test_database import TestDataBase
 from test_http_api.test_table import TestTable
+from test_http_api.test_index import TestIndex
+from test_http_api.test_insert import TestInsert
 #from test.localapibase import SdkTest
 
 class SdkTest:
@@ -30,22 +32,30 @@ def test_database(test_object):
     for method in test_methods:
          getattr(t, method)()
 
-# def test_table(test_object):
-#     t: test_object = TestTable()
-#     # 获取测试类对象的所有属性和方法
-#     methods = dir(t)
-#     # 筛选出所有以 test_ 开头的方法名
-#     test_methods = [method for method in methods if method.startswith('test_')]
-#     # 逐个调用测试方法
-#     for method in test_methods:
-#         getattr(t, method)()
-#     return 
-
-def debugTest(test_object):
+def test_table(test_object):
     t: test_object = TestTable()
-    t.test_table()
+    methods = dir(t)
+    test_methods = [method for method in methods if method.startswith('test_')]
+    for method in test_methods:
+        getattr(t, method)()
+    return
 
+def test_index(test_object):
+    t: test_object = TestIndex()
+    methods = dir(t)
+    test_methods = [method for method in methods if method.startswith('test_')]
+    for method in test_methods:
+        getattr(t, method)()
+    return
 
+def test_insert(test_object):
+    return 
+
+def SingleTest(test_object):
+    t: test_object = TestIndex()
+    t.test_create_index_HNSW()
+
+#test_table(HttpTest())
 #test_database(HttpTest())
-debugTest(HttpTest())
+SingleTest(HttpTest())
 

@@ -23,7 +23,7 @@ from test_http_api.httpapibase import HttpTest
 
 
 def run_all():
-    apibase.test_database(HttpTest)
+    apibase.test_table(HttpTest)
 
 if __name__ == '__main__':
     run_all()

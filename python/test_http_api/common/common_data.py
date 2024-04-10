@@ -7,16 +7,33 @@ baseHeader = {
     'content-type': 'application/json',
 }
 
-baseResponse = {
-    "error_code": 0,
-}
-
 baseData = {
     "create_option": "ignore_if_exists",
     "drop_option": "ignore_if_not_exists",
     "fields": {},
     "properties": {}
 }
+
+types = [
+            "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+             "double", "varchar", "boolean"
+        ]
+
+baseResponse = {
+    "error_code": 0,
+}
+
+baseCreateOptions = {
+    "kError": '',
+    "kIgnore": "ignore_if_exists",
+    "kReplace": "replace_if_exists"
+}
+
+baseDropOptions = {
+    "kError": "",
+    "kIgnore": "ignore_if_not_exists",
+}
+
 
 tableDefaultData = {
     "fields": 

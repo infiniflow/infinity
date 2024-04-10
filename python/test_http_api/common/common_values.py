@@ -24,18 +24,7 @@ types_array = [
 ]
 
 types_example_array = [
-    # int
     1, 127, 32767, 2147483647, pow(2, 63) - 1, 10,
-    # pow(2, 127) - 1,
-    # float
-    # float(1.1), np.float32(1/3), np.double(1/3), np.float64(1/3),
-    # string
-    # "^789$ test insert varchar",
-    # bool
-    # True,
-    # vector
-    # np.array([1.1, 2.2, 3.3]),
-    # [1, 2, 3]
 ]
 
 # db_name, table_name, index_name, column_name
@@ -51,9 +40,26 @@ invalid_name_array = [
     'name-12',
     '12name',
     '数据库名',
-    # ''.join('x' for i in range(11)),
-    None,
 ]
+
+types = [
+            "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+             "double", "varchar", "boolean"
+        ]
+
+create_valid_option = {
+    "kError","kIgnore","kReplace"
+}
+create_invalid_option = {
+    1.1,"#@$@!%string",[],{},()
+}
+drop_valid_option = {
+     "kError","kIgnore"
+}
+drop_invalid_option = {
+    "kReplace",1.1,"#@$@!%string",[],{},()
+}
+
 
 invalid_vector_array = []
 invalid_int_array = []

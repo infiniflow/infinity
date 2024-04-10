@@ -52,12 +52,12 @@ class HttpTest:
     #Post operation
     def TearDown(self,resp,expect={}): 
         print("status_code:"+str(resp.status_code))
-        
         status_code = expect.get("status_code", None)
         if status_code is not None:
             assert resp.status_code == expect['status_code']
         else:
-           assert resp.status_code ==  expected_status_code  
+           assert resp.status_code ==  expected_status_code
+          
         resp_json = resp.json()
         for item in expect.items():
             if resp_json.get(item[0],None) is None:
@@ -163,21 +163,21 @@ class HttpTest:
     
     def createTable(self,dbname,tbname,fields=[],properties=[],expect={
         "error_code": 0
-    }):
+    },opt="kIgnore"):
         url = f"databases/{dbname}/tables/{tbname}"
         h = self.SetUpHeader(['accept','content-type'])
-        d = self.SetUpData(['create_option'],{'fields': fields, 'properties': properties})
+        d = self.SetUpData(['create_option'],{'fields': fields, 'properties': properties,'create_option':baseCreateOptions[opt]})
         r = self.Request(url,"post",h,d)
         print(r)
         self.TearDown(r,expect)
         return 
     
     def dropTable(self,dbname,tbname,expect={
-        "error_code": 0
-    }):
+        "error_code": 0,
+    },opt = "kIgnore"):
         url = f"databases/{dbname}/tables/{tbname}"
         h = self.SetUpHeader(['accept','content-type'])
-        d = self.SetUpData(['drop_option'])
+        d = self.SetUpData(['drop_option'],{'drop_option':baseDropOptions[opt]})
         r = self.Request(url,"delete",h,d)
         self.TearDown(r,expect)
         return 
@@ -189,21 +189,23 @@ class HttpTest:
         self.TearDown(r,expect)
         return 
     
-    def ListTables (self,dbname,expect):
+    def ListTables (self,dbname,expect={
+        "error_code": 0,
+    }):
         url = f"databases/{dbname}/tables"
         h = self.SetUpHeader(['accept'])
         r = self.Request(url,"get",h)
         self.TearDown(r,expect)
         return 
     
-    def GetAllTables (self,dbname,tbname):
+    def GetAllTables (self,dbname):
         url = f"databases/{dbname}/tables"
         h = self.SetUpHeader(['accept'])
         r = self.Request(url,"get",h)
         #return all db names
         ret = []
         tblist = (r.json())["tables"]
-        for item in tblist.items():
+        for item in tblist:
             ret.append(item)
         return ret 
 
@@ -213,6 +215,126 @@ class HttpTest:
         r = self.Request(url,"get",h)
         self.TearDown(r,expect)
         return
+    
+    # part index 
+    def createIdx(self,dbname,tbname,idxname,fields=[],index={},expect={
+        "error_code":0,
+    },opt = "kIgnore"):
+        url = f"databases/{dbname}/tables/{tbname}/indexes/{idxname}"
+        ignore = False 
+        if opt == "kIgnore":
+            ignore = True 
+        h = self.SetUpHeader(['accept','content-type'],)
+        d = self.SetUpData([],{"fields":fields,"index":index,"create_option":{"ignore_if_exists":ignore}})
+        r = self.Request(url,"post",h,d)
+        self.TearDown(r,expect)
+        return 
+    
+    def dropIdx(self,dbname,tbname,idxname,expect={
+        "error_code":0,
+    },opt = "kIgnore"):
+        url = f"databases/{dbname}/tables/{tbname}/indexes/{idxname}"
+        h = self.SetUpHeader(['accept'])
+        #d = self.SetUpData([],{"drop_option":baseDropOptions[opt]})
+        r = self.Request(url,"delete",h)
+        self.TearDown(r,expect)
+        return 
+    
+    def showIdx(self,dbname,tbname,idxname,expect):
+        url = f"databases/{dbname}/tables/{tbname}/indexes/{idxname}"
+        h = self.SetUpHeader(['accept'])
+        r = self.Request(url,"get",h)
+        self.TearDown(r,expect)
+        return 
+    
+    def listIdx(self,dbname,tbname,expect):
+        url = f"databases/{dbname}/tables/{tbname}/indexes"
+        h = self.SetUpHeader(['accept'])
+        r = self.Request(url,"get",h)
+        self.TearDown(r,expect)
+        return 
+    
+    #insert data to tables
+    def insert(self,dbname,tbname,filter=[],expect={
+        "error_code":0
+    }):
+        url = f"databases/{dbname}/tables/{tbname}/docs"
+        h = self.SetUpHeader(['accept',"content-type"])
+        r = self.Request(url,"post",h,filter)
+        self.TearDown(r,expect)
+        return 
+    # delete data from table
+    def delete(self,dbname,tbname,filter={},expect={
+        "error_code":0,
+        #"delete_row_count": 10,
+    }):
+        url = f"databases/{dbname}/tables/{tbname}/docs"
+        h = self.SetUpHeader(['accept',"content-type"])
+        r = self.Request(url,"delete",h,filter)
+        self.TearDown(r,expect)
+        return 
+    
+    def update(self,dbname,tbname,update={},filter={},expect={
+        "error_code":0,
+        #"update_row_count":10
+    }):
+        url = f"databases/{dbname}/tables/{tbname}/docs"
+        h = self.SetUpHeader(['accept',"content-type"])
+        d = self.SetUpData([],{"update":update,"filter":filter})
+        r = self.Request(url,"put",h,d)
+        self.TearDown(r,expect)
+        return 
+    
+    def search(self,dbname,tbname,output={},filter={},fusion={},expect={
+        "error_code":0,
+        #output
+    }):
+        url = f"databases/{dbname}/tables/{tbname}/docs"
+        h = self.SetUpHeader(['accept',"content-type"])
+        d = self.SetUpData([],{"output":output,"filter":filter,"fusion":fusion})
+        r = self.Request(url,"get",h,d)
+        self.TearDown(r,expect)
+        return 
+    
+    def getVariables(self,vanme,expect={
+        "error_code":0
+    }):
+        url = f"variables/{vanme}"
+        h = self.SetUpHeader(['accept'])
+        r = self.Request(url,"get",h)
+        self.TearDown(r,expect)
+        return 
+    
+    def showSegmentList(self,dbname,tbname,expect):
+        url = f"databases/{dbname}/tables/{tbname}/segments/"
+        h = self.SetUpHeader(['accept'])
+        r = self.Request(url,"get",h)
+        self.TearDown(r,expect)
+        return 
+    
+    def showSpecificSegmentDetail(self,dbname,tbname,segid,expect):
+        url = f"databases/{dbname}/tables/{tbname}/segments/{segid}"
+        h = self.SetUpHeader(['accept'])
+        r = self.Request(url,"get",h)
+        self.TearDown(r,expect)
+        return 
+    
+    def showBlocksList(self,dbname,tbname,segid,expect):
+        url = f"databases/{dbname}/tables/{tbname}/segments/{segid}/blocks/"
+        h = self.SetUpHeader(['accept'])
+        r = self.Request(url,"get",h)
+        self.TearDown(r,expect)
+        return 
+    
+    def showSpecificBlockDetail(self,dbname,tbname,segid,bid,expect):
+        url = f"databases/{dbname}/tables/{tbname}/segments/{segid}/blocks/{bid}"
+        h = self.SetUpHeader(['accept'])
+        r = self.Request(url,"get",h)
+        self.TearDown(r,expect)
+        return
+
+
+    
     
     url: str
     header_dict: dict
