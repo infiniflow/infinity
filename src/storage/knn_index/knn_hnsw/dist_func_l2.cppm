@@ -36,9 +36,19 @@ public:
 private:
     using SIMDFuncType = DataType (*)(const DataType *, const DataType *, SizeT);
 
-    SIMDFuncType SIMDFunc = nullptr;
+    SIMDFuncType SIMDFunc;
 
 public:
+    PlainL2Dist() : SIMDFunc(nullptr) {}
+    PlainL2Dist(PlainL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    PlainL2Dist &operator=(PlainL2Dist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~PlainL2Dist() = default;
+
     PlainL2Dist(SizeT dim) {
         if constexpr (std::is_same<DataType, float>()) {
 #if defined(USE_AVX512)
@@ -100,9 +110,18 @@ public:
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);
 
-    SIMDFuncType SIMDFunc = nullptr;
+    SIMDFuncType SIMDFunc;
 
 public:
+    LVQL2Dist() : SIMDFunc(nullptr) {}
+    LVQL2Dist(LVQL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    LVQL2Dist &operator=(LVQL2Dist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~LVQL2Dist() = default;
     LVQL2Dist(SizeT dim) {
         if constexpr (std::is_same<CompressType, i8>()) {
 #if defined(USE_AVX512)

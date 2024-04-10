@@ -36,6 +36,16 @@ private:
     PlainVecStoreMeta(SizeT dim) : dim_(dim) {}
 
 public:
+    PlainVecStoreMeta() : dim_(0) {}
+    PlainVecStoreMeta(This &&other) : dim_(std::exchange(other.dim_, 0)) {}
+    This &operator=(This &&other) {
+        if (this != &other) {
+            dim_ = std::exchange(other.dim_, 0);
+        }
+        return *this;
+    }
+    ~PlainVecStoreMeta() = default;
+
     static This Make(SizeT dim) { return This(dim); }
 
     void Save(FileHandler &file_handler) const { file_handler.Write(&dim_, sizeof(dim_)); }

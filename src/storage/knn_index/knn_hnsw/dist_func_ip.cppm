@@ -39,6 +39,15 @@ private:
     SIMDFuncType SIMDFunc;
 
 public:
+    PlainIPDist() : SIMDFunc(nullptr) {}
+    PlainIPDist(PlainIPDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    PlainIPDist &operator=(PlainIPDist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~PlainIPDist() = default;
     PlainIPDist(SizeT dim) {
         if constexpr (std::is_same<DataType, float>()) {
 #if defined(USE_AVX512)
@@ -112,6 +121,15 @@ private:
     SIMDFuncType SIMDFunc;
 
 public:
+    LVQIPDist() : SIMDFunc(nullptr) {}
+    LVQIPDist(LVQIPDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    LVQIPDist &operator=(LVQIPDist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~LVQIPDist() = default;
     LVQIPDist(SizeT dim) {
         if constexpr (std::is_same<CompressType, i8>()) {
 #if defined(USE_AVX512)

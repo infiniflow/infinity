@@ -56,6 +56,7 @@ export namespace std {
 // using std::stringstream;
     using std::forward;
     using std::move;
+    using std::exchange;
 
     using std::swap;
 

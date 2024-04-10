@@ -84,7 +84,7 @@ public:
         std::visit(
             [chunk_sizes, max_chunk_n, dimension, M, ef_c, this](auto &&arg) {
                 using T = std::decay_t<decltype(*arg)>;
-                knn_hnsw_ptr_ = T::Make(chunk_sizes, max_chunk_n, dimension, M, ef_c).release();
+                knn_hnsw_ptr_ = new T(T::Make(chunk_sizes, max_chunk_n, dimension, M, ef_c));
             },
             knn_hnsw_ptr_);
     }
@@ -93,7 +93,7 @@ public:
         std::visit(
             [&file_handler, this](auto &&arg) {
                 using T = std::decay_t<decltype(*arg)>;
-                knn_hnsw_ptr_ = T::Load(file_handler).release();
+                knn_hnsw_ptr_ = new T(T::Load(file_handler));
             },
             knn_hnsw_ptr_);
     }

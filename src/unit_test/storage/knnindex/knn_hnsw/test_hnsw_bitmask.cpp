@@ -78,14 +78,14 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     using Hnsw = KnnHnsw<LVQL2VecStoreType<f32, i8>, LabelT>;
     int M = 16;
     int ef_construction = 200;
-    auto hnsw_index = Hnsw::Make(base_embedding_count, max_chunk_n, dimension, M, ef_construction);
+    Hnsw hnsw_index = Hnsw::Make(base_embedding_count, max_chunk_n, dimension, M, ef_construction);
 
-    hnsw_index->InsertVecsRaw(base_embedding.get(), base_embedding_count);
+    hnsw_index.InsertVecsRaw(base_embedding.get(), base_embedding_count);
 
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);
     {
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k);
 
         EXPECT_NEAR(result[0].first, 0, error);
         EXPECT_NEAR(result[0].second, 0, error);
@@ -105,7 +105,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_NEAR(result[0].first, 0, error);
         EXPECT_NEAR(result[0].second, 0, error);
@@ -121,7 +121,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_NEAR(result[0].first, 0.08, error);
         EXPECT_NEAR(result[0].second, 2, error);
@@ -134,7 +134,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_NEAR(result[0].first, 0.2, error);
         EXPECT_NEAR(result[0].second, 3, error);

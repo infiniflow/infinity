@@ -40,7 +40,7 @@ public:
     using VecStoreInner = typename VecStoreT::Inner;
 
 private:
-    DataStore(SizeT chunk_size, SizeT max_chunk_n, VecStoreMeta vec_store_meta, GraphStoreMeta graph_store_meta)
+    DataStore(SizeT chunk_size, SizeT max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
         : chunk_size_(chunk_size), max_chunk_n_(max_chunk_n), vec_store_meta_(std::move(vec_store_meta)),
           graph_store_meta_(std::move(graph_store_meta)) {
         assert(chunk_size > 0);
@@ -50,11 +50,24 @@ private:
     }
 
 public:
+    DataStore() : chunk_size_(0), max_chunk_n_(0), chunk_shift_(0), cur_vec_num_(0) {}
     DataStore(This &&other)
-        : chunk_size_(other.chunk_size_), max_chunk_n_(other.max_chunk_n_), chunk_shift_(other.chunk_shift_), cur_vec_num_(other.cur_vec_num_.load()),
+        : chunk_size_(std::exchange(other.chunk_size_, 0)), max_chunk_n_(std::exchange(other.max_chunk_n_, 0)),
+          chunk_shift_(std::exchange(other.chunk_shift_, 0)), cur_vec_num_(other.cur_vec_num_.exchange(0)),
           vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)),
-          inners_(std::move(other.inners_)) {}
-
+          inners_(std::exchange(other.inners_, nullptr)) {}
+    DataStore &operator=(This &&other) {
+        if (this != &other) {
+            chunk_size_ = std::exchange(other.chunk_size_, 0);
+            max_chunk_n_ = std::exchange(other.max_chunk_n_, 0);
+            chunk_shift_ = std::exchange(other.chunk_shift_, 0);
+            cur_vec_num_ = other.cur_vec_num_.exchange(0);
+            vec_store_meta_ = std::move(other.vec_store_meta_);
+            graph_store_meta_ = std::move(other.graph_store_meta_);
+            inners_ = std::exchange(other.inners_, nullptr);
+        }
+        return *this;
+    }
     ~DataStore() {
         if (!inners_) {
             return;
@@ -113,7 +126,7 @@ public:
         auto [chunk_num, last_chunk_size] = ret.ChunkInfo(cur_vec_num);
         for (SizeT i = 0; i < chunk_num; ++i) {
             SizeT cur_chunk_size = (i < chunk_num - 1) ? chunk_size : last_chunk_size;
-            ret.inners_[i] = Inner::Load(file_handler, cur_chunk_size, chunk_size, vec_store_meta, graph_store_meta);
+            ret.inners_[i] = Inner::Load(file_handler, cur_chunk_size, chunk_size, ret.vec_store_meta_, ret.graph_store_meta_);
         }
         return ret;
     }

@@ -43,14 +43,23 @@ private:
           levelx_size_(sizeof(VertexLX) + sizeof(VertexType) * Mmax) {}
 
 public:
-    GraphStoreMeta(GraphStoreMeta &&other) {
-        Mmax0_ = other.Mmax0_;
-        Mmax_ = other.Mmax_;
-        level0_size_ = other.level0_size_;
-        levelx_size_ = other.levelx_size_;
-        max_layer_ = other.max_layer_;
-        enterpoint_ = other.enterpoint_;
+    GraphStoreMeta() : Mmax0_(0), Mmax_(0), level0_size_(0), levelx_size_(0), max_layer_(-1), enterpoint_(-1) {}
+    GraphStoreMeta(GraphStoreMeta &&other)
+        : Mmax0_(std::exchange(other.Mmax0_, 0)), Mmax_(std::exchange(other.Mmax_, 0)), level0_size_(std::exchange(other.level0_size_, 0)),
+          levelx_size_(std::exchange(other.levelx_size_, 0)), max_layer_(std::exchange(other.max_layer_, -1)),
+          enterpoint_(std::exchange(other.enterpoint_, -1)) {}
+    GraphStoreMeta &operator=(GraphStoreMeta &&other) {
+        if (this != &other) {
+            Mmax0_ = std::exchange(other.Mmax0_, 0);
+            Mmax_ = std::exchange(other.Mmax_, 0);
+            level0_size_ = std::exchange(other.level0_size_, 0);
+            levelx_size_ = std::exchange(other.levelx_size_, 0);
+            max_layer_ = std::exchange(other.max_layer_, -1);
+            enterpoint_ = std::exchange(other.enterpoint_, -1);
+        }
+        return *this;
     }
+    ~GraphStoreMeta() = default;
 
     static GraphStoreMeta Make(SizeT Mmax0, SizeT Mmax) {
         GraphStoreMeta meta(Mmax0, Mmax);

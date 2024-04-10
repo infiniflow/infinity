@@ -69,16 +69,30 @@ private:
     static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {2 * M, M}; }
 
 public:
+    KnnHnsw() : M_(0), ef_construction_(0), ef_(0), mult_(0) {}
     KnnHnsw(This &&other)
-        : M_(other.M_), ef_construction_(other.ef_construction_), ef_(other.ef_), mult_(other.mult_), level_rng_(std::move(other.level_rng_)),
-          data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)) {}
+        : M_(std::exchange(other.M_, 0)), ef_construction_(std::exchange(other.ef_construction_, 0)), ef_(std::exchange(other.ef_, 0)),
+          mult_(std::exchange(other.mult_, 0.0)), level_rng_(std::move(other.level_rng_)), data_store_(std::move(other.data_store_)),
+          distance_(std::move(other.distance_)) {}
+    This &operator=(This &&other) {
+        if (this != &other) {
+            M_ = std::exchange(other.M_, 0);
+            ef_construction_ = std::exchange(other.ef_construction_, 0);
+            ef_ = std::exchange(other.ef_, 0);
+            mult_ = std::exchange(other.mult_, 0.0);
+            level_rng_ = std::move(other.level_rng_);
+            data_store_ = std::move(other.data_store_);
+            distance_ = std::move(other.distance_);
+        }
+        return *this;
+    }
     ~KnnHnsw() = default;
 
-    static UniquePtr<This> Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT M, SizeT ef_construction) {
+    static This Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT M, SizeT ef_construction) {
         auto [Mmax0, Mmax] = This::GetMmax(M);
         auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
         Distance distance(data_store.dim());
-        return UniquePtr<This>(new This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0));
+        return This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0);
     }
 
     void Save(FileHandler &file_handler) {
@@ -87,7 +101,7 @@ public:
         data_store_.Save(file_handler);
     }
 
-    static UniquePtr<This> Load(FileHandler &file_handler) {
+    static This Load(FileHandler &file_handler) {
         SizeT M;
         file_handler.Read(&M, sizeof(M));
         SizeT ef_construction;
@@ -96,7 +110,7 @@ public:
         auto data_store = DataStore::Load(file_handler);
         Distance distance(data_store.dim());
 
-        return UniquePtr<This>(new This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0));
+        return This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0);
     }
 
 private:
@@ -373,8 +387,6 @@ private:
 
     DataStore data_store_;
     Distance distance_;
-
-    // std::mutex global_mutex_;
 
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:

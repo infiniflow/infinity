@@ -65,18 +65,18 @@ public:
 
         LocalFileSystem fs;
         {
-            auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
+            Hnsw hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
-            hnsw_index->InsertVecsRaw(data.get(), element_size);
+            hnsw_index.InsertVecsRaw(data.get(), element_size);
             // std::ofstream os("tmp/dump.txt");
-            // hnsw_index->Dump(os);
-            hnsw_index->Check();
+            // hnsw_index.Dump(os);
+            hnsw_index.Check();
 
-            hnsw_index->SetEf(10);
+            hnsw_index.SetEf(10);
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
-                auto result = hnsw_index->KnnSearchSorted(query, 1);
+                auto result = hnsw_index.KnnSearchSorted(query, 1);
                 if (result[0].second == (LabelT)i) {
                     ++correct;
                 }
@@ -87,7 +87,7 @@ public:
 
             u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
             UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
-            hnsw_index->Save(*file_handler);
+            hnsw_index.Save(*file_handler);
             file_handler->Close();
         }
 
@@ -96,15 +96,15 @@ public:
             UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
 
             auto hnsw_index = Hnsw::Load(*file_handler);
-            hnsw_index->SetEf(10);
+            hnsw_index.SetEf(10);
 
             // std::ofstream os("tmp/dump2.txt");
-            // hnsw_index->Dump(os);
-            hnsw_index->Check();
+            // hnsw_index.Dump(os);
+            hnsw_index.Check();
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
-                auto result = hnsw_index->KnnSearchSorted(query, 1);
+                auto result = hnsw_index.KnnSearchSorted(query, 1);
                 if (result[0].second == (LabelT)i) {
                     ++correct;
                 }
@@ -144,7 +144,7 @@ public:
             HnswInsertConfig config;
             config.optimize_ = true;
 
-            auto [start_i, end_i] = hnsw_index->StoreDataRaw(data.get(), element_size / 2, 0 /*offset*/, config);
+            auto [start_i, end_i] = hnsw_index.StoreDataRaw(data.get(), element_size / 2, 0 /*offset*/, config);
             {
                 std::atomic<i32> idx = start_i;
                 std::vector<std::jthread> worker_threads;
@@ -155,13 +155,13 @@ public:
                             if (i >= end_i) {
                                 break;
                             }
-                            hnsw_index->Build(i);
+                            hnsw_index.Build(i);
                         }
                     });
                 }
             }
             for (int i = element_size / 2; i < element_size; ++i) {
-                hnsw_index->InsertVecsRaw(data.get() + i * dim, 1 /*offset*/, i);
+                hnsw_index.InsertVecsRaw(data.get() + i * dim, 1 /*offset*/, i);
             }
             stop.store(true);
         });
@@ -171,7 +171,7 @@ public:
                 while (stop.load() == false) {
                     for (int i = 0; i < element_size; ++i) {
                         const float *query = data.get() + i * dim;
-                        auto result = hnsw_index->KnnSearchSorted(query, 1);
+                        auto result = hnsw_index.KnnSearchSorted(query, 1);
                         // if (!result.empty()) {
                         //     EXPECT_EQ(result[0].second, (LabelT)i);
                         // }
