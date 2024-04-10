@@ -97,6 +97,14 @@ target_link_libraries(
     atomic.a
 )
 
+if(ENABLE_JEMALLOC)
+    target_link_libraries(infinity_benchmark jemalloc.a)
+    target_link_libraries(knn_import_benchmark jemalloc.a)
+    target_link_libraries(knn_query_benchmark jemalloc.a)
+    target_link_libraries(fulltext_import_benchmark jemalloc.a)
+    target_link_libraries(fulltext_query_benchmark jemalloc.a)
+endif()
+
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)

@@ -20,13 +20,18 @@ import stl;
 import memory_pool;
 import index_defines;
 import doc_iterator;
+import term_doc_iterator;
 
 namespace infinity {
 export class MultiQueryDocIterator : public DocIterator {
 public:
-    MultiQueryDocIterator() = default;
-
-    virtual ~MultiQueryDocIterator() = default;
+    explicit MultiQueryDocIterator(Vector<UniquePtr<DocIterator>> &&children) : children_(std::move(children)) {
+        for (u32 i = 0; i < children_.size(); ++i) {
+            if (auto term_doc_iter = dynamic_cast<TermDocIterator *>(children_[i].get()); term_doc_iter) {
+                term_doc_iter->DoSeek(0);
+            }
+        }
+    }
 
     virtual bool IsAnd() const { return false; }
 

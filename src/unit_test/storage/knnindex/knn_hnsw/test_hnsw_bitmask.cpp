@@ -12,10 +12,12 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+#include "unit_test/base_test.h"
+
 import stl;
 import bitmask;
-import plain_store;
-import lvq_store;
+import data_store;
+import vec_store_type;
 import dist_func_l2;
 import dist_func_ip;
 import hnsw_alg;
@@ -24,15 +26,16 @@ import hnsw_common;
 
 using namespace infinity;
 
-#define EXPECT_VALUE_EQ(a, b)                                                                                                                        \
-    if (auto f = f64(a) - f64(b); std::max(f, -f) > 1e-4) {                                                                                          \
-        std::cerr << "values aren't equal at line\t" << __LINE__ << "\tvalues: " << a << " != " << b << std::endl;                                   \
-    }
+class HnswAlgBitmaskTest : public BaseTest {
+public:
+    static constexpr float error = 1e-4;
+};
 
-int main() {
+TEST_F(HnswAlgBitmaskTest, test1) {
     i64 dimension = 4;
     i64 top_k = 4;
     i64 base_embedding_count = 4;
+    int max_chunk_n = 1;
     UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
     UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension);
 
@@ -72,29 +75,29 @@ int main() {
     }
 
     using LabelT = u64;
-    using Hnsw = KnnHnsw<f32, LabelT, LVQStore<f32, LabelT, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, LabelT, i8>>;
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<f32, i8>, LabelT>;
     int M = 16;
     int ef_construction = 200;
-    auto hnsw_index = Hnsw::Make(base_embedding_count, dimension, M, ef_construction, {});
+    Hnsw hnsw_index = Hnsw::Make(base_embedding_count, max_chunk_n, dimension, M, ef_construction);
 
-    hnsw_index->InsertVecsRaw(base_embedding.get(), base_embedding_count);
+    hnsw_index.InsertVecsRaw(base_embedding.get(), base_embedding_count);
 
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);
     {
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k);
 
-        EXPECT_VALUE_EQ(result[0].first, 0);
-        EXPECT_VALUE_EQ(result[0].second, 0);
+        EXPECT_NEAR(result[0].first, 0, error);
+        EXPECT_NEAR(result[0].second, 0, error);
 
-        EXPECT_VALUE_EQ(result[1].first, 0.02);
-        EXPECT_VALUE_EQ(result[1].second, 1);
+        EXPECT_NEAR(result[1].first, 0.02, error);
+        EXPECT_NEAR(result[1].second, 1, error);
 
-        EXPECT_VALUE_EQ(result[2].first, 0.08);
-        EXPECT_VALUE_EQ(result[2].second, 2);
+        EXPECT_NEAR(result[2].first, 0.08, error);
+        EXPECT_NEAR(result[2].second, 2, error);
 
-        EXPECT_VALUE_EQ(result[3].first, 0.2);
-        EXPECT_VALUE_EQ(result[3].second, 3);
+        EXPECT_NEAR(result[3].first, 0.2, error);
+        EXPECT_NEAR(result[3].second, 3, error);
     }
 
     auto p_bitmask = Bitmask::Make(64);
@@ -102,38 +105,38 @@ int main() {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k, filter);
 
-        EXPECT_VALUE_EQ(result[0].first, 0);
-        EXPECT_VALUE_EQ(result[0].second, 0);
+        EXPECT_NEAR(result[0].first, 0, error);
+        EXPECT_NEAR(result[0].second, 0, error);
 
-        EXPECT_VALUE_EQ(result[1].first, 0.08);
-        EXPECT_VALUE_EQ(result[1].second, 2);
+        EXPECT_NEAR(result[1].first, 0.08, error);
+        EXPECT_NEAR(result[1].second, 2, error);
 
-        EXPECT_VALUE_EQ(result[2].first, 0.2);
-        EXPECT_VALUE_EQ(result[2].second, 3);
+        EXPECT_NEAR(result[2].first, 0.2, error);
+        EXPECT_NEAR(result[2].second, 3, error);
     }
 
     p_bitmask->SetFalse(0);
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k, filter);
 
-        EXPECT_VALUE_EQ(result[0].first, 0.08);
-        EXPECT_VALUE_EQ(result[0].second, 2);
+        EXPECT_NEAR(result[0].first, 0.08, error);
+        EXPECT_NEAR(result[0].second, 2, error);
 
-        EXPECT_VALUE_EQ(result[1].first, 0.2);
-        EXPECT_VALUE_EQ(result[1].second, 3);
+        EXPECT_NEAR(result[1].first, 0.2, error);
+        EXPECT_NEAR(result[1].second, 3, error);
     }
 
     p_bitmask->SetFalse(2);
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index.KnnSearchSorted(query_embedding.get(), top_k, filter);
 
-        EXPECT_VALUE_EQ(result[0].first, 0.2);
-        EXPECT_VALUE_EQ(result[0].second, 3);
+        EXPECT_NEAR(result[0].first, 0.2, error);
+        EXPECT_NEAR(result[0].second, 3, error);
     }
 }

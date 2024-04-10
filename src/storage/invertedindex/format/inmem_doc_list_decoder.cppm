@@ -28,7 +28,13 @@ public:
 
     void Init(df_t df, SkipListReaderPostingByteSlice *skiplist_reader, PostingByteSlice *doc_list_buffer);
 
-    bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
+    bool DecodeSkipList(docid_t start_doc_id, docid_t &prev_last_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
+
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const;
+
+    bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer);
 
     bool DecodeCurrentTFBuffer(tf_t *tf_buffer);
 
@@ -37,15 +43,18 @@ public:
     u32 GetSeekedDocCount() const { return skiped_item_count_ << MAX_DOC_PER_RECORD_BIT_NUM; }
 
 private:
-    bool DecodeDocBufferWithoutSkipList(docid_t last_doc_id_in_prev_record, u32 offset, docid_t start_doc_id, DocBufferInfo &doc_buffer_info);
+    bool DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_prev_record, u32 offset, docid_t start_doc_id, docid_t &last_doc_id);
 
-    u32 skiped_item_count_ = 0;
+    // u32 skiped_item_count_ = 0;
     MemoryPool *session_pool_;
     SkipListReaderPostingByteSlice *skiplist_reader_ = nullptr;
     PostingByteSlice *doc_list_buffer_ = nullptr;
     PostingByteSliceReader doc_list_reader_;
     df_t df_ = 0;
     bool finish_decoded_ = false;
+    bool finish_copy_prepared_doc_buffer_ = false;
+    docid_t *doc_buffer_to_copy_ = nullptr;
+    SizeT decode_count_ = 0;
 };
 
 } // namespace infinity

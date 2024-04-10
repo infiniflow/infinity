@@ -48,6 +48,7 @@ struct TableEntry;
 struct IndexReader;
 class Scorer;
 class DocIterator;
+class EarlyTerminateIterator;
 
 // step 1. get the query tree from parser
 // step 2. push down the weight to the leaf term node
@@ -78,6 +79,8 @@ struct QueryNode {
     virtual void PushDownWeight(float factor = 1.0f) = 0;
     // create the iterator from the query tree, need to be called after optimization
     virtual std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const = 0;
+    virtual std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const = 0;
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 };
@@ -89,9 +92,11 @@ struct TermQueryNode final : public QueryNode {
 
     TermQueryNode() : QueryNode(QueryNodeType::TERM) {}
 
-    void PushDownWeight(float factor) final { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const final;
-    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final;
+    void PushDownWeight(float factor) override { MultiplyWeight(factor); }
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 };
 
 struct MultiQueryNode : public QueryNode {
@@ -118,23 +123,31 @@ struct MultiQueryNode : public QueryNode {
 // otherwise, query statement is invalid
 struct NotQueryNode final : public MultiQueryNode {
     NotQueryNode() : MultiQueryNode(QueryNodeType::NOT) {}
-    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const final;
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
 };
 struct AndQueryNode final : public MultiQueryNode {
     AndQueryNode() : MultiQueryNode(QueryNodeType::AND) {}
-    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const final;
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
 };
 struct AndNotQueryNode final : public MultiQueryNode {
     AndNotQueryNode() : MultiQueryNode(QueryNodeType::AND_NOT) {}
-    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const final;
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
 };
 struct OrQueryNode final : public MultiQueryNode {
     OrQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
-    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const final;
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
 };
 
 // unimplemented

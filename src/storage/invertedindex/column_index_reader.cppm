@@ -24,17 +24,21 @@ import index_defines;
 import memory_indexer;
 import internal_types;
 import segment_index_entry;
+import chunk_index_entry;
 
 export module column_index_reader;
 
 namespace infinity {
 struct TableEntry;
+class BlockMaxTermDocIterator;
 
 export class ColumnIndexReader {
 public:
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
     UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
+
+    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, MemoryPool *session_pool, float weight);
 
     float GetAvgColumnLength() const;
 
@@ -46,8 +50,8 @@ private:
 public:
     // for loading column length files
     String index_dir_;
-    Vector<String> base_names_;
-    Vector<RowID> base_row_ids_;
+    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_;
+    SharedPtr<MemoryIndexer> memory_indexer_{nullptr};
 };
 
 namespace detail {

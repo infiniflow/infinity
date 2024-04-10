@@ -115,12 +115,9 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
-        String column_length_file_path = index_dir + "/" + chunk_names[i] + LENGTH_SUFFIX;
-        auto column_length_file_handler =
-            MakeShared<FullTextColumnLengthFileHandler>(MakeUnique<LocalFileSystem>(), column_length_file_path, fake_segment_index_entry_1.get());
         MemoryIndexer
             indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard", *byte_slice_pool_, *buffer_pool_, thread_pool_);
-        indexer.Insert(column, row_offsets[i], row_counts[i], column_length_file_handler);
+        indexer.Insert(column, row_offsets[i], row_counts[i]);
         indexer.Dump();
     }
 }

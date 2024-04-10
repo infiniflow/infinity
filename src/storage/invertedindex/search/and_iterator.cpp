@@ -23,8 +23,7 @@ import internal_types;
 
 namespace infinity {
 
-AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) {
-    children_ = std::move(iterators);
+AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiQueryDocIterator(std::move(iterators)) {
     sorted_iterators_.reserve(children_.size());
     for (u32 i = 0; i < children_.size(); ++i) {
         sorted_iterators_.push_back(children_[i].get());
@@ -32,12 +31,16 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) {
     std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto lhs, const auto rhs) { return lhs->GetDF() < rhs->GetDF(); });
     // initialize doc_id_ to first doc
     DoSeek(0);
+    // init df
+    and_iterator_df_ = std::numeric_limits<u32>::max();
+    for (const auto &c : children_) {
+        and_iterator_df_ = std::min(and_iterator_df_, c->GetDF());
+    }
 }
 
-AndIterator::~AndIterator() {}
-
 void AndIterator::DoSeek(RowID doc_id) {
-    auto ib = sorted_iterators_.begin(), ie = sorted_iterators_.end();
+    auto ib = sorted_iterators_.begin();
+    const auto ie = sorted_iterators_.end();
     while (ib != ie) {
         (*ib)->Seek(doc_id);
         if (RowID doc = (*ib)->Doc(); doc != doc_id) {
@@ -51,11 +54,4 @@ void AndIterator::DoSeek(RowID doc_id) {
     doc_id_ = doc_id;
 }
 
-u32 AndIterator::GetDF() const {
-    u32 min_df = std::numeric_limits<u32>::max();
-    for (u32 i = 0; i < children_.size(); ++i) {
-        min_df = std::min(min_df, children_[i]->GetDF());
-    }
-    return min_df;
-}
 } // namespace infinity

@@ -14,24 +14,21 @@
 
 module;
 
-module term_doc_iterator;
-
+module doc_iterator;
 import stl;
 import memory_pool;
-import posting_iterator;
 import index_defines;
-import term_meta;
-import doc_iterator;
 import internal_types;
+import term_doc_iterator;
 
 namespace infinity {
-TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight)
-    : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
-    DoSeek(0);
+
+// for term iter
+void DocIterator::PrepareFirstDoc() {
+    if (auto term_doc_iter = dynamic_cast<TermDocIterator *>(this); term_doc_iter) {
+        term_doc_iter->DoSeek(0);
+    }
+    // do nothing for normal "or", "and", "and not" iter
 }
-
-TermDocIterator::~TermDocIterator() {}
-
-void TermDocIterator::DoSeek(RowID doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
 
 } // namespace infinity

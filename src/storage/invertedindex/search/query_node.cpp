@@ -13,6 +13,11 @@ import table_entry;
 import column_index_reader;
 import match_data;
 import posting_iterator;
+import early_terminate_iterator;
+import blockmax_term_doc_iterator;
+import blockmax_and_iterator;
+import blockmax_and_not_iterator;
+import blockmax_maxscore_iterator;
 
 namespace infinity {
 
@@ -327,7 +332,24 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
         // nodes under "not" will not be added to scorer
         scorer->AddDocIterator(search.get(), column_id);
     }
-    return std::move(search);
+    return search;
+}
+
+std::unique_ptr<EarlyTerminateIterator>
+TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+    ColumnID column_id = table_entry->GetColumnIdByName(column_);
+    ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
+    if (!column_index_reader)
+        return nullptr;
+    auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight());
+    if (!search) {
+        return nullptr;
+    }
+    if (scorer) {
+        // nodes under "not" will not be added to scorer
+        scorer->AddBlockMaxDocIterator(search.get(), column_id);
+    }
+    return search;
 }
 
 std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
@@ -345,6 +367,25 @@ std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const TableEntry *table_
         return std::move(sub_doc_iters[0]);
     } else {
         return MakeUnique<AndIterator>(std::move(sub_doc_iters));
+    }
+}
+
+std::unique_ptr<EarlyTerminateIterator>
+AndQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+    Vector<std::unique_ptr<EarlyTerminateIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    for (auto &child : children_) {
+        auto iter = child->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+        if (iter) {
+            sub_doc_iters.emplace_back(std::move(iter));
+        }
+    }
+    if (sub_doc_iters.empty()) {
+        return nullptr;
+    } else if (sub_doc_iters.size() == 1) {
+        return std::move(sub_doc_iters[0]);
+    } else {
+        return MakeUnique<BlockMaxAndIterator>(std::move(sub_doc_iters));
     }
 }
 
@@ -372,6 +413,31 @@ std::unique_ptr<DocIterator> AndNotQueryNode::CreateSearch(const TableEntry *tab
     }
 }
 
+std::unique_ptr<EarlyTerminateIterator>
+AndNotQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+    Vector<std::unique_ptr<EarlyTerminateIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    // check if the first child is a valid query
+    auto first_iter = children_.front()->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+    if (!first_iter) {
+        // no need to continue if the first child is invalid
+        return nullptr;
+    }
+    sub_doc_iters.emplace_back(std::move(first_iter));
+    for (u32 i = 1; i < children_.size(); ++i) {
+        // set scorer to nullptr, because nodes under "not" should not be added to scorer
+        auto iter = children_[i]->CreateEarlyTerminateSearch(table_entry, index_reader, nullptr);
+        if (iter) {
+            sub_doc_iters.emplace_back(std::move(iter));
+        }
+    }
+    if (sub_doc_iters.size() == 1) {
+        return std::move(sub_doc_iters[0]);
+    } else {
+        return MakeUnique<BlockMaxAndNotIterator>(std::move(sub_doc_iters));
+    }
+}
+
 std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
@@ -390,7 +456,32 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const TableEntry *table_e
     }
 }
 
+std::unique_ptr<EarlyTerminateIterator>
+OrQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+    Vector<std::unique_ptr<EarlyTerminateIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    for (auto &child : children_) {
+        auto iter = child->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+        if (iter) {
+            sub_doc_iters.emplace_back(std::move(iter));
+        }
+    }
+    if (sub_doc_iters.empty()) {
+        return nullptr;
+    } else if (sub_doc_iters.size() == 1) {
+        return std::move(sub_doc_iters[0]);
+    } else {
+        return MakeUnique<BlockMaxMaxscoreIterator>(std::move(sub_doc_iters));
+    }
+}
+
 std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+    UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
+    return nullptr;
+}
+
+std::unique_ptr<EarlyTerminateIterator>
+NotQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
     return nullptr;
 }

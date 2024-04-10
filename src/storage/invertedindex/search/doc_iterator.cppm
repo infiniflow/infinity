@@ -41,6 +41,9 @@ public:
         return doc_id == doc_id_;
     }
 
+    // for term iter
+    void PrepareFirstDoc();
+
     RowID Next() {
         DoSeek(doc_id_ + 1);
         return doc_id_;

@@ -20,18 +20,16 @@ import stl;
 
 namespace infinity {
 
-#pragma pack(4)
 struct CreateField {
     //    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
 
     TxnTimeStamp create_ts_{};
-    i32 row_count_{};
+    i64 row_count_{};
 
     bool operator==(const CreateField &rhs) const { return create_ts_ == rhs.create_ts_ && row_count_ == rhs.row_count_; }
 
     bool operator!=(const CreateField &rhs) const { return !(*this == rhs); }
 };
-#pragma pack()
 
 export struct BlockVersion {
     constexpr static std::string_view PATH = "version";

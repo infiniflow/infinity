@@ -112,6 +112,12 @@ RUN --mount=type=bind,source=lz4-1.9.4.tar.gz,target=/root/lz4-1.9.4.tar.gz  \
     && cd lz4-1.9.4 && CFLAGS="-fPIC" make -j install \
     && ldconfig && cd /root && rm -rf lz4-1.9.4
 
+# Install jemalloc-5.3.0
+RUN --mount=type=bind,source=jemalloc-5.3.0.tar.bz2,target=/root/jemalloc-5.3.0.tar.bz2  \
+    cd /root && tar xjf jemalloc-5.3.0.tar.bz2 \
+    && cd jemalloc-5.3.0 && ./configure --enable-static && make -j install \
+    && ldconfig && cd /root && rm -rf jemalloc-5.3.0
+
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

@@ -22,8 +22,7 @@ import index_defines;
 import multi_query_iterator;
 import doc_iterator;
 namespace infinity {
-OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) {
-    children_ = std::move(iterators);
+OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiQueryDocIterator(std::move(iterators)) {
     count_ = children_.size();
     iterator_heap_.resize(children_.size() + 1);
     for (u32 i = 0; i < children_.size(); ++i) {
@@ -35,9 +34,11 @@ OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) {
         AdjustDown(i);
     }
     doc_id_ = iterator_heap_[1].doc_id_;
+    // init df
+    or_iterator_df_ = std::accumulate(children_.begin(), children_.end(), 0, [](u32 sum, const UniquePtr<DocIterator> &iter) -> u32 {
+        return sum + iter->GetDF();
+    });
 }
-
-OrIterator::~OrIterator() {}
 
 void OrIterator::DoSeek(RowID id) {
     while (id > iterator_heap_[1].doc_id_) {
@@ -47,14 +48,6 @@ void OrIterator::DoSeek(RowID id) {
         AdjustDown(1);
     }
     doc_id_ = iterator_heap_[1].doc_id_;
-}
-
-u32 OrIterator::GetDF() const {
-    u32 sum = 0;
-    for (u32 i = 0; i < children_.size(); ++i) {
-        sum += children_[i]->GetDF();
-    }
-    return sum;
 }
 
 } // namespace infinity

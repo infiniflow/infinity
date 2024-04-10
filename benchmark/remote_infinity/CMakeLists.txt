@@ -26,6 +26,10 @@ target_link_libraries(
         thrift.a
 )
 
+if(ENABLE_JEMALLOC)
+    target_link_libraries(remote_query_benchmark jemalloc.a)
+endif()
+
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
