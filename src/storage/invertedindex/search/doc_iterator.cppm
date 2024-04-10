@@ -53,6 +53,9 @@ public:
 
     virtual u32 GetDF() const = 0;
 
+    // print the query tree, for debugging
+    virtual void PrintTree(std::ostream &os, const String &prefix = "", bool is_final = true) const = 0;
+
 protected:
     RowID doc_id_{INVALID_ROWID};
 };

@@ -79,7 +79,7 @@ bool BlockMaxMaxscoreIterator::BlockSkipTo(RowID doc_id, float threshold) {
     }
 }
 
-Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) {
+Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) {
     if (threshold > BlockMaxBM25Score()) [[unlikely]] {
         return {false, 0.0F, INVALID_ROWID};
     }
@@ -94,25 +94,20 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
         bool match_any = false;
         for (u32 j = sorted_iterators_.size(); j > pivot; --j) {
             const auto &it = sorted_iterators_[j - 1];
-            auto [success, score, id] = it->SeekInBlockRange(doc_id, 0, doc_id);
+            auto [success, score, id] = it->SeekInBlockRange(doc_id, doc_id, 0);
             if (success) {
                 assert((id == doc_id));
                 match_any = true;
                 leftover_threshold -= score;
             }
-            //TODO: speed up the skip
             auto [success2, id2] = it->PeekInBlockRange(doc_id + 1, block_end);
             if (success2) {
                 next_candidate = std::min(next_candidate, id2);
             }
         }
         if (match_any) {
-            for (u32 i = pivot; i > 0; --i) {
-                if (leftover_threshold > common_block_max_bm25_score_until_[i - 1]) {
-                    // switch to next candidate
-                    break;
-                }
-                auto [success, score, id] = sorted_iterators_[i - 1]->SeekInBlockRange(doc_id, 0, doc_id);
+            for (u32 i = pivot; i > 0 and leftover_threshold <= common_block_max_bm25_score_until_[i - 1]; --i) {
+                auto [success, score, id] = sorted_iterators_[i - 1]->SeekInBlockRange(doc_id, doc_id, 0);
                 if (success) {
                     leftover_threshold -= score;
                 }
@@ -144,26 +139,6 @@ Pair<bool, RowID> BlockMaxMaxscoreIterator::PeekInBlockRange(RowID doc_id, RowID
     return {match_any, next_candidate};
 }
 
-Pair<RowID, float> BlockMaxMaxscoreIterator::NextWithThreshold(float threshold) {
-    // TODO:
-    return {};
-}
-
-Pair<RowID, float> BlockMaxMaxscoreIterator::BlockNextWithThreshold(float threshold) {
-    for (RowID next_skip = doc_id_ + 1;;) {
-        if (!BlockSkipTo(next_skip, threshold)) [[unlikely]] {
-            return {INVALID_ROWID, 0.0F};
-        }
-        next_skip = std::max(next_skip, BlockMinPossibleDocID());
-        auto [success, score, id] = SeekInBlockRange(next_skip, threshold, BlockLastDocID());
-        if (success) {
-            // success in SeekInBlockRange, inner doc_id_ is updated
-            return {id, score};
-        }
-        next_skip = BlockLastDocID() + 1;
-    }
-}
-
 void BlockMaxMaxscoreIterator::UpdateScoreThreshold(float threshold) {
     const float base_threshold = threshold - BM25ScoreUpperBound();
     for (const auto &it : sorted_iterators_) {
@@ -173,6 +148,21 @@ void BlockMaxMaxscoreIterator::UpdateScoreThreshold(float threshold) {
     while (pivot < sorted_iterators_.size() and bm25_scores_upper_bound_until_[pivot] < threshold) {
         ++pivot;
     }
+}
+
+bool BlockMaxMaxscoreIterator::Seek(RowID doc_id) {
+    if (doc_id_ > doc_id) {
+        return false;
+    }
+    if (doc_id_ == doc_id) {
+        return true;
+    }
+    for (const auto &it : sorted_iterators_) {
+        if (it->Seek(doc_id)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace infinity

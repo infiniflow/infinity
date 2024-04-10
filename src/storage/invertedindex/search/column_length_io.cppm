@@ -64,14 +64,14 @@ private:
 };
 
 export class ColumnLengthReader {
-    Vector<FullTextColumnLengthReader> column_length_vector_;
+    Vector<UniquePtr<FullTextColumnLengthReader>> column_length_vector_;
 
 public:
     void AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length);
 
-    FullTextColumnLengthReader *GetColumnLengthReader(u32 scorer_column_idx) { return &column_length_vector_[scorer_column_idx]; }
+    FullTextColumnLengthReader *GetColumnLengthReader(u32 scorer_column_idx) { return column_length_vector_[scorer_column_idx].get(); }
 
-    inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx].GetColumnLength(row_id); }
+    inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx]->GetColumnLength(row_id); }
 };
 
 } // namespace infinity
