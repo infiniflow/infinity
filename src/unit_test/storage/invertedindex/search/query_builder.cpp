@@ -31,6 +31,9 @@ import query_node;
 import search_driver;
 import table_entry;
 import early_terminate_iterator;
+import infinity_context;
+import global_resource_usage;
+import logger;
 
 namespace infinity {
 
@@ -47,7 +50,21 @@ public:
         }
         doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_ROWID;
     }
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {}
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {
+        os << prefix;
+        os << (is_final ? "└──" : "├──");
+        os << "MockVectorDocIterator";
+        int print_child_num = std::min<int>(doc_ids_.size(), 5);
+        os << " (first " << print_child_num << " doc_ids_: ";
+        for (int i = 0; i < print_child_num; ++i) {
+            os << doc_ids_[i].ToUint64();
+            if (i != print_child_num - 1) {
+                os << ", ";
+            }
+        }
+        os << ")";
+        os << '\n';
+    }
     Vector<RowID> doc_ids_;
     u32 idx_ = 0;
 };
@@ -112,7 +129,27 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> 
 // 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
 // 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
 
-class QueryBuilderTest : public BaseTest {};
+class QueryBuilderTest : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+};
 
 union FakeQueryBuilder {
     char empty_space[2 * sizeof(QueryBuilder)];
@@ -160,16 +197,16 @@ TEST_F(QueryBuilderTest, test_and) {
         and_root->Add(std::move(and_CDE));
         std::set_intersection(vec_AB_and.begin(), vec_AB_and.end(), vec_CDE_and.begin(), vec_CDE_and.end(), std::back_inserter(expect_result));
     }
-    std::cerr << "\nQueryTree before optimization:" << std::endl;
-    static_cast<QueryNode *>(and_root.get())->PrintTree(std::cerr);
+    OStringStream oss;
+    oss << "QueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(and_root.get())->PrintTree(oss);
+    LOG_INFO(std::move(oss).str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
-    std::cerr << "\nQueryTree after optimization:" << std::endl;
-    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // A and B and C and D and E
     auto and_iter = dynamic_cast<AndIterator *>(result_iter.get());
@@ -223,16 +260,16 @@ TEST_F(QueryBuilderTest, test_or) {
         or_root->Add(std::move(or_CDE));
         std::set_union(vec_AB_or.begin(), vec_AB_or.end(), vec_CDE_or.begin(), vec_CDE_or.end(), std::back_inserter(expect_result));
     }
-    std::cerr << "\nQueryTree before optimization:" << std::endl;
-    static_cast<QueryNode *>(or_root.get())->PrintTree(std::cerr);
+    OStringStream oss;
+    oss << "QueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(or_root.get())->PrintTree(oss);
+    LOG_INFO(std::move(oss).str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
-    std::cerr << "\nQueryTree after optimization:" << std::endl;
-    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // A or B or C or D or E
     auto or_iter = dynamic_cast<OrIterator *>(result_iter.get());
@@ -290,16 +327,16 @@ TEST_F(QueryBuilderTest, test_and_not) {
         not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
         and_not_root->Add(std::move(not_E));
     }
-    std::cerr << "\nQueryTree before optimization:" << std::endl;
-    static_cast<QueryNode *>(and_not_root.get())->PrintTree(std::cerr);
+    OStringStream oss;
+    oss << "QueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
+    LOG_INFO(std::move(oss).str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
-    std::cerr << "\nQueryTree after optimization:" << std::endl;
-    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // (A or B or C) and not (D, E)
     // child: 1. (A or B or C), 2. D, 3. E
@@ -363,16 +400,16 @@ TEST_F(QueryBuilderTest, test_and_not2) {
         not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
         and_not_root->Add(std::move(not_E));
     }
-    std::cerr << "\nQueryTree before optimization:" << std::endl;
-    static_cast<QueryNode *>(and_not_root.get())->PrintTree(std::cerr);
+    OStringStream oss;
+    oss << "QueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
+    LOG_INFO(std::move(oss).str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
-    std::cerr << "\nQueryTree after optimization:" << std::endl;
-    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // (A and B and D) and not (C, E)
     // child: 1. (A and B and D), 2. C, 3. E
