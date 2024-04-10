@@ -15,7 +15,6 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
-    jemalloc.a
 )
 
 # ########################################
@@ -37,7 +36,6 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
-    jemalloc.a
 )
 
 # query benchmark
@@ -57,7 +55,6 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
-    jemalloc.a
 )
 
 # ########################################
@@ -79,7 +76,6 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
-    jemalloc.a
 )
 
 # query benchmark
@@ -99,8 +95,15 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
-    jemalloc.a
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(infinity_benchmark jemalloc.a)
+    target_link_libraries(knn_import_benchmark jemalloc.a)
+    target_link_libraries(knn_query_benchmark jemalloc.a)
+    target_link_libraries(fulltext_import_benchmark jemalloc.a)
+    target_link_libraries(fulltext_query_benchmark jemalloc.a)
+endif()
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

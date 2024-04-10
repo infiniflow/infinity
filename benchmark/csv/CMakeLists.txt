@@ -7,8 +7,11 @@ add_executable(csv_benchmark
 
 target_link_libraries(csv_benchmark
         zsv_parser
-        jemalloc.a
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(csv_benchmark jemalloc.a)
+endif()
 
 target_include_directories(csv_benchmark
         PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")

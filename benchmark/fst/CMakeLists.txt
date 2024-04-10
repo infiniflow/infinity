@@ -8,8 +8,11 @@ target_link_libraries(
     fst
     infinity_core
     benchmark_profiler
-    jemalloc.a
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(fst jemalloc.a)
+endif()
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
