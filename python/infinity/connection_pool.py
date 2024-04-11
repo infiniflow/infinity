@@ -1,21 +1,19 @@
-from threading import Thread, Lock, Condition
+from threading import Lock, Condition
 import infinity
 from infinity.common import NetworkAddress
-
-def resize_pool():
-    pass
+import logging
+from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
 
 class ConnectionPool(object):
 
-    def __init__(self, uri = NetworkAddress("127.0.0.1", 23817), min_size=4, max_size=16, timeout=10.0, interval=600.0):
+    def __init__(self, uri = NetworkAddress("127.0.0.1", 23817), min_size=4, max_size=16, timeout=10.0):
         assert (min_size <= max_size)
         self.uri_ = uri
         self.min_size_ = min_size
         self.max_size_ = max_size
         self.curr_size_ = 0
         self.timeout_ = timeout
-        self.interval_ = interval
 
         self.free_pool_ = []
         self.created_conns_ = []
@@ -33,12 +31,12 @@ class ConnectionPool(object):
         self.created_conns_.append(infinity_coon)
 
 
-    def get_conn(self):
+    def get_conn(self) -> RemoteThriftInfinityConnection:
         with self.mutex_:
             while(len(self.free_pool_) == 0 and self.curr_size_ == self.max_size_):
                 is_waken = self.cond_.wait(self.timeout_)
                 if (not is_waken):
-                    raise Exception("Wait connection timeout.")
+                    logging.warn("connection waiting...")
             if (len(self.free_pool_) == 0):
                 self._create_conn()
             conn = self.free_pool_.pop()
