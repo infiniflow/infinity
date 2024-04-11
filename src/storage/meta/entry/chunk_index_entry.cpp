@@ -123,12 +123,9 @@ void ChunkIndexEntry::Cleanup() {
 
 void ChunkIndexEntry::SaveIndexFile() {
     if (buffer_obj_ == nullptr) {
-        UnrecoverableError("buffer obj should not has nullptr.");
+        return;
     }
-    if (buffer_obj_->Save()) {
-        buffer_obj_->Sync();
-        buffer_obj_->CloseFile();
-    }
+    buffer_obj_->Save();
 }
 
 } // namespace infinity
