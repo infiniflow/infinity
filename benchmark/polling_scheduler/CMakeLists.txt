@@ -25,5 +25,5 @@ target_link_libraries(
 )
 
 if(ENABLE_JEMALLOC)
-    target_link_libraries(polling_scheduler_benchmark jemalloc.a)
+    target_link_libraries(polling_scheduler_benchmark jemalloc.a dl)
 endif()
