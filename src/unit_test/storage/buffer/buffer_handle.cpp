@@ -116,9 +116,7 @@ TEST_F(BufferHandleTest, test1) {
             EXPECT_EQ(data[i], (int)i);
         }
 
-        EXPECT_EQ(buf1->Save(), true);
-        buf1->Sync();
-        buf1->CloseFile();
+        buf1->Save();
     }
     {
         auto buf_handle2 = buf2->Load();

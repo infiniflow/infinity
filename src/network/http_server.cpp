@@ -430,6 +430,76 @@ public:
     }
 };
 
+class ImportHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String database_name = request->getPathVariable("database_name");
+        String table_name = request->getPathVariable("table_name");
+
+        nlohmann::json json_response;
+        HTTPStatus http_status = HTTPStatus::CODE_500;
+
+        String data_body = request->readBodyToString();
+        try {
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
+
+            ImportOptions import_options;
+
+            String file_type_str = http_body_json["file_type"];
+            ToLower(file_type_str);
+            if(file_type_str == "csv") {
+                import_options.copy_file_type_ = CopyFileType::kCSV;
+            } else if(file_type_str == "json") {
+                import_options.copy_file_type_ = CopyFileType::kJSON;
+            } else if(file_type_str == "jsonl") {
+                import_options.copy_file_type_ = CopyFileType::kJSONL;
+            } else if(file_type_str == "fvecs") {
+                import_options.copy_file_type_ = CopyFileType::kFVECS;
+            } else {
+                json_response["error_code"] = ErrorCode::kNotSupported;
+                json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
+            if(import_options.copy_file_type_ == CopyFileType::kCSV) {
+                if(http_body_json.contains("header")) {
+                    import_options.header_ = http_body_json["header"];
+                }
+                if(http_body_json.contains("delimiter")) {
+                    String delimiter = http_body_json["delimiter"];
+                    if(delimiter.size() != 1) {
+                        json_response["error_code"] = ErrorCode::kNotSupported;
+                        json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
+                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                    }
+                    import_options.delimiter_ = delimiter[0];
+                } else {
+                    import_options.delimiter_ = ',';
+                }
+            }
+            String file_path = http_body_json["file_path"];
+
+            auto result = infinity->Import(database_name, table_name, file_path, import_options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
+        } catch (nlohmann::json::exception &e) {
+            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+            json_response["error_message"] = e.what();
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class InsertHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -1573,6 +1643,7 @@ void HTTPServer::Start(u16 port) {
     router->route("GET", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<ShowTableColumnsHandler>());
 
     // DML
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}", MakeShared<ImportHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<InsertHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<DeleteHandler>());
     router->route("PUT", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<UpdateHandler>());

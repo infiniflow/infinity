@@ -58,13 +58,14 @@ private:
     void PushGCQueue(BufferObj *buffer_handle);
 
 private:
-    std::shared_mutex rw_locker_{};
+    std::mutex w_locker_{};
 
     SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
     atomic_u64 current_memory_size_{}; // TODO: need to be atomic
-    HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
+    HashMap<String, SharedPtr<BufferObj>> buffer_map_{};
+    Vector<SharedPtr<BufferObj>> deprecated_array_{};
     SpecificConcurrentQueue<BufferObj *> gc_queue_{};
 };
 } // namespace infinity

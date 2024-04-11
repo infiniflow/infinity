@@ -506,10 +506,7 @@ void SegmentIndexEntry::SaveIndexFile() {
     u64 segment_id = this->segment_id_;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
     for (auto &buffer_ptr : vector_buffer_) {
-        if (buffer_ptr->Save()) {
-            buffer_ptr->Sync();
-            buffer_ptr->CloseFile();
-        }
+        buffer_ptr->Save();
     }
 }
 
