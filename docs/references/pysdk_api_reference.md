@@ -512,7 +512,7 @@ table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7,
 
 ## import
 
-**RemoteTable.import(*filpath, import_options = None*)**
+**RemoteTable.import_data(*filpath, import_options = None*)**
 
 Import data from a file into the table object
 
