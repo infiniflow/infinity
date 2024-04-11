@@ -345,10 +345,8 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     auto option_flag = column_index_reader->GetOptionFlag();
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
-        fmt::print("fetch position = true\n");
     }
     auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get(), fetch_position);
-//    auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
     if (!posting_iterator) {
         return nullptr;
     }

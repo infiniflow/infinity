@@ -224,7 +224,6 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
     BaseProfiler profiler;
     profiler.Begin();
     for (auto match_text : query_vec) {
-        LOG_INFO(fmt::format("query text: {}\n", match_text));
         auto *search_expr = new SearchExpr();
         {
             auto exprs = new std::vector<ParsedExpr *>();
@@ -232,21 +231,9 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
             auto *match_expr = new MatchExpr();
             match_expr->fields_ = fields;
             match_expr->matching_text_ = match_text;
-            LOG_INFO(fmt::format("match expr fields: {}, matching_text: {}\n", match_expr->fields_, match_expr->matching_text_));
             exprs->push_back(match_expr);
-
             search_expr->SetExprs(exprs);
         }
-
-        //        auto output_columns = new std::vector<ParsedExpr *>();
-        //        {
-        //            ColumnExpr *col1 = new ColumnExpr();
-        //            col1->names_.emplace_back("col1");
-        //            output_columns->emplace_back(col1);
-        //            ColumnExpr *col2 = new ColumnExpr();
-        //            col2->names_.emplace_back("col2");
-        //            output_columns->emplace_back(col2);
-        //        }
 
         std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
         {
@@ -255,19 +242,21 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
             auto select_score_expr = new FunctionExpr();
             select_score_expr->func_name_ = "score";
             output_columns->emplace_back(select_rowid_expr);
+            output_columns->emplace_back(select_score_expr);
         }
-        //        infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
+        infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
+        /*
         auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
         {
-            LOG_INFO(fmt::format("Search result: {}\n", result.ToString()));
-            //            auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
-            //            auto &column = *cv[0];
-            //            auto result_id = reinterpret_cast<const std::string *>(column.data());
-            //
-            //            for (size_t i = 0; i < column.Size(); ++i) {
-            //                LOG_INFO(fmt::format("result_id[{}] = {}\n", i, result_id[i]));
-            //            }
+            auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
+            auto &column = *cv[0];
+            auto result_id = reinterpret_cast<const RowID *>(column.data());
+            auto cnt = column.Size();
+            for (size_t i = 0; i < cnt; ++i) {
+                LOG_INFO(fmt::format("result_id[{}] = {}", i, result_id[i].ToUint64()));
+            }
         }
+        */
     }
     LOG_INFO(fmt::format("Query data cost: {}", profiler.ElapsedToString()));
     profiler.End();
@@ -278,10 +267,16 @@ int main(int argc, char *argv[]) {
     CLI::App app{"fulltext_benchmark"};
     // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
     // Using enumerations in an option
-    Map<String, Mode> mode_map{{"insert", Mode::kInsert}, {"import", Mode::kImport}, {"merge", Mode::kMerge}};
+    enum class Mode : u8 { kInsert, kImport, kMerge, kQuery };
+    Map<String, Mode> mode_map{
+        {"insert", Mode::kInsert},
+        {"import", Mode::kImport},
+        {"merge", Mode::kMerge},
+        {"query", Mode::kQuery}
+    };
     Mode mode(Mode::kInsert);
     SizeT insert_batch = 500;
-    app.add_option("--mode", mode, "Bencmark mode, one of insert, import, merge")
+    app.add_option("--mode", mode, "Bencmark mode, one of insert, import, merge, query")
         ->required()
         ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
     app.add_option("--insert-batch", insert_batch, "batch size of each insert, valid only at insert and merge mode, default value 500");
@@ -315,13 +310,13 @@ int main(int argc, char *argv[]) {
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
             BenchmarkOptimize(infinity, db_name, table_name);
         }
+        case Mode::kQuery: {
+            BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+            BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
+            BenchmarkQuery(infinity, db_name, table_name);
+        }
     }
     sleep(10);
 
-    BenchmarkQuery(infinity, db_name, table_name);
     Infinity::LocalUnInit();
-
-    // SharedPtr<Infinity> infinity_query = Infinity::LocalConnect();
-    // BenchmarkQuery(infinity_query, db_name, table_name);
-
 }

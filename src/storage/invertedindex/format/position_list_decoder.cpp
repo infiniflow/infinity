@@ -99,7 +99,6 @@ void PositionListDecoder::Init(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_
 }
 
 void PositionListDecoder::Init(const ByteSliceList *pos_list, tf_t total_tf, u32 pos_list_begin, InDocPositionState *state) {
-    fmt::print("PositionListDecoder::Init\n");
     total_tf_ = total_tf;
     pos_encoder_ = GetPosListEncoder();
 
@@ -111,16 +110,9 @@ void PositionListDecoder::Init(const ByteSliceList *pos_list, tf_t total_tf, u32
     pos_list_reader_.Seek(pos_list_begin);
     u32 pos_skiplist_len = pos_list_reader_.ReadVUInt32();
     // read pos list length
-    auto pos_list_len = pos_list_reader_.ReadVUInt32();
-    fmt::print("pos_list_begin = {}\n", pos_list_begin);
-    fmt::print("pos_skiplist_len = {}\n", pos_skiplist_len);
-    fmt::print("pos_list_len = {}\n", pos_list_len);
-    auto pos_list_end = pos_list_reader_.Tell() + pos_list_len + pos_skiplist_len;
-    auto pos_len = pos_list_end - pos_list_begin;
-    fmt::print("pos_len = {}\n", pos_len);
+    pos_list_reader_.ReadVUInt32();
 
     u32 pos_skiplist_start = pos_list_reader_.Tell();
-    fmt::print("pos_skiplist_start = {}\n", pos_skiplist_start);
     pos_list_begin_ = pos_skiplist_start + pos_skiplist_len;
 
     InitPositionSkipList(pos_list, total_tf, pos_skiplist_start, pos_skiplist_len, state);

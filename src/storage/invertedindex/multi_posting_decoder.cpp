@@ -121,7 +121,6 @@ IndexDecoder *MultiPostingDecoder::CreateIndexDecoder(u32 doc_list_begin_pos) {
 
 bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     u32 locate_seg_cursor = LocateSegment(segment_cursor_, start_row_id);
-    fmt::print("Move to segment: {}\n", start_row_id.ToUint64());
     if (locate_seg_cursor >= segment_count_) {
         return false;
     }
@@ -133,7 +132,6 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
         return MemSegMoveToSegment(posting_writer);
     } else {
         return SplitDiskSegMoveToSegment(cur_segment_posting);
-//        return DiskSegMoveToSegment(cur_segment_posting);
     }
 }
 
@@ -184,15 +182,10 @@ bool MultiPostingDecoder::DiskSegMoveToSegment(SegmentPosting &cur_segment_posti
     doc_list_reader_.Open(posting_list);
     const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
 
-    auto doc_begin = doc_list_reader.Tell();
     u32 doc_skiplist_size = doc_list_reader.ReadVUInt32();
     u32 doc_list_size = doc_list_reader.ReadVUInt32();
-    fmt::print("In DiskSegMoveToSegment\n");
-    fmt::print("doc_skiplist_size: {}\n", doc_skiplist_size);
-    fmt::print("doc_list_size: {}\n", doc_list_size);
 
     u32 doc_list_begin_pos = doc_list_reader.Tell() + doc_skiplist_size;
-    fmt::print("doc_list_begin_pos: {}\n", doc_list_begin_pos);
     if (index_decoder_) {
         if (session_pool_) {
             index_decoder_->~IndexDecoder();
@@ -206,9 +199,6 @@ bool MultiPostingDecoder::DiskSegMoveToSegment(SegmentPosting &cur_segment_posti
     u32 doc_skiplist_start = doc_list_reader.Tell();
     u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
 
-    auto doc_end = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
-    auto doc_size = doc_end - doc_begin;
-    fmt::print("doc_size: {}\n", doc_size);
     index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, posting_list, term_meta.GetDocFreq());
     if (format_option_.HasPositionList()) {
         u32 pos_list_begin = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
@@ -244,9 +234,7 @@ IndexDecoder* MultiPostingDecoder::CreateDocIndexDecoder(u32 doc_list_begin_pos)
 }
 
 bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_posting) {
-    fmt::print("In SplitDiskSegMoveToSegment\n");
     ByteSliceReader doc_reader;
-    // ByteSliceList *posting_list = cur_segment_posting.GetSliceListPtr().get();
 
     ByteSliceList *doc_slice_list = cur_segment_posting.GetDocSliceListPtr().get();
 
@@ -255,12 +243,10 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
 
     const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
     u32 doc_skiplist_size = doc_reader.ReadVUInt32();
-    u32 doc_list_size = doc_reader.ReadVUInt32();
+    doc_reader.ReadVUInt32();
 
     u32 doc_list_begin_pos = doc_reader.Tell() + doc_skiplist_size;
-    fmt::print("doc_skiplist_size: {}\n", doc_skiplist_size);
-    fmt::print("doc_list_size: {}\n", doc_list_size);
-    fmt::print("doc_list_begin_pos: {}\n", doc_list_begin_pos);
+
 
     if (index_decoder_) {
         if (session_pool_) {
@@ -271,27 +257,19 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
         }
         index_decoder_ = nullptr;
     }
-    fmt::print("CreateDocIndexDecoder\n");
     index_decoder_ = CreateDocIndexDecoder(doc_list_begin_pos);
     u32 doc_skiplist_start = doc_reader.Tell();
     u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
-    fmt::print("doc_skiplist_start: {}\n", doc_skiplist_start);
-    fmt::print("doc_skip_list_end: {}\n", doc_skip_list_end);
 
     index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, doc_slice_list, term_meta.GetDocFreq());
     if (format_option_.HasPositionList()) {
-        // assert(nullptr != pos_reader_.GetByteSliceList());
-        ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
 
+        ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
         assert(nullptr != pos_slice_list);
         pos_reader_.Open(pos_slice_list);
 
         u32 pos_list_begin = pos_reader_.Tell();
-        auto pos_skiplist_size = pos_reader_.ReadVUInt32();
-        auto pos_list_size = pos_reader_.ReadVUInt32();
-        fmt::print("pos_skiplist_size: {}, pos_list_size: {}\n", pos_skiplist_size, pos_list_size);
         in_doc_state_keeper_.MoveToSegment(pos_slice_list, term_meta.GetTotalTermFreq(), pos_list_begin, format_option_);
-        fmt::print("pos_list_begin: {}\n", pos_list_begin);
 
         if (in_doc_pos_iterator_) {
             if (session_pool_) {
