@@ -31,8 +31,8 @@ target_link_libraries(
 )
 
 if(ENABLE_JEMALLOC)
-    target_link_libraries(hnsw_benchmark2 jemalloc.a)
-    target_link_libraries(ann_ivfflat_benchmark jemalloc.a)
+    target_link_libraries(hnsw_benchmark2 jemalloc.a dl)
+    target_link_libraries(ann_ivfflat_benchmark jemalloc.a dl)
 endif()
 
 # add_definitions(-march=native)
