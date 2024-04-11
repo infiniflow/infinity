@@ -13,7 +13,11 @@
 // limitations under the License.
 
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
+#ifdef ENABLE_JEMALLOC_PROF
+#include <jemalloc/jemalloc.h>
+#endif
 
 import compilation_config;
 import stl;
@@ -90,9 +94,17 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             exit(0);
             break;
         }
+#ifdef ENABLE_JEMALLOC_PROF
+        case SIGUSR2: {
+            // http://jemalloc.net/jemalloc.3.html
+            int rc = mallctl("prof.dump", NULL, NULL, NULL, 0);
+            printf("Dump memory profile %d\n", rc);
+            break;
+        }
+#endif
         default: {
             // Ignore
-            fmt::print("Other type of signal: %d\n", signal_number);
+            printf("Other type of signal: %d\n", signal_number);
         }
     }
     //    exit(0);
@@ -104,6 +116,9 @@ void RegisterSignal() {
     sig_action.sa_sigaction = SignalHandler;
     sigemptyset(&sig_action.sa_mask);
     sigaction(SIGUSR1, &sig_action, NULL);
+#ifdef ENABLE_JEMALLOC_PROF
+    sigaction(SIGUSR2, &sig_action, NULL);
+#endif
     sigaction(SIGINT, &sig_action, NULL);
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);
