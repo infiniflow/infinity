@@ -47,6 +47,7 @@ import statement_common;
 import embedding_info;
 import bg_task;
 import physical_import;
+import chunk_index_entry;
 
 using namespace infinity;
 
@@ -599,7 +600,12 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             auto iter = index_by_segment.find(0);
             if (iter != index_by_segment.end()) {
                 auto &segment_index_entry = iter->second;
-                auto index_handle = segment_index_entry->GetIndex();
+
+                Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+                segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+                for (auto &chunk_index_entry : chunk_index_entries) {
+                    auto index_handle = chunk_index_entry->GetIndex();
+                }
             }
         }
 

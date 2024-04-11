@@ -41,6 +41,12 @@ struct BlockEntry;
 struct TableEntry;
 class BufferManager;
 struct SegmentEntry;
+struct TableEntry;
+
+export struct PopulateEntireConfig {
+    bool prepare_;
+    bool check_ts_;
+};
 
 export class SegmentIndexEntry : public BaseEntry, public EntryInterface {
 
@@ -57,6 +63,10 @@ public:
                                                                    TransactionID txn_id,
                                                                    TxnTimeStamp begin_ts,
                                                                    TxnTimeStamp commit_ts);
+
+    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(const SharedPtr<String> &index_dir, CreateIndexParam *param, SegmentID segment_id);
+
+    static String IndexFileName(SegmentID segment_id);
 
     [[nodiscard]] BufferHandle GetIndex();
 
@@ -87,9 +97,10 @@ public:
     inline SegmentID segment_id() const { return segment_id_; }
     inline TxnTimeStamp min_ts() const { return min_ts_; }
     inline TxnTimeStamp max_ts() const { return max_ts_; }
+    const SharedPtr<String> &index_dir() const;
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager* buffer_manager);
+    void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager *buffer_manager);
 
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
@@ -101,7 +112,7 @@ public:
     void MemIndexLoad(const String &base_name, RowID base_row_id);
 
     // Populate index entirely for the segment
-    void PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn);
+    void PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config);
 
     u32 MemIndexRowCount();
 
@@ -161,7 +172,13 @@ public:
     }
 
 public:
-    SharedPtr<ChunkIndexEntry> AddChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
+    SharedPtr<ChunkIndexEntry> AddChunkIndexEntry(const TableEntry *table_entry, RowID base_rowid, BufferManager *buffer_mgr);
+
+    SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
+
+    SharedPtr<ChunkIndexEntry>
+    AddChunkIndexEntryReplay(TableEntry *table_entry, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
     void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }

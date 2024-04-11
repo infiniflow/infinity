@@ -777,7 +777,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
                     }
                     auto *segment_index_entry = iter2->second.get();
-                    segment_index_entry->AddChunkIndexEntry(base_name, base_rowid, row_count);
+                    segment_index_entry->AddChunkIndexEntryReplay(table_entry, base_name, base_rowid, row_count, buffer_mgr);
                 }
                 break;
             }

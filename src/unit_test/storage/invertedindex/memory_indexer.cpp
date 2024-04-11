@@ -130,7 +130,7 @@ TEST_F(MemoryIndexerTest, Insert) {
         indexer2->CommitSync();
     }
 
-    fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 4U);
+    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 4U);
     fake_segment_index_entry_1->SetMemoryIndexer(std::move(indexer2));
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
@@ -146,7 +146,7 @@ TEST_F(MemoryIndexerTest, test2) {
     indexer1.Insert(column_, 2, 2, true);
     indexer1.Insert(column_, 4, 1, true);
     indexer1.Dump(true);
-    fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
+    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
 

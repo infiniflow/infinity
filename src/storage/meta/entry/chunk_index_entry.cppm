@@ -23,40 +23,68 @@ import third_party;
 import base_entry;
 import meta_entry_interface;
 import cleanup_scanner;
+import index_file_worker;
+import index_base;
+import buffer_handle;
 
 namespace infinity {
 
 class Txn;
 class SegmentIndexEntry;
 struct BlockEntry;
-struct TableEntry;
 class BufferManager;
+class BufferObj;
 struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
 export class ChunkIndexEntry : public BaseEntry, public EntryInterface {
-
-public:
+private:
     ChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
+    static String IndexFileName(SegmentID segment_id, const RowID &base_rowid);
+
+    static UniquePtr<IndexFileWorker> CreateFileWorker(const IndexBase *index_base,
+                                                       const SharedPtr<String> &index_dir,
+                                                       CreateIndexParam *param,
+                                                       SegmentID segment_id,
+                                                       RowID base_rowid);
+
+public:
     static SharedPtr<ChunkIndexEntry>
-    NewChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
+    NewChunkIndexEntry(SegmentIndexEntry *segment_index_entry, CreateIndexParam *param, RowID base_rowid, BufferManager *buffer_mgr);
 
     static SharedPtr<ChunkIndexEntry>
-    NewReplayChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
+    NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
+
+    static SharedPtr<ChunkIndexEntry> NewReplayChunkIndexEntry(SegmentIndexEntry *segment_index_entry,
+                                                               CreateIndexParam *param,
+                                                               const String &base_name,
+                                                               RowID base_rowid,
+                                                               u32 row_count,
+                                                               BufferManager *buffer_mgr);
+
+    void SetRowCount(u32 row_count) { row_count_ = row_count; }
+
+    BufferHandle GetIndex();
 
     nlohmann::json Serialize();
 
     static UniquePtr<ChunkIndexEntry> Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry);
 
-    virtual void Cleanup() override {}
+    virtual void Cleanup() override;
+
     virtual void PickCleanup(CleanupScanner *scanner) override {}
+
+    void SaveIndexFile();
 
 public:
     SegmentIndexEntry *segment_index_entry_;
     String base_name_;
     RowID base_rowid_;
     u32 row_count_;
+
+private:
+    BufferObj *buffer_obj_{};
 };
 
 } // namespace infinity
