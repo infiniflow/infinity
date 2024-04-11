@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <cassert>
-#include <istream>
+#include <iostream>
 #include <sstream>
 #include <utility>
 
@@ -22,9 +22,11 @@
 #include "search_parser.h"
 #include "search_scanner.h"
 
+import stl;
 import term;
 import infinity_exception;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -61,16 +63,16 @@ void ParseFields(const std::string &fields_str, std::vector<std::pair<std::strin
 }
 
 std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string &fields_str, const std::string &query) const {
+    std::unique_ptr<QueryNode> parsed_query_tree;
     std::vector<std::pair<std::string, float>> fields;
     ParseFields(fields_str, fields);
     if (fields.empty()) {
-        return ParseSingle(query);
+        parsed_query_tree = ParseSingle(query);
     } else if (fields.size() == 1) {
-        auto result = ParseSingle(query, &(fields[0].first));
-        if (result) {
-            result->MultiplyWeight(fields[0].second);
+        parsed_query_tree = ParseSingle(query, &(fields[0].first));
+        if (parsed_query_tree) {
+            parsed_query_tree->MultiplyWeight(fields[0].second);
         }
-        return result;
     } else {
         std::vector<std::unique_ptr<QueryNode>> or_children;
         for (auto &[default_field, boost] : fields) {
@@ -80,16 +82,26 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string
                 or_children.emplace_back(std::move(sub_result));
             }
         }
-        if (or_children.empty()) {
-            return nullptr;
-        } else if (or_children.size() == 1) {
-            return std::move(or_children[0]);
-        } else {
-            auto node_or = std::make_unique<OrQueryNode>();
-            node_or->children_ = std::move(or_children);
-            return node_or;
+        if (or_children.size() == 1) {
+            parsed_query_tree = std::move(or_children[0]);
+        } else if (!or_children.empty()) {
+            parsed_query_tree = std::make_unique<OrQueryNode>();
+            static_cast<OrQueryNode *>(parsed_query_tree.get())->children_ = std::move(or_children);
         }
     }
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "Query tree:\n";
+        if (parsed_query_tree) {
+            parsed_query_tree->PrintTree(oss);
+        } else {
+            oss << "Empty query tree!\n";
+        }
+        LOG_INFO(std::move(oss).str());
+    }
+#endif
+    return parsed_query_tree;
 }
 
 std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, const std::string *default_field_ptr) const {

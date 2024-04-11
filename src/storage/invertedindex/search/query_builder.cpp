@@ -14,6 +14,7 @@
 
 module;
 
+#include <iostream>
 #include <vector>
 module query_builder;
 
@@ -31,6 +32,7 @@ import query_node;
 import base_table_ref;
 import segment_entry;
 import blockmax_term_doc_iterator;
+import logger;
 
 namespace infinity {
 
@@ -48,17 +50,45 @@ QueryBuilder::~QueryBuilder() {}
 
 UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
     // Optimize the query tree.
-    context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    if (!context.optimized_query_tree_) {
+        context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    }
     // Create the iterator from the query tree.
-    UniquePtr<DocIterator> result = context.query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+    UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "DocIterator:\n";
+        if (result) {
+            result->PrintTree(oss);
+        } else {
+            oss << "Empty tree!\n";
+        }
+        LOG_INFO(std::move(oss).str());
+    }
+#endif
     return result;
 }
 
 UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullTextQueryContext &context) {
     // Optimize the query tree.
-    context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    if (!context.optimized_query_tree_) {
+        context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    }
     // Create the iterator from the query tree.
-    UniquePtr<EarlyTerminateIterator> result = context.query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_);
+    UniquePtr<EarlyTerminateIterator> result = context.optimized_query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_);
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "EarlyTerminateIterator:\n";
+        if (result) {
+            result->PrintTree(oss);
+        } else {
+            oss << "Empty tree!\n";
+        }
+        LOG_INFO(std::move(oss).str());
+    }
+#endif
     return result;
 }
 
