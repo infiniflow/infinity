@@ -12,7 +12,8 @@ import position_list_format_option;
 import posting_field;
 import short_list_optimize_util;
 import index_defines;
-import index_defines;
+import third_party;
+
 module position_list_decoder;
 
 namespace infinity {

@@ -36,12 +36,13 @@ export class ColumnIndexReader {
 public:
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
-    UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool);
+    UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool, bool fetch_position = true);
 
     UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, MemoryPool *session_pool, float weight);
 
     float GetAvgColumnLength() const;
 
+    optionflag_t GetOptionFlag() const { return flag_; }
 private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
