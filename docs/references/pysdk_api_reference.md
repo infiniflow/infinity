@@ -6,9 +6,9 @@ slug: /python_api_reference
 
 ## connect
 
-***class*** **infinity.connect(*uri = <font color=grey>REMOTE_HOST</font>*)**
+***class*** **infinity.connect(*uri = REMOTE_HOST*)**
 
-connect to the Infinity server and return a infinity object. 
+Connect to the Infinity server and return a infinity object. 
 
 ### Parameters
 
@@ -35,12 +35,12 @@ infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
 
 **infinity.disconnet()**
 
-disconnects the current Infinity object from the server.
+Disconnect the current Infinity object from the server.
 >automatically called when an Infinity object is destructed.
 
 ### Returns
 
-- success: response `success` is `True`
+- success: `True`
 - failure: `Exception`
 
 ### Examples
@@ -51,7 +51,7 @@ infinity_obj.disconnect()
 
 ## create_database
 
-**Infinity.create_database(*db_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+**Infinity.create_database(*db_name, conflict_type = ConflictType.Error*)**
 
 Create a database using given name. Different approaches will be adopted depending on the `conflict_type` field, if database with the same name has existed. 
 
@@ -64,7 +64,7 @@ emun type which could be *Error*, *Ignore* or *Replace*, defined in *infinity.co
 
 ### Returns
 
-- success: response `success` is `True`
+- success: `True`
 - failure: `Exception`
 
 ### Examples
@@ -74,7 +74,7 @@ infinity_obj.create_database("my_database")
 
 ## drop_database
 
-**Infinity.drop_database(*db_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+**Infinity.drop_database(*db_name, conflict_type = ConflictType.Error*)**
 
 Drop a database by name.
 
@@ -87,7 +87,7 @@ emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### Returns
 
-- success: response `success` is `True`
+- success: `True`
 - failure: `Exception`
 
 ### Examples
@@ -167,7 +167,7 @@ metadata.table_count  #0
 
 ## create_table
 
-**RemoteDatabase.create_table(*table_name, columns_definition, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+**RemoteDatabase.create_table(*table_name, columns_definition, conflict_type = ConflictType.Error*)**
 
 Create a table using given name, and specify defination of each column.
 
@@ -223,7 +223,7 @@ db_obj.create_table("test_create_embedding_table",
 
 ## drop_table
 
-**RemoteDatabase.create_table(*table_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+**RemoteDatabase.create_table(*table_name, conflict_type = ConflictType.Error*)**
 
 Drops a table by name.
 
@@ -327,7 +327,7 @@ res
 
 ## create_index
 
-**RemoteTable.create_index(*index_name, index_infos, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+**RemoteTable.create_index(*index_name, index_infos, conflict_type = ConflictType.Error*)**
 
 Create an index by `IndexInfo` list.
 
@@ -398,7 +398,7 @@ table_obj.create_index("my_index",
 
 ## create_index
 
-**RemoteTable.create_index(*index_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+**RemoteTable.create_index(*index_name, conflict_type = ConflictType.Error*)**
 
 Drops an index by name.
 
@@ -512,7 +512,7 @@ table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7,
 
 ## import
 
-**RemoteTable.import(*filpath, import_options = <font color=grey>None</font>*)**
+**RemoteTable.import(*filpath, import_options = None*)**
 
 Import data from a file into the table object
 
@@ -542,7 +542,7 @@ table_obj.import_data(test_csv_dir, None)
 
 ## delete
 
-**RemoteTable.delete(*cond = <font color=grey>None</font>*)**
+**RemoteTable.delete(*cond = None*)**
 
 Delete rows by condition.The condition is similar to the WHERE conditions in SQL. If  condition is not specified, all the data will be removed in the table object.
 
@@ -564,7 +564,7 @@ table_obj.delete()
 
 ## update
 
-**RemoteTable.delete(*cond = <font color=grey>None</font>*)**
+**RemoteTable.delete(*cond = None*)**
 
 search for rows that satisfy the condition and update them using the provided values.
 
@@ -639,7 +639,7 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 
 ## knn
 
-**RemoteTable.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = <font color=grey>None</font>*)**
+**RemoteTable.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None*)**
 
 Build a KNN search expression. Find the top n closet records to the given vector.
 
@@ -693,7 +693,7 @@ table_obj.match('body', 'harmful', 'topn=2')
 
 ## fusion
 
-**RemoteTable.fusion(*method, options_text = <font color=grey>''</font>*)**
+**RemoteTable.fusion(*method, options_text = ''*)**
 
 Build a fusion expression.
 
