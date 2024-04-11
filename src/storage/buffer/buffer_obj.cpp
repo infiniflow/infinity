@@ -130,6 +130,7 @@ bool BufferObj::Free() {
         }
         case BufferStatus::kClean: {
             file_worker_->FreeInMemory();
+            LOG_INFO(fmt::format("Remove buffer object: {}", this->GetFilename()));
 //            buffer_mgr_->RemoveBufferObj(this->GetFilename());
             break;
         }
@@ -147,11 +148,13 @@ bool BufferObj::Save() {
         switch (status_) {
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
+                LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
                 file_worker_->WriteToFile(false);
                 write = true;
                 break;
             }
             case BufferStatus::kFreed: {
+                LOG_TRACE(fmt::format("BufferObj::Move file: {}", GetFilename()));
                 file_worker_->MoveFile();
                 break;
             }
@@ -193,9 +196,10 @@ void BufferObj::SetAndTryCleanup() {
                 UnrecoverableError("Assert: freed buffer object shouldn't in gc_queue.");
             }
             String file_name = this->GetFilename();
-            LOG_TRACE(fmt::format("Remove file and buffer: {}", file_name));
+            LOG_TRACE(fmt::format("Remove file: {}", file_name));
             file_worker_->CleanupFile();
-//            buffer_mgr_->RemoveBufferObj(file_name);
+            LOG_TRACE(fmt::format("Remove from buffer: {}", file_name));
+            buffer_mgr_->RemoveBufferObj(file_name);
             LOG_TRACE(fmt::format("Removed file and buffer: {}", file_name));
             break;
         }

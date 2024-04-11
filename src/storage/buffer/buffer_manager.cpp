@@ -42,8 +42,8 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
 
-    auto res = buffer_obj.get();
-    std::unique_lock w_locker(rw_locker_);
+    BufferObj* res = buffer_obj.get();
+    std::unique_lock<std::mutex> lock(w_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         UnrecoverableError(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
     }
@@ -54,9 +54,9 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
 BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     LOG_TRACE(fmt::format("Get buffer object: {}", file_path));
-    rw_locker_.lock_shared();
+    w_locker_.lock();
     auto iter1 = buffer_map_.find(file_path);
-    rw_locker_.unlock_shared();
+    w_locker_.unlock();
 
     if (iter1 != buffer_map_.end()) {
         return iter1->second.get();
@@ -65,10 +65,10 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     // Cannot find BufferHandle in buffer_map, read from disk
     auto buffer_obj = MakeUnique<BufferObj>(this, false, std::move(file_worker));
 
-    rw_locker_.lock();
+    w_locker_.lock();
     auto [iter2, insert_ok] = buffer_map_.emplace(std::move(file_path), std::move(buffer_obj));
     // If insert_ok is false, it means another thread has inserted the same buffer handle. Return it.
-    rw_locker_.unlock();
+    w_locker_.unlock();
 
     return iter2->second.get();
 }
@@ -76,7 +76,9 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
 // return false if buffer_obj is not loaded
 void BufferManager::RemoveBufferObj(const String &file_path) {
     LOG_TRACE(fmt::format("Erasing buffer object: {}", file_path));
-    std::unique_lock w_lock(rw_locker_);
+    std::unique_lock<std::mutex> lock(w_locker_);
+    deprecated_array_.clear();
+    deprecated_array_.emplace_back(buffer_map_[file_path]);
     buffer_map_.erase(file_path);
     LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
 }
