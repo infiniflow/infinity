@@ -249,11 +249,9 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
     // ByteSliceList *posting_list = cur_segment_posting.GetSliceListPtr().get();
 
     ByteSliceList *doc_slice_list = cur_segment_posting.GetDocSliceListPtr().get();
-    ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
 
     doc_reader.Open(doc_slice_list);
     doc_reader_.Open(doc_slice_list);
-    pos_reader_.Open(pos_slice_list);
 
     const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
     u32 doc_skiplist_size = doc_reader.ReadVUInt32();
@@ -282,6 +280,12 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
 
     index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, doc_slice_list, term_meta.GetDocFreq());
     if (format_option_.HasPositionList()) {
+        // assert(nullptr != pos_reader_.GetByteSliceList());
+        ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
+
+        assert(nullptr != pos_slice_list);
+        pos_reader_.Open(pos_slice_list);
+
         u32 pos_list_begin = pos_reader_.Tell();
         auto pos_skiplist_size = pos_reader_.ReadVUInt32();
         auto pos_list_size = pos_reader_.ReadVUInt32();

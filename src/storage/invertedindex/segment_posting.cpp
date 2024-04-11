@@ -22,6 +22,8 @@ import term_meta;
 import byte_slice_reader;
 import index_defines;
 import internal_types;
+import file_reader;
+import memory_pool;
 
 module segment_posting;
 
@@ -32,6 +34,7 @@ void SegmentPosting::Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id
     doc_count_ = doc_count;
     term_meta_ = term_meta;
     posting_writer_ = nullptr;
+    posting_reader_ = nullptr;
 }
 
 void SegmentPosting::Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer) {
@@ -45,13 +48,33 @@ void SegmentPosting::Init(SharedPtr<ByteSliceList> doc_slice_list,
                           SharedPtr<ByteSliceList> pos_slice_list,
                           RowID base_row_id,
                           u64 doc_count,
-                          TermMeta &term_meta) {
+                          TermMeta &term_meta,
+                          u64 pos_begin,
+                          u64 pos_size,
+                          const SharedPtr<FileReader> &posting_reader,
+                          MemoryPool *session_pool) {
     doc_slice_list_ = std::move(doc_slice_list);
     pos_slice_list_ = std::move(pos_slice_list);
     base_row_id_ = base_row_id;
     doc_count_ = doc_count;
     term_meta_ = term_meta;
     posting_writer_ = nullptr;
+    pos_begin_ = pos_begin;
+    pos_size_ = pos_size;
+    posting_reader_ = MakeShared<FileReader>(posting_reader->fs_, posting_reader->path_, 1024);
+    session_pool_ = session_pool;
+}
+
+const SharedPtr<ByteSliceList> &SegmentPosting::GetPosSliceListPtr() {
+    if (pos_slice_list_.get() == nullptr) {
+        ByteSlice *pos_slice = ByteSlice::CreateSlice(pos_size_, session_pool_);
+
+        posting_reader_->Seek(term_meta_.doc_start_ + pos_begin_);
+        posting_reader_->Read((char *)pos_slice->data_, pos_size_);
+
+        pos_slice_list_ = MakeShared<ByteSliceList>(pos_slice, session_pool_);
+    }
+    return pos_slice_list_;
 }
 
 } // namespace infinity

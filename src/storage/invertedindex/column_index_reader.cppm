@@ -42,6 +42,7 @@ public:
 
     float GetAvgColumnLength() const;
 
+    optionflag_t GetOptionFlag() const { return flag_; }
 private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;

@@ -21,6 +21,8 @@ import posting_writer;
 import term_meta;
 import index_defines;
 import internal_types;
+import file_reader;
+import memory_pool;
 
 export module segment_posting;
 
@@ -33,7 +35,15 @@ public:
 
     // for on disk segment posting
     void Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
-    void Init(SharedPtr<ByteSliceList> doc_slice_list, SharedPtr<ByteSliceList> pos_slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
+    void Init(SharedPtr<ByteSliceList> doc_slice_list,
+              SharedPtr<ByteSliceList> pos_slice_list,
+              RowID base_row_id,
+              u64 doc_count,
+              TermMeta &term_meta,
+              u64 pos_begin,
+              u64 pos_size,
+              const SharedPtr<FileReader> &posting_reader,
+              MemoryPool *session_pool);
     // for in memory segment posting
     void Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer);
 
@@ -59,15 +69,19 @@ public:
 
     const SharedPtr<ByteSliceList> &GetDocSliceListPtr() const { return doc_slice_list_; }
 
-    const SharedPtr<ByteSliceList> &GetPosSliceListPtr() const { return pos_slice_list_; }
+    const SharedPtr<ByteSliceList> &GetPosSliceListPtr();
 
 private:
-    SharedPtr<ByteSliceList> slice_list_;
-    SharedPtr<ByteSliceList> doc_slice_list_;
-    SharedPtr<ByteSliceList> pos_slice_list_;
+    SharedPtr<ByteSliceList> slice_list_{nullptr};
+    SharedPtr<ByteSliceList> doc_slice_list_{nullptr};
+    SharedPtr<ByteSliceList> pos_slice_list_{nullptr};
     RowID base_row_id_ = INVALID_ROWID;
     u32 doc_count_ = 0;
     TermMeta term_meta_;
-    SharedPtr<PostingWriter> posting_writer_;
+    SharedPtr<PostingWriter> posting_writer_{nullptr};
+    SharedPtr<FileReader> posting_reader_{nullptr};
+    u64 pos_begin_ = 0;
+    u64 pos_size_ = 0;
+    MemoryPool *session_pool_;
 };
 } // namespace infinity

@@ -278,22 +278,24 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
             search_expr->SetExprs(exprs);
         }
 
-        auto output_columns = new std::vector<ParsedExpr *>();
-        {
-            ColumnExpr *col1 = new ColumnExpr();
-            col1->names_.emplace_back("col1");
-            output_columns->emplace_back(col1);
-            ColumnExpr *col2 = new ColumnExpr();
-            col2->names_.emplace_back("col2");
-            output_columns->emplace_back(col2);
-        }
-
 //        auto output_columns = new std::vector<ParsedExpr *>();
 //        {
-//            auto select_rowid_expr = new FunctionExpr();
-//            select_rowid_expr->func_name_ = "id";
-//            output_columns->emplace_back(select_rowid_expr);
+//            ColumnExpr *col1 = new ColumnExpr();
+//            col1->names_.emplace_back("col1");
+//            output_columns->emplace_back(col1);
+//            ColumnExpr *col2 = new ColumnExpr();
+//            col2->names_.emplace_back("col2");
+//            output_columns->emplace_back(col2);
 //        }
+
+        std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>();
+        {
+            auto select_rowid_expr = new FunctionExpr();
+            select_rowid_expr->func_name_ = "row_id";
+            auto select_score_expr = new FunctionExpr();
+            select_score_expr->func_name_ = "score";
+            output_columns->emplace_back(select_rowid_expr);
+        }
 //        infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
         auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
         {
@@ -330,7 +332,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (is_import) {
-        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+//        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
         BenchmarkImport(infinity, db_name, table_name, srcfile);
     }
     if (is_insert) {
@@ -338,8 +340,8 @@ int main(int argc, char* argv[]) {
         BenchmarkInsert(infinity, db_name, table_name, srcfile);
     }
     if (is_merge) {
-        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
-        BenchmarkInsert(infinity, db_name, table_name, srcfile);
+//        BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
+//        BenchmarkInsert(infinity, db_name, table_name, srcfile);
         BenchmarkOptimize(infinity, db_name, table_name);
     }
     sleep(10);

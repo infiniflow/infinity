@@ -52,8 +52,6 @@ bool DiskIndexSegmentReader::GetSegmentPostingBack(const String &term, SegmentPo
         return false;
     }
     u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
-    fmt::print("term = {}, file_length = {}\n", term, file_length);
-    fmt::print("file path = {}\n", posting_reader_->path_);
     ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -69,15 +67,9 @@ bool DiskIndexSegmentReader::GetSegmentPostingBack(const String &term, SegmentPo
         byte_slice_reader.Seek(pos_list_begin);
         auto pos_skiplist_size = byte_slice_reader.ReadVUInt32();
         auto pos_list_size = byte_slice_reader.ReadVUInt32();
-        fmt::print("doc_skiplist_size = {}\n", doc_skiplist_size);
-        fmt::print("doc_list_size = {}\n", doc_list_size);
-        fmt::print("pos_skiplist_size = {}\n", pos_skiplist_size);
-        fmt::print("pos_list_size = {}\n", pos_list_size);
-        fmt::print("slice->data_ size = {}\n", slice->size_);
 
     }
     SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
-    fmt::print("slice size: {}, byte_slice_list total size: {}\n", slice->size_, byte_slice_list->GetTotalSize());
     seg_posting.Init(std::move(byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
     return true;
 }
@@ -90,13 +82,13 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
     u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
     u64 doc_header_length = sizeof(u32) * 2;
     u64 pos_header_length = sizeof(u32) * 2;
-    fmt::print("term = {}, file_length = {}\n", term, file_length);
-    fmt::print("file path = {}\n", posting_reader_->path_);
 
     ByteSlice *doc_header_slice = ByteSlice::CreateSlice(doc_header_length, session_pool);
     ByteSlice *pos_header_slice = ByteSlice::CreateSlice(pos_header_length, session_pool);
     ByteSlice *doc_slice = nullptr;
     ByteSlice *pos_slice = nullptr;
+    u64 pos_begin = -1;
+    u64 pos_size = -1;
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -113,9 +105,10 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
         doc_slice = ByteSlice::CreateSlice(doc_size, session_pool);
         posting_reader_->Seek(term_meta.doc_start_);
         posting_reader_->Read((char *)doc_slice->data_, doc_size);
+        pos_begin = doc_byte_slice_reader.Tell() + doc_skiplist_size + doc_list_size;
+        pos_size = file_length - doc_size;
 
         if (fetch_position) {
-            auto pos_begin = doc_byte_slice_reader.Tell() + doc_skiplist_size + doc_list_size;
             fmt::print("doc_start: {}, pos_begin: {}, doc_size: {}\n", term_meta.doc_start_, pos_begin, doc_size);
             posting_reader_->Seek(term_meta.doc_start_ + pos_begin);
             posting_reader_->Read((char *)pos_header_slice->data_, pos_header_length);
@@ -125,27 +118,29 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
             auto pos_skiplist_size = pos_byte_slice_reader.ReadVUInt32();
             auto pos_list_size = pos_byte_slice_reader.ReadVUInt32();
             auto pos_header_real_length = pos_byte_slice_reader.Tell() - pos_byte_slice_begin;
-            fmt::print("pos_byte_slice_reader.Tell: {}, pos_byte_slice_begin: {}\n", pos_byte_slice_reader.Tell(), pos_byte_slice_begin);
-            fmt::print("pos_header_real_length: {}, pos_skiplist_size: {}, pos_list_size: {}\n", pos_header_real_length, pos_skiplist_size, pos_list_size);
             auto pos_size = pos_header_real_length + pos_skiplist_size + pos_list_size;
             assert(pos_size + doc_size == file_length);
-            fmt::print("doc_size: {}, pos_size: {}, pos_header_real_length: {}\n", doc_size, pos_size, pos_header_real_length);
             pos_slice = ByteSlice::CreateSlice(pos_size, session_pool);
             posting_reader_->Seek(term_meta.doc_start_ + pos_begin);
             posting_reader_->Read((char *)pos_slice->data_, pos_size);
         }
     }
     SharedPtr<ByteSliceList> doc_byte_slice_list = MakeShared<ByteSliceList>(doc_slice, session_pool);
-    fmt::print("doc slice size: {}, doc_byte_slice_list total size: {}\n", doc_slice->size_, doc_byte_slice_list->GetTotalSize());
-//    seg_posting.Init(std::move(doc_byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
 
     SharedPtr<ByteSliceList> pos_byte_slice_list = nullptr;
     if (fetch_position) {
         pos_byte_slice_list = MakeShared<ByteSliceList>(pos_slice, session_pool);
-        fmt::print("pos slice size: {}, pos_byte_slice_list total size: {}\n", pos_slice->size_, pos_byte_slice_list->GetTotalSize());
     }
-//    seg_posting.Init(std::move(pos_byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
-    seg_posting.Init(std::move(doc_byte_slice_list), std::move(pos_byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
+
+    seg_posting.Init(std::move(doc_byte_slice_list),
+                     std::move(pos_byte_slice_list),
+                     base_row_id_,
+                     term_meta.doc_freq_,
+                     term_meta,
+                     pos_begin,
+                     pos_size,
+                     posting_reader_,
+                     session_pool);
     return true;
 }
 
