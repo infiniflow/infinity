@@ -34,14 +34,14 @@ class BaseClient:
         pass
 
     @abstractmethod
-    def search(self) -> list[int]:
+    def search(self) -> list[list[Any]]:
         """
         Execute the corresponding query tasks (vector search, full-text search, hybrid search) based on the parsed parameters. 
         The function returns id list.
         """
         pass
 
-    def check_and_save_results(self, results: list[int]):
+    def check_and_save_results(self, results: list[list[Any]]):
         """
         The correct results for queries are read from the mode configuration file to compare with the search results and calculate recall.
         Record the results (metrics to be measured) and save them in the results folder.
