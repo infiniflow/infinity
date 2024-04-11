@@ -99,6 +99,7 @@ class TestTable:
 
     def test_show_tables(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        
         db = infinity_obj.get_database("default")
 
         with pl.Config(fmt_str_lengths=1000):

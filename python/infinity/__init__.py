@@ -19,7 +19,6 @@ __version__ = importlib.metadata.version("infinity_sdk")
 from infinity.common import URI, NetworkAddress, LOCAL_HOST
 from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
-from connection_pool import ConnectionPool
 
 def connect(
         uri: URI = LOCAL_HOST
