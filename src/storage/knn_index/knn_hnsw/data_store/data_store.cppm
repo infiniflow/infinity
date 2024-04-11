@@ -15,7 +15,7 @@
 module;
 
 #include <cassert>
-#include <fstream>
+#include <ostream>
 
 export module data_store;
 
@@ -293,10 +293,22 @@ public:
     void Dump(std::ostream &os) const {
         SizeT cur_vec_num = this->cur_vec_num();
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+
+        os << "[CONST] chunk_size: " << chunk_size_ << ", max_chunk_n: " << max_chunk_n_ << ", chunk_shift: " << chunk_shift_ << std::endl;
+        os << "cur_vec_num: " << cur_vec_num << std::endl;
+
+        vec_store_meta_.Dump(os);
         for (SizeT i = 0; i < chunk_num; ++i) {
-            os << "-------chunk " << i << std::endl;
+            os << "chunk " << i << std::endl;
             SizeT cur_chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
-            inners_[i].Dump(os, cur_chunk_size, graph_store_meta_);
+            inners_[i].DumpVec(os, i * chunk_size_, cur_chunk_size, vec_store_meta_);
+        }
+
+        graph_store_meta_.Dump(os);
+        for (SizeT i = 0; i < chunk_num; ++i) {
+            os << "chunk " << i << std::endl;
+            SizeT cur_chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
+            inners_[i].DumpGraph(os, cur_chunk_size, graph_store_meta_);
         }
     }
 };
@@ -396,7 +408,16 @@ public:
         graph_store_inner_.Check(chunk_size, meta, vertex_i_offset, cur_vec_num, max_l);
     }
 
-    void Dump(std::ostream &os, SizeT chunk_size, const GraphStoreMeta &meta) const { graph_store_inner_.Dump(os, chunk_size, meta); }
+    void DumpVec(std::ostream &os, SizeT offset, SizeT chunk_size, const VecStoreMeta &meta) const {
+        vec_store_inner_.Dump(os, offset, chunk_size, meta);
+        os << "labels: [";
+        for (SizeT i = 0; i < chunk_size; ++i) {
+            os << labels_[i] << ", ";
+        }
+        os << "]" << std::endl;
+    }
+
+    void DumpGraph(std::ostream &os, SizeT chunk_size, const GraphStoreMeta &meta) const { graph_store_inner_.Dump(os, chunk_size, meta); }
 };
 
 } // namespace infinity

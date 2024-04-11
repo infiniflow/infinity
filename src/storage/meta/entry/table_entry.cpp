@@ -294,13 +294,14 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         if (!status.ok())
             continue;
         const IndexBase *index_base = table_index_entry->index_base();
-        if (index_base->index_type_ != IndexType::kFullText) {
+        if (index_base->index_type_ != IndexType::kFullText && index_base->index_type_ != IndexType::kHnsw) {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_WARN(*err_msg);
             continue;
         }
-        SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn);
+        PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
+        SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
         if (segment_index_entry.get() != nullptr) {
             Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
             txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
@@ -743,7 +744,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             }
             SharedPtr<ChunkIndexEntry> chunk_index_entry =
-                MakeShared<ChunkIndexEntry>(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
+                ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             segment_index_entry->ReplaceChunkIndexEntries(chunk_index_entry);
             // OPTIMIZE invoke this func at which the txn hasn't been commited yet.

@@ -16,7 +16,6 @@ module;
 
 export module index_file_worker;
 
-
 import index_base;
 import file_worker;
 import stl;
@@ -39,7 +38,10 @@ protected:
     SharedPtr<IndexBase> index_base_{};
 
 public:
-    explicit IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def)
+    explicit IndexFileWorker(SharedPtr<String> file_dir,
+                             SharedPtr<String> file_name,
+                             SharedPtr<IndexBase> index_base,
+                             SharedPtr<ColumnDef> column_def)
         : FileWorker(file_dir, file_name), column_def_(column_def), index_base_(index_base) {}
 
     SizeT GetMemoryCost() const override { return 0; }

@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <ostream>
 #include <xmmintrin.h>
 
 export module plain_vec_store;
@@ -62,6 +63,9 @@ public:
 
 private:
     SizeT dim_;
+
+public:
+    void Dump(std::ostream &os) const { os << "[CONST] dim: " << dim_ << std::endl; }
 };
 
 export template <typename DataType>
@@ -100,6 +104,18 @@ private:
 
 private:
     UniquePtr<DataType[]> ptr_;
+
+public:
+    void Dump(std::ostream &os, SizeT offset, SizeT chunk_size, const Meta &meta) const {
+        for (int i = 0; i < (int)chunk_size; i++) {
+            os << "vec " << i << "(" << offset + i << "): ";
+            const DataType *v = GetVec(i, meta);
+            for (SizeT j = 0; j < meta.dim(); j++) {
+                os << v[j] << " ";
+            }
+            os << std::endl;
+        }
+    }
 };
 
 } // namespace infinity

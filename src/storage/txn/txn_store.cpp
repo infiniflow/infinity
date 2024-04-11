@@ -75,6 +75,9 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
 }
 
 void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
+    for (const auto &[segment_id, segment_index_entry] : index_entry_map_) {
+        segment_index_entry->CommitSegmentIndex(txn_id, commit_ts);
+    }
     for (auto chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->Commit(commit_ts);
     }
