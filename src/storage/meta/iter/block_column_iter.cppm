@@ -92,4 +92,28 @@ private:
     BlockOffset offset_;
 };
 
+export template <typename DataType>
+class MemIndexInserterIter {
+public:
+    MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
+        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+          ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}
+
+    Optional<Pair<const DataType *, SegmentOffset>> Next() {
+        if (cur_ == end_) {
+            return None;
+        }
+        const void *ret = column_vector_->data() + cur_ * ele_size_;
+        const auto *v_ptr = reinterpret_cast<const DataType *>(ret);
+        return std::make_pair(v_ptr, block_offset_ + cur_++);
+    }
+
+private:
+    SegmentOffset block_offset_;
+    SharedPtr<ColumnVector> column_vector_;
+    SizeT ele_size_;
+    SizeT cur_;
+    SizeT end_;
+};
+
 } // namespace infinity

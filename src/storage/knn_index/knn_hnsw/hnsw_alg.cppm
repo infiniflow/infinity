@@ -14,7 +14,7 @@
 
 module;
 
-#include <fstream>
+#include <ostream>
 #include <random>
 
 export module hnsw_alg;
@@ -291,16 +291,18 @@ private:
 
 public:
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void InsertVecs(Iterator &&iter, const HnswInsertConfig &config) {
+    Pair<SizeT, SizeT> InsertVecs(Iterator &&iter, const HnswInsertConfig &config) {
         auto [start_i, end_i] = StoreData(std::move(iter), config);
         for (VertexType vertex_i = start_i; vertex_i < end_i; ++vertex_i) {
             Build(vertex_i);
         }
+        return {start_i, end_i};
     }
 
     // This function for test
-    void InsertVecsRaw(const DataType *query, SizeT insert_n, LabelType offset = 0, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        InsertVecs(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n, offset), config);
+    Pair<SizeT, SizeT>
+    InsertVecsRaw(const DataType *query, SizeT insert_n, LabelType offset = 0, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+        return InsertVecs(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n, offset), config);
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
@@ -396,6 +398,8 @@ public:
 
     void Dump(std::ostream &os) const {
         os << std::endl << "---------------------------------------------" << std::endl;
+        os << "[CONST] M: " << M_ << ", ef_construction: " << ef_construction_ << ", mult: " << mult_ << std::endl;
+        os << "ef: " << ef_ << std::endl;
         data_store_.Dump(os);
         os << "---------------------------------------------" << std::endl;
     }

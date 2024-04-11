@@ -442,7 +442,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("#{}#{}#{}#{}@{}", *db_name_, *table_name_, *index_name_, segment_id_, (u8)(type_)));
     }
-    void Flush(TxnTimeStamp max_commit_ts);
+    void FlushDataToDisk(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 

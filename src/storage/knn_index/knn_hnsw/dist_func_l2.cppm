@@ -15,7 +15,7 @@
 module;
 
 #include "header.h"
-#include <type_traits>
+#include <ostream>
 
 import stl;
 import hnsw_common;
@@ -98,6 +98,13 @@ public:
     }
 
     static GlobalCacheType MakeGlobalCache(const MeanType *, SizeT) { return {}; }
+
+public:
+    static void DumpLocalCache(std::ostream &os, const LocalCacheType &local_cache) {
+        os << "norm1_scale: " << local_cache.first << ", norm2sq_scalesq: " << local_cache.second << std::endl;
+    }
+
+    static void DumpGlobalCache(std::ostream &, const GlobalCacheType &) {}
 };
 
 export template <typename DataType, typename CompressType>
