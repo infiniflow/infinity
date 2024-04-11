@@ -24,13 +24,14 @@ import hnsw_common;
 import file_system;
 import vec_store_type;
 import graph_store;
-import third_party;
-import logger;
 
 namespace infinity {
 
 template <typename VecStoreT, typename LabelType>
 class DataStoreInner;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
 
 export template <typename VecStoreT, typename LabelType>
 class DataStore {
@@ -274,8 +275,6 @@ private:
     UniquePtr<Inner[]> inners_;
 
 public:
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
     void Check() const {
         i32 max_l = -1;
         SizeT i;
@@ -289,9 +288,7 @@ public:
         }
         auto [max_layer, ep] = GetEnterPoint();
         assert(max_l == max_layer);
-        LOG_TRACE(fmt::format("{} {}", max_layer, ep));
     }
-#pragma clang diagnostic pop
 
     void Dump(std::ostream &os) const {
         SizeT cur_vec_num = this->cur_vec_num();
@@ -304,6 +301,7 @@ public:
     }
 };
 
+#pragma clang diagnostic pop
 //----------------------------------------------- Inner -----------------------------------------------
 
 template <typename VecStoreT, typename LabelType>
