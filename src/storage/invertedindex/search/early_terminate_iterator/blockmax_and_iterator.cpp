@@ -27,10 +27,7 @@ namespace infinity {
 BlockMaxAndIterator::BlockMaxAndIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators) : sorted_iterators_(std::move(iterators)) {
     std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) { return a->DocFreq() < b->DocFreq(); });
     // init df
-    doc_freq_ = std::numeric_limits<u32>::max();
-    for (const auto &c : sorted_iterators_) {
-        doc_freq_ = std::min(doc_freq_, c->DocFreq());
-    }
+    doc_freq_ = sorted_iterators_.front()->DocFreq();
     common_block_max_bm25_score_parts_.resize(sorted_iterators_.size());
     leftover_scores_upper_bound_.resize(sorted_iterators_.size());
     for (u32 i = sorted_iterators_.size() - 1; i > 0; --i) {
@@ -40,6 +37,9 @@ BlockMaxAndIterator::BlockMaxAndIterator(Vector<UniquePtr<EarlyTerminateIterator
 }
 
 void BlockMaxAndIterator::UpdateScoreThreshold(float threshold) {
+    if (threshold < 0) {
+        return;
+    }
     const float base_threshold = threshold - BM25ScoreUpperBound();
     for (const auto &it : sorted_iterators_) {
         it->UpdateScoreThreshold(base_threshold + it->BM25ScoreUpperBound());
