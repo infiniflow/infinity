@@ -130,8 +130,8 @@ bool BufferObj::Free() {
         }
         case BufferStatus::kClean: {
             file_worker_->FreeInMemory();
-            LOG_INFO(fmt::format("Remove buffer object: {}", this->GetFilename()));
-//            buffer_mgr_->RemoveBufferObj(this->GetFilename());
+            LOG_TRACE(fmt::format("Remove buffer object: {}", this->GetFilename()));
+            buffer_mgr_->RemoveBufferObj(this->GetFilename());
             break;
         }
         case BufferStatus::kNew: {

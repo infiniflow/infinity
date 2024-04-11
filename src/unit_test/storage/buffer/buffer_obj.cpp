@@ -75,7 +75,7 @@ class BufferObjTest : public BaseTest {
 
 public:
     void SaveBufferObj(BufferObj *buffer_obj) {
-        return buffer_obj->Save();
+        buffer_obj->Save();
     };
 
     void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {

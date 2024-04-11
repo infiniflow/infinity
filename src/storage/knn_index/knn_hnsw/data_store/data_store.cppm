@@ -24,6 +24,8 @@ import hnsw_common;
 import file_system;
 import vec_store_type;
 import graph_store;
+import third_party;
+import logger;
 
 namespace infinity {
 
@@ -287,6 +289,7 @@ public:
         }
         auto [max_layer, ep] = GetEnterPoint();
         assert(max_l == max_layer);
+        LOG_TRACE(fmt::format("{} {}", max_layer, ep));
     }
 #pragma clang diagnostic pop
 

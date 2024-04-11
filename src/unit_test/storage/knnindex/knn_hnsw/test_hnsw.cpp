@@ -27,6 +27,7 @@ import dist_func_l2;
 import dist_func_ip;
 import vec_store_type;
 import hnsw_common;
+import infinity_context;
 
 using namespace infinity;
 
@@ -224,21 +225,37 @@ public:
 
 TEST_F(HnswAlgTest, test1) {
     // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
+    InfinityContext::instance().Init(nullptr);
+
     using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
     TestSimple<Hnsw>();
+
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(HnswAlgTest, test2) {
+    InfinityContext::instance().Init(nullptr);
+
     using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     TestSimple<Hnsw>();
+
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(HnswAlgTest, test3) {
+    InfinityContext::instance().Init(nullptr);
+
     using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
     TestParallel<Hnsw>();
+
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(HnswAlgTest, test4) {
+    InfinityContext::instance().Init(nullptr);
+
     using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     TestParallel<Hnsw>();
+
+    InfinityContext::instance().UnInit();
 }
