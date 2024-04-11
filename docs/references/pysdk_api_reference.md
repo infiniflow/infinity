@@ -6,98 +6,99 @@ slug: /python_api_reference
 
 ## connect
 
-Connects to the Infinity server and gets an Infinity object.
+***class*** **infinity.connect(*uri = <font color=grey>REMOTE_HOST</font>*)**
 
-```python
-infinity_obj = infinity.connect(REMOTE_HOST)
-```
-
-### Details
-
-This method connect to the Infinity server and return a infinity object. 
+connect to the Infinity server and return a infinity object. 
 
 ### Parameters
 
-- `REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)`
+- **uri : NetworkAddress**
+ a NetworkAddress object is simply a struct whith 2 fields which indicate ip address(str) and port number(int) respectively. Local infinity service could be accessed by:
+ `REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)`
+ defined in *infinity.common*, which is also default value.
 
 ### Returns
 
 - success: An Infinity object.
 - failure: `Exception`
 
+### Examples
+
+```python
+infinity_obj = infinity.connect()
+infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
+```
+
 ---
 
-## infinity_obj.disconnect
+## disconnect
 
-Disconnects from the Infinity server.
+**infinity.disconnet()**
+
+disconnects the current Infinity object from the server.
+>automatically called when an Infinity object is destructed.
+
+### Returns
+
+- success: response `success` is `True`
+- failure: `Exception`
+
+### Examples
 
 ```python
 infinity_obj.disconnect()
 ```
 
-### Details
+## create_database
 
-This method disconnects the current Infinity object from the server.
+**Infinity.create_database(*db_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
 
-> It is automatically called when an Infinity object is destructed.
+Create a database using given name. Different approaches will be adopted depending on the `conflict_type` field, if database with the same name has existed. 
 
-#### Returns
+### Parameters
 
-- success:
-    - response `success` is `True`
+- **db_name : str(ont empty)** 
+name of the database
+- **confilict_type : ConflictType**
+emun type which could be *Error*, *Ignore* or *Replace*, defined in *infinity.common*
+
+### Returns
+
+- success: response `success` is `True`
 - failure: `Exception`
 
-## infinity_obj.create_database
-
-Creates a database.
-
+### Examples
 ```python
 infinity_obj.create_database("my_database")
 ```
 
-### Details
+## drop_database
 
-This method creates a database by name. 
+**Infinity.drop_database(*db_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+
+Drop a database by name.
 
 ### Parameters
 
-- `db_name` : `str`
+- **db_name : str** 
+name of the database
+- **confilict_type : ConflictType**
+emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: response `success` is `True`
 - failure: `Exception`
 
-## infinity_obj.drop_database
-
-Drops a database.
-
+### Examples
 ```python
 infinity_obj.drop_database("my_database")
 ```
 
-### Details
-
-This method drops a database by name.
-
-### Parameters
-
-- `db_name` : `str` Name of the database to drop.
-
-### Returns
-
-- success:
-    - response `success` is `True`
-- failure: `Exception`
-
-## infinity_obj.list_databases
+## list_databases
+**Infinity.list_databases()**
 
 Lists all databases.
-
-```python
-infinity_obj.list_databases()
-```
 
 ### Details
 
@@ -105,154 +106,267 @@ This method lists all databases.
 
 ### Returns
 
-- success:
-    - response `success` is `True`.
-    - response `db_names` `list[str]`
+- success: response `db_names` `list[str]`
 - failure: `Exception`
 
-## infinity_obj.get_database
-
-Gets a database object.
+### Examples
 
 ```python
-db_obj=infinity_obj.get_database("default")
+res = infinity_obj.list_databases() 
+res.db_names #["my_database"]
 ```
 
-### Details
+## get_database
 
-This method retrieves a database object by name.
+**Infinity.get_database(*db_name*)**
+
+Retrieve a database object by name.
 
 ### Parameters
 
-- `db_name` : `str` The name of the database to retrieve.
+- **db_name : str** 
+name of the database
 
 ### Returns
 
-- success:
-    - A database object. 
+- success: A database object. 
 - failure: `Exception`
+
+### Examples
+
+```python
+db_obj=infinity_obj.get_database("my_database")
+```
+
+## show_database
+
+**Infinity.show_database(*db_name*)**
+
+Get the metadata of a database by name.
+
+### Parameters
+
+- **db_name : str** 
+name of the database
+
+### Returns
+
+- success: response `metadata` `ShowDatabaseResponse` 
+    except from error infomation, ShowDatabaseResponse struct includes ***database_name : string, store_dir : string, table_count : int***
+- failure: `Exception`
+
+### Examples
+
+```python
+metadata=infinity_obj.show_database("my_database")
+metadata.database_name  #my_database
+metadata.table_count  #0
+```
 
 ---
 
-## db_obj.create_table
+## create_table
 
-Creates a table.
+**RemoteDatabase.create_table(*table_name, columns_definition, conflict_type = <font color=grey>ConflictType.Error</font>*)**
 
-```python
-db_obj.create_table("test_create_varchar_table",
-	                  {"c1": "varchar, primary key", "c2": "float"}, None)
-
-db_obj.create_table("test_create_embedding_table", 
-										{"c1": "vector,128,float"}, None)
-
-```
-
-### Details
-
-#### numeric or varchar
-
-- `columns_definition` : `dict`
-    - key: `column name`: `str`
-    - value: `<datatype>`,`<constraint>`,`<constraint>` :`str`
-
-#### embedding
-
-- `columns_definition` : `dict`
-    - key: `column name`: `str`
-    - value: vector,`<dimension>`,`<element_type>` :`str`
+Create a table using given name, and specify defination of each column.
 
 ### Parameters
 
-- `table_name` : `str`
-- `columns_definition` : `dict[str, str]`
-- `options` : None
+- **table_name : str(not empty)** 
+name of the table to be created
+- **columns_definition : dict[str, str]**
+A dict object whose key value pair indicates name of the column and its datatype. Espcially, a vector column should be declared as *"vector, \<dimision>\, \<datatype>\"*
+`note: ordinary datatype can be int8/int16/int32/int64/int128/`
+- **confilict_type : ConflictType**
+emun type which could be *Error* or *Ignore*, defined in *infinity.common*
+
+### note
+- ordinary datatype can be:
+    - int8
+    - int16
+    - int32/int/integer
+    - int64
+    - int128
+    - float/float32
+    - double/float64
+    - varchar
+    - bool
+- vector datatype can be:
+    - bit
+    - int8
+    - int16
+    - int32/int
+    - int64
+    - float/float32
+    - double/float64
 
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: response `success` is `True`
 - failure: `Exception`
 
-## db_obj.drop_table
-
-Drops a table.
+### Examples
 
 ```python
-db_obj.drop_table("test_create_varchar_table", if_exists=True)
+db_obj.create_table("test_create_varchar_table",
+	            {"c1": "varchar", "c2": "float"})
+# CREATE TABLE test_create_varchar_table(
+#   c1 VARCHAR PRIMARY KEY,
+#   c2 FLOAT
+# );
+
+db_obj.create_table("test_create_embedding_table", 
+                    {"c1": "vector,128,float"}, ConflictType.Replace)
+# a 128-dimensional float vector
 ```
 
-### Details
+## drop_table
+
+**RemoteDatabase.create_table(*table_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
 
 Drops a table by name.
 
 ### Parameters
 
-- `table_name` : `str` The name of the table to drop.
-- `if_exists` : `bool`
+- **table_name : str(not empty)** 
+name of the table
+- **confilict_type : ConflictType**
+emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: response `success` is `True`
 - failure: `Exception`
 
-## db_obj.get_table
-
-Gets a table object.
+### Examples
 
 ```python
-table_obj = db_obj.get_table("test_create_varchar_table")
+db_obj.drop_table("test_create_varchar_table", ConflictType.Error)
 ```
 
-### Details
+## get_table
 
-This method retrieves a table object by name.
+**RemoteDatabase.get_table(*table_name*)**
+
+Retrieve a table object by name.
 
 ### Parameters
 
-- `table_name` : `str` The name of the intended table.
+- **table_name : str** 
+name of the intended table.
 
 ### Returns
 
-- success:
-    - A table object
-- failure: `Exception`
+- success: A table object
+- failure: `Exception`, if the table does not exist
 
-## db_obj.list_tables
+### Examples
+
+```python
+try:
+    table_obj = db_obj.get_table("test_create_varchar_table")
+except Exception as e:
+    print(e)
+```
+
+## list_tables
+**RemoteDatabase.list_tables()**
 
 Lists all tables.
 
+### Returns
+
+- success: response `db_names` `list[str]`
+- failure: `Exception`
+
+### Examples
+
 ```python
-db_obj.list_tables()
+res = infinity_obj.list_databases()
+res.table_names #["test_create_varchar_table"]
 ```
 
-### Details
+## show_table
 
-This method lists all tables in the database.
+**RemoteDatabase.show_tables()**
+
+Get the information of each table in the database.
 
 ### Returns
 
-- success:
-    - response `success` is `True`
-    - response `table_names` list[str]
+- success: response `metadata`: `polars.DataFrame` 
+    the returned dataframe contains 8 columns and the number of rows of it depends on how many tables the database have.These 8 columns are respectively:
+    - **database : str**
+    - **table : str**
+    - **type : str**
+    - **column_count : int64**
+    - **block_count : int64**
+    - **block_capacity : int64**
+    - **segment_count : int64**
+    - **segment_capacity : int64**
 - failure: `Exception`
+
+### Examples
+
+```python
+res = db.show_tables()
+res
+┌──────────┬─────────────────────┬───────┬──────────────┬─────────────┬────────────────┬───────────────┬──────────────────┐
+│ database ┆ table               ┆ type  ┆ column_count ┆ block_count ┆ block_capacity ┆ segment_count ┆ segment_capacity │
+│ ---      ┆ ---                 ┆ ---   ┆ ---          ┆ ---         ┆ ---            ┆ ---           ┆ ---              │
+│ str      ┆ str                 ┆ str   ┆ i64          ┆ i64         ┆ i64            ┆ i64           ┆ i64              │
+╞══════════╪═════════════════════╪═══════╪══════════════╪═════════════╪════════════════╪═══════════════╪══════════════════╡
+│ default  ┆ test_create_varchar ┆ Table ┆ 2            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608          │
+│          ┆ table               ┆       ┆              ┆             ┆                ┆               ┆                  │
+└──────────┴─────────────────────┴───────┴──────────────┴─────────────┴────────────────┴───────────────┴──────────────────┘
+
+```
 
 ---
 
-## table_obj.create_index
+## create_index
 
-Creates an index by `IndexInfo` list.
+**RemoteTable.create_index(*index_name, index_infos, conflict_type = <font color=grey>ConflictType.Error</font>*)**
+
+Create an index by `IndexInfo` list.
+
+### Parameters
+
+- **index_name : str**
+- **index_infos : list[IndexInfo]**
+A IndexInfo struct contains three fields, which are column_name, index_type, index_param_list respectively.
+    - **column_name : str**
+     Name of the column to build index on.
+    - **index_type : IndexType**
+    emun type which could be `IVFFlat` , `Hnsw`, `HnswLVQ` or `FullText`, defined in *infinity.index*
+    `Note: The difference between Hnsw and HnswLVQ is only adopting different clustering method. The former uses K-Means while the later uses LVQ(Learning Vector Quantization)`
+    - **index_param_list**
+    A list of InitParameter. The InitParameter struct is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
+        - IVFFlat : `'centroids_count'`(default:`'128'`), `'metric'`(required)
+        - Hnsw & HnswLVQ : `'M'`(default:`'16'`), `'ef_construction'`(default:`'50'`), `'ef'`(default:`'50'`), `'metric'`(required)
+        - FullText : `'ANALYZER'`(default:`'standard'`)
+
+        the metric field supports `ip`(inner product) and `l2`(Euclidean distance)
+- **confilict_type : ConflictType**
+emun type which could be `Error` , `Replace`, or `Ignore`, defined in *infinity.common*
+
+### Returns
+
+- success: response `success` is `True`
+- failure: `Exception`
+
+### Examples
 
 ```python
 db_obj.create_table("test_index_ivfflat", {
             "c1": "vector,1024,float"}, None)
 db_obj.get_table("test_index_ivfflat")
 table_obj.create_index("my_index",
-                       [index.IndexInfo("c1",index.IndexType.IVFFlat,
-	                      [		
-													index.InitParameter("centroids_count", "128"),
-	                        index.InitParameter("metric", "l2")
-												])], None)
+                        [index.IndexInfo("c1",index.IndexType.IVFFlat,
+	                    [
+                            index.InitParameter("centroids_count", "128"),
+                            index.InitParameter("metric", "l2")])], None)
 ```
 
 ```python
@@ -276,96 +390,143 @@ db_obj.create_table(
 
 db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",
-                             [index.IndexInfo("body",
-							                                index.IndexType.FullText,
-	                                            []),
-                              index.IndexInfo("doctitle",
-                                              index.IndexType.FullText,
-                                              []),
-                              index.IndexInfo("docdate",
-                                              index.IndexType.FullText,
-                                              []),
+                             [index.IndexInfo("body", index.IndexType.FullText, []),
+                              index.IndexInfo("doctitle", index.IndexType.FullText, []),
+                              index.IndexInfo("docdate", index.IndexType.FullText, []),
                               ], None)
 ```
 
-### Details
+## create_index
 
-This method uses `indexInfo` to create an index.
+**RemoteTable.create_index(*index_name, conflict_type = <font color=grey>ConflictType.Error</font>*)**
 
-- `IndexInfo`
-    - `column_name` : `str` Name of the column. Required.
-    - `index_type` : `Enum`. The index type. Includes: 
-        - `IVFFlat`
-        - `HnswLVQ`
-        - `Hnsw`
-        - `FullText`
-    - `index_param_list` : list[InitParameter]
-        - `param_name` : `str`
-        - `param_value` : `str`
-        - example
-            - `InitParameter("M", "16")`
-            - `InitParameter("ef_construction", "50")`
-            - `InitParameter("ef", "50")`
-            - `InitParameter("metric", "l2")`
-            - `InitParameter("centroids_count", "128")`
+Drops an index by name.
 
 ### Parameters
 
-- `index_name` : `str`
-- `index_infos` : `list[IndexInfo]`
-- `options` : None
+- **index_name : str** 
+The name of the index to drop.
+- **confilict_type : ConflictType**
+emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: response `success` is `True`
 - failure: `Exception`
 
-## table_obj.drop_index
-
-Drops an index.
+### Examples
 
 ```python
 table_obj.drop_index("my_index")
 ```
 
-### Details
+## show_index
 
-This method drops an index by index name.
+**RemoteTable.show_index(*index_name*)**
+
+Retrieve the metadata of an index by name.
 
 ### Parameters
 
-- `index_name` : `str` The name of the index to drop.
+- **index_name : str** 
+name of the index to look up.
 
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: `metadata` : `ShowIndexResponse`
+the struct `ShowIndexResponse` contains:
+    - **db_name: string**
+    - **table_name: string**
+    - **index_name: string**
+    - **index_type: string**
+    - **index_column_names: string**
+    - **index_column_ids: string**
+    - **other_parameters: string**
+    the parameters for index creation
+    - **store_dir: string**
+    - **segment_index_count: string**
 - failure: `Exception`
 
-## table_obj.insert
-
-Inserts a record into the table.
+### Examples
 
 ```python
-table_obj.insert([{"profile": [1.1, 2.2, 3.3], "age": 30, "c3": "Michael"}])
+res = table_obj.create_index("my_index",[index.IndexInfo("c1",  index.IndexType.IVFFlat,
+        [index.InitParameter("centroids_count", "128"),index.  InitParameter("metric", "l2")])], 
+        ConflictType.Error)
+assert res.error_code == ErrorCode.OK
+res = table_obj.show_index("my_index")
+print(res)
+#ShowIndexResponse(error_code=0, error_msg='', db_name='default', table_name='test_create_index_show_index', index_name='my_index',
+#index_type='IVFFlat', index_column_names='c1', index_column_ids='0', other_parameters='metric = l2, centroids_count = 128', store_dir='/tmp/
+#infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index', segment_index_count='0')
 ```
 
+## list_indexs
+
+**RemoteTable.show_index(*index_name*)**
+
+List the index names built on the table
+
+### Returns
+
+- success: `metadata` : `ListIndexResponse`
+    A filed named index_name is a list of retrived index names
+- failure: `Exception`
+
+### Examples
+
 ```python
-table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
+res = table_obj.list_indexes()
+res.index_names #['my_index']
 ```
+
+## insert
+
+**RemoteTable.insert(*data*)**
+
+Insert records into the table.
 
 ### Details
 
 This method inserts a record into a table. The inserted record is a list of `dict`.
 
-- `dict`
-    - key: `column name` :str
-    - value: `str` ,`int` , `float` ,`list`
+### Parameters
+
+- **data** : list
+    a list of dict which contains information of a record, and would have to be consistent with the table schama.
+    - dict
+        - key: **column name :str**
+        - value: ***str, int, float, list(vector)***
+
+### Returns
+
+- success: response `success` is `True`
+- failure: `Exception`
+
+### Examples
+```python
+table_obj.insert({"profile": [1.1, 2.2, 3.3], "age": 30, "c3": "Michael"})
+
+table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7, 8.8, 9.9]}])
+```
+
+## import
+
+**RemoteTable.import(*filpath, import_options = <font color=grey>None</font>*)**
+
+Import data from a file into the table object
 
 ### Parameters
 
-- `data` : list[dict[str, Union[str, int, float, list[Union[int, float]]]]]
+- **file_path : str**
+- **options : dict** 
+a dict which could contain three fields, 'file_type', 'delimiter' and 'header'. If these are not specifyed in the passing parameters, default value is 'csv', ',' and False repectively.  
+    - file_type: str
+    can be ``'csv', 'fvecs', 'json', 'jsonl'`` (default: `'csv'`)
+    - delimiter : str
+    used to decode csv file(defalut: `','`)
+    - header : bool
+    specify whether the csv file has header(defalut: `False`)
 
 ### Returns
 
@@ -373,203 +534,180 @@ This method inserts a record into a table. The inserted record is a list of `dic
     - response `success` is `True`
 - failure: `Exception`
 
-## table_obj.import
-
-Imports data into the table.
+### Examples
 
 ```python
 table_obj.import_data(test_csv_dir, None)
 ```
 
-### Details
+## delete
 
-This method imports data into the table object. Supported file types:
+**RemoteTable.delete(*cond = <font color=grey>None</font>*)**
 
-- `csv` 
-- `fvecs` 
-- `json`
+Delete rows by condition.The condition is similar to the WHERE conditions in SQL. If  condition is not specified, all the data will be removed in the table object.
 
 ### Parameters
 
-- `file_path` : str
-- `options` : `None`
+- **cond : str**
+`note : cond has only supported 'and' and 'or' conjunction expression by now. more functions like 'between and', 'in' are comming soon` 
 
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: response `success` is `True`
 - failure: `Exception`
 
-## table_obj.delete
-
-Delete rows by condition.
-
+### Examples
 ```python
 table_obj.delete("c1 = 1")
 table_obj.delete()
 ```
 
-### Details
+## update
 
-The condition is similar to the WHERE conditions in SQL. If  condition is not specified, this method deletes all data in the table object.
+**RemoteTable.delete(*cond = <font color=grey>None</font>*)**
+
+search for rows that satisfy the condition and update them using the provided values.
 
 ### Parameters
 
-- `cond` :  Optional[str]
-- `options` : None
+- **cond : str(not empty)**
+- **data : list[dict[str, Union[str, int, float]]](not empty)**
+a list of dict where key indicates column, value indicates new value.
+`note: update column with vector datatype is meaningless and not supported`
 
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: response `success` is `True`
 - failure: `Exception`
 
-## table_obj.update
-
-Updates rows by condition.
+### Examples
 
 ```python
 table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ```
 
-### Details
+## output
 
-This method searches for rows that satisfy the search condition and updates them using the provided values.
+**RemoteTable.output(*columns*)**
+Specifies the columns to display in the search output, or perform aggragation operation and other calculations. 
 
-- The search condition is similar to the WHERE conditions in SQL.
-- Data is what needs to be updated.
+```python
+table_obj.output(["*"])
+table_obj.output(["num", "body"])
+table_obj.output(["_row_id"])
+table_obj.output(["avg(c2)"])
+table_obj.output(["c1+5"])
+```
 
 ### Parameters
 
-- `cond` : `str`
-- `data` : list[dict[str, Union[str, int, float]]]
-
+- **columns : list[str] (not empty)**
+supported aggragation functions:
+    - count
+    - min
+    - max
+    - sum
+    - avg
+    
 ### Returns
 
-- success:
-    - response `success` is `True`
+- success: return self `RemoteTable`
 - failure: `Exception`
 
-## table_obj.output
+## filter
 
-Specifies the columns to display in the search output. 
+**RemoteTable.delete(*cond*)**
 
-```python
-table_obj.output(["num", "body"])
-# To display all columns
-table_obj.output(["*"])
-# To display row ID
-table_obj.output(["_row_id"])
-```
-
-Converts the output to different display types.
-
-```python
-# Returns a data result
-table_obj.output(["*"]).to_result()
-# Returns a pandas result
-table_obj.output(["*"]).to_df()
-# Returns a polars result
-table_obj.output(["*"]).to_pl()
-# Returns a pyarrow result
-table_obj.output(["*"]).to_arrow()
-```
-
-### Details
-
-This method specifies the columns to display in the search output. You must input a  list of `str` 
-
-- To display all columns:`["*"]`
-- To display row ID: `["_row_id"]`
+Build a filtering condition expression.
 
 ### Parameters
 
-- `columns` : Optional[list[str]]
+- **cond : str**
+`note : cond has only supported 'and' and 'or' conjunction expression by now.` 
 
 ### Returns
 
-- self : `InfinityThriftQueryBuilder`
+- success: return self `RemoteTable`
+- failure: `Exception`
 
-## table_obj.filter
-
-Builds a filtering condition expression.
+### Examples
 
 ```python
 table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 ```
 
-### Details
+## knn
 
-This method builds a filtering expression. 
+**RemoteTable.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = <font color=grey>None</font>*)**
 
-`str`:  Similar to the WHERE condition in SQL.
+Build a KNN search expression. Find the top n closet records to the given vector.
 
 ### Parameters
 
-- `where` : Optional[str]
+- **vector_column_name : str**
+- **embedding_data : list/np.ndarray**
+- **embedding_data_type : str**
+- **distance_type : str**
+  -  `'l2'` 
+  - `'cosine'`(not available) 
+  - `'ip'` 
+  - `'hamming'`(not available)
+
+- **topn : int**
+- **knn_params : list**
 
 ### Returns
 
-- self : `InfinityThriftQueryBuilder`
+- success: return self `RemoteTable`
+- failure: `Exception`
 
-## table_obj.knn
-
-Builds a KNN search expression.
+### Examples
 
 ```python
 table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
 table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
-### Details
+## match
 
-VEC supports list or np.ndarray.
+Build a full-text search expression.
 
 ### Parameters
 
-- `vector_column_name` : `str`
-- `embedding_data` : VEC
-- `embedding_data_type` : `str`
-  - `float`
-  - `int`
-
-- `distance_type` : `str`
-  -  `l2` 
-  - `cosine` 
-  - `ip` 
-  - `hamming`
-
-- `topn` : `int`
+- **fields : str**
+    The column where text is searched in, and has create fulltext index on it before. 
+- **matching_text : str**
+- **options_text : str**
+    topn=2, retrive the two most relevent records
 
 ### Returns
 
-- self : `InfinityThriftQueryBuilder`
+- success: return self `RemoteTable`
+- failure: `Exception`
 
-## table_obj.match
-
-Builds a full-text search expression.
-
+### Examples
 ```python
 table_obj.match('body', 'harmful', 'topn=2')
 ```
 
-### Details
+## fusion
 
-This method builds a full-text search expression. 
+**RemoteTable.fusion(*method, options_text = <font color=grey>''</font>*)**
+
+Build a fusion expression.
 
 ### Parameters
 
-- `fields` : `str` The text’s body
-- `matching_text` : `str` The text to match.
-- `options_text` : `str` `'topn=2'`: The display count is 2.
+- **method : str**
+- **method : options_text**
 
 ### Returns
 
-- self : `InfinityThriftQueryBuilder`
+- success: return self `RemoteTable`
+- failure: `Exception`
 
-## table_obj.fusion
-
-Builds a fusion expression.
+### Examples
 
 ```python
 table_obj.fusion('rrf')
@@ -581,76 +719,32 @@ table_obj.fusion('rrf')
 
 [Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
 
-### Parameters
+## get result
 
-- `method` : `str`
+**RemoteTable.to_result()**
+**RemoteTable.to_df()**
+**RemoteTable.to_pl()**
+**RemoteTable.to_arrow()**
+
+After querying, these four methods above can get result into specific type. 
+`Note: output method must be executed before get result`
 
 ### Returns
 
-- self : `InfinityThriftQueryBuilder`
+- **to_result() : tuple[dict[str, list[Any]], dict[str, Any]]**
+Python's built-in type
+- **to_df() : pandas.DataFrame**
+- **to_pl() : polars.DataFrame**
+- **to_arrow() : pyarrow.Table**
 
-## table_obj.output.to_result
+### Examples
 
-Returns a data result.
-
-```python
-table_obj.output(["*"]).to_result()
 ```
+res = table_obj.output(['c1', 'c1']).to_df()
 
-### Details
-
-This method returns a data result of Python's built-in type.
-
-(data_dict, data_type_dict)
-
-### Returns
-
-- `tuple[dict[str, list[Any]], dict[str, Any]]`
-
-## table_obj.output.to_df
-
-Returns a pandas result.
-
-```python
-table_obj.output(["*"]).to_df()
+res = table_obj.output(['*'])
+               .knn('vec', [3.0, 2.8, 2.7, 3.1], 'float', 'ip', 1)
+               .match('doctitle, num, body', 'word', match_param_3)
+               .fusion('rrf')
+               .to_pl()
 ```
-
-### Details
-
-This method returns a data result in pandas `DataFrame`.
-
-### Returns
-
-- `pandas.DataFrame`
-
-## table_obj.output.to_pl
-
-Returns a polars result.
-
-```python
-table_obj.output(["*"]).to_pl()
-```
-
-### Details
-
-This method returns a data result in polars `DataFrame`
-
-### Returns
-
-- `polars.DataFrame`
-
-## table_obj.to_arrow
-
-Returns a pyarrow result.
-
-```python
-table_obj.output(["*"]).to_arrow()
-```
-
-### Details
-
-The method returns a data result in arrow `Table`.
-
-### Returns
-
-- pyarrow.`Table`

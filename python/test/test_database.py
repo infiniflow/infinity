@@ -47,29 +47,23 @@ class TestDatabase:
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
+        infinity_obj.drop_database("my_database", ConflictType.Ignore)
+
         # infinity
         db = infinity_obj.create_database("my_database")
         assert db
 
-        try:
-            db = infinity_obj.create_database("my_database!@#")
-        except Exception as e:
-            print(e)
+        with pytest.raises(Exception):
+            infinity_obj.create_database("my_database!@#")
 
-        try:
-            db = infinity_obj.create_database("my-database-dash")
-        except Exception as e:
-            print(e)
+        with pytest.raises(Exception):
+            infinity_obj.create_database("my-database-dash")
 
-        try:
-            db = infinity_obj.create_database("123_database")
-        except Exception as e:
-            print(e)
+        with pytest.raises(Exception):
+            infinity_obj.create_database("123_database")
 
-        try:
-            db = infinity_obj.create_database("")
-        except Exception as e:
-            print(e)
+        with pytest.raises(Exception):
+            infinity_obj.create_database("")
 
         res = infinity_obj.list_databases()
         assert res is not None
@@ -112,12 +106,8 @@ class TestDatabase:
 
         # 2. create db with invalid name
         for db_name in common_values.invalid_name_array:
-            try:
-                # print('db name: ', db_name)
-                db = infinity_obj.create_database(db_name)
-                assert False
-            except Exception as e:
-                print(e)
+            with pytest.raises(Exception):
+                infinity_obj.create_database(db_name)
 
         # 3. disconnect
         res = infinity_obj.disconnect()
@@ -273,10 +263,8 @@ class TestDatabase:
 
         # 2. drop db with invalid name
         for db_name in common_values.invalid_name_array:
-            try:
-                db = infinity_obj.drop_database(db_name)
-            except Exception as e:
-                print(e)
+            with pytest.raises(Exception):
+                infinity_obj.drop_database(db_name)
 
         # 3. disconnect
         res = infinity_obj.disconnect()
@@ -305,7 +293,7 @@ class TestDatabase:
             print(e)
 
         # 1. create db
-        db = infinity_obj.create_database("my_database")
+        db = infinity_obj.create_database("my_database", ConflictType.Error)
 
         # 2. get db(using db)
         db = infinity_obj.get_database("my_database")
@@ -316,16 +304,13 @@ class TestDatabase:
         print(db._db_name)
 
         # 4.
-        res = infinity_obj.drop_database("my_database")
+        res = infinity_obj.drop_database("my_database", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # 2. drop db with invalid name
         for db_name in common_values.invalid_name_array:
-            try:
-                db = infinity_obj.drop_database(db_name)
-                raise Exception(f"Can drop db: {db_name}")
-            except Exception as e:
-                print(e)
+            with pytest.raises(Exception):
+                infinity_obj.drop_database(db_name)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -351,14 +336,14 @@ class TestDatabase:
 
         # 2. create db
         try:
-            db = infinity_obj.create_database("my_database")
+            db = infinity_obj.create_database("my_database", ConflictType.Error)
             assert False
         except Exception as e:
             print(f'Caught exception: {e}')
 
         # 3. drop db
         try:
-            db = infinity_obj.drop_database("my_database")
+            db = infinity_obj.drop_database("my_database", ConflictType.Error)
         except Exception as e:
             print(f'Caught exception: {e}')
 
@@ -456,12 +441,12 @@ class TestDatabase:
         # create db
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_obj.drop_database("test_show_database", ConflictType.Ignore)
-        infinity_obj.create_database("test_show_database")
+        infinity_obj.create_database("test_show_database", ConflictType.Error)
 
         res = infinity_obj.show_database("test_show_database")
         assert res.database_name == "test_show_database"
 
-        infinity_obj.drop_database("test_show_database", ConflictType.Ignore)
+        infinity_obj.drop_database("test_show_database", ConflictType.Error)
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
@@ -550,9 +535,10 @@ class TestDatabase:
     def test_show_valid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"})
+        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         res = db_obj.show_table(table_name)
+        db_obj.drop_table("test_show_table", ConflictType.Error)
         print(res)
 
     @pytest.mark.parametrize("table_name", [pytest.param("Invalid name"),
@@ -566,28 +552,33 @@ class TestDatabase:
     def test_show_invalid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"})
+        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj.show_table(table_name)
+
+        db_obj.drop_table("test_show_table", ConflictType.Error)
 
     @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
     def test_show_not_exist_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"})
+        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         with pytest.raises(Exception, match=f"ERROR:3022, Table {table_name} doesn't exist"):
             db_obj.show_table(table_name)
+
+        db_obj.drop_table("test_show_table", ConflictType.Error)
 
     @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
     def test_show_table_columns_with_valid_name(self, get_infinity_db, column_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
-        db_obj.create_table("test_show_table_columns", {"c1": "int", "c2": "vector,3,int"})
+        db_obj.create_table("test_show_table_columns", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         res = db_obj.show_columns(column_name)
+        db_obj.drop_table("test_show_table_columns", ConflictType.Error)
         print(res)
 
     @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
@@ -607,4 +598,5 @@ class TestDatabase:
 
         with pytest.raises(Exception):
             db_obj.show_columns(column_name)
+        db_obj.drop_table("test_show_table_columns", ConflictType.Error)
 

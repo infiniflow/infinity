@@ -10,6 +10,10 @@ target_link_libraries(
     benchmark_profiler
 )
 
+if(ENABLE_JEMALLOC)
+    target_link_libraries(fst jemalloc.a dl)
+endif()
+
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)

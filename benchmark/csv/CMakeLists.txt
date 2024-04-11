@@ -9,6 +9,10 @@ target_link_libraries(csv_benchmark
         zsv_parser
 )
 
+if(ENABLE_JEMALLOC)
+    target_link_libraries(csv_benchmark jemalloc.a dl)
+endif()
+
 target_include_directories(csv_benchmark
         PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(csv_benchmark

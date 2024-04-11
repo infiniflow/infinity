@@ -33,6 +33,7 @@ namespace infinity {
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
 
 std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
+    std::unique_ptr<QueryNode> optimized_root;
     if (!root) {
         RecoverableError(Status::SyntaxError("Invalid query statement: Empty query tree"));
     }
@@ -42,29 +43,43 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     switch (root->GetType()) {
         case QueryNodeType::TERM: {
             // no need to optimize
-            return root;
+            optimized_root = std::move(root);
+            break;
         }
         case QueryNodeType::NOT: {
             RecoverableError(Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level"));
-            return nullptr;
+            break;
         }
         case QueryNodeType::AND:
         case QueryNodeType::OR: {
-            auto new_root = static_cast<MultiQueryNode *>(root.get())->GetNewOptimizedQueryTree();
-            if (new_root->GetType() == QueryNodeType::NOT) {
+            optimized_root = static_cast<MultiQueryNode *>(root.get())->GetNewOptimizedQueryTree();
+            if (optimized_root->GetType() == QueryNodeType::NOT) {
                 RecoverableError(Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level"));
             }
-            return new_root;
+            break;
         }
         case QueryNodeType::AND_NOT: {
             UnrecoverableError("Unexpected AndNotQueryNode from parser output");
-            return nullptr;
+            break;
         }
         default: {
             UnrecoverableError("GetOptimizedQueryTree: Unexpected case!");
-            return nullptr;
+            break;
         }
     }
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "Query tree after optimization:\n";
+        if (optimized_root) {
+            optimized_root->PrintTree(oss);
+        } else {
+            oss << "Empty query tree!\n";
+        }
+        LOG_INFO(std::move(oss).str());
+    }
+#endif
+    return optimized_root;
 }
 
 std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
@@ -338,6 +353,8 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
         return nullptr;
     }
     auto search = MakeUnique<TermDocIterator>(std::move(posting_iterator), column_id, GetWeight());
+    search->term_ptr_ = &term_;
+    search->column_name_ptr_ = &column_;
     if (scorer) {
         // nodes under "not" will not be added to scorer
         scorer->AddDocIterator(search.get(), column_id);
@@ -355,6 +372,8 @@ TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRe
     if (!search) {
         return nullptr;
     }
+    search->term_ptr_ = &term_;
+    search->column_name_ptr_ = &column_;
     if (scorer) {
         // nodes under "not" will not be added to scorer
         scorer->AddBlockMaxDocIterator(search.get(), column_id);

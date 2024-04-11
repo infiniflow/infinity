@@ -36,12 +36,6 @@ import index_hnsw;
 import default_values;
 import txn_store;
 import base_table_ref;
-import hnsw_common;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
-import lvq_store;
-import plain_store;
 import extra_ddl_info;
 
 namespace infinity {

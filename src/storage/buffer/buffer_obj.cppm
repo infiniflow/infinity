@@ -76,10 +76,6 @@ public:
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();
 
-    void Sync();
-
-    void CloseFile();
-
     void SetAndTryCleanup();
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }

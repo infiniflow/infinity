@@ -252,8 +252,12 @@ target_link_libraries(infinity
         atomic.a
         event.a
         oatpp.a
-#        profiler
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(infinity jemalloc.a dl)
+endif()
+
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
@@ -369,7 +373,6 @@ target_link_libraries(unit_test
         fastpfor
         lz4.a
         atomic.a
-#        profiler
         thrift.a
 )
 
@@ -405,29 +408,3 @@ else()
         add_definitions(-msse4.2 -mfma)
         target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
 endif()
-
-add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
-
-target_link_libraries(test_hnsw
-    infinity_core
-)
-
-add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
-
-target_link_directories(test_hnsw_bitmask PUBLIC "${CMAKE_BINARY_DIR}/lib")
-
-target_link_libraries(test_hnsw_bitmask
-    infinity_core
-    sql_parser
-    onnxruntime_mlas
-    zsv_parser
-    roaring
-    newpfor
-    fastpfor
-    thrift.a
-    thriftnb.a
-    lz4.a
-    atomic.a
-    event.a
-    #        profiler
-)

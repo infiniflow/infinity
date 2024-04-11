@@ -14,17 +14,19 @@
 
 module;
 
+#include <cassert>
+#include <iostream>
 #include <tuple>
 module early_terminate_iterator;
 import internal_types;
 import stl;
 import index_defines;
+import infinity_exception;
 
 namespace infinity {
 
-/*
-// simple case code for Term and "AND"
 Pair<RowID, float> EarlyTerminateIterator::NextWithThreshold(float threshold) {
+    /*
     while (true) {
         RowID next_doc = Next();
         if (next_doc == INVALID_ROWID) [[unlikely]] {
@@ -34,16 +36,19 @@ Pair<RowID, float> EarlyTerminateIterator::NextWithThreshold(float threshold) {
             return {next_doc, score};
         }
     }
+    */
+    UnrecoverableError("Not implemented");
+    return {};
 }
 
-// simple case code for Term and "AND"
 Pair<RowID, float> EarlyTerminateIterator::BlockNextWithThreshold(float threshold) {
     for (RowID next_skip = doc_id_ + 1;;) {
         if (!BlockSkipTo(next_skip, threshold)) [[unlikely]] {
             return {INVALID_ROWID, 0.0F};
         }
         next_skip = std::max(next_skip, BlockMinPossibleDocID());
-        auto [success, score, id] = SeekInBlockRange(next_skip, threshold);
+        assert((next_skip <= BlockLastDocID()));
+        auto [success, score, id] = SeekInBlockRange(next_skip, BlockLastDocID(), threshold);
         if (success) {
             // success in SeekInBlockRange, inner doc_id_ is updated
             return {id, score};
@@ -51,6 +56,25 @@ Pair<RowID, float> EarlyTerminateIterator::BlockNextWithThreshold(float threshol
         next_skip = BlockLastDocID() + 1;
     }
 }
-*/
+
+void MultiQueryEarlyTerminateIteratorCommonPrintTree(const EarlyTerminateIterator *this_iter,
+                                                     std::string_view iter_type_name,
+                                                     const Vector<UniquePtr<EarlyTerminateIterator>> &children,
+                                                     std::ostream &os,
+                                                     const String &prefix,
+                                                     bool is_final) {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << iter_type_name;
+    os << " (children count: " << children.size() << ")";
+    os << " (doc_freq: " << this_iter->DocFreq() << ")";
+    os << " (bm25_score_upper_bound: " << this_iter->BM25ScoreUpperBound() << ")";
+    os << '\n';
+    const String next_prefix = prefix + (is_final ? "    " : "│   ");
+    for (u32 i = 0; i + 1 < children.size(); ++i) {
+        children[i]->PrintTree(os, next_prefix, false);
+    }
+    children.back()->PrintTree(os, next_prefix, true);
+}
 
 } // namespace infinity

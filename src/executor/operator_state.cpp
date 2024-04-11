@@ -50,11 +50,9 @@ bool QueueSourceState::GetData() {
     switch (fragment_data_base->type_) {
         case FragmentDataType::kData: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
-            if (!fragment_data->data_idx_.has_value()) {
+            if (fragment_data->is_last_ &&
+                (!fragment_data->data_idx_.has_value() || fragment_data->data_idx_.value() + 1 == fragment_data->data_count_)) {
                 // fragment completed
-                MarkCompletedTask(fragment_data->fragment_id_);
-            } else if (fragment_data->data_idx_.value() + 1 == fragment_data->data_count_) {
-                // Get an all data from this
                 MarkCompletedTask(fragment_data->fragment_id_);
             }
             break;

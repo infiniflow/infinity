@@ -46,6 +46,12 @@ public:
 
     float GetWeight() const { return weight_; }
 
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+
+    // debug info
+    const String *term_ptr_ = nullptr;
+    const String *column_name_ptr_ = nullptr;
+
 private:
     u64 column_id_;
     UniquePtr<PostingIterator> iter_;

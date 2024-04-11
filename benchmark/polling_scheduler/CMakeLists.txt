@@ -23,3 +23,7 @@ target_link_libraries(
         infinity_core
         benchmark_profiler
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(polling_scheduler_benchmark jemalloc.a dl)
+endif()

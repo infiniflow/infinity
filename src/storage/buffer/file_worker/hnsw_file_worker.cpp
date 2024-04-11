@@ -61,7 +61,9 @@ void HnswFileWorker::AllocateInMemory() {
     switch (embedding_type) {
         case kElemFloat: {
             AbstractHnsw<f32, SegmentOffset> abstract_hnsw(nullptr, index_hnsw);
-            abstract_hnsw.Make(max_element_, dimension, M, ef_c);
+            SizeT chunk_size = 8192; // TODO
+            SizeT max_chunk_n = 1024; // TODO
+            abstract_hnsw.Make(chunk_size, max_chunk_n, dimension, M, ef_c);
             data_ = abstract_hnsw.RawPtr();
             break;
         }
