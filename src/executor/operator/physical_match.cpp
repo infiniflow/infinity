@@ -203,14 +203,14 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         blockmax_duration = std::chrono::duration_cast<std::chrono::microseconds>(blockmax_end_ts - blockmax_begin_ts).count();
 #endif
     }
-    if (use_ordinary_iter) {
-        result_count = ordinary_result_count;
-        score_result = ordinary_score_result.get();
-        row_id_result = ordinary_row_id_result.get();
-    } else {
+    if (use_block_max_iter) {
         result_count = blockmax_result_count;
         score_result = blockmax_score_result.get();
         row_id_result = blockmax_row_id_result.get();
+    } else {
+        result_count = ordinary_result_count;
+        score_result = ordinary_score_result.get();
+        row_id_result = ordinary_row_id_result.get();
     }
 #ifdef INFINITY_DEBUG
     {

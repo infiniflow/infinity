@@ -95,11 +95,13 @@ Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id
     if (threshold > BlockMaxBM25Score()) [[unlikely]] {
         return {false, 0.0F, INVALID_ROWID};
     }
-    RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
-    while (true) {
+    const RowID block_last = BlockLastDocID();
+    const RowID seek_end = std::min(doc_id_no_beyond, block_last);
+    while (doc_id <= seek_end) {
         doc_id = iter_.SeekDoc(doc_id);
         // always update inner doc_id_
         doc_id_ = doc_id;
+        assert((doc_id <= block_last));
         if (doc_id > seek_end) {
             return {false, 0.0F, INVALID_ROWID};
         }
@@ -108,6 +110,7 @@ Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id
         }
         ++doc_id;
     }
+    return {false, 0.0F, INVALID_ROWID};
 }
 
 Pair<bool, RowID> BlockMaxTermDocIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
