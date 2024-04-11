@@ -10,7 +10,7 @@ target_link_libraries(csv_benchmark
 )
 
 if(ENABLE_JEMALLOC)
-    target_link_libraries(csv_benchmark jemalloc.a)
+    target_link_libraries(csv_benchmark jemalloc.a dl)
 endif()
 
 target_include_directories(csv_benchmark

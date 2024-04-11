@@ -529,6 +529,45 @@ curl --request GET \
 ```
 
 
+## Import
+
+Imports data into a specified table.
+
+#### Request
+
+```
+curl --request PUT \
+     --url localhost:23820/databases/{database_name}/tables/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' \
+{
+    "file_path":"./filename.json",
+    "file_type":"csv",
+    "header":false,
+    "delimiter":","
+} '
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "error_code": 0
+}
+```
+
+- 500 Error
+
+```
+{
+    "error_code": 3032,
+    "error_message": "Not supported file type: docx"
+}
+```
+
 ## Insert
 
 Inserts data into a specified table.

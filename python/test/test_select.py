@@ -222,7 +222,7 @@ class TestSelect:
         print(res)
         res = table_obj.output(["avg(c2)"]).to_pl()
         print(res)
-
+        
         res = db_obj.drop_table("test_select_aggregate")
         assert res.error_code == ErrorCode.OK
 
