@@ -52,11 +52,10 @@ class TestCase:
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         assert infinity_obj
 
-        try:
+        db_name = ""
+        with pytest.raises(Exception,
+                           match=f"DB name '{db_name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"):
             db = infinity_obj.create_database("")
-        except Exception as e:
-            print(e)
-
         assert infinity_obj.disconnect()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",

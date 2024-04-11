@@ -11,6 +11,7 @@ import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import posting_writer;
+import vector_with_lock;
 import posting_decoder;
 import term_meta;
 import column_index_iterator;
@@ -117,10 +118,9 @@ public:
     PostingDumper(MemoryPool *memory_pool,
                   RecyclePool *buffer_pool,
                   const PostingFormatOption &format_option,
-                  std::shared_mutex &column_length_mutex,
-                  Vector<u32> &column_length_array)
-        : format_option_(format_option), column_length_mutex_(column_length_mutex), column_length_array_(column_length_array) {
-        posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option, column_length_mutex_, column_length_array_);
+                  VectorWithLock<u32> &column_length_array)
+        : format_option_(format_option), column_lengths_(column_length_array) {
+        posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option, column_lengths_);
     }
 
     ~PostingDumper() {}
@@ -141,8 +141,7 @@ private:
     PostingFormatOption format_option_;
     SharedPtr<PostingWriter> posting_writer_;
     // for column length info
-    std::shared_mutex &column_length_mutex_;
-    Vector<u32> &column_length_array_;
+    VectorWithLock<u32> &column_lengths_;
 };
 
 class SortedPosting {
@@ -175,14 +174,9 @@ private:
     DocMerger doc_merger_;
 };
 
-PostingMerger::PostingMerger(MemoryPool *memory_pool,
-                             RecyclePool *buffer_pool,
-                             optionflag_t flag,
-                             std::shared_mutex &column_length_mutex,
-                             Vector<u32> &column_length_array)
-    : memory_pool_(memory_pool), buffer_pool_(buffer_pool), format_option_(flag), column_length_mutex_(column_length_mutex),
-      column_length_array_(column_length_array) {
-    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, column_length_mutex_, column_length_array_);
+PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, optionflag_t flag, VectorWithLock<u32> &column_length_array)
+    : memory_pool_(memory_pool), buffer_pool_(buffer_pool), format_option_(flag), column_lengths_(column_length_array) {
+    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, column_lengths_);
 }
 
 PostingMerger::~PostingMerger() {}

@@ -60,13 +60,13 @@ target_link_libraries(
 # ########################################
 # fulltext
 # import benchmark
-add_executable(fulltext_import_benchmark
-    ./fulltext/fulltext_import_benchmark.cpp
+add_executable(fulltext_benchmark
+    ./fulltext/fulltext_benchmark.cpp
 )
 
-target_include_directories(fulltext_import_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(fulltext_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
-    fulltext_import_benchmark
+    fulltext_benchmark
     infinity_core
     benchmark_profiler
     sql_parser
@@ -96,6 +96,14 @@ target_link_libraries(
     lz4.a
     atomic.a
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(infinity_benchmark jemalloc.a)
+    target_link_libraries(knn_import_benchmark jemalloc.a)
+    target_link_libraries(knn_query_benchmark jemalloc.a)
+    target_link_libraries(fulltext_benchmark jemalloc.a)
+    target_link_libraries(fulltext_query_benchmark jemalloc.a)
+endif()
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

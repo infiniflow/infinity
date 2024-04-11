@@ -12,6 +12,8 @@ import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
+import vector_with_lock;
+
 module posting_writer;
 
 namespace infinity {
@@ -19,10 +21,9 @@ namespace infinity {
 PostingWriter::PostingWriter(MemoryPool *byte_slice_pool,
                              RecyclePool *buffer_pool,
                              PostingFormatOption posting_option,
-                             std::shared_mutex &column_length_mutex,
-                             Vector<u32> &column_length_array)
+                             VectorWithLock<u32> &column_lengths)
     : byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), posting_option_(posting_option),
-      posting_format_(new PostingFormat(posting_option)), column_length_mutex_(column_length_mutex), column_length_array_(column_length_array) {
+      posting_format_(new PostingFormat(posting_option)), column_lengths_(column_lengths) {
     if (posting_option.HasPositionList()) {
         position_list_encoder_ = new PositionListEncoder(posting_option_, byte_slice_pool_, buffer_pool_, posting_format_->GetPositionListFormat());
     }

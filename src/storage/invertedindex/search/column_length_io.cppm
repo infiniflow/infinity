@@ -14,11 +14,15 @@
 
 module;
 
+#include <cassert>
+
 export module column_length_io;
 
 import stl;
 import index_defines;
 import internal_types;
+import chunk_index_entry;
+import memory_indexer;
 
 namespace infinity {
 class SegmentIndexEntry;
@@ -26,78 +30,48 @@ class IndexReader;
 class FileSystem;
 class FileHandler;
 
-// write array of u32 to file
-// multiple threads will write to different offsets of the file at different times
-export class FullTextColumnLengthFileHandler {
-public:
-    FullTextColumnLengthFileHandler(UniquePtr<FileSystem> file_system, const String &path, SegmentIndexEntry *segment_index_entry);
-    ~FullTextColumnLengthFileHandler();
-    void WriteColumnLength(const u32 *column_length_array, u32 column_length_count, u32 start_from_offset);
-
-private:
-    std::mutex mutex_;
-    UniquePtr<FileSystem> file_system_;
-    UniquePtr<FileHandler> file_handler_;
-    SegmentIndexEntry *segment_index_entry_;
-};
-
-export class FullTextColumnLengthUpdateJob {
-public:
-    FullTextColumnLengthUpdateJob(SharedPtr<FullTextColumnLengthFileHandler> file_handler,
-                                  u32 column_length_count,
-                                  u32 start_from_offset,
-                                  std::shared_mutex &memory_indexer_mutex,
-                                  Vector<u32> &memory_indexer_array);
-    u32 *GetColumnLengthArray() { return column_length_array_.get(); }
-    void DumpToFile();
-
-private:
-    SharedPtr<FullTextColumnLengthFileHandler> file_handler_;
-    UniquePtr<u32[]> column_length_array_;
-    u32 column_length_count_;
-    u32 start_from_offset_;
-    std::shared_mutex &memory_indexer_mutex_;
-    Vector<u32> &memory_indexer_array_;
-};
-
 export class FullTextColumnLengthReader {
 public:
     FullTextColumnLengthReader(UniquePtr<FileSystem> file_system,
                                const String &index_dir,
-                               const Vector<String> &base_names,
-                               const Vector<RowID> &base_row_ids);
+                               const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries,
+                               SharedPtr<MemoryIndexer> memory_indexer);
 
     inline u32 GetColumnLength(RowID row_id) {
-        // assume that there is a file which contains row_id
-        if (row_id >= next_base_rowid_ or row_id < current_base_rowid_) [[unlikely]] {
-            SeekFile(row_id);
+        if (current_chunk_ != std::numeric_limits<u32>::max() && row_id >= chunk_index_entries_[current_chunk_]->base_rowid_ &&
+            row_id < chunk_index_entries_[current_chunk_]->base_rowid_ + chunk_index_entries_[current_chunk_]->row_count_) [[likely]] {
+            assert(column_lengths_.size() == chunk_index_entries_[current_chunk_]->row_count_);
+            return column_lengths_[row_id - chunk_index_entries_[current_chunk_]->base_rowid_];
         }
-        return column_length_array_[row_id - current_base_rowid_];
+        if (memory_indexer_.get() != nullptr) {
+            RowID base_rowid = memory_indexer_->GetBaseRowId();
+            u32 doc_count = memory_indexer_->GetDocCount();
+            if (row_id >= base_rowid && row_id < base_rowid + doc_count) {
+                return memory_indexer_->GetColumnLength(row_id - base_rowid);
+            }
+        }
+        return SeekFile(row_id);
     }
 
-    void SeekFile(RowID row_id);
-
 private:
+    u32 SeekFile(RowID row_id);
     UniquePtr<FileSystem> file_system_;
     const String &index_dir_;
-    const Vector<String> &base_names_;
-    const Vector<RowID> &base_row_ids_; // must in ascending order, have an INVALID_ROWID at the end
-    RowID current_base_rowid_ = INVALID_ROWID;
-    RowID next_base_rowid_ = INVALID_ROWID;
-    u32 current_index_ = 0;
-    UniquePtr<u32[]> column_length_array_;
-    u32 column_length_array_capacity_ = 0;
+    const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries_; // must in ascending order
+    SharedPtr<MemoryIndexer> memory_indexer_;
+    u32 current_chunk_{std::numeric_limits<u32>::max()};
+    Vector<u32> column_lengths_;
 };
 
 export class ColumnLengthReader {
-    Vector<FullTextColumnLengthReader> column_length_vector_;
+    Vector<UniquePtr<FullTextColumnLengthReader>> column_length_vector_;
 
 public:
     void AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length);
 
-    FullTextColumnLengthReader *GetColumnLengthReader(u32 scorer_column_idx) { return &column_length_vector_[scorer_column_idx]; }
+    FullTextColumnLengthReader *GetColumnLengthReader(u32 scorer_column_idx) { return column_length_vector_[scorer_column_idx].get(); }
 
-    inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx].GetColumnLength(row_id); }
+    inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx]->GetColumnLength(row_id); }
 };
 
 } // namespace infinity

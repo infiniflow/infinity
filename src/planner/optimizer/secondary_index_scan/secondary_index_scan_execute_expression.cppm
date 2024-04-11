@@ -126,10 +126,7 @@ export class FilterExecuteSingleRange {
     FilterIntervalRange interval_range_;
 
     inline void SetIntervalToEmpty() {
-        std::visit(Overload{[]<typename T>(FilterIntervalRangeT<T> &interval) { interval.SetAlwaysFalse(); },
-                            [](const std::monostate &empty) {
-                                UnrecoverableError("FilterExecuteSingleRange::SetIntervalToEmpty(): class member interval_range_ not initialized!");
-                            }},
+        std::visit(Overload{[]<typename T>(FilterIntervalRangeT<T> &interval) { interval.SetAlwaysFalse(); }, [](const std::monostate &empty) {}},
                    interval_range_);
     }
 

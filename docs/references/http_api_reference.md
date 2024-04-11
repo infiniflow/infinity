@@ -168,6 +168,12 @@ curl --request POST \
             "type": "integer",
             "constraints": ["not null"]
         }
+        "my_vector"
+        {
+            "type": "vector",
+            "dimension": 1024,
+            "element_type": "float"
+        }
     ],
     "properties": 
     [

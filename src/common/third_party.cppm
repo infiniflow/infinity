@@ -86,6 +86,8 @@ export using CLI::InvalidError;
 export using CLI::HorribleError;
 export using CLI::OptionNotFound;
 export using CLI::ArgumentMismatch;
+export using CLI::CheckedTransformer;
+export using CLI::ignore_case;
 } // namespace CLI
 
 namespace toml {

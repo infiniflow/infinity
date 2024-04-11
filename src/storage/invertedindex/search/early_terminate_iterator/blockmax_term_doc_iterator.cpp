@@ -16,6 +16,7 @@ module;
 
 #include <cassert>
 #include <cmath>
+#include <iostream>
 #include <tuple>
 module blockmax_term_doc_iterator;
 
@@ -90,75 +91,66 @@ float BlockMaxTermDocIterator::BM25Score() {
     return bm25_common_score_ * tf / (tf + k1 * (1.0F - b + b * doc_len / avg_column_len_));
 }
 
-Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) {
+Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) {
     if (threshold > BlockMaxBM25Score()) [[unlikely]] {
         return {false, 0.0F, INVALID_ROWID};
     }
     RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
     while (true) {
-        RowID next_doc = iter_.SeekDoc(doc_id);
+        doc_id = iter_.SeekDoc(doc_id);
         // always update inner doc_id_
-        doc_id_ = next_doc;
-        if (next_doc > seek_end) {
+        doc_id_ = doc_id;
+        if (doc_id > seek_end) {
             return {false, 0.0F, INVALID_ROWID};
         }
         if (const float score = BM25Score(); score >= threshold) {
-            return {true, score, next_doc};
+            return {true, score, doc_id};
         }
-        doc_id = next_doc + 1;
+        ++doc_id;
     }
 }
 
 Pair<bool, RowID> BlockMaxTermDocIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
-    RowID current_doc = doc_id_;
-    RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
+    const RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
     if (doc_id > seek_end) {
         return {false, INVALID_ROWID};
     }
-    if (current_doc != INVALID_ROWID and current_doc >= doc_id) {
-        // use current doc_id_
-        if (current_doc <= seek_end) {
-            return {true, current_doc};
-        } else {
-            return {false, INVALID_ROWID};
+    // check cache
+    if (peek_doc_id_range_start_ <= doc_id) {
+        if (const RowID peek_cache = peek_doc_id_val_; peek_cache >= doc_id) {
+            if (peek_cache <= seek_end) {
+                return {true, peek_cache};
+            }
+            if (peek_doc_id_range_end_ >= seek_end) {
+                return {false, INVALID_ROWID};
+            }
         }
     }
     // need to decode
-    return iter_.PeekInBlockRange(doc_id, seek_end);
+    Pair<bool, RowID> result = iter_.PeekInBlockRange(doc_id, seek_end);
+    // update cache
+    peek_doc_id_range_start_ = doc_id;
+    peek_doc_id_range_end_ = seek_end;
+    peek_doc_id_val_ = result.second;
+    return result;
 }
 
-// simple case code for Term and "AND"
-Pair<RowID, float> BlockMaxTermDocIterator::NextWithThreshold(float threshold) {
-    /*
-    while (true) {
-        RowID next_doc = Next();
-        if (next_doc == INVALID_ROWID) [[unlikely]] {
-            return {INVALID_ROWID, 0.0F};
-        }
-        if (float score = BM25Score(); score >= threshold) {
-            return {next_doc, score};
-        }
-    }
-    */
-    // TODO:
-    return {};
+bool BlockMaxTermDocIterator::Seek(RowID doc_id) {
+    const RowID seek_result = iter_.SeekDoc(doc_id);
+    doc_id_ = seek_result;
+    return seek_result == doc_id;
 }
 
-// simple case code for Term and "AND"
-Pair<RowID, float> BlockMaxTermDocIterator::BlockNextWithThreshold(float threshold) {
-    for (RowID next_skip = doc_id_ + 1;;) {
-        if (!BlockSkipTo(next_skip, threshold)) [[unlikely]] {
-            return {INVALID_ROWID, 0.0F};
-        }
-        next_skip = std::max(next_skip, BlockMinPossibleDocID());
-        assert((next_skip <= BlockLastDocID()));
-        auto [success, score, id] = SeekInBlockRange(next_skip, threshold, BlockLastDocID());
-        if (success) {
-            // success in SeekInBlockRange, inner doc_id_ is updated
-            return {id, score};
-        }
-        next_skip = BlockLastDocID() + 1;
-    }
+void BlockMaxTermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << "BlockMaxTermDocIterator";
+    os << " (weight: " << weight_ << ")";
+    os << " (column: " << *column_name_ptr_ << ")";
+    os << " (term: " << *term_ptr_ << ")";
+    os << " (doc_freq: " << DocFreq() << ")";
+    os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
+    os << '\n';
 }
 
 } // namespace infinity

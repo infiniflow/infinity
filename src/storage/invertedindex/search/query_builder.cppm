@@ -30,6 +30,7 @@ namespace infinity {
 struct QueryNode;
 export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_;
+    UniquePtr<QueryNode> optimized_query_tree_;
 };
 
 class EarlyTerminateIterator;

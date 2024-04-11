@@ -414,8 +414,6 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
 }
 
 TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
-    // GTEST_SKIP();
-
     auto db_name = MakeShared<String>("db_test");
     auto db_dir = MakeShared<String>("data");
     auto table_name = MakeShared<String>("table_test");
