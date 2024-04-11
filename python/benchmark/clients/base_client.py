@@ -1,3 +1,4 @@
+import argparse
 from abc import abstractmethod
 from typing import Any, List, Optional, Dict, Union
 from enum import Enum
@@ -7,19 +8,22 @@ class FilterType(str, Enum):
     RANGE = "range"
     GEO = "geo"
 
+
 class BaseClient:
     """
     Base class for all clients(Qdrant, ES, infinity).
     mode is a string that corresponds to a JSON file's address in the configurations. 
     Each client reads the required parameters from the JSON configuration file.
     """
+
     @abstractmethod
     def __init__(self,
                  mode: str,
+                 options: argparse.Namespace,
                  drop_old: bool = True) -> None:
         """
         The mode configuration file is parsed to extract the needed parameters, which are then all stored for use by other functions.
-        """        
+        """
         pass
 
     @abstractmethod
@@ -36,7 +40,7 @@ class BaseClient:
         The function returns id list.
         """
         pass
-    
+
     def check_and_save_results(self, results: list[int]):
         """
         The correct results for queries are read from the mode configuration file to compare with the search results and calculate recall.
