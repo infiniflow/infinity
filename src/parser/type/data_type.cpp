@@ -20,8 +20,11 @@
 #include "type/info/embedding_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include <iostream>
 #include <charconv>
+#include <ctype.h>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h> 
 
 namespace infinity {
 
@@ -277,33 +280,78 @@ nlohmann::json DataType::Serialize() {
     return json_res;
 }
 
+// std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
+//     LogicalType logical_type = data_type_json["data_type"];
+
+//     std::shared_ptr<TypeInfo> type_info{nullptr};
+//     if (data_type_json.contains("type_info")) {
+//         const nlohmann::json &type_info_json = data_type_json["type_info"];
+//         switch (logical_type) {
+//             case LogicalType::kArray: {
+//                 ParserError("Array isn't implemented here.");
+//                 type_info = nullptr;
+//                 break;
+//             }
+// //            case LogicalType::kBitmap: {
+// //                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
+// //                break;
+// //            }
+//             case LogicalType::kDecimal: {
+//                 type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
+//                 break;
+//             }
+//             case LogicalType::kEmbedding: {
+//                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
+//                 break;
+//             }
+//             default:
+//                 // There's no type_info for other types
+//                 break;
+//         }
+//     }
+//     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
+//     return data_type;
+// }
+
 std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
-    LogicalType logical_type = data_type_json["data_type"];
+    std::string type = data_type_json["type"];
+    if (type == "vector")
+        type = "embedding";
+
+    const LogicalType logical_type = Str2LogicalType(type);
+
     std::shared_ptr<TypeInfo> type_info{nullptr};
-    if (data_type_json.contains("type_info")) {
-        const nlohmann::json &type_info_json = data_type_json["type_info"];
-        switch (logical_type) {
-            case LogicalType::kArray: {
-                ParserError("Array isn't implemented here.");
-                type_info = nullptr;
-                break;
-            }
-//            case LogicalType::kBitmap: {
-//                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
-//                break;
-//            }
-            case LogicalType::kDecimal: {
-                type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
-                break;
-            }
-            case LogicalType::kEmbedding: {
-                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
-                break;
-            }
-            default:
-                // There's no type_info for other types
-                break;
+    switch (logical_type) {
+        case LogicalType::kArray: {
+            ParserError("Array isn't implemented here.");
+            type_info = nullptr;
+            break;
         }
+        case LogicalType::kDecimal: {
+            type_info = DecimalInfo::Make(data_type_json["precision"], data_type_json["scale"]);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            std::string etype = data_type_json["element_type"];
+            int  dimension = data_type_json["dimension"];
+
+            EmbeddingDataType e_data_type;
+            if (etype == "integer") {
+                e_data_type = EmbeddingDataType::kElemInt32;
+            } else if (etype == "float") {
+                e_data_type = EmbeddingDataType::kElemFloat;
+            } else if (etype == "double") {
+                e_data_type = EmbeddingDataType::kElemDouble;
+            } else {
+                e_data_type = EmbeddingDataType::kElemInvalid;
+            }
+
+            type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+            break;
+        }
+        default:
+            // There's no type_info for other types
+            break;
     }
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
     return data_type;
@@ -313,11 +361,11 @@ std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_ty
     const LogicalType logical_type = Str2LogicalType(data_type_string);
 
     switch (logical_type) {
-            case LogicalType::kArray:
-            case LogicalType::kDecimal:
-            case LogicalType::kEmbedding: {
-                return nullptr;
-            }
+        case LogicalType::kArray:
+        case LogicalType::kDecimal:
+        case LogicalType::kEmbedding: {
+            return nullptr;
+        }
             case LogicalType::kInvalid: {
                 ParserError("Invalid data type");
             }

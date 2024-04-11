@@ -1,13 +1,13 @@
 import sys 
 import pytest 
-import concurrent.futures
 from httpapibase import HttpTest
 from common.common_values import * 
+import infinity.index as index
 
 class TestIndex(HttpTest):
     def test_create_index_IVFFlat(self):
         dbname = "default"
-        tbname = "test_create_index_HMSW"
+        tbname = "test_create_index_IVFFlat"
         idxname = "my_index"
         self.dropTable(dbname,tbname)
         self.createTable(
@@ -15,10 +15,13 @@ class TestIndex(HttpTest):
             tbname,
             {
                 "c1":{
-                    "type":["vector","1024","float"],
+                    "type":"vector",
+                    "dimension":1024,
+                    "element_type":"float",
                 }
             }
         )
+
         self.createIdx(dbname,tbname,idxname,
         [
             "c1",
@@ -45,7 +48,9 @@ class TestIndex(HttpTest):
             tbname,
             {
                 "c1":{
-                    "type":["vector,1024,integer"]
+                    "type":"vector",
+                    "dimension":1024,
+                    "element_type":"float",
                 }
             }
         )
@@ -60,7 +65,6 @@ class TestIndex(HttpTest):
             "ef": "50",
             "metric": "l2"
         })
-
         self.dropIdx(dbname,tbname,idxname)
         self.dropTable(dbname,tbname)
         return
@@ -96,6 +100,7 @@ class TestIndex(HttpTest):
         self.dropIdx(dbname,tbname,idxname)
         self.dropTable(dbname,tbname)
         return
+    
     #PASS
     def test_drop_non_existent_index(self):
         dbname = "default"
@@ -132,6 +137,7 @@ class TestIndex(HttpTest):
         self.dropIdx(dbname,tbname,idxname)
         self.dropTable(dbname,tbname)
         return
+    
      # create / drop index with invalid options
     @pytest.mark.parametrize("column_name",
                              [(1, False), (2.2, False), ((1, 2), False), ([1, 2, 3], False), ("c1", True)])
@@ -151,9 +157,29 @@ class TestIndex(HttpTest):
         ([index.InitParameter("centroids_count", "128"),
           index.InitParameter("metric", "l2")], True)
     ])
-    @pytest.mark.parametrize("types", ["vector, 3, float"])
-    def test_create_drop_vector_index_invalid_options(self):
-        
+    def test_create_drop_vector_index_invalid_options(self,column_name,index_type,params):
+        dbname = "default"
+        tbname = "test_create_drop_vector_index_invalid_options"
+        idxname = "my_index"
+        self.dropTable(dbname,tbname)
+        self.createTable(
+            dbname,
+            tbname,
+            {
+                "type":"vector",
+                "dimension":3, 
+                "element_type":"float", 
+            }
+        )
+        index_info = [index.IndexInfo(column_name[0], index_type[0], params[0])]
+        if not column_name[1] or not index_type[1] or not params[1]:
+                self.createIdx(dbname,tbname,"my_index", index_info,{
+                        "status_code":500,
+                        "error_code":3022,
+                    })
+        else:
+            self.create_index("my_index", index_info)
+
         return
     def test_create_drop_different_fulltext_index_invalid_options(self):
         return

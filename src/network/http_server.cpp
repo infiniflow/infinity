@@ -224,7 +224,14 @@ public:
             auto field_element = field.value();
             String value_type = field_element["type"];
             ToLower(value_type);
-            SharedPtr<DataType> column_type = DataType::StringDeserialize(value_type);
+
+            SharedPtr<DataType> column_type;
+            if (value_type == "vector") {
+                column_type = DataType::Deserialize(field_element);
+            } else {
+                column_type = DataType::StringDeserialize(value_type);
+            }
+
             if (column_type) {
                 HashSet<ConstraintType> constraints;
                 for (auto &constraint_json : field_element["constraints"]) {
@@ -248,6 +255,8 @@ public:
         CreateTableOptions create_table_opts;
         if (option == "ignore_if_exists") {
             create_table_opts.conflict_type_ = ConflictType::kIgnore;
+        } else if (option == "replace_if_exists") {
+            create_table_opts.conflict_type_ = ConflictType::kReplace;
         }
 
         auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, create_table_opts);

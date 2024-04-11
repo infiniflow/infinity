@@ -53,7 +53,7 @@ def test_insert(test_object):
 
 def SingleTest(test_object):
     t: test_object = TestIndex()
-    t.test_create_index_HNSW()
+    t.test_create_index_IVFFlat()
 
 #test_table(HttpTest())
 #test_database(HttpTest())
