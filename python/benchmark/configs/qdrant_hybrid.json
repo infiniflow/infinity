@@ -8,11 +8,13 @@
  "data_type": "json",
  "data_path": "datasets/dbpedia/dbpedia.json",
  "data_link": "to_be_set",
+ "vector_name": "openai",
+ "topK": 100,
  "vector_index": {
     "type": "HNSW",
     "index_params":{
         "M": 16,
-        "ef": 200
+        "ef_construct": 200
     }
  },
  "query_type": "json",
@@ -21,10 +23,12 @@
  "insert_batch_size": 1024,
  "payload_index_schema": {
     "_id": "keyword",
-    "title": "keyword",
+    "title": "keyword"
+ },
+ "full_text_index_schema": {
     "text": {
         "type": "text",
-        "tokenizer": "models.TokenizerType.WORD",
+        "tokenizer": "word",
         "min_token_len": 3,
         "max_token_len": 15
     }
