@@ -149,11 +149,6 @@ SegmentIndexEntry::CreateFileWorkers(const SharedPtr<String> &index_dir, CreateI
             }
             break;
         }
-        case IndexType::kHnsw: {
-            auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
-            file_worker = MakeUnique<HnswFileWorker>(index_dir, file_name, create_hnsw_param);
-            break;
-        }
         case IndexType::kSecondary: {
             auto create_secondary_param = static_cast<CreateSecondaryIndexParam *>(param);
             auto const row_count = create_secondary_param->row_count_;
@@ -690,6 +685,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     String column_name = index_base->column_name();
     UniquePtr<CreateIndexParam> create_index_param =
         GetCreateIndexParam(table_index_entry->table_index_def(), segment_row_count, table_entry->GetColumnDefByName(column_name));
+
     auto segment_index_entry = LoadIndexEntry(table_index_entry, segment_id, buffer_mgr, create_index_param.get());
     if (segment_index_entry.get() == nullptr) {
         UnrecoverableError("Failed to load index entry");
@@ -699,7 +695,8 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
     if (index_entry_json.contains("chunk_index_entries")) {
         for (const auto &chunk_index_entry_json : index_entry_json["chunk_index_entries"]) {
-            UniquePtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::Deserialize(chunk_index_entry_json, segment_index_entry.get());
+            SharedPtr<ChunkIndexEntry> chunk_index_entry =
+                ChunkIndexEntry::Deserialize(chunk_index_entry_json, segment_index_entry.get(), create_index_param.get(), buffer_mgr);
             segment_index_entry->chunk_index_entries_.push_back(std::move(chunk_index_entry));
         }
     }

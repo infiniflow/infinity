@@ -108,11 +108,14 @@ nlohmann::json ChunkIndexEntry::Serialize() {
     return index_entry_json;
 }
 
-UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry) {
+SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &index_entry_json,
+                                                        SegmentIndexEntry *segment_index_entry,
+                                                        CreateIndexParam *param,
+                                                        BufferManager *buffer_mgr) {
     String base_name = index_entry_json["base_name"];
     RowID base_rowid = RowID::FromUint64(index_entry_json["base_rowid"]);
     u32 row_count = index_entry_json["row_count"];
-    return UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(segment_index_entry, base_name, base_rowid, row_count));
+    return NewReplayChunkIndexEntry(segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
 }
 
 void ChunkIndexEntry::Cleanup() {

@@ -69,7 +69,10 @@ public:
 
     nlohmann::json Serialize();
 
-    static UniquePtr<ChunkIndexEntry> Deserialize(const nlohmann::json &index_entry_json, SegmentIndexEntry *segment_index_entry);
+    static SharedPtr<ChunkIndexEntry> Deserialize(const nlohmann::json &index_entry_json,
+                                                  SegmentIndexEntry *segment_index_entry,
+                                                  CreateIndexParam *param,
+                                                  BufferManager *buffer_mgr);
 
     virtual void Cleanup() override;
 
