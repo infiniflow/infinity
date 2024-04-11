@@ -26,10 +26,6 @@ export class BlockMaxAndIterator final : public EarlyTerminateIterator {
 public:
     explicit BlockMaxAndIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators);
 
-    Pair<RowID, float> NextWithThreshold(float threshold) override;
-
-    Pair<RowID, float> BlockNextWithThreshold(float threshold) override;
-
     void UpdateScoreThreshold(float threshold) override;
 
     bool BlockSkipTo(RowID doc_id, float threshold) override;
@@ -42,9 +38,15 @@ public:
 
     float BlockMaxBM25Score() override { return common_block_max_bm25_score_; }
 
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, float threshold, RowID doc_id_no_beyond) override;
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
+
+    bool Seek(RowID doc_id) override;
+
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
+        return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxAndIterator", sorted_iterators_, os, prefix, is_final);
+    }
 
 private:
     // block max info

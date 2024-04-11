@@ -18,10 +18,43 @@ import stl;
 import search_driver;
 import query_node;
 import infinity_exception;
+import global_resource_usage;
+import infinity_context;
+import logger;
 
 using namespace infinity;
 
-class QueryParserAndOptimizerTest : public BaseTest {};
+class QueryParserAndOptimizerTest : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+};
+
+struct LogHelper {
+    void Reset() {
+        LOG_INFO(std::move(oss).str());
+        oss.str("");
+        oss.clear();
+    }
+    ~LogHelper() { LOG_INFO(std::move(oss).str()); }
+    OStringStream oss;
+};
 
 int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
     // read and parse line by line, ignoring empty lines and comments
@@ -31,32 +64,32 @@ int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
         if (firstNonBlank == std::string::npos || line[firstNonBlank] == '#') {
             continue;
         }
+        LogHelper log_helper;
+        auto &oss = log_helper.oss;
         line = line.substr(firstNonBlank);
-        std::cerr << "---query: ###" << line << "###" << std::endl;
+        oss << "---query: ###" << line << "###" << std::endl;
         std::unique_ptr<QueryNode> parser_result = driver.ParseSingle(line);
         if (!parser_result) {
-            std::cerr << "---parser failed" << std::endl;
+            oss << "---parser failed\n";
             return -1;
         } else {
-            std::cerr << "---parser accepted" << std::endl;
-            std::cerr << "---parser output tree:" << std::endl;
-            parser_result->PrintTree(std::cerr);
-            std::cerr << std::endl;
+            oss << "---parser accepted" << std::endl;
+            oss << "---parser output tree:" << std::endl;
+            parser_result->PrintTree(oss);
+            oss << std::endl;
+            log_helper.Reset();
             std::unique_ptr<QueryNode> optimizer_result;
             bool recoverable_exception = false;
             try {
                 optimizer_result = QueryNode::GetOptimizedQueryTree(std::move(parser_result));
             } catch (const RecoverableException &e) {
                 recoverable_exception = true;
-                std::cerr << "---optimizer failed with recoverable exception:\n---" << e.what() << '\n' << std::endl;
+                oss << "---optimizer failed with recoverable exception:\n---" << e.what() << '\n' << std::endl;
             }
             if (optimizer_result) {
-                std::cerr << "---optimizer accepted" << std::endl;
-                std::cerr << "---optimizer output tree:" << std::endl;
-                optimizer_result->PrintTree(std::cerr);
-                std::cerr << std::endl;
+                oss << "---optimizer accepted" << std::endl;
             } else if (!recoverable_exception) {
-                std::cerr << "---optimizer failed" << std::endl;
+                oss << "---optimizer failed" << std::endl;
                 return -1;
             }
         }

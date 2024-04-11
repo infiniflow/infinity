@@ -75,7 +75,10 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
 void ColumnLengthReader::AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length) {
     u64 column_id = column_ids.back();
     ColumnIndexReader *reader = index_reader->GetColumnIndexReader(column_id);
-    column_length_vector_.emplace_back(MakeUnique<LocalFileSystem>(), reader->index_dir_, reader->chunk_index_entries_, reader->memory_indexer_);
+    column_length_vector_.emplace_back(MakeUnique<FullTextColumnLengthReader>(MakeUnique<LocalFileSystem>(),
+                                                                              reader->index_dir_,
+                                                                              reader->chunk_index_entries_,
+                                                                              reader->memory_indexer_));
     avg_column_length.emplace_back(reader->GetAvgColumnLength());
 }
 
