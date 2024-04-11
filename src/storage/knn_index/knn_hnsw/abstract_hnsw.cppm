@@ -121,12 +121,12 @@ public:
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void InsertVecs(Iterator &&iter, const HnswInsertConfig &config) {
+    void InsertVecs(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         std::visit([&iter, &config](auto &&arg) { arg->InsertVecs(std::move(iter), config); }, knn_hnsw_ptr_);
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    Pair<SizeT, SizeT> StoreData(Iterator &&iter, const HnswInsertConfig &config) {
+    Pair<SizeT, SizeT> StoreData(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         return std::visit([&iter, &config](auto &&arg) { return arg->StoreData(std::move(iter), config); }, knn_hnsw_ptr_);
     }
 

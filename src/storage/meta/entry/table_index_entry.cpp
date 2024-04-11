@@ -356,6 +356,8 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
     return vector_file_worker;
 }
 
+String TableIndexEntry::IndexFileName(u32 segment_id) { return fmt::format("seg{}.idx", segment_id); }
+
 void TableIndexEntry::Cleanup() {
     if (this->deleted_) {
         return;

@@ -114,7 +114,7 @@ public:
 
     Vector<UniquePtr<IndexFileWorker>> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
 
-    static String IndexFileName(u32 segment_id) { return fmt::format("seg{}.idx", segment_id); }
+    static String IndexFileName(u32 segment_id);
 
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }

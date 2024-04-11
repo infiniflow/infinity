@@ -72,6 +72,8 @@ public:
     static UniquePtr<SegmentIndexEntry>
     Deserialize(const nlohmann::json &index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
+    void CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp commit_ts);
+
     bool Flush(TxnTimeStamp checkpoint_ts);
 
     void Cleanup() final;

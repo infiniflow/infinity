@@ -795,7 +795,7 @@ void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
     block_entry_->Flush(max_commit_ts);
 }
 
-void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { segment_index_entry_->Flush(max_commit_ts); }
+void AddSegmentIndexEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) { segment_index_entry_->Flush(max_commit_ts); }
 
 /// class CatalogDeltaEntry
 i32 CatalogDeltaEntry::GetSizeInBytes() const {

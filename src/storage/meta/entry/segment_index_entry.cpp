@@ -443,6 +443,17 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
     return Status::OK();
 }
 
+void SegmentIndexEntry::CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    std::unique_lock lock(rw_locker_);
+
+    max_ts_ = commit_ts;
+    if (!this->Committed()) {
+        txn_id_ = txn_id;
+        checkpoint_ts_ = commit_ts;
+        this->Commit(commit_ts);
+    }
+}
+
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     if (table_index_entry_->index_base()->index_type_ == IndexType::kFullText) {
         // Fulltext index doesn't need to be checkpointed.
