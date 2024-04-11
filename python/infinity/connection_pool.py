@@ -7,6 +7,7 @@ from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
 class ConnectionPool(object):
 
+
     def __init__(self, uri = NetworkAddress("127.0.0.1", 23817), min_size=4, max_size=16, timeout=10.0):
         assert (min_size <= max_size)
         self.uri_ = uri
@@ -14,7 +15,6 @@ class ConnectionPool(object):
         self.max_size_ = max_size
         self.curr_size_ = 0
         self.timeout_ = timeout
-
         self.free_pool_ = []
         self.created_conns_ = []
         self.mutex_ = Lock()

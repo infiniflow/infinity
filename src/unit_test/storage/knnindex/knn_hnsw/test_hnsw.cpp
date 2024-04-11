@@ -22,7 +22,12 @@ import file_system;
 import file_system_type;
 import local_file_system;
 import file_system_type;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
 import data_store;
+#pragma clang diagnostic pop
+
 import dist_func_l2;
 import dist_func_ip;
 import vec_store_type;

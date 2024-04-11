@@ -227,7 +227,7 @@ void BlockEntry::FlushData(int64_t checkpoint_row_count) {
 void BlockEntry::FlushVersion(BlockVersion &checkpoint_version) { checkpoint_version.SaveToFile(this->VersionFilePath()); }
 
 void BlockEntry::Flush(TxnTimeStamp checkpoint_ts, bool check_commit) {
-    LOG_TRACE(fmt::format("Segment: {}, Block: {} is being flushing", this->segment_entry_->segment_id(), this->block_id_));
+    LOG_TRACE(fmt::format("Segment: {}, Block: {} is flushing", this->segment_entry_->segment_id(), this->block_id_));
     if (checkpoint_ts < this->checkpoint_ts_) {
         UnrecoverableError(
             fmt::format("BlockEntry checkpoint_ts skew! checkpoint_ts: {}, this->checkpoint_ts_: {}", checkpoint_ts, this->checkpoint_ts_));
@@ -271,8 +271,9 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts, bool check_commit) {
             checkpoint_version.deleted_[i] = 0;
         }
     }
-
+    LOG_TRACE("Block entry flush before flush version");
     FlushVersion(checkpoint_version);
+    LOG_TRACE("Block entry flush before flush data");
     FlushData(checkpoint_row_count);
     this->checkpoint_ts_ = checkpoint_ts;
     this->checkpoint_row_count_ = checkpoint_row_count;
