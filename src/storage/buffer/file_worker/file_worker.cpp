@@ -57,16 +57,16 @@ void FileWorker::WriteToFile(bool to_spill) {
     file_handler_ = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
     if (to_spill) {
         auto local_file_handle = static_cast<LocalFileHandler *>(file_handler_.get());
-        LOG_WARN(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
+        LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
     }
     bool prepare_success = false;
     DeferFn defer_fn([&]() {
-        if (to_spill) {
-            LOG_WARN(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
-        }
         if (!prepare_success) {
             file_handler_->Close();
             file_handler_ = nullptr;
+        }
+        if(to_spill) {
+            LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
         }
     });
     WriteToFileImpl(prepare_success);
@@ -114,8 +114,9 @@ void FileWorker::CleanupFile() {
         LOG_TRACE(fmt::format("Cleanup: File {} not found.", file_path));
         return;
     }
-    LOG_INFO(fmt::format("Cleanup file: {}", file_path));
+    LOG_TRACE(fmt::format("Cleaning up file: {}", file_path));
     fs.DeleteFile(file_path);
+    LOG_TRACE(fmt::format("Cleaned file: {}", file_path));
 }
 
 } // namespace infinity
