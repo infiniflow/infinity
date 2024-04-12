@@ -568,6 +568,13 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
                 }
                 break;
             }
+            // TODO: uncommit this.
+            // case IndexType::kHnsw: {
+            //     for (const auto &[seg_id, ranges] : seg_append_ranges) {
+            //         MemIndexInsertHnsw(table_index_entry, txn, seg_id, ranges);
+            //     }
+            //     break;
+            // }
             default: {
                 UniquePtr<String> err_msg =
                     MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -578,6 +585,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
 }
 
 void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges) {
+    const IndexBase *index_base = table_index_entry->index_base();
+
     SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(seg_id, MAX_TIMESTAMP);
     SharedPtr<SegmentIndexEntry> segment_index_entry;
     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
@@ -585,7 +594,10 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
     if (created) {
         Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
         txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
-        table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+
+        if (index_base->index_type_ == IndexType::kFullText) {
+            table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+        }
     }
     table_index_entry->last_segment_ = segment_index_entry;
     Vector<SharedPtr<BlockEntry>> block_entries;
@@ -607,7 +619,10 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-                table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+
+                if (index_base->index_type_ == IndexType::kFullText) {
+                    table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+                }
             }
         }
     }
