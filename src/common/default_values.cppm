@@ -116,7 +116,7 @@ export {
     constexpr SizeT DBT_COMPACTION_S = DEFAULT_BLOCK_CAPACITY;
 
     // default query option parameter
-    constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 100;
+    constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 10;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
