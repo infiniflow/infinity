@@ -18,6 +18,8 @@ import infinity
 import pytest
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
+from infinity.connection_pool import ConnectionPool
+
 
 from common import common_values
 
@@ -43,6 +45,13 @@ def get_infinity_db():
     # disconnect
     res = infinity_obj.disconnect()
     assert res.error_code == ErrorCode.OK
+
+
+@pytest.fixture(scope="function", autouse=False)
+def get_infinity_connection_pool():
+    connection_pool = ConnectionPool(common_values.TEST_REMOTE_HOST)
+    yield connection_pool
+    connection_pool.destroy()
 
 
 @pytest.fixture(scope="class")
