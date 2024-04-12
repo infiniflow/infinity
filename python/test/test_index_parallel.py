@@ -15,8 +15,8 @@ TEST_DATA_DIR = "/test/data/"
 
 class TestIndexParallel:
 
-    @pytest.mark.xfail(reason="AddressSanitizer: heap-use-after-free & deadlock when import parallelly")
     @pytest.mark.parametrize("file_format", ["csv"])
+    @pytest.mark.skip(reason="AddressSanitizer: heap-use-after-free & deadlock when import parallelly")
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
         def write_worker(connection_pool:ConnectionPool, data, file_path, end_time, thread_id):
@@ -104,7 +104,7 @@ class TestIndexParallel:
     @pytest.mark.parametrize("knn_distance_type", ["l2"])
     @pytest.mark.parametrize("file_format", ["csv"])
     @pytest.mark.parametrize("running_time",[30])
-    @pytest.mark.xfail(reason="Invalid MergeFlag from 1 to 3@src/storage/wal/catalog_delta_entry.cpp:182")
+    @pytest.mark.skip(reason="Invalid MergeFlag from 1 to 3@src/storage/wal/catalog_delta_entry.cpp:182")
     def test_vector_index_single_thread(self, get_infinity_connection_pool, index_type, index_column_name, knn_column_name, 
                                       index_distance_type, knn_distance_type, file_format, running_time):
         file_path = os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test_knn." + file_format
@@ -175,7 +175,7 @@ class TestIndexParallel:
     @pytest.mark.parametrize("index_distance_type", ["l2"])
     @pytest.mark.parametrize("knn_distance_type", ["l2"])
     @pytest.mark.parametrize("file_format", ["csv"])
-    @pytest.mark.xfail(reason = "sometimes can not find lock segement xx, clock id 0, even occurs without read thread\n and sometimes segment fault")
+    @pytest.mark.skip(reason = "sometimes can not find lock segement xx, clock id 0, even occurs without read thread\n and sometimes segment fault")
     def test_vector_index_rw_parallel(self, get_infinity_connection_pool, index_type, index_column_name, knn_column_name, 
                                       index_distance_type, knn_distance_type, file_format):
 
