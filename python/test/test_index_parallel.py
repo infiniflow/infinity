@@ -40,6 +40,7 @@ class TestIndexParallel:
             
             connection_pool.release_conn(infinity_obj)
 
+            
         def read_worker(connection_pool:ConnectionPool, end_time):
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default")
@@ -79,7 +80,6 @@ class TestIndexParallel:
                                                       index.IndexType.FullText,
                                                       [])])
         assert res.error_code == ErrorCode.OK
-
 
         kInsertThreadNum = 4
         kRuningTime = 10
