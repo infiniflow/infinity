@@ -425,6 +425,12 @@ TxnTimeStamp Txn::Commit() {
     cond_var_.wait(lk, [this] { return done_bottom_; });
     LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, this->CommitTS()));
 
+    if (txn_context_.GetTxnState() != TxnState::kToRollback) {
+        // abort because of conflict
+        this->Rollback();
+        return this->CommitTS();
+    }
+
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         // Snapshot the physical operations in one txn
@@ -433,14 +439,17 @@ TxnTimeStamp Txn::Commit() {
     return this->CommitTS();
 }
 
-void Txn::CommitBottom() noexcept {
+bool Txn::CommitBottom() noexcept {
     LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
 
     // prepare to commit txn local data into table
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
-    // Append data, trigger compaction
-    txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
+    // // check conflict
+    bool success = txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
+    if (success) {
+        return false;
+    }
 
     txn_context_.SetTxnCommitted();
 
@@ -457,6 +466,8 @@ void Txn::CommitBottom() noexcept {
     done_bottom_ = true;
     cond_var_.notify_one();
     LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_id_));
+
+    return true;
 }
 
 void Txn::CancelCommitBottom() {

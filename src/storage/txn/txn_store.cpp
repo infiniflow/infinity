@@ -242,7 +242,7 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
 }
 
 // TODO: remove commit_ts
-void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+bool TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     // Init append state
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
@@ -259,6 +259,8 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
+
+    return true;
 }
 
 /**
@@ -417,10 +419,14 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *b
     }
 }
 
-void TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+bool TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
+        bool success = table_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
+        if (!success) {
+            return false;
+        }
     }
+    return true;
 }
 
 void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {
