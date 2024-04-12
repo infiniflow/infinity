@@ -26,7 +26,7 @@ public:
     IndexSegmentReader();
     virtual ~IndexSegmentReader() {}
 
-    virtual bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const = 0;
+    virtual bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const = 0;
 };
 
 } // namespace infinity

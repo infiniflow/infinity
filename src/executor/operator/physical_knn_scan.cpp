@@ -60,6 +60,7 @@ import status;
 import buffer_obj;
 import create_index_info;
 import knn_expr;
+import chunk_index_entry;
 
 import block_entry;
 import segment_index_entry;
@@ -420,8 +421,13 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 break;
             }
             case IndexType::kHnsw: {
-                    BufferHandle index_handle = segment_index_entry->GetIndex();
                     const auto *index_hnsw = static_cast<const IndexHnsw *>(segment_index_entry->table_index_entry()->index_base());
+
+                    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+
+                    for (auto &chunk_index_entry : chunk_index_entries) {
+                    BufferHandle index_handle = chunk_index_entry->GetIndex();
                     AbstractHnsw<f32, SegmentOffset> abstract_hnsw(index_handle.GetDataMut(), index_hnsw);
 
                     for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
@@ -484,6 +490,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             row_ids[i] = RowID{segment_entry->segment_id(), l_ptr[i]};
                         }
                         merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
+                    }
                     }
                     break;
                 }

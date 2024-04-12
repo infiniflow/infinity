@@ -88,7 +88,7 @@ void PostingMergerTest::CreateIndex() {
         indexer1("/tmp/infinity/posting_merger", "chunk1", RowID(0U, 0U), flag_, "standard", *byte_slice_pool_, *buffer_pool_, thread_pool_);
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
-    fake_segment_index_entry_1->AddChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
+    fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
     auto indexer2 = MakeUnique<MemoryIndexer>("/tmp/infinity/posting_merger",
                                               "chunk2",

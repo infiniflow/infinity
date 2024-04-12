@@ -233,14 +233,14 @@ SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(bool spill) {
     return chunk_index_entry;
 }
 
-SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn) {
-    if (index_base_->index_type_ != IndexType::kFullText) {
+SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
+    if (index_base_->index_type_ != IndexType::kFullText && index_base_->index_type_ != IndexType::kHnsw) {
         return nullptr;
     }
     auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_capacity(), column_def_);
     u32 segment_id = segment_entry->segment_id();
     SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
-    segment_index_entry->PopulateEntirely(segment_entry, txn);
+    segment_index_entry->PopulateEntirely(segment_entry, txn, config);
     index_by_segment_.emplace(segment_id, segment_index_entry);
     return segment_index_entry;
 }
@@ -278,109 +278,6 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
         }
     }
     return Status::OK();
-}
-
-Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
-    Vector<UniquePtr<IndexFileWorker>> vector_file_worker;
-    // reference file_worker will be invalidated when vector_file_worker is resized
-    const auto index_base = param->index_base_;
-    const auto column_def = param->column_def_;
-    if (index_base->index_type_ == IndexType::kFullText) {
-        // fulltext doesn't use BufferManager
-        return vector_file_worker;
-    }
-
-    auto file_name = MakeShared<String>(IndexFileName(segment_id));
-    vector_file_worker.resize(1);
-    auto &file_worker = vector_file_worker[0];
-    switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
-            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
-            switch (elem_type) {
-                case kElemFloat: {
-                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(this->index_dir(),
-                                                                             file_name,
-                                                                             index_base,
-                                                                             column_def,
-                                                                             create_annivfflat_param->row_count_);
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Create IVF Flat index: Unsupported element type.");
-                }
-            }
-            break;
-        }
-        case IndexType::kHnsw: {
-            auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
-            file_worker = MakeUnique<HnswFileWorker>(this->index_dir(), file_name, index_base, column_def, create_hnsw_param->max_element_);
-            break;
-        }
-        case IndexType::kFullText: {
-            // fulltext doesn't use BufferManager
-            break;
-        }
-        case IndexType::kSecondary: {
-            auto create_secondary_param = static_cast<CreateSecondaryIndexParam *>(param);
-            auto const row_count = create_secondary_param->row_count_;
-            auto const part_capacity = create_secondary_param->part_capacity_;
-            // now we can only use row_count to calculate the part_num
-            // because the actual_row_count will reduce when we delete rows
-            // consider the timestamp, actual_row_count may be less than, equal to or greater than rows we can actually read
-            u32 part_num = (row_count + part_capacity - 1) / part_capacity;
-            vector_file_worker.resize(part_num + 1);
-            // cannot use invalid file_worker
-            vector_file_worker[0] =
-                MakeUnique<SecondaryIndexFileWorker>(this->index_dir(), file_name, index_base, column_def, 0, row_count, part_capacity);
-            for (u32 i = 1; i <= part_num; ++i) {
-                auto part_file_name = MakeShared<String>(fmt::format("{}_part{}", *file_name, i));
-                vector_file_worker[i] =
-                    MakeUnique<SecondaryIndexFileWorker>(this->index_dir(), part_file_name, index_base, column_def, i, row_count, part_capacity);
-            }
-            break;
-        }
-        default: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
-        }
-    }
-    // cannot use invalid file_worker
-    if (vector_file_worker[0].get() == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
-        LOG_ERROR(*err_msg);
-        UnrecoverableError(*err_msg);
-    }
-    return vector_file_worker;
-}
-
-UniquePtr<CreateIndexParam>
-TableIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def) {
-    switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);
-        }
-        case IndexType::kHnsw: {
-            SizeT max_element = seg_row_count;
-            return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
-        }
-        case IndexType::kFullText: {
-            return MakeUnique<CreateIndexParam>(index_base, column_def);
-        }
-        case IndexType::kSecondary: {
-            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
-        }
-        default: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
-        }
-    }
-    return nullptr;
 }
 
 void TableIndexEntry::Cleanup() {

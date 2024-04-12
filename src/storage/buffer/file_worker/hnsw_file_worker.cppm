@@ -26,30 +26,19 @@ import column_def;
 
 namespace infinity {
 
-export struct CreateHnswLVQParam : public CreateIndexParam {
-    const SizeT max_element_{};
-
-    CreateHnswLVQParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, SizeT max_element)
-        : CreateIndexParam(index_base, column_def), max_element_(max_element) {}
-};
-
 export struct CreateHnswParam : public CreateIndexParam {
-    const SizeT max_element_{};
+    SizeT chunk_size_{};
+    SizeT max_chunk_num_{};
 
-    CreateHnswParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, SizeT max_element)
-        : CreateIndexParam(index_base, column_def), max_element_(max_element) {}
+    CreateHnswParam(SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def, SizeT chunk_size, SizeT max_chunk_num)
+        : CreateIndexParam(index_base, column_def), chunk_size_(chunk_size), max_chunk_num_(max_chunk_num) {}
 };
 
 export class HnswFileWorker : public IndexFileWorker {
-    const SizeT max_element_{};
-
 public:
-    explicit HnswFileWorker(SharedPtr<String> file_dir,
-                            SharedPtr<String> file_name,
-                            SharedPtr<IndexBase> index_base,
-                            SharedPtr<ColumnDef> column_def,
-                            SizeT max_element)
-        : IndexFileWorker(file_dir, file_name, index_base, column_def), max_element_(max_element) {}
+    explicit HnswFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, CreateHnswParam *create_hnsw_param)
+        : IndexFileWorker(file_dir, file_name, create_hnsw_param->index_base_, create_hnsw_param->column_def_),
+          chunk_size_(create_hnsw_param->chunk_size_), max_chunk_num_(create_hnsw_param->max_chunk_num_) {}
 
     virtual ~HnswFileWorker() override;
 
@@ -66,6 +55,10 @@ private:
     EmbeddingDataType GetType() const;
 
     SizeT GetDimension() const;
+
+private:
+    SizeT chunk_size_{};
+    SizeT max_chunk_num_{};
 };
 
 } // namespace infinity

@@ -15,7 +15,7 @@
 module;
 
 #include <cassert>
-#include <fstream>
+#include <ostream>
 
 export module graph_store;
 
@@ -130,6 +130,14 @@ private:
     mutable std::mutex mtx_;
     i32 max_layer_;
     VertexType enterpoint_;
+
+public:
+    void Dump(std::ostream &os) const {
+        auto [max_layer, enterpoint] = GetEnterPoint();
+        os << "[CONST] Mmax0: " << Mmax0_ << ", Mmax: " << Mmax_ << ", level0_size: " << level0_size_ << ", levelx_size: " << levelx_size_
+           << std::endl;
+        os << "max_layer: " << max_layer << ", enterpoint: " << enterpoint << std::endl;
+    }
 };
 
 export class GraphStoreInner {

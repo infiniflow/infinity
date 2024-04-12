@@ -15,7 +15,7 @@
 module;
 
 #include "header.h"
-#include <type_traits>
+#include <ostream>
 
 import stl;
 import hnsw_common;
@@ -105,6 +105,14 @@ public:
             norm2 += mean[i] * mean[i];
         }
         return {norm1, norm2};
+    }
+
+    static void DumpLocalCache(std::ostream &os, const LocalCacheType &local_cache) {
+        os << "norm1: " << local_cache.first << ", mean_c: " << local_cache.second << std::endl;
+    }
+
+    static void DumpGlobalCache(std::ostream &os, const GlobalCacheType &global_cache) {
+        os << "norm1_mean: " << global_cache.first << ", norm2_mean: " << global_cache.second << std::endl;
     }
 };
 

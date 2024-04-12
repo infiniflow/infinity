@@ -13,6 +13,7 @@ import segment_posting;
 import index_defines;
 import posting_list_format;
 import internal_types;
+import posting_writer;
 
 namespace infinity {
 export class MultiPostingDecoder {
@@ -70,7 +71,10 @@ private:
     }
 
     bool MoveToSegment(RowID start_row_id);
-
+    bool MemSegMoveToSegment(const SharedPtr<PostingWriter> &posting_writer);
+    bool DiskSegMoveToSegment(SegmentPosting &cur_segment_posting);
+    bool SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_posting);
+    IndexDecoder *CreateDocIndexDecoder(u32 doc_list_begin_pos);
 private:
     PostingFormatOption format_option_;
     bool need_decode_doc_id_ = false;
@@ -86,5 +90,8 @@ private:
     MemoryPool *session_pool_;
     InDocPositionIterator *in_doc_pos_iterator_ = nullptr;
     InDocStateKeeper in_doc_state_keeper_;
+private:
+    ByteSliceReader doc_reader_;
+    ByteSliceReader pos_reader_;
 };
 } // namespace infinity

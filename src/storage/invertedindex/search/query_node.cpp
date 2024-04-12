@@ -18,6 +18,8 @@ import blockmax_term_doc_iterator;
 import blockmax_and_iterator;
 import blockmax_and_not_iterator;
 import blockmax_maxscore_iterator;
+import index_defines;
+import third_party;
 
 namespace infinity {
 
@@ -336,9 +338,15 @@ std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
 std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
-    if (!column_index_reader)
+    if (!column_index_reader) {
         return nullptr;
-    auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
+    }
+    bool fetch_position = false;
+    auto option_flag = column_index_reader->GetOptionFlag();
+    if (option_flag & OptionFlag::of_position_list) {
+        fetch_position = true;
+    }
+    auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get(), fetch_position);
     if (!posting_iterator) {
         return nullptr;
     }
