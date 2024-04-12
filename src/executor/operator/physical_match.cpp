@@ -61,12 +61,12 @@ import fulltext_score_result_heap;
 
 namespace infinity {
 
-void ASSERT_FLOAT_EQ6(u32 i, float a, float b) {
+void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     float diff_percent = std::abs(a - b) / std::max(std::abs(a), std::abs(b));
-    if (diff_percent >= 1e-6) {
+    if (diff_percent > bar) {
         OStringStream oss;
         oss << "result mismatch at " << i << " : a: " << a << ", b: " << b << ", diff_percent: " << diff_percent << std::endl;
-        UnrecoverableError(std::move(oss).str());
+        RecoverableError(Status::SyntaxError("Debug Info: " + std::move(oss).str()));
     }
 }
 
@@ -118,26 +118,39 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     const float *score_result = nullptr;
     const RowID *row_id_result = nullptr;
     // for comparison
-    UniquePtr<DocIterator> doc_iterator;
     UniquePtr<EarlyTerminateIterator> et_iter;
+    UniquePtr<DocIterator> doc_iterator;
+    // run EarlyTerminateIterator again to avoid the effect of cache
+    UniquePtr<EarlyTerminateIterator> et_iter_2;
+    UniquePtr<EarlyTerminateIterator> et_iter_3;
     u32 ordinary_loop_cnt = 0;
     u32 blockmax_loop_cnt = 0;
+    u32 blockmax_loop_cnt_2 = 0;
     u32 ordinary_result_count = 0;
     u32 blockmax_result_count = 0;
+    u32 blockmax_result_count_2 = 0;
     UniquePtr<float[]> ordinary_score_result;
     UniquePtr<RowID[]> ordinary_row_id_result;
     UniquePtr<float[]> blockmax_score_result;
     UniquePtr<RowID[]> blockmax_row_id_result;
-    using TimeDurationType = std::chrono::high_resolution_clock::rep;
-    TimeDurationType ordinary_duration = 0;
-    TimeDurationType blockmax_duration = 0;
+    UniquePtr<float[]> blockmax_score_result_2;
+    UniquePtr<RowID[]> blockmax_row_id_result_2;
+    using TimeDurationType = std::chrono::duration<float>;
+    TimeDurationType ordinary_duration = {};
+    TimeDurationType blockmax_duration = {};
+    TimeDurationType blockmax_duration_2 = {};
+    TimeDurationType blockmax_duration_3 = {};
     FullTextQueryContext full_text_query_context;
     full_text_query_context.query_tree_ = std::move(query_tree);
+    if (use_block_max_iter) {
+        et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+    }
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context);
     }
-    if (use_block_max_iter) {
-        et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+    if (use_block_max_iter and use_ordinary_iter) {
+        et_iter_2 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+        et_iter_3 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
     }
 
     // 3 full text search
@@ -150,31 +163,6 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         top_n = top_n_option;
     } else {
         top_n = DEFAULT_FULL_TEXT_OPTION_TOP_N;
-    }
-    if (use_ordinary_iter) {
-        RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->PrepareFirstDoc(), doc_iterator->Doc());
-        if (iter_row_id != INVALID_ROWID) [[likely]] {
-            ordinary_score_result = MakeUniqueForOverwrite<float[]>(top_n);
-            ordinary_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n);
-            FullTextScoreResultHeap result_heap(top_n, ordinary_score_result.get(), ordinary_row_id_result.get());
-#ifdef INFINITY_DEBUG
-            auto ordinary_begin_ts = std::chrono::high_resolution_clock::now();
-#endif
-            do {
-                ++ordinary_loop_cnt;
-                // call scorer
-                float score = query_builder.Score(iter_row_id);
-                result_heap.AddResult(score, iter_row_id);
-                // get next row_id
-                iter_row_id = doc_iterator->Next();
-            } while (iter_row_id != INVALID_ROWID);
-            result_heap.Sort();
-            ordinary_result_count = result_heap.GetResultSize();
-#ifdef INFINITY_DEBUG
-            auto ordinary_end_ts = std::chrono::high_resolution_clock::now();
-            ordinary_duration = std::chrono::duration_cast<std::chrono::microseconds>(ordinary_end_ts - ordinary_begin_ts).count();
-#endif
-        }
     }
     if (use_block_max_iter) {
         blockmax_score_result = MakeUniqueForOverwrite<float[]>(top_n);
@@ -200,7 +188,90 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         blockmax_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
         auto blockmax_end_ts = std::chrono::high_resolution_clock::now();
-        blockmax_duration = std::chrono::duration_cast<std::chrono::microseconds>(blockmax_end_ts - blockmax_begin_ts).count();
+        blockmax_duration = blockmax_end_ts - blockmax_begin_ts;
+#endif
+    }
+    if (use_ordinary_iter) {
+        RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->PrepareFirstDoc(), doc_iterator->Doc());
+        if (iter_row_id != INVALID_ROWID) [[likely]] {
+            ordinary_score_result = MakeUniqueForOverwrite<float[]>(top_n);
+            ordinary_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n);
+            FullTextScoreResultHeap result_heap(top_n, ordinary_score_result.get(), ordinary_row_id_result.get());
+#ifdef INFINITY_DEBUG
+            auto ordinary_begin_ts = std::chrono::high_resolution_clock::now();
+#endif
+            do {
+                ++ordinary_loop_cnt;
+                // call scorer
+                float score = query_builder.Score(iter_row_id);
+                result_heap.AddResult(score, iter_row_id);
+                // get next row_id
+                iter_row_id = doc_iterator->Next();
+            } while (iter_row_id != INVALID_ROWID);
+            result_heap.Sort();
+            ordinary_result_count = result_heap.GetResultSize();
+#ifdef INFINITY_DEBUG
+            auto ordinary_end_ts = std::chrono::high_resolution_clock::now();
+            ordinary_duration = ordinary_end_ts - ordinary_begin_ts;
+#endif
+        }
+    }
+    if (use_ordinary_iter and use_block_max_iter) {
+        blockmax_score_result_2 = MakeUniqueForOverwrite<float[]>(top_n);
+        blockmax_row_id_result_2 = MakeUniqueForOverwrite<RowID[]>(top_n);
+        FullTextScoreResultHeap result_heap(top_n, blockmax_score_result_2.get(), blockmax_row_id_result_2.get());
+#ifdef INFINITY_DEBUG
+        auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
+#endif
+        if (et_iter_2) {
+            while (true) {
+                ++blockmax_loop_cnt_2;
+                auto [id, et_score] = et_iter_2->BlockNextWithThreshold(result_heap.GetScoreThreshold());
+                if (id == INVALID_ROWID) [[unlikely]] {
+                    break;
+                }
+                if (result_heap.AddResult(et_score, id)) {
+                    // update threshold
+                    et_iter_2->UpdateScoreThreshold(result_heap.GetScoreThreshold());
+                }
+            }
+        }
+        result_heap.Sort();
+        blockmax_result_count_2 = result_heap.GetResultSize();
+#ifdef INFINITY_DEBUG
+        auto blockmax_end_ts = std::chrono::high_resolution_clock::now();
+        blockmax_duration_2 = blockmax_end_ts - blockmax_begin_ts;
+        {
+            auto blockmax_score_result_3 = MakeUniqueForOverwrite<float[]>(top_n);
+            auto blockmax_row_id_result_3 = MakeUniqueForOverwrite<RowID[]>(top_n);
+            FullTextScoreResultHeap result_heap_3(top_n, blockmax_score_result_3.get(), blockmax_row_id_result_3.get());
+            auto blockmax_begin_ts_3 = std::chrono::high_resolution_clock::now();
+            u32 blockmax_loop_cnt_3 = 0;
+            if (et_iter_3) {
+                while (true) {
+                    ++blockmax_loop_cnt_3;
+                    auto [id, et_score] = et_iter_3->BlockNextWithThreshold(result_heap_3.GetScoreThreshold());
+                    if (id == INVALID_ROWID) [[unlikely]] {
+                        break;
+                    }
+                    if (result_heap_3.AddResult(et_score, id)) {
+                        // update threshold
+                        et_iter_3->UpdateScoreThreshold(result_heap_3.GetScoreThreshold());
+                    }
+                }
+            }
+            result_heap_3.Sort();
+            if (blockmax_loop_cnt_3 != blockmax_loop_cnt_2) {
+                assert(false);
+            }
+            assert(result_heap_3.GetResultSize() == result_heap.GetResultSize());
+            for (u32 i = 0; i < top_n; ++i) {
+                assert(blockmax_score_result_2[i] == blockmax_score_result_3[i]);
+                assert(blockmax_row_id_result_2[i] == blockmax_row_id_result_3[i]);
+            }
+            auto blockmax_end_ts_3 = std::chrono::high_resolution_clock::now();
+            blockmax_duration_3 = blockmax_end_ts_3 - blockmax_begin_ts_3;
+        }
 #endif
     }
     if (use_block_max_iter) {
@@ -216,29 +287,38 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     {
         OStringStream stat_info;
         stat_info << "Full text search stat:\n";
+        if (use_block_max_iter) {
+            stat_info << "blockmax_duration: " << blockmax_duration << std::endl;
+            stat_info << "blockmax_loop_cnt: " << blockmax_loop_cnt << std::endl;
+        }
         if (use_ordinary_iter) {
             stat_info << "ordinary_duration: " << ordinary_duration << std::endl;
             stat_info << "ordinary_loop_cnt: " << ordinary_loop_cnt << std::endl;
         }
-        if (use_block_max_iter) {
-            stat_info << "blockmax_duration: " << blockmax_duration << std::endl;
-            stat_info << "blockmax_loop_cnt: " << blockmax_loop_cnt << std::endl;
+        if (use_ordinary_iter and use_block_max_iter) {
+            stat_info << "blockmax_duration_2: " << blockmax_duration_2 << std::endl;
+            stat_info << "blockmax_duration_3: " << blockmax_duration_3 << std::endl;
+            stat_info << "blockmax_loop_cnt_2: " << blockmax_loop_cnt_2 << std::endl;
         }
         LOG_INFO(std::move(stat_info).str());
     }
     if (use_ordinary_iter and use_block_max_iter) {
         OStringStream compare_info;
         compare_info << "Compare ordinary and blockmax:\n";
-        compare_info << "duration ratio: " << (static_cast<float>(blockmax_duration) / ordinary_duration) << std::endl;
+        compare_info << "duration ratio 1: " << blockmax_duration.count() / ordinary_duration.count() << std::endl;
+        compare_info << "duration ratio 2: " << blockmax_duration_2.count() / ordinary_duration.count() << std::endl;
+        compare_info << "duration ratio 3: " << blockmax_duration_3.count() / ordinary_duration.count() << std::endl;
+        compare_info << "duration ratio 2/1: " << blockmax_duration_2.count() / blockmax_duration.count() << std::endl;
+        compare_info << "duration ratio 3/2: " << blockmax_duration_3.count() / blockmax_duration_2.count() << std::endl;
         compare_info << "loop count ratio: " << (static_cast<float>(blockmax_loop_cnt) / ordinary_loop_cnt) << std::endl;
         LOG_INFO(std::move(compare_info).str());
-        if (ordinary_result_count != blockmax_result_count) {
-            OStringStream oss;
-            oss << "result count mismatch: ordinary: " << ordinary_result_count << ", blockmax: " << blockmax_result_count << '\n';
-            UnrecoverableError(std::move(oss).str());
+        if (blockmax_result_count != blockmax_result_count_2 or ordinary_result_count != blockmax_result_count or
+            blockmax_loop_cnt != blockmax_loop_cnt_2) {
+            RecoverableError(Status::SyntaxError("Debug Info: result count mismatch!"));
         }
         for (u32 i = 0; i < result_count; ++i) {
-            ASSERT_FLOAT_EQ6(i, ordinary_score_result[i], blockmax_score_result[i]);
+            ASSERT_FLOAT_EQ(1e-6, i, ordinary_score_result[i], blockmax_score_result[i]);
+            ASSERT_FLOAT_EQ(0.0f, i, blockmax_score_result[i], blockmax_score_result_2[i]);
         }
     }
 #endif
