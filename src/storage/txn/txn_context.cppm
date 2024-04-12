@@ -57,15 +57,15 @@ public:
 
     inline void SetTxnToRollback() {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kStarted) {
-            UnrecoverableError("Transaction isn't in STARTED status.");
+        if (state_ != TxnState::kCommitting) {
+            UnrecoverableError("Transaction isn't in COMMITTING status.");
         }
         state_ = TxnState::kToRollback;
     }
 
     inline void SetTxnRollbacking(TxnTimeStamp rollback_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kToRollback) {
+        if (state_ != TxnState::kToRollback && state_ != TxnState::kStarted) {
             UnrecoverableError("Transaction isn't in TO_ROLLBACK status.");
         }
         state_ = TxnState::kRollbacking;

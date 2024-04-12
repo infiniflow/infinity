@@ -109,7 +109,7 @@ public:
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 
-    bool PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+    bool PrepareCommit(Catalog *catalog, TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
 

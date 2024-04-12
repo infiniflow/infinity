@@ -91,6 +91,8 @@ public:
 
     bool CommitBottom() noexcept;
 
+    void DoneCommitBottom();
+
     void CancelCommitBottom();
 
     void Rollback();

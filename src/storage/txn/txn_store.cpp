@@ -242,7 +242,20 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
 }
 
 // TODO: remove commit_ts
-bool TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+bool TxnTableStore::PrepareCommit(Catalog *catalog, TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+    {
+        TableEntry *latest_table_entry;
+        const auto &db_name = *table_entry_->GetDBName();
+        const auto &table_name = *table_entry_->GetTableName();
+        TxnTimeStamp begin_ts = txn_->BeginTS();
+        bool conflict = catalog->CheckTableConflict(db_name, table_name, txn_id, begin_ts, latest_table_entry);
+        if (conflict) {
+            return false;
+        }
+        if (latest_table_entry != table_entry_) {
+            UnrecoverableError(fmt::format("Table entry should conflict, table name: {}", table_name));
+        }
+    }
     // Init append state
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
@@ -421,7 +434,7 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *b
 
 bool TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        bool success = table_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
+        bool success = table_store->PrepareCommit(catalog_, txn_id, commit_ts, buffer_mgr);
         if (!success) {
             return false;
         }
