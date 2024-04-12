@@ -107,8 +107,6 @@ public:
     Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
                                              CompactSegmentsTaskType type);
 
-    void Scan(SharedPtr<DataBlock> &output_block);
-
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
