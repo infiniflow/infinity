@@ -31,7 +31,7 @@ public:
     InMemIndexSegmentReader(MemoryIndexer *memory_indexer);
     virtual ~InMemIndexSegmentReader() = default;
 
-    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
+    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const override;
 
 private:
     SharedPtr<MemoryIndexer::PostingTable> posting_table_;

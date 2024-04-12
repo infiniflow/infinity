@@ -68,17 +68,18 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
     }
 }
 
-UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {
+UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool, bool fetch_position) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
-        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool);
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool, fetch_position);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
     }
-    if (seg_postings->empty())
+    if (seg_postings->empty()) {
         return nullptr;
+    }
     auto iter = MakeUnique<PostingIterator>(flag_, session_pool);
     u32 state_pool_size = 0; // TODO
     iter->Init(std::move(seg_postings), state_pool_size);
