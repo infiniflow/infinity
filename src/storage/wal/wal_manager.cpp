@@ -168,11 +168,8 @@ void WalManager::Flush() {
             }
 
             Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
-            bool success = false;
-            if (txn != nullptr) {
-                // Commit sequentially so they get visible in the same order with wal.
-                success = txn->CommitBottom();
-            }
+            // Commit sequentially so they get visible in the same order with wal.
+            bool success = success = txn->CommitBottom();
             if (!success) {
                 txn->SetTxnToRollback();
                 continue;
@@ -192,6 +189,8 @@ void WalManager::Flush() {
             // update
             max_commit_ts_ = entry->commit_ts_;
             wal_size_ += act_size;
+
+            txn->DoneCommitBottom();
         }
 
         if (!running_.load()) {

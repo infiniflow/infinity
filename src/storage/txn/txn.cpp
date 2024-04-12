@@ -425,10 +425,13 @@ TxnTimeStamp Txn::Commit() {
     cond_var_.wait(lk, [this] { return done_bottom_; });
     LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, this->CommitTS()));
 
-    if (txn_context_.GetTxnState() != TxnState::kToRollback) {
+    if (txn_context_.GetTxnState() == TxnState::kToRollback) {
         // abort because of conflict
         this->Rollback();
         return this->CommitTS();
+    }
+    if (txn_context_.GetTxnState() != TxnState::kCommitted) {
+        UnrecoverableError("Transaction isn't in COMMITTED status.");
     }
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
@@ -447,7 +450,7 @@ bool Txn::CommitBottom() noexcept {
 
     // // check conflict
     bool success = txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
-    if (success) {
+    if (!success) {
         return false;
     }
 
@@ -461,13 +464,15 @@ bool Txn::CommitBottom() noexcept {
         local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
         txn_mgr_->AddWaitFlushTxn(txn_id_);
     }
+    return true;
+}
+
+void Txn::DoneCommitBottom() {
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
     LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_id_));
-
-    return true;
 }
 
 void Txn::CancelCommitBottom() {
