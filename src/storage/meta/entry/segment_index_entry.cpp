@@ -239,7 +239,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             break;
         }
         case IndexType::kHnsw: {
-            break;
             const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
             if (memory_hnsw_indexer_.get() == nullptr) {
                 auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);

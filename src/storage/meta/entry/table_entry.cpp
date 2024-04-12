@@ -562,19 +562,13 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             continue;
         const IndexBase *index_base = table_index_entry->index_base();
         switch (index_base->index_type_) {
+            case IndexType::kHnsw:
             case IndexType::kFullText: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
                 break;
             }
-            // TODO: uncommit this.
-            // case IndexType::kHnsw: {
-            //     for (const auto &[seg_id, ranges] : seg_append_ranges) {
-            //         MemIndexInsertHnsw(table_index_entry, txn, seg_id, ranges);
-            //     }
-            //     break;
-            // }
             default: {
                 UniquePtr<String> err_msg =
                     MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));

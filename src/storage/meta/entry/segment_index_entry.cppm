@@ -158,6 +158,11 @@ public:
         return {chunk_index_entries_, memory_indexer_};
     }
 
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetHnswIndexSnapshot() {
+        std::shared_lock lock(rw_locker_);
+        return {chunk_index_entries_, memory_hnsw_indexer_};
+    }
+
     Pair<u64, u32> GetFulltextColumnLenInfo() {
         std::shared_lock lock(rw_locker_);
         if (ft_column_len_sum_ == 0 && memory_indexer_.get() != nullptr) {

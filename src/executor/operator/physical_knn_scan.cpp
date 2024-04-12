@@ -423,11 +423,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             case IndexType::kHnsw: {
                     const auto *index_hnsw = static_cast<const IndexHnsw *>(segment_index_entry->table_index_entry()->index_base());
 
-                    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
-
-                    for (auto &chunk_index_entry : chunk_index_entries) {
-                    BufferHandle index_handle = chunk_index_entry->GetIndex();
+                    auto hnsw_search = [&](BufferHandle index_handle, bool with_lock) {
                     AbstractHnsw<f32, SegmentOffset> abstract_hnsw(index_handle.GetDataMut(), index_hnsw);
 
                     for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
@@ -459,10 +455,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
                             } else {
                                 std::tie(result_n1, d_ptr, l_ptr) =
-                                        abstract_hnsw.KnnSearch(query,
-                                                                knn_scan_shared_data->topk_,
-                                                                false /*with_lock*/); // TMP setting here to check performance
-                                                                                      // wrong for unsealed segment
+                                    abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, with_lock);
                             }
                         }
 
@@ -495,7 +488,18 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         }
                         merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                     }
+                    };
+
+                    auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetHnswIndexSnapshot();
+                    for (auto &chunk_index_entry : chunk_index_entries) {
+                        BufferHandle index_handle = chunk_index_entry->GetIndex();
+                        hnsw_search(index_handle, false);
                     }
+                    if (memory_index_entry.get() != nullptr) {
+                        BufferHandle index_handle = memory_index_entry->GetIndex();
+                        hnsw_search(index_handle, true);
+                    }
+
                     break;
                 }
                 default: {
