@@ -225,8 +225,6 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
     return {nullptr, Status::OK()};
 }
 
-void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
-
 void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
