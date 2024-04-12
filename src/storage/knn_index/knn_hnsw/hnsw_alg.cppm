@@ -123,7 +123,7 @@ private:
     }
 
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
-    template <FilterConcept<LabelType> Filter = NoneType>
+    template <bool WithLock, FilterConcept<LabelType> Filter = NoneType>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>>
     SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
         auto d_ptr = MakeUniqueForOverwrite<DataType[]>(result_n);
@@ -155,7 +155,10 @@ private:
                 break;
             }
 
-            std::shared_lock<std::shared_mutex> lock = data_store_.SharedLock(c_idx);
+            std::shared_lock<std::shared_mutex> lock;
+            if constexpr (WithLock) {
+                lock = data_store_.SharedLock(c_idx);
+            }
 
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(c_idx, layer_idx);
             int prefetch_start = neighbor_size - 1 - prefetch_offset_;
@@ -190,6 +193,7 @@ private:
         return {result_handler.GetSize(0), std::move(d_ptr), std::move(i_ptr)};
     }
 
+    template <bool WithLock>
     VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
         DataType cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_.vec_store_meta());
@@ -197,7 +201,10 @@ private:
         while (check) {
             check = false;
 
-            std::shared_lock<std::shared_mutex> lock = data_store_.SharedLock(cur_p);
+            std::shared_lock<std::shared_mutex> lock;
+            if constexpr (WithLock) {
+                lock = data_store_.SharedLock(cur_p);
+            }
 
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
@@ -276,7 +283,7 @@ private:
 
     LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
-    template <FilterConcept<LabelType> Filter = NoneType>
+    template <bool WithLock, FilterConcept<LabelType> Filter = NoneType>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const DataType *q, SizeT k, const Filter &filter) const {
         auto query = data_store_.MakeQuery(q);
         auto [max_layer, ep] = data_store_.GetEnterPoint();
@@ -284,9 +291,9 @@ private:
             return {0, nullptr, nullptr};
         }
         for (i32 cur_layer = max_layer; cur_layer > 0; --cur_layer) {
-            ep = SearchLayerNearest(ep, query, cur_layer);
+            ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
-        return SearchLayer<Filter>(ep, query, 0, std::max(k, ef_), filter);
+        return SearchLayer<WithLock, Filter>(ep, query, 0, std::max(k, ef_), filter);
     }
 
 public:
@@ -331,10 +338,10 @@ public:
         data_store_.AddVertex(vertex_i, q_layer);
 
         for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
-            ep = SearchLayerNearest(ep, query, cur_layer);
+            ep = SearchLayerNearest<true>(ep, query, cur_layer);
         }
         for (i32 cur_layer = std::min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
-            auto [result_n, d_ptr, v_ptr] = SearchLayer(ep, query, cur_layer, ef_construction_, None);
+            auto [result_n, d_ptr, v_ptr] = SearchLayer<true>(ep, query, cur_layer, ef_construction_, None);
             auto search_result = Vector<PDV>(result_n);
             for (SizeT i = 0; i < result_n; ++i) {
                 search_result[i] = {d_ptr[i], v_ptr[i]};
@@ -347,9 +354,9 @@ public:
         }
     }
 
-    template <FilterConcept<LabelType> Filter = NoneType>
+    template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, const Filter &filter) const {
-        auto [result_n, d_ptr, v_ptr] = KnnSearchInner<Filter>(q, k, filter);
+        auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
             labels[i] = GetLabel(v_ptr[i]);
@@ -357,14 +364,15 @@ public:
         return {result_n, std::move(d_ptr), std::move(labels)};
     }
 
+    template <bool WithLock = true>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k) const {
-        return KnnSearch<NoneType>(q, k, None);
+        return KnnSearch<NoneType, WithLock>(q, k, None);
     }
 
     // function for test, add sort for convenience
-    template <FilterConcept<LabelType> Filter = NoneType>
+    template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
     Vector<Pair<DataType, LabelType>> KnnSearchSorted(const DataType *q, SizeT k, const Filter &filter) const {
-        auto [result_n, d_ptr, v_ptr] = KnnSearchInner<Filter>(q, k, filter);
+        auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         Vector<Pair<DataType, LabelType>> result(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
             result[i] = {d_ptr[i], GetLabel(v_ptr[i])};

@@ -458,7 +458,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 DeleteFilter filter(segment_entry, begin_ts);
                                 std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
                             } else {
-                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_);
+                                std::tie(result_n1, d_ptr, l_ptr) =
+                                        abstract_hnsw.KnnSearch(query,
+                                                                knn_scan_shared_data->topk_,
+                                                                false /*with_lock*/); // TMP setting here to check performance
+                                                                                      // wrong for unsealed segment
                             }
                         }
 
