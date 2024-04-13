@@ -11,7 +11,7 @@ target_link_libraries(
 )
 
 if(ENABLE_JEMALLOC)
-    target_link_libraries(fst jemalloc.a dl)
+    target_link_libraries(fst jemalloc.a)
 endif()
 
 # add_definitions(-march=native)
