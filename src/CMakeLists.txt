@@ -255,7 +255,7 @@ target_link_libraries(infinity
 )
 
 if(ENABLE_JEMALLOC)
-    target_link_libraries(infinity jemalloc.a dl)
+    target_link_libraries(infinity jemalloc.a)
 endif()
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")

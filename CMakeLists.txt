@@ -134,8 +134,10 @@ find_package(Lz4 REQUIRED)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
 option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
-if(ENABLE_JEMALLOC)
+if(ENABLE_JEMALLOC AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     find_package(jemalloc REQUIRED)
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
 endif()
 
 add_subdirectory(src)
