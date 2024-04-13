@@ -53,7 +53,7 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
         result = fmt::format("{}/{}_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN), name);
         ++cnt;
     } while (!fs.CreateDirectoryNoExp(result));
-    LOG_TRACE(fmt::format("Generate path {} time: {}", result, cnt));
+    LOG_INFO(fmt::format("Created directory {} in {} times", result, cnt));
     return MakeShared<String>(std::move(result));
 }
 
