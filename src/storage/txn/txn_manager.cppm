@@ -112,7 +112,6 @@ private:
     u64 sequence_{};
 
     MultiSet<TxnTimeStamp> TxnTimestampsSet_;
-    Atomic<TxnTimeStamp> oldestVisibleTs_{}; // oldest Ts
 };
 
 } // namespace infinity
