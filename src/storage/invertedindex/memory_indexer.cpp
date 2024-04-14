@@ -72,9 +72,11 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &analyzer,
                              MemoryPool &byte_slice_pool,
                              RecyclePool &buffer_pool,
-                             ThreadPool &thread_pool)
+                             ThreadPool &inverting_thread_pool,
+                             ThreadPool &commiting_thread_pool)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
-      buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(13UL), ring_sorted_(13UL) {
+      buffer_pool_(buffer_pool), inverting_thread_pool_(inverting_thread_pool), commiting_thread_pool_(commiting_thread_pool), ring_inverted_(15UL),
+      ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
@@ -109,7 +111,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
             inverter->SortForOfflineDump();
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
-        thread_pool_.push(std::move(func));
+        inverting_thread_pool_.push(std::move(func));
     } else {
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, provider, column_lengths_);
@@ -120,7 +122,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
             this->ring_inverted_.Put(task->task_seq_, inverter);
             // LOG_INFO(fmt::format("online inverter {} end", id));
         };
-        thread_pool_.push(std::move(func));
+        inverting_thread_pool_.push(std::move(func));
     }
     {
         std::unique_lock<std::mutex> lock(mutex_);
@@ -130,9 +132,9 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
 
 void MemoryIndexer::Commit(bool offline) {
     if (offline) {
-        thread_pool_.push([this](int id) { this->CommitOffline(); });
+        commiting_thread_pool_.push([this](int id) { this->CommitOffline(); });
     } else
-        thread_pool_.push([this](int id) { this->CommitSync(); });
+        commiting_thread_pool_.push([this](int id) { this->CommitSync(); });
 }
 
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
@@ -163,10 +165,6 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
 }
 
 SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
-    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
-    if (!lock.try_lock())
-        return 0;
-
     Vector<SharedPtr<ColumnInverter>> inverters;
     // LOG_INFO("MemoryIndexer::CommitSync begin");
     u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
@@ -179,13 +177,21 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         this->ring_sorted_.Put(seq_commit, inverters[0]);
     };
 
-    this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
-    // num_merged = inverters.size();
-    for (auto &inverter : inverters) {
-        inverter->GeneratePosting();
-        num_generated += inverter->GetMerged();
+    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
+    if (!lock.try_lock())
+        return 0;
+
+    while (1) {
+        this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
+        // num_merged = inverters.size();
+        if (inverters.empty())
+            break;
+        for (auto &inverter : inverters) {
+            inverter->GeneratePosting();
+            num_generated += inverter->GetMerged();
+        }
     }
-    {
+    if (num_generated > 0) {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_ -= num_generated;
         if (inflight_tasks_ == 0) {

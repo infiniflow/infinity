@@ -227,7 +227,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                                             index_fulltext->analyzer_,
                                                             table_index_entry_->GetFulltextByteSlicePool(),
                                                             table_index_entry_->GetFulltextBufferPool(),
-                                                            table_index_entry_->GetFulltextThreadPool());
+                                                            table_index_entry_->GetFulltextInvertingThreadPool(),
+                                                            table_index_entry_->GetFulltextCommitingThreadPool());
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
                 assert(begin_row_id == memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount());
@@ -291,7 +292,8 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
                                                 index_fulltext->analyzer_,
                                                 table_index_entry_->GetFulltextByteSlicePool(),
                                                 table_index_entry_->GetFulltextBufferPool(),
-                                                table_index_entry_->GetFulltextThreadPool());
+                                                table_index_entry_->GetFulltextInvertingThreadPool(),
+                                                table_index_entry_->GetFulltextCommitingThreadPool());
     memory_indexer_->Load();
 }
 
@@ -315,7 +317,8 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                                                         index_fulltext->analyzer_,
                                                         table_index_entry_->GetFulltextByteSlicePool(),
                                                         table_index_entry_->GetFulltextBufferPool(),
-                                                        table_index_entry_->GetFulltextThreadPool());
+                                                        table_index_entry_->GetFulltextInvertingThreadPool(),
+                                                        table_index_entry_->GetFulltextCommitingThreadPool());
             u64 column_id = column_def->id();
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {

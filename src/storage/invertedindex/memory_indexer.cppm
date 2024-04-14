@@ -57,7 +57,8 @@ public:
                   const String &analyzer,
                   MemoryPool &byte_slice_pool,
                   RecyclePool &buffer_pool,
-                  ThreadPool &thread_pool);
+                  ThreadPool &inverting_thread_pool,
+                  ThreadPool &commiting_thread_pool);
 
     ~MemoryIndexer();
 
@@ -124,7 +125,8 @@ private:
     String analyzer_;
     MemoryPool &byte_slice_pool_;
     RecyclePool &buffer_pool_;
-    ThreadPool &thread_pool_;
+    ThreadPool &inverting_thread_pool_;
+    ThreadPool &commiting_thread_pool_;
     u32 doc_count_{0};
     SharedPtr<PostingTable> posting_table_;
     PostingPtr prepared_posting_{nullptr};
