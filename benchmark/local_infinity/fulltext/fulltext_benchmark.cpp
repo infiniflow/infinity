@@ -13,12 +13,15 @@
 // limitations under the License.
 
 #include <cassert>
+#include <csignal>
 #include <cstring>
 #include <string>
 #include <tuple>
 #include <unistd.h>
-#include <getopt.h>
 #include <vector>
+#ifdef ENABLE_JEMALLOC_PROF
+#include <jemalloc/jemalloc.h>
+#endif
 
 import stl;
 import third_party;
@@ -262,6 +265,32 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
     }
 }
 
+void SignalHandler(int signal_number, siginfo_t *, void *) {
+    switch (signal_number) {
+#ifdef ENABLE_JEMALLOC_PROF
+        case SIGUSR2: {
+            // http://jemalloc.net/jemalloc.3.html
+            int rc = mallctl("prof.dump", NULL, NULL, NULL, 0);
+            printf("Dump memory profile %d\n", rc);
+            break;
+        }
+#endif
+        default: {
+            // Ignore
+            printf("Other type of signal: %d\n", signal_number);
+        }
+    }
+}
+
+void RegisterSignal() {
+    struct sigaction sig_action;
+    sig_action.sa_flags = SA_SIGINFO;
+    sig_action.sa_sigaction = SignalHandler;
+    sigemptyset(&sig_action.sa_mask);
+#ifdef ENABLE_JEMALLOC_PROF
+    sigaction(SIGUSR2, &sig_action, NULL);
+#endif
+}
 
 int main(int argc, char *argv[]) {
     CLI::App app{"fulltext_benchmark"};
@@ -285,6 +314,7 @@ int main(int argc, char *argv[]) {
     } catch (const CLI::ParseError &e) {
         return app.exit(e);
     }
+    RegisterSignal();
 
     String db_name = "default";
     String table_name = "ft_dbpedia_benchmark";
