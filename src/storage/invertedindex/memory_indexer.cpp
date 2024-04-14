@@ -77,7 +77,7 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
       buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(13UL), ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
-    Path path = Path(index_dir) / base_name + ".tmp.merge";
+    Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
 }
 
