@@ -42,7 +42,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
 
-    BufferObj* res = buffer_obj.get();
+    BufferObj *res = buffer_obj.get();
     std::unique_lock<std::mutex> lock(w_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         UnrecoverableError(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
@@ -81,6 +81,29 @@ void BufferManager::RemoveBufferObj(const String &file_path) {
     deprecated_array_.emplace_back(buffer_map_[file_path]);
     buffer_map_.erase(file_path);
     LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
+}
+
+void BufferManager::RemoveBufferObjsInBulk(const Vector<String> &paths_to_delete) {
+    std::unique_lock<std::mutex> lock(w_locker_);
+    deprecated_array_.clear();
+
+    for (unsigned long i = 0; i < paths_to_delete.size(); i++) {
+        const auto& file_path = paths_to_delete[i];
+        if (buffer_map_.find(file_path) != buffer_map_.end()) {
+            deprecated_array_.emplace_back(buffer_map_[file_path]);
+            buffer_map_.erase(file_path);
+            LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
+        } else {
+            LOG_TRACE(fmt::format("Buffer object not found for: {}", file_path));
+        }
+    }
+}
+
+void BufferManager::ExecuteDeletions() {
+    FileWorker::DeleteFilesInBulk(file_path_delete);
+    RemoveBufferObjsInBulk(obj_path_delete);
+    file_path_delete.clear();
+    obj_path_delete.clear();
 }
 
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {

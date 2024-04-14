@@ -48,6 +48,14 @@ public:
 
     u64 memory_usage() const { return current_memory_size_.load(); }
 
+    void AddFilePath(const String &path) { file_path_delete.push_back(path); }
+
+    void AddBufferObjPath(const String &path) { obj_path_delete.push_back(path); }
+
+    void RemoveBufferObjsInBulk(const Vector<String> &paths_to_delete);
+
+    void ExecuteDeletions();
+
 private:
     friend class BufferObj;
 
@@ -67,5 +75,8 @@ private:
     HashMap<String, SharedPtr<BufferObj>> buffer_map_{};
     Vector<SharedPtr<BufferObj>> deprecated_array_{};
     SpecificConcurrentQueue<BufferObj *> gc_queue_{};
+
+    Vector<String> file_path_delete;
+    Vector<String> obj_path_delete;
 };
 } // namespace infinity

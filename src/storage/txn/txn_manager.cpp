@@ -68,6 +68,8 @@ Txn *TxnManager::BeginTxn() {
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
     ts_map_.emplace(ts, new_txn_id);
+
+    TxnTimestampsSet_.insert(ts);
     rw_locker_.unlock();
 
     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
@@ -147,7 +149,12 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp txn_ts = txn->Commit();
     rw_locker_.lock();
-    txn_map_.erase(txn->TxnID());
+    // txn_map_.erase(txn->TxnID());
+    // Remove the transaction's timestamp from the active set
+    auto it = TxnTimestampsSet_.find(txn->BeginTS());
+    if (it != TxnTimestampsSet_.end()) {
+        TxnTimestampsSet_.erase(it);
+    }
     rw_locker_.unlock();
     return txn_ts;
 }
@@ -155,7 +162,12 @@ TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
     rw_locker_.lock();
-    txn_map_.erase(txn->TxnID());
+    // txn_map_.erase(txn->TxnID());
+    // Remove the transaction's timestamp from the active set
+    auto it = TxnTimestampsSet_.find(txn->BeginTS());
+    if (it != TxnTimestampsSet_.end()) {
+        TxnTimestampsSet_.erase(it);
+    }
     rw_locker_.unlock();
 }
 
@@ -166,7 +178,8 @@ void TxnManager::AddWaitFlushTxn(TransactionID txn_id) {
     // }
     // LOG_INFO(fmt::format("Current wait flush set: {}, add txn: {} to wait flush set", ss.str(), txn_id));
     std::unique_lock w_lock(rw_locker_);
-    wait_flush_txns_.insert(txn_id);
+    // wait_flush_txns_.insert(txn_id);
+    TxnTimestampsSet_.insert(GetTxn(txn_id)->BeginTS());
 }
 
 void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
@@ -180,28 +193,43 @@ void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
     // }
     // LOG_INFO(fmt::format("Current wait flush set: {}, Remove txn: {} from wait flush set", ss1.str(), ss2.str()));
     std::unique_lock w_lock(rw_locker_);
+    // for (auto txn_id : txn_ids) {
+    //     if (!wait_flush_txns_.erase(txn_id)) {
+    //         UnrecoverableError(fmt::format("Txn: {} not found in wait flush set", txn_id));
+    //     }
+    // }
     for (auto txn_id : txn_ids) {
-        if (!wait_flush_txns_.erase(txn_id)) {
-            UnrecoverableError(fmt::format("Txn: {} not found in wait flush set", txn_id));
+        auto txn = GetTxn(txn_id);
+        if (txn) {
+            auto it = TxnTimestampsSet_.find(txn->BeginTS());
+            if (it != TxnTimestampsSet_.end()) {
+                TxnTimestampsSet_.erase(it);
+            }
+        } else {
+            LOG_ERROR(fmt::format("Txn: {} not found", txn_id));
         }
     }
 }
 
 TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     std::unique_lock w_locker(rw_locker_);
-    for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
-        auto &[ts, txn_id] = *iter;
-        if (txn_map_.find(txn_id) != txn_map_.end()) {
-            LOG_TRACE(fmt::format("Txn: {} not found in txn map", txn_id));
-            return ts;
-        }
-        if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
-            LOG_TRACE(fmt::format("Txn: {} wait flush", txn_id));
-            return ts;
-        }
-        iter = ts_map_.erase(iter);
+    // for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
+    //     auto &[ts, txn_id] = *iter;
+    //     if (txn_map_.find(txn_id) != txn_map_.end()) {
+    //         LOG_TRACE(fmt::format("Txn: {} not found in txn map", txn_id));
+    //         return ts;
+    //     }
+    //     if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
+    //         LOG_TRACE(fmt::format("Txn: {} wait flush", txn_id));
+    //         return ts;
+    //     }
+    //     iter = ts_map_.erase(iter);
+    // }
+    // LOG_TRACE(fmt::format("No txn is active, return the next ts {}", start_ts_));
+    // return start_ts_;
+    if (!TxnTimestampsSet_.empty()) {
+        return *TxnTimestampsSet_.begin();
     }
-    LOG_TRACE(fmt::format("No txn is active, return the next ts {}", start_ts_));
     return start_ts_;
 }
 

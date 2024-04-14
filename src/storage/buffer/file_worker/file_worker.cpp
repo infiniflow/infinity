@@ -65,7 +65,7 @@ void FileWorker::WriteToFile(bool to_spill) {
             file_handler_->Close();
             file_handler_ = nullptr;
         }
-        if(to_spill) {
+        if (to_spill) {
             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
         }
     });
@@ -109,7 +109,7 @@ void FileWorker::CleanupFile() {
     String file_path = fmt::format("{}/{}", *file_dir_, *file_name_);
     if (!fs.Exists(file_path)) {
         // this may happen the same reason as in "CleanupScanner::CleanupDir"
-        // It may also happen when cleanup a table not been flushed (need a checkpoint txn), 
+        // It may also happen when cleanup a table not been flushed (need a checkpoint txn),
         // at that time there is not data file under dir.
         LOG_TRACE(fmt::format("Cleanup: File {} not found.", file_path));
         return;
@@ -118,5 +118,6 @@ void FileWorker::CleanupFile() {
     fs.DeleteFile(file_path);
     LOG_TRACE(fmt::format("Cleaned file: {}", file_path));
 }
+
 
 } // namespace infinity

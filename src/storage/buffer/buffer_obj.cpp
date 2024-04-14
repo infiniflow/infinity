@@ -166,7 +166,7 @@ bool BufferObj::Save() {
         }
         type_ = BufferType::kPersistent;
     }
-    if(write) {
+    if (write) {
         file_worker_->Sync();
         file_worker_->CloseFile();
     }
@@ -187,7 +187,8 @@ void BufferObj::SetAndTryCleanup() {
             if (!wait_for_gc_) {
                 UnrecoverableError("Assert: unloaded buffer object should in gc_queue.");
             }
-            file_worker_->CleanupFile();
+            String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
+            buffer_mgr_->AddFilePath(file_path);
             status_ = BufferStatus::kClean;
             break;
         }
@@ -197,9 +198,11 @@ void BufferObj::SetAndTryCleanup() {
             }
             String file_name = this->GetFilename();
             LOG_TRACE(fmt::format("Remove file: {}", file_name));
-            file_worker_->CleanupFile();
+
+            String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
+            buffer_mgr_->AddFilePath(file_path);
             LOG_TRACE(fmt::format("Remove from buffer: {}", file_name));
-            buffer_mgr_->RemoveBufferObj(file_name);
+            buffer_mgr_->AddBufferObjPath(file_name);
             LOG_TRACE(fmt::format("Removed file and buffer: {}", file_name));
             break;
         }
