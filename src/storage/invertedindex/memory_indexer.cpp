@@ -136,11 +136,10 @@ void MemoryIndexer::Commit(bool offline) {
 }
 
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
-    bool generating = false;
-    bool changed = generating_.compare_exchange_strong(generating, true);
-    if (!changed)
+    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
+    if (!lock.try_lock())
         return 0;
-    generating = true;
+
     if (nullptr == spill_file_handle_) {
         PrepareSpillFile();
     }
@@ -153,7 +152,6 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
             num_runs_++;
         }
     }
-    generating_.compare_exchange_strong(generating, false);
     if (num > 0) {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_ -= num;
@@ -165,6 +163,10 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
 }
 
 SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
+    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
+    if (!lock.try_lock())
+        return 0;
+
     Vector<SharedPtr<ColumnInverter>> inverters;
     // LOG_INFO("MemoryIndexer::CommitSync begin");
     u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
@@ -177,18 +179,12 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         this->ring_sorted_.Put(seq_commit, inverters[0]);
     };
 
-    bool generating = false;
-    bool changed = generating_.compare_exchange_strong(generating, true);
-    if (!changed)
-        goto QUIT;
-    generating = true;
     this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
     // num_merged = inverters.size();
     for (auto &inverter : inverters) {
         inverter->GeneratePosting();
         num_generated += inverter->GetMerged();
     }
-    generating_.compare_exchange_strong(generating, false);
     {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_ -= num_generated;
@@ -197,7 +193,6 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         }
     }
 
-QUIT:
     // LOG_INFO(fmt::format("MemoryIndexer::CommitSync sorted {} inverters, generated posting for {} inverters(merged to {}), inflight_tasks_ is {}",
     //                      num_sorted,
     //                      num_generated,

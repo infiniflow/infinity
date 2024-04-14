@@ -132,10 +132,9 @@ private:
     Ring<SharedPtr<ColumnInverter>> ring_sorted_;
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};
-    Atomic<bool> generating_{false};
-
     std::condition_variable cv_;
     std::mutex mutex_;
+    std::mutex mutex_commit_;
 
     u32 num_runs_{0};                  // For offline index building
     FILE *spill_file_handle_{nullptr}; // Temp file for offline external merge sort
