@@ -78,7 +78,7 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
       buffer_pool_(buffer_pool), inverting_thread_pool_(inverting_thread_pool), commiting_thread_pool_(commiting_thread_pool), ring_inverted_(15UL),
       ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
-    prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
+    prepared_posting_ = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
 }
@@ -313,7 +313,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     PostingPtr posting;
     bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
     if (!found) {
-        prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
+        prepared_posting_ = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_lengths_);
     }
     return posting;
 }
