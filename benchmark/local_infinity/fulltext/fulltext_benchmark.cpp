@@ -220,10 +220,10 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
 
 void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
-    std::vector<std::string> query_vec = {"Animalia", "Algorithms"};
-    BaseProfiler profiler;
-    profiler.Begin();
+    std::vector<std::string> query_vec = {"Animalia", "Algorithms", "Animalia Algorithms", "network space", "harmful chemical anarchism"};
     for (auto match_text : query_vec) {
+        BaseProfiler profiler;
+        profiler.Begin();
         auto *search_expr = new SearchExpr();
         {
             auto exprs = new std::vector<ParsedExpr *>();
@@ -257,9 +257,9 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
             }
         }
         */
+        LOG_INFO(fmt::format("Query text: {}, time cost: {}", match_text, profiler.ElapsedToString()));
+        profiler.End();
     }
-    LOG_INFO(fmt::format("Query data cost: {}", profiler.ElapsedToString()));
-    profiler.End();
 }
 
 
