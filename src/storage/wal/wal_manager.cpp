@@ -156,6 +156,7 @@ void WalManager::Flush() {
         // auto [max_commit_ts, wal_size] = GetWalState();
         TxnManager *txn_mgr = storage_->txn_manager();
 
+        Vector<Txn *> txns;
         for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry == nullptr) {
@@ -169,8 +170,9 @@ void WalManager::Flush() {
 
             Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
             // Commit sequentially so they get visible in the same order with wal.
-            bool success = success = txn->CommitBottom();
-            if (!success) {
+            bool conflict = txn->CheckConflict();
+            txns.push_back(txn);
+            if (conflict) {
                 txn->SetTxnToRollback();
                 continue;
             }
@@ -189,8 +191,6 @@ void WalManager::Flush() {
             // update
             max_commit_ts_ = entry->commit_ts_;
             wal_size_ += act_size;
-
-            txn->DoneCommitBottom();
         }
 
         if (!running_.load()) {
@@ -213,6 +213,10 @@ void WalManager::Flush() {
         }
 
         log_batch.clear();
+
+        for (Txn *txn : txns) {
+            txn->CommitBottom();
+        }
 
         // Check if the wal file is too large, swap to a new one.
         try {

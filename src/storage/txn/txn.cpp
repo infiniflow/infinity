@@ -427,8 +427,7 @@ TxnTimeStamp Txn::Commit() {
 
     if (txn_context_.GetTxnState() == TxnState::kToRollback) {
         // abort because of conflict
-        this->Rollback();
-        return this->CommitTS();
+        RecoverableError(Status::TxnRollback(txn_id_));
     }
     if (txn_context_.GetTxnState() != TxnState::kCommitted) {
         UnrecoverableError("Transaction isn't in COMMITTED status.");
@@ -442,32 +441,33 @@ TxnTimeStamp Txn::Commit() {
     return this->CommitTS();
 }
 
-bool Txn::CommitBottom() noexcept {
-    LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
+bool Txn::CheckConflict() {
+    LOG_TRACE(fmt::format("Txn check conflict: {} is started.", txn_id_));
 
-    // prepare to commit txn local data into table
-    TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
-
-    // // check conflict
-    bool success = txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
-    if (!success) {
-        return false;
-    }
-
-    txn_context_.SetTxnCommitted();
-
-    txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
-
-    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
-
-    if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
-        txn_mgr_->AddWaitFlushTxn(txn_id_);
-    }
-    return true;
+    return txn_store_.CheckConflict();
 }
 
-void Txn::DoneCommitBottom() {
+void Txn::CommitBottom() {
+    LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
+    if (txn_context_.GetTxnState() != TxnState::kToRollback) {
+        // prepare to commit txn local data into table
+        TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
+
+        // // check conflict
+        txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
+
+        txn_context_.SetTxnCommitted();
+
+        txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
+
+        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
+
+        if (!local_catalog_delta_ops_entry_->operations().empty()) {
+            local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
+            txn_mgr_->AddWaitFlushTxn(txn_id_);
+        }
+    }
+
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;

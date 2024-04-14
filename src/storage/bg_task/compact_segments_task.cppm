@@ -99,7 +99,15 @@ public:
 
 //    void BeginTxn() { txn_->Begin(); }
 
-    void CommitTxn() { txn_->txn_mgr()->CommitTxn(txn_); }
+    bool TryCommitTxn() {
+        try {
+            txn_->txn_mgr()->CommitTxn(txn_);
+            return true;
+        } catch (const RecoverableException &e) {
+            txn_->txn_mgr()->RollBackTxn(txn_);
+            return false;
+        }
+    }
 
     bool Execute();
 

@@ -89,9 +89,9 @@ public:
 
     TxnTimeStamp Commit();
 
-    bool CommitBottom() noexcept;
+    bool CheckConflict();
 
-    void DoneCommitBottom();
+    void CommitBottom();
 
     void CancelCommitBottom();
 

@@ -241,21 +241,24 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     blocks_.clear();
 }
 
-// TODO: remove commit_ts
-bool TxnTableStore::PrepareCommit(Catalog *catalog, TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
-    {
-        TableEntry *latest_table_entry;
-        const auto &db_name = *table_entry_->GetDBName();
-        const auto &table_name = *table_entry_->GetTableName();
-        TxnTimeStamp begin_ts = txn_->BeginTS();
-        bool conflict = catalog->CheckTableConflict(db_name, table_name, txn_id, begin_ts, latest_table_entry);
-        if (conflict) {
-            return false;
-        }
-        if (latest_table_entry != table_entry_) {
-            UnrecoverableError(fmt::format("Table entry should conflict, table name: {}", table_name));
-        }
+bool TxnTableStore::CheckConflict(Catalog *catalog) const {
+    TransactionID txn_id = txn_->TxnID();
+    TableEntry *latest_table_entry;
+    const auto &db_name = *table_entry_->GetDBName();
+    const auto &table_name = *table_entry_->GetTableName();
+    TxnTimeStamp begin_ts = txn_->BeginTS();
+    bool conflict = catalog->CheckTableConflict(db_name, table_name, txn_id, begin_ts, latest_table_entry);
+    if (conflict) {
+        return true;
     }
+    if (latest_table_entry != table_entry_) {
+        UnrecoverableError(fmt::format("Table entry should conflict, table name: {}", table_name));
+    }
+    return false;
+}
+
+// TODO: remove commit_ts
+void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     // Init append state
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
@@ -272,15 +275,13 @@ bool TxnTableStore::PrepareCommit(Catalog *catalog, TransactionID txn_id, TxnTim
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
-
-    return true;
 }
 
 /**
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
-    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_);
+    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
         txn_index_store->Commit(txn_id, commit_ts);
@@ -315,16 +316,16 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
 }
 
 void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {
-    auto [iter, insert_ok] = txn_segments_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry));
+    auto [iter, insert_ok] = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry));
     if (!insert_ok) {
         UnrecoverableError(fmt::format("Attempt to add segment store twice"));
     }
 }
 
 void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry) {
-    auto iter = txn_segments_.find(segment_entry->segment_id());
-    if (iter == txn_segments_.end()) {
-        iter = txn_segments_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry)).first;
+    auto iter = txn_segments_store_.find(segment_entry->segment_id());
+    if (iter == txn_segments_store_.end()) {
+        iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry)).first;
     }
     iter->second.block_entries_.emplace_back(block_entry);
 }
@@ -346,7 +347,7 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
     for (const auto &[index_name, index_store] : txn_indexes_store_) {
         index_store->AddDeltaOp(local_delta_ops, commit_ts);
     }
-    for (const auto &[segment_id, segment_store] : txn_segments_) {
+    for (const auto &[segment_id, segment_store] : txn_segments_store_) {
         segment_store.AddDeltaOp(local_delta_ops, append_state_.get(), commit_ts);
     }
 
@@ -432,14 +433,19 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *b
     }
 }
 
-bool TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+bool TxnStore::CheckConflict() const {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        bool success = table_store->PrepareCommit(catalog_, txn_id, commit_ts, buffer_mgr);
-        if (!success) {
-            return false;
+        if (table_store->CheckConflict(catalog_)) {
+            return true;
         }
     }
-    return true;
+    return false;
+}
+
+void TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
+    }
 }
 
 void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {

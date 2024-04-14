@@ -109,7 +109,9 @@ public:
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 
-    bool PrepareCommit(Catalog *catalog, TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+    bool CheckConflict(Catalog *catalog) const;
+
+    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
 
@@ -130,10 +132,10 @@ public:
 public: // Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
 
-    const HashMap<SegmentID, TxnSegmentStore> &txn_segments() const { return txn_segments_; }
+    const HashMap<SegmentID, TxnSegmentStore> &txn_segments() const { return txn_segments_store_; }
 
 private:
-    HashMap<SegmentID, TxnSegmentStore> txn_segments_{};
+    HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
     Vector<SegmentEntry *> set_sealed_segments_{};
 
     int ptr_seq_n_;
@@ -172,7 +174,9 @@ public:
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
 
-    bool PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+    bool CheckConflict() const;
+
+    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
     void CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr);
 
