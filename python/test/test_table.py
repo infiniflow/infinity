@@ -713,17 +713,17 @@ class TestTable(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("types", [
-    #     "int", "int8", "int16", "int32", "int64", "integer",
-    #     "float", "float32", "double", "float64",
-    #     "varchar",
-    #     "bool",
-    #     "vector, 3, float"])
-    # def test_create_valid_option(self, types):
-    #     # connect
-    #     infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-    #     db_obj = infinity_obj.get_database("default")
-    #     db_obj.drop_table("test_valid_option", ConflictType.Ignore)
+    @pytest.mark.parametrize("types", [
+        "int", "int8", "int16", "int32", "int64", "integer",
+        "float", "float32", "double", "float64",
+        "varchar",
+        "bool",
+        "vector, 3, float"])
+    def test_create_valid_option(self, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_valid_option", ConflictType.Ignore)
 
         db_obj.create_table("test_valid_option", {"c1": types}, ConflictType.Error)
 
