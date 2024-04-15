@@ -102,6 +102,19 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         doc_count = doc_count_;
         doc_count_ += row_count;
     }
+    // if ((doc_count & 0x0FFF) == 0) {
+    //     SizeT inverting_que_size = inverting_thread_pool_.queue_size();
+    //     SizeT commiting_que_size = commiting_thread_pool_.queue_size();
+    //     SizeT inverted_ring_size = ring_inverted_.Size();
+    //     SizeT sorted_ring_size = ring_sorted_.Size();
+    //     LOG_INFO(fmt::format("doc_count {}, inverting_que_size {}, commiting_que_size {}, inverted_ring_size {}, sorted_ring_size {}",
+    //                          doc_count,
+    //                          inverting_que_size,
+    //                          commiting_que_size,
+    //                          inverted_ring_size,
+    //                          sorted_ring_size));
+    // }
+
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     if (offline) {
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, nullptr, column_lengths_);

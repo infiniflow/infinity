@@ -48,9 +48,9 @@ import column_expr;
 
 using namespace infinity;
 
-void ReadJsonl(std::ifstream &input_file, int lines_to_read, Vector<Tuple<char *, char *, char *>> &batch) {
+void ReadJsonl(std::ifstream &input_file, SizeT lines_to_read, Vector<Tuple<char *, char *, char *>> &batch) {
     String line;
-    int lines_readed = 0;
+    SizeT lines_readed = 0;
     batch.clear();
     static const char *columns[3] = {"id", "title", "text"};
     while (lines_readed < lines_to_read) {
@@ -149,24 +149,22 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     BaseProfiler profiler;
 
     profiler.Begin();
-    SizeT num_rows = 0;
-    Vector<Tuple<char *, char *, char *>> batch;
-    batch.reserve(insert_batch);
+    Vector<Tuple<char *, char *, char *>> batch_cache;
+    ReadJsonl(input_file, (SizeT)(-1), batch_cache);
+    SizeT num_rows = batch_cache.size();
+    LOG_INFO(fmt::format("ReadJsonl {} rows cost: {}", num_rows, profiler.ElapsedToString()));
+    profiler.End();
 
+    profiler.Begin();
     Vector<String> orig_columns{"id", "title", "text"};
-    bool done = false;
     ConstantExpr *const_expr = nullptr;
-    while (!done) {
-        ReadJsonl(input_file, insert_batch, batch);
-        if (batch.empty()) {
-            done = true;
-            break;
-        }
-        num_rows += batch.size();
+    SizeT num_inserted = 0;
+    while (num_inserted < num_rows) {
         Vector<String> *columns = new Vector<String>(orig_columns);
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-        for (auto &t : batch) {
-            values->reserve(insert_batch);
+        values->reserve(insert_batch);
+        for (SizeT i = 0; i<insert_batch && (num_inserted+i)<num_rows; i++){
+            auto &t = batch_cache[num_inserted+i];
             auto value_list = new Vector<ParsedExpr *>(columns->size());
             const_expr = new ConstantExpr(LiteralType::kString);
             const_expr->str_value_ = std::get<0>(t);
@@ -181,6 +179,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
         }
         infinity->Insert(db_name, table_name, columns, values);
         // NOTE: ~InsertStatement() has deleted or freed columns, values, value_list, const_expr, const_expr->str_value_
+        num_inserted += insert_batch;
     }
     input_file.close();
     LOG_INFO(fmt::format("Insert data {} rows cost: {}", num_rows, profiler.ElapsedToString()));
@@ -339,12 +338,16 @@ int main(int argc, char *argv[]) {
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
             BenchmarkOptimize(infinity, db_name, table_name);
+            break;
         }
         case Mode::kQuery: {
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
             BenchmarkQuery(infinity, db_name, table_name);
+            break;
         }
+        default:
+            printf("Unsupported benchmark mode: %u\n", static_cast<u8>(mode));
     }
     sleep(10);
 
