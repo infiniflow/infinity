@@ -92,9 +92,17 @@ void BufferManager::ExecuteDeletions() {
         const auto &file_path = obj_path_delete_[i];
         LOG_TRACE(fmt::format("Erasing buffer object: {}", file_path));
         deprecated_array_.emplace_back(buffer_map_[file_path]);
-        buffer_map_.erase(file_path);
         LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
     }
+
+    std::unique_lock<std::mutex> lock(w_locker_);
+    for (size_t i = 0; i < obj_path_delete_.size(); i++) {
+        const auto &file_path = obj_path_delete_[i];
+        LOG_TRACE(fmt::format("Erasing buffer map: {}", file_path));
+        buffer_map_.erase(file_path);
+        LOG_TRACE(fmt::format("Erased buffer map: {}", file_path));
+    }
+
     // clear
     file_path_delete_.clear();
     obj_path_delete_.clear();
