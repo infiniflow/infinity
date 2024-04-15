@@ -21,12 +21,12 @@ from common import common_values
 from utils import copy_data
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 
 TEST_DATA_DIR = "/test/data/"
 
 
-class TestIndex(SDKTest):
+class TestIndex(TestSdk):
 
     def test_create_index_IVFFlat(self, get_infinity_db):
         db_obj = get_infinity_db

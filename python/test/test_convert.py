@@ -5,9 +5,9 @@ from common import common_values
 import infinity
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.common import ConflictType
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 
-class TestConvert(SDKTest):
+class TestConvert(TestSdk):
     def test_to_pl(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")

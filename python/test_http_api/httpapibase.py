@@ -7,18 +7,7 @@ from common.common_data import *
 from common.common_values import *
 
 class HttpTest:
-
-    def __init__(self,
-                 url = default_url,
-                 h=baseHeader,
-                 r=baseResponse,
-                 d = baseData
-                ):
-        self.url = url 
-        self.header_dict = h
-        self.response_dict = r
-        self.data_dict = d
-        return
+ 
     
     #Pre operation: set header
     def SetUpHeader(self,param=[],tp={}): 
@@ -371,8 +360,13 @@ class HttpTest:
         desired_path = current_file[:index + len("infinity")]
         return str(desired_path)
     
-    url: str
-    header_dict: dict
-    response_dict: dict
-    data_dict: dict 
+    # url: str
+    # header_dict: dict
+    # response_dict: dict
+    # data_dict: dict 
+
+    url = default_url
+    header_dict = baseHeader
+    response_dict = baseResponse
+    data_dict = baseData
 

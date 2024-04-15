@@ -9,11 +9,11 @@ from threading import Thread
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 TEST_DATA_DIR = "/test/data/"
 
 
-class TestIndexParallel(SDKTest):
+class TestIndexParallel(TestSdk):
 
     @pytest.mark.parametrize("file_format", ["csv"])
     @pytest.mark.skip(reason="AddressSanitizer: heap-use-after-free & deadlock when import parallelly")

@@ -20,13 +20,13 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 
 from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
     generate_commas_enwiki
 
 
-class TestImport(SDKTest):
+class TestImport(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)

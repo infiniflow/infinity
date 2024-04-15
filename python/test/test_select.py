@@ -22,10 +22,10 @@ from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import copy_data
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 
 
-class TestSelect(SDKTest):
+class TestSelect(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)

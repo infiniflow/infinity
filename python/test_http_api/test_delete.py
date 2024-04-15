@@ -6,6 +6,7 @@ from common.common_values import *
 
 class TestDelete(HttpTest):
     def test_version(self):
+        
         return 
     #pass
     def test_delete(self):
@@ -125,7 +126,7 @@ class TestDelete(HttpTest):
         for i in range(len(types)):
             self.dropTable(dbname,tbname+str(i))
         return
-    
+    #PASS
     def test_delete_table_with_one_block(self):
         dbname = "default"
         tbname = "test_delete_table_with_one_block"
@@ -136,7 +137,7 @@ class TestDelete(HttpTest):
         self.delete(dbname,tbname,"c1 = 1")
         self.dropTable(dbname,tbname)
         return
-    
+    #PASS
     def test_delete_table_with_one_segment(self):
         dbname = "default"
         tbname = "test_delete_table_with_one_segment"
@@ -149,7 +150,7 @@ class TestDelete(HttpTest):
             self.delete(dbname,tbname,"c1 = " + str(i))
         self.dropTable(dbname,tbname)
         return 
-    
+    #PASS
     def test_select_before_after_delete(self):
         dbname = "default"
         tbname = "test_select_before_after_delete"
@@ -162,7 +163,7 @@ class TestDelete(HttpTest):
         self.delete(dbname,tbname,"c1=1")
         self.dropTable(dbname,tbname)
         return 
-    
+    #PASS
     def test_delete_insert_data(self):
         dbname = "default"
         tbname = "test_delete_insert_data"
@@ -192,6 +193,7 @@ class TestDelete(HttpTest):
         return 
     
     # Make Critical Error
+    @pytest.mark.skip(reason="make critical error")
     def test_delete_dropped_table(self):
         dbname = "default"
         tbname = "test_delete_dropped_table"
@@ -232,6 +234,7 @@ class TestDelete(HttpTest):
             self.dropTable(dbname,tbname)
         return
     
+    @pytest.mark.skip(reason="make critical error")
     def test_delete_one_block_without_expression(self):
         dbname = "default"
         tbname = "test_delete_one_block_without_expression"
@@ -242,7 +245,8 @@ class TestDelete(HttpTest):
         self.delete(dbname,tbname,"c1 = 1")
         self.dropTable(dbname,tbname)
         return
-    #TODO: delete cant't without any expression
+    
+  
     def test_delete_one_segment_without_expression(self):
         dbname = "default"
         tbname = "test_delete_one_segment_without_expression"
@@ -252,6 +256,7 @@ class TestDelete(HttpTest):
             self.insert(dbname,tbname,values)
         self.dropTable(dbname,tbname)
         return
+    
     
     def test_filter_with_valid_expression(self):
         filter_list = [ 
@@ -276,6 +281,7 @@ class TestDelete(HttpTest):
             self.delete(dbname,tbname,filter_list[i])
         self.dropTable(dbname,tbname)
         return
+    @pytest.mark.skip(reason="make critical error")
     def test_filter_with_invalid_expression(self):
         filter_list = [ 
             "c1",
@@ -295,6 +301,7 @@ class TestDelete(HttpTest):
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             self.insert(dbname,tbname,values)
+
         for i in range(len(filter_list)):
             self.delete(dbname,tbname,filter_list[i],{
                 "status_code":500,

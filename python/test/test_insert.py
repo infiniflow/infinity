@@ -25,10 +25,10 @@ import infinity.index as index
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from utils import start_infinity_service_in_subporcess
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 
 
-class TestInsert(SDKTest):
+class TestInsert(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)

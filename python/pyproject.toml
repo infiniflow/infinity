@@ -30,8 +30,11 @@ markers =[
     "L3",
     "complex",
     "slow",
-    "nightly"
+    "nightly",
+    "test: mark a test function"
 ]
+
+
 filterwarnings = [
     "error",
     "ignore::UserWarning",

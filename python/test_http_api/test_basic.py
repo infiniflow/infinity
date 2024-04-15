@@ -7,5 +7,4 @@ import infinity.index as index
 import httputils
 
 class TestCase(HttpTest):
-    
     pass 

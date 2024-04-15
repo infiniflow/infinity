@@ -46,7 +46,6 @@ def get_infinity_db():
     res = infinity_obj.disconnect()
     assert res.error_code == ErrorCode.OK
 
-
 @pytest.fixture(scope="function", autouse=False)
 def get_infinity_connection_pool():
     connection_pool = ConnectionPool(common_values.TEST_REMOTE_HOST)

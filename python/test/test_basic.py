@@ -23,16 +23,15 @@ import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import copy_data
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 
 test_csv_file = "embedding_int_dim3.csv"
 
-
-class TestCase(SDKTest):
+class TestCase(TestSdk):
     def test_version(self):
         print(infinity.__version__)
-
     def test_connection(self):
+        
         """
         target: test connect and disconnect server ok
         method: connect server
@@ -43,7 +42,8 @@ class TestCase(SDKTest):
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
             assert infinity_obj.disconnect()
-
+    
+    
     def test_create_db_with_invalid_name(self):
         """
         target: test db name limitation
@@ -58,7 +58,8 @@ class TestCase(SDKTest):
                            match=f"DB name '{db_name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"):
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
-
+    
+   
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_basic(self, check_data):

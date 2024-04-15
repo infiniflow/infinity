@@ -14,16 +14,21 @@
 
 import os
 import pytest 
-import python.testbase as testbase
-from test_http_api.httpapibase import HttpTest
 
-# def run():
-#     os.system("cd test")
-#     os.system("python3 -m pytest -m 'not complex and not slow' test")
+#import delete table insert update show knn index database
 
 
-def run_all():
-    testbase.test_table(HttpTest)
+def run_sdk():
+    os.system("cd test")
+    os.system("python3 -m pytest -m 'not complex and not slow' test")
+
+def run_http():
+    os.system("cd test_http_api")
+    os.system("python3 -m pytest -m 'not complex and not slow' test_http_api")   
+
+
+# def run_all():
+#     test_base.test_table(HttpTest)
 
 if __name__ == '__main__':
-    run_all()
+    run_http()

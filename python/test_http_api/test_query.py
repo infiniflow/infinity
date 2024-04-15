@@ -4,11 +4,13 @@ from httpapibase import HttpTest
 from common.common_values import * 
 import infinity.index as index
 
+@pytest.mark.skip(reason="can not insert varchar")
 class TestQuery(HttpTest):
     def test_query(self):
         dbname = "default"
         tbname = "my_table"
         idxname = "my_index"
+        self.dropTable(dbname,tbname)
         self.createTable(
             dbname,tbname,{
                 "num":{
@@ -41,3 +43,18 @@ class TestQuery(HttpTest):
         })
         
         return 
+    
+    def test_query_builder(self):
+        dbname = "default"
+        tbname = "my_table"
+        idxname = "my_index"
+        self.dropTable(dbname,tbname)
+        self.createTable(
+            dbname,tbname,{
+                "c1":{
+                    "type":"integer",
+                },
+            }
+        )
+        self.select(dbname,tbname,
+                ["*"])

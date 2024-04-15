@@ -20,10 +20,10 @@ from infinity.common import ConflictType
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
-from sdktestbase import SDKTest
+from test_sdkbase import TestSdk
 
 
-class TestTable(SDKTest):
+class TestTable(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)

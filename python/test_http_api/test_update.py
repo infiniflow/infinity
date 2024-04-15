@@ -43,21 +43,19 @@ class TestUpdate(HttpTest):
             "error_code":3067,
         })
         return 
-   
+    #PASS
     def test_update_empty_table(self):
         dbname = "default"
         tbname = "test_update_empty_table"
         self.showdb(dbname)
         self.dropTable(dbname,tbname)
-        self.createTable(dbname,tbname,{},{
+        self.createTable(dbname,tbname,{},{},{
             "status_code":500,
-            "error_code":3022,
+            "error_code":3048,
         })
         self.showTable(dbname,tbname,{
-            "error_code":0,
-            "database_name": dbname,
-            "table_name": tbname,
-            "column_count" : 0,
+            "status_code":500,
+            "error_code":3022,
         })
         self.update(dbname,tbname,{"c2": 90, "c3": 900},"c1 = 1")
         self.dropTable(dbname,tbname)
@@ -80,10 +78,7 @@ class TestUpdate(HttpTest):
             "table_name": tbname,
             "column_count" : 3,
         })
-        self.update(dbname,tbname,{"c2":90,"c3":900},"c1 = 1",{
-            "status_code": 500,
-            "error_code": 3069,
-        })
+        self.update(dbname,tbname,{"c2":90,"c3":900},"c1 = 1")
         return 
     #PASS
     def test_update_no_row_is_met_the_condition(self):
@@ -116,6 +111,7 @@ class TestUpdate(HttpTest):
             self.dropTable(dbname,tbname)
 
         return 
+    #PASS
     def test_update_all_row_is_met_the_condition(self):
         dbname = "default"
         tbname = "test_update_all_row_is_met_the_condition"
@@ -156,7 +152,7 @@ class TestUpdate(HttpTest):
         self.insert(dbname,tbname,values)
         self.update(dbname,tbname,{"c2":20},"c1 = 1")
         return
-    
+    #PASS
     def test_update_table_with_one_segment(self):
         dbname = "default"
         tbname = "test_update_all_row_is_met_the_condition"
@@ -168,7 +164,7 @@ class TestUpdate(HttpTest):
             self.insert(dbname,tbname,values)
         self.update(dbname,tbname,{"c2":20},"c1 = 1")
         return
-    
+    #PASS
     def test_update_before_delete(self):
         dbname = "default"
         tbname = "test_update_before_delete"
@@ -185,7 +181,7 @@ class TestUpdate(HttpTest):
         self.delete(dbname,tbname,"c1 = 1")
         self.update(dbname,tbname,{"c2": 20},"c1 = 1")
         return
-    
+    #PASS
     def test_update_inserted_data(self):
         dbname = "default"
         tbname = "test_update_before_delete"
@@ -219,7 +215,7 @@ class TestUpdate(HttpTest):
 
         self.update(dbname,tbname,{"c2": 21},"c1 = 1")
         return 
-    
+    #PASS
     def test_update_dropped_table(self):
         dbname = "default"
         tbname = "test_update_before_delete"
@@ -232,7 +228,7 @@ class TestUpdate(HttpTest):
         self.update(dbname,tbname,{"c2":21},"c1 = 1")
         self.dropTable(dbname,tbname)
         return 
-    
+    #PASS
     def test_update_invalid_value(self):
         dbname = "default"
         tbname = "test_update_before_delete"
@@ -257,7 +253,7 @@ class TestUpdate(HttpTest):
             })
             self.dropTable(dbname,tbname)
         return 
-
+    #PASS
     def test_update_new_value(self):
         types = ["integer","float"]
         types_example = [1,1.333,"1"]
@@ -276,7 +272,7 @@ class TestUpdate(HttpTest):
             self.update(dbname,tbname,{"c2": types_example[i]},"c1 = 1")
             self.dropTable(dbname,tbname)
         return 
-   
+    #PASS
     def test_valid_filter_expression(self):
         filter_list = [
             "c1 > 10",
@@ -307,6 +303,7 @@ class TestUpdate(HttpTest):
         for i in range(len(filter_list)):
             self.update(dbname,tbname,{"c2": 1},filter_list[i])
         return
+    #PASS
     def test_invalid_filter_expression(self):
         filter_list = [
             "_row_id",

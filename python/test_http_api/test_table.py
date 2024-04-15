@@ -668,12 +668,21 @@ class TestTable(HttpTest):
     def test_table_create_valid_option(self):
         dbname = "default"
         tbname = "test_table_create_valid_option"
+    
         self.showdb(dbname)
         self.dropTable(dbname,tbname)
         for i  in create_valid_option:
-            self.createTable(dbname,tbname+str(i), {"c1": {"type":"integer"}},{},{},i)
+            url = f"databases/{dbname}/tables/{tbname}"
+            h = self.SetUpHeader(['accept','content-type'])
+            d = self.SetUpData(['create_option'],{'fields': {"c1": {"type":"integer"}}, 'properties': {},'create_option':str(i)})
+            r = self.Request(url,"post",h,d)
+            print(r)
+            self.TearDown(r,{
+                "status_code":200,
+                "error_code":0,    
+            })
             self.dropTable(dbname,tbname)
-        return
+        return 
     
     def test_table_create_invalid_option(self):
         dbname = "default"

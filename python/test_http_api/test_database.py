@@ -6,10 +6,9 @@ from httpapibase import HttpTest
 from common.common_values import * 
 
 class TestDataBase(HttpTest):
-    def __init__(self):
-        super().__init__(self)
 
     def test_verison(self):
+        
         pass 
     
     def test_database(self):
@@ -102,39 +101,39 @@ class TestDataBase(HttpTest):
         self.cleardbs()
 
 
-    # @pytest.mark.skip(reason="Cost too much times")
-    # def test_create_drop_show_1M_databases(self):
-    #     """
-    #     create 1M dbs, show these dbs, drop these dbs
-    #     """
-    #     dbs = self.getdbs()
-    #     #list all databases
-    #     for db_name in dbs:
-    #         if db_name == 'default':
-    #             continue 
-    #         self.dropdb(db_name)
+    @pytest.mark.skip(reason="Cost too much times")
+    def test_create_drop_show_1M_databases(self):
+        """
+        create 1M dbs, show these dbs, drop these dbs
+        """
+        dbs = self.getdbs()
+        #list all databases
+        for db_name in dbs:
+            if db_name == 'default':
+                continue 
+            self.dropdb(db_name)
         
-    #     #create databases
-    #     db_count = 1000000
-    #     for i in range(db_count):
-    #         print('create db_name' + str(i))
-    #         self.dropdb('db_name' + str(i))
-    #     for i in range(db_count):
-    #         self.createdb('db_name' + str(i))
+        #create databases
+        db_count = 1000000
+        for i in range(db_count):
+            print('create db_name' + str(i))
+            self.dropdb('db_name' + str(i))
+        for i in range(db_count):
+            self.createdb('db_name' + str(i))
 
-    #     dbs = self.getdbs()
+        dbs = self.getdbs()
 
-    #     #list all databases
-    #     for db_name in dbs:
-    #         print("db name:" + db_name)
-    #     assert len(dbs) == (db_count + 1)
+        #list all databases
+        for db_name in dbs:
+            print("db name:" + db_name)
+        assert len(dbs) == (db_count + 1)
 
-    #     #drop databases
-    #     for i in range(db_count):
-    #         if db_name == 'default':
-    #             continue 
-    #         print('drop db_name' + str(i))
-    #         self.dropdb('db_name'+str(i))
+        #drop databases
+        for i in range(db_count):
+            if db_name == 'default':
+                continue 
+            print('drop db_name' + str(i))
+            self.dropdb('db_name'+str(i))
 
     def test_repeatedly_create_drop_show_databases(self):
         """

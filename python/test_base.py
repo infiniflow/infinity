@@ -1,9 +1,7 @@
 import pytest
 import sys 
-
 sys.path.append("/home/yyk/work/infinity/python/test")
 sys.path.append("/home/yyk/work/infinity/python/test_http_api/common")
-
 sys.path.append("/home/yyk/work/infinity/python/test/common")
 sys.path.append("/home/yyk/work/infinity/python/test/data_type")
 sys.path.append("/home/yyk/work/infinity/python")
@@ -28,15 +26,16 @@ class SdkTest():
 
 
 @pytest.fixture(params=[SdkTest(), HttpTest()])
-def test_object(request):
+def testobject(request):
     return request.param
 
 # def test_database(test_object):
-#     t: test_object = TestDataBase()
+#     t: test_object = TestDelete()
 #     methods = dir(t)
 #     test_methods = [method for method in methods if method.startswith('test_')]
 #     for method in test_methods:
 #          getattr(t, method)()
+# test_database(HttpTest())
 
 # def test_table(test_object):
 #     t: test_object = TestTable()
@@ -73,8 +72,8 @@ def test_object(request):
 #     t: test_object = TestInsert()
 #     return 
 
-def SingleTest(test_object):
-    t: test_object =  TestIndex()
-    t.test_unsupported_vector_index()
+def SingleTest(testobject):
+    t: testobject =  TestTable()
+    t.test_table_create_valid_option()
 
 SingleTest(HttpTest())
