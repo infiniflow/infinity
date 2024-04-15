@@ -72,6 +72,7 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
     }
+    // sometimes the result of pos_end_ is 0 ??? bug?
     u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
     u64 doc_header_length = sizeof(u32) * 2;
     u64 pos_header_length = sizeof(u32) * 2;
@@ -100,7 +101,6 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
         posting_reader_->Read((char *)doc_slice->data_, doc_size);
         pos_begin = doc_byte_slice_reader.Tell() + doc_skiplist_size + doc_list_size;
         pos_size = file_length - doc_size;
-
         if (fetch_position) {
             posting_reader_->Seek(term_meta.doc_start_ + pos_begin);
             posting_reader_->Read((char *)pos_header_slice->data_, pos_header_length);
@@ -123,7 +123,6 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
     if (fetch_position) {
         pos_byte_slice_list = MakeShared<ByteSliceList>(pos_slice, session_pool);
     }
-
     seg_posting.Init(std::move(doc_byte_slice_list),
                      std::move(pos_byte_slice_list),
                      base_row_id_,

@@ -290,6 +290,15 @@ void RegisterSignal() {
     sigaction(SIGUSR2, &sig_action, NULL);
 #endif
 }
+void BenchmarkMoreQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, int query_times = 10) {
+    BaseProfiler profiler;
+    profiler.Begin();
+    for (int i = 0; i < query_times; i++) {
+        BenchmarkQuery(infinity, db_name, table_name);
+    }
+    LOG_INFO(fmt::format("run benchmark query {} times cost: {}", query_times, profiler.ElapsedToString()));
+    profiler.End();
+}
 
 int main(int argc, char *argv[]) {
     CLI::App app{"fulltext_benchmark"};
@@ -321,6 +330,11 @@ int main(int argc, char *argv[]) {
     String srcfile = test_data_path();
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
+// #define DEL_LOCAL_DATA
+#ifdef DEL_LOCAL_DATA
+    system("rm -rf /tmp/infinity/data  /tmp/infinity/log  /tmp/infinity/temp  /tmp/infinity/wal");
+#endif
+
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
 
     switch (mode) {
@@ -343,11 +357,13 @@ int main(int argc, char *argv[]) {
         case Mode::kQuery: {
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
-            BenchmarkQuery(infinity, db_name, table_name);
+            BenchmarkOptimize(infinity, db_name, table_name);
+            BenchmarkMoreQuery(infinity, db_name, table_name, 1);
             break;
         }
-        default:
+        default: {
             printf("Unsupported benchmark mode: %u\n", static_cast<u8>(mode));
+        }
     }
     sleep(10);
 
