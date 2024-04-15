@@ -179,6 +179,7 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
                     return MergeFlag::kDeleteAndNew;
                 }
                 default: {
+                    LOG_CRITICAL(fmt::format("Invalid MergeFlag {}", this->ToString()));
                     UnrecoverableError(fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag)));
                 }
             }

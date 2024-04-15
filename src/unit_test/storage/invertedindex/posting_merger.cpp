@@ -63,7 +63,8 @@ protected:
     RecyclePool *buffer_pool_;
 
     MemoryPool *byte_slice_pool_;
-    ThreadPool thread_pool_{4};
+    ThreadPool inverting_thread_pool_{4};
+    ThreadPool commiting_thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -84,8 +85,15 @@ void PostingMergerTest::CreateIndex() {
     }
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    MemoryIndexer
-        indexer1("/tmp/infinity/posting_merger", "chunk1", RowID(0U, 0U), flag_, "standard", *byte_slice_pool_, *buffer_pool_, thread_pool_);
+    MemoryIndexer indexer1("/tmp/infinity/posting_merger",
+                           "chunk1",
+                           RowID(0U, 0U),
+                           flag_,
+                           "standard",
+                           *byte_slice_pool_,
+                           *buffer_pool_,
+                           inverting_thread_pool_,
+                           commiting_thread_pool_);
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
@@ -97,7 +105,8 @@ void PostingMergerTest::CreateIndex() {
                                               "standard",
                                               *byte_slice_pool_,
                                               *buffer_pool_,
-                                              thread_pool_);
+                                              inverting_thread_pool_,
+                                              commiting_thread_pool_);
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }
