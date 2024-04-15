@@ -201,9 +201,9 @@ void BufferObj::SetAndTryCleanup() {
 
             String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
             buffer_mgr_->AddFilePath(file_path);
-            LOG_TRACE(fmt::format("Remove from buffer: {}", file_name));
+            LOG_TRACE(fmt::format("Add the file to be deleted from buffer: {}", file_name));
             buffer_mgr_->AddBufferObjPath(file_name);
-            LOG_TRACE(fmt::format("Removed file and buffer: {}", file_name));
+            LOG_TRACE(fmt::format("Add the file and buffer to be deleted: {}", file_name));
             break;
         }
         default: {

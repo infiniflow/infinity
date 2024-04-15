@@ -59,7 +59,7 @@ public:
 
     void CloseFile();
 
-    static void DeleteFilesInBulk(const Vector<String> &file_paths);
+    static void CleanupFilesInBulk(const Vector<String> &file_paths);
 protected:
     virtual void WriteToFileImpl(bool &prepare_success) = 0;
 

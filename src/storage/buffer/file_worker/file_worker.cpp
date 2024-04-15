@@ -119,7 +119,7 @@ void FileWorker::CleanupFile() {
     LOG_TRACE(fmt::format("Cleaned file: {}", file_path));
 }
 
-void FileWorker::DeleteFilesInBulk(const Vector<String> &file_paths) {
+void FileWorker::CleanupFilesInBulk(const Vector<String> &file_paths) {
     LocalFileSystem fs;
     for (unsigned long i = 0; i < file_paths.size(); i++) {
         const auto &path = file_paths[i];

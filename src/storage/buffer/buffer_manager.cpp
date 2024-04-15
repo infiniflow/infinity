@@ -88,19 +88,16 @@ void BufferManager::RemoveBufferObjsInBulk(const Vector<String> &paths_to_delete
     deprecated_array_.clear();
 
     for (unsigned long i = 0; i < paths_to_delete.size(); i++) {
-        const auto& file_path = paths_to_delete[i];
-        if (buffer_map_.find(file_path) != buffer_map_.end()) {
-            deprecated_array_.emplace_back(buffer_map_[file_path]);
-            buffer_map_.erase(file_path);
-            LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
-        } else {
-            LOG_TRACE(fmt::format("Buffer object not found for: {}", file_path));
-        }
+        const auto &file_path = paths_to_delete[i];
+        LOG_TRACE(fmt::format("Erasing buffer object: {}", file_path));
+        deprecated_array_.emplace_back(buffer_map_[file_path]);
+        buffer_map_.erase(file_path);
+        LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
     }
 }
 
 void BufferManager::ExecuteDeletions() {
-    FileWorker::DeleteFilesInBulk(file_path_delete);
+    FileWorker::CleanupFilesInBulk(file_path_delete);
     RemoveBufferObjsInBulk(obj_path_delete);
     file_path_delete.clear();
     obj_path_delete.clear();
