@@ -216,6 +216,7 @@ TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     if (!TxnTimestampsSet_.empty()) {
         return *TxnTimestampsSet_.begin();
     }
+    LOG_TRACE(fmt::format("No txn is active, return the next ts {}", start_ts_));
     return start_ts_;
 }
 
