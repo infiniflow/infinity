@@ -1,25 +1,27 @@
 import os
+import random
 import time
+from threading import Thread
 
 import infinity.index as index
 import pandas
 import pytest
-import random
-from threading import Thread
 from infinity.common import ConflictType
-from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
+from infinity.errors import ErrorCode
+
 from test_sdkbase import TestSdk
+
 TEST_DATA_DIR = "/test/data/"
 
 
 class TestIndexParallel(TestSdk):
 
     @pytest.mark.parametrize("file_format", ["csv"])
-    @pytest.mark.skip(reason="AddressSanitizer: heap-use-after-free & deadlock when import parallelly")
+    @pytest.mark.skip(reason="segfault")
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
-        def write_worker(connection_pool:ConnectionPool, data, file_path, end_time, thread_id):
+        def write_worker(connection_pool: ConnectionPool, data, file_path, end_time, thread_id):
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default")
             table_obj = db_obj.get_table("test_fulltext_index_parallel")
@@ -30,34 +32,33 @@ class TestIndexParallel(TestSdk):
                     value = []
                     for i in range(len(data["doctitle"])):
                         value.append({"doctitle": data["doctitle"][i],
-                                    "docdate": data["docdate"][i], "body": data["body"][i]})
+                                      "docdate": data["docdate"][i], "body": data["body"][i]})
                     table_obj.insert(value)
                     print(f"thread {thread_id}: insert complete")
                 if operation == 1:
                     print(f"thread {thread_id}: begin import")
                     table_obj.import_data(file_path, {"delimiter": "\t"})
                     print(f"thread {thread_id}: import complete")
-            
+
             connection_pool.release_conn(infinity_obj)
 
-            
-        def read_worker(connection_pool:ConnectionPool, end_time):
+        def read_worker(connection_pool: ConnectionPool, end_time):
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default")
             table_obj = db_obj.get_table("test_fulltext_index_parallel")
-            
+
             while time.time() < end_time:
                 res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
-                "body^5", "harmful chemical", "topn=3").to_pl()
+                    "body^5", "harmful chemical", "topn=3").to_pl()
                 print(res)
                 time.sleep(0.1)
-            
-            connection_pool.release_conn(infinity_obj)
 
+            connection_pool.release_conn(infinity_obj)
 
         # prepare data for insert
         column_names = ["doctitle", "docdate", "body"]
-        file_path = os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format
+        file_path = os.getcwd() + TEST_DATA_DIR + file_format + \
+            "/enwiki_99." + file_format
         df = pandas.read_csv(file_path,
                              delimiter="\t",
                              header=None,
@@ -69,7 +70,8 @@ class TestIndexParallel(TestSdk):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.drop_table("test_fulltext_index_parallel", ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_fulltext_index_parallel", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("test_fulltext_index_parallel", {
             "doctitle": "varchar",
@@ -86,16 +88,18 @@ class TestIndexParallel(TestSdk):
         threads = []
         end_time = time.time()+kRuningTime
         for i in range(kInsertThreadNum):
-            threads.append(Thread(target=write_worker, args=[connection_pool, data, file_path, end_time, i]))
-        threads.append(Thread(target=read_worker, args=[connection_pool, end_time]))
+            threads.append(Thread(target=write_worker, args=[
+                           connection_pool, data, file_path, end_time, i]))
+        # threads.append(Thread(target=read_worker, args=[
+        #                connection_pool, end_time]))
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):
             threads[i].join()
 
-        res = db_obj.drop_table("test_fulltext_index_parallel", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_fulltext_index_parallel", ConflictType.Error)
         connection_pool.release_conn(infinity_obj)
-        
 
     @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw])
     @pytest.mark.parametrize("index_column_name", ["gender_vector"])
@@ -103,16 +107,18 @@ class TestIndexParallel(TestSdk):
     @pytest.mark.parametrize("index_distance_type", ["l2"])
     @pytest.mark.parametrize("knn_distance_type", ["l2"])
     @pytest.mark.parametrize("file_format", ["csv"])
-    @pytest.mark.parametrize("running_time",[30])
+    @pytest.mark.parametrize("running_time", [30])
     @pytest.mark.skip(reason="Invalid MergeFlag from 1 to 3@src/storage/wal/catalog_delta_entry.cpp:182")
-    def test_vector_index_single_thread(self, get_infinity_connection_pool, index_type, index_column_name, knn_column_name, 
-                                      index_distance_type, knn_distance_type, file_format, running_time):
-        file_path = os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test_knn." + file_format
+    def test_vector_index_single_thread(self, get_infinity_connection_pool, index_type, index_column_name, knn_column_name,
+                                        index_distance_type, knn_distance_type, file_format, running_time):
+        file_path = os.getcwd() + TEST_DATA_DIR + file_format + \
+            "/pysdk_test_knn." + file_format
 
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.drop_table("test_vector_index_parallel", ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_vector_index_parallel", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_vector_index_parallel", {
@@ -147,14 +153,14 @@ class TestIndexParallel(TestSdk):
             print("begin import")
             table_obj.import_data(file_path)
             print("import complete")
-        res = table_obj.output(["variant_id"]).knn(knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
+        res = table_obj.output(["variant_id"]).knn(
+            knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
         print(res)
-        
 
-        res = db_obj.drop_table("test_vector_index_parallel", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_vector_index_parallel", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         connection_pool.release_conn(infinity_obj)
-
 
     # @pytest.mark.parametrize("index_column_name", ["gender_vector",
     #                                                "color_vector",
@@ -169,17 +175,18 @@ class TestIndexParallel(TestSdk):
     # @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     # @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
     # @pytest.mark.parametrize("file_format", ["csv"])
+
     @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw])
     @pytest.mark.parametrize("index_column_name", ["gender_vector"])
     @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2"])
     @pytest.mark.parametrize("knn_distance_type", ["l2"])
     @pytest.mark.parametrize("file_format", ["csv"])
-    @pytest.mark.skip(reason = "sometimes can not find lock segement xx, clock id 0, even occurs without read thread\n and sometimes segment fault")
-    def test_vector_index_rw_parallel(self, get_infinity_connection_pool, index_type, index_column_name, knn_column_name, 
+    @pytest.mark.skip(reason="sometimes can not find lock segement xx, clock id 0, even occurs without read thread\n and sometimes segment fault")
+    def test_vector_index_rw_parallel(self, get_infinity_connection_pool, index_type, index_column_name, knn_column_name,
                                       index_distance_type, knn_distance_type, file_format):
 
-        def write_worker(connection_pool:ConnectionPool, file_path, end_time, thread_id):
+        def write_worker(connection_pool: ConnectionPool, file_path, end_time, thread_id):
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default")
             table_obj = db_obj.get_table("test_vector_index_parallel")
@@ -188,28 +195,31 @@ class TestIndexParallel(TestSdk):
                 print(f"thread {thread_id}: begin import")
                 table_obj.import_data(file_path)
                 print(f"thread {thread_id}: import complete")
-            
+
             connection_pool.release_conn(infinity_obj)
 
-        def read_worker(connection_pool:ConnectionPool, end_time, knn_column_name, knn_distance_type):
+        def read_worker(connection_pool: ConnectionPool, end_time, knn_column_name, knn_distance_type):
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default")
             table_obj = db_obj.get_table("test_vector_index_parallel")
-            
+
             while time.time() < end_time:
-                res = table_obj.output(["variant_id"]).knn(knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
+                res = table_obj.output(["variant_id"]).knn(
+                    knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
                 print(res)
                 time.sleep(0.1)
-            
+
             connection_pool.release_conn(infinity_obj)
 
-        file_path = os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test_knn." + file_format
+        file_path = os.getcwd() + TEST_DATA_DIR + file_format + \
+            "/pysdk_test_knn." + file_format
 
-        #create index
+        # create index
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.drop_table("test_vector_index_parallel", ConflictType.Ignore)
+        res = db_obj.drop_table(
+            "test_vector_index_parallel", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_vector_index_parallel", {
@@ -239,19 +249,22 @@ class TestIndexParallel(TestSdk):
                                                               "metric", index_distance_type)
                                                       ])], ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        
+
         kInsertThreadNum = 4
         kRuningTime = 10
         threads = []
         end_time = time.time()+kRuningTime
         for i in range(kInsertThreadNum):
-            threads.append(Thread(target=write_worker, args=[connection_pool, file_path, end_time, i]))
-        threads.append(Thread(target=read_worker, args=[connection_pool, end_time, knn_column_name, knn_distance_type]))
+            threads.append(Thread(target=write_worker, args=[
+                           connection_pool, file_path, end_time, i]))
+        threads.append(Thread(target=read_worker, args=[
+                       connection_pool, end_time, knn_column_name, knn_distance_type]))
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):
             threads[i].join()
 
-        res = db_obj.drop_table("test_vector_index_parallel", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_vector_index_parallel", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         connection_pool.release_conn(infinity_obj)

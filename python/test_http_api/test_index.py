@@ -217,9 +217,8 @@ class TestIndex(HttpTest):
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False),
         ((1, 2), False), ({"1": 2}, False), ([], True)
     ])
-    @pytest.mark.parametrize("types", ["int", "int8", "int16", "int32", "int64", "integer",
-                                       "float", "float32", "double", "float64",
-                                       "varchar", "bool", "vector, 3, float"])
+    @pytest.mark.parametrize("types", ["integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+             "double", "varchar", "boolean" ,{ "type":"vector","dimension":3, "element_type":"float",}])
     def test_create_drop_different_fulltext_index_invalid_options(self,column_name, index_type,
                                                                   params, types):
         dbname = "default"
@@ -230,7 +229,7 @@ class TestIndex(HttpTest):
             dbname,
             tbname,
             {
-                "type":types
+                "c1":types
             }
         )
         if types != "varchar" or not column_name[1] or not index_type[1] or not params[1]:

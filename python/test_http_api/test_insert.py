@@ -341,6 +341,7 @@ class TestInsert(HttpTest):
 
         self.dropTable(dbname,tbname)
         return 
+    
     @pytest.mark.skip(reason="error")
     @pytest.mark.parametrize("batch", [10, 1024])
     @pytest.mark.parametrize("types", [(1, False), (1.1, False), ("1#$@!adf", False), ([1, 2, 3], True)])
