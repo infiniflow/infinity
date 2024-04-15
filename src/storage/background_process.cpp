@@ -88,8 +88,11 @@ void BGTaskProcessor::Process() {
                     auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
 //                    task->BeginTxn();
                     task->Execute();
-                    task->CommitTxn();
-                    LOG_INFO("Compact segments in background done");
+                    if (task->TryCommitTxn()) {
+                        LOG_INFO("Compact segments in background done");
+                    } else {
+                        LOG_WARN("Compact segments in background rollbacked");
+                    }
                     break;
                 }
                 case BGTaskType::kCleanup: {
