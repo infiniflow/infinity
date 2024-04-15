@@ -703,8 +703,9 @@ void TableEntry::OptimizeIndex(Txn *txn) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-        if (!status.ok())
+        if (!status.ok()) {
             continue;
+        }
         const IndexBase *index_base = table_index_entry->index_base();
         if (index_base->index_type_ != IndexType::kFullText) {
             UniquePtr<String> err_msg =

@@ -85,6 +85,7 @@ private:
     String* path_ = nullptr;
     u64 pos_begin_ = 0;
     u64 pos_size_ = 0;
+    u64 doc_start_ = 0;
     MemoryPool *session_pool_;
 };
 } // namespace infinity

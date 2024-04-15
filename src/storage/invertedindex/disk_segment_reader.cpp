@@ -46,13 +46,36 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
 
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {}
 
-bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
-    fmt::print("term = {}, DiskIndexSegmentReader::GetSegmentPosting", term);
+bool DiskIndexSegmentReader::GetSegmentPostingBack(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
     }
     u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
+    ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        posting_reader_->Seek(term_meta.doc_start_);
+        posting_reader_->Read((char *)slice->data_, file_length);
+
+        ByteSliceReader byte_slice_reader;
+        byte_slice_reader.Open(slice);
+
+    }
+    SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
+    seg_posting.Init(std::move(byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
+    return true;
+}
+
+bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
+    fmt::print("term = {}, DiskIndexSegmentReader::GetSegmentPosting\n", term);
+    TermMeta term_meta;
+    if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
+        return false;
+    }
+    // sometimes the result of pos_end_ is 0 ???
+    u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
+    fmt::print("term_meta_pos_end_ = {}, term_meta_doc_start_ = {}, file_length = {}\n", term_meta.pos_end_, term_meta.doc_start_, file_length);
     u64 doc_header_length = sizeof(u32) * 2;
     u64 pos_header_length = sizeof(u32) * 2;
 
@@ -80,7 +103,7 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
         posting_reader_->Read((char *)doc_slice->data_, doc_size);
         pos_begin = doc_byte_slice_reader.Tell() + doc_skiplist_size + doc_list_size;
         pos_size = file_length - doc_size;
-        fmt::print("term = {}, doc size = {}, pos size = {}, fetch position = {}\n", term, doc_size, pos_size, fetch_position);
+        fmt::print("term = {}, doc size = {}, pos size = {}, file_length = {}, fetch position = {}\n", term, doc_size, pos_size, file_length, fetch_position);
         if (fetch_position) {
             fmt::print("term = {}, fetch position = true\n", term);
             posting_reader_->Seek(term_meta.doc_start_ + pos_begin);
@@ -92,7 +115,8 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
             auto pos_list_size = pos_byte_slice_reader.ReadVUInt32();
             auto pos_header_real_length = pos_byte_slice_reader.Tell() - pos_byte_slice_begin;
             auto pos_size_cal = pos_header_real_length + pos_skiplist_size + pos_list_size;
-            assert(pos_size_cal + doc_size == file_length);
+            fmt::print("term={}, pos size cal={}, doc_size={}, file_length={}\n", term, pos_size_cal, doc_size, file_length);
+            // assert(pos_size_cal + doc_size == file_length);
             pos_slice = ByteSlice::CreateSlice(pos_size_cal, session_pool);
             posting_reader_->Seek(term_meta.doc_start_ + pos_begin);
             posting_reader_->Read((char *)pos_slice->data_, pos_size_cal);
@@ -104,7 +128,7 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
     if (fetch_position) {
         pos_byte_slice_list = MakeShared<ByteSliceList>(pos_slice, session_pool);
     }
-
+    fmt::print("term meta doc start = {}, pos begin = {}, pos size = {}\n", term_meta.doc_start_, pos_begin, pos_size);
     seg_posting.Init(std::move(doc_byte_slice_list),
                      std::move(pos_byte_slice_list),
                      base_row_id_,

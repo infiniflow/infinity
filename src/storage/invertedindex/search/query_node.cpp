@@ -1,4 +1,5 @@
 #include "query_node.h"
+#include <chrono>
 
 import stl;
 import status;
@@ -33,6 +34,9 @@ namespace infinity {
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
 
 std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
+#ifdef INFINITY_DEBUG
+    auto start_time = std::chrono::high_resolution_clock::now();
+#endif
     std::unique_ptr<QueryNode> optimized_root;
     if (!root) {
         RecoverableError(Status::SyntaxError("Invalid query statement: Empty query tree"));
@@ -69,7 +73,10 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     }
 #ifdef INFINITY_DEBUG
     {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(end_time - start_time);
         OStringStream oss;
+        oss << "Query tree optimization time cost: " << duration << std::endl;
         oss << "Query tree after optimization:\n";
         if (optimized_root) {
             optimized_root->PrintTree(oss);
@@ -354,6 +361,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
         fmt::print("fetch position = true\n");
         fetch_position = true;
     }
+    fetch_position = false;
     fmt::print("hello\n");
     auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get(), fetch_position);
     if (!posting_iterator) {
@@ -382,6 +390,7 @@ TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRe
         fmt::print("fetch position = true\n");
         fetch_position = true;
     }
+    fetch_position = false;
     fmt::print("CreateEarlyTerminateSearch\n");
     auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight(), fetch_position);
     if (!search) {

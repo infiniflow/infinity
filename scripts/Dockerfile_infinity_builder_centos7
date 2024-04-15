@@ -113,9 +113,11 @@ RUN --mount=type=bind,source=lz4-1.9.4.tar.gz,target=/root/lz4-1.9.4.tar.gz  \
     && ldconfig && cd /root && rm -rf lz4-1.9.4
 
 # Install jemalloc-5.3.0
+# Known issue: Composition of `-fsanitize=address`, staticly linked jemalloc and `mallctl` cause crash at initialization.
+# Refers to https://github.com/jemalloc/jemalloc/issues/2454
 RUN --mount=type=bind,source=jemalloc-5.3.0.tar.bz2,target=/root/jemalloc-5.3.0.tar.bz2  \
     cd /root && tar xjf jemalloc-5.3.0.tar.bz2 \
-    && cd jemalloc-5.3.0 && CFLAGS="-fPIE" CXXFLAGS="-fPIE" ./configure --enable-static && make -j install \
+    && cd jemalloc-5.3.0 && CFLAGS="-fPIE" CXXFLAGS="-fPIE" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind && make -j install \
     && ldconfig && cd /root && rm -rf jemalloc-5.3.0
 
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local

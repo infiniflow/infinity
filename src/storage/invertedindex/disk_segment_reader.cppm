@@ -33,7 +33,7 @@ public:
     virtual ~DiskIndexSegmentReader();
 
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const override;
-
+    bool GetSegmentPostingBack(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const;
 private:
     RowID base_row_id_{INVALID_ROWID};
     SharedPtr<DictionaryReader> dict_reader_;

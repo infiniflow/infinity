@@ -60,22 +60,26 @@ void SegmentPosting::Init(SharedPtr<ByteSliceList> doc_slice_list,
     base_row_id_ = base_row_id;
     doc_count_ = doc_count;
     term_meta_ = term_meta;
+    doc_start_ = term_meta.doc_start_;
+    fmt::print("Segment Init: doc_start = {}, input term meta doc start = {}\n", doc_start_, term_meta.doc_start_);
     posting_writer_ = nullptr;
     pos_begin_ = pos_begin;
     pos_size_ = pos_size;
-    posting_reader_ = MakeShared<FileReader>(posting_reader->fs_, posting_reader->path_, 1024);
-    // fs_ = &posting_reader->fs_;
-    // path_ = &posting_reader->path_;
+    // posting_reader_ = MakeShared<FileReader>(posting_reader->fs_, posting_reader->path_, 1024);
+    fs_ = &posting_reader->fs_;
+    path_ = &posting_reader->path_;
     session_pool_ = session_pool;
 }
 
 const SharedPtr<ByteSliceList> &SegmentPosting::GetPosSliceListPtr() {
     if (pos_slice_list_.get() == nullptr) {
-        // auto posting_reader = MakeUnique<FileReader>(*fs_, *path_, 1024);
+        fmt::print("pos_slice_list_ is nullptr, SegmentPosting::GetPosSliceListPtr()\n");
+        auto posting_reader = MakeUnique<FileReader>(*fs_, *path_, 1024);
         ByteSlice *pos_slice = ByteSlice::CreateSlice(pos_size_, session_pool_);
 
-        posting_reader_->Seek(term_meta_.doc_start_ + pos_begin_);
-        posting_reader_->Read((char *)pos_slice->data_, pos_size_);
+        posting_reader->Seek(term_meta_.doc_start_ + pos_begin_);
+        fmt::print("doc start = {}, pos begin = {}, pos size = {}\n", term_meta_.doc_start_, pos_begin_, pos_size_);
+        posting_reader->Read((char *)pos_slice->data_, pos_size_);
 
         pos_slice_list_ = MakeShared<ByteSliceList>(pos_slice, session_pool_);
     }

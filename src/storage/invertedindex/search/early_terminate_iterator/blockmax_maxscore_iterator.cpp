@@ -51,25 +51,37 @@ bool BlockMaxMaxscoreIterator::BlockSkipTo(RowID doc_id, float threshold) {
     }
     while (true) {
         RowID next_candidate = INVALID_ROWID;
-        float sum_block_max_bm25_score = 0.0f;
         bool match_any = false;
-        for (u32 i = 0; i < sorted_iterators_.size(); ++i) {
-            if (const auto &it = sorted_iterators_[i]; it->BlockSkipTo(doc_id, 0)) {
+        u32 i = sorted_iterators_.size();
+        for (float min_leftover_threshold = threshold; i > 0; --i) {
+            if (const auto &it = sorted_iterators_[i - 1]; it->BlockSkipTo(doc_id, 0)) {
                 // success in block skip
                 if (const RowID lowest_possible = it->BlockMinPossibleDocID(); lowest_possible <= doc_id) {
                     match_any = true;
-                    sum_block_max_bm25_score += it->BlockMaxBM25Score();
+                    min_leftover_threshold -= it->BlockMaxBM25Score();
                     next_candidate = std::min(next_candidate, it->BlockLastDocID() + 1);
                 } else {
                     next_candidate = std::min(next_candidate, lowest_possible);
                 }
             }
-            common_block_max_bm25_score_until_[i] = sum_block_max_bm25_score;
+            if (const float leftover_max_score = i > 1 ? bm25_scores_upper_bound_until_[i - 2] : 0.0f; min_leftover_threshold > leftover_max_score) {
+                // no need to check the rest
+                break;
+            }
         }
-        if (match_any and sum_block_max_bm25_score >= threshold) {
+        if (i == 0 and match_any) {
+            float sum_score = 0.0f;
+            for (u32 j = 0; j < sorted_iterators_.size(); ++j) {
+                const auto &it = sorted_iterators_[j];
+                if (const RowID lowest_possible = it->BlockMinPossibleDocID(); lowest_possible <= doc_id) {
+                    sum_score += sorted_iterators_[j]->BlockMaxBM25Score();
+                }
+                common_block_max_bm25_score_until_[j] = sum_score;
+            }
             common_block_min_possible_doc_id_ = doc_id;
             common_block_last_doc_id_ = next_candidate - 1;
-            common_block_max_bm25_score_ = sum_block_max_bm25_score;
+            common_block_max_bm25_score_ = sum_score;
+            assert((sum_score >= threshold));
             return true;
         }
         if (next_candidate == INVALID_ROWID) {
@@ -140,6 +152,9 @@ Pair<bool, RowID> BlockMaxMaxscoreIterator::PeekInBlockRange(RowID doc_id, RowID
 }
 
 void BlockMaxMaxscoreIterator::UpdateScoreThreshold(float threshold) {
+    if (threshold < 0) {
+        return;
+    }
     const float base_threshold = threshold - BM25ScoreUpperBound();
     for (const auto &it : sorted_iterators_) {
         it->UpdateScoreThreshold(base_threshold + it->BM25ScoreUpperBound());
@@ -150,7 +165,7 @@ void BlockMaxMaxscoreIterator::UpdateScoreThreshold(float threshold) {
     }
 }
 
-bool BlockMaxMaxscoreIterator::Seek(RowID doc_id) {
+bool BlockMaxMaxscoreIterator::NotPartCheckExist(RowID doc_id) {
     if (doc_id_ > doc_id) {
         return false;
     }
@@ -158,7 +173,7 @@ bool BlockMaxMaxscoreIterator::Seek(RowID doc_id) {
         return true;
     }
     for (const auto &it : sorted_iterators_) {
-        if (it->Seek(doc_id)) {
+        if (it->NotPartCheckExist(doc_id)) {
             return true;
         }
     }

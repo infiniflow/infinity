@@ -27,7 +27,7 @@ target_link_libraries(
 )
 
 if(ENABLE_JEMALLOC)
-    target_link_libraries(remote_query_benchmark jemalloc.a dl)
+    target_link_libraries(remote_query_benchmark jemalloc.a)
 endif()
 
 # add_definitions(-march=native)
