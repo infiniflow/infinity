@@ -19,9 +19,6 @@ export module file_worker;
 import stl;
 import file_system;
 import third_party;
-import local_file_system;
-import file_system_type;
-import logger;
 
 namespace infinity {
 
@@ -62,19 +59,7 @@ public:
 
     void CloseFile();
 
-    static void DeleteFilesInBulk(const Vector<String> &file_paths) {
-        LocalFileSystem fs;
-        for (unsigned long i = 0; i < file_paths.size(); i++) {
-            const auto& path = file_paths[i];
-            if (fs.Exists(path)) {
-                LOG_TRACE(fmt::format("Cleaning up file: {}", path));
-                fs.DeleteFile(path);
-                LOG_TRACE(fmt::format("Cleaned file: {}", path));
-            } else {
-                LOG_TRACE(fmt::format("Cleanup: File {} not found for deletion", path));
-            }
-        }
-    }
+    static void DeleteFilesInBulk(const Vector<String> &file_paths);
 protected:
     virtual void WriteToFileImpl(bool &prepare_success) = 0;
 
