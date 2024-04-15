@@ -136,7 +136,6 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
 }
 
 bool MultiPostingDecoder::MemSegMoveToSegment(const SharedPtr<PostingWriter> &posting_writer) {
-    fmt::print("MultiPostingDecoder::MemSegMoveToSegment\n");
     InMemPostingDecoder *posting_decoder = posting_writer->CreateInMemPostingDecoder(session_pool_);
     if (index_decoder_) {
         if (session_pool_) {
@@ -235,7 +234,6 @@ IndexDecoder* MultiPostingDecoder::CreateDocIndexDecoder(u32 doc_list_begin_pos)
 }
 
 bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_posting) {
-    fmt::print("MultiPostingDecoder::SplitDiskSegMoveToSegment\n");
     ByteSliceReader doc_reader;
 
     ByteSliceList *doc_slice_list = cur_segment_posting.GetDocSliceListPtr().get();
@@ -245,11 +243,9 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
 
     const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
     u32 doc_skiplist_size = doc_reader.ReadVUInt32();
-    u32 doc_list_size = doc_reader.ReadVUInt32();
+    doc_reader.ReadVUInt32();
 
     u32 doc_list_begin_pos = doc_reader.Tell() + doc_skiplist_size;
-
-    fmt::print("doc skiplist size = {}, doc list size = {}, doc list begin pos = {}\n", doc_skiplist_size, doc_list_size, doc_list_begin_pos);
 
     if (index_decoder_) {
         if (session_pool_) {
@@ -266,13 +262,11 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
 
     index_decoder_->InitSkipList(doc_skiplist_start, doc_skiplist_end, doc_slice_list, term_meta.GetDocFreq());
     if (format_option_.HasPositionList()) {
-        fmt::print("format_option_.HasPositionList() = {}\n", format_option_.HasPositionList());
         ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
         assert(nullptr != pos_slice_list);
         pos_reader_.Open(pos_slice_list);
 
         u32 pos_list_begin = pos_reader_.Tell();
-        fmt::print("pos_list_begin: {}\n", pos_list_begin);
 
         in_doc_state_keeper_.MoveToSegment(pos_slice_list, term_meta.GetTotalTermFreq(), pos_list_begin, format_option_);
 

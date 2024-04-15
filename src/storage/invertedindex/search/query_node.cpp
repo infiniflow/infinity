@@ -348,21 +348,12 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     if (!column_index_reader) {
         return nullptr;
     }
-//#define FETCH_POSITION
-//#ifdef FETCH_POSITION
-//    bool fetch_position = true;
-//#else
-//    bool fetch_position = false;
-//#endif
-//    bool fetch_position = true;
+
     bool fetch_position = false;
     auto option_flag = column_index_reader->GetOptionFlag();
     if (option_flag & OptionFlag::of_position_list) {
-        fmt::print("fetch position = true\n");
         fetch_position = true;
     }
-    fetch_position = false;
-    fmt::print("hello\n");
     auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get(), fetch_position);
     if (!posting_iterator) {
         return nullptr;
@@ -387,11 +378,8 @@ TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRe
     bool fetch_position = false;
     auto option_flag = column_index_reader->GetOptionFlag();
     if (option_flag & OptionFlag::of_position_list) {
-        fmt::print("fetch position = true\n");
         fetch_position = true;
     }
-    fetch_position = false;
-    fmt::print("CreateEarlyTerminateSearch\n");
     auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight(), fetch_position);
     if (!search) {
         return nullptr;

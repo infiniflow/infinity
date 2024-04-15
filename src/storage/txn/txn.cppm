@@ -89,7 +89,9 @@ public:
 
     TxnTimeStamp Commit();
 
-    void CommitBottom() noexcept;
+    bool CheckConflict();
+
+    void CommitBottom();
 
     void CancelCommitBottom();
 
@@ -173,6 +175,8 @@ public:
     inline TxnTimeStamp BeginTS() { return txn_context_.GetBeginTS(); }
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
+
+    void SetTxnToRollback() { txn_context_.SetTxnToRollback(); }
 
     void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
 

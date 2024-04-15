@@ -13,12 +13,15 @@
 // limitations under the License.
 
 #include <cassert>
+#include <csignal>
 #include <cstring>
 #include <string>
 #include <tuple>
 #include <unistd.h>
-#include <getopt.h>
 #include <vector>
+#ifdef ENABLE_JEMALLOC_PROF
+#include <jemalloc/jemalloc.h>
+#endif
 
 import stl;
 import third_party;
@@ -45,9 +48,9 @@ import column_expr;
 
 using namespace infinity;
 
-void ReadJsonl(std::ifstream &input_file, int lines_to_read, Vector<Tuple<char *, char *, char *>> &batch) {
+void ReadJsonl(std::ifstream &input_file, SizeT lines_to_read, Vector<Tuple<char *, char *, char *>> &batch) {
     String line;
-    int lines_readed = 0;
+    SizeT lines_readed = 0;
     batch.clear();
     static const char *columns[3] = {"id", "title", "text"};
     while (lines_readed < lines_to_read) {
@@ -146,24 +149,22 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
     BaseProfiler profiler;
 
     profiler.Begin();
-    SizeT num_rows = 0;
-    Vector<Tuple<char *, char *, char *>> batch;
-    batch.reserve(insert_batch);
+    Vector<Tuple<char *, char *, char *>> batch_cache;
+    ReadJsonl(input_file, (SizeT)(-1), batch_cache);
+    SizeT num_rows = batch_cache.size();
+    LOG_INFO(fmt::format("ReadJsonl {} rows cost: {}", num_rows, profiler.ElapsedToString()));
+    profiler.End();
 
+    profiler.Begin();
     Vector<String> orig_columns{"id", "title", "text"};
-    bool done = false;
     ConstantExpr *const_expr = nullptr;
-    while (!done) {
-        ReadJsonl(input_file, insert_batch, batch);
-        if (batch.empty()) {
-            done = true;
-            break;
-        }
-        num_rows += batch.size();
+    SizeT num_inserted = 0;
+    while (num_inserted < num_rows) {
         Vector<String> *columns = new Vector<String>(orig_columns);
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-        for (auto &t : batch) {
-            values->reserve(insert_batch);
+        values->reserve(insert_batch);
+        for (SizeT i = 0; i<insert_batch && (num_inserted+i)<num_rows; i++){
+            auto &t = batch_cache[num_inserted+i];
             auto value_list = new Vector<ParsedExpr *>(columns->size());
             const_expr = new ConstantExpr(LiteralType::kString);
             const_expr->str_value_ = std::get<0>(t);
@@ -178,6 +179,7 @@ void BenchmarkInsert(SharedPtr<Infinity> infinity, const String &db_name, const 
         }
         infinity->Insert(db_name, table_name, columns, values);
         // NOTE: ~InsertStatement() has deleted or freed columns, values, value_list, const_expr, const_expr->str_value_
+        num_inserted += insert_batch;
     }
     input_file.close();
     LOG_INFO(fmt::format("Insert data {} rows cost: {}", num_rows, profiler.ElapsedToString()));
@@ -262,6 +264,32 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
     }
 }
 
+void SignalHandler(int signal_number, siginfo_t *, void *) {
+    switch (signal_number) {
+#ifdef ENABLE_JEMALLOC_PROF
+        case SIGUSR2: {
+            // http://jemalloc.net/jemalloc.3.html
+            int rc = mallctl("prof.dump", NULL, NULL, NULL, 0);
+            printf("Dump memory profile %d\n", rc);
+            break;
+        }
+#endif
+        default: {
+            // Ignore
+            printf("Other type of signal: %d\n", signal_number);
+        }
+    }
+}
+
+void RegisterSignal() {
+    struct sigaction sig_action;
+    sig_action.sa_flags = SA_SIGINFO;
+    sig_action.sa_sigaction = SignalHandler;
+    sigemptyset(&sig_action.sa_mask);
+#ifdef ENABLE_JEMALLOC_PROF
+    sigaction(SIGUSR2, &sig_action, NULL);
+#endif
+}
 void BenchmarkMoreQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, int query_times = 10) {
     BaseProfiler profiler;
     profiler.Begin();
@@ -272,12 +300,7 @@ void BenchmarkMoreQuery(SharedPtr<Infinity> infinity, const String &db_name, con
     profiler.End();
 }
 
-int main(int argc, char *argn[]) {
-    argc = 3;
-    const char *argv[] = {
-        "fulltext_benchmark",
-        "--mode", "query"
-    };
+int main(int argc, char *argv[]) {
     CLI::App app{"fulltext_benchmark"};
     // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
     // Using enumerations in an option
@@ -299,17 +322,19 @@ int main(int argc, char *argn[]) {
     } catch (const CLI::ParseError &e) {
         return app.exit(e);
     }
+    RegisterSignal();
 
     String db_name = "default";
     String table_name = "ft_dbpedia_benchmark";
     String index_name = "ft_dbpedia_index";
     String srcfile = test_data_path();
-    srcfile += "/benchmark/dbpedia-entity/corpus2000000.jsonl";
+    srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
-#define DEL_LOCAL_DATA
+// #define DEL_LOCAL_DATA
 #ifdef DEL_LOCAL_DATA
     system("rm -rf /tmp/infinity/data  /tmp/infinity/log  /tmp/infinity/temp  /tmp/infinity/wal");
 #endif
+
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
 
     switch (mode) {
@@ -335,6 +360,9 @@ int main(int argc, char *argn[]) {
             BenchmarkOptimize(infinity, db_name, table_name);
             BenchmarkMoreQuery(infinity, db_name, table_name, 1);
             break;
+        }
+        default: {
+            printf("Unsupported benchmark mode: %u\n", static_cast<u8>(mode));
         }
     }
     sleep(10);

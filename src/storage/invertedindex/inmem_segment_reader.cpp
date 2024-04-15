@@ -30,7 +30,6 @@ InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
     : posting_table_(memory_indexer->GetPostingTable()), base_row_id_(memory_indexer->GetBaseRowId()) {}
 
 bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool,  bool fetch_position) const {
-    fmt::print("InMemIndexSegmentReader::GetSegmentPosting\n");
     SharedPtr<PostingWriter> writer;
     bool found = posting_table_->store_.Get(term, writer);
     if (found) {

@@ -54,7 +54,6 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
                 MakeShared<DiskIndexSegmentReader>(index_dir_, chunk_index_entries[i]->base_name_, chunk_index_entries[i]->base_rowid_, flag);
             segment_readers_.push_back(std::move(segment_reader));
         }
-        fmt::print("disk segment reader size: {}\n", segment_readers_.size());
         chunk_index_entries_.insert(chunk_index_entries_.end(),
                                     std::move_iterator(chunk_index_entries.begin()),
                                     std::move_iterator(chunk_index_entries.end()));

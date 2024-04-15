@@ -45,7 +45,6 @@ void InDocStateKeeper::MoveToSegment(ByteSliceList *pos_list, tf_t total_tf, u32
     PositionListDecoder *decoder = session_pool_
                                        ? (new ((session_pool_)->Allocate(sizeof(PositionListDecoder))) PositionListDecoder(option, session_pool_))
                                        : new PositionListDecoder(option, session_pool_);
-    fmt::print("InDocStateKeeper::MoveToSegment\n");
     pos_decoders_.push_back(decoder);
     decoder->Init(pos_list, total_tf, pos_list_begin, state_);
     state_->SetPositionListDecoder(decoder);

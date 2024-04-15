@@ -41,7 +41,6 @@ void PositionListDecoder::InitPositionSkipList(const ByteSliceList *pos_list,
                                                u32 pos_skiplist_start,
                                                u32 pos_skiplist_len,
                                                InDocPositionState *state) {
-    fmt::print("PositionListDecoder::InitPositionSkipList(const ByteSliceList *...\n");
     u32 pos_skiplist_end = pos_skiplist_start + pos_skiplist_len;
     if (ShortListOptimizeUtil::IsShortPosList(total_tf)) {
         decoded_pos_count_ = total_tf;
@@ -51,7 +50,6 @@ void PositionListDecoder::InitPositionSkipList(const ByteSliceList *pos_list,
                                                    SkipListReaderByteSlice(option_.GetDocListFormatOption())
                                              : new SkipListReaderByteSlice(option_.GetDocListFormatOption());
         skiplist_reader_real_size_ = sizeof(SkipListReaderByteSlice);
-        fmt::print("pos_list total size = {}, pos_skiplist_start: {}, pos_skiplist_end: {}\n", pos_list->GetTotalSize(), pos_skiplist_start, pos_skiplist_end);
         static_cast<SkipListReaderByteSlice *>(pos_skiplist_reader_)->Load(pos_list, pos_skiplist_start, pos_skiplist_end);
         decoded_pos_count_ = 0;
     }
@@ -77,7 +75,6 @@ void PositionListDecoder::InitPositionSkipList(ByteSlice *pos_list,
 }
 
 void PositionListDecoder::Init(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_begin, InDocPositionState *state) {
-    fmt::print("PositionListDecoder::Init(ByteSlice *...\n");
     pos_single_slice_ = pos_list;
 
     total_tf_ = total_tf;
@@ -102,7 +99,6 @@ void PositionListDecoder::Init(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_
 }
 
 void PositionListDecoder::Init(const ByteSliceList *pos_list, tf_t total_tf, u32 pos_list_begin, InDocPositionState *state) {
-    fmt::print("PositionListDecoder::Init(const ByteSliceList *...\n");
     total_tf_ = total_tf;
     pos_encoder_ = GetPosListEncoder();
 
