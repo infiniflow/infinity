@@ -72,12 +72,14 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &analyzer,
                              MemoryPool &byte_slice_pool,
                              RecyclePool &buffer_pool,
-                             ThreadPool &thread_pool)
+                             ThreadPool &inverting_thread_pool,
+                             ThreadPool &commiting_thread_pool)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
-      buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(13UL), ring_sorted_(13UL) {
+      buffer_pool_(buffer_pool), inverting_thread_pool_(inverting_thread_pool), commiting_thread_pool_(commiting_thread_pool), ring_inverted_(15UL),
+      ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
-    Path path = Path(index_dir) / "tmp.merge";
+    Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
 }
 
@@ -100,6 +102,19 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         doc_count = doc_count_;
         doc_count_ += row_count;
     }
+    // if ((doc_count & 0x0FFF) == 0) {
+    //     SizeT inverting_que_size = inverting_thread_pool_.queue_size();
+    //     SizeT commiting_que_size = commiting_thread_pool_.queue_size();
+    //     SizeT inverted_ring_size = ring_inverted_.Size();
+    //     SizeT sorted_ring_size = ring_sorted_.Size();
+    //     LOG_INFO(fmt::format("doc_count {}, inverting_que_size {}, commiting_que_size {}, inverted_ring_size {}, sorted_ring_size {}",
+    //                          doc_count,
+    //                          inverting_que_size,
+    //                          commiting_que_size,
+    //                          inverted_ring_size,
+    //                          sorted_ring_size));
+    // }
+
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     if (offline) {
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, nullptr, column_lengths_);
@@ -109,7 +124,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
             inverter->SortForOfflineDump();
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
-        thread_pool_.push(std::move(func));
+        inverting_thread_pool_.push(std::move(func));
     } else {
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, provider, column_lengths_);
@@ -120,7 +135,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
             this->ring_inverted_.Put(task->task_seq_, inverter);
             // LOG_INFO(fmt::format("online inverter {} end", id));
         };
-        thread_pool_.push(std::move(func));
+        inverting_thread_pool_.push(std::move(func));
     }
     {
         std::unique_lock<std::mutex> lock(mutex_);
@@ -130,17 +145,16 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
 
 void MemoryIndexer::Commit(bool offline) {
     if (offline) {
-        thread_pool_.push([this](int id) { this->CommitOffline(); });
+        commiting_thread_pool_.push([this](int id) { this->CommitOffline(); });
     } else
-        thread_pool_.push([this](int id) { this->CommitSync(); });
+        commiting_thread_pool_.push([this](int id) { this->CommitSync(); });
 }
 
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
-    bool generating = false;
-    bool changed = generating_.compare_exchange_strong(generating, true);
-    if (!changed)
+    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
+    if (!lock.try_lock())
         return 0;
-    generating = true;
+
     if (nullptr == spill_file_handle_) {
         PrepareSpillFile();
     }
@@ -153,7 +167,6 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
             num_runs_++;
         }
     }
-    generating_.compare_exchange_strong(generating, false);
     if (num > 0) {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_ -= num;
@@ -177,19 +190,21 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         this->ring_sorted_.Put(seq_commit, inverters[0]);
     };
 
-    bool generating = false;
-    bool changed = generating_.compare_exchange_strong(generating, true);
-    if (!changed)
-        goto QUIT;
-    generating = true;
-    this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
-    // num_merged = inverters.size();
-    for (auto &inverter : inverters) {
-        inverter->GeneratePosting();
-        num_generated += inverter->GetMerged();
+    std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
+    if (!lock.try_lock())
+        return 0;
+
+    while (1) {
+        this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
+        // num_merged = inverters.size();
+        if (inverters.empty())
+            break;
+        for (auto &inverter : inverters) {
+            inverter->GeneratePosting();
+            num_generated += inverter->GetMerged();
+        }
     }
-    generating_.compare_exchange_strong(generating, false);
-    {
+    if (num_generated > 0) {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_ -= num_generated;
         if (inflight_tasks_ == 0) {
@@ -197,7 +212,6 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         }
     }
 
-QUIT:
     // LOG_INFO(fmt::format("MemoryIndexer::CommitSync sorted {} inverters, generated posting for {} inverters(merged to {}), inflight_tasks_ is {}",
     //                      num_sorted,
     //                      num_generated,
@@ -383,7 +397,7 @@ void MemoryIndexer::OfflineDump() {
                 term_meta_dumpler.Dump(dict_file_writer, term_meta);
                 fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
             }
-            posting = MakeUnique<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_lengths_);
+            posting = MakeUnique<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
             // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
             last_term_str = String(tuple.term_);
             last_term = std::string_view(last_term_str);
