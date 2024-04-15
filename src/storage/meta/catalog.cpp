@@ -881,6 +881,8 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     // Rename temp file to regular catalog file
     catalog_file_handler->Rename(catalog_tmp_path, full_catalog_path);
 
+    global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
+
     LOG_INFO(fmt::format("Saved catalog to: {}", full_catalog_path));
 }
 
