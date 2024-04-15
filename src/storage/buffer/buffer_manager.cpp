@@ -97,10 +97,10 @@ void BufferManager::RemoveBufferObjsInBulk(const Vector<String> &paths_to_delete
 }
 
 void BufferManager::ExecuteDeletions() {
-    FileWorker::CleanupFilesInBulk(file_path_delete);
-    RemoveBufferObjsInBulk(obj_path_delete);
-    file_path_delete.clear();
-    obj_path_delete.clear();
+    FileWorker::CleanupFilesInBulk(file_path_delete_);
+    RemoveBufferObjsInBulk(obj_path_delete_);
+    file_path_delete_.clear();
+    obj_path_delete_.clear();
 }
 
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
