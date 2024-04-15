@@ -368,6 +368,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
             const BlockEntry *block_entry = base_table_ref_->block_index_->GetBlockEntry(segment_id, block_id);
+            assert(block_entry != nullptr);
             SizeT column_id = 0;
             for (; column_id < column_n; ++column_id) {
                 BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);

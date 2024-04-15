@@ -57,7 +57,8 @@ public:
                   const String &analyzer,
                   MemoryPool &byte_slice_pool,
                   RecyclePool &buffer_pool,
-                  ThreadPool &thread_pool);
+                  ThreadPool &inverting_thread_pool,
+                  ThreadPool &commiting_thread_pool);
 
     ~MemoryIndexer();
 
@@ -124,7 +125,8 @@ private:
     String analyzer_;
     MemoryPool &byte_slice_pool_;
     RecyclePool &buffer_pool_;
-    ThreadPool &thread_pool_;
+    ThreadPool &inverting_thread_pool_;
+    ThreadPool &commiting_thread_pool_;
     u32 doc_count_{0};
     SharedPtr<PostingTable> posting_table_;
     PostingPtr prepared_posting_{nullptr};
@@ -132,10 +134,9 @@ private:
     Ring<SharedPtr<ColumnInverter>> ring_sorted_;
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};
-    Atomic<bool> generating_{false};
-
     std::condition_variable cv_;
     std::mutex mutex_;
+    std::mutex mutex_commit_;
 
     u32 num_runs_{0};                  // For offline index building
     FILE *spill_file_handle_{nullptr}; // Temp file for offline external merge sort
