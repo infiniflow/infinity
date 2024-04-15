@@ -182,26 +182,27 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         u32 pos = 0;
         u32 last_pos = -1;
         assert(i < MAX_GROUP_SIZE_);
-        while (size_micro_run_[i]) {
+        if (size_micro_run_[i] <= 0)
+            continue;
+        while (pos + sizeof(LenType) <= size_micro_run_[i]) {
             LenType len = *(LenType *)(micro_buf_[i] + pos);
-            if (pos + sizeof(LenType) + len > size_micro_run_[i]) {
-                // std::cout << "len " << len << " size_micro_run_[" << i << "] " << size_micro_run_[i] << std::endl;
-                assert(last_pos != (u32)-1); // buffer too small that can't hold one record
-
-                len = *(LenType *)(micro_buf_[i] + last_pos) + sizeof(LenType);
-                char *tmp = (char *)malloc(len);
-                memcpy(tmp, micro_buf_[i] + last_pos, len);
-
-                pre_heap_.push(KeyAddr(tmp, run_addr_[i] + pos, i));
-                //
-                size_micro_run_[i] = pos;
+            if (pos + sizeof(LenType) + len <= size_micro_run_[i]) {
+                num_micro_run_[i]++;
+                last_pos = pos;
+                pos += sizeof(LenType) + len;
+            } else {
                 break;
             }
-
-            num_micro_run_[i]++;
-            last_pos = pos;
-            pos += sizeof(LenType) + len;
         }
+        // std::cout << "len " << len << " size_micro_run_[" << i << "] " << size_micro_run_[i] << std::endl;
+        assert(last_pos != (u32)-1); // buffer too small that can't hold one record
+        assert(last_pos + sizeof(LenType) <= size_micro_run_[i]);
+        assert(pos <= size_micro_run_[i]);
+        LenType len = (LenType)(pos - last_pos);
+        char *tmp = (char *)malloc(len);
+        memcpy(tmp, micro_buf_[i] + last_pos, len);
+        pre_heap_.push(KeyAddr(tmp, run_addr_[i] + pos, i));
+        size_micro_run_[i] = pos;
     }
 }
 

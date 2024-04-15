@@ -174,6 +174,7 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json["index_dir"] = *this->index_dir_;
         json["index_base"] = this->index_base_->Serialize();
 
+        std::shared_lock r_lock(rw_locker_);
         for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
             segment_index_entry_candidates.emplace_back((SegmentIndexEntry *)index_entry.get());
         }
@@ -241,6 +242,7 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
     u32 segment_id = segment_entry->segment_id();
     SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
     segment_index_entry->PopulateEntirely(segment_entry, txn, config);
+    std::unique_lock w_lock(rw_locker_);
     index_by_segment_.emplace(segment_id, segment_index_entry);
     return segment_index_entry;
 }
@@ -256,6 +258,7 @@ TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_i
         if (!is_replay) {
             segment_index_entry->CreateIndexPrepare(segment_entry, txn, prepare, check_ts);
         }
+        std::unique_lock w_lock(rw_locker_);
         index_by_segment_.emplace(segment_id, segment_index_entry);
         segment_index_entries.push_back(segment_index_entry.get());
         if (unsealed_id == segment_id) {
@@ -270,7 +273,8 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
         // TODO
         RecoverableError(Status::NotSupport("Not implemented"));
     }
-    for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = GetIndexBySegmentSnapshot();
+    for (auto &[segment_id, segment_index_entry] : index_by_segment) {
         atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
         auto status = segment_index_entry->CreateIndexDo(create_index_idx);
         if (!status.ok()) {
@@ -284,6 +288,7 @@ void TableIndexEntry::Cleanup() {
     if (this->deleted_) {
         return;
     }
+    std::unique_lock w_lock(rw_locker_);
     for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
         segment_index_entry->Cleanup();
     }
@@ -302,6 +307,7 @@ void TableIndexEntry::Cleanup() {
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
 void TableIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
+    std::unique_lock w_lock(rw_locker_);
     for (auto iter = index_by_segment_.begin(); iter != index_by_segment_.end();) {
         auto &[segment_id, segment_index_entry] = *iter;
         if (std::binary_search(sorted_segment_ids.begin(), sorted_segment_ids.end(), segment_id)) {
