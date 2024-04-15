@@ -139,12 +139,29 @@ public:
     }
 
     template <FilterConcept<LabelType> Filter>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, const Filter &filter) const {
-        return std::visit([q, k, &filter](auto &&arg) { return arg->template KnnSearch<Filter>(q, k, filter); }, knn_hnsw_ptr_);
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>>
+    KnnSearch(const DataType *q, SizeT k, const Filter &filter, bool with_lock = true) const {
+        return std::visit(
+            [q, k, &filter, with_lock](auto &&arg) {
+                if (with_lock) {
+                    return arg->template KnnSearch<Filter, true>(q, k, filter);
+                } else {
+                    return arg->template KnnSearch<Filter, false>(q, k, filter);
+                }
+            },
+            knn_hnsw_ptr_);
     }
 
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k) const {
-        return std::visit([q, k](auto &&arg) { return arg->KnnSearch(q, k); }, knn_hnsw_ptr_);
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, bool with_lock = true) const {
+        return std::visit(
+            [q, k, with_lock](auto &&arg) {
+                if (with_lock) {
+                    return arg->template KnnSearch<true>(q, k);
+                } else {
+                    return arg->template KnnSearch<false>(q, k);
+                }
+            },
+            knn_hnsw_ptr_);
     }
 
 private:

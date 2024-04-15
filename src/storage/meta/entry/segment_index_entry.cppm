@@ -158,6 +158,11 @@ public:
         return {chunk_index_entries_, memory_indexer_};
     }
 
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetHnswIndexSnapshot() {
+        std::shared_lock lock(rw_locker_);
+        return {chunk_index_entries_, memory_hnsw_indexer_};
+    }
+
     Pair<u64, u32> GetFulltextColumnLenInfo() {
         std::shared_lock lock(rw_locker_);
         if (ft_column_len_sum_ == 0 && memory_indexer_.get() != nullptr) {
@@ -172,7 +177,9 @@ public:
     }
 
 public:
-    SharedPtr<ChunkIndexEntry> AddChunkIndexEntry(const TableEntry *table_entry, RowID base_rowid, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> CreateChunkIndexEntry(const TableEntry *table_entry, RowID base_rowid, BufferManager *buffer_mgr);
+
+    void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
     SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
 
@@ -203,6 +210,7 @@ private:
     TxnTimeStamp checkpoint_ts_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
+    SharedPtr<ChunkIndexEntry> memory_hnsw_indexer_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
 
     u64 ft_column_len_sum_{}; // increase only
