@@ -45,13 +45,13 @@ u32 Scorer::GetOrSetColumnIndex(u64 column_id) {
 
 void Scorer::AddDocIterator(TermDocIterator *iter, u64 column_id) {
     u32 column_index = GetOrSetColumnIndex(column_id);
-    iterators_.resize(column_index + 1);
+    iterators_.resize(std::max<u32>(column_index + 1, iterators_.size()));
     iterators_[column_index].push_back(iter);
 }
 
 void Scorer::AddBlockMaxDocIterator(BlockMaxTermDocIterator *iter, u64 column_id) {
     u32 column_index = GetOrSetColumnIndex(column_id);
-    block_max_iterators_.resize(column_index + 1);
+    block_max_iterators_.resize(std::max<u32>(column_index + 1, block_max_iterators_.size()));
     block_max_iterators_[column_index].push_back(iter);
     iter->InitBM25Info(total_df_, avg_column_length_[column_index], column_length_reader_.GetColumnLengthReader(column_index));
 }
