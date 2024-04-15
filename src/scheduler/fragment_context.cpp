@@ -630,6 +630,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kDelete: {
             UnrecoverableError(
                 fmt::format("{} shouldn't be the first operator of the fragment", PhysicalOperatorToString(first_operator->operator_type())));
+            break;
         }
         case PhysicalOperatorType::kMergeAggregate:
         case PhysicalOperatorType::kMergeHash:
@@ -671,6 +672,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kCrossProduct:
         case PhysicalOperatorType::kPreparedPlan: {
             UnrecoverableError(fmt::format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())));
+            break;
         }
         case PhysicalOperatorType::kTableScan: {
             if ((i64)tasks_.size() != parallel_count) {

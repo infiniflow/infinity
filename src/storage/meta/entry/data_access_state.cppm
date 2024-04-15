@@ -24,6 +24,8 @@ import internal_types;
 
 namespace infinity {
 
+struct SegmentEntry;
+
 export struct AppendRange {
     inline explicit AppendRange(u32 segment_id, u16 block_id, u16 start_offset, u16 row_count)
         : segment_id_(segment_id), block_id_(block_id), start_offset_(start_offset), row_count_(row_count) {}
@@ -55,7 +57,8 @@ export struct AppendState {
 };
 
 export struct ImportState {
-    Vector<void *> segments_ptr_;
+    // Vector<void *> segments_ptr_;
+    Vector<SharedPtr<SegmentEntry>> segment_entries_{};
 };
 
 export struct DeleteState {
