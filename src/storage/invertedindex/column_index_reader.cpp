@@ -54,6 +54,7 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
                 MakeShared<DiskIndexSegmentReader>(index_dir_, chunk_index_entries[i]->base_name_, chunk_index_entries[i]->base_rowid_, flag);
             segment_readers_.push_back(std::move(segment_reader));
         }
+        fmt::print("disk segment reader size: {}\n", segment_readers_.size());
         chunk_index_entries_.insert(chunk_index_entries_.end(),
                                     std::move_iterator(chunk_index_entries.begin()),
                                     std::move_iterator(chunk_index_entries.end()));
@@ -86,17 +87,18 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryP
     return iter;
 }
 
-UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight) {
+UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight, bool fetch_position) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
-        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool);
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool, fetch_position);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
     }
-    if (seg_postings->empty())
+    if (seg_postings->empty()) {
         return nullptr;
+    }
     auto result = MakeUnique<BlockMaxTermDocIterator>(flag_, session_pool);
     result->MultiplyWeight(weight);
     u32 state_pool_size = 0; // TODO

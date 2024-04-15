@@ -38,7 +38,7 @@ public:
 
     UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool, bool fetch_position = true);
 
-    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, MemoryPool *session_pool, float weight);
+    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, MemoryPool *session_pool, float weight, bool fetch_position = true);
 
     float GetAvgColumnLength() const;
 

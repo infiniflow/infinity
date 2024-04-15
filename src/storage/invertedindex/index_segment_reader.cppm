@@ -26,6 +26,7 @@ public:
     IndexSegmentReader();
     virtual ~IndexSegmentReader() {}
 
+    // fetch_position is only valid in DiskIndexSegmentReader
     virtual bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const = 0;
 };
 

@@ -24,6 +24,8 @@ import index_defines;
 import internal_types;
 import file_reader;
 import memory_pool;
+import file_system;
+import third_party;
 
 module segment_posting;
 
@@ -62,11 +64,14 @@ void SegmentPosting::Init(SharedPtr<ByteSliceList> doc_slice_list,
     pos_begin_ = pos_begin;
     pos_size_ = pos_size;
     posting_reader_ = MakeShared<FileReader>(posting_reader->fs_, posting_reader->path_, 1024);
+    // fs_ = &posting_reader->fs_;
+    // path_ = &posting_reader->path_;
     session_pool_ = session_pool;
 }
 
 const SharedPtr<ByteSliceList> &SegmentPosting::GetPosSliceListPtr() {
     if (pos_slice_list_.get() == nullptr) {
+        // auto posting_reader = MakeUnique<FileReader>(*fs_, *path_, 1024);
         ByteSlice *pos_slice = ByteSlice::CreateSlice(pos_size_, session_pool_);
 
         posting_reader_->Seek(term_meta_.doc_start_ + pos_begin_);

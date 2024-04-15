@@ -199,6 +199,7 @@ void BenchmarkCreateIndex(SharedPtr<Infinity> infinity,
 
     auto r = infinity->CreateIndex(db_name, table_name, index_name, index_info_list, CreateIndexOptions());
     if (r.IsOk()) {
+        fmt::print("flush index\n");
         r = infinity->Flush();
     } else {
         LOG_ERROR(fmt::format("Fail to create index {}", r.ToString()));
@@ -220,7 +221,7 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
 
 void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
-    std::vector<std::string> query_vec = {"Animalia", "Algorithms"};
+    std::vector<std::string> query_vec = {"Animalia", "Algorithms", "is", "disorder", "anniversary", "natural", "and"};
     BaseProfiler profiler;
     profiler.Begin();
     for (auto match_text : query_vec) {
@@ -245,38 +246,41 @@ void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const S
             output_columns->emplace_back(select_score_expr);
         }
         infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
-        /*
-        auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
-        {
-            auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
-            auto &column = *cv[0];
-            auto result_id = reinterpret_cast<const RowID *>(column.data());
-            auto cnt = column.Size();
-            for (size_t i = 0; i < cnt; ++i) {
-                LOG_INFO(fmt::format("result_id[{}] = {}", i, result_id[i].ToUint64()));
-            }
-        }
-        */
     }
     LOG_INFO(fmt::format("Query data cost: {}", profiler.ElapsedToString()));
     profiler.End();
 }
 
+void BenchmarkMoreQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name, int query_times = 10) {
+    BaseProfiler profiler;
+    profiler.Begin();
+    for (int i = 0; i < query_times; i++) {
+        BenchmarkQuery(infinity, db_name, table_name);
+    }
+    LOG_INFO(fmt::format("run benchmark query {} times cost: {}", query_times, profiler.ElapsedToString()));
+    profiler.End();
+}
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argn[]) {
+    argc = 3;
+    const char *argv[] = {
+        "fulltext_benchmark",
+        "--mode", "insert"
+    };
     CLI::App app{"fulltext_benchmark"};
     // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
     // Using enumerations in an option
-    enum class Mode : u8 { kInsert, kImport, kMerge, kQuery };
+    enum class Mode : u8 { kInsert, kImport, kMerge, kQuery, kOnlyQuery };
     Map<String, Mode> mode_map{
         {"insert", Mode::kInsert},
         {"import", Mode::kImport},
         {"merge", Mode::kMerge},
-        {"query", Mode::kQuery}
+        {"query", Mode::kQuery},
+        {"only_query", Mode::kOnlyQuery}
     };
     Mode mode(Mode::kInsert);
     SizeT insert_batch = 500;
-    app.add_option("--mode", mode, "Bencmark mode, one of insert, import, merge, query")
+    app.add_option("--mode", mode, "Bencmark mode, one of insert, import, merge, query, only_query")
         ->required()
         ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
     app.add_option("--insert-batch", insert_batch, "batch size of each insert, valid only at insert and merge mode, default value 500");
@@ -292,28 +296,45 @@ int main(int argc, char *argv[]) {
     String srcfile = test_data_path();
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
-    SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
+// #define DEL_LOCAL_DATA
+#ifdef DEL_LOCAL_DATA
+    system("rm -rf /tmp/infinity/data  /tmp/infinity/log  /tmp/infinity/temp  /tmp/infinity/wal");
+#endif
 
     switch (mode) {
         case Mode::kInsert: {
+            SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
             break;
         }
         case Mode::kImport: {
+            SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkImport(infinity, db_name, table_name, srcfile);
             break;
         }
         case Mode::kMerge: {
+            SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
             BenchmarkOptimize(infinity, db_name, table_name);
+            break;
         }
         case Mode::kQuery: {
+            SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
+            BenchmarkMoreQuery(infinity, db_name, table_name, 20);
+            break;
+        }
+        case Mode::kOnlyQuery: {
+            String data_path = "/tmp/infinity";
+            Infinity::LocalInit(data_path);
+
+            SharedPtr<Infinity> infinity = Infinity::LocalConnect();
             BenchmarkQuery(infinity, db_name, table_name);
+            break;
         }
     }
     sleep(10);

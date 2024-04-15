@@ -46,28 +46,8 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
 
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {}
 
-bool DiskIndexSegmentReader::GetSegmentPostingBack(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
-    TermMeta term_meta;
-    if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
-        return false;
-    }
-    u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
-    ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        posting_reader_->Seek(term_meta.doc_start_);
-        posting_reader_->Read((char *)slice->data_, file_length);
-
-        ByteSliceReader byte_slice_reader;
-        byte_slice_reader.Open(slice);
-
-    }
-    SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
-    seg_posting.Init(std::move(byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
-    return true;
-}
-
 bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
+    fmt::print("term = {}, DiskIndexSegmentReader::GetSegmentPosting", term);
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
@@ -100,8 +80,9 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
         posting_reader_->Read((char *)doc_slice->data_, doc_size);
         pos_begin = doc_byte_slice_reader.Tell() + doc_skiplist_size + doc_list_size;
         pos_size = file_length - doc_size;
-
+        fmt::print("term = {}, doc size = {}, pos size = {}, fetch position = {}\n", term, doc_size, pos_size, fetch_position);
         if (fetch_position) {
+            fmt::print("term = {}, fetch position = true\n", term);
             posting_reader_->Seek(term_meta.doc_start_ + pos_begin);
             posting_reader_->Read((char *)pos_header_slice->data_, pos_header_length);
             ByteSliceReader pos_byte_slice_reader;
