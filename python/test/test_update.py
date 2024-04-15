@@ -336,7 +336,6 @@ class TestUpdate:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_update_inserted_long_before", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"}, ConflictType.Error)
-
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         table_obj.insert(values)
@@ -382,7 +381,6 @@ class TestUpdate:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
-
         # update
         table_obj.update("c1 = 1", [{"c2": types_example}])
         update_res = table_obj.output(["*"]).to_df()

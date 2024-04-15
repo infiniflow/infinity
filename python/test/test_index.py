@@ -519,6 +519,7 @@ class TestIndex:
         table_obj.insert(value)
         res = table_obj.output(["*"]).to_pl()
         print(res)
+        
 
         # delete data
         table_obj.delete()
@@ -547,7 +548,6 @@ class TestIndex:
                           ConflictType.Ignore)
         table_obj = db_obj.create_table("test_create_index_on_update_table", {"c1": "vector,128,float", "c2": "int"},
                                         ConflictType.Error)
-
         # insert data
         embedding_data = [i for i in range(128)]
         value = [{"c1": embedding_data, "c2": i} for i in range(10)]

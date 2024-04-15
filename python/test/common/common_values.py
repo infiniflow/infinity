@@ -64,6 +64,15 @@ types = [
             "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
              "double", "varchar", "boolean"
         ]
+types_example = [
+    1, 127, 32767, 2147483647, pow(2, 63) - 1, 10.33,11.22,"a",True 
+]
+
+check_file_data =  [{"file_name": "pysdk_test_blankspace.csv"},
+               {"file_name": "pysdk_test_commas.csv"},
+               {"file_name": "pysdk_test_semicolons.csv"},
+               {"file_name": "pysdk_test_tabular.csv"}]
+delimiter = [["blankspace", " "],["commas", ","],["semicolons", ";"],["tabular", "\t"]]
 
 
 create_valid_option = [

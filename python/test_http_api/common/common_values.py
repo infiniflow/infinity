@@ -46,20 +46,28 @@ types = [
             "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
              "double", "varchar", "boolean"
         ]
+types_example = [
+    1, 127, 32767, 2147483647, pow(2, 63) - 1, 10.33,11.22,"a",True 
+]
 
-create_valid_option = {
+create_valid_option = [
     "kError","kIgnore","kReplace"
-}
-create_invalid_option = {
+]
+create_invalid_option = [
     1.1,"#@$@!%string",[],{},()
-}
-drop_valid_option = {
+]
+drop_valid_option = [
      "kError","kIgnore"
-}
-drop_invalid_option = {
+]
+drop_invalid_option = [
     "kReplace",1.1,"#@$@!%string",[],{},()
-}
+]
 
+check_file_data =  [{"file_name": "pysdk_test_blankspace.csv"},
+               {"file_name": "pysdk_test_commas.csv"},
+               {"file_name": "pysdk_test_semicolons.csv"},
+               {"file_name": "pysdk_test_tabular.csv"}]
+delimiter = [["blankspace", " "],["commas", ","],["semicolons", ";"],["tabular", "\t"]]
 
 invalid_vector_array = []
 invalid_int_array = []

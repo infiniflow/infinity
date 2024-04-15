@@ -444,8 +444,7 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body)["data"];
             ImportOptions import_options;
 
             String file_type_str = http_body_json["file_type"];
@@ -696,7 +695,6 @@ public:
 
                                         const_expr->double_array_.emplace_back(value_ref.template get<double>());
                                     }
-
                                     values_row->emplace_back(const_expr);
                                     const_expr = nullptr;
 
@@ -723,6 +721,16 @@ public:
 
                                 values_row->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
                                 expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+                                break;
+
+                                // infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
+                                // column_type_map.emplace(key, LiteralType::kString);
+                                // auto str_value = value.template get<std::string>();
+                                // char str_buffer[str_value.size() + 1];
+                                // std::strcpy(str_buffer, str_value.c_str());
+                                // const_expr->str_value_ = str_buffer;
+                                // values_row->emplace_back(const_expr);
+                                // const_expr = nullptr;
                                 break;
                             }
                             case nlohmann::json::value_t::object:
@@ -916,6 +924,7 @@ public:
 
                                 UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
                                 ExprParser expr_parser;
+                                // ConstantExpr expr_parser;
                                 expr_parser.Parse(string_value, expr_parsed_result.get());
                                 if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
                                     json_response["error_code"] = ErrorCode::kInvalidExpression;
