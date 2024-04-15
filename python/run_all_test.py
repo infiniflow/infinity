@@ -14,7 +14,7 @@
 
 import os
 import pytest 
-import apibase
+import python.testbase as testbase
 from test_http_api.httpapibase import HttpTest
 
 # def run():
@@ -23,7 +23,7 @@ from test_http_api.httpapibase import HttpTest
 
 
 def run_all():
-    apibase.test_table(HttpTest)
+    testbase.test_table(HttpTest)
 
 if __name__ == '__main__':
     run_all()

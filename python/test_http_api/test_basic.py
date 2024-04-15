@@ -6,5 +6,6 @@ from common.common_values import *
 import infinity.index as index
 import httputils
 
-class TestBasic(HttpTest):
+class TestCase(HttpTest):
+    
     pass 

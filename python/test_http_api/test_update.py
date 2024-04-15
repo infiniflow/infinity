@@ -8,6 +8,7 @@ from common.common_values import *
 class TestUpdate(HttpTest):
     def test_version(self):
         return
+    #PASS
     def test_update(self):
         dbname = "default"
         tbname = "test_update"
@@ -18,6 +19,12 @@ class TestUpdate(HttpTest):
             "c1":{
                 "type":"integer",
                 "constraints": ["primary key","not null"],
+            },
+            "c2":{
+                "type":"integer",
+            },
+            "c3":{
+                "type":"integer",
             }
         })
         self.insert(dbname,tbname,
@@ -25,17 +32,15 @@ class TestUpdate(HttpTest):
              {"c1": 4, "c2": 40, "c3": 400}]
         )
         self.update(dbname,tbname,{"c2": 90, "c3": 900},"c1 = 1")
-        # self.select(dbname,tbname,
-        # ["c1","c2",],"",{},
-        # {
-        #     "error_code":0,
-        #     "output":[
-        #         {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)}
-        #     ]
-        # })
+        self.select(dbname,tbname,
+        ["c1","c2",],"",{},{},
+        {
+            "error_code":0,
+            "output":[{'c1': '2', 'c2': '20'}, {'c1': '3', 'c2': '30'}, {'c1': '4', 'c2': '40'}, {'c1': '1', 'c2': '90'}]
+        })
         self.update(dbname,tbname,{"c2": 90, "c3": 900},None,{
             "status_code":500,
-            "error_code":3069,
+            "error_code":3067,
         })
         return 
    
@@ -140,7 +145,7 @@ class TestUpdate(HttpTest):
             self.update(dbname,tbname+str(i),{"c2": types_example[i]},"c1 = "+str(types_array[i]))
             self.dropTable(dbname,tbname+str(i))
         return 
-    
+    #PASS
     def test_update_table_with_one_block(self):
         dbname = "default"
         tbname = "test_update_all_row_is_met_the_condition"

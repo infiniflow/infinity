@@ -20,9 +20,10 @@ from infinity.common import ConflictType
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
+from sdktestbase import SDKTest
 
 
-class TestTable:
+class TestTable(SDKTest):
 
     def test_version(self):
         print(infinity.__version__)
@@ -59,7 +60,7 @@ class TestTable:
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table")
+        db_obj.drop_table("my_table", ConflictType.Ignore)
 
         # infinity
         tb = db_obj.create_table(
@@ -87,7 +88,7 @@ class TestTable:
         res = db_obj.list_tables()
         assert res.error_code == ErrorCode.OK
 
-        res = db_obj.drop_table("my_table")
+        res = db_obj.drop_table("my_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.list_tables()
@@ -99,7 +100,7 @@ class TestTable:
 
     def test_show_tables(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        
+
         db = infinity_obj.get_database("default")
 
         with pl.Config(fmt_str_lengths=1000):
@@ -147,7 +148,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
@@ -155,7 +156,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 " ": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
@@ -163,7 +164,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "12": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
@@ -171,7 +172,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "[]": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
@@ -179,7 +180,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "()": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
@@ -187,7 +188,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "{}": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
@@ -195,7 +196,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "1": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
@@ -203,7 +204,7 @@ class TestTable:
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "1.1": "vector,128,float"}, ConflictType.Error)
             assert table_obj
-            db_obj.drop_table("test_create_invalid_column_name")
+            db_obj.drop_table("test_create_invalid_column_name", ConflictType.Error)
 
     @pytest.mark.parametrize("column_name", common_values.invalid_name_array)
     def test_create_table_with_invalid_column_name_python(self, column_name):
@@ -317,18 +318,19 @@ class TestTable:
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table", ConflictType.Ignore)
+        db_obj.drop_table("test_table_with_different_column_types", ConflictType.Ignore)
 
         # infinity
         tb = db_obj.create_table(
-            "my_table", {"c1": "bool, primary key", "c2": "int", "c3": "int8", "c4": "int16",
-                         "c5": "int32", "c6": "int64", "c7": "int128", "c8": "float", "c9": "float32",
-                         "c10": "double", "c11": "float64", "c12": "varchar", "c13": "integer"}, ConflictType.Error)
+            "test_table_with_different_column_types",
+            {"c1": "bool, primary key", "c2": "int", "c3": "int8", "c4": "int16",
+             "c5": "int32", "c6": "int64", "c7": "int128", "c8": "float", "c9": "float32",
+             "c10": "double", "c11": "float64", "c12": "varchar", "c13": "integer"}, ConflictType.Error)
         assert tb is not None
 
         for tb_type in common_values.invalid_name_array:
             try:
-                tb = db_obj.create_table("my_table", {"c1": tb_type}, ConflictType.Error)
+                tb = db_obj.create_table("test_table_with_different_column_types", {"c1": tb_type}, ConflictType.Error)
                 raise Exception(f"Can create tb: {tb_type}")
             except Exception as e:
                 print(e)
@@ -341,12 +343,12 @@ class TestTable:
 
         # get table
         try:
-            res = db_obj.get_table("my_table")
+            res = db_obj.get_table("test_table_with_different_column_types")
         except Exception as e:
             print(e)
 
         # drop table
-        res = db_obj.drop_table("my_table")
+        res = db_obj.drop_table("test_table_with_different_column_types", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -363,7 +365,7 @@ class TestTable:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table", ConflictType.Ignore)
+        db_obj.drop_table("test_table_with_various_column_types", ConflictType.Ignore)
         c_count = 10000
 
         types = [
@@ -379,7 +381,7 @@ class TestTable:
 
         # create tb with 10000 columns with various column types
         try:
-            tb = db_obj.create_table('my_table', params, ConflictType.Error)
+            tb = db_obj.create_table('test_table_with_various_column_types', params, ConflictType.Error)
         except Exception as e:
             print(e)
 
@@ -391,13 +393,13 @@ class TestTable:
 
         # get table
         try:
-            res = db_obj.get_table("my_table")
+            res = db_obj.get_table("test_table_with_various_column_types")
             print(res.output(["c2"]))
         except Exception as e:
             print(e)
 
         # drop table
-        res = db_obj.drop_table("my_table")
+        res = db_obj.drop_table("test_table_with_various_column_types", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -438,7 +440,7 @@ class TestTable:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table", ConflictType.Ignore)
+        db_obj.drop_table("test_various_tables_with_various_columns", ConflictType.Ignore)
 
         tb_count = 1000
         column_count = 10000
@@ -457,11 +459,15 @@ class TestTable:
 
         for i in range(tb_count):
             try:
-                tb = db_obj.create_table("my_table" + str(i), params, ConflictType.Error)
+                tb = db_obj.create_table("test_various_tables_with_various_columns" + str(i), params,
+                                         ConflictType.Error)
                 print(i)
                 # raise Exception(f"Can create table")
             except Exception as e:
                 print(e)
+
+        for i in range(tb_count):
+            db_obj.drop_table("test_various_tables_with_various_columns" + str(i), params, ConflictType.Error)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -479,7 +485,7 @@ class TestTable:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table", ConflictType.Ignore)
+        db_obj.drop_table("test_after_disconnect_use_table", ConflictType.Ignore)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -487,13 +493,13 @@ class TestTable:
 
         # create table
         try:
-            res = db_obj.create_table("my_table", {"c1": "int"}, ConflictType.Error)
+            res = db_obj.create_table("test_after_disconnect_use_table", {"c1": "int"}, ConflictType.Error)
         except Exception as e:
             print(e)
 
         # drop table
         try:
-            res = db_obj.drop_table("my_table")
+            res = db_obj.drop_table("test_after_disconnect_use_table", ConflictType.Error)
         except Exception as e:
             print(e)
 
@@ -511,32 +517,34 @@ class TestTable:
         except Exception as e:
             print(e)
 
-    # # create/drop table with invalid options
-    # def test_table_with_invalid_options(self):
-    #     """
-    #     target: create/drop table with invalid options.
-    #     methods: create table with various options
-    #     expect: all operations successfully
-    #     """
-    #     # connect
-    #     infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-    #     db_obj = infinity_obj.get_database("default")
-    #     db_obj.drop_table("my_table", ConflictType.Ignore)
+    # create/drop table with invalid options
+    def test_table_with_invalid_options(self):
+        """
+        target: create/drop table with invalid options.
+        methods: create table with various options
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_table_with_invalid_options", ConflictType.Ignore)
 
-    #     for option_name in common_values.invalid_name_array:
-    #         try:
-    #             tb = db_obj.create_table("my_table", {"c1": "int"}, option_name)
-    #             # raise Exception(f"Can create option_name: {option_name}")
-    #         except Exception as e:
-    #             print(e)
+        for option_name in common_values.invalid_name_array:
+            try:
+                tb = db_obj.create_table("test_table_with_invalid_options", {"c1": "int"}, option_name)
+                # raise Exception(f"Can create option_name: {option_name}")
+            except Exception as e:
+                print(e)
 
-    #     # disconnect
-    #     res = infinity_obj.disconnect()
-    #     assert res.error_code == ErrorCode.OK
-    #     # try:
-    #     #     res = infinity_obj.disconnect()
-    #     # except Exception as e:
-    #     #     print(e)
+        db_obj.drop_table("test_table_with_invalid_options", ConflictType.Error)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+        # try:
+        #     res = infinity_obj.disconnect()
+        # except Exception as e:
+        #     print(e)
 
     # create created table, drop dropped table.
     def test_create_drop_table(self):
@@ -548,23 +556,23 @@ class TestTable:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table", ConflictType.Ignore)
+        db_obj.drop_table("test_create_drop_table", ConflictType.Ignore)
 
         # create
         tb = db_obj.create_table(
-            "my_table", {"c1": "int, primary key", "c2": "float"}, ConflictType.Error)
+            "test_create_drop_table", {"c1": "int, primary key", "c2": "float"}, ConflictType.Error)
         assert tb is not None
 
         try:
-            tb = db_obj.create_table("my_table", {"c1": "int"}, ConflictType.Error)
+            tb = db_obj.create_table("test_create_drop_table", {"c1": "int"}, ConflictType.Error)
         except Exception as e:
             print(e)
 
         # drop
-        db_obj.drop_table("my_table")
+        db_obj.drop_table("test_create_drop_table", ConflictType.Error)
 
         try:
-            tb = db_obj.drop_table("my_table")
+            tb = db_obj.drop_table("test_create_drop_table", ConflictType.Error)
         except Exception as e:
             print(e)
 
@@ -617,7 +625,7 @@ class TestTable:
 
         for i in range(tb_count):
             try:
-                tb = db_obj.drop_table("my_table" + str(i))
+                tb = db_obj.drop_table("my_table" + str(i), ConflictType.Error)
             except Exception as e:
                 print(e)
 
@@ -641,12 +649,12 @@ class TestTable:
 
         tb_count = 1000000
         for i in range(tb_count):
-            try:
-                tb = db_obj.create_table("my_table" + str(i), {"c1": "int"}, ConflictType.Error)
-                print(i)
-                # raise Exception(f"Can create table")
-            except Exception as e:
-                print(e)
+            res = db_obj.create_table("my_table" + str(i), {"c1": "int"}, ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+
+        for i in range(tb_count):
+            res = db_obj.drop_table("my_table" + str(i), {"c1": "int"}, ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -717,7 +725,10 @@ class TestTable:
     #     db_obj = infinity_obj.get_database("default")
     #     db_obj.drop_table("test_valid_option", ConflictType.Ignore)
 
-    #     db_obj.create_table("test_valid_option", {"c1": types}, ConflictType.Error)
+        db_obj.create_table("test_valid_option", {"c1": types}, ConflictType.Error)
+
+        res = db_obj.drop_table("test_valid_option", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     #     # disconnect
     #     res = infinity_obj.disconnect()
@@ -737,7 +748,8 @@ class TestTable:
         db_obj.drop_table("test_drop_option", ConflictType.Ignore)
 
         db_obj.create_table("test_drop_option", {"c1": types}, ConflictType.Error)
-        db_obj.drop_table("test_drop_option", ConflictType.Error)
+        res = db_obj.drop_table("test_drop_option", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -753,6 +765,9 @@ class TestTable:
         db_obj.create_table("test_create_same_name", {"c1": "int"}, ConflictType.Error)
         with pytest.raises(Exception, match="ERROR:3017*"):
             db_obj.create_table("test_create_same_name", {"c1": "int"}, ConflictType.Error)
+
+        res = db_obj.drop_table("test_create_same_name", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -778,6 +793,9 @@ class TestTable:
         db_obj.create_table("test_same_column_name", {"c1": "int",
                                                       "c1": "int"}, ConflictType.Error)
 
+        res = db_obj.drop_table("test_same_column_name", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
@@ -800,6 +818,9 @@ class TestTable:
         values = {"c" + str(i): types for i in column_number}
         db_obj.create_table("test_column_numbers", values, ConflictType.Error)
 
+        res = db_obj.drop_table("test_column_numbers", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("conflict_type", [ConflictType.Error,
                                                ConflictType.Ignore,
                                                ConflictType.Replace,
@@ -809,9 +830,10 @@ class TestTable:
                                                ])
     def test_table_create_valid_option(self, get_infinity_db, conflict_type):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_table_create_option", ConflictType.Ignore)
-        db_obj.create_table("test_various_table_create_option", {"c1": "int"}, conflict_type)
-
+        db_obj.drop_table("test_table_create_valid_option", ConflictType.Ignore)
+        db_obj.create_table("test_table_create_valid_option", {"c1": "int"}, conflict_type)
+        res = db_obj.drop_table("test_table_create_valid_option", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
                                                pytest.param("#@$@!%string"),
@@ -833,8 +855,8 @@ class TestTable:
                               ])
     def test_table_drop_valid_option(self, get_infinity_db, conflict_type):
         db_obj = get_infinity_db
-        db_obj.create_table("test_various_table_drop_option", {"c1": "int"}, ConflictType.Ignore)
-        db_obj.drop_table("test_various_table_drop_option", conflict_type)
+        db_obj.create_table("test_table_drop_valid_option", {"c1": "int"}, ConflictType.Ignore)
+        db_obj.drop_table("test_table_drop_valid_option", conflict_type)
 
     @pytest.mark.parametrize("conflict_type",
                              [pytest.param(ConflictType.Replace),
@@ -851,12 +873,18 @@ class TestTable:
         with pytest.raises(Exception, match=f"ERROR:3066, invalid conflict type"):
             db_obj.drop_table("test_various_table_drop_option", conflict_type)
 
+        res = db_obj.drop_table("test_various_table_drop_option", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_create_duplicated_table_with_ignore_option(self, get_infinity_db):
         db_obj = get_infinity_db
         db_obj.drop_table("test_create_duplicated_table_with_ignore_option", ConflictType.Ignore)
 
         for i in range(100):
             db_obj.create_table("test_create_duplicated_table_with_ignore_option", {"c1": "int"}, ConflictType.Ignore)
+
+        res = db_obj.drop_table("test_create_duplicated_table_with_ignore_option", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def test_create_duplicated_table_with_error_option(self, get_infinity_db):
         db_obj = get_infinity_db
@@ -866,10 +894,17 @@ class TestTable:
             for i in range(100):
                 db_obj.create_table("test_create_duplicated_table_with_error_option", {"c1": "int"}, ConflictType.Error)
 
+        res = db_obj.drop_table("test_create_duplicated_table_with_error_option", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_create_duplicated_table_with_replace_option(self, get_infinity_db):
         db_obj = get_infinity_db
         db_obj.drop_table("test_create_duplicated_table_with_replace_option", ConflictType.Ignore)
 
         with pytest.raises(Exception, match="ERROR:3017*"):
             for i in range(100):
-                db_obj.create_table("test_create_duplicated_table_with_replace_option", {"c" + str(i): "int"}, ConflictType.Replace)
+                db_obj.create_table("test_create_duplicated_table_with_replace_option", {"c" + str(i): "int"},
+                                    ConflictType.Replace)
+
+        res = db_obj.drop_table("test_create_duplicated_table_with_replace_option", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

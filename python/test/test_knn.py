@@ -22,9 +22,10 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
 from utils import copy_data, generate_commas_enwiki
+from sdktestbase import SDKTest
 
 
-class TestKnn:
+class TestKnn(SDKTest):
 
     def test_version(self):
         print(infinity.__version__)

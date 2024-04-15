@@ -16,9 +16,10 @@ import polars as pl
 from common import common_values
 from infinity.common import ConflictType
 import infinity
+from sdktestbase import SDKTest
 
 
-class TestDescribe:
+class TestDescribe(SDKTest):
 
     def test_show_table(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)

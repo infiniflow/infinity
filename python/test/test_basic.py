@@ -23,11 +23,12 @@ import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import copy_data
+from sdktestbase import SDKTest
 
 test_csv_file = "embedding_int_dim3.csv"
 
 
-class TestCase:
+class TestCase(SDKTest):
     def test_version(self):
         print(infinity.__version__)
 

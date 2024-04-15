@@ -1375,6 +1375,7 @@ public:
         auto database_name = request->getPathVariable("database_name");
         auto table_name = request->getPathVariable("table_name");
         auto index_name = request->getPathVariable("index_name");
+
         auto result = infinity->DropIndex(database_name, table_name, index_name, DropIndexOptions());
 
         nlohmann::json json_response;

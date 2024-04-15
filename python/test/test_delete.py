@@ -22,9 +22,10 @@ import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import trace_expected_exceptions
+from sdktestbase import SDKTest
 
 
-class TestDelete:
+class TestDelete(SDKTest):
 
     def test_version(self):
         print(infinity.__version__)

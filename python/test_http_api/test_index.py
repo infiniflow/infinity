@@ -578,41 +578,12 @@ class TestIndex(HttpTest):
         })
         return
     
-    #ERROR
+    #ERROR update error
     @pytest.mark.skip
     @pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
     def test_create_index_on_update_table(self):
         dbname = "default"
-        tbname = " test_create_index_on_update_table"
-        idxname = "my_index"
-        self.showdb(dbname)
-        self.dropTable(dbname,tbname)
-        self.createTable(dbname,tbname,{
-            "c1":{
-                "type":"vector",
-                "dimension":128,
-                "element_type":"float"
-            },
-            "c2":{
-                "type":"integer",
-            }
-        })
-        embedding_data = [i for i in range(128)]
-        value = [{"c1": embedding_data, "c2": i} for i in range(10)]
-        self.insert(dbname,tbname,value)
-
-        embedding_data = [i + 0.1 * i for i in range(128)]
-        value = [{"c1": embedding_data} for _ in range(10)]
-        for i in range(10):
-             self.update(dbname,tbname,{"c1":embedding_data},"c2 = "+str(i))
-        self.dropTable(dbname,tbname)
-
-        self.select(dbname,tbname,["c1","c2"])
-        return
-    
-    def test_create_index_with_various_options(self):
-        dbname = "default"
-        tbname = " test_create_index_with_various_options"
+        tbname = "test_create_index_on_update_table"
         idxname = "my_index"
         self.showdb(dbname)
         self.dropTable(dbname,tbname)
@@ -626,8 +597,40 @@ class TestIndex(HttpTest):
                 "type":"integer",
             }
         })
-        idx_option = ["kError","kIgnore","kReplace"]
+        embedding_data = [float(i) for i in range(4)]
+        for i in range(10):
+            self.insert(dbname,tbname,[{"c1": embedding_data, "c2": i}])
+
+        embedding_data = [(float(i) + 0.1) for i in range(4)]
+        for i in range(10):
+             self.update(dbname,tbname,{"c1":embedding_data},"c2 = "+str(i))
+        self.dropTable(dbname,tbname)
+
+        self.select(dbname,tbname,["c1","c2"],"",{},{},{
+            "status_code":500,
+        })
+        return
+    
+    #PASS
+    def test_create_index_with_valid_options(self):
+        dbname = "default"
+        tbname = "test_create_index_with_valid_options"
+        idxname = "my_index"
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":4,
+                "element_type":"float"
+            },
+            "c2":{
+                "type":"integer",
+            }
+        })
+        idx_option = ["kError","kIgnore"]
         for opt in idx_option:
+
             self.createIdx(dbname,tbname,idxname,["c1"],{
                 "type": "HNSW",
                 "M": "16",
@@ -638,15 +641,317 @@ class TestIndex(HttpTest):
         self.dropIdx(dbname,tbname,idxname)
         self.dropTable(dbname,tbname)
         return
-    def test_create_duplicated_index_with_various_options(self, get_infinity_db, conflict_type):
+    
+    #PASS
+    def test_create_index_with_invalid_options(self):
+        dbname = "default"
+        tbname = "test_create_duplicated_index_with_various_options"
+        idxname = "my_index"
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":4,
+                "element_type":"float"
+            },
+        })
+        idx_option = [1.1,"#@$@!%string",[],{},()]
+        i = 0
+        for opt in idx_option:
+            if i== 0:
+                self.createIdx(dbname,tbname,idxname,["c1"],{
+                        "type": "HNSW",
+                        "M": "16",
+                        "ef_construction": "50",
+                        "ef": "50",
+                        "metric": "l2"
+                },{"error_code":0},opt)
+            else:
+                self.createIdx(dbname,tbname,idxname,["c1"],{
+                        "type": "HNSW",
+                        "M": "16",
+                        "ef_construction": "50",
+                        "ef": "50",
+                        "metric": "l2"
+                },{"status_code":500},opt)
+            i+=1
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
         return
-    def test_show_index(self, get_infinity_db):
+    
+    #PASS
+    def test_create_duplicated_index_with_valid_options(self):
+        dbname = "default"
+        tbname = "test_create_duplicated_index_with_valid_options"
+        idxname = "my_index"
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float"
+            },
+        })
+        for _ in range(10):
+            self.createIdx(dbname,tbname,idxname,["c1"],{
+                "type": "HNSW",
+                "M": "16",
+                "ef_construction": "50",
+                "ef": "50",
+                "metric": "l2"
+            })
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
+        return 
+    
+    #PASS
+    def  test_create_duplicated_index_with_valid_error_options(self):
+        dbname = "default"
+        tbname = "test_create_duplicated_index_with_valid_error_options"
+        idxname = "my_index"
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float"
+            },
+        })
+       
+        self.createIdx(dbname,tbname,idxname,["c1"],{
+                "type": "HNSW",
+                "M": "16",
+                "ef_construction": "50",
+                "ef": "50",
+                "metric": "l2"
+        },{
+            "error_code":0   
+        },"kError")
+
+        self.createIdx(dbname,tbname,idxname,["c1"],{
+                "type": "HNSW",
+                "M": "16",
+                "ef_construction": "50",
+                "ef": "50",
+                "metric": "l2"
+        },{
+            "status_code":500,
+            "error_code":3018  
+        },"kReplace")
+        
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
+        return 
+    #PASS
+    def test_show_index(self):
+        dbname = "default"
+        tbname = "test_show_index"
+        idxname = "my_index"
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float",
+            },
+        })
+        for i in range(5):
+            self.createIdx(dbname,tbname,idxname+str(i),["c1"],{
+                    "type": "HNSW",
+                    "M": "16",
+                    "ef_construction": "50",
+                    "ef": "50",
+                    "metric": "l2"
+            })
+            self.showIdx(dbname,tbname,idxname+str(i),{
+                    "error_code":0,
+            })
+            self.dropIdx(dbname,tbname,idxname+str(i))
+        self.dropTable(dbname,tbname)
         return
-    def test_show_various_name_index(self, get_infinity_db, index_name):
+    #PASS
+    def test_show_valid_name_index(self):
+        dbname = "default"
+        tbname = "test_show_various_name_index"
+        idxname = "my_index"
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float",
+            },
+        })
+        self.createIdx(dbname,tbname,idxname,["c1"],{
+                    "type": "HNSW",
+                    "M": "16",
+                    "ef_construction": "50",
+                    "ef": "50",
+                    "metric": "l2"
+        })
+        self.showIdx(dbname,tbname,idxname,{
+                    "error_code":0,
+        })
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
         return
-    def test_list_index(self, get_infinity_db):
+    #PASS
+    def test_show_invalid_name_index(self):
+        dbname = "default"
+        tbname = "test_show_various_name_index"
+        idxname = "my_idx"
+        idx_name_list =["*Invalid name","not_exist_name",1,1.1,True,[],(),{}]
+
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float",
+            },
+        })
+        
+        self.createIdx(dbname,tbname,idxname,["c1"],{
+                        "type": "HNSW",
+                        "M": "16",
+                        "ef_construction": "50",
+                        "ef": "50",
+                        "metric": "l2"
+        })
+        for name in idx_name_list:
+             self.showIdx(dbname,tbname,name,{
+                    "status_code":500,
+                    "error_code":3023,
+        })
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
+        return 
+    #PASS
+    def test_list_index(self):
+        dbname = "default"
+        tbname = "test_list_index"
+        idxname = "my_idx"
+
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float",
+            },
+        })
+        for i in range(10):
+            self.createIdx(dbname,tbname,idxname+str(i),["c1"],{
+                    "type": "HNSW",
+                    "M": "16",
+                    "ef_construction": "50",
+                    "ef": "50",
+                    "metric": "l2"
+            })
+        self.listIdx(dbname,tbname,{
+            "error_code":0,
+        })
+        for i in range(10):
+            self.dropIdx(dbname,tbname,idxname+str(i))
         return
-    def test_drop_index_with_various_options(self, get_infinity_db, conflict_type):
+    #PASS (drop options dosen't need option: ignore ?)
+    def test_drop_index_with_valid_options(self):
+        dbname = "default"
+        tbname = "test_drop_index_with_valid_options"
+        idxname = "my_idx"
+
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float",
+            },
+        })
+        self.createIdx(dbname,tbname,idxname,["c1"],{
+                    "type": "HNSW",
+                    "M": "16",
+                    "ef_construction": "50",
+                    "ef": "50",
+                    "metric": "l2"
+        })
+        self.dropIdx(dbname,tbname,idxname,{
+            "error_code":0,
+        },"kError")
+        self.dropIdx(dbname,tbname,idxname,{
+            "status_code":500,
+            "error_code":3023,
+        })
         return
-    def test_same_column_with_different_parameters(self, get_infinity_db, index_distance_type):
+    
+    @pytest.mark.skip
+    @pytest.mark.xfail(reason="no apt for dropTable actually")
+    def test_drop_index_with_invalid_options(self):
+        return 
+    
+    #PASS
+    def test_supported_vector_index(self):
+        dbname = "default"
+        tbname = "test_drop_index_with_invalid_options"
+        idxname = "my_idx"
+
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float",
+            },
+        })
+        index_distance_type = ["l2", "ip"]
+        for t in index_distance_type:
+            self.createIdx(dbname,tbname,idxname,["c1"],{
+                        "type": "HNSW",
+                        "M": "16",
+                        "ef_construction": "50",
+                        "ef": "50",
+                        "metric": t 
+            })
+        self.dropIdx(dbname,tbname,idxname)
+        self.dropTable(dbname,tbname)
+        return
+    
+    #PASS
+    def test_unsupported_vector_index(self):
+        dbname = "default"
+        tbname = "test_drop_index_with_invalid_options"
+        idxname = "my_idx"
+
+        self.showdb(dbname)
+        self.dropTable(dbname,tbname)
+        self.createTable(dbname,tbname,{
+            "c1":{
+                "type":"vector",
+                "dimension":1024,
+                "element_type":"float",
+            },
+        })
+        index_distance_type = ["cosine", "hamming"]
+        for t in index_distance_type:
+            self.createIdx(dbname,tbname,idxname,["c1"],{
+                        "type": "HNSW",
+                        "M": "16",
+                        "ef_construction": "50",
+                        "ef": "50",
+                        "metric": t 
+            },{
+                "status_code":500,
+                "error_code":3061,
+            })
+        
+        self.dropTable(dbname,tbname)
         return

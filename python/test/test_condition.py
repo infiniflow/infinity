@@ -15,9 +15,9 @@
 from sqlglot import condition
 
 from infinity.remote_thrift.table import traverse_conditions
+from sdktestbase import SDKTest
 
-
-class TestCondition:
+class TestCondition(SDKTest):
 
     def test_traverse_conditions(self):
         res = (condition("c1 > 1 and c2 < 2 or c3 = 3.3"))

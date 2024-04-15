@@ -228,6 +228,10 @@ class HttpTest:
         ignore = False 
         if opt == "kIgnore":
             ignore = True 
+        elif opt == "kError":
+            ignore = False
+        else:
+            ignore = opt 
         h = self.SetUpHeader(['accept','content-type'],)
         d = self.SetUpData([],{"fields":fields,"index":index,"create_option":{"ignore_if_exists":ignore}})
         r = self.Request(url,"post",h,d)
