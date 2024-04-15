@@ -48,11 +48,9 @@ public:
 
     u64 memory_usage() const { return current_memory_size_.load(); }
 
-    void AddFilePath(const String &path) { file_path_delete_.push_back(path); }
+    void AddPathForDeletions(const String &path) { file_path_delete_.push_back(path); }
 
-    void AddBufferObjPath(const String &path) { obj_path_delete_.push_back(path); }
-
-    void RemoveBufferObjsInBulk(const Vector<String> &paths_to_delete);
+    void AddBufferObjectForDeletion(const String &path) { obj_path_delete_.push_back(path); }
 
     void ExecuteDeletions();
 

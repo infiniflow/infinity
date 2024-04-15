@@ -59,6 +59,8 @@ public:
 
     TxnTimeStamp GetTimestamp();
 
+    TxnTimeStamp GetBeginTimestamp(TransactionID txn_id);
+
     void Invalidate(TxnTimeStamp commit_ts);
 
     void SendToWAL(Txn *txn);
@@ -110,8 +112,6 @@ private:
     bool enable_compaction_{};
 
     u64 sequence_{};
-
-    MultiSet<TxnTimeStamp> TxnTimestampsSet_;
 };
 
 } // namespace infinity

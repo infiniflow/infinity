@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+#include "base64.hpp"
 
 import stl;
 import file_worker;
@@ -20,7 +21,6 @@ import third_party;
 import local_file_system;
 import logger;
 import specific_concurrent_queue;
-
 import infinity_exception;
 import buffer_obj;
 
@@ -83,22 +83,19 @@ void BufferManager::RemoveBufferObj(const String &file_path) {
     LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
 }
 
-void BufferManager::RemoveBufferObjsInBulk(const Vector<String> &paths_to_delete) {
-    std::unique_lock<std::mutex> lock(w_locker_);
+void BufferManager::ExecuteDeletions() {
+    FileWorker::BulkCleanup(file_path_delete_);
+    // remove buffer objects in bulk
     deprecated_array_.clear();
 
-    for (unsigned long i = 0; i < paths_to_delete.size(); i++) {
-        const auto &file_path = paths_to_delete[i];
+    for (size_t i = 0; i < obj_path_delete_.size(); i++) {
+        const auto &file_path = obj_path_delete_[i];
         LOG_TRACE(fmt::format("Erasing buffer object: {}", file_path));
         deprecated_array_.emplace_back(buffer_map_[file_path]);
         buffer_map_.erase(file_path);
         LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
     }
-}
-
-void BufferManager::ExecuteDeletions() {
-    FileWorker::CleanupFilesInBulk(file_path_delete_);
-    RemoveBufferObjsInBulk(obj_path_delete_);
+    // clear
     file_path_delete_.clear();
     obj_path_delete_.clear();
 }

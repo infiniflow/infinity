@@ -188,7 +188,7 @@ void BufferObj::SetAndTryCleanup() {
                 UnrecoverableError("Assert: unloaded buffer object should in gc_queue.");
             }
             String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
-            buffer_mgr_->AddFilePath(file_path);
+            buffer_mgr_->AddPathForDeletions(file_path);
             status_ = BufferStatus::kClean;
             break;
         }
@@ -200,9 +200,9 @@ void BufferObj::SetAndTryCleanup() {
             LOG_TRACE(fmt::format("Remove file: {}", file_name));
 
             String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
-            buffer_mgr_->AddFilePath(file_path);
+            buffer_mgr_->AddPathForDeletions(file_path);
             LOG_TRACE(fmt::format("Add the file to be deleted from buffer: {}", file_name));
-            buffer_mgr_->AddBufferObjPath(file_name);
+            buffer_mgr_->AddBufferObjectForDeletion(file_name);
             LOG_TRACE(fmt::format("Add the file and buffer to be deleted: {}", file_name));
             break;
         }
