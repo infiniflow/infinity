@@ -63,8 +63,13 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     UniquePtr<FileHandler> file_handler = file_system_->OpenFile(column_length_file_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
     SizeT file_size = file_system_->GetFileSize(*file_handler);
     assert(file_size % sizeof(u32) == 0);
-    column_lengths_.resize(file_size / sizeof(u32));
-    i64 read_count = file_system_->Read(*file_handler, &column_lengths_[0], file_size);
+    u32 new_size = file_size / sizeof(u32);
+    if (new_size > column_lengths_capacity_) {
+        column_lengths_capacity_ = 2 * new_size;
+        column_lengths_ = MakeUniqueForOverwrite<u32[]>(column_lengths_capacity_);
+    }
+    column_lengths_size_ = new_size;
+    i64 read_count = file_system_->Read(*file_handler, column_lengths_.get(), file_size);
     file_handler->Close();
     if (read_count != i64(file_size)) {
         UnrecoverableError("SeekFile: read_count != file_size");
