@@ -40,7 +40,7 @@ class TestDelete(HttpTest):
         self.dropTable(dbname,tbname)
         return 
     
-    #PASS  error: delete empty table without any error resp
+    #PASS 
     def test_delete_empty_table(self):
         dbname = "default"
         tbname = "test_delete_empty_table"

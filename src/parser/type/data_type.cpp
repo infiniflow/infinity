@@ -326,8 +326,6 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
     }else{
         return nullptr;
     }
-    
-    //const LogicalType logical_type = Str2LogicalType(type);
 
     std::shared_ptr<TypeInfo> type_info{nullptr};
     switch (logical_type) {
@@ -341,25 +339,31 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             break;
         }
         case LogicalType::kEmbedding: {
+            if (data_type_json.contains("type")) {
 
-            
+                std::string etype = data_type_json["element_type"];
+                int dimension = data_type_json["dimension"];
+                EmbeddingDataType e_data_type;
+                if (etype == "integer") {
+                    e_data_type = EmbeddingDataType::kElemInt32;
+                } else if (etype == "float") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    e_data_type = EmbeddingDataType::kElemInvalid;
+                }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                break;
 
-            std::string etype = data_type_json["element_type"];
-            int  dimension = data_type_json["dimension"];
+            } else if (data_type_json.contains("data_type")) {
 
-            EmbeddingDataType e_data_type;
-            if (etype == "integer") {
-                e_data_type = EmbeddingDataType::kElemInt32;
-            } else if (etype == "float") {
-                e_data_type = EmbeddingDataType::kElemFloat;
-            } else if (etype == "double") {
-                e_data_type = EmbeddingDataType::kElemDouble;
+                type_info = EmbeddingInfo::Make(data_type_json["embedding_type"], data_type_json["dimension"]);
+                break;
+
             } else {
-                e_data_type = EmbeddingDataType::kElemInvalid;
+                return nullptr;
             }
-
-            type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
-            break;
         }
         default:
             // There's no type_info for other types
