@@ -56,7 +56,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         KnnExpr *knn_expr{nullptr};
         MatchExpr *match_expr{nullptr};
         // SearchExpr *search_expr = new SearchExpr();
-        SearchExpr *search_expr(nullptr);
+        SearchExpr *search_expr{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
