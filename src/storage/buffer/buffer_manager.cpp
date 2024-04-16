@@ -13,7 +13,6 @@
 // limitations under the License.
 
 module;
-#include "base64.hpp"
 
 import stl;
 import file_worker;
@@ -83,24 +82,26 @@ void BufferManager::RemoveBufferObj(const String &file_path) {
     LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
 }
 
-void BufferManager::ExecuteDeletions() {
+void BufferManager::RemoveBufferObjects() {
     FileWorker::BulkCleanup(file_path_delete_);
     // remove buffer objects in bulk
     deprecated_array_.clear();
 
-    for (size_t i = 0; i < obj_path_delete_.size(); i++) {
+    for (SizeT i = 0; i < obj_path_delete_.size(); i++) {
         const auto &file_path = obj_path_delete_[i];
         LOG_TRACE(fmt::format("Erasing buffer object: {}", file_path));
         deprecated_array_.emplace_back(buffer_map_[file_path]);
         LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
     }
 
-    std::unique_lock<std::mutex> lock(w_locker_);
-    for (size_t i = 0; i < obj_path_delete_.size(); i++) {
-        const auto &file_path = obj_path_delete_[i];
-        LOG_TRACE(fmt::format("Erasing buffer map: {}", file_path));
-        buffer_map_.erase(file_path);
-        LOG_TRACE(fmt::format("Erased buffer map: {}", file_path));
+    {
+        std::unique_lock<std::mutex> lock(w_locker_);
+        for (SizeT i = 0; i < obj_path_delete_.size(); i++) {
+            const auto &file_path = obj_path_delete_[i];
+            LOG_TRACE(fmt::format("Erasing buffer map: {}", file_path));
+            buffer_map_.erase(file_path);
+            LOG_TRACE(fmt::format("Erased buffer map: {}", file_path));
+        }
     }
 
     // clear
