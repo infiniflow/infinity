@@ -13,6 +13,12 @@ query I
 COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
 
+statement error
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH (analyzer=jieba);
+
+statement error
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH (analyzer=ngram);
+
 statement ok
 CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT;
 

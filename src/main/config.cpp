@@ -237,6 +237,8 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             system_option_.storage_capacity_ = default_storage_capacity;
             system_option_.garbage_collection_interval_ = default_garbage_collection_interval;
             system_option_.garbage_collection_storage_ratio_ = default_garbage_collection_storage_ratio;
+            system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
+            system_option_.enable_compaction_ = default_enable_compaction;
         }
 
         // Buffer
@@ -256,11 +258,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         }
 
         // Resource
-        {
-            system_option_.resource_dict_path_ = default_resource_dict_path;
-            system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
-            system_option_.enable_compaction_ = default_enable_compaction;
-        }
+        { system_option_.resource_dict_path_ = default_resource_dict_path; }
     } else {
         fmt::print("Read config from: {}\n", *config_path);
         toml::table config = toml::parse_file(*config_path);
@@ -423,6 +421,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
             system_option_.garbage_collection_storage_ratio_ =
                 storage_config["garbage_collection_storage_ratio"].value_or(default_garbage_collection_storage_ratio);
+
+            system_option_.cleanup_interval_ = std::chrono::seconds(storage_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
+            system_option_.enable_compaction_ = storage_config["enable_compaction"].value_or(default_enable_compaction);
         }
 
         // Buffer
@@ -467,8 +468,6 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         {
             auto resource_config = config["resource"];
             system_option_.resource_dict_path_ = resource_config["dictionary_dir"].value_or(default_resource_dict_path);
-            system_option_.cleanup_interval_ = std::chrono::seconds(resource_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
-            system_option_.enable_compaction_  = resource_config["enable_compaction"].value_or(default_enable_compaction);
         }
     }
 

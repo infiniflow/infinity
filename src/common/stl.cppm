@@ -182,7 +182,13 @@ export namespace std {
     using std::dynamic_pointer_cast;
 
     namespace filesystem {
-        using std::filesystem::file_size;
+    using std::filesystem::canonical;
+    using std::filesystem::copy;
+    using std::filesystem::exists;
+    using std::filesystem::file_size;
+    using std::filesystem::path;
+    using std::filesystem::remove;
+    using std::filesystem::remove_all;
     }
 
     using std::mt19937;

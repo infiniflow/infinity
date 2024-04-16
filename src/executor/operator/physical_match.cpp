@@ -72,6 +72,9 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
 
 void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_terms) {
     UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
+    if (analyzer.get() == nullptr) {
+        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name)));
+    }
     Term input_term;
     input_term.text_ = std::move(text);
     analyzer->Analyze(input_term, output_terms);
