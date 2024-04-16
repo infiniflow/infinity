@@ -389,6 +389,9 @@ public:
         response.__set_error_code((i64)(ErrorCode::kOk));
         response.__set_can_skip(false);
         LOG_TRACE(fmt::format("Upload file name: {} , index: {}", path.c_str(), request.index));
+
+        // Clean up the directory
+        fs.DeleteFile(path.c_str());
     }
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) final {
