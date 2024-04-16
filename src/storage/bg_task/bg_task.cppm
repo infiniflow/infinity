@@ -19,6 +19,7 @@ import txn;
 import catalog;
 import catalog_delta_entry;
 import cleanup_scanner;
+import buffer_manager;
 
 export module bg_task;
 
@@ -132,7 +133,7 @@ export struct ForceCheckpointTask final : public CheckpointTaskBase {
 export class CleanupTask final : public BGTask {
 public:
     // Try clean up is async task?
-    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
+    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 public:
     ~CleanupTask() override = default;
@@ -140,7 +141,7 @@ public:
     String ToString() const override { return "CleanupTask"; }
 
     void Execute() {
-        CleanupScanner scanner(catalog_, visible_ts_);
+        CleanupScanner scanner(catalog_, visible_ts_, buffer_mgr_);
         scanner.Scan();
         // FIXME(sys): This is a blocking call, should it be async?
         std::move(scanner).Cleanup();
@@ -150,6 +151,8 @@ private:
     Catalog *const catalog_;
 
     const TxnTimeStamp visible_ts_;
+
+    BufferManager *buffer_mgr_;
 };
 
 } // namespace infinity
