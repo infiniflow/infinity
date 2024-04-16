@@ -118,6 +118,9 @@ class TestKnn(TestSdk):
                            "query_price": 1.0
                            }])
 
+        res = db_obj.drop_table("test_insert_multi_column", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
