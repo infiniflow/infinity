@@ -45,7 +45,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
 
     switch (expression->type()) {
         case ExpressionType::kAggregate:
-            return CreateState(static_pointer_cast<AggregateExpression>(expression), agg_state);
+            return CreateState(static_pointer_cast<AggregateExpression>(expression), agg_state, AggregateFlag::kUninitialized);
         case ExpressionType::kCast:
             return CreateState(static_pointer_cast<CastExpression>(expression));
         case ExpressionType::kCase:
@@ -68,13 +68,14 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
     return nullptr;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state) {
+SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
     if (agg_expr->arguments().size() != 1) {
         RecoverableError(Status::FunctionArgsError(agg_expr->ToString()));
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->agg_state_ = agg_state;
+    result->agg_flag_ = agg_flag;
     result->AddChild(agg_expr->arguments()[0]);
 
     // Aggregate function will only have one output value.

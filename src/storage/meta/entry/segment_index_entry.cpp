@@ -219,7 +219,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
             if (memory_indexer_.get() == nullptr) {
-                String base_name = fmt::format("ft_{}", begin_row_id.ToUint64());
+                String base_name = fmt::format("ft_{:016x}", begin_row_id.ToUint64());
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
                                                             base_name,
@@ -357,7 +357,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
             u32 seg_id = segment_entry->segment_id();
             RowID base_row_id(seg_id, 0);
-            String base_name = fmt::format("ft_{}", base_row_id.ToUint64());
+            String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
             memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
                                                         base_name,
                                                         base_row_id,
