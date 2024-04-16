@@ -53,11 +53,19 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kFreed: {
             buffer_mgr_->RequestSpace(GetBufferSize(), this);
-            file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
+            bool load_success = true;
+            try {
+                file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
+            } catch (const UnrecoverableException &e) {
+                load_success = false;
+            }
             if (type_ == BufferType::kEphemeral) {
                 type_ = BufferType::kTemp;
             }
-            break;
+            if (load_success) {
+                break;
+            }
+            type_ = BufferType::kEphemeral;
         }
         case BufferStatus::kNew: {
             LOG_TRACE(fmt::format("Request memory {}", GetBufferSize()));
