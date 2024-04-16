@@ -86,18 +86,18 @@ class TestImport:
             if not check_data:
                 generate_fvecs(100, 128, "pysdk_test.fvecs")
                 copy_data("pysdk_test.fvecs")
-            db_obj.drop_table("test_import_different_file_format_data_fvecs")
-            table_obj = db_obj.create_table("test_import_different_file_format_data_fvecs",
+            db_obj.drop_table("test_import_different_file_format_data")
+            table_obj = db_obj.create_table("test_import_different_file_format_data",
                                             {"c1": "vector,128,float"}, ConflictType.Error)
             table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test.fvecs", {"file_type": file_format})
             res = table_obj.output(["*"]).to_df()
             print(res)
-
-        print(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
-        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
-                              {"file_type": file_format})
-        res = table_obj.output(["*"]).to_df()
-        print(res)
+        else:
+            print(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+            table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
+                                  {"file_type": file_format})
+            res = table_obj.output(["*"]).to_df()
+            print(res)
 
         db_obj.drop_table("test_import_different_file_format_data_fvecs", ConflictType.Error)
 
