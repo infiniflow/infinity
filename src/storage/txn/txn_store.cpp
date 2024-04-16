@@ -332,11 +332,7 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
 
 void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace_back(segment_entry); }
 
-void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
-                               bool enable_compaction,
-                               BGTaskProcessor *bg_task_processor,
-                               TxnManager *txn_mgr,
-                               TxnTimeStamp commit_ts) const {
+void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts) const {
     local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
 
     Vector<Pair<TableIndexEntry *, int>> txn_indexes_vec(txn_indexes_.begin(), txn_indexes_.end());
@@ -369,9 +365,6 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
     }
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
         compact_state_.AddDeltaOp(local_delta_ops, commit_ts);
-    }
-    if (enable_compaction) {
-        this->TryTriggerCompaction(bg_task_processor, txn_mgr);
     }
 }
 
@@ -414,7 +407,7 @@ TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
     return iter->second.get();
 }
 
-void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const {
+void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr) const {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     Vector<Pair<DBEntry *, int>> txn_dbs_vec(txn_dbs_.begin(), txn_dbs_.end());
     std::sort(txn_dbs_vec.begin(), txn_dbs_vec.end(), [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
@@ -427,9 +420,19 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, BGTaskProcessor *b
     for (auto [table_entry, ptr_seq_n] : txn_tables_vec) {
         local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry, commit_ts));
     }
-    bool enable_compaction = txn_->txn_mgr()->enable_compaction();
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->AddDeltaOp(local_delta_ops, enable_compaction, bg_task_processor, txn_mgr, commit_ts);
+        table_store->AddDeltaOp(local_delta_ops, txn_mgr, commit_ts);
+    }
+}
+
+void TxnStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor) const {
+    TxnManager *txn_mgr = txn_->txn_mgr();
+    bool enable_compaction = txn_mgr->enable_compaction();
+    if (!enable_compaction) {
+        return;
+    }
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->TryTriggerCompaction(bg_task_processor, txn_mgr);
     }
 }
 
@@ -448,7 +451,7 @@ void TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, Buffe
     }
 }
 
-void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {
+void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
     // Commit the prepared data
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         table_store->Commit(txn_id, commit_ts);

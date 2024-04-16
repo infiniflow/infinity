@@ -393,16 +393,16 @@ void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
 
 WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 
-//void Txn::Begin() {
-//    TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
-//    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
-//    txn_context_.SetTxnBegin(ts);
-//}
+// void Txn::Begin() {
+//     TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
+//     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+//     txn_context_.SetTxnBegin(ts);
+// }
 
-//void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
-//    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
-//    txn_context_.SetTxnBegin(begin_ts);
-//}
+// void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
+//     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
+//     txn_context_.SetTxnBegin(begin_ts);
+// }
 
 TxnTimeStamp Txn::Commit() {
     //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
@@ -458,9 +458,7 @@ void Txn::CommitBottom() {
 
         txn_context_.SetTxnCommitted();
 
-        txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
-
-        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
+        txn_store_.CommitBottom(txn_id_, commit_ts);
 
         if (!local_catalog_delta_ops_entry_->operations().empty()) {
             local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
@@ -473,6 +471,11 @@ void Txn::CommitBottom() {
     done_bottom_ = true;
     cond_var_.notify_one();
     LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_id_));
+
+    if (txn_context_.GetTxnState() != TxnState::kToRollback) {
+        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
+        txn_store_.TryTriggerCompaction(bg_task_processor_);
+    }
 }
 
 void Txn::CancelCommitBottom() {
