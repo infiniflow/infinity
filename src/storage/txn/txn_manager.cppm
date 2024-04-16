@@ -45,6 +45,8 @@ public:
 
     Txn *GetTxn(TransactionID txn_id);
 
+    SharedPtr<Txn> GetTxnPtr(TransactionID txn_id);
+
     TxnState GetTxnState(TransactionID txn_id);
 
     inline void Lock() { rw_locker_.lock(); }

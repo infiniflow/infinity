@@ -37,42 +37,18 @@ BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, Catalog *catalog) : wa
 void BGTaskProcessor::Start() {
     processor_thread_ = Thread([this] { Process(); });
     LOG_INFO("Background processor is started.");
-
-    compact_thread_ = Thread([this] { CompactProcess(); });
-    LOG_INFO("Compact processor is started.");
 }
 
 void BGTaskProcessor::Stop() {
-    {
-        LOG_INFO("Compact processor is stopping.");
-        SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
-        compact_queue_.Enqueue(stop_task);
-        stop_task->Wait();
-        compact_thread_.join();
-        LOG_INFO("Compact processor is stopped.");
-    }
-    {
-        LOG_INFO("Background processor is stopping.");
-        SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
-        task_queue_.Enqueue(stop_task);
-        stop_task->Wait();
-        processor_thread_.join();
-        LOG_INFO("Background processor is stopped.");
-    }
+    LOG_INFO("Background processor is stopping.");
+    SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
+    task_queue_.Enqueue(stop_task);
+    stop_task->Wait();
+    processor_thread_.join();
+    LOG_INFO("Background processor is stopped.");
 }
 
-void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) {
-    switch (bg_task->type_) {
-        case BGTaskType::kCompactSegments: {
-            compact_queue_.Enqueue(std::move(bg_task));
-            break;
-        }
-        default: {
-            task_queue_.Enqueue(std::move(bg_task));
-            break;
-        }
-    }
-}
+void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
 void BGTaskProcessor::Process() {
     bool running{true};
@@ -122,30 +98,6 @@ void BGTaskProcessor::Process() {
                     LOG_INFO("Update segment bloom filter done");
                     break;
                 }
-                default: {
-                    UnrecoverableError("Invalid background task");
-                    break;
-                }
-            }
-
-            bg_task->Complete();
-        }
-        tasks.clear();
-    }
-}
-
-void BGTaskProcessor::CompactProcess() {
-    bool running{true};
-    Deque<SharedPtr<BGTask>> bg_tasks;
-    while (running) {
-        compact_queue_.DequeueBulk(bg_tasks);
-        for (const auto &bg_task : bg_tasks) {
-            switch (bg_task->type_) {
-                case BGTaskType::kStopProcessor: {
-                    LOG_INFO("Stop the background processor");
-                    running = false;
-                    break;
-                }
                 case BGTaskType::kCompactSegments: {
                     LOG_INFO("Compact segments in background");
                     auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
@@ -163,9 +115,10 @@ void BGTaskProcessor::CompactProcess() {
                     break;
                 }
             }
+
             bg_task->Complete();
         }
-        bg_tasks.clear();
+        tasks.clear();
     }
 }
 

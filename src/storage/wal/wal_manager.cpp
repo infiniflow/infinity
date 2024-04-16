@@ -156,7 +156,7 @@ void WalManager::Flush() {
         // auto [max_commit_ts, wal_size] = GetWalState();
         TxnManager *txn_mgr = storage_->txn_manager();
 
-        Vector<Txn *> txns;
+        Vector<SharedPtr<Txn>> txns;
         for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry == nullptr) {
@@ -168,7 +168,7 @@ void WalManager::Flush() {
                 UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
 
-            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
+            SharedPtr<Txn> txn = txn_mgr->GetTxnPtr(entry->txn_id_);
             // Commit sequentially so they get visible in the same order with wal.
             bool conflict = txn->CheckConflict();
             txns.push_back(txn);
@@ -214,7 +214,7 @@ void WalManager::Flush() {
 
         log_batch.clear();
 
-        for (Txn *txn : txns) {
+        for (auto txn : txns) {
             txn->CommitBottom();
         }
 
