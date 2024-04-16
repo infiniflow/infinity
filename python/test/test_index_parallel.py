@@ -18,7 +18,7 @@ TEST_DATA_DIR = "/test/data/"
 class TestIndexParallel(TestSdk):
 
     @pytest.mark.parametrize("file_format", ["csv"])
-    @pytest.mark.skip(reason="segfault")
+    @pytest.mark.skip(reason="deadlock caused by compaction")
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
         def write_worker(connection_pool: ConnectionPool, data, file_path, end_time, thread_id):
@@ -84,14 +84,14 @@ class TestIndexParallel(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         kInsertThreadNum = 4
-        kRuningTime = 10
+        kRuningTime = 60
         threads = []
         end_time = time.time()+kRuningTime
         for i in range(kInsertThreadNum):
             threads.append(Thread(target=write_worker, args=[
                            connection_pool, data, file_path, end_time, i]))
-        # threads.append(Thread(target=read_worker, args=[
-        #                connection_pool, end_time]))
+        threads.append(Thread(target=read_worker, args=[
+                       connection_pool, end_time]))
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):

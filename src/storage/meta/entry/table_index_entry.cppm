@@ -90,7 +90,7 @@ public:
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot();
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot(const TableEntry *table_entry, TxnTimeStamp begin_ts);
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     String GetPathNameTail() const;
     bool GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry);
