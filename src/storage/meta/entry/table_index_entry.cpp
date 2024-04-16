@@ -93,10 +93,13 @@ SharedPtr<TableIndexEntry> TableIndexEntry::ReplayTableIndexEntry(TableIndexMeta
     return table_index_entry;
 }
 
-Map<SegmentID, SharedPtr<SegmentIndexEntry>> TableIndexEntry::GetIndexBySegmentSnapshot() {
+Map<SegmentID, SharedPtr<SegmentIndexEntry>> TableIndexEntry::GetIndexBySegmentSnapshot(const TableEntry *table_entry, TxnTimeStamp begin_ts) {
     std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_snapshot;
     for (const auto &[segment_id, segment_index_entry] : this->index_by_segment_) {
+        bool visible = table_entry->CheckVisible(segment_id, begin_ts);
+        if (!visible)
+            continue;
         index_by_segment_snapshot.emplace(segment_id, segment_index_entry);
     }
     return index_by_segment_snapshot;
@@ -273,7 +276,7 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
         // TODO
         RecoverableError(Status::NotSupport("Not implemented"));
     }
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = GetIndexBySegmentSnapshot();
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = GetIndexBySegmentSnapshot(table_entry, MAX_TIMESTAMP);
     for (auto &[segment_id, segment_index_entry] : index_by_segment) {
         atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
         auto status = segment_index_entry->CreateIndexDo(create_index_idx);

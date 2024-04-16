@@ -88,8 +88,8 @@ class TestIndexParallel:
         for i in range(kInsertThreadNum):
             threads.append(Thread(target=write_worker, args=[
                            connection_pool, data, file_path, end_time, i]))
-        # threads.append(Thread(target=read_worker, args=[
-        #                connection_pool, end_time]))
+        threads.append(Thread(target=read_worker, args=[
+                       connection_pool, end_time]))
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):

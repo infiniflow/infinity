@@ -440,6 +440,23 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         }
     }
 
+    // Update fulltext ts so that TableIndexReaderCache::GetIndexReader will update the cache
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, commit_ts);
+        if (!status.ok())
+            continue;
+        const IndexBase *index_base = table_index_entry->index_base();
+        switch (index_base->index_type_) {
+            case IndexType::kFullText: {
+                table_index_entry->UpdateFulltextSegmentTs(commit_ts);
+                break;
+            }
+            default: {
+            }
+        }
+    }
+
     if (compaction_alg_.get() == nullptr) {
         return Status::OK();
     }
@@ -740,7 +757,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 base_rowids.push_back(chunk_index_entry->base_rowid_);
                 total_row_count += chunk_index_entry->row_count_;
             }
-            String dst_base_name = fmt::format("ft_{}_{}", base_rowid.ToUint64(), total_row_count);
+            String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
             ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
                                                   index_fulltext->flag_,
                                                   &table_index_entry->GetFulltextByteSlicePool(),
@@ -812,6 +829,16 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     }
 
     return result;
+}
+
+bool TableEntry::CheckVisible(SegmentID segment_id, TxnTimeStamp begin_ts) const {
+    std::shared_lock lock(this->rw_locker_);
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
+        return false;
+    }
+    const auto &segment = iter->second;
+    return segment->CheckVisible(begin_ts);
 }
 
 nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
