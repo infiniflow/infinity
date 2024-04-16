@@ -13,7 +13,6 @@
 // limitations under the License.
 
 module;
-#include "base64.hpp"
 
 module file_worker;
 
@@ -106,7 +105,7 @@ void FileWorker::MoveFile() {
 
 void FileWorker::BulkCleanup(const Vector<String> &file_paths) {
     LocalFileSystem fs;
-    for (size_t i = 0; i < file_paths.size(); i++) {
+    for (SizeT i = 0; i < file_paths.size(); i++) {
         const auto &path = file_paths[i];
         if (fs.Exists(path)) {
             LOG_TRACE(fmt::format("Cleaning up file: {}", path));

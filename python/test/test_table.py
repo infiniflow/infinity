@@ -123,7 +123,12 @@ class TestTable(TestSdk):
             "c1": "varchar, primary key", "c2": "float"}, ConflictType.Error)
         assert table_obj
 
-        db_obj.drop_table("test_create_varchar_table")
+        res = db_obj.drop_table("test_create_varchar_table")
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     def test_create_embedding_table(self):
         """
@@ -138,7 +143,12 @@ class TestTable(TestSdk):
             "c1": "vector,128,float"}, ConflictType.Error)
         assert table_obj
 
-        db_obj.drop_table("test_create_embedding_table")
+        res = db_obj.drop_table("test_create_embedding_table")
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     def test_create_table_with_invalid_column_name(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
