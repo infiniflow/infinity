@@ -47,35 +47,30 @@ BufferObj::~BufferObj() = default;
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
-        case BufferStatus::kLoaded:
+        case BufferStatus::kLoaded: {
+            break;
+        }
         case BufferStatus::kUnloaded: {
+            buffer_mgr_->RemoveFromGCQueue(this);
             break;
         }
         case BufferStatus::kFreed: {
-            buffer_mgr_->RequestSpace(GetBufferSize(), this);
-            bool load_success = true;
+            buffer_mgr_->RequestSpace(GetBufferSize());
             try {
                 file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
             } catch (const UnrecoverableException &e) {
-                load_success = false;
+                file_worker_->AllocateInMemory();
             }
             if (type_ == BufferType::kEphemeral) {
                 type_ = BufferType::kTemp;
             }
-            if (load_success) {
-                break;
-            }
-            type_ = BufferType::kEphemeral;
+            break;
         }
         case BufferStatus::kNew: {
             LOG_TRACE(fmt::format("Request memory {}", GetBufferSize()));
-            buffer_mgr_->RequestSpace(GetBufferSize(), this);
+            buffer_mgr_->RequestSpace(GetBufferSize());
             file_worker_->AllocateInMemory();
             LOG_TRACE(fmt::format("Allocated memory {}", GetBufferSize()));
-            break;
-        }
-        case BufferStatus::kClean: {
-            UnrecoverableError("Calling with invalid status: clean");
             break;
         }
     }
@@ -104,10 +99,7 @@ void BufferObj::UnloadInner() {
         case BufferStatus::kLoaded: {
             --rc_;
             if (rc_ == 0) {
-                if (!wait_for_gc_) {
-                    buffer_mgr_->PushGCQueue(this);
-                    wait_for_gc_ = true;
-                }
+                buffer_mgr_->PushGCQueue(this);
                 status_ = BufferStatus::kUnloaded;
             }
             break;
@@ -119,48 +111,61 @@ void BufferObj::UnloadInner() {
     }
 }
 
-bool BufferObj::Free() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    switch (status_) {
-        case BufferStatus::kFreed:
-        case BufferStatus::kLoaded: {
-            // loaded again after free, do nothing.
-            // Or has been freed in fronter of the queue.
-            return false;
-        }
-        case BufferStatus::kUnloaded: {
-            switch (type_) {
-                case BufferType::kTemp:
-                case BufferType::kPersistent: {
-                    // do nothing
-                    break;
-                }
-                case BufferType::kEphemeral: {
-                    file_worker_->WriteToFile(true);
-                    break;
-                }
-            }
-            file_worker_->FreeInMemory();
-            wait_for_gc_ = false;
-            status_ = BufferStatus::kFreed;
+void BufferObj::Free() {
+    // no lock is needed because already in gc_queue
+    if (status_ != BufferStatus::kUnloaded) {
+        UnrecoverableError("Invalid call.");
+    }
+    switch (type_) {
+        case BufferType::kTemp:
+        case BufferType::kPersistent: {
+            // do nothing
             break;
         }
-        case BufferStatus::kClean: {
-            file_worker_->FreeInMemory();
-            LOG_TRACE(fmt::format("Remove buffer object: {}", this->GetFilename()));
-            buffer_mgr_->RemoveBufferObj(this->GetFilename());
+        case BufferType::kEphemeral: {
+            file_worker_->WriteToFile(true);
             break;
-        }
-        case BufferStatus::kNew: {
-            UnrecoverableError("Invalid call.");
         }
     }
-    return true;
+    file_worker_->FreeInMemory();
+    status_ = BufferStatus::kFreed;
+
+    // std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    // switch (status_) {
+    //     case BufferStatus::kFreed: {
+    //         UnrecoverableError("Invalid call.");
+    //     }
+    //     case BufferStatus::kLoaded: {
+    //         // loaded again after free, do nothing.
+    //         // Or has been freed in fronter of the queue.
+    //         return false;
+    //     }
+    //     case BufferStatus::kUnloaded: {
+    //         switch (type_) {
+    //             case BufferType::kTemp:
+    //             case BufferType::kPersistent: {
+    //                 // do nothing
+    //                 break;
+    //             }
+    //             case BufferType::kEphemeral: {
+    //                 file_worker_->WriteToFile(true);
+    //                 break;
+    //             }
+    //         }
+    //         file_worker_->FreeInMemory();
+    //         status_ = BufferStatus::kFreed;
+    //         break;
+    //     }
+    //     case BufferStatus::kNew: {
+    //         UnrecoverableError("Invalid call.");
+    //     }
+    // }
+    // return true;
 }
 
 bool BufferObj::Save() {
     bool write = false;
-    rw_locker_.lock(); // This lock will be released on return if not write, otherwise released by CloseFile()
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     if (type_ != BufferType::kPersistent) {
         switch (status_) {
             case BufferStatus::kLoaded:
@@ -187,40 +192,20 @@ bool BufferObj::Save() {
         file_worker_->Sync();
         file_worker_->CloseFile();
     }
-    rw_locker_.unlock();
     return write;
 }
 
-void BufferObj::SetAndTryCleanup() {
+void BufferObj::Cleanup() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
         case BufferStatus::kNew: {
             // when insert data into table with index, the index buffer_obj
             // will remain BufferStatus::kNew, so we should allow this situation
-            status_ = BufferStatus::kClean;
             break;
         }
-        case BufferStatus::kUnloaded: {
-            if (!wait_for_gc_) {
-                UnrecoverableError("Assert: unloaded buffer object should in gc_queue.");
-            }
-            String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
-            buffer_mgr_->AddPathForDeletions(file_path);
-            status_ = BufferStatus::kClean;
-            break;
-        }
+        case BufferStatus::kUnloaded:
         case BufferStatus::kFreed: {
-            if (wait_for_gc_) {
-                UnrecoverableError("Assert: freed buffer object shouldn't in gc_queue.");
-            }
-            String file_name = this->GetFilename();
-            LOG_TRACE(fmt::format("Remove file: {}", file_name));
-
-            String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
-            buffer_mgr_->AddPathForDeletions(file_path);
-            LOG_TRACE(fmt::format("Add the file to be deleted from buffer: {}", file_name));
-            buffer_mgr_->AddBufferObjectForDeletion(file_name);
-            LOG_TRACE(fmt::format("Add the file and buffer to be deleted: {}", file_name));
+            buffer_mgr_->RemoveBufferObj(this);
             break;
         }
         default: {
@@ -238,25 +223,19 @@ void BufferObj::CheckState() const {
             break;
         }
         case BufferStatus::kUnloaded: {
-            if (rc_ > 0 || !wait_for_gc_) {
+            if (rc_ > 0) {
                 UnrecoverableError("Invalid status.");
             }
             break;
         }
         case BufferStatus::kFreed: {
-            if (rc_ > 0 || wait_for_gc_) {
+            if (rc_ > 0) {
                 UnrecoverableError("Invalid status.");
             }
             break;
         }
         case BufferStatus::kNew: {
-            if (type_ != BufferType::kEphemeral || rc_ > 0 || wait_for_gc_) {
-                UnrecoverableError("Invalid status.");
-            }
-            break;
-        }
-        case BufferStatus::kClean: {
-            if (rc_ > 0 || !wait_for_gc_) {
+            if (type_ != BufferType::kEphemeral || rc_ > 0) {
                 UnrecoverableError("Invalid status.");
             }
             break;
