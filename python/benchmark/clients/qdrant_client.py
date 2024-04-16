@@ -12,6 +12,7 @@ from qdrant_client.models import VectorParams, Distance
 import os
 import time
 import json
+import h5py
 from typing import Any, List, Optional
 
 from base_client import BaseClient, FieldValue
@@ -29,6 +30,20 @@ class QdrantClient(BaseClient):
             self.distance = Distance.COSINE
         elif self.data['distance'] == 'L2':
             self.distance = Distance.EUCLID
+    
+    def upload_bach(self, ids: list[int], vectors, payloads = None):
+        self.client.upsert(
+            collection_name=self.collection_name,
+            points=models.Batch(
+                ids=ids,
+                vectors=vectors,
+                payloads=payloads
+            ),
+            wait=True
+        )
+
+    def upload(self):
+        # get the dataset (downloading is completed in run.py)
         if 'vector_index' in self.data:
             index_config = self.data['vector_index']
             if index_config['type'] == "HNSW":
@@ -49,7 +64,6 @@ class QdrantClient(BaseClient):
                                             size=self.data['vector_size'],
                                             distance=self.distance),
                                             hnsw_config=hnsw_config)
-
         # set payload index
         if 'payload_index_schema' in self.data:
             for field_name, field_schema in self.data['payload_index_schema'].items():
@@ -70,53 +84,45 @@ class QdrantClient(BaseClient):
                 self.client.create_payload_index(collection_name=self.collection_name,
                                                 field_name=field_name,
                                                 field_schema=field_schema)
-    
-    def upload_bach(self, ids: list[int], vectors, payloads):
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=models.Batch(
-                ids=ids,
-                vectors=vectors,
-                payloads=payloads
-            ),
-            wait=True
-        )
-
-    def upload(self):
-        # get the dataset (downloading is completed in run.py)
-        dataset_path = "/home/infinity/yj/codes/infinity/python/benchmark/datasets/dbpedia/dbpedia.json"
+        dataset_path = os.path.abspath(self.data['data_path'])
         vector_name = self.data['vector_name']
         batch_size=self.data['insert_batch_size']
         total_time = 0
-        with open(dataset_path, 'r') as f:
-            _, ext = os.path.splitext(dataset_path)
-            if ext == '.json':
-                vectors = []
-                payloads = []
-                for i, line in enumerate(f):
-                    if i > 50000:
-                        break
-                    if i % batch_size == 0 and i > 0:
-                        start_time = time.time()
-                        self.upload_bach(list(range(i-batch_size, i)), vectors, payloads)
-                        end_time = time.time()
-                        total_time += end_time - start_time
-                        # reset vectors and payloads for the next batch
-                        vectors = []
-                        payloads = []
-                    record = json.loads(line)
-                    vectors.append(record[vector_name])
-                    del record[vector_name]
-                    payloads.append(record)
-                if vectors:
-                    start_time = time.time()
-                    self.upload_bach(list(range(i-len(vectors)+1, i+1)), vectors, payloads)
-                    end_time = time.time()
-                    total_time += end_time - start_time
+        _, ext = os.path.splitext(dataset_path)
+        if ext == '.json':
+            with open(dataset_path, 'r') as f:
                     vectors = []
                     payloads = []
-            
-            print(f"Total time for uploading: {total_time:.2f} seconds")
+                    for i, line in enumerate(f):
+                        if i % batch_size == 0 and i > 0:
+                            start_time = time.time()
+                            self.upload_bach(list(range(i-batch_size, i)), vectors, payloads)
+                            end_time = time.time()
+                            total_time += end_time - start_time
+                            # reset vectors and payloads for the next batch
+                            vectors = []
+                            payloads = []
+                        record = json.loads(line)
+                        vectors.append(record[vector_name])
+                        del record[vector_name]
+                        payloads.append(record)
+                    if vectors:
+                        start_time = time.time()
+                        self.upload_bach(list(range(i-len(vectors)+1, i+1)), vectors, payloads)
+                        end_time = time.time()
+                        total_time += end_time - start_time
+                        vectors = []
+                        payloads = []
+        elif ext == '.hdf5':
+            with h5py.File(dataset_path) as f:
+                vectors = []
+                for i, line in enumerate(f['train']):
+                    if i % batch_size == 0 and i != 0:
+                        self.upload_bach(list(range(i-batch_size, i)), vectors)
+                        vectors= []
+                    vectors.append(line)
+                if vectors:
+                    self.upload_bach(list(range(i-len(vectors)+1, i+1)), vectors)
 
     # build filter condition
     def build_condition(
@@ -159,23 +165,39 @@ class QdrantClient(BaseClient):
 
     def search(self) -> list[list[Any]]:
         # get the queries path
-        query_path = "/home/infinity/yj/codes/infinity/python/benchmark/datasets/dbpedia/hybrid_queries.json"
+        query_path = os.path.abspath(self.data['query_path'])
         results = []
-        with open(query_path, 'r') as f:
-            for line in f.readlines():
-                query = json.loads(line)
+        _, ext = os.path.splitext(query_path)
+        if ext == '.json':
+            with open(query_path, 'r') as f:
+                for line in f.readlines():
+                    query = json.loads(line)
+                    start = time.time()
+                    result = self.client.search(
+                        collection_name=self.collection_name,
+                        query_vector=query['vector'],
+                        limit=self.data.get('topK', 10),
+                        query_filter=self.parse(
+                            self.data.get('query_filter', None)
+                        ),
+                        with_payload=False
+                    )
+                    end = time.time()
+                    print(f"latency of search with filter: {(end - start)*1000:.2f} milliseconds")
+                    results.append(result)
+        elif ext == '.hdf5':
+            with h5py.File(query_path, 'r') as f:
                 start = time.time()
-                result = self.client.search(
-                    collection_name=self.collection_name,
-                    query_vector=query['vector'],
-                    limit=self.data.get('topK', 10),
-                    query_filter=self.parse(
-                        self.data.get('query_filter', None)
-                    ),
-                    with_payload=False
-                )
+                for line in f['test']:
+                    result = self.client.search(
+                        collection_name=self.collection_name,
+                        query_vector=line,
+                        limit=self.data.get('topK', 10),
+                        query_filter=self.parse(
+                            self.data.get('query_filter', None)
+                        )
+                    )
+                    results.append(result)
                 end = time.time()
-                print(f"latency of search with filter: {(end - start)*1000:.2f} milliseconds")
-                print(result)
-                results.append(result)
+                print(f"latency of KNN search: {(end - start)*1000/len(f['test']):.2f} milliseconds")
         return results

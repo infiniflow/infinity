@@ -55,7 +55,8 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         FusionExpr *fusion_expr{nullptr};
         KnnExpr *knn_expr{nullptr};
         MatchExpr *match_expr{nullptr};
-        SearchExpr *search_expr = new SearchExpr();
+        // SearchExpr *search_expr = new SearchExpr();
+        SearchExpr *search_expr(nullptr);
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -126,6 +127,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                         "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
                     return;
                 }
+                search_expr = new SearchExpr();
                 auto &fusion_children = elem.value();
                 for (const auto &expression : fusion_children.items()) {
                     String key = expression.key();
@@ -164,6 +166,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
                 search_expr->Validate();
             } else if (IsEqual(key, "knn")) {
+                search_expr = new SearchExpr();
                 if (fusion_expr != nullptr or knn_expr != nullptr or match_expr != nullptr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
                     response["error_message"] =
@@ -314,7 +317,9 @@ KnnExpr *HTTPSearch::ParseKnn(nlohmann::json &knn_json_object, HTTPStatus &http_
         ToLower(key);
         if (IsEqual(key, "fields")) {
             ColumnExpr *column_expr = new ColumnExpr();
-            column_expr->names_.emplace_back(field_json_obj.value());
+            for(size_t i=0;i<field_json_obj.value().size();i++){
+                column_expr->names_.emplace_back(field_json_obj.value()[i]);
+            }
             knn_expr->column_expr_ = column_expr;
             column_expr = nullptr;
         } else if (IsEqual(key, "query_vector")) {

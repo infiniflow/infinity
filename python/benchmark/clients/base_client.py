@@ -4,11 +4,11 @@ from typing import Any, List, Optional, Dict, Union
 from enum import Enum
 class FilterType(str, Enum):
     VALUE_MATCH = "value_match"
-    FULL_TEXT_MATCH = "text_match"
+    TEXT_MATCH = "text_match"
     RANGE = "range"
     GEO = "geo"
 
-
+FieldValue = Union[str, int, float]
 class BaseClient:
     """
     Base class for all clients(Qdrant, ES, infinity).
@@ -102,7 +102,7 @@ class BaseClient:
                 field_name, value=criteria.get("value")
             )
         if FilterType.TEXT_MATCH == filter_type:
-            return self.build_full_text_match_filter(
+            return self.build_text_match_filter(
                 field_name, text=criteria.get("text")
             )
         if FilterType.RANGE == filter_type:
@@ -122,8 +122,6 @@ class BaseClient:
             )
         raise NotImplementedError
 
-    FieldValue = Union[str, int, float]
-
     def build_exact_match_filter(self, field_name: str, value: FieldValue) -> Any:
         raise NotImplementedError
 
@@ -137,7 +135,7 @@ class BaseClient:
     ) -> Any:
         raise NotImplementedError
 
-    def build_geo_filter(
-        self, field_name: str, lat: float, lon: float, radius: float
+    def build_text_match_filter(
+        self, field_name: str, text: str
     ) -> Any:
         raise NotImplementedError

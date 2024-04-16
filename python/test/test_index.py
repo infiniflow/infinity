@@ -21,11 +21,12 @@ from common import common_values
 from utils import copy_data
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
+from test_sdkbase import TestSdk
 
 TEST_DATA_DIR = "/test/data/"
 
 
-class TestIndex:
+class TestIndex(TestSdk):
 
     def test_create_index_IVFFlat(self, get_infinity_db):
         db_obj = get_infinity_db
@@ -519,6 +520,7 @@ class TestIndex:
         table_obj.insert(value)
         res = table_obj.output(["*"]).to_pl()
         print(res)
+        
 
         # delete data
         table_obj.delete()
@@ -547,7 +549,6 @@ class TestIndex:
                           ConflictType.Ignore)
         table_obj = db_obj.create_table("test_create_index_on_update_table", {"c1": "vector,128,float", "c2": "int"},
                                         ConflictType.Error)
-
         # insert data
         embedding_data = [i for i in range(128)]
         value = [{"c1": embedding_data, "c2": i} for i in range(10)]

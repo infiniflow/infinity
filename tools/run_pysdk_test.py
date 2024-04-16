@@ -18,7 +18,6 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
         stderr=sys.stderr,
         universal_newlines=True,
     )
-
     process.wait()
     if process.returncode != 0:
         raise Exception(f"An error occurred: {process.stderr}")
@@ -26,10 +25,11 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("pysdk test finished.")
 
 
+
 if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     current_path = os.getcwd()
-    python_test_dir = current_path + "/python"
+    python_test_dir = current_path + "/python/"
     parser = argparse.ArgumentParser(description="Python SDK Test For Infinity")
     parser.add_argument(
         "-m",

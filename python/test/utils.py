@@ -10,6 +10,7 @@ import pytest
 
 from common import common_values
 
+
 current_path = os.getcwd()
 data_dir = current_path + common_values.TEST_DATA_DIR
 copy_dir = common_values.TEST_TMP_DIR

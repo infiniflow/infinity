@@ -19,9 +19,9 @@ from common import common_values
 import infinity
 from infinity.table import ExplainType
 from infinity.common import ConflictType
+from test_sdkbase import TestSdk
 
-
-class TestExplain:
+class TestExplain(TestSdk):
 
     def test_explain_default(self):
         """
