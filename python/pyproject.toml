@@ -31,7 +31,6 @@ markers =[
     "complex",
     "slow",
     "nightly",
-    "test: mark a test function"
 ]
 
 
