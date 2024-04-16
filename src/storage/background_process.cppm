@@ -36,10 +36,14 @@ public:
 
 private:
     void Process();
+    void CompactProcess();
 
 private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_;
+    BlockingQueue<SharedPtr<BGTask>> compact_queue_;
+
     Thread processor_thread_{};
+    Thread compact_thread_{};
 
     WalManager *wal_manager_{};
     Catalog *catalog_{};
