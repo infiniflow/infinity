@@ -314,11 +314,20 @@ nlohmann::json DataType::Serialize() {
 // }
 
 std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
-    std::string type = data_type_json["type"];
-    if (type == "vector")
-        type = "embedding";
-
-    const LogicalType logical_type = Str2LogicalType(type);
+    std::string type;
+    LogicalType logical_type;
+    if (data_type_json.contains("type")) {
+        type = data_type_json["type"];
+        if (type == "vector")
+            type = "embedding";
+        logical_type = Str2LogicalType(type);
+    }else if (data_type_json.contains("data_type")){
+        logical_type = data_type_json["data_type"];
+    }else{
+        return nullptr;
+    }
+    
+    //const LogicalType logical_type = Str2LogicalType(type);
 
     std::shared_ptr<TypeInfo> type_info{nullptr};
     switch (logical_type) {
