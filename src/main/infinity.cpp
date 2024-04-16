@@ -489,6 +489,7 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
 }
 
 QueryResult Infinity::Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options) {
+    
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),

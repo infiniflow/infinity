@@ -10,7 +10,6 @@ import pytest
 
 from common import common_values
 
-
 current_path = os.getcwd()
 data_dir = current_path + common_values.TEST_DATA_DIR
 copy_dir = common_values.TEST_TMP_DIR
@@ -28,6 +27,12 @@ def trace_expected_exceptions(func):
 
     return wrapped_func
 
+def get_project_path():
+    current_file = os.path.abspath(__file__)
+    index = current_file.index("infinity")
+    desired_path = current_file[:index + len("infinity")]
+    return str(desired_path)
+
 
 # read fvecs file
 def read_fvecs_file(filename):
@@ -39,7 +44,7 @@ def read_fvecs_file(filename):
 
 
 def start_infinity_service_in_subporcess():
-    shell = os.getcwd() + "/build/src/infinity"
+    shell = get_project_path() + "/cmake-build-debug/src/infinity"
     with open("./tmp.txt", "w") as f:
         infinity = subprocess.Popen(shell, stdout=f)
     time.sleep(1)
@@ -47,7 +52,7 @@ def start_infinity_service_in_subporcess():
 
 
 def copy_data(file_name):
-    data_dir = os.getcwd() + common_values.TEST_DATA_DIR
+    data_dir = get_project_path() + common_values.TEST_DATA_DIR
     for dirpath, dirnames, filenames in os.walk(data_dir):
         for filename in filenames:
             if filename == file_name:
@@ -57,21 +62,21 @@ def copy_data(file_name):
 
 
 def generate_big_int_csv(num, filename):
-    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
+    with open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
         for i in range(num):
             f.write(str(i) + "," + str(i) + '\n')
     f.close()
 
 
 def generate_big_rows_csv(num, filename):
-    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
+    with open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
         for i in range(num):
             f.write(str(i) + ",asdasdlk中fjio@!#!@asd #$%$23\n")
     f.close()
 
 
 def generate_big_columns_csv(num, filename):
-    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
+    with open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
         data = ''.join(str(i) + ',' for i in range(num - 1))
         data += str(num - 1)
         f.write(data)
@@ -79,7 +84,7 @@ def generate_big_columns_csv(num, filename):
 
 
 def generate_fvecs(num, dim, filename):
-    with open(os.getcwd() + common_values.TEST_DATA_DIR + "fvecs/" + filename, "wb") as fvecs_file:
+    with open(get_project_path() + common_values.TEST_DATA_DIR + "fvecs/" + filename, "wb") as fvecs_file:
         for _ in range(num):
             fvecs_file.write((dim).to_bytes(4, byteorder="little"))
             fvec = np.random.random(dim).astype(np.float32)
@@ -88,8 +93,8 @@ def generate_fvecs(num, dim, filename):
 
 
 def generate_commas_enwiki(in_filename, out_filename, is_embedding):
-    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + in_filename, "r") as infile, \
-         open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + out_filename, "w") as outfile:
+    with open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + in_filename, "r") as infile, \
+         open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + out_filename, "w") as outfile:
             reader = csv.reader(infile, delimiter='\t')
             writer = csv.writer(outfile, delimiter=',')
 
@@ -103,3 +108,8 @@ def generate_commas_enwiki(in_filename, out_filename, is_embedding):
             else:
                 for row in reader:
                     writer.writerow(row)
+def check_data(data_dir):
+    # path not exists
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+        return False

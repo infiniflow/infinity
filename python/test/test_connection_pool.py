@@ -2,8 +2,9 @@ from common import common_values
 import time
 from infinity.connection_pool import ConnectionPool
 from infinity.common import ConflictType
+from test_sdkbase import TestSdk
 
-class TestConnectionPool:
+class TestConnectionPool(TestSdk):
     #test whether the connection get from the pool could work properly and the management of pool is correct.
     def test_basic(self):
         connction_pool = ConnectionPool(uri=common_values.TEST_REMOTE_HOST, min_size=4, max_size=8)

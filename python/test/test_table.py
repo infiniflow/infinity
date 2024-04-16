@@ -20,9 +20,10 @@ from infinity.common import ConflictType
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
+from test_sdkbase import TestSdk
 
 
-class TestTable:
+class TestTable(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)
@@ -739,9 +740,9 @@ class TestTable:
         res = db_obj.drop_table("test_valid_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
+    #     # disconnect
+    #     res = infinity_obj.disconnect()
+    #     assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("types", [
         "int", "int8", "int16", "int32", "int64", "integer",

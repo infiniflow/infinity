@@ -19,9 +19,10 @@ from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
+from test_sdkbase import TestSdk
 
 
-class TestDatabase:
+class TestDatabase(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)

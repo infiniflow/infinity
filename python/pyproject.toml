@@ -30,8 +30,10 @@ markers =[
     "L3",
     "complex",
     "slow",
-    "nightly"
+    "nightly",
 ]
+
+
 filterwarnings = [
     "error",
     "ignore::UserWarning",
