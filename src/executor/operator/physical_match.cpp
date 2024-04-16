@@ -393,10 +393,19 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
 PhysicalMatch::PhysicalMatch(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<MatchExpression> match_expr,
+                             bool have_filter,
+                             UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                             const SharedPtr<BaseExpression> &filter_leftover,
+                             const SharedPtr<BaseExpression> &secondary_index_filter_qualified,
+                             HashMap<ColumnID, TableIndexEntry *> &&secondary_index_column_index_map,
+                             Vector<FilterExecuteElem> &&filter_execute_command,
                              u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), table_index_(match_table_index),
-      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)) {}
+      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), have_filter_(have_filter),
+      fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), filter_leftover_(filter_leftover),
+      secondary_index_filter_qualified_(secondary_index_filter_qualified),
+      secondary_index_column_index_map_(std::move(secondary_index_column_index_map)), filter_execute_command_(std::move(filter_execute_command)) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 
