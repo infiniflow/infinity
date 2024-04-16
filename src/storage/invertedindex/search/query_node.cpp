@@ -348,6 +348,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     if (!column_index_reader) {
         return nullptr;
     }
+
     bool fetch_position = false;
     auto option_flag = column_index_reader->GetOptionFlag();
     if (option_flag & OptionFlag::of_position_list) {
@@ -371,9 +372,15 @@ std::unique_ptr<EarlyTerminateIterator>
 TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
-    if (!column_index_reader)
+    if (!column_index_reader) {
         return nullptr;
-    auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight());
+    }
+    bool fetch_position = false;
+    auto option_flag = column_index_reader->GetOptionFlag();
+    if (option_flag & OptionFlag::of_position_list) {
+        fetch_position = true;
+    }
+    auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight(), fetch_position);
     if (!search) {
         return nullptr;
     }

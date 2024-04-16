@@ -77,6 +77,14 @@ BufferHandle BufferObj::Load() {
     return BufferHandle(this, data);
 }
 
+void BufferObj::LoadInner() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    if (status_ != BufferStatus::kLoaded) {
+        UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+    }
+    ++rc_;
+}
+
 void BufferObj::GetMutPointer() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     type_ = BufferType::kEphemeral;
@@ -97,6 +105,7 @@ void BufferObj::UnloadInner() {
             break;
         }
         default: {
+            LOG_INFO(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
             UnrecoverableError(fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_)));
         }
     }
