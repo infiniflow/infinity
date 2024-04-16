@@ -324,10 +324,10 @@ void Catalog::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp com
     table_index_entry->CommitCreateIndex(txn_index_store, commit_ts, is_replay);
 }
 
-void Catalog::RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn) {
-    auto *table_index_entry = txn_index_store->table_index_entry_;
-    table_index_entry->RollbackPopulateIndex(txn_index_store, txn);
-}
+// void Catalog::RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn) {
+//     auto *table_index_entry = txn_index_store->table_index_entry_;
+//     table_index_entry->RollbackPopulateIndex(txn_index_store, txn);
+// }
 
 void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     return table_entry->AppendData(txn_id, txn_store, commit_ts, buffer_mgr);

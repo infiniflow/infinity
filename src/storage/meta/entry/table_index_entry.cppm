@@ -125,7 +125,7 @@ public:
 
     void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
 
-    void RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn);
+    // void RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn);
 
     // replay
     void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
