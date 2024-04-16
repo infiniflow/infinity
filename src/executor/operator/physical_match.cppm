@@ -30,6 +30,9 @@ import load_meta;
 import infinity_exception;
 import internal_types;
 import data_type;
+import table_index_entry;
+import fast_rough_filter;
+import secondary_index_scan_execute_expression;
 
 namespace infinity {
 
@@ -68,11 +71,19 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline MatchExpression* match_expr() const { return match_expr_.get(); }
+    [[nodiscard]] inline MatchExpression *match_expr() const { return match_expr_.get(); }
+
 private:
-    u64 table_index_{};
-    SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<MatchExpression> match_expr_{};
+    u64 table_index_ = 0;
+    SharedPtr<BaseTableRef> base_table_ref_;
+    SharedPtr<MatchExpression> match_expr_;
+
+    // for filter
+    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
+    SharedPtr<BaseExpression> filter_leftover_;
+    HashMap<ColumnID, TableIndexEntry *> secondary_index_column_index_map_;
+    // secondary index filter execute expression
+    Vector<FilterExecuteElem> filter_execute_command_;
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
 };
