@@ -341,6 +341,9 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             break;
         }
         case LogicalType::kEmbedding: {
+
+            
+
             std::string etype = data_type_json["element_type"];
             int  dimension = data_type_json["dimension"];
 
