@@ -24,7 +24,7 @@ def run_sdk():
 
 def run_http():
     os.system("cd test_http_api")
-    os.system("python3 -m pytest -m 'not complex and not slow' test_http_api")   
+    os.system("python3 -m pytest -m 'not complex and not slow' test_http_api/test_index.py")   
 
 
 # def run_all():

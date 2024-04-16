@@ -167,6 +167,7 @@ class TestSelect(HttpTest):
     
     #PASS
     def test_select_embedding_int32(self):
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_select_embedding_int32"
         filename = "embedding_int_dim3.csv"
@@ -203,6 +204,7 @@ class TestSelect(HttpTest):
         return
     #PASS
     def test_select_embedding_float(self):
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_select_embedding_int32"
         filename = "embedding_float_dim4.csv"
@@ -244,6 +246,7 @@ class TestSelect(HttpTest):
         return
     #PASS
     def test_select_big_embedding(self):
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_select_embedding_int32"
         filename = "embedding_int_dim3.csv"
