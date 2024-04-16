@@ -435,7 +435,6 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
 
         txn_mgr->CommitTxn(txn);
 
-        usleep(5000 * 1000);
         infinity::InfinityContext::instance().UnInit();
     }
 #ifdef INFINITY_DEBUG
