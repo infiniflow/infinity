@@ -21,9 +21,9 @@ from infinity.infinity import ShowVariable
 from infinity.remote_thrift.client import ThriftInfinityClient
 
 from common import common_values
+from test_sdkbase import TestSdk
 
-
-class TestInfinity:
+class TestInfinity(TestSdk):
 
     def test_get_database(self):
         infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)

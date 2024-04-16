@@ -62,7 +62,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
 
-      - name: Start infinity pysdk debug version
+      - name: Start infinity pysdk & http_api debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
@@ -70,9 +70,13 @@ jobs:
 
       - name: pysdk debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
 
-      - name: Stop infinity pysdk debug
+      - name: http_api debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
+
+      - name: Stop infinity pysdk & http_api debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: sudo kill $(pidof cmake-build-debug/src/infinity) && sleep 5s
 
@@ -139,7 +143,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
 
-      - name: Start infinity pysdk release version
+      - name: Start infinity pysdk & http_api release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
@@ -147,9 +151,13 @@ jobs:
 
       - name: pysdk release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
 
-      - name: Stop infinity pysdk release
+      - name: http_api release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
+
+      - name: Stop infinity pysdk & http_api release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
 

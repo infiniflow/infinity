@@ -22,9 +22,10 @@ import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import trace_expected_exceptions
+from test_sdkbase import TestSdk
 
 
-class TestUpdate:
+class TestUpdate(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)
@@ -420,7 +421,6 @@ class TestUpdate:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
-
         # update
         table_obj.update("c1 = 1", [{"c2": types_example}])
         update_res = table_obj.output(["*"]).to_df()

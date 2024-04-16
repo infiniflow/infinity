@@ -17,9 +17,10 @@ from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 import infinity
+from test_sdkbase import TestSdk
 
 
-class TestDescribe:
+class TestDescribe(TestSdk):
 
     def test_show_table(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
