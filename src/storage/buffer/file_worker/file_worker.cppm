@@ -37,8 +37,6 @@ public:
 
     void MoveFile();
 
-    void CleanupFile();
-
     virtual void AllocateInMemory() = 0;
 
     virtual void FreeInMemory() = 0;
@@ -59,6 +57,7 @@ public:
 
     void CloseFile();
 
+    static void BulkCleanup(const Vector<String> &file_paths);
 protected:
     virtual void WriteToFileImpl(bool &prepare_success) = 0;
 

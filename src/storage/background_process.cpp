@@ -28,6 +28,7 @@ import infinity_exception;
 import wal_manager;
 import catalog;
 import third_party;
+import buffer_manager;
 
 namespace infinity {
 
