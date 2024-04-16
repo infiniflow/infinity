@@ -127,8 +127,8 @@ void Storage::UnInit() {
     fmt::print("Shutdown storage ...\n");
     periodic_trigger_thread_->Stop();
     bg_processor_->Stop();
-
     wal_mgr_->Stop();
+
     txn_mgr_.reset();
     bg_processor_.reset();
     wal_mgr_.reset();
