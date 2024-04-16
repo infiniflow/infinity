@@ -99,7 +99,7 @@ class TestImport:
         res = table_obj.output(["*"]).to_df()
         print(res)
 
-        db_obj.drop_table("test_import_different_file_format_data", ConflictType.Error)
+        db_obj.drop_table("test_import_different_file_format_data_fvecs", ConflictType.Error)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -137,7 +137,7 @@ class TestImport:
 
         res = table_obj.output(["*"]).to_df()
         print(res)
-        db_obj.drop_table("test_import_empty_file_fvecs", ConflictType.Error)
+        db_obj.drop_table("test_import_empty_file_csv", ConflictType.Error)
 
         # disconnect
         res = infinity_obj.disconnect()
