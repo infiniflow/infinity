@@ -229,6 +229,23 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
+bool Catalog::CheckTableConflict(const String &db_name,
+                                 const String &table_name,
+                                 TransactionID txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TableEntry *&table_entry) {
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError("Check conflict is not for non-exist db meta");
+    }
+    DBEntry *db_entry = nullptr;
+    bool conflict = db_meta->CheckConflict(std::move(r_lock), txn_id, begin_ts, db_entry);
+    if (conflict) {
+        return true;
+    }
+    return db_entry->CheckConflict(table_name, txn_id, begin_ts, table_entry);
+}
+
 Tuple<SharedPtr<TableInfo>, Status>
 Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
@@ -880,6 +897,8 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Rename temp file to regular catalog file
     catalog_file_handler->Rename(catalog_tmp_path, full_catalog_path);
+
+    global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
 
     LOG_INFO(fmt::format("Saved catalog to: {}", full_catalog_path));
 }

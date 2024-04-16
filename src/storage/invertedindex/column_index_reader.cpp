@@ -39,6 +39,7 @@ import index_base;
 import index_full_text;
 import third_party;
 import blockmax_term_doc_iterator;
+import default_values;
 
 namespace infinity {
 void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment) {
@@ -86,17 +87,18 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryP
     return iter;
 }
 
-UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight) {
+UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight, bool fetch_position) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
-        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool);
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool, fetch_position);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
     }
-    if (seg_postings->empty())
+    if (seg_postings->empty()) {
         return nullptr;
+    }
     auto result = MakeUnique<BlockMaxTermDocIterator>(flag_, session_pool);
     result->MultiplyWeight(weight);
     u32 state_pool_size = 0; // TODO
@@ -131,7 +133,9 @@ IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeS
     IndexReader result;
     result.session_pool_ = MakeShared<MemoryPool>();
     std::scoped_lock lock(mutex_);
-    if (begin_ts >= cache_ts_ and begin_ts < first_known_update_ts_) [[likely]] {
+    assert(cache_ts_ <= first_known_update_ts_);
+    assert(first_known_update_ts_ == MAX_TIMESTAMP || first_known_update_ts_ <= last_known_update_ts_);
+    if (cache_ts_ != 0 && begin_ts >= cache_ts_ && begin_ts < first_known_update_ts_) [[likely]] {
         // no need to build, use cache
         result.column_index_readers_ = cache_column_readers_;
         result.column2analyzer_ = column2analyzer_;
@@ -153,14 +157,14 @@ IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeS
             }
             String column_name = index_base->column_name();
             auto column_id = self_table_entry_ptr->GetColumnIdByName(column_name);
-            auto ts = table_index_entry->GetFulltexSegmentUpdateTs();
-            if (auto &target_ts = cache_column_ts[column_id]; target_ts < ts) {
+            assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
+            if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
-                target_ts = ts;
+                target_ts = begin_ts;
                 const IndexFullText *index_full_text = reinterpret_cast<const IndexFullText *>(index_base);
                 // update column2analyzer_
                 (*result.column2analyzer_)[column_name] = index_full_text->analyzer_;
-                if (auto it = cache_column_ts_.find(column_id); it != cache_column_ts_.end() and it->second == ts) {
+                if (auto it = cache_column_ts_.find(column_id); it != cache_column_ts_.end() and it->second == begin_ts) {
                     // reuse cache
                     (*result.column_index_readers_)[column_id] = cache_column_readers_->at(column_id);
                 } else {
@@ -168,7 +172,8 @@ IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeS
                     auto column_index_reader = MakeShared<ColumnIndexReader>();
                     optionflag_t flag = index_full_text->flag_;
                     String index_dir = *(table_index_entry->index_dir());
-                    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = table_index_entry->GetIndexBySegmentSnapshot();
+                    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment =
+                        table_index_entry->GetIndexBySegmentSnapshot(self_table_entry_ptr, begin_ts);
                     column_index_reader->Open(flag, std::move(index_dir), std::move(index_by_segment));
                     (*result.column_index_readers_)[column_id] = std::move(column_index_reader);
                 }
@@ -177,7 +182,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeS
         if (begin_ts >= last_known_update_ts_) {
             // need to update cache
             cache_ts_ = last_known_update_ts_;
-            first_known_update_ts_ = std::numeric_limits<TxnTimeStamp>::max();
+            first_known_update_ts_ = MAX_TIMESTAMP;
             last_known_update_ts_ = 0;
             cache_column_ts_ = std::move(cache_column_ts);
             cache_column_readers_ = result.column_index_readers_;

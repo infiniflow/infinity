@@ -29,7 +29,7 @@ import third_party;
 
 namespace infinity {
 
-CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
+CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr) : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
 
@@ -39,6 +39,8 @@ void CleanupScanner::Cleanup() && {
     for (auto &entry : entries_) {
         std::move(*entry).Cleanup();
     }
+
+    buffer_mgr_->RemoveBufferObjects();
 }
 
 void CleanupScanner::CleanupDir(const String &dir) {

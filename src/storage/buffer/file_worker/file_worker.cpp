@@ -65,7 +65,7 @@ void FileWorker::WriteToFile(bool to_spill) {
             file_handler_->Close();
             file_handler_ = nullptr;
         }
-        if(to_spill) {
+        if (to_spill) {
             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
         }
     });
@@ -103,20 +103,21 @@ void FileWorker::MoveFile() {
     fs.Rename(src_path, dest_path);
 }
 
-void FileWorker::CleanupFile() {
+void FileWorker::BulkCleanup(const Vector<String> &file_paths) {
     LocalFileSystem fs;
-
-    String file_path = fmt::format("{}/{}", *file_dir_, *file_name_);
-    if (!fs.Exists(file_path)) {
-        // this may happen the same reason as in "CleanupScanner::CleanupDir"
-        // It may also happen when cleanup a table not been flushed (need a checkpoint txn), 
-        // at that time there is not data file under dir.
-        LOG_TRACE(fmt::format("Cleanup: File {} not found.", file_path));
-        return;
+    for (SizeT i = 0; i < file_paths.size(); i++) {
+        const auto &path = file_paths[i];
+        if (fs.Exists(path)) {
+            LOG_TRACE(fmt::format("Cleaning up file: {}", path));
+            fs.DeleteFile(path);
+            LOG_TRACE(fmt::format("Cleaned file: {}", path));
+        } else {
+            // this may happen the same reason as in "CleanupScanner::CleanupDir"
+            // It may also happen when cleanup a table not been flushed (need a checkpoint txn),
+            // at that time there is not data file under dir.
+            LOG_TRACE(fmt::format("Cleanup: File {} not found for deletion", path));
+        }
     }
-    LOG_TRACE(fmt::format("Cleaning up file: {}", file_path));
-    fs.DeleteFile(file_path);
-    LOG_TRACE(fmt::format("Cleaned file: {}", file_path));
 }
 
 } // namespace infinity

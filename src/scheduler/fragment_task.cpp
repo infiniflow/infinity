@@ -59,9 +59,13 @@ void FragmentTask::OnExecute() {
     // For streaming type, we need to run sink each execution
 
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
+    if(source_state_->state_type_ == SourceStateType::kQueue) {
+        // For debug
+        LOG_TRACE(PhysOpsToString());
+    }
 
     bool execute_success{false};
-    source_op->Execute(fragment_context->query_context(), source_state_.get());
+    source_op->Execute(query_context, source_state_.get());
     Status operator_status{};
     if (source_state_->status_.ok()) {
         // No source error
@@ -76,8 +80,8 @@ void FragmentTask::OnExecute() {
                 profiler.StartOperator(operator_refs[op_idx]);
                 DeferFn defer_fn([&]() { profiler.StopOperator(operator_states_[op_idx].get()); });
 
-                operator_refs[op_idx]->InputLoad(fragment_context->query_context(), operator_states_[op_idx].get(), table_refs);
-                execute_success = operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
+                operator_refs[op_idx]->InputLoad(query_context, operator_states_[op_idx].get(), table_refs);
+                execute_success = operator_refs[op_idx]->Execute(query_context, operator_states_[op_idx].get());
                 operator_refs[op_idx]->FillingTableRefs(table_refs);
 
                 if (!operator_states_[op_idx]->status_.ok()) {

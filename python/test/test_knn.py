@@ -80,6 +80,13 @@ class TestKnn:
 
         # print(res)
 
+        res = db_obj.drop_table("fix_tmp_20240116", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     def test_insert_multi_column(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
@@ -110,6 +117,12 @@ class TestKnn:
                            "query_price": 1.0
                            }])
 
+        res = db_obj.drop_table("test_insert_multi_column", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # knn various column name
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -117,8 +130,8 @@ class TestKnn:
                                              "color_vector"])
     def test_knn_on_vector_column(self, get_infinity_db, check_data, column_name):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_vector_column_name", conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_various_vector_column_name", {
+        db_obj.drop_table("test_knn_on_vector_column", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_knn_on_vector_column", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
             "color_vector": "vector,4,float",
@@ -137,6 +150,9 @@ class TestKnn:
         res = table_obj.output(["variant_id", "_row_id"]).knn(column_name, [1.0] * 4, "float", "ip", 2).to_pl()
         print(res)
 
+        res = db_obj.drop_table("test_knn_on_vector_column", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("column_name", [pytest.param("variant_id"),
@@ -147,8 +163,8 @@ class TestKnn:
                                              ])
     def test_knn_on_non_vector_column(self, get_infinity_db, check_data, column_name):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_vector_column_name", conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_various_vector_column_name", {
+        db_obj.drop_table("test_knn_on_non_vector_column", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_knn_on_non_vector_column", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
             "color_vector": "vector,4,float",
@@ -168,6 +184,10 @@ class TestKnn:
             res = table_obj.output(["variant_id", "_row_id"]).knn(column_name, [1.0] * 4, "float", "ip", 2).to_pl()
             print(res)
 
+
+        res = db_obj.drop_table("test_knn_on_non_vector_column", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -176,8 +196,8 @@ class TestKnn:
     ])
     def test_valid_embedding_data(self, get_infinity_db, check_data, embedding_data):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_embedding_data", conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_various_embedding_data", {
+        db_obj.drop_table("test_valid_embedding_data", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_valid_embedding_data", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
             "color_vector": "vector,4,float",
@@ -196,6 +216,9 @@ class TestKnn:
         res = table_obj.output(["variant_id", "_row_id"]).knn("gender_vector", embedding_data, "float", "ip", 2).to_pl()
         print(res)
 
+        res = db_obj.drop_table("test_valid_embedding_data", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -209,8 +232,8 @@ class TestKnn:
     ])
     def test_invalid_embedding_data(self, get_infinity_db, check_data, embedding_data):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_embedding_data", conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_various_embedding_data", {
+        db_obj.drop_table("test_invalid_embedding_data", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_invalid_embedding_data", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
             "color_vector": "vector,4,float",
@@ -230,6 +253,9 @@ class TestKnn:
             res = table_obj.output(["variant_id", "_row_id"]).knn("gender_vector", embedding_data, "float", "ip", 2).to_pl()
             print(res)
 
+        res = db_obj.drop_table("test_invalid_embedding_data", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -241,8 +267,8 @@ class TestKnn:
     ])
     def test_valid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_embedding_data_type", conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_various_embedding_data_type", {
+        db_obj.drop_table("test_valid_embedding_data_type", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_valid_embedding_data_type", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
             "color_vector": "vector,4,float",
@@ -268,6 +294,9 @@ class TestKnn:
                                                        "ip",
                                                        2).to_pl()
 
+        res = db_obj.drop_table("test_valid_embedding_data_type", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -283,8 +312,8 @@ class TestKnn:
     ])
     def test_invalid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_embedding_data_type", conflict_type=ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_various_embedding_data_type", {
+        db_obj.drop_table("test_invalid_embedding_data_type", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_invalid_embedding_data_type", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
             "color_vector": "vector,4,float",
@@ -310,6 +339,8 @@ class TestKnn:
                 res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
                                                            "ip",
                                                            2).to_pl()
+        res = db_obj.drop_table("test_invalid_embedding_data_type", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -357,6 +388,8 @@ class TestKnn:
                 res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
                                                            distance_type[0],
                                                            2).to_pl()
+        res = db_obj.drop_table("test_various_distance_type", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -396,6 +429,8 @@ class TestKnn:
         else:
             with pytest.raises(Exception, match=topn[2]):
                 res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
+        res = db_obj.drop_table("test_various_topn", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -450,6 +485,12 @@ class TestKnn:
         res = table_obj.output(["variant_id"]).knn(knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
         print(res)
 
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("index_column_name", ["gender_vector",
@@ -468,8 +509,8 @@ class TestKnn:
                               index_column_name, knn_column_name,
                               index_distance_type, knn_distance_type):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_with_index", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_index", {
+        db_obj.drop_table("test_with_index_after", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_index_after", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
             "color_vector": "vector,4,float",
@@ -503,13 +544,20 @@ class TestKnn:
 
         assert res.error_code == ErrorCode.OK
 
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_index_after", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+
     @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_valid_columns(self, get_infinity_db, check_data, match_param_1):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_with_fulltext_match_with_columns", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_fulltext_match_with_columns",
+        db_obj.drop_table("test_with_fulltext_match_with_valid_columns", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_valid_columns",
                                         {"doctitle": "varchar",
                                          "docdate": "varchar",
                                          "body": "varchar",
@@ -535,6 +583,12 @@ class TestKnn:
                .to_pl())
         print(res)
 
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_fulltext_match_with_valid_columns", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("match_param_1", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -545,8 +599,8 @@ class TestKnn:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_invalid_columns(self, get_infinity_db, check_data, match_param_1):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_with_fulltext_match_with_columns", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_fulltext_match_with_columns",
+        db_obj.drop_table("test_with_fulltext_match_with_invalid_columns", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_columns",
                                         {"doctitle": "varchar",
                                          "docdate": "varchar",
                                          "body": "varchar",
@@ -573,14 +627,20 @@ class TestKnn:
                    .to_pl())
             print(res)
 
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_fulltext_match_with_invalid_columns", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("match_param_2", ["a word a segment",
                                                "body=Greek"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_valid_words(self, get_infinity_db, check_data, match_param_2):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_with_fulltext_match_with_words", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_fulltext_match_with_words",
+        db_obj.drop_table("test_with_fulltext_match_with_valid_words", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_valid_words",
                                         {"doctitle": "varchar",
                                          "docdate": "varchar",
                                          "body": "varchar",
@@ -606,6 +666,12 @@ class TestKnn:
                .to_pl())
         print(res)
 
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_fulltext_match_with_valid_words", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("match_param_2", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -616,8 +682,8 @@ class TestKnn:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_invalid_words(self, get_infinity_db, check_data, match_param_2):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_with_fulltext_match_with_words", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_fulltext_match_with_words",
+        db_obj.drop_table("test_with_fulltext_match_with_invalid_words", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_words",
                                         {"doctitle": "varchar",
                                          "docdate": "varchar",
                                          "body": "varchar",
@@ -644,6 +710,13 @@ class TestKnn:
                    .fusion('rrf')
                    .to_pl())
             print(res)
+
+
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_fulltext_match_with_invalid_words", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("match_param_3", [pytest.param("@#$!#@$SDa^sdf3!@#$"),
                                                "topn=1",
@@ -679,6 +752,12 @@ class TestKnn:
                .to_pl())
         print(res)
 
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_fulltext_match_with_options", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
 
     @pytest.mark.parametrize("match_param_3", [pytest.param(1),
                                                pytest.param(1.1),
@@ -689,8 +768,8 @@ class TestKnn:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_with_fulltext_match_with_options", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_fulltext_match_with_options",
+        db_obj.drop_table("test_with_fulltext_match_with_invalid_options", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_options",
                                         {"doctitle": "varchar",
                                          "docdate": "varchar",
                                          "body": "varchar",
@@ -717,3 +796,10 @@ class TestKnn:
                    .fusion('rrf')
                    .to_pl())
             print(res)
+
+
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_fulltext_match_with_invalid_options", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

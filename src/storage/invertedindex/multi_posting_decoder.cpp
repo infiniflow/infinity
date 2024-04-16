@@ -197,9 +197,9 @@ bool MultiPostingDecoder::DiskSegMoveToSegment(SegmentPosting &cur_segment_posti
     }
     index_decoder_ = CreateIndexDecoder(doc_list_begin_pos);
     u32 doc_skiplist_start = doc_list_reader.Tell();
-    u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
+    u32 doc_skiplist_end = doc_skiplist_start + doc_skiplist_size;
 
-    index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, posting_list, term_meta.GetDocFreq());
+    index_decoder_->InitSkipList(doc_skiplist_start, doc_skiplist_end, posting_list, term_meta.GetDocFreq());
     if (format_option_.HasPositionList()) {
         u32 pos_list_begin = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
         in_doc_state_keeper_.MoveToSegment(posting_list, term_meta.GetTotalTermFreq(), pos_list_begin, format_option_);
@@ -247,7 +247,6 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
 
     u32 doc_list_begin_pos = doc_reader.Tell() + doc_skiplist_size;
 
-
     if (index_decoder_) {
         if (session_pool_) {
             index_decoder_->~IndexDecoder();
@@ -259,16 +258,16 @@ bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_
     }
     index_decoder_ = CreateDocIndexDecoder(doc_list_begin_pos);
     u32 doc_skiplist_start = doc_reader.Tell();
-    u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
+    u32 doc_skiplist_end = doc_skiplist_start + doc_skiplist_size;
 
-    index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, doc_slice_list, term_meta.GetDocFreq());
+    index_decoder_->InitSkipList(doc_skiplist_start, doc_skiplist_end, doc_slice_list, term_meta.GetDocFreq());
     if (format_option_.HasPositionList()) {
-
         ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
         assert(nullptr != pos_slice_list);
         pos_reader_.Open(pos_slice_list);
 
         u32 pos_list_begin = pos_reader_.Tell();
+
         in_doc_state_keeper_.MoveToSegment(pos_slice_list, term_meta.GetTotalTermFreq(), pos_list_begin, format_option_);
 
         if (in_doc_pos_iterator_) {

@@ -45,7 +45,7 @@ public:
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 
-    bool Seek(RowID doc_id) override;
+    bool NotPartCheckExist(RowID doc_id) override;
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
         return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxAndNotIterator", inner_iterators_, os, prefix, is_final);

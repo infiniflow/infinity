@@ -20,7 +20,6 @@ import third_party;
 import local_file_system;
 import logger;
 import specific_concurrent_queue;
-
 import infinity_exception;
 import buffer_obj;
 
@@ -33,16 +32,19 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, Share
     if (!fs.Exists(*data_dir_)) {
         fs.CreateDirectory(*data_dir_);
     }
-    if (!fs.Exists(*temp_dir_)) {
-        fs.CreateDirectory(*temp_dir_);
+
+    if (fs.Exists(*temp_dir_)) {
+        fs.DeleteDirectory(*temp_dir_);
     }
+
+    fs.CreateDirectory(*temp_dir_);
 }
 
 BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
 
-    BufferObj* res = buffer_obj.get();
+    BufferObj *res = buffer_obj.get();
     std::unique_lock<std::mutex> lock(w_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         UnrecoverableError(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
@@ -81,6 +83,33 @@ void BufferManager::RemoveBufferObj(const String &file_path) {
     deprecated_array_.emplace_back(buffer_map_[file_path]);
     buffer_map_.erase(file_path);
     LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
+}
+
+void BufferManager::RemoveBufferObjects() {
+    FileWorker::BulkCleanup(file_path_delete_);
+    // remove buffer objects in bulk
+    deprecated_array_.clear();
+
+    for (SizeT i = 0; i < obj_path_delete_.size(); i++) {
+        const auto &file_path = obj_path_delete_[i];
+        LOG_TRACE(fmt::format("Erasing buffer object: {}", file_path));
+        deprecated_array_.emplace_back(buffer_map_[file_path]);
+        LOG_TRACE(fmt::format("Erased buffer object: {}", file_path));
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(w_locker_);
+        for (SizeT i = 0; i < obj_path_delete_.size(); i++) {
+            const auto &file_path = obj_path_delete_[i];
+            LOG_TRACE(fmt::format("Erasing buffer map: {}", file_path));
+            buffer_map_.erase(file_path);
+            LOG_TRACE(fmt::format("Erased buffer map: {}", file_path));
+        }
+    }
+
+    // clear
+    file_path_delete_.clear();
+    obj_path_delete_.clear();
 }
 
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {

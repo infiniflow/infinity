@@ -178,12 +178,12 @@ void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path)
     Path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
     if (!srcFile.is_open()) {
-        UnrecoverableError("Failed to open source file");
+        UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
         return;
     }
     std::ofstream dstFile(dst, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
-        UnrecoverableError("Failed to open destination file");
+        UnrecoverableError(fmt::format("Failed to open destination file {}", dst_path));
         return;
     }
     char buffer[BUFFER_SIZE];

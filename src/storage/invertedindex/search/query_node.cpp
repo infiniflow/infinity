@@ -1,4 +1,5 @@
 #include "query_node.h"
+#include <chrono>
 
 import stl;
 import status;
@@ -33,6 +34,9 @@ namespace infinity {
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
 
 std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
+#ifdef INFINITY_DEBUG
+    auto start_time = std::chrono::high_resolution_clock::now();
+#endif
     std::unique_ptr<QueryNode> optimized_root;
     if (!root) {
         RecoverableError(Status::SyntaxError("Invalid query statement: Empty query tree"));
@@ -69,7 +73,10 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     }
 #ifdef INFINITY_DEBUG
     {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(end_time - start_time);
         OStringStream oss;
+        oss << "Query tree optimization time cost: " << duration << std::endl;
         oss << "Query tree after optimization:\n";
         if (optimized_root) {
             optimized_root->PrintTree(oss);
@@ -341,6 +348,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     if (!column_index_reader) {
         return nullptr;
     }
+
     bool fetch_position = false;
     auto option_flag = column_index_reader->GetOptionFlag();
     if (option_flag & OptionFlag::of_position_list) {
@@ -364,9 +372,15 @@ std::unique_ptr<EarlyTerminateIterator>
 TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
-    if (!column_index_reader)
+    if (!column_index_reader) {
         return nullptr;
-    auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight());
+    }
+    bool fetch_position = false;
+    auto option_flag = column_index_reader->GetOptionFlag();
+    if (option_flag & OptionFlag::of_position_list) {
+        fetch_position = true;
+    }
+    auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight(), fetch_position);
     if (!search) {
         return nullptr;
     }

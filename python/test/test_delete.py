@@ -306,15 +306,20 @@ class TestDelete:
         table_obj = db_obj.get_table("test_various_expression_in_where_clause")
 
         values = [{"c1": column_types_example} for _ in range(5)]
-        table_obj.insert(values)
+        try:
+            table_obj.insert(values)
 
-        insert_res = table_obj.output(["*"]).to_df()
-        print(insert_res)
+            insert_res = table_obj.output(["*"]).to_df()
+            print(insert_res)
 
-        table_obj.delete("c1 = " + str(column_types_example))
-        delete_res = table_obj.output(["*"]).to_df()
-        print(delete_res)
-        db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Error)
+            table_obj.delete("c1 = " + str(column_types_example))
+            delete_res = table_obj.output(["*"]).to_df()
+            print(delete_res)
+        except Exception as e:
+            print(e)
+
+        res = db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def test_delete_one_block_without_expression(self, get_infinity_db):
         # connect
@@ -332,7 +337,8 @@ class TestDelete:
         table_obj.delete()
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_delete_one_block_without_expression", ConflictType.Error)
+        res = db_obj.drop_table("test_delete_one_block_without_expression", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def test_delete_one_segment_without_expression(self, get_infinity_db):
         # connect

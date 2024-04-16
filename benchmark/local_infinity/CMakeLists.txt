@@ -98,11 +98,11 @@ target_link_libraries(
 )
 
 if(ENABLE_JEMALLOC)
-    target_link_libraries(infinity_benchmark jemalloc.a dl)
-    target_link_libraries(knn_import_benchmark jemalloc.a dl)
-    target_link_libraries(knn_query_benchmark jemalloc.a dl)
-    target_link_libraries(fulltext_benchmark jemalloc.a dl)
-    target_link_libraries(fulltext_query_benchmark jemalloc.a dl)
+    target_link_libraries(infinity_benchmark jemalloc.a)
+    target_link_libraries(knn_import_benchmark jemalloc.a)
+    target_link_libraries(knn_query_benchmark jemalloc.a)
+    target_link_libraries(fulltext_benchmark jemalloc.a)
+    target_link_libraries(fulltext_query_benchmark jemalloc.a)
 endif()
 
 # add_definitions(-march=native)

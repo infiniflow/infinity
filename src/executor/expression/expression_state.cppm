@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+    // Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,12 +29,19 @@ export module expression_state;
 
 namespace infinity {
 
+export enum class AggregateFlag : i8 {
+    kUninitialized = 0,
+    kRunning = 1,
+    kFinish = 2,
+    kRunAndFinish = 3,
+};
+
 export class ExpressionState {
 public:
     // Static functions
     static SharedPtr<ExpressionState> CreateState(const SharedPtr<BaseExpression> &expression, char * = nullptr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state);
+    static SharedPtr<ExpressionState> CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag);
 
     static SharedPtr<ExpressionState> CreateState(const SharedPtr<CaseExpression> &agg_expr);
 
@@ -56,6 +63,8 @@ public:
     SharedPtr<ColumnVector> &OutputColumnVector() { return column_vector_; }
 
     char *agg_state_{};
+
+    AggregateFlag agg_flag_{AggregateFlag::kUninitialized};
 
 private:
     Vector<SharedPtr<ExpressionState>> children_;

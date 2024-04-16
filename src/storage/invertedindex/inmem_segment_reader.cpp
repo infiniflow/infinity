@@ -23,6 +23,7 @@ import index_segment_reader;
 import index_defines;
 import posting_writer;
 import memory_indexer;
+import third_party;
 
 namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)

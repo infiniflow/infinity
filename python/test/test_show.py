@@ -15,6 +15,7 @@ import polars as pl
 
 from common import common_values
 from infinity.common import ConflictType
+from infinity.errors import ErrorCode
 import infinity
 
 
@@ -23,24 +24,38 @@ class TestDescribe:
     def test_show_table(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        db = infinity_obj.get_database("default")
-        db.drop_table("test_show_table")
-        db.create_table(
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_show_table", ConflictType.Ignore)
+        db_obj.create_table(
             "test_show_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
         with pl.Config(fmt_str_lengths=1000):
-            res = db.show_table("test_show_table")
+            res = db_obj.show_table("test_show_table")
             print(res)
+
+        res = db_obj.drop_table("test_show_table", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     def test_show_columns(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        db = infinity_obj.get_database("default")
-        db.drop_table("test_show_columns")
-        db.create_table(
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_show_columns", ConflictType.Ignore)
+        db_obj.create_table(
             "test_show_columns", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
         with pl.Config(fmt_str_lengths=1000):
-            res = db.show_columns("test_show_columns")
+            res = db_obj.show_columns("test_show_columns")
             print(res)
             # check the polars dataframe
             assert res.columns == ["column_name", "column_type", "constraint"]
+
+        res = db_obj.drop_table("test_show_columns", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 

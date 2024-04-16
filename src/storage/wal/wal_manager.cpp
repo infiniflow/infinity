@@ -154,6 +154,9 @@ void WalManager::Flush() {
             continue;
         }
         // auto [max_commit_ts, wal_size] = GetWalState();
+        TxnManager *txn_mgr = storage_->txn_manager();
+
+        Vector<Txn *> txns;
         for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry == nullptr) {
@@ -164,6 +167,16 @@ void WalManager::Flush() {
             if (entry->cmds_.empty()) {
                 UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
+
+            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
+            // Commit sequentially so they get visible in the same order with wal.
+            bool conflict = txn->CheckConflict();
+            txns.push_back(txn);
+            if (conflict) {
+                txn->SetTxnToRollback();
+                continue;
+            }
+
             i32 exp_size = entry->GetSizeInBytes();
             Vector<char> buf(exp_size);
             char *ptr = buf.data();
@@ -199,15 +212,11 @@ void WalManager::Flush() {
             }
         }
 
-        TxnManager *txn_mgr = storage_->txn_manager();
-        // Commit sequentially so they get visible in the same order with wal.
-        for (const auto &entry : log_batch) {
-            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
-            if (txn != nullptr) {
-                txn->CommitBottom();
-            }
-        }
         log_batch.clear();
+
+        for (Txn *txn : txns) {
+            txn->CommitBottom();
+        }
 
         // Check if the wal file is too large, swap to a new one.
         try {
