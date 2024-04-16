@@ -1,12 +1,12 @@
 {
  "name": "qdrant_hybrid",
  "app": "qdrant",
- "app_path": "servers/qdrant/",
+ "app_path": "python/benchmark/servers/qdrant/",
  "connection_url": "http://localhost:6333",
  "vector_size": 1536,
  "distance": "cosine",
  "data_type": "json",
- "data_path": "datasets/dbpedia/dbpedia.json",
+ "data_path": "python/benchmark/datasets/dbpedia/dbpedia.json",
  "data_link": "to_be_set",
  "vector_name": "openai",
  "topK": 100,
@@ -18,7 +18,7 @@
     }
  },
  "query_type": "json",
- "query_path": "datasets/dbpedia/queries.json",
+ "query_path": "python/benchmark/datasets/dbpedia/queries.json",
  "query_link": "to_be_set",
  "insert_batch_size": 1024,
  "payload_index_schema": {
