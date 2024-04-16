@@ -764,7 +764,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             UnrecoverableError("Unexpected operator type");
         }
         case PhysicalOperatorType::kAggregate: {
-            if (fragment_type_ != FragmentType::kParallelStream) {
+            if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 

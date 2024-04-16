@@ -85,16 +85,29 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
 
     auto data_state = state->agg_state_;
 
-    // 1. Initialize the aggregate state.
-    expr->aggregate_function_.init_func_(data_state);
-
-    // 2. Loop to fill the aggregate state
-    expr->aggregate_function_.update_func_(data_state, child_output_col);
-
-    // 3. Get the aggregate result and append to output column vector.
-
-    const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
-    output_column_vector->AppendByPtr(result_ptr);
+    switch (state->agg_flag_) {
+        case AggregateFlag::kUninitialized: {
+            expr->aggregate_function_.init_func_(data_state);
+            state->agg_flag_ = AggregateFlag::kRunning;
+        }
+        case AggregateFlag::kRunning: {
+            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            break;
+        }
+        case AggregateFlag::kFinish: {
+            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            output_column_vector->AppendByPtr(result_ptr);
+            break;
+        }
+        case AggregateFlag::kRunAndFinish: {
+            expr->aggregate_function_.init_func_(data_state);
+            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            output_column_vector->AppendByPtr(result_ptr);
+            break;
+        }
+    }
 
     in_aggregate_ = false;
 }
