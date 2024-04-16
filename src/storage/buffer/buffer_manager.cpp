@@ -32,9 +32,12 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, Share
     if (!fs.Exists(*data_dir_)) {
         fs.CreateDirectory(*data_dir_);
     }
-    if (!fs.Exists(*temp_dir_)) {
-        fs.CreateDirectory(*temp_dir_);
+
+    if (fs.Exists(*temp_dir_)) {
+        fs.DeleteDirectory(*temp_dir_);
     }
+
+    fs.CreateDirectory(*temp_dir_);
 }
 
 BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
