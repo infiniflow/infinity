@@ -447,7 +447,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest1) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-//#define LOCAL_MERGER_TEST
+// #define LOCAL_MERGER_TEST
 #ifdef LOCAL_MERGER_TEST
 TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest2) {
     using namespace infinity;

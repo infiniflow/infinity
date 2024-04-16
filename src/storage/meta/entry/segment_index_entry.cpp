@@ -55,6 +55,7 @@ import block_entry;
 import local_file_system;
 import chunk_index_entry;
 import abstract_hnsw;
+import block_column_iter;
 
 namespace infinity {
 
@@ -210,13 +211,13 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
     u16 block_id = block_entry->block_id();
     RowID begin_row_id(seg_id, row_offset + u32(block_id) * block_entry->row_capacity());
 
-    const IndexBase *index_base = table_index_entry_->index_base();
-    const ColumnDef *column_def = table_index_entry_->column_def().get();
+    const SharedPtr<IndexBase> &index_base = table_index_entry_->table_index_def();
+    const SharedPtr<ColumnDef> &column_def = table_index_entry_->column_def();
     ColumnID column_id = column_def->id();
 
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
-            const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+            const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
             if (memory_indexer_.get() == nullptr) {
                 String base_name = fmt::format("ft_{}", begin_row_id.ToUint64());
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
@@ -238,8 +239,38 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             memory_indexer_->Insert(column_vector, row_offset, row_count, false);
             break;
         }
+        case IndexType::kHnsw: {
+            const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
+            if (memory_hnsw_indexer_.get() == nullptr) {
+                auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
+                SharedPtr<ChunkIndexEntry> memory_hnsw_indexer = ChunkIndexEntry::NewChunkIndexEntry(this, param.get(), begin_row_id, buffer_manager);
+
+                std::unique_lock<std::shared_mutex> lck(rw_locker_);
+                memory_hnsw_indexer_ = std::move(memory_hnsw_indexer);
+            }
+            BufferHandle buffer_handle = memory_hnsw_indexer_->GetIndex();
+
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                UnrecoverableError("HNSW supports embedding type.");
+            }
+            TypeInfo *type_info = column_def->type()->type_info().get();
+            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            switch (embedding_info->Type()) {
+                case kElemFloat: {
+                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
+                    MemIndexInserterIter<f32> iter(0, block_column_entry, buffer_manager, row_offset, row_count);
+                    abstract_hnsw.InsertVecs(std::move(iter));
+                    break;
+                }
+                default: {
+                    RecoverableError(Status::NotSupport("Not support data type for index hnsw."));
+                }
+            }
+            break;
+        }
         case IndexType::kIVFFlat:
-        case IndexType::kHnsw:
         case IndexType::kSecondary: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -267,15 +298,32 @@ void SegmentIndexEntry::MemIndexCommit() {
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
-    if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
-        return nullptr;
-    memory_indexer_->Dump(false, spill);
-    if (!spill) {
-        chunk_index_entry = AddFtChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
-        this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());
-        memory_indexer_.reset();
+    switch (index_base->index_type_) {
+        case IndexType::kHnsw: {
+            if (memory_hnsw_indexer_.get() == nullptr) {
+                return nullptr;
+            }
+            auto dump_indexer = std::exchange(memory_hnsw_indexer_, nullptr);
+            this->AddChunkIndexEntry(dump_indexer);
+            return dump_indexer;
+        }
+        case IndexType::kFullText: {
+            if (memory_indexer_.get() == nullptr) {
+                return nullptr;
+            }
+            memory_indexer_->Dump(false, spill);
+            if (!spill) {
+                chunk_index_entry =
+                    AddFtChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
+                this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());
+                memory_indexer_.reset();
+            }
+            return chunk_index_entry;
+        }
+        default: {
+            return nullptr;
+        }
     }
-    return chunk_index_entry;
 }
 
 void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
@@ -342,7 +390,8 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
 
             RowID base_rowid(segment_entry->segment_id(), 0);
-            SharedPtr<ChunkIndexEntry> chunk_index_entry = AddChunkIndexEntry(segment_entry->GetTableEntry(), base_rowid, buffer_mgr);
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = CreateChunkIndexEntry(segment_entry->GetTableEntry(), base_rowid, buffer_mgr);
+            this->AddChunkIndexEntry(chunk_index_entry);
             BufferHandle buffer_handle = chunk_index_entry->GetIndex();
 
             switch (embedding_info->Type()) {
@@ -542,8 +591,9 @@ void SegmentIndexEntry::CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp co
 }
 
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
-    if (table_index_entry_->index_base()->index_type_ == IndexType::kFullText) {
-        // Fulltext index doesn't need to be checkpointed.
+    auto index_type = table_index_entry_->index_base()->index_type_;
+    if (index_type == IndexType::kFullText || index_type == IndexType::kHnsw) {
+        // Fulltext index, Hnsw doesn't need to be checkpointed.
         return false;
     }
 
@@ -615,15 +665,17 @@ void SegmentIndexEntry::SaveIndexFile() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntry(const TableEntry *table_entry, RowID base_rowid, BufferManager *buffer_mgr) {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateChunkIndexEntry(const TableEntry *table_entry, RowID base_rowid, BufferManager *buffer_mgr) {
     const auto &index_base = table_index_entry_->table_index_def();
     const auto &column_def = table_entry->GetColumnDefByName(index_base->column_name());
     auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
 
-    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewChunkIndexEntry(this, param.get(), base_rowid, buffer_mgr);
+    return ChunkIndexEntry::NewChunkIndexEntry(this, param.get(), base_rowid, buffer_mgr);
+}
+
+void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry) {
     std::shared_lock lock(rw_locker_);
     chunk_index_entries_.push_back(chunk_index_entry);
-    return chunk_index_entry;
 }
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
