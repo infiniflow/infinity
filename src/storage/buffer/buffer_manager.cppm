@@ -52,7 +52,7 @@ public:
 
     void AddBufferObjectForDeletion(const String &path) { obj_path_delete_.push_back(path); }
 
-    void ExecuteDeletions();
+    void RemoveBufferObjects();
 
 private:
     friend class BufferObj;
