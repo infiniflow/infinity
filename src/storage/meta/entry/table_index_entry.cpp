@@ -148,7 +148,7 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
     }
 }
 
-void TableIndexEntry::RollbackPopulateIndex(TxnIndexStore *txn_index_store) {
+void TableIndexEntry::RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn) {
     std::unique_lock w_lock(rw_locker_);
     for (auto *chunk_index_entry : txn_index_store->chunk_index_entries_) {
         chunk_index_entry->Cleanup();
@@ -156,6 +156,9 @@ void TableIndexEntry::RollbackPopulateIndex(TxnIndexStore *txn_index_store) {
         segment_index_entry->RemoveChunkIndexEntry(chunk_index_entry);
     }
     for (const auto &[segment_id, segment_index_entry] : txn_index_store->index_entry_map_) {
+        if (segment_index_entry->begin_ts_ != txn->BeginTS()) {
+            continue;
+        }
         segment_index_entry->Cleanup();
         if (index_by_segment_.erase(segment_id) == 0) {
             UnrecoverableError("Failed to erase segment index entry");

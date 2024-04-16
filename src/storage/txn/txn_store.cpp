@@ -232,7 +232,7 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        Catalog::RollbackPopulateIndex(txn_index_store.get());
+        Catalog::RollbackPopulateIndex(txn_index_store.get(), txn_);
     }
     Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
     blocks_.clear();
