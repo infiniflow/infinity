@@ -45,6 +45,12 @@ import statement_common;
 import extra_ddl_info;
 import update_statement;
 import http_search;
+import knn_expr;
+import type_info;
+import logical_type;
+import embedding_info;
+import decimal_info;
+import status;
 
 namespace {
 
@@ -225,9 +231,29 @@ public:
             String value_type = field_element["type"];
             ToLower(value_type);
 
-            SharedPtr<DataType> column_type;
+            SharedPtr<DataType> column_type{nullptr};
+            SharedPtr<TypeInfo> type_info{nullptr};
             if (value_type == "vector") {
-                column_type = DataType::Deserialize(field_element);
+                String etype = field_element["element_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType e_data_type;
+                if (etype == "integer") {
+                    e_data_type = EmbeddingDataType::kElemInt32;
+                } else if (etype == "float") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    e_data_type = EmbeddingDataType::kElemInvalid;
+                }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);
+            } else if (value_type == "decimal") {
+                type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
+                column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
+            } else if (value_type == "array") {
+                infinity::Status::ParserError("Array isn't implemented here.");
+                type_info = nullptr;
             } else {
                 column_type = DataType::StringDeserialize(value_type);
             }
