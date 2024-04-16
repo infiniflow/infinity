@@ -621,6 +621,7 @@ class TestKnn(HttpTest):
             })
         return 
     def test_with_fulltext_match_with_valid_columns(self):
+        httputils.check_data(TEST_TMP_DIR)
         match_param_1 = ["doctitle","num","body"]
         dbname = "default"
         tbname = "test_with_fulltext_match_with_valid_columns"
@@ -666,7 +667,7 @@ class TestKnn(HttpTest):
                 })
         return
     def test_with_fulltext_match_with_invalid_columns(self):
-       
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_with_fulltext_match_with_invalid_columns"
         
@@ -712,6 +713,7 @@ class TestKnn(HttpTest):
                 })
         return
     def test_with_fulltext_match_with_valid_words(self):
+        httputils.check_data(TEST_TMP_DIR)
         match_param_2 = ["a word a segment","body=Greek"]
         dbname = "default"
         tbname = "test_with_fulltext_match_with_valid_words"
@@ -758,6 +760,7 @@ class TestKnn(HttpTest):
                 })
         return 
     def test_with_fulltext_match_with_invalid_words(self):
+        httputils.check_data(TEST_TMP_DIR)
         match_param_2 = [1,1.1,[],{},()]
         dbname = "default"
         tbname = "test_with_fulltext_match_with_valid_words"
@@ -804,6 +807,7 @@ class TestKnn(HttpTest):
                 })
         return 
     def test_with_fulltext_match_with_options(self):
+        httputils.check_data(TEST_TMP_DIR)
         match_param_3 = ["@#$!#@$SDa^sdf3!@#$","topn=1","1"]
         dbname = "default"
         tbname = "test_with_fulltext_match_with_options"
@@ -850,6 +854,7 @@ class TestKnn(HttpTest):
                 })
         return
     def test_with_fulltext_match_with_invalid_options(self):
+        httputils.check_data(TEST_TMP_DIR)
         match_param_3 = [1,1.1,[],{},()]
         dbname = "default"
         tbname = "test_with_fulltext_match_with_invalid_words"

@@ -161,6 +161,7 @@ class TestIndex(HttpTest):
         dbname = "default"
         tbname = "test_create_drop_vector_index_invalid_options"
         idxname = "my_index"
+
         self.dropTable(dbname,tbname)
         self.createTable(
             dbname,
@@ -397,6 +398,7 @@ class TestIndex(HttpTest):
         return 
    
     def test_import_data_create_index(self):
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_import_data_create_index"
         idxname = "my_index"
@@ -430,6 +432,7 @@ class TestIndex(HttpTest):
     #ERROR: IVFFlat realtime index is not supported yet
     @pytest.mark.skip(reason="IVFFlat realtime index is not supported yet")
     def test_create_vector_index_import_data(self):
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_create_vector_index_import_data"
         idxname = "my_index"
@@ -459,6 +462,7 @@ class TestIndex(HttpTest):
     #ERROR: IVFFlat realtime index is not supported yet
     @pytest.mark.skip(reason="IVFFlat realtime index is not supported yet")
     def test_create_index_import_data(self):
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_create_index_import_data"
         idxname = "my_index"
@@ -495,6 +499,7 @@ class TestIndex(HttpTest):
     #ERROR: IVFFlat realtime index is not supported yet
     @pytest.mark.skip(reason="IVFFlat realtime index is not supported yet")
     def test_insert_data_fulltext_index_search(self):
+        httputils.check_data(TEST_TMP_DIR)
         httputils.copy_data("enwiki_99.csv")
         dbname = "default"
         tbname = "test_insert_data_fulltext_index_search"
@@ -522,6 +527,7 @@ class TestIndex(HttpTest):
 
         return 
     def test_fulltext_match_with_invalid_analyzer(self):
+        httputils.check_data(TEST_TMP_DIR)
         dbname = "default"
         tbname = "test_fulltext_match_with_invalid_analyzer"
         idxname = "my_index"

@@ -39,7 +39,9 @@ void CleanupPeriodicTrigger::Trigger() {
     }
     last_visible_ts_ = visible_ts;
     LOG_INFO(fmt::format("Cleanup visible timestamp: {}", visible_ts));
-    auto cleanup_task = MakeShared<CleanupTask>(catalog_, visible_ts);
+
+    auto buffer_mgr = txn_mgr_->GetBufferMgr();
+    auto cleanup_task = MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr);
     bg_processor_->Submit(std::move(cleanup_task));
 }
 

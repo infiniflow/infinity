@@ -408,7 +408,7 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     // merge
     global_catalog_delta_entry->ReplayDeltaEntry(std::move(local_catalog_delta_entry));
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 4u);
+    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 5u);
 
     infinity::InfinityContext::instance().UnInit();
 }
