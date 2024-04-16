@@ -723,7 +723,7 @@ void AddDBEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp la
     MergeFlag flag = this->NextDeleteFlag(other->merge_flag_);
     TxnTimeStamp commit_ts = this->commit_ts_;
     *this = std::move(*static_cast<AddDBEntryOp *>(other.get()));
-    if (commit_ts >= last_full_checkpoint_ts) {
+    if (commit_ts > last_full_checkpoint_ts) {
         this->merge_flag_ = flag;
     }
 }
@@ -739,7 +739,7 @@ void AddTableEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp
     //     LOG_INFO("AAA");
     // }
     *this = std::move(*add_table_op);
-    if (commit_ts >= last_full_checkpoint_ts) {
+    if (commit_ts > last_full_checkpoint_ts) {
         this->merge_flag_ = flag;
     }
 }
@@ -752,7 +752,7 @@ void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeSta
     MergeFlag flag = this->NextDeleteFlag(add_segment_op->merge_flag_);
     TxnTimeStamp commit_ts = this->commit_ts_;
     *this = std::move(*add_segment_op);
-    if (commit_ts >= last_full_checkpoint_ts) {
+    if (commit_ts > last_full_checkpoint_ts) {
         this->merge_flag_ = flag;
     }
 }
@@ -780,7 +780,7 @@ void AddTableIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTime
     MergeFlag flag = this->NextDeleteFlag(add_table_index_op->merge_flag_);
     TxnTimeStamp commit_ts = this->commit_ts_;
     *this = std::move(*add_table_index_op);
-    if (commit_ts >= last_full_checkpoint_ts) {
+    if (commit_ts > last_full_checkpoint_ts) {
         this->merge_flag_ = flag;
     }
 }
