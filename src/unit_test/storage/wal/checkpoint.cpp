@@ -96,7 +96,9 @@ protected:
             }
             usleep(1000 * 1000);
         }
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+
+        auto buffer_mgr = txn_mgr->GetBufferMgr();
+        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
 

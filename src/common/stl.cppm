@@ -47,6 +47,7 @@ module;
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <queue>
 
 export module stl;
 
@@ -57,7 +58,6 @@ export namespace std {
     using std::forward;
     using std::move;
     using std::exchange;
-
     using std::swap;
 
     using std::max;
@@ -270,6 +270,9 @@ namespace infinity {
 
     template<typename S>
     using HashSet = std::unordered_set<S>;
+
+    template<typename T>
+    using MultiSet = std::multiset<T>;
 
     template<typename T>
     using MaxHeap = std::priority_queue<T>;

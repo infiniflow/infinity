@@ -86,17 +86,18 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryP
     return iter;
 }
 
-UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight) {
+UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight, bool fetch_position) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
-        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool);
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool, fetch_position);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
     }
-    if (seg_postings->empty())
+    if (seg_postings->empty()) {
         return nullptr;
+    }
     auto result = MakeUnique<BlockMaxTermDocIterator>(flag_, session_pool);
     result->MultiplyWeight(weight);
     u32 state_pool_size = 0; // TODO

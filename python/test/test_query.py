@@ -59,6 +59,14 @@ class TestQuery:
         query_builder.fusion('rrf')
         res = query_builder.to_df()
         print(res)
+        res = table.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db.drop_table("my_table", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = conn.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     def test_query_builder(self):
         # connect
@@ -70,3 +78,9 @@ class TestQuery:
             "test_query_builder", {"c1": "int"}, ConflictType.Error)
         query_builder = table_obj.query_builder
         query_builder.output(["*"]).to_df()
+
+        res = db_obj.drop_table("test_query_builder", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK

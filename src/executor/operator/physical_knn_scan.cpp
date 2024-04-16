@@ -267,44 +267,44 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                   block_column_idx + 1,
                                   brute_task_n));
         } else [[likely]] {
-        LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after FastRoughFilter",
-                              knn_scan_function_data->task_id_,
-                              block_column_idx + 1,
-                              brute_task_n));
-        const auto row_count = block_entry->row_count();
-        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+            LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after FastRoughFilter",
+                                  knn_scan_function_data->task_id_,
+                                  block_column_idx + 1,
+                                  brute_task_n));
+            const auto row_count = block_entry->row_count();
+            BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
-        Bitmask bitmask;
-        bitmask.Initialize(std::bit_ceil(row_count));
-        if (filter_expression_) {
-            auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
-            auto &filter_state_ = knn_scan_function_data->filter_state_;
-            auto &bool_column = knn_scan_function_data->bool_column_;
-            // filter and build bitmask, if filter_expression_ != nullptr
-            db_for_filter->Reset(row_count);
-            ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
-            bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
-            ExpressionEvaluator expr_evaluator;
-            expr_evaluator.Init(db_for_filter);
-            expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
-            const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
-            SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-            MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true);
-            bool_column->Reset();
-        }
-        block_entry->SetDeleteBitmask(begin_ts, bitmask);
+            Bitmask bitmask;
+            bitmask.Initialize(std::bit_ceil(row_count));
+            if (filter_expression_) {
+                auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
+                auto &filter_state_ = knn_scan_function_data->filter_state_;
+                auto &bool_column = knn_scan_function_data->bool_column_;
+                // filter and build bitmask, if filter_expression_ != nullptr
+                db_for_filter->Reset(row_count);
+                ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
+                bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
+                ExpressionEvaluator expr_evaluator;
+                expr_evaluator.Init(db_for_filter);
+                expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
+                const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
+                SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
+                MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true);
+                bool_column->Reset();
+            }
+            block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
             ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
 
-        auto data = reinterpret_cast<const DataType *>(column_vector.data());
-        merge_heap->Search(query,
-                           data,
-                           knn_scan_shared_data->dimension_,
-                           dist_func->dist_func_,
-                           row_count,
-                           block_entry->segment_id(),
-                           block_entry->block_id(),
-                           bitmask);
+            auto data = reinterpret_cast<const DataType *>(column_vector.data());
+            merge_heap->Search(query,
+                               data,
+                               knn_scan_shared_data->dimension_,
+                               dist_func->dist_func_,
+                               row_count,
+                               block_entry->segment_id(),
+                               block_entry->block_id(),
+                               bitmask);
         }
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
@@ -327,171 +327,183 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             LOG_TRACE(
                 fmt::format("KnnScan: {} index {}/{} skipped after FastRoughFilter", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         } else [[likely]] {
-        LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after FastRoughFilter",
-                              knn_scan_function_data->task_id_,
-                              index_idx + 1,
-                              index_task_n));
-        auto segment_row_count = segment_entry->row_count();
-        Bitmask bitmask;
-        if (filter_expression_) {
-            bitmask.Initialize(std::bit_ceil(segment_row_count));
-            SizeT segment_row_count_real = 0;
-            auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
-            auto &filter_state_ = knn_scan_function_data->filter_state_;
-            auto &bool_column = knn_scan_function_data->bool_column_;
-            // filter and build bitmask, if filter_expression_ != nullptr
-            ExpressionEvaluator expr_evaluator;
-            auto block_entry_iter = BlockEntryIter(segment_entry);
-            for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                auto row_count = block_entry->row_count();
-                db_for_filter->Reset(row_count);
-                ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
-                bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
-                expr_evaluator.Init(db_for_filter);
-                expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
-                const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
-                SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-                MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true, segment_row_count_real);
-                segment_row_count_real += row_count;
-                bool_column->Reset();
-            }
-            if (segment_row_count_real != segment_row_count) {
-                UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
-                                               segment_id,
-                                               segment_row_count_real,
-                                               segment_row_count));
-            }
-        }
-        bool use_bitmask = !bitmask.IsAllTrue();
-
-        switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
-            case IndexType::kIVFFlat: {
-                BufferHandle index_handle = segment_index_entry->GetIndex();
-                auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
-                i32 n_probes = 1;
-                auto IVFFlatScanTemplate = [&]<typename AnnIVFFlatType, typename... OptionalFilter>(OptionalFilter &&...filter) {
-                    AnnIVFFlatType ann_ivfflat_query(query,
-                                                     knn_scan_shared_data->query_count_,
-                                                     knn_scan_shared_data->topk_,
-                                                     knn_scan_shared_data->dimension_,
-                                                     knn_scan_shared_data->elem_type_);
-                    ann_ivfflat_query.Begin();
-                    ann_ivfflat_query.Search(index, segment_id, n_probes, std::forward<OptionalFilter>(filter)...);
-                    ann_ivfflat_query.EndWithoutSort();
-                    auto dists = ann_ivfflat_query.GetDistances();
-                    auto row_ids = ann_ivfflat_query.GetIDs();
-                    // TODO: now only work for one query
-                    // FIXME: cant work for multiple queries
-                    auto result_count =
-                        std::lower_bound(dists, dists + knn_scan_shared_data->topk_, AnnIVFFlatType::InvalidValue(), AnnIVFFlatType::CompareDist) -
-                        dists;
-                    merge_heap->Search(dists, row_ids, result_count);
-                };
-                auto IVFFlatScan = [&]<typename... OptionalFilter>(OptionalFilter &&...filter) {
-                    switch (knn_scan_shared_data->knn_distance_type_) {
-                        case KnnDistanceType::kL2: {
-                            IVFFlatScanTemplate.template operator()<AnnIVFFlatL2<DataType>>(std::forward<OptionalFilter>(filter)...);
-                            break;
-                        }
-                        case KnnDistanceType::kInnerProduct: {
-                            IVFFlatScanTemplate.template operator()<AnnIVFFlatIP<DataType>>(std::forward<OptionalFilter>(filter)...);
-                            break;
-                        }
-                        default: {
-                            RecoverableError(Status::NotSupport("Not implemented"));
-                        }
-                    }
-                };
-                if (use_bitmask) {
-                    if (segment_entry->CheckAnyDelete(begin_ts)) {
-                        DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
-                        IVFFlatScan(filter);
-                    } else {
-                        BitmaskFilter<SegmentOffset> filter(bitmask);
-                        IVFFlatScan(filter);
-                    }
-                } else {
-                    if (segment_entry->CheckAnyDelete(begin_ts)) {
-                        DeleteFilter filter(segment_entry, begin_ts);
-                        IVFFlatScan(filter);
-                    } else {
-                        IVFFlatScan();
-                    }
+            LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after FastRoughFilter",
+                                  knn_scan_function_data->task_id_,
+                                  index_idx + 1,
+                                  index_task_n));
+            auto segment_row_count = segment_entry->row_count();
+            Bitmask bitmask;
+            if (filter_expression_) {
+                bitmask.Initialize(std::bit_ceil(segment_row_count));
+                SizeT segment_row_count_real = 0;
+                auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
+                auto &filter_state_ = knn_scan_function_data->filter_state_;
+                auto &bool_column = knn_scan_function_data->bool_column_;
+                // filter and build bitmask, if filter_expression_ != nullptr
+                ExpressionEvaluator expr_evaluator;
+                auto block_entry_iter = BlockEntryIter(segment_entry);
+                for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+                    auto row_count = block_entry->row_count();
+                    db_for_filter->Reset(row_count);
+                    ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
+                    bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
+                    expr_evaluator.Init(db_for_filter);
+                    expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
+                    const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
+                    SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
+                    MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true, segment_row_count_real);
+                    segment_row_count_real += row_count;
+                    bool_column->Reset();
                 }
-                break;
+                if (segment_row_count_real != segment_row_count) {
+                    UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
+                                                   segment_id,
+                                                   segment_row_count_real,
+                                                   segment_row_count));
+                }
             }
-            case IndexType::kHnsw: {
+            bool use_bitmask = !bitmask.IsAllTrue();
+
+            switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
+                case IndexType::kIVFFlat: {
+                    BufferHandle index_handle = segment_index_entry->GetIndex();
+                    auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
+                    i32 n_probes = 1;
+                    auto IVFFlatScanTemplate = [&]<typename AnnIVFFlatType, typename... OptionalFilter>(OptionalFilter &&...filter) {
+                        AnnIVFFlatType ann_ivfflat_query(query,
+                                                         knn_scan_shared_data->query_count_,
+                                                         knn_scan_shared_data->topk_,
+                                                         knn_scan_shared_data->dimension_,
+                                                         knn_scan_shared_data->elem_type_);
+                        ann_ivfflat_query.Begin();
+                        ann_ivfflat_query.Search(index, segment_id, n_probes, std::forward<OptionalFilter>(filter)...);
+                        ann_ivfflat_query.EndWithoutSort();
+                        auto dists = ann_ivfflat_query.GetDistances();
+                        auto row_ids = ann_ivfflat_query.GetIDs();
+                        // TODO: now only work for one query
+                        // FIXME: cant work for multiple queries
+                        auto result_count = std::lower_bound(dists,
+                                                             dists + knn_scan_shared_data->topk_,
+                                                             AnnIVFFlatType::InvalidValue(),
+                                                             AnnIVFFlatType::CompareDist) -
+                                            dists;
+                        merge_heap->Search(dists, row_ids, result_count);
+                    };
+                    auto IVFFlatScan = [&]<typename... OptionalFilter>(OptionalFilter &&...filter) {
+                        switch (knn_scan_shared_data->knn_distance_type_) {
+                            case KnnDistanceType::kL2: {
+                                IVFFlatScanTemplate.template operator()<AnnIVFFlatL2<DataType>>(std::forward<OptionalFilter>(filter)...);
+                                break;
+                            }
+                            case KnnDistanceType::kInnerProduct: {
+                                IVFFlatScanTemplate.template operator()<AnnIVFFlatIP<DataType>>(std::forward<OptionalFilter>(filter)...);
+                                break;
+                            }
+                            default: {
+                                RecoverableError(Status::NotSupport("Not implemented"));
+                            }
+                        }
+                    };
+                    if (use_bitmask) {
+                        if (segment_entry->CheckAnyDelete(begin_ts)) {
+                            DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
+                            IVFFlatScan(filter);
+                        } else {
+                            BitmaskFilter<SegmentOffset> filter(bitmask);
+                            IVFFlatScan(filter);
+                        }
+                    } else {
+                        if (segment_entry->CheckAnyDelete(begin_ts)) {
+                            DeleteFilter filter(segment_entry, begin_ts);
+                            IVFFlatScan(filter);
+                        } else {
+                            IVFFlatScan();
+                        }
+                    }
+                    break;
+                }
+                case IndexType::kHnsw: {
                     const auto *index_hnsw = static_cast<const IndexHnsw *>(segment_index_entry->table_index_entry()->index_base());
 
-                    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+                    auto hnsw_search = [&](BufferHandle index_handle, bool with_lock) {
+                        AbstractHnsw<f32, SegmentOffset> abstract_hnsw(index_handle.GetDataMut(), index_hnsw);
 
-                    for (auto &chunk_index_entry : chunk_index_entries) {
-                    BufferHandle index_handle = chunk_index_entry->GetIndex();
-                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(index_handle.GetDataMut(), index_hnsw);
-
-                    for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
-                        if (opt_param.param_name_ == "ef") {
-                            u64 ef = std::stoull(opt_param.param_value_);
-                            abstract_hnsw.SetEf(ef);
-                        }
-                    }
-
-                    i64 result_n = -1;
-                    for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
-                        const DataType *query =
-                            static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-
-                        SizeT result_n1 = 0;
-                        UniquePtr<DataType[]> d_ptr = nullptr;
-                        UniquePtr<SegmentOffset[]> l_ptr = nullptr;
-                        if (use_bitmask) {
-                            if (segment_entry->CheckAnyDelete(begin_ts)) {
-                                DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
-                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
-                            } else {
-                                BitmaskFilter<SegmentOffset> filter(bitmask);
-                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
-                            }
-                        } else {
-                            if (segment_entry->CheckAnyDelete(begin_ts)) {
-                                DeleteFilter filter(segment_entry, begin_ts);
-                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter);
-                            } else {
-                                std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_);
+                        for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
+                            if (opt_param.param_name_ == "ef") {
+                                u64 ef = std::stoull(opt_param.param_value_);
+                                abstract_hnsw.SetEf(ef);
                             }
                         }
 
-                        if (result_n < 0) {
-                            result_n = result_n1;
-                        } else if (result_n != (i64)result_n1) {
-                            UnrecoverableError("KnnScan: result_n mismatch");
-                        }
+                        i64 result_n = -1;
+                        for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
+                            const DataType *query =
+                                static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
 
-                        switch (knn_scan_shared_data->knn_distance_type_) {
-                            case KnnDistanceType::kInvalid: {
-                                UnrecoverableError("Invalid distance type");
-                            }
-                            case KnnDistanceType::kL2:
-                            case KnnDistanceType::kHamming: {
-                                break;
-                            }
-                            case KnnDistanceType::kCosine:
-                            case KnnDistanceType::kInnerProduct: {
-                                for (i64 i = 0; i < result_n; ++i) {
-                                    d_ptr[i] = -d_ptr[i];
+                            SizeT result_n1 = 0;
+                            UniquePtr<DataType[]> d_ptr = nullptr;
+                            UniquePtr<SegmentOffset[]> l_ptr = nullptr;
+                            if (use_bitmask) {
+                                if (segment_entry->CheckAnyDelete(begin_ts)) {
+                                    DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
+                                    std::tie(result_n1, d_ptr, l_ptr) =
+                                        abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, with_lock);
+                                } else {
+                                    BitmaskFilter<SegmentOffset> filter(bitmask);
+                                    std::tie(result_n1, d_ptr, l_ptr) =
+                                        abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, with_lock);
                                 }
-                                break;
+                            } else {
+                                if (segment_entry->CheckAnyDelete(begin_ts)) {
+                                    DeleteFilter filter(segment_entry, begin_ts);
+                                    std::tie(result_n1, d_ptr, l_ptr) =
+                                        abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, with_lock);
+                                } else {
+                                    std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, with_lock);
+                                }
                             }
-                        }
 
-                        auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
-                        for (i64 i = 0; i < result_n; ++i) {
-                            row_ids[i] = RowID{segment_entry->segment_id(), l_ptr[i]};
+                            if (result_n < 0) {
+                                result_n = result_n1;
+                            } else if (result_n != (i64)result_n1) {
+                                UnrecoverableError("KnnScan: result_n mismatch");
+                            }
+
+                            switch (knn_scan_shared_data->knn_distance_type_) {
+                                case KnnDistanceType::kInvalid: {
+                                    UnrecoverableError("Invalid distance type");
+                                }
+                                case KnnDistanceType::kL2:
+                                case KnnDistanceType::kHamming: {
+                                    break;
+                                }
+                                case KnnDistanceType::kCosine:
+                                case KnnDistanceType::kInnerProduct: {
+                                    for (i64 i = 0; i < result_n; ++i) {
+                                        d_ptr[i] = -d_ptr[i];
+                                    }
+                                    break;
+                                }
+                            }
+
+                            auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
+                            for (i64 i = 0; i < result_n; ++i) {
+                                row_ids[i] = RowID{segment_entry->segment_id(), l_ptr[i]};
+                            }
+                            merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                         }
-                        merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
+                    };
+
+                    auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetHnswIndexSnapshot();
+                    for (auto &chunk_index_entry : chunk_index_entries) {
+                        BufferHandle index_handle = chunk_index_entry->GetIndex();
+                        hnsw_search(index_handle, false);
                     }
+                    if (memory_index_entry.get() != nullptr) {
+                        BufferHandle index_handle = memory_index_entry->GetIndex();
+                        hnsw_search(index_handle, true);
                     }
+
                     break;
                 }
                 default: {

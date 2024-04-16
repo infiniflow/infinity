@@ -77,6 +77,14 @@ BufferHandle BufferObj::Load() {
     return BufferHandle(this, data);
 }
 
+void BufferObj::LoadInner() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    if (status_ != BufferStatus::kLoaded) {
+        UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+    }
+    ++rc_;
+}
+
 void BufferObj::GetMutPointer() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     type_ = BufferType::kEphemeral;
@@ -97,6 +105,7 @@ void BufferObj::UnloadInner() {
             break;
         }
         default: {
+            LOG_INFO(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
             UnrecoverableError(fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_)));
         }
     }
@@ -166,7 +175,7 @@ bool BufferObj::Save() {
         }
         type_ = BufferType::kPersistent;
     }
-    if(write) {
+    if (write) {
         file_worker_->Sync();
         file_worker_->CloseFile();
     }
@@ -187,7 +196,8 @@ void BufferObj::SetAndTryCleanup() {
             if (!wait_for_gc_) {
                 UnrecoverableError("Assert: unloaded buffer object should in gc_queue.");
             }
-            file_worker_->CleanupFile();
+            String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
+            buffer_mgr_->AddPathForDeletions(file_path);
             status_ = BufferStatus::kClean;
             break;
         }
@@ -197,10 +207,12 @@ void BufferObj::SetAndTryCleanup() {
             }
             String file_name = this->GetFilename();
             LOG_TRACE(fmt::format("Remove file: {}", file_name));
-            file_worker_->CleanupFile();
-            LOG_TRACE(fmt::format("Remove from buffer: {}", file_name));
-            buffer_mgr_->RemoveBufferObj(file_name);
-            LOG_TRACE(fmt::format("Removed file and buffer: {}", file_name));
+
+            String file_path = fmt::format("{}/{}", *(file_worker_->file_dir_), *(file_worker_->file_name_));
+            buffer_mgr_->AddPathForDeletions(file_path);
+            LOG_TRACE(fmt::format("Add the file to be deleted from buffer: {}", file_name));
+            buffer_mgr_->AddBufferObjectForDeletion(file_name);
+            LOG_TRACE(fmt::format("Add the file and buffer to be deleted: {}", file_name));
             break;
         }
         default: {

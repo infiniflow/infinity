@@ -562,6 +562,7 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             continue;
         const IndexBase *index_base = table_index_entry->index_base();
         switch (index_base->index_type_) {
+            case IndexType::kHnsw:
             case IndexType::kFullText: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
@@ -578,6 +579,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
 }
 
 void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges) {
+    const IndexBase *index_base = table_index_entry->index_base();
+
     SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(seg_id, MAX_TIMESTAMP);
     SharedPtr<SegmentIndexEntry> segment_index_entry;
     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
@@ -585,7 +588,10 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
     if (created) {
         Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
         txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
-        table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+
+        if (index_base->index_type_ == IndexType::kFullText) {
+            table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+        }
     }
     table_index_entry->last_segment_ = segment_index_entry;
     Vector<SharedPtr<BlockEntry>> block_entries;
@@ -607,7 +613,10 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-                table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+
+                if (index_base->index_type_ == IndexType::kFullText) {
+                    table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+                }
             }
         }
     }
@@ -703,8 +712,9 @@ void TableEntry::OptimizeIndex(Txn *txn) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-        if (!status.ok())
+        if (!status.ok()) {
             continue;
+        }
         const IndexBase *index_base = table_index_entry->index_base();
         if (index_base->index_type_ != IndexType::kFullText) {
             UniquePtr<String> err_msg =
