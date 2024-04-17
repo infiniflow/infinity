@@ -51,6 +51,7 @@ import logical_type;
 import embedding_info;
 import decimal_info;
 import status;
+import constant_expr;
 
 namespace {
 
@@ -475,13 +476,13 @@ public:
 
             String file_type_str = http_body_json["file_type"];
             ToLower(file_type_str);
-            if(file_type_str == "csv") {
+            if (file_type_str == "csv") {
                 import_options.copy_file_type_ = CopyFileType::kCSV;
-            } else if(file_type_str == "json") {
+            } else if (file_type_str == "json") {
                 import_options.copy_file_type_ = CopyFileType::kJSON;
-            } else if(file_type_str == "jsonl") {
+            } else if (file_type_str == "jsonl") {
                 import_options.copy_file_type_ = CopyFileType::kJSONL;
-            } else if(file_type_str == "fvecs") {
+            } else if (file_type_str == "fvecs") {
                 import_options.copy_file_type_ = CopyFileType::kFVECS;
             } else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
@@ -489,13 +490,13 @@ public:
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            if(import_options.copy_file_type_ == CopyFileType::kCSV) {
-                if(http_body_json.contains("header")) {
+            if (import_options.copy_file_type_ == CopyFileType::kCSV) {
+                if (http_body_json.contains("header")) {
                     import_options.header_ = http_body_json["header"];
                 }
-                if(http_body_json.contains("delimiter")) {
+                if (http_body_json.contains("delimiter")) {
                     String delimiter = http_body_json["delimiter"];
-                    if(delimiter.size() != 1) {
+                    if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
                         json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
                         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -736,27 +737,9 @@ public:
                                 auto string_value = value.template get<String>();
                                 column_type_map.emplace(key, LiteralType::kString);
 
-                                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-                                ExprParser expr_parser;
-                                expr_parser.Parse(string_value, expr_parsed_result.get());
-                                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                                    json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                    json_response["error_message"] = fmt::format("Invalid expression: {}", string_value);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
-                                values_row->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
-                                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
-                                break;
-
-                                // infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
-                                // column_type_map.emplace(key, LiteralType::kString);
-                                // auto str_value = value.template get<std::string>();
-                                // char str_buffer[str_value.size() + 1];
-                                // std::strcpy(str_buffer, str_value.c_str());
-                                // const_expr->str_value_ = str_buffer;
-                                // values_row->emplace_back(const_expr);
-                                // const_expr = nullptr;
+                                ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
+                                const_expr->str_value_ = strdup(string_value.c_str());
+                                values_row->emplace_back(const_expr);
                                 break;
                             }
                             case nlohmann::json::value_t::object:
@@ -948,18 +931,9 @@ public:
 
                                 auto string_value = value.template get<String>();
 
-                                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-                                ExprParser expr_parser;
-                                // ConstantExpr expr_parser;
-                                expr_parser.Parse(string_value, expr_parsed_result.get());
-                                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                                    json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                    json_response["error_message"] = fmt::format("Invalid expression: {}", string_value);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
-                                (*values_row)[column_id] = expr_parsed_result->exprs_ptr_->at(0);
-                                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+                                ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
+                                const_expr->str_value_ = strdup(string_value.c_str());
+                                (*values_row)[column_id] = const_expr;
 
                                 break;
                             }
@@ -982,8 +956,14 @@ public:
                 auto result = infinity->Insert(database_name, table_name, columns, column_values);
                 columns = nullptr;
                 column_values = nullptr;
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
 
             } else {
                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
@@ -1028,15 +1008,20 @@ public:
             const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
             expr_parsed_result->exprs_ptr_->at(0) = nullptr;
 
-            // Only one block
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
 
-            // Get sum delete rows
-            Value value = data_block->GetValue(1, 0);
-            json_response["delete_row_count"] = value.value_.big_int;
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-
+                // Only one block
+                DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                // Get sum delete rows
+                Value value = data_block->GetValue(1, 0);
+                json_response["delete_row_count"] = value.value_.big_int;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
@@ -1062,7 +1047,7 @@ public:
 
             Vector<UpdateExpr *> *update_expr_array = new Vector<UpdateExpr *>();
             DeferFn defer_free_update_expr_array([&]() {
-                if(update_expr_array != nullptr) {
+                if (update_expr_array != nullptr) {
                     for (auto &expr : *update_expr_array) {
                         delete expr;
                     }
@@ -1234,8 +1219,14 @@ public:
             expr_parsed_result->exprs_ptr_->at(0) = nullptr;
             update_expr_array = nullptr;
 
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
 
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
@@ -1552,7 +1543,6 @@ public:
                         json_segment[column_name] = column_value;
                     }
                     json_response["segments"].push_back(json_segment);
-
                 }
             }
             json_response["table_name"] = table_name;
@@ -1598,7 +1588,6 @@ public:
                         json_block[column_name] = column_value;
                     }
                     json_response["blocks"].push_back(json_block);
-
                 }
             }
 
@@ -1698,7 +1687,9 @@ void HTTPServer::Start(u16 port) {
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments", MakeShared<ShowSegmentsListHandler>());
 
     // block
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}", MakeShared<ShowBlockDetailHandler>());
+    router->route("GET",
+                  "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}",
+                  MakeShared<ShowBlockDetailHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks", MakeShared<ShowBlocksListHandler>());
 
     // variable
