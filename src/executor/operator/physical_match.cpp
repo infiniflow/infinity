@@ -58,8 +58,253 @@ import analyzer;
 import term;
 import early_terminate_iterator;
 import fulltext_score_result_heap;
+import physical_index_scan;
+import explain_logical_plan;
+import column_index_reader;
+import match_data;
+import filter_value_type_classification;
 
 namespace infinity {
+class FilterDocIterator : public DocIterator {
+private:
+    const SizeT filter_result_count_;
+    const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_;
+    const BaseExpression *secondary_index_filter_;
+    u32 GetDF() const override { return std::min<SizeT>(filter_result_count_, std::numeric_limits<u32>::max()); }
+
+public:
+    FilterDocIterator(SizeT filter_result_count,
+                      const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr,
+                      const BaseExpression *secondary_index_filter)
+        : filter_result_count_(filter_result_count), filter_result_ptr_(filter_result_ptr), secondary_index_filter_(secondary_index_filter) {
+        DoSeek(0);
+    }
+    void DoSeek(RowID doc_id) override {
+        // TODO
+    }
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {
+        os << prefix;
+        os << (is_final ? "└──" : "├──");
+        os << "FilterDocIterator (";
+        String filter_str;
+        ExplainLogicalPlan::Explain(secondary_index_filter_, filter_str);
+        os << filter_str << ")\n";
+    }
+};
+
+class BlockMaxFilterIterator final : public EarlyTerminateIterator {
+private:
+    const SizeT filter_result_count_;
+    const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_;
+    const BaseExpression *secondary_index_filter_;
+
+private:
+    SegmentID current_segment_id_ = filter_result_ptr_->begin()->first;
+
+    // -1: not decoded
+    // 0: use Vector<u32>*
+    // 1: use Bitmask*
+    i8 decode_status_ = -1;
+    const Vector<u32> *doc_id_list_ = nullptr;
+    const Bitmask *doc_id_bitmask_ = nullptr;
+    u32 pos_ = 0;
+
+public:
+    BlockMaxFilterIterator(SizeT filter_result_count,
+                           const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr,
+                           const BaseExpression *secondary_index_filter)
+        : filter_result_count_(filter_result_count), filter_result_ptr_(filter_result_ptr), secondary_index_filter_(secondary_index_filter) {
+        doc_freq_ = std::min<SizeT>(filter_result_count_, std::numeric_limits<u32>::max());
+    }
+
+    void UpdateScoreThreshold(float threshold) override {} // do nothing
+
+    bool BlockSkipTo(RowID doc_id, float threshold) override {
+        SegmentID segment_id = doc_id.segment_id_;
+        assert(segment_id >= current_segment_id_);
+        if (segment_id != current_segment_id_) {
+            if (const auto it = filter_result_ptr_->lower_bound(segment_id); it == filter_result_ptr_->end()) {
+                return false;
+            } else {
+                current_segment_id_ = it->first;
+                decode_status_ = -1;
+                doc_id_list_ = nullptr;
+                doc_id_bitmask_ = nullptr;
+                pos_ = 0;
+            }
+        }
+        return true;
+    }
+
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const { return {}; }
+
+    RowID BlockMinPossibleDocID() const override { return RowID(current_segment_id_, 0); }
+
+    RowID BlockLastDocID() const override { return RowID(current_segment_id_, std::numeric_limits<SegmentOffset>::max()); }
+
+    float BlockMaxBM25Score() override { return 0.0f; }
+
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override {
+        assert(doc_id.segment_id_ == current_segment_id_);
+        assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
+        assert(doc_id.segment_offset_ <= doc_id_no_beyond.segment_offset_);
+        const u32 seek_offset_start = doc_id.segment_offset_;
+        const u32 seek_offset_end = doc_id_no_beyond.segment_offset_;
+        if (decode_status_ == -1) [[unlikely]] {
+            const std::variant<Vector<u32>, Bitmask> &doc_id_list_or_bitmask = filter_result_ptr_->at(current_segment_id_);
+            decode_status_ = doc_id_list_or_bitmask.index();
+            assert((decode_status_ == 0 || decode_status_ == 1));
+            pos_ = 0;
+            switch (decode_status_) {
+                case 0: {
+                    doc_id_list_ = &std::get<0>(doc_id_list_or_bitmask);
+                    doc_id_bitmask_ = nullptr;
+                    break;
+                }
+                case 1: {
+                    doc_id_list_ = nullptr;
+                    doc_id_bitmask_ = &std::get<1>(doc_id_list_or_bitmask);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Error variant status!");
+                    break;
+                }
+            }
+        }
+        switch (decode_status_) {
+            case 0: {
+                // use Vector<u32>*
+                u32 pos = pos_;
+                for (; pos < doc_id_list_->size(); ++pos) {
+                    if ((*doc_id_list_)[pos] >= seek_offset_start) {
+                        break;
+                    }
+                }
+                pos_ = pos;
+                if (pos < doc_id_list_->size()) {
+                    if (const u32 offset_in_segment = (*doc_id_list_)[pos]; offset_in_segment <= seek_offset_end) {
+                        return {true, 0.0f, RowID(current_segment_id_, offset_in_segment)};
+                    }
+                }
+                break;
+            }
+            case 1: {
+                // use Bitmask*
+                if (pos_) {
+                    // check previous result
+                    if (pos_ > seek_offset_end) {
+                        return {false, 0.0f, INVALID_ROWID};
+                    }
+                    if (pos_ >= seek_offset_start) {
+                        return {true, 0.0f, RowID(current_segment_id_, pos_)};
+                    }
+                }
+                const u64 *data_ptr = doc_id_bitmask_->GetData();
+                const u32 current_64_pos = seek_offset_start / 64;
+                const u32 next_64_pos = (seek_offset_start + 63) / 64;
+                const u32 total_64_end = (doc_id_bitmask_->count() + 63) / 64;
+                if (const u64 data_start = data_ptr[current_64_pos]; current_64_pos != next_64_pos and data_start) {
+                    u32 i = seek_offset_start - current_64_pos * 64;
+                    for (; i < 64; ++i) {
+                        if (data_start & (1ULL << i)) {
+                            break;
+                        }
+                    }
+                    if (i < 64) {
+                        const u32 pos = current_64_pos * 64 + i;
+                        pos_ = pos;
+                        if (pos <= seek_offset_end) {
+                            return {true, 0.0f, RowID(current_segment_id_, pos)};
+                        }
+                    }
+                }
+                u32 pos_64 = next_64_pos;
+                for (; pos_64 < total_64_end; ++pos_64) {
+                    if (const u64 data = data_ptr[pos_64]; data) {
+                        u32 i = 0;
+                        for (; i < 64; ++i) {
+                            if (data & (1ULL << i)) {
+                                break;
+                            }
+                        }
+                        assert(i < 64);
+                        const u32 pos = pos_64 * 64 + i;
+                        pos_ = pos;
+                        if (pos <= seek_offset_end) {
+                            return {true, 0.0f, RowID(current_segment_id_, pos)};
+                        }
+                        break;
+                    }
+                }
+                if (pos_64 == total_64_end) {
+                    // no more valid doc_id
+                    pos_ = std::numeric_limits<u32>::max();
+                }
+                break;
+            }
+            default: {
+                UnrecoverableError("Error variant status!");
+                break;
+            }
+        }
+        return {false, 0.0f, INVALID_ROWID};
+    }
+
+    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
+        // will not be called
+        UnrecoverableError("Should not be called!");
+        return {false, INVALID_ROWID};
+    }
+
+    bool NotPartCheckExist(RowID doc_id) override {
+        // will not be called
+        UnrecoverableError("Should not be called!");
+        return false;
+    }
+
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
+        os << prefix;
+        os << (is_final ? "└──" : "├──");
+        os << "BlockMaxFilterIterator (";
+        String filter_str;
+        ExplainLogicalPlan::Explain(secondary_index_filter_, filter_str);
+        os << filter_str << ")\n";
+    }
+};
+
+// use QueryNodeType::TERM
+// treat it as TERM in optimization
+// total_df: total rows after filter
+// score: always 0.0f
+struct FilterQueryNode final : public QueryNode {
+    const SizeT filter_result_count_;
+    const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_;
+    const BaseExpression *secondary_index_filter_;
+    FilterQueryNode(SizeT filter_result_count,
+                    const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr,
+                    const BaseExpression *secondary_index_filter)
+        : QueryNode(QueryNodeType::TERM), filter_result_count_(filter_result_count), filter_result_ptr_(filter_result_ptr),
+          secondary_index_filter_(secondary_index_filter) {}
+
+    void PushDownWeight(float factor) override { MultiplyWeight(factor); }
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, Scorer *) const override {
+        return MakeUnique<FilterDocIterator>(filter_result_count_, filter_result_ptr_, secondary_index_filter_);
+    }
+    std::unique_ptr<EarlyTerminateIterator> CreateEarlyTerminateSearch(const TableEntry *, IndexReader &, Scorer *) const override {
+        return MakeUnique<BlockMaxFilterIterator>(filter_result_count_, filter_result_ptr_, secondary_index_filter_);
+    }
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override {
+        os << prefix;
+        os << (is_final ? "└──" : "├──");
+        os << "Filter (";
+        String filter_str;
+        ExplainLogicalPlan::Explain(secondary_index_filter_, filter_str);
+        os << filter_str << ")\n";
+    }
+};
 
 void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     float diff_percent = std::abs(a - b) / std::max(std::abs(a), std::abs(b));
@@ -72,16 +317,15 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
 
 void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_terms) {
     UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
+    if (analyzer.get() == nullptr) {
+        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name)));
+    }
     Term input_term;
     input_term.text_ = std::move(text);
     analyzer->Analyze(input_term, output_terms);
 }
 
-bool ExecuteInnerHomebrewed(QueryContext *query_context,
-                            OperatorState *operator_state,
-                            SharedPtr<BaseTableRef> &base_table_ref_,
-                            SharedPtr<MatchExpression> &match_expr_,
-                            Vector<SharedPtr<DataType>> OutputTypes) {
+bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
     using TimeDurationType = std::chrono::duration<float, std::milli>;
     auto execute_start_time = std::chrono::high_resolution_clock::now();
     // 1. build QueryNode tree
@@ -148,7 +392,14 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     TimeDurationType blockmax_duration_2 = {};
     TimeDurationType blockmax_duration_3 = {};
     FullTextQueryContext full_text_query_context;
-    full_text_query_context.query_tree_ = std::move(query_tree);
+    if (!have_filter_) {
+        full_text_query_context.query_tree_ = std::move(query_tree);
+    } else {
+        auto and_root = MakeUnique<AndQueryNode>();
+        and_root->Add(std::move(query_tree));
+        and_root->Add(MakeUnique<FilterQueryNode>(filter_result_count_, &filter_result_, secondary_index_filter_qualified_.get()));
+        full_text_query_context.query_tree_ = std::move(and_root);
+    }
     if (use_block_max_iter) {
         et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
     }
@@ -342,6 +593,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     // 4 populate result DataBlock
     // 4.1 prepare first output_data_block
     auto &output_data_blocks = operator_state->data_block_array_;
+    Vector<SharedPtr<DataType>> OutputTypes = std::move(*GetOutputTypes());
     auto append_data_block = [&]() {
         auto data_block = DataBlock::MakeUniquePtr();
         data_block->Init(OutputTypes);
@@ -393,10 +645,19 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
 PhysicalMatch::PhysicalMatch(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<MatchExpression> match_expr,
+                             bool have_filter,
+                             UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                             const SharedPtr<BaseExpression> &filter_leftover,
+                             const SharedPtr<BaseExpression> &secondary_index_filter_qualified,
+                             HashMap<ColumnID, TableIndexEntry *> &&secondary_index_column_index_map,
+                             Vector<FilterExecuteElem> &&filter_execute_command,
                              u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), table_index_(match_table_index),
-      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)) {}
+      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), have_filter_(have_filter),
+      fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), filter_leftover_(filter_leftover),
+      secondary_index_filter_qualified_(secondary_index_filter_qualified),
+      secondary_index_column_index_map_(std::move(secondary_index_column_index_map)), filter_execute_command_(std::move(filter_execute_command)) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 
@@ -404,7 +665,22 @@ void PhysicalMatch::Init() {}
 
 bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto start_time = std::chrono::high_resolution_clock::now();
-    bool return_value = ExecuteInnerHomebrewed(query_context, operator_state, base_table_ref_, match_expr_, std::move(*GetOutputTypes()));
+    if (have_filter_) {
+        filter_result_ = SolveSecondaryIndexFilter(fast_rough_filter_evaluator_.get(),
+                                                   filter_execute_command_,
+                                                   secondary_index_column_index_map_,
+                                                   base_table_ref_.get(),
+                                                   query_context->GetTxn()->BeginTS());
+        for (const auto &[segment_id, result] : filter_result_) {
+            filter_result_count_ +=
+                std::visit(Overload{[](const Vector<u32> &v) -> SizeT { return v.size(); }, [](const Bitmask &m) -> SizeT { return m.CountTrue(); }},
+                           result);
+        }
+        auto finish_filter_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float, std::milli> filter_duration = finish_filter_time - start_time;
+        LOG_INFO(fmt::format("PhysicalMatch Prepare: Filter time: {} ms", filter_duration.count()));
+    }
+    bool return_value = ExecuteInnerHomebrewed(query_context, operator_state);
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float, std::milli> duration = end_time - start_time;
     LOG_INFO(fmt::format("PhysicalMatch Execute time: {} ms", duration.count()));

@@ -92,7 +92,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string
 #ifdef INFINITY_DEBUG
     {
         OStringStream oss;
-        oss << "Query tree:\n";
+        oss << "Query tree (without filter):\n";
         if (parsed_query_tree) {
             parsed_query_tree->PrintTree(oss);
         } else {

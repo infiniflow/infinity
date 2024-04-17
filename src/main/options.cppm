@@ -90,7 +90,7 @@ export struct SystemOptions {
 
     // Resource
     String resource_dict_path_{};
-    std::chrono::seconds cleanup_interval_{};
+    u64 cleanup_interval_sec_{};
     bool enable_compaction_{};
 };
 
