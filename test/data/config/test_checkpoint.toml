@@ -5,7 +5,7 @@ timezone = "utc-8"
 [resource]
 cleanup_interval = 0
 # close auto compaction
-enable_compaction = false
+compact_interval = 0
 
 [wal]
 #short checkpoint interval to allow quick cleanup
