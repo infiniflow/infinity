@@ -183,11 +183,11 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 
 void BlockColumnEntry::Cleanup() {
     if (buffer_ != nullptr) {
-        buffer_->SetAndTryCleanup();
+        buffer_->Cleanup();
     }
     for (auto *outline_buffer : outline_buffers_) {
         if (outline_buffer) {
-            outline_buffer->SetAndTryCleanup();
+            outline_buffer->Cleanup();
         }
     }
 }

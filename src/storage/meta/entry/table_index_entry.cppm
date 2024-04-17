@@ -84,7 +84,7 @@ public:
     // Getter
     const SharedPtr<String> &GetIndexName() const { return index_base_->index_name_; }
 
-    inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
+    inline TableIndexMeta *table_index_meta() { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }
     const SharedPtr<IndexBase> &table_index_def() const { return index_base_; }
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
@@ -125,7 +125,7 @@ public:
 
     void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
 
-    void RollbackCreateIndex(TxnIndexStore *txn_index_store);
+    // void RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn);
 
     // replay
     void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);

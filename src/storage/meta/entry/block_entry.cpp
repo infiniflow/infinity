@@ -309,7 +309,7 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["columns"].emplace_back(block_column_entry->Serialize());
     }
     json_res["min_row_ts"] = this->min_row_ts_;
-    json_res["max_row_ts"] = this->max_row_ts_;
+    json_res["max_row_ts"] = std::min(this->max_row_ts_, max_commit_ts);
     json_res["version_file"] = this->VersionFilePath();
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
