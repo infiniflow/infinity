@@ -20,6 +20,8 @@ import standard_analyzer;
 import chinese_analyzer;
 using namespace infinity;
 
+namespace fs = std::filesystem;
+
 class StandardAnalyzerTest : public BaseTest {};
 
 TEST_F(StandardAnalyzerTest, test1) {
@@ -117,17 +119,32 @@ TEST_F(StandardAnalyzerTest, test5) {
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
 }
 
-/*
 TEST_F(StandardAnalyzerTest, test6) {
-    static const std::string ROOT_PATH = "../../../resource";
+    // Get the path to the executable using the /proc/self/exe symlink
+    fs::path executablePath = "/proc/self/exe";
+    std::error_code ec;
+    // Resolve the symlink to get the actual path
+    executablePath = fs::canonical(executablePath, ec);
+    if (ec) {
+        std::cerr << "Error resolving the path: " << executablePath << " " << ec.message() << std::endl;
+        return;
+    }
+    std::cerr << "/proc/self/exe: " << executablePath << std::endl;
 
-    ChineseAnalyzer analyzer(ROOT_PATH);
+    fs::path ROOT_PATH = executablePath.parent_path().parent_path().parent_path().parent_path() / "resource";
+    std::cerr << "ROOT_PATH: " << ROOT_PATH << std::endl;
+
+    if (!fs::exists(ROOT_PATH)){
+        std::cerr << "Resource directory doesn't exist: " << ROOT_PATH << std::endl;
+        return;
+    }
+
+    ChineseAnalyzer analyzer(ROOT_PATH.string());
     analyzer.Load();
     TermList term_list;
     String input("南京市长江大桥，。。");
-    analyzer.Analyze(input, term_list, true);
+    analyzer.Analyze(input, term_list);
     for (unsigned i = 0; i < term_list.size(); ++i) {
         std::cout << term_list[i].text_ << std::endl;
     }
 }
-*/

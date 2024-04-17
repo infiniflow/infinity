@@ -1950,6 +1950,28 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     String match_expression = String(intent_size, ' ') + " - match expression: " + match_node->match_expr()->ToString();
     result->emplace_back(MakeShared<String>(match_expression));
 
+    // filter expression
+    if (match_node->have_filter()) {
+        {
+            String filter_str = String(intent_size, ' ') + " - filter for secondary index: ";
+            if (const auto *filter_expr = match_node->filter_secondary_index_expr(); filter_expr) {
+                ExplainLogicalPlan::Explain(filter_expr, filter_str);
+            } else {
+                filter_str += "None";
+            }
+            result->emplace_back(MakeShared<String>(filter_str));
+        }
+        {
+            String filter_str = String(intent_size, ' ') + " - filter except secondary index: ";
+            if (const auto *filter_expr = match_node->filter_leftover_expr(); filter_expr) {
+                ExplainLogicalPlan::Explain(filter_expr, filter_str);
+            } else {
+                filter_str += "None";
+            }
+            result->emplace_back(MakeShared<String>(filter_str));
+        }
+    }
+
     // Output columns
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = match_node->GetOutputNames()->size();

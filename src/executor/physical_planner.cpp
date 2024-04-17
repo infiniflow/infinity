@@ -838,6 +838,12 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
     return MakeUnique<PhysicalMatch>(logical_match->node_id(),
                                      logical_match->base_table_ref_,
                                      logical_match->match_expr_,
+                                     static_cast<bool>(logical_match->filter_expression_),
+                                     std::move(logical_match->fast_rough_filter_evaluator_),
+                                     logical_match->filter_leftover_,
+                                     logical_match->secondary_index_filter_qualified_,
+                                     std::move(logical_match->secondary_index_column_index_map_),
+                                     std::move(logical_match->filter_execute_command_),
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas());
 }
