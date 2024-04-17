@@ -115,9 +115,9 @@ public:
     // Resource
     [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
 
-    [[nodiscard]] inline u64 cleanup_interval_sec() const { return system_option_.cleanup_interval_sec_; }
+    [[nodiscard]] inline std::chrono::seconds cleanup_interval() const { return system_option_.cleanup_interval_; }
 
-    [[nodiscard]] inline bool enable_compaction() const { return system_option_.enable_compaction_; }
+    [[nodiscard]] inline std::chrono::seconds compact_interval() const { return system_option_.compact_interval_; }
 
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);

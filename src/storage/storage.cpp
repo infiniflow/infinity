@@ -37,6 +37,7 @@ import txn;
 import infinity_exception;
 import status;
 import background_process;
+import compaction_process;
 import status;
 import bg_task;
 import periodic_trigger_thread;
@@ -68,13 +69,18 @@ void Storage::Init() {
 
     bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
     // Construct txn manager
+    std::chrono::seconds compact_interval = config_ptr_->compact_interval();
+    bool enable_compaction = compact_interval.count() > 0;
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
                                       bg_processor_.get(),
                                       wal_mgr_.get(),
                                       new_catalog_->next_txn_id_,
                                       system_start_ts,
-                                      config_ptr_->enable_compaction());
+                                      enable_compaction);
+    if (enable_compaction) {
+        compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get(), compact_interval);
+    }
 
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.
@@ -83,6 +89,9 @@ void Storage::Init() {
     new_catalog_->MemIndexRecover(buffer_mgr_.get());
 
     bg_processor_->Start();
+    if (compact_processor_.get() != nullptr) {
+        compact_processor_->Start();
+    }
 
     auto txn = txn_mgr_->BeginTxn();
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
@@ -93,12 +102,10 @@ void Storage::Init() {
     {
         periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-        u64 cleanup_interval_sec = config_ptr_->cleanup_interval_sec();
+        std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval_sec();
         if (cleanup_interval_sec > 0) {
-            periodic_trigger_thread_->AddTrigger(MakeUnique<CleanupPeriodicTrigger>(std::chrono::seconds(cleanup_interval_sec),
-                                                                                    bg_processor_.get(),
-                                                                                    new_catalog_.get(),
-                                                                                    txn_mgr_.get()));
+            periodic_trigger_thread_->AddTrigger(
+                MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
         } else {
             LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
         }
@@ -126,10 +133,16 @@ void Storage::Init() {
 void Storage::UnInit() {
     fmt::print("Shutdown storage ...\n");
     periodic_trigger_thread_->Stop();
+    if (compact_processor_.get() != nullptr) {
+        compact_processor_->Stop();
+    }
     bg_processor_->Stop();
     wal_mgr_->Stop();
 
     txn_mgr_.reset();
+    if (compact_processor_.get() != nullptr) {
+        compact_processor_.reset();
+    }
     bg_processor_.reset();
     wal_mgr_.reset();
     new_catalog_.reset();

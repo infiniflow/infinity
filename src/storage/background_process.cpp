@@ -98,18 +98,6 @@ void BGTaskProcessor::Process() {
                     LOG_INFO("Update segment bloom filter done");
                     break;
                 }
-                case BGTaskType::kCompactSegments: {
-                    LOG_INFO("Compact segments in background");
-                    auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
-                    //                    task->BeginTxn();
-                    task->Execute();
-                    if (task->TryCommitTxn()) {
-                        LOG_INFO("Compact segments in background done");
-                    } else {
-                        LOG_WARN("Compact segments in background rollbacked");
-                    }
-                    break;
-                }
                 default: {
                     UnrecoverableError("Invalid background task");
                     break;

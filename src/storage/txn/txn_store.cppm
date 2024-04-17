@@ -115,7 +115,7 @@ public:
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
 
-    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
+    void MaintainCompactionAlg() const;
 
     void AddSegmentStore(SegmentEntry *segment_entry);
 
@@ -124,8 +124,6 @@ public:
     void AddSealedSegment(SegmentEntry *segment_entry);
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts) const;
-
-    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor) const;
 
 public: // Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
@@ -172,7 +170,7 @@ public:
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, TxnManager *txn_mgr) const;
 
-    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor) const;
+    void MaintainCompactionAlg() const;
 
     bool CheckConflict() const;
 

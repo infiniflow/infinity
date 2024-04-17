@@ -90,8 +90,8 @@ export struct SystemOptions {
 
     // Resource
     String resource_dict_path_{};
-    u64 cleanup_interval_sec_{};
-    bool enable_compaction_{};
+    std::chrono::seconds cleanup_interval_{};
+    std::chrono::seconds compact_interval_{};
 };
 
 } // namespace infinity

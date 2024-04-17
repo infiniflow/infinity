@@ -293,27 +293,12 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     }
 }
 
-void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const {
-    std::function<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->BeginTxn(); };
-
-    // FIXME OPT: trigger compaction one time for all segments
+void TxnTableStore::MaintainCompactionAlg() const {
     for (auto *sealed_segment : set_sealed_segments_) {
-        auto ret = table_entry_->TryCompactAddSegment(sealed_segment, generate_txn);
-        if (!ret.has_value()) {
-            continue;
-        }
-        auto &[to_compacts, txn] = *ret;
-        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
-        bg_task_processor->Submit(std::move(compact_task));
+        table_entry_->AddSegmentToCompactionAlg(sealed_segment);
     }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
-        auto ret = table_entry_->TryCompactDeleteRow(segment_id, generate_txn);
-        if (!ret.has_value()) {
-            continue;
-        }
-        auto &[to_compacts, txn] = *ret;
-        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
-        bg_task_processor->Submit(std::move(compact_task));
+        table_entry_->AddDeleteToCompactionAlg(segment_id);
     }
 }
 
@@ -427,14 +412,9 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mg
     }
 }
 
-void TxnStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor) const {
-    TxnManager *txn_mgr = txn_->txn_mgr();
-    bool enable_compaction = txn_mgr->enable_compaction();
-    if (!enable_compaction) {
-        return;
-    }
+void TxnStore::MaintainCompactionAlg() const {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->TryTriggerCompaction(bg_task_processor, txn_mgr);
+        table_store->MaintainCompactionAlg();
     }
 }
 

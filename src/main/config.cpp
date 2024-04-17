@@ -177,7 +177,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     // Default resource config
     String default_resource_dict_path = String("/var/infinity/resource");
     u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
-    bool default_enable_compaction = DEFAULT_ENABLE_COMPACTION;
+    u64 default_compact_interval_sec = DEFAULT_COMPACT_INTERVAL_SEC;
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
@@ -237,8 +237,8 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             system_option_.storage_capacity_ = default_storage_capacity;
             system_option_.garbage_collection_interval_ = default_garbage_collection_interval;
             system_option_.garbage_collection_storage_ratio_ = default_garbage_collection_storage_ratio;
-            system_option_.cleanup_interval_sec_ = default_cleanup_interval_sec;
-            system_option_.enable_compaction_ = default_enable_compaction;
+            system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
+            system_option_.compact_interval_ = std::chrono::seconds(default_compact_interval_sec);
         }
 
         // Buffer
@@ -422,8 +422,8 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             system_option_.garbage_collection_storage_ratio_ =
                 storage_config["garbage_collection_storage_ratio"].value_or(default_garbage_collection_storage_ratio);
 
-            system_option_.cleanup_interval_sec_ = storage_config["cleanup_interval"].value_or(default_cleanup_interval_sec);
-            system_option_.enable_compaction_ = storage_config["enable_compaction"].value_or(default_enable_compaction);
+            system_option_.cleanup_interval_ = std::chrono::seconds(storage_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
+            system_option_.compact_interval_ = std::chrono::seconds(storage_config["compact_interval"].value_or(default_compact_interval_sec));
         }
 
         // Buffer
@@ -511,8 +511,8 @@ void Config::PrintAll() const {
     fmt::print(" - storage_capacity: {}\n", Utility::FormatByteSize(system_option_.storage_capacity_));
     fmt::print(" - garbage_collection_interval: {}\n", Utility::FormatTimeInfo(system_option_.garbage_collection_interval_));
     fmt::print(" - garbage_collection_storage_ratio: {}\n", system_option_.garbage_collection_storage_ratio_);
-    fmt::print(" - cleanup_interval_sec: {}\n", system_option_.cleanup_interval_sec_);
-    fmt::print(" - enable_compaction: {}\n", system_option_.enable_compaction_);
+    fmt::print(" - cleanup_interval_sec: {}\n", system_option_.cleanup_interval_.count());
+    fmt::print(" - enable_compaction: {}\n", system_option_.compact_interval_.count());
 
     // Buffer
     fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));

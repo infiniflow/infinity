@@ -436,6 +436,10 @@ TxnTimeStamp Txn::Commit() {
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         // Snapshot the physical operations in one txn
+        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
+        if (txn_mgr_->enable_compaction()) {
+            txn_store_.MaintainCompactionAlg();
+        }
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }
     return this->CommitTS();
@@ -471,11 +475,6 @@ void Txn::CommitBottom() {
     done_bottom_ = true;
     cond_var_.notify_one();
     LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_id_));
-
-    if (txn_context_.GetTxnState() != TxnState::kToRollback) {
-        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
-        txn_store_.TryTriggerCompaction(bg_task_processor_);
-    }
 }
 
 void Txn::CancelCommitBottom() {

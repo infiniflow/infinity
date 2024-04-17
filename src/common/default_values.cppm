@@ -95,6 +95,7 @@ export {
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
 
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
+    constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
     constexpr bool DEFAULT_ENABLE_COMPACTION = true;
 
     constexpr std::string_view SYSTEM_DB_NAME = "system";
