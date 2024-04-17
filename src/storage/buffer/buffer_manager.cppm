@@ -62,7 +62,7 @@ private:
 
     bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
-    void AddToCleanList(BufferObj *buffer_obj);
+    void AddToCleanList(BufferObj *buffer_obj, bool free);
 
 private:
     std::mutex w_locker_{};

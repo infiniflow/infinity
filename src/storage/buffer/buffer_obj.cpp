@@ -52,7 +52,7 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kUnloaded: {
             if (!buffer_mgr_->RemoveFromGCQueue(this)) {
-                UnrecoverableError("Invalid call.");
+                UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename()));
             }
             break;
         }
@@ -85,37 +85,6 @@ BufferHandle BufferObj::Load() {
     return BufferHandle(this, data);
 }
 
-void BufferObj::LoadInner() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    if (status_ != BufferStatus::kLoaded) {
-        UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
-    }
-    ++rc_;
-}
-
-void BufferObj::GetMutPointer() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    type_ = BufferType::kEphemeral;
-}
-
-void BufferObj::UnloadInner() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    switch (status_) {
-        case BufferStatus::kLoaded: {
-            --rc_;
-            if (rc_ == 0) {
-                buffer_mgr_->PushGCQueue(this);
-                status_ = BufferStatus::kUnloaded;
-            }
-            break;
-        }
-        default: {
-            LOG_INFO(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
-            UnrecoverableError(fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_)));
-        }
-    }
-}
-
 bool BufferObj::Free() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     // no lock is needed because already in gc_queue
@@ -123,7 +92,7 @@ bool BufferObj::Free() {
         return false;
     }
     if (status_ != BufferStatus::kUnloaded) {
-        UnrecoverableError("Invalid call.");
+        UnrecoverableError(fmt::format("attempt to free {} buffer object", BufferStatusToString(status_)));
     }
     switch (type_) {
         case BufferType::kTemp:
@@ -176,26 +145,62 @@ bool BufferObj::Save() {
 void BufferObj::Cleanup() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
-        case BufferStatus::kNew: {
-            // when insert data into table with index, the index buffer_obj
-            // will remain BufferStatus::kNew, so we should allow this situation
+        // when insert data into table with index, the index buffer_obj
+        // will remain BufferStatus::kNew, so we should allow this situation
+        case BufferStatus::kNew:
+        case BufferStatus::kFreed: {
             status_ = BufferStatus::kClean;
+            buffer_mgr_->AddToCleanList(this, false /*free*/);
             break;
         }
         case BufferStatus::kUnloaded: {
             file_worker_->FreeInMemory();
             status_ = BufferStatus::kClean;
-            break;
-        }
-        case BufferStatus::kFreed: {
-            status_ = BufferStatus::kClean;
+            buffer_mgr_->AddToCleanList(this, true /*free*/);
             break;
         }
         default: {
-            UnrecoverableError("Assert: buffer object status isn't freed or unloaded.");
+            UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
         }
     }
-    buffer_mgr_->AddToCleanList(this);
+}
+
+void BufferObj::CleanupFile() {
+    if (status_ != BufferStatus::kClean) {
+        UnrecoverableError("Invalid status.");
+    }
+    file_worker_->CleanupFile();
+}
+
+void BufferObj::LoadInner() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    if (status_ != BufferStatus::kLoaded) {
+        UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+    }
+    ++rc_;
+}
+
+void BufferObj::GetMutPointer() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    type_ = BufferType::kEphemeral;
+}
+
+void BufferObj::UnloadInner() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    switch (status_) {
+        case BufferStatus::kLoaded: {
+            --rc_;
+            if (rc_ == 0) {
+                buffer_mgr_->PushGCQueue(this);
+                status_ = BufferStatus::kUnloaded;
+            }
+            break;
+        }
+        default: {
+            LOG_INFO(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+            UnrecoverableError(fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_)));
+        }
+    }
 }
 
 void BufferObj::CheckState() const {

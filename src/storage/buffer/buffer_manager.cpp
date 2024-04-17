@@ -65,7 +65,6 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
         return iter1->second.get();
     }
 
-    // Cannot find BufferHandle in buffer_map, read from disk
     auto buffer_obj = MakeUnique<BufferObj>(this, false, std::move(file_worker));
 
     auto [iter2, _] = buffer_map_.emplace(std::move(file_path), std::move(buffer_obj));
@@ -79,6 +78,10 @@ void BufferManager::RemoveClean() {
     {
         std::unique_lock lock(clean_locker_);
         clean_list.swap(clean_list_);
+    }
+
+    for (auto *buffer_obj : clean_list) {
+        buffer_obj->CleanupFile();
     }
 
     {
@@ -139,9 +142,15 @@ bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
     return false;
 }
 
-void BufferManager::AddToCleanList(BufferObj *buffer_obj) {
-    std::unique_lock lock(clean_locker_);
-    clean_list_.push_back(buffer_obj);
+void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool free) {
+    {
+        std::unique_lock lock(clean_locker_);
+        clean_list_.push_back(buffer_obj);
+    }
+    if (free) {
+        std::unique_lock lock(w_locker_);
+        current_memory_size_ -= buffer_obj->GetBufferSize();
+    }
 }
 
 } // namespace infinity
