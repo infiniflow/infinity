@@ -58,7 +58,7 @@ private:
     // BufferHandle calls it, after unload.
     void PushGCQueue(BufferObj *buffer_obj);
 
-    void RemoveFromGCQueue(BufferObj *buffer_obj);
+    bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
     void RemoveBufferObj(BufferObj *buffer_obj);
 

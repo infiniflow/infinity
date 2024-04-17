@@ -51,7 +51,9 @@ BufferHandle BufferObj::Load() {
             break;
         }
         case BufferStatus::kUnloaded: {
-            buffer_mgr_->RemoveFromGCQueue(this);
+            if (!buffer_mgr_->RemoveFromGCQueue(this)) {
+                UnrecoverableError("Invalid call.");
+            }
             break;
         }
         case BufferStatus::kFreed: {
@@ -129,38 +131,6 @@ void BufferObj::Free() {
     }
     file_worker_->FreeInMemory();
     status_ = BufferStatus::kFreed;
-
-    // std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    // switch (status_) {
-    //     case BufferStatus::kFreed: {
-    //         UnrecoverableError("Invalid call.");
-    //     }
-    //     case BufferStatus::kLoaded: {
-    //         // loaded again after free, do nothing.
-    //         // Or has been freed in fronter of the queue.
-    //         return false;
-    //     }
-    //     case BufferStatus::kUnloaded: {
-    //         switch (type_) {
-    //             case BufferType::kTemp:
-    //             case BufferType::kPersistent: {
-    //                 // do nothing
-    //                 break;
-    //             }
-    //             case BufferType::kEphemeral: {
-    //                 file_worker_->WriteToFile(true);
-    //                 break;
-    //             }
-    //         }
-    //         file_worker_->FreeInMemory();
-    //         status_ = BufferStatus::kFreed;
-    //         break;
-    //     }
-    //     case BufferStatus::kNew: {
-    //         UnrecoverableError("Invalid call.");
-    //     }
-    // }
-    // return true;
 }
 
 bool BufferObj::Save() {

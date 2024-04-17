@@ -77,11 +77,10 @@ void BufferManager::RequestSpace(SizeT need_size) {
     auto iter = gc_list_.begin();
     while (current_memory_size_ + need_size > memory_limit_ && iter != gc_list_.end()) {
         auto buffer_obj = *iter;
-        auto size = buffer_obj->GetBufferSize();
 
         buffer_obj->Free();
 
-        current_memory_size_ -= size;
+        current_memory_size_ -= buffer_obj->GetBufferSize();
         iter = gc_list_.erase(iter);
         gc_map_.erase(buffer_obj);
     }
@@ -101,16 +100,20 @@ void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
     gc_map_[buffer_obj] = --gc_list_.end();
 }
 
-void BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
+bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
     std::unique_lock lock(gc_locker_);
     if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
         gc_list_.erase(iter->second);
         gc_map_.erase(iter);
+        return true;
     }
+    return false;
 }
 
 void BufferManager::RemoveBufferObj(BufferObj *buffer_obj) {
-    RemoveFromGCQueue(buffer_obj);
+    if (RemoveFromGCQueue(buffer_obj)) {
+        current_memory_size_ -= buffer_obj->GetBufferSize();
+    }
     std::unique_lock lock(w_locker_);
     auto file_path = buffer_obj->GetFilename();
     buffer_map_.erase(file_path);
