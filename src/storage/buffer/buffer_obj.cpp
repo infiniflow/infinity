@@ -75,6 +75,9 @@ BufferHandle BufferObj::Load() {
             LOG_TRACE(fmt::format("Allocated memory {}", GetBufferSize()));
             break;
         }
+        default: {
+            UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
+        }
     }
     status_ = BufferStatus::kLoaded;
     ++rc_;
@@ -113,8 +116,12 @@ void BufferObj::UnloadInner() {
     }
 }
 
-void BufferObj::Free() {
+bool BufferObj::Free() {
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     // no lock is needed because already in gc_queue
+    if (status_ == BufferStatus::kClean) {
+        return false;
+    }
     if (status_ != BufferStatus::kUnloaded) {
         UnrecoverableError("Invalid call.");
     }
@@ -131,6 +138,7 @@ void BufferObj::Free() {
     }
     file_worker_->FreeInMemory();
     status_ = BufferStatus::kFreed;
+    return true;
 }
 
 bool BufferObj::Save() {
@@ -171,17 +179,23 @@ void BufferObj::Cleanup() {
         case BufferStatus::kNew: {
             // when insert data into table with index, the index buffer_obj
             // will remain BufferStatus::kNew, so we should allow this situation
+            status_ = BufferStatus::kClean;
             break;
         }
-        case BufferStatus::kUnloaded:
+        case BufferStatus::kUnloaded: {
+            file_worker_->FreeInMemory();
+            status_ = BufferStatus::kClean;
+            break;
+        }
         case BufferStatus::kFreed: {
-            buffer_mgr_->RemoveBufferObj(this);
+            status_ = BufferStatus::kClean;
             break;
         }
         default: {
             UnrecoverableError("Assert: buffer object status isn't freed or unloaded.");
         }
     }
+    buffer_mgr_->AddToCleanList(this);
 }
 
 void BufferObj::CheckState() const {
@@ -209,6 +223,11 @@ void BufferObj::CheckState() const {
                 UnrecoverableError("Invalid status.");
             }
             break;
+        }
+        case BufferStatus::kClean: {
+            if (rc_ > 0) {
+                UnrecoverableError("Invalid status.");
+            }
         }
     }
 }

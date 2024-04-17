@@ -28,7 +28,7 @@ export enum class BufferStatus {
     kLoaded,
     kUnloaded,
     kFreed,
-    // kClean,
+    kClean,
     kNew,
 };
 
@@ -69,7 +69,7 @@ public:
 
     // called by BufferMgr in GC process.
     // return true if is freed.
-    void Free();
+    bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();

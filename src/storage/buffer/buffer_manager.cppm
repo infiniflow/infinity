@@ -49,6 +49,8 @@ public:
         return current_memory_size_;
     }
 
+    void RemoveClean();
+
 private:
     friend class BufferObj;
 
@@ -60,7 +62,7 @@ private:
 
     bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
-    void RemoveBufferObj(BufferObj *buffer_obj);
+    void AddToCleanList(BufferObj *buffer_obj);
 
 private:
     std::mutex w_locker_{};
@@ -75,6 +77,9 @@ private:
     std::mutex gc_locker_{};
     HashMap<BufferObj *, GCListIter> gc_map_{};
     List<BufferObj *> gc_list_{};
+
+    std::mutex clean_locker_{};
+    Vector<BufferObj *> clean_list_{};
 };
 
 } // namespace infinity
