@@ -799,9 +799,13 @@ void AddChunkIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTime
     *this = std::move(*static_cast<AddChunkIndexEntryOp *>(other.get()));
 }
 
-void SetSegmentStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) { UnrecoverableError("SetSegmentStatusSealedOp::Merge not allowed"); }
+void SetSegmentStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) {
+    UnrecoverableError("SetSegmentStatusSealedOp::Merge not allowed");
+}
 
-void SetBlockStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) { UnrecoverableError("SetBlockStatusSealedOp::Merge not allowed"); }
+void SetBlockStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) {
+    UnrecoverableError("SetBlockStatusSealedOp::Merge not allowed");
+}
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
     LOG_TRACE(fmt::format("BlockEntry {} flush to disk", block_entry_->block_id()));
@@ -966,7 +970,12 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
             ++last_sequence_;
 
             if (!sequence_heap_.empty() && sequence_heap_.top() == last_sequence_ + 1) {
-                delta_entry = std::move(delta_entry_map_[sequence_heap_.top()]);
+                auto iter = delta_entry_map_.find(sequence_heap_.top());
+                if (iter != delta_entry_map_.end()) {
+                    UnrecoverableError(fmt::format("sequence_heap_.top() {} in delta_entry_map_", sequence_heap_.top()));
+                }
+                delta_entry = std::move(iter->second);
+                delta_entry_map_.erase(iter);
                 sequence_heap_.pop();
             } else {
                 break;
