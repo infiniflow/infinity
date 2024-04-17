@@ -128,6 +128,15 @@ public:
         chunk_index_entries.insert(chunk_index_entries.end(), chunk_index_entries_.begin(), chunk_index_entries_.end());
     }
 
+    void RemoveChunkIndexEntry(ChunkIndexEntry *chunk_index_entry) {
+        RowID base_rowid = chunk_index_entry->base_rowid_;
+        std::unique_lock lock(rw_locker_);
+        chunk_index_entries_.erase(std::remove_if(chunk_index_entries_.begin(),
+                                                  chunk_index_entries_.end(),
+                                                  [base_rowid](const SharedPtr<ChunkIndexEntry> &entry) { return entry->base_rowid_ == base_rowid; }),
+                                   chunk_index_entries_.end());
+    }
+
     void ReplaceChunkIndexEntries(SharedPtr<ChunkIndexEntry> merged_chunk_index_entry) {
         std::shared_lock lock(rw_locker_);
         SizeT num_entries = chunk_index_entries_.size();

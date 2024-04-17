@@ -139,7 +139,7 @@ private:
     Vector<SegmentEntry *> set_sealed_segments_{};
 
     int ptr_seq_n_;
-    Map<TableIndexEntry *, int> txn_indexes_{};
+    HashMap<TableIndexEntry *, int> txn_indexes_{};
     HashMap<String, UniquePtr<TxnIndexStore>> txn_indexes_store_{};
 
     TxnCompactStore compact_state_;
@@ -187,8 +187,8 @@ private:
     Txn *txn_{}; // TODO: remove this
     Catalog *catalog_{};
     int ptr_seq_n_{};
-    Map<DBEntry *, int> txn_dbs_{};
-    Map<TableEntry *, int> txn_tables_{};
+    HashMap<DBEntry *, int> txn_dbs_{};
+    HashMap<TableEntry *, int> txn_tables_{};
     // Key: table name Value: TxnTableStore
     HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 };

@@ -27,6 +27,7 @@ def trace_expected_exceptions(func):
 
     return wrapped_func
 
+
 def get_project_path():
     current_file = os.path.abspath(__file__)
     index = current_file.index("infinity")
@@ -94,20 +95,22 @@ def generate_fvecs(num, dim, filename):
 
 def generate_commas_enwiki(in_filename, out_filename, is_embedding):
     with open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + in_filename, "r") as infile, \
-         open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + out_filename, "w") as outfile:
-            reader = csv.reader(infile, delimiter='\t')
-            writer = csv.writer(outfile, delimiter=',')
+            open(get_project_path() + common_values.TEST_DATA_DIR + "csv/" + out_filename, "w") as outfile:
+        reader = csv.reader(infile, delimiter='\t')
+        writer = csv.writer(outfile, delimiter=',')
 
-            if is_embedding:
-                i = 0
-                for row in reader:
-                    suffix = [i, "[{},{},{},{}]".format(
-                         i, i, i, i)]
-                    writer.writerow(row + suffix)
-                    i += 1
-            else:
-                for row in reader:
-                    writer.writerow(row)
+        if is_embedding:
+            i = 0
+            for row in reader:
+                suffix = [i, "[{},{},{},{}]".format(
+                    i, i, i, i)]
+                writer.writerow(row + suffix)
+                i += 1
+        else:
+            for row in reader:
+                writer.writerow(row)
+
+
 def check_data(data_dir):
     # path not exists
     if not os.path.exists(data_dir):

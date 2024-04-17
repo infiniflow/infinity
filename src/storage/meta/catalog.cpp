@@ -312,10 +312,10 @@ Catalog::GetTableIndexInfo(const String &db_name, const String &table_name, cons
     return table_entry->GetTableIndexInfo(index_name, txn_id, begin_ts);
 }
 
-Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id) {
-    const TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
-    TableEntry *table_entry = table_index_meta->GetTableEntry();
-    table_entry->RemoveIndexEntry(index_name, txn_id);
+Status Catalog::RemoveIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id) {
+    TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
+    LOG_TRACE(fmt::format("Remove a index entry: {}", *table_index_entry->GetIndexName()));
+    table_index_meta->DeleteEntry(txn_id);
     return Status::OK();
 }
 
@@ -324,10 +324,10 @@ void Catalog::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp com
     table_index_entry->CommitCreateIndex(txn_index_store, commit_ts, is_replay);
 }
 
-void Catalog::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
-    auto *table_index_entry = txn_index_store->table_index_entry_;
-    table_index_entry->RollbackCreateIndex(txn_index_store);
-}
+// void Catalog::RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn) {
+//     auto *table_index_entry = txn_index_store->table_index_entry_;
+//     table_index_entry->RollbackPopulateIndex(txn_index_store, txn);
+// }
 
 void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     return table_entry->AppendData(txn_id, txn_store, commit_ts, buffer_mgr);
