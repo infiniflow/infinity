@@ -60,27 +60,43 @@ protected:
         : query_context_(query_context), base_table_ref_(base_table_ref) {}
 
     // old "and" tree structure is destroyed
-    inline void FlattenAndExpression(SharedPtr<BaseExpression> &&expression) {
+    inline void FlattenAndExpression(const SharedPtr<BaseExpression> &expression) {
         if (expression->type() == ExpressionType::kFunction) {
             auto function_expression = std::static_pointer_cast<FunctionExpression>(expression);
             if (function_expression->ScalarFunctionName() == "AND") {
                 // flatten the arguments of and expression
-                AddSubexpressions(std::move(expression));
+                AddSubexpressions(expression);
                 return;
             }
         }
         // the expression is not "and" expression, cannot be flattened
-        flatten_and_subexpressions_.emplace_back(std::move(expression));
+        flatten_and_subexpressions_.push_back(expression);
     }
 
-    inline void AddSubexpressions(SharedPtr<BaseExpression> &&expression) {
+    inline void AddSubexpressions(const SharedPtr<BaseExpression> &expression) {
         // flatten the arguments of "and" expression
-        for (auto &child_expression : expression->arguments()) {
-            FlattenAndExpression(std::move(child_expression));
+        for (const auto &child_expression : expression->arguments()) {
+            FlattenAndExpression(child_expression);
         }
     }
 
 public:
+    static inline bool HaveLeftColumnAndRightValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
+        if (expression->arguments().size() != 2) {
+            UnrecoverableError("HaveLeftColumnAndRightValue: argument size != 2");
+        }
+        return IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_valid_column) and
+               IsValueResultExpression(expression->arguments()[1], sub_expr_depth + 1);
+    }
+
+    static inline bool HaveRightColumnAndLeftValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
+        if (expression->arguments().size() != 2) {
+            UnrecoverableError("HaveRightColumnAndLeftValue: argument size != 2");
+        }
+        return IsValidColumnExpression(expression->arguments()[1], sub_expr_depth + 1, is_valid_column) and
+               IsValueResultExpression(expression->arguments()[0], sub_expr_depth + 1);
+    }
+
     static inline bool IsValidColumnExpression(const SharedPtr<BaseExpression> &expression, u32 sub_expr_depth, auto &is_valid_column_expression) {
         switch (expression->type()) {
             case ExpressionType::kCast: {
@@ -208,9 +224,9 @@ public:
     IndexScanFilterExpressionPushDownMethod(QueryContext *query_context, const BaseTableRef &base_table_ref)
         : FilterExpressionPushDownMethodBase(query_context, base_table_ref) {}
 
-    IndexScanFilterExpressionPushDownResult SolveForIndexScan(SharedPtr<BaseExpression> &&expression) {
+    IndexScanFilterExpressionPushDownResult SolveForIndexScan(const SharedPtr<BaseExpression> &expression) {
         // flatten expressions combined by "and" into a vector of subexpressions
-        FlattenAndExpression(std::move(expression));
+        FlattenAndExpression(expression);
         // collect column index information
         InitColumnIndexEntries();
         // classification of subexpressions
@@ -258,8 +274,8 @@ private:
 
     inline void FindIndexFilterCandidates() {
         for (auto &expression : flatten_and_subexpressions_) {
-            if (CanApplyIndexScan(expression)) {
-                index_filter_candidates_.emplace_back(std::move(expression));
+            if (auto new_expr = RewriteForIndexScan(expression); new_expr) {
+                index_filter_candidates_.emplace_back(std::move(new_expr));
             } else {
                 index_filter_leftover_.emplace_back(std::move(expression));
             }
@@ -268,7 +284,7 @@ private:
     }
 
     // classification of subexpressions
-    inline bool CanApplyIndexScan(const SharedPtr<BaseExpression> &expression) {
+    inline SharedPtr<BaseExpression> RewriteForIndexScan(const SharedPtr<BaseExpression> &expression) {
         // case 1. expression is a scalar expression containing only one column and the column has a secondary index
         // case 2. expression is an "and" or "or" expression, and each child expression can be applied to the index scan (recursive check)
         // now we do not support "not" expression in index scan
@@ -282,29 +298,41 @@ private:
                                     expression->Name()));
                 }
                 // recursive check
-                return CanApplyIndexScan(expression->arguments()[0]) and CanApplyIndexScan(expression->arguments()[1]);
+                auto left_arg = RewriteForIndexScan(expression->arguments()[0]);
+                if (!left_arg) {
+                    return nullptr;
+                }
+                auto right_arg = RewriteForIndexScan(expression->arguments()[1]);
+                if (!right_arg) {
+                    return nullptr;
+                }
+                // both left and right can be applied to index scan
+                Vector<SharedPtr<BaseExpression>> arguments;
+                arguments.emplace_back(std::move(left_arg));
+                arguments.emplace_back(std::move(right_arg));
+                return MakeShared<FunctionExpression>(function_expression->func_, std::move(arguments));
             } else if (f_name == "NOT") {
                 LOG_TRACE(fmt::format("Unsupported expression type: In CanApplyIndexScan(), the expression {} is a \"not\" function expression. "
                                       "Now we do not support not expression in index scan.",
                                       expression->Name()));
-                return false;
+                return nullptr;
             } else {
                 // case 1.
-                return CheckExprIndexState(expression, 0);
+                return CheckExprIndexStateAndRewrite(expression, 0);
             }
         } else if (expression->type() == ExpressionType::kValue) {
             LOG_TRACE(fmt::format("Unsupported expression type: In CanApplyIndexScan(), the expression \"{}\" is a value expression. "
                                   "Need to apply the expression rewrite optimizer first.",
                                   expression->Name()));
-            return false;
+            return nullptr;
         } else {
             LOG_TRACE(fmt::format("Unsupported expression type: In CanApplyIndexScan(), unknown expression: {}.", expression->Name()));
-            return false;
+            return nullptr;
         }
     }
 
     // case 1. expression needs to be in the form of "[cast] x compare value_expression" and the column x should have a secondary index.
-    inline bool CheckExprIndexState(const SharedPtr<BaseExpression> &expression, u32 sub_expr_depth) {
+    inline SharedPtr<BaseExpression> CheckExprIndexStateAndRewrite(const SharedPtr<BaseExpression> &expression, u32 sub_expr_depth) {
         // TODO: now do not support "!=" in index scan
         // expected: depth 0: <, >, <=, >=, = function
         //           depth >= 1: left: column_expr. right: +, -, *, / function (ABS? POW? MOD?), or value, or cast.
@@ -313,19 +341,18 @@ private:
                 auto function_expression = std::static_pointer_cast<FunctionExpression>(expression);
                 auto const &f_name = function_expression->ScalarFunctionName();
                 static constexpr std::array<const char *, 5> IndexScanSupportedCompareFunctionNames = {"<", ">", "<=", ">=", "="};
+                static constexpr std::array<const char *, 5> IndexScanSupportedCompareFunctionNamesCorrespondingReverse = {">", "<", ">=", "<=", "="};
                 // depth 0: <, >, <=, >=, = function
-                if (std::find(IndexScanSupportedCompareFunctionNames.begin(), IndexScanSupportedCompareFunctionNames.end(), f_name) !=
-                    IndexScanSupportedCompareFunctionNames.end()) {
+                if (auto name_iter = std::find(IndexScanSupportedCompareFunctionNames.begin(), IndexScanSupportedCompareFunctionNames.end(), f_name);
+                    name_iter != IndexScanSupportedCompareFunctionNames.end()) {
                     // supported compare function
                     if (expression->arguments().size() != 2) {
                         UnrecoverableError(fmt::format("Expression depth: {}. Unsupported expression type: In CheckExprIndexState(), the compare "
                                                        "expression {} argument size != 2.",
                                                        sub_expr_depth,
                                                        expression->Name()));
-                        return false;
+                        return nullptr;
                     }
-                    bool valid_compare = true;
-                    // left expression should be column
                     auto is_column_index = [&m = candidate_column_index_map_](const SharedPtr<BaseExpression> &expr, u32 depth) -> bool {
                         if (!(expr->Type().CanBuildSecondaryIndex())) {
                             // Unsupported type
@@ -347,48 +374,49 @@ private:
                             return false;
                         }
                     };
-                    if (!IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_column_index)) {
-                        LOG_TRACE(fmt::format("Expression depth: {}. Left expression is not a column with secondary index: {}.",
-                                              sub_expr_depth,
-                                              function_expression->Name()));
-                        valid_compare = false;
-                    }
-                    if (!IsValueResultExpression(expression->arguments()[1], sub_expr_depth + 1)) {
+                    if (HaveLeftColumnAndRightValue(function_expression, sub_expr_depth + 1, is_column_index)) {
+                        return expression;
+                    } else if (HaveRightColumnAndLeftValue(function_expression, sub_expr_depth + 1, is_column_index)) {
+                        Vector<SharedPtr<BaseExpression>> arguments = expression->arguments();
+                        std::swap(arguments[0], arguments[1]);
+                        auto name_idx = name_iter - IndexScanSupportedCompareFunctionNames.begin();
+                        auto function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(),
+                                                                              IndexScanSupportedCompareFunctionNamesCorrespondingReverse[name_idx]);
+                        auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+                        ScalarFunction func = scalar_function_set_ptr->GetMostMatchFunction(arguments);
+                        return MakeShared<FunctionExpression>(std::move(func), std::move(arguments));
+                    } else {
                         //  right expression should be value
-                        LOG_TRACE(fmt::format("Expression depth: {}. Invalid filter function: {}. Right expression is not value type.",
+                        LOG_TRACE(fmt::format("Expression depth: {}. Cannot apply to secondary index: Invalid filter function: {}.",
                                               sub_expr_depth,
                                               function_expression->Name()));
-                        valid_compare = false;
+                        return nullptr;
                     }
-                    if (valid_compare) {
-                        LOG_TRACE(fmt::format("Expression depth: {}. Valid filter function: {}.", sub_expr_depth, function_expression->Name()));
-                    }
-                    return valid_compare;
                 } else {
                     // unsupported compare function
                     LOG_TRACE(fmt::format("Expression depth: {}. Unsupported filter function for index scan: {}.",
                                           sub_expr_depth,
                                           function_expression->Name()));
-                    return false;
+                    return nullptr;
                 }
             }
             case ExpressionType::kValue: {
                 LOG_TRACE(fmt::format("Expression depth: {}. Value {} appears in depth 0. Maybe need the expression rewrite optimizer.",
                                       sub_expr_depth,
                                       expression->Name()));
-                return false;
+                return nullptr;
             }
             case ExpressionType::kCast: {
                 LOG_TRACE(fmt::format("Expression depth: {}. Cast expression {} appears in depth 0. Maybe need the expression rewrite optimizer.",
                                       sub_expr_depth,
                                       expression->Name()));
-                return false;
+                return nullptr;
             }
             default: {
                 LOG_TRACE(fmt::format("Expression depth: {}. Unsupported expression type: In CheckExprIndexState(), unsupported expression {}.",
                                       sub_expr_depth,
                                       expression->Name()));
-                return false;
+                return nullptr;
             }
         }
     }
@@ -482,9 +510,9 @@ private:
 
 IndexScanFilterExpressionPushDownResult FilterExpressionPushDown::PushDownToIndexScan(QueryContext *query_context,
                                                                                       const BaseTableRef &base_table_ref,
-                                                                                      SharedPtr<BaseExpression> &&expression) {
+                                                                                      const SharedPtr<BaseExpression> &expression) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref);
-    return filter_expression_push_down_method.SolveForIndexScan(std::move(expression));
+    return filter_expression_push_down_method.SolveForIndexScan(expression);
 }
 
 class FastRoughFilterEvaluatorTrue final : public FastRoughFilterEvaluator {
@@ -626,12 +654,14 @@ public:
                             }
                         }
                     };
-                    if (HaveLeftColumnAndRightValue(function_expression, sub_expr_depth + 1, is_valid_column)) {
+                    if (FilterExpressionPushDownMethodBase::HaveLeftColumnAndRightValue(function_expression, sub_expr_depth + 1, is_valid_column)) {
                         // known expression 2
                         return SolveForExpr2(expression->arguments()[0],
                                              expression->arguments()[1],
                                              Case2CompareTypes[std::distance(Case2FunctionNames.begin(), it)]);
-                    } else if (HaveRightColumnAndLeftValue(function_expression, sub_expr_depth + 1, is_valid_column)) {
+                    } else if (FilterExpressionPushDownMethodBase::HaveRightColumnAndLeftValue(function_expression,
+                                                                                               sub_expr_depth + 1,
+                                                                                               is_valid_column)) {
                         // known expression 2
                         return SolveForExpr2(expression->arguments()[1],
                                              expression->arguments()[0],
@@ -692,10 +722,12 @@ public:
                             }
                         }
                     };
-                    if (HaveLeftColumnAndRightValue(function_expression, sub_expr_depth + 1, is_valid_column)) {
+                    if (FilterExpressionPushDownMethodBase::HaveLeftColumnAndRightValue(function_expression, sub_expr_depth + 1, is_valid_column)) {
                         // known expression 1
                         return SolveForExpr1(expression->arguments()[0], expression->arguments()[1]);
-                    } else if (HaveRightColumnAndLeftValue(function_expression, sub_expr_depth + 1, is_valid_column)) {
+                    } else if (FilterExpressionPushDownMethodBase::HaveRightColumnAndLeftValue(function_expression,
+                                                                                               sub_expr_depth + 1,
+                                                                                               is_valid_column)) {
                         // known expression 1
                         return SolveForExpr1(expression->arguments()[1], expression->arguments()[0]);
                     } else {
@@ -721,22 +753,6 @@ public:
     }
 
 private:
-    static inline bool HaveLeftColumnAndRightValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
-        if (expression->arguments().size() != 2) {
-            UnrecoverableError("HaveLeftColumnAndRightValue: argument size != 2");
-        }
-        return FilterExpressionPushDownMethodBase::IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_valid_column) and
-               FilterExpressionPushDownMethodBase::IsValueResultExpression(expression->arguments()[1], sub_expr_depth + 1);
-    }
-
-    static inline bool HaveRightColumnAndLeftValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
-        if (expression->arguments().size() != 2) {
-            UnrecoverableError("HaveRightColumnAndLeftValue: argument size != 2");
-        }
-        return FilterExpressionPushDownMethodBase::IsValidColumnExpression(expression->arguments()[1], sub_expr_depth + 1, is_valid_column) and
-               FilterExpressionPushDownMethodBase::IsValueResultExpression(expression->arguments()[0], sub_expr_depth + 1);
-    }
-
     static inline UniquePtr<FastRoughFilterEvaluator> ReturnAlwaysTrue() { return MakeUnique<FastRoughFilterEvaluatorTrue>(); }
 
     static inline UniquePtr<FastRoughFilterEvaluator> ReturnAlwaysFalse() { return MakeUnique<FastRoughFilterEvaluatorFalse>(); }

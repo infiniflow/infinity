@@ -23,6 +23,7 @@ import logical_filter;
 import logical_table_scan;
 import logical_index_scan;
 import logical_knn_scan;
+import logical_match;
 import query_context;
 import logical_node_visitor;
 import infinity_exception;
@@ -61,6 +62,11 @@ public:
             auto &knn_scan = static_cast<LogicalKnnScan &>(*op);
             auto &filter_expression = knn_scan.filter_expression_;
             knn_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
+        } else if (op->operator_type() == LogicalNodeType::kMatch) {
+            // also need to apply filter
+            auto &match = static_cast<LogicalMatch &>(*op);
+            auto &filter_expression = match.filter_expression_;
+            match.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
         } else if (op->operator_type() == LogicalNodeType::kIndexScan) {
             UnrecoverableError("ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.");
         }
