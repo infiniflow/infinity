@@ -115,7 +115,7 @@ public:
     // Resource
     [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
 
-    [[nodiscard]] inline std::chrono::seconds cleanup_interval() const { return system_option_.cleanup_interval_; }
+    [[nodiscard]] inline u64 cleanup_interval_sec() const { return system_option_.cleanup_interval_sec_; }
 
     [[nodiscard]] inline bool enable_compaction() const { return system_option_.enable_compaction_; }
 
