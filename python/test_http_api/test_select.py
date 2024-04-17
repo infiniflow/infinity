@@ -61,7 +61,7 @@ class TestSelect(HttpTest):
             "error_code": 0,
             "output": [{'(c1 + c2)': '6'}]
         })
-
+        self.drop_table(db_name, table_name)
         # TODO: fix me
 
         # self.select(db_name, table_name, ["c1"], "c1 > 2 AND c2 < 4", {}, {}, {
@@ -102,6 +102,7 @@ class TestSelect(HttpTest):
                         "error_code": 0,
                         'output': [{'count(star)': '13'}]
                     })
+        self.drop_table(db_name, table_name)
         return
 
     def test_select_varchar(self):
@@ -134,6 +135,7 @@ class TestSelect(HttpTest):
                          "c1": 'k', "c2": 'k'}, {"c1": 'l', "c2": 'l'},
                      {"c1": 'm', "c2": 'm'}])
         self.select(db_name, table_name, ["*"])
+        self.drop_table(db_name, table_name)
         return
 
     def test_select_big(self):
@@ -155,7 +157,7 @@ class TestSelect(HttpTest):
             self.insert(db_name, table_name, [
                 {"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}
             ])
-
+        self.drop_table(db_name, table_name)
         return
 
     def test_select_embedding_int32(self):
@@ -332,6 +334,7 @@ class TestSelect(HttpTest):
                           )
 
         self.select(db_name, table_name, ["c1", "c2"])
+        self.drop_table(db_name, table_name)
         return
         # PASS
 

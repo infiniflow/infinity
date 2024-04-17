@@ -94,8 +94,6 @@ class TestDataBase(HttpTest):
 
         # drop databases
         for i in range(db_count):
-            if db_name == 'default':
-                continue
             print('drop db_name' + str(i))
             self.drop_database('db_name' + str(i))
         self.clear_database()
@@ -129,8 +127,6 @@ class TestDataBase(HttpTest):
 
         # drop databases
         for i in range(db_count):
-            if db_name == 'default':
-                continue
             print('drop db_name' + str(i))
             self.drop_database('db_name' + str(i))
 

@@ -253,6 +253,7 @@ class TestImport(HttpTest):
                 "header": False,
                 "delimiter": delimiter[i][1],
             })
+            self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -309,6 +310,8 @@ class TestImport(HttpTest):
             "header": True,
             "delimiter": ","
         })
+
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -384,6 +387,8 @@ class TestImport(HttpTest):
                                  "status_code": 500,
                                  "error_code": 3032,
                              })
+
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -410,6 +415,7 @@ class TestImport(HttpTest):
                              "status_code": 500,
                              "error_code": 3032,
                          })
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -443,6 +449,8 @@ class TestImport(HttpTest):
                                  "status_code": 500,
                                  "error_code": 7012,
                              })
+
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -464,6 +472,8 @@ class TestImport(HttpTest):
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir, "file_type": "csv", "header": False, "delimiter": ","
         })
+
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -513,6 +523,8 @@ class TestImport(HttpTest):
                              "status_code": 500,
                              "error_code": 3039,
                          })
+
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -584,4 +596,6 @@ class TestImport(HttpTest):
             "header": False,
             "delimiter": ","
         })
+
+        self.drop_table(db_name, table_name)
         return

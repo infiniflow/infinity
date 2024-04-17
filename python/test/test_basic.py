@@ -84,9 +84,15 @@ class TestCase(TestSdk):
         for port in ports:
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
-            infinity_obj.drop_database("my_db", ConflictType.Ignore)
+
+            res = infinity_obj.list_databases()
+            assert res.error_code == ErrorCode.OK
+            for db_name in res.db_names:
+                if db_name != 'default':
+                    infinity_obj.drop_database(db_name, ConflictType.Error)
+
             # infinity
-            db_obj = infinity_obj.create_database("my_db")
+            db_obj = infinity_obj.create_database("my_db", ConflictType.Error)
             assert db_obj is not None
 
             res = infinity_obj.list_databases()
@@ -95,7 +101,7 @@ class TestCase(TestSdk):
             for db in res.db_names:
                 assert db in ['my_db', 'default']
 
-            res = infinity_obj.drop_database("my_db")
+            res = infinity_obj.drop_database("my_db", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
             db_obj = infinity_obj.get_database("default")

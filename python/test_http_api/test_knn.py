@@ -67,6 +67,7 @@ class TestKnn(HttpTest):
                                            "query_color": "red",
                                            "query_price": 1.0
                                            }])
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -119,6 +120,7 @@ class TestKnn(HttpTest):
                         "error_code": 0,
                         "output": [{'variant_id': '123'}]
                     })
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -172,6 +174,7 @@ class TestKnn(HttpTest):
                         "error_code": 3013,
                         # "output": [{'variant_id': '123'}]
                     })
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -224,6 +227,7 @@ class TestKnn(HttpTest):
                         "error_code": 0,
                         "output": [{'variant_id': '123'}]
                     })
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -285,7 +289,7 @@ class TestKnn(HttpTest):
                             "status_code": 500,
                             "error_code": 3013,
                         })
-
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -352,6 +356,7 @@ class TestKnn(HttpTest):
                         "status_code": 500,
                         "error_code": 3013,
                     })
+        self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.skip(reason="knn use element_type:integer leads to segment fault")
@@ -396,7 +401,7 @@ class TestKnn(HttpTest):
                         "status_code": 500,
                         "error_code": 3013,
                     })
-
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -457,6 +462,7 @@ class TestKnn(HttpTest):
                                 "status_code": 500,
                                 "error_code": 3032,
                             })
+        self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.parametrize("topn", [0, -1, "test", {}, (), [1] * 4])
@@ -497,6 +503,7 @@ class TestKnn(HttpTest):
                 "metric_type": "l2"
             }}, {}, {"status_code": 500
                      })
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_index_before(self):
@@ -558,7 +565,7 @@ class TestKnn(HttpTest):
                                 "error_code": 0,
                                 "output": [{'variant_id': '123'}]
                             })
-
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_index_after(self):
@@ -620,6 +627,7 @@ class TestKnn(HttpTest):
                 "ef": "50",
                 "metric": "l2"
             })
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_fulltext_match_with_valid_columns(self):
@@ -667,6 +675,7 @@ class TestKnn(HttpTest):
                         "error_code": 0,
                         "output": [{'variant_id': '123'}]
                     })
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_fulltext_match_with_invalid_columns(self):
@@ -714,6 +723,7 @@ class TestKnn(HttpTest):
                         "error_code": 3067,
                         "output": [{'variant_id': '123'}]
                     })
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_fulltext_match_with_valid_words(self):
@@ -762,6 +772,7 @@ class TestKnn(HttpTest):
                             "error_code": 0,
                             "output": []
                         })
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_fulltext_match_with_invalid_words(self):
@@ -810,6 +821,7 @@ class TestKnn(HttpTest):
                             "status_code": 500,
                             "error_code": 3067,
                         })
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_fulltext_match_with_options(self):
@@ -858,6 +870,7 @@ class TestKnn(HttpTest):
                             "error_code": 0,
                             "output": []
                         })
+        self.drop_table(db_name, table_name)
         return
 
     def test_with_fulltext_match_with_invalid_options(self):
@@ -906,4 +919,5 @@ class TestKnn(HttpTest):
                             "status_code": 500,
                             "error_code": 3067,
                         })
+        self.drop_table(db_name, table_name)
         return

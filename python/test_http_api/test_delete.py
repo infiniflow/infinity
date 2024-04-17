@@ -107,6 +107,7 @@ class TestDelete(HttpTest):
             ])
             self.delete(db_name, table_name, "c1=" + str(types_example[i] - 1))
             i += 1
+        self.drop_table(db_name, table_name)
         return
         # PASS
 

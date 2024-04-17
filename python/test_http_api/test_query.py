@@ -34,6 +34,7 @@ class TestQuery(HttpTest):
                     [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
         self.create_index(db_name, table_name, idxname, fields=["body"],
                           index={"column_name": "body", "type": "FULLTEXT"})
+        self.drop_table(db_name, table_name)
         return
 
     def test_query_builder(self):
@@ -50,3 +51,4 @@ class TestQuery(HttpTest):
         )
         self.select(db_name, table_name,
                     ["*"])
+        self.drop_table(db_name, table_name)
