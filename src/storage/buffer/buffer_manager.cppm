@@ -16,7 +16,7 @@ module;
 
 import stl;
 import file_worker;
-import specific_concurrent_queue;
+// import specific_concurrent_queue;
 
 export module buffer_manager;
 
@@ -35,8 +35,6 @@ public:
     // Get an existing BufferHandle from memory or disk.
     BufferObj *Get(UniquePtr<FileWorker> file_worker);
 
-    void RemoveBufferObj(const String &file_path);
-
     SharedPtr<String> GetDataDir() const { return data_dir_; }
 
     SharedPtr<String> GetTempDir() const { return temp_dir_; }
@@ -46,35 +44,42 @@ public:
         return memory_limit_;
     }
 
-    u64 memory_usage() const { return current_memory_size_.load(); }
+    u64 memory_usage() {
+        std::unique_lock<std::mutex> lock(gc_locker_);
+        return current_memory_size_;
+    }
 
-    void AddPathForDeletions(const String &path) { file_path_delete_.push_back(path); }
-
-    void AddBufferObjectForDeletion(const String &path) { obj_path_delete_.push_back(path); }
-
-    void RemoveBufferObjects();
+    void RemoveClean();
 
 private:
     friend class BufferObj;
 
     // BufferHandle calls it, before allocate memory. It will start GC if necessary.
-    void RequestSpace(SizeT need_size, BufferObj *buffer_obj);
+    void RequestSpace(SizeT need_size);
 
     // BufferHandle calls it, after unload.
-    void PushGCQueue(BufferObj *buffer_handle);
+    void PushGCQueue(BufferObj *buffer_obj);
+
+    bool RemoveFromGCQueue(BufferObj *buffer_obj);
+
+    void AddToCleanList(BufferObj *buffer_obj, bool free);
 
 private:
     std::mutex w_locker_{};
+    using GCListIter = List<BufferObj *>::iterator;
 
     SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
-    atomic_u64 current_memory_size_{}; // TODO: need to be atomic
-    HashMap<String, SharedPtr<BufferObj>> buffer_map_{};
-    Vector<SharedPtr<BufferObj>> deprecated_array_{};
-    SpecificConcurrentQueue<BufferObj *> gc_queue_{};
+    u64 current_memory_size_{};
+    HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
 
-    Vector<String> file_path_delete_;
-    Vector<String> obj_path_delete_;
+    std::mutex gc_locker_{};
+    HashMap<BufferObj *, GCListIter> gc_map_{};
+    List<BufferObj *> gc_list_{};
+
+    std::mutex clean_locker_{};
+    Vector<BufferObj *> clean_list_{};
 };
+
 } // namespace infinity

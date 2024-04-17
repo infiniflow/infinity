@@ -39,8 +39,7 @@ void CleanupScanner::Cleanup() && {
     for (auto &entry : entries_) {
         std::move(*entry).Cleanup();
     }
-
-    buffer_mgr_->RemoveBufferObjects();
+    buffer_mgr_->RemoveClean();
 }
 
 void CleanupScanner::CleanupDir(const String &dir) {

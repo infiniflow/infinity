@@ -69,7 +69,7 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
     for (auto [segment_id, segment_index_entry] : index_entry_map_) {
         local_delta_ops->AddOperation(MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry, commit_ts));
     }
-    for (auto chunk_index_entry : chunk_index_entries_) {
+    for (auto *chunk_index_entry : chunk_index_entries_) {
         local_delta_ops->AddOperation(MakeUnique<AddChunkIndexEntryOp>(chunk_index_entry, commit_ts));
     }
 }
@@ -78,7 +78,7 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     for (const auto &[segment_id, segment_index_entry] : index_entry_map_) {
         segment_index_entry->CommitSegmentIndex(txn_id, commit_ts);
     }
-    for (auto chunk_index_entry : chunk_index_entries_) {
+    for (auto *chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->Commit(commit_ts);
     }
 }
@@ -231,14 +231,16 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RollbackAppend(table_entry_, txn_id, abort_ts, this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
-    for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        Catalog::RollbackCreateIndex(txn_index_store.get());
-        auto *table_index_entry = txn_index_store->table_index_entry_;
-        table_index_entry->Cleanup();
-        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id);
-    }
+    // for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
+    //     Catalog::RollbackPopulateIndex(txn_index_store.get(), txn_);
+    // }
     Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
     blocks_.clear();
+
+    for (auto &[table_index_entry, ptr_seq_n] : txn_indexes_) {
+        table_index_entry->Cleanup();
+        Catalog::RemoveIndexEntry(table_index_entry, txn_id); // fix me
+    }
 }
 
 bool TxnTableStore::CheckConflict(Catalog *catalog) const {
