@@ -35,6 +35,7 @@ class TestShow(HttpTest):
             "column_count": 3,
             "row_count": 0
         })
+        self.drop_table(db_name, table_name)
         return
 
     def test_show_columns(self):
@@ -63,4 +64,5 @@ class TestShow(HttpTest):
                 {'column_name': 'vec', 'column_type': 'Embedding(float,5)', 'constraint': ''}
             ]
         })
+        self.drop_table(db_name, table_name)
         return

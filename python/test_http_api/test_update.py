@@ -44,6 +44,7 @@ class TestUpdate(HttpTest):
             "status_code": 500,
             "error_code": 3067,
         })
+        self.drop_table(db_name, table_name)
         return
         # PASS
 
@@ -85,6 +86,7 @@ class TestUpdate(HttpTest):
             "column_count": 3,
         })
         self.update(db_name, table_name, {"c2": 90, "c3": 900}, "c1 = 1")
+        self.drop_table(db_name, table_name)
         return
         # PASS
 
@@ -161,6 +163,7 @@ class TestUpdate(HttpTest):
         values = [{"c1": 1, "c2": 2} for _ in range(8192)]
         self.insert(db_name, table_name, values)
         self.update(db_name, table_name, {"c2": 20}, "c1 = 1")
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -177,6 +180,7 @@ class TestUpdate(HttpTest):
             values = [{"c1": 1, "c2": 2} for _ in range(8)]
             self.insert(db_name, table_name, values)
         self.update(db_name, table_name, {"c2": 20}, "c1 = 1")
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -195,6 +199,7 @@ class TestUpdate(HttpTest):
 
         self.delete(db_name, table_name, "c1 = 1")
         self.update(db_name, table_name, {"c2": 20}, "c1 = 1")
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -210,6 +215,7 @@ class TestUpdate(HttpTest):
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         self.insert(db_name, table_name, values)
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
+        self.drop_table(db_name, table_name)
 
         return
 
@@ -230,6 +236,7 @@ class TestUpdate(HttpTest):
         time.sleep(3600)
 
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
+        self.drop_table(db_name, table_name)
         return
         # PASS
 
@@ -322,6 +329,7 @@ class TestUpdate(HttpTest):
 
         for i in range(len(filter_list)):
             self.update(db_name, table_name, {"c2": 1}, filter_list[i])
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -352,4 +360,5 @@ class TestUpdate(HttpTest):
                 "status_code": 500,
                 "error_code": 3063,
             })
+        self.drop_table(db_name, table_name)
         return

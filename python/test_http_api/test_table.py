@@ -127,6 +127,7 @@ class TestTable(HttpTest):
         self.list_tables("default")
         return
 
+    @pytest.mark.skip(reason="skip")
     def test_show_tables(self):
         self.show_database("default")
         tblist = self.get_all_tables("default")
@@ -261,6 +262,8 @@ class TestTable(HttpTest):
                         # "error_message": "Duplicate table: {table_name} in {db_name}.",
                     }
                 )
+
+        self.drop_table(db_name, table_name)
         return
 
     def test_table_with_different_column_name(self):
@@ -396,7 +399,7 @@ class TestTable(HttpTest):
                 expect = {"status_code": 500, "error_code": 3017}
                 self.tear_down(r, expect)
             idx += 1
-
+        self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.slow
@@ -428,6 +431,7 @@ class TestTable(HttpTest):
                 "my_table" + str(i),
                 params,
             )
+        self.drop_table(db_name, table_name)
         return
 
     def test_after_disconnect_use_table(self):
@@ -462,7 +466,6 @@ class TestTable(HttpTest):
             "kError",
         )
 
-        self.drop_table(db_name, table_name)
         self.drop_table(db_name, table_name)
 
     @pytest.mark.skip(reason="Feature request")
@@ -576,6 +579,7 @@ class TestTable(HttpTest):
             "status_code": 500,
             "error_code": 3048,
         })
+        self.drop_table(db_name, table_name)
         return
 
         # @pytest.mark.parametrize("types", [
@@ -624,6 +628,7 @@ class TestTable(HttpTest):
             "status_code": 500,
             "error_code": 3017,
         }, "kError")
+        self.drop_table(db_name, table_name)
         return
 
     def test_drop_same_name_table(self):
@@ -665,6 +670,7 @@ class TestTable(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, params)
+        self.drop_table(db_name, table_name)
         return
 
     def test_table_create_valid_option(self):

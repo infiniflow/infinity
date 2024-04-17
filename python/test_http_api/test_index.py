@@ -124,6 +124,7 @@ class TestIndex(HttpTest):
             "status_code": 500,
             "error_code": 3023,
         })
+        self.drop_table(db_name, table_name)
         return
 
     # PASS
@@ -309,6 +310,7 @@ class TestIndex(HttpTest):
             "other_parameters": "metric = l2, centroids_count = 128",
         })
         self.drop_index(db_name, table_name, idxname)
+        self.drop_table(db_name, table_name)
         return
 
     def test_drop_index_show_index(self):
@@ -340,6 +342,8 @@ class TestIndex(HttpTest):
             "status_code": 500,
             "error_code": 3023,
         })
+
+        self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.skip(reason="skip")
@@ -434,6 +438,7 @@ class TestIndex(HttpTest):
                     "metric": "l2"
                 })
                 continue
+        self.drop_table(db_name, table_name)
         return
 
     # ERROR: IVFFlat realtime index is not supported yet
@@ -568,7 +573,7 @@ class TestIndex(HttpTest):
         }, {}, {
                         "error_code": 0,
                     })
-
+        self.drop_table(db_name, table_name)
         return
         # ERROR
 
@@ -890,9 +895,11 @@ class TestIndex(HttpTest):
         })
         for i in range(10):
             self.drop_index(db_name, table_name, idxname + str(i))
+
+        self.drop_table(db_name, table_name)
         return
 
-    # PASS (drop options dosen't need option: ignore ?)
+    # PASS (drop options doesn't need option: ignore ?)
     def test_drop_index_with_valid_options(self):
         db_name = "default"
         table_name = "test_drop_index_with_valid_options"
@@ -921,6 +928,7 @@ class TestIndex(HttpTest):
             "status_code": 500,
             "error_code": 3023,
         })
+        self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.skip
