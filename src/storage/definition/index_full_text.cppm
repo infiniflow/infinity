@@ -38,12 +38,7 @@ public:
                   Vector<String> column_names,
                   const String &analyzer,
                   optionflag_t flag = OPTION_FLAG_ALL)
-                  // optionflag_t flag = NO_TERM_FREQUENCY)
-        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), flag_(flag) {
-        if (analyzer.empty()) {
-            analyzer_ = "standard";
-        }
-    };
+        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), flag_(flag){};
 
     ~IndexFullText() final = default;
 
