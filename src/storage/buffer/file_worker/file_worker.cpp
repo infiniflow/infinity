@@ -31,16 +31,6 @@ namespace infinity {
 
 FileWorker::~FileWorker() = default;
 
-void FileWorker::Sync() {
-    LocalFileSystem fs;
-    fs.SyncFile(*file_handler_);
-}
-
-void FileWorker::CloseFile() {
-    LocalFileSystem fs;
-    fs.Close(*file_handler_);
-}
-
 void FileWorker::WriteToFile(bool to_spill) {
     if (data_ == nullptr) {
         UnrecoverableError("No data will be written.");
@@ -103,20 +93,28 @@ void FileWorker::MoveFile() {
     fs.Rename(src_path, dest_path);
 }
 
-void FileWorker::BulkCleanup(const Vector<String> &file_paths) {
+void FileWorker::Sync() {
     LocalFileSystem fs;
-    for (SizeT i = 0; i < file_paths.size(); i++) {
-        const auto &path = file_paths[i];
-        if (fs.Exists(path)) {
-            LOG_TRACE(fmt::format("Cleaning up file: {}", path));
-            fs.DeleteFile(path);
-            LOG_TRACE(fmt::format("Cleaned file: {}", path));
-        } else {
-            // this may happen the same reason as in "CleanupScanner::CleanupDir"
-            // It may also happen when cleanup a table not been flushed (need a checkpoint txn),
-            // at that time there is not data file under dir.
-            LOG_TRACE(fmt::format("Cleanup: File {} not found for deletion", path));
-        }
+    fs.SyncFile(*file_handler_);
+}
+
+void FileWorker::CloseFile() {
+    LocalFileSystem fs;
+    fs.Close(*file_handler_);
+}
+
+void FileWorker::CleanupFile() {
+    LocalFileSystem fs;
+    String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+    if (fs.Exists(path)) {
+        LOG_TRACE(fmt::format("Cleaning up file: {}", path));
+        fs.DeleteFile(path);
+        LOG_TRACE(fmt::format("Cleaned file: {}", path));
+    } else {
+        // this may happen the same reason as in "CleanupScanner::CleanupDir"
+        // It may also happen when cleanup a table not been flushed (need a checkpoint txn),
+        // at that time there is not data file under dir.
+        LOG_TRACE(fmt::format("Cleanup: File {} not found for deletion", path));
     }
 }
 

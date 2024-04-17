@@ -329,18 +329,16 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
 }
 
 void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry) {
-    {
-        std::unique_lock w_lock(rw_locker_);
-        for (auto iter = block_entry.rbegin(); iter != block_entry.rend(); ++iter) {
-            BlockEntry *block = *iter;
-            if (!block->Committed()) {
-                if (block_entries_.empty() || block_entries_.back()->block_id() != block->block_id()) {
-                    UnrecoverableError("BlockEntry rollback order is not correct");
-                }
-                auto &rollback_block = block_entries_.back();
-                rollback_block->Cleanup();
-                block_entries_.pop_back();
+    std::unique_lock w_lock(rw_locker_);
+    for (auto iter = block_entry.rbegin(); iter != block_entry.rend(); ++iter) {
+        BlockEntry *block = *iter;
+        if (!block->Committed()) {
+            if (block_entries_.empty() || block_entries_.back()->block_id() != block->block_id()) {
+                UnrecoverableError("BlockEntry rollback order is not correct");
             }
+            auto &rollback_block = block_entries_.back();
+            rollback_block->Cleanup();
+            block_entries_.pop_back();
         }
     }
 }
@@ -365,7 +363,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 
         json_res["min_row_ts"] = this->min_row_ts_;
-        json_res["max_row_ts"] = this->max_row_ts_;
+        json_res["max_row_ts"] = std::min(this->max_row_ts_, max_commit_ts);
         json_res["deleted"] = this->deleted_;
         json_res["row_count"] = this->row_count_;
         json_res["actual_row_count"] = this->actual_row_count_;

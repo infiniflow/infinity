@@ -435,7 +435,6 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-
         res = db_obj.drop_table("test_insert_table_with_10000_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -457,7 +456,6 @@ class TestInsert(TestSdk):
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
-
 
         res = db_obj.drop_table("test_insert_with_not_matched_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
