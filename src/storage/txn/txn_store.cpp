@@ -276,6 +276,12 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
+    for (auto *sealed_segment : set_sealed_segments_) {
+        if (!sealed_segment->SetSealed()) {
+            UnrecoverableError(fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id()));
+        }
+    }
+
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
 
@@ -339,9 +345,6 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *t
         BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(sealed_segment, txn_->buffer_mgr(), commit_ts);
         // now have minmax filter and optional bloom filter
         // serialize filter
-        if (!sealed_segment->SetSealed()) {
-            UnrecoverableError(fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id()));
-        }
         local_delta_ops->AddOperation(
             MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, sealed_segment->GetFastRoughFilter()->SerializeToString(), commit_ts));
         // FIXME: hack here
