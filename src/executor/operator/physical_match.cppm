@@ -102,8 +102,10 @@ private:
     Vector<FilterExecuteElem> filter_execute_command_;
     // filter result, form an iterator
     Map<SegmentID, std::variant<Vector<u32>, Bitmask>> filter_result_;
+    SizeT filter_result_count_ = 0;
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
+    bool ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state);
 };
 
 } // namespace infinity
