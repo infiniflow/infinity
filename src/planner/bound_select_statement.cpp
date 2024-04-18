@@ -62,7 +62,6 @@ import infinity_exception;
 import expression_transformer;
 import expression_type;
 
-
 import base_table_ref;
 import subquery_table_ref;
 import cross_product_table_ref;
@@ -70,6 +69,7 @@ import join_table_ref;
 import knn_expression;
 import third_party;
 import table_reference;
+import common_query_filter;
 
 namespace infinity {
 
@@ -151,6 +151,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         // FIXME: need check if there is subquery inside the where conditions
         auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
+        auto common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, static_pointer_cast<BaseTableRef>(table_ref_ptr_));
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(search_expr_->match_exprs_.size());
         for (auto &match_expr : search_expr_->match_exprs_) {
@@ -160,6 +161,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             SharedPtr<LogicalMatch> matchNode = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
             matchNode->filter_expression_ = filter_expr;
+            matchNode->common_query_filter_ = common_query_filter;
             match_knn_nodes.push_back(std::move(matchNode));
         }
 
@@ -170,6 +172,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             }
             SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, knn_expr, query_context, bind_context);
             knn_scan->filter_expression_ = filter_expr;
+            knn_scan->common_query_filter_ = common_query_filter;
             match_knn_nodes.push_back(std::move(knn_scan));
         }
 

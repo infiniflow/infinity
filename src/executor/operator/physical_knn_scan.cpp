@@ -243,6 +243,11 @@ template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
+    if (!common_query_filter_->TryFinishBuild(begin_ts, query_context->GetTxn()->buffer_mgr())) {
+        // not ready, abort and wait for next time
+        return;
+    }
+
     auto knn_scan_function_data = operator_state->knn_scan_function_data_.get();
     auto knn_scan_shared_data = knn_scan_function_data->knn_scan_shared_data_;
 
@@ -259,39 +264,38 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         // brute force
         BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
         const BlockEntry *block_entry = block_column_entry->block_entry();
-        // check FastRoughFilter
-        const auto &fast_rough_filter = *block_entry->GetFastRoughFilter();
-        if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) [[unlikely]] {
-            // skip this block
-            LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} skipped after FastRoughFilter",
-                                  knn_scan_function_data->task_id_,
-                                  block_column_idx + 1,
-                                  brute_task_n));
-        } else [[likely]] {
-            LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after FastRoughFilter",
+        const auto block_id = block_entry->block_id();
+        const SegmentID segment_id = block_entry->GetSegmentEntry()->segment_id();
+        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+            LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after common_query_filter",
                                   knn_scan_function_data->task_id_,
                                   block_column_idx + 1,
                                   brute_task_n));
             const auto row_count = block_entry->row_count();
             BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
+            // filter for segment
+            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
             Bitmask bitmask;
             bitmask.Initialize(std::bit_ceil(row_count));
-            if (filter_expression_) {
-                auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
-                auto &filter_state_ = knn_scan_function_data->filter_state_;
-                auto &bool_column = knn_scan_function_data->bool_column_;
-                // filter and build bitmask, if filter_expression_ != nullptr
-                db_for_filter->Reset(row_count);
-                ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
-                bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
-                ExpressionEvaluator expr_evaluator;
-                expr_evaluator.Init(db_for_filter);
-                expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
-                const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
-                SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-                MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true);
-                bool_column->Reset();
+            bitmask.SetAllFalse();
+            const u32 block_start_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+            const u32 block_end_offset = block_start_offset + row_count;
+            if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                const auto it1 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_start_offset);
+                const auto it2 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_end_offset);
+                for (auto it = it1; it < it2; ++it) {
+                    bitmask.SetTrue(*it - block_start_offset);
+                }
+            } else {
+                u32 u64_start_offset = block_start_offset / 64;
+                u32 u64_end_offset = (block_end_offset - 1) / 64;
+                u64 *data = bitmask.GetData();
+                const u64 *filter_data = std::get<Bitmask>(filter_result).GetData();
+                for (u32 i = u64_start_offset; i <= u64_end_offset; ++i) {
+                    data[i - u64_start_offset] = filter_data[i];
+                }
             }
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
@@ -311,7 +315,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
         SegmentIndexEntry *segment_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
-        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
         auto segment_id = segment_index_entry->segment_id();
         SegmentEntry *segment_entry = nullptr;
@@ -321,47 +324,23 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         } else {
             segment_entry = iter->second;
         }
-        // check FastRoughFilter
-        const auto &fast_rough_filter = *segment_entry->GetFastRoughFilter();
-        if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) [[unlikely]] {
-            // skip this segment
-            LOG_TRACE(
-                fmt::format("KnnScan: {} index {}/{} skipped after FastRoughFilter", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
-        } else [[likely]] {
-            LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after FastRoughFilter",
+        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+            LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after common_query_filter",
                                   knn_scan_function_data->task_id_,
                                   index_idx + 1,
                                   index_task_n));
             auto segment_row_count = segment_entry->row_count();
             Bitmask bitmask;
-            if (filter_expression_) {
-                bitmask.Initialize(std::bit_ceil(segment_row_count));
-                SizeT segment_row_count_real = 0;
-                auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
-                auto &filter_state_ = knn_scan_function_data->filter_state_;
-                auto &bool_column = knn_scan_function_data->bool_column_;
-                // filter and build bitmask, if filter_expression_ != nullptr
-                ExpressionEvaluator expr_evaluator;
-                auto block_entry_iter = BlockEntryIter(segment_entry);
-                for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                    auto row_count = block_entry->row_count();
-                    db_for_filter->Reset(row_count);
-                    ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
-                    bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
-                    expr_evaluator.Init(db_for_filter);
-                    expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
-                    const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
-                    SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-                    MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true, segment_row_count_real);
-                    segment_row_count_real += row_count;
-                    bool_column->Reset();
+            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+            if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                bitmask.Initialize(std::ceil(segment_row_count));
+                bitmask.SetAllFalse();
+                for (u32 row_id : filter_result_vector) {
+                    bitmask.SetTrue(row_id);
                 }
-                if (segment_row_count_real != segment_row_count) {
-                    UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
-                                                   segment_id,
-                                                   segment_row_count_real,
-                                                   segment_row_count));
-                }
+            } else {
+                bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
             }
             bool use_bitmask = !bitmask.IsAllTrue();
 

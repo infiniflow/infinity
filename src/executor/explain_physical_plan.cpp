@@ -85,7 +85,7 @@ import extra_ddl_info;
 import column_def;
 import statement_common;
 import flush_statement;
-
+import common_query_filter;
 import table_entry;
 
 namespace infinity {
@@ -812,10 +812,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     result->emplace_back(MakeShared<String>(query_embedding));
 
     // filter expression
-    BaseExpression *filter_expr = knn_scan_node->filter_expression_.get();
-    if (filter_expr != nullptr) {
+    if (knn_scan_node->common_query_filter_ and knn_scan_node->common_query_filter_->original_filter_) {
         String filter_str = String(intent_size, ' ') + " - filter: ";
-        ExplainLogicalPlan::Explain(filter_expr, filter_str);
+        ExplainLogicalPlan::Explain(knn_scan_node->common_query_filter_->original_filter_.get(), filter_str);
         result->emplace_back(MakeShared<String>(filter_str));
     }
 
@@ -1316,7 +1315,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [id, status, dir, size, block_count, row_capacity, row_count, actual_row_count, room, column_count]";
+            output_columns_str +=
+                " - output columns: [id, status, dir, size, block_count, row_capacity, row_count, actual_row_count, room, column_count]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
@@ -1969,10 +1969,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     result->emplace_back(MakeShared<String>(match_expression));
 
     // filter expression
-    if (match_node->have_filter()) {
+    if (const CommonQueryFilter *filter = match_node->common_query_filter(); filter) {
         {
             String filter_str = String(intent_size, ' ') + " - filter for secondary index: ";
-            if (const auto *filter_expr = match_node->filter_secondary_index_expr(); filter_expr) {
+            if (const auto *filter_expr = filter->secondary_index_filter_qualified_.get(); filter_expr) {
                 ExplainLogicalPlan::Explain(filter_expr, filter_str);
             } else {
                 filter_str += "None";
@@ -1981,7 +1981,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
         }
         {
             String filter_str = String(intent_size, ' ') + " - filter except secondary index: ";
-            if (const auto *filter_expr = match_node->filter_leftover_expr(); filter_expr) {
+            if (const auto *filter_expr = filter->filter_leftover_.get(); filter_expr) {
                 ExplainLogicalPlan::Explain(filter_expr, filter_str);
             } else {
                 filter_str += "None";
@@ -2059,6 +2059,5 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 }
-
 
 } // namespace infinity
