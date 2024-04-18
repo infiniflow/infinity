@@ -212,6 +212,3 @@ install(DIRECTORY "src/thrift" DESTINATION "${INCLUDE_INSTALL_DIR}"
 install(DIRECTORY "${CMAKE_BINARY_DIR}/thrift" DESTINATION "${INCLUDE_INSTALL_DIR}"
     FILES_MATCHING PATTERN "*.h")
 
-if(BUILD_TESTING)
-    add_subdirectory(test)
-endif()
