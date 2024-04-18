@@ -264,9 +264,11 @@ public:
     // set nullptr to close auto compaction
     void SetCompactionAlg(UniquePtr<CompactionAlg> compaction_alg) { compaction_alg_ = std::move(compaction_alg); }
 
-    Optional<Pair<Vector<SegmentEntry *>, Txn *>> TryCompactAddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn);
+    void AddSegmentToCompactionAlg(SegmentEntry *segment_entry);
 
-    Optional<Pair<Vector<SegmentEntry *>, Txn *>> TryCompactDeleteRow(SegmentID segment_id, std::function<Txn *()> generate_txn);
+    void AddDeleteToCompactionAlg(SegmentID segment_id);
+
+    Optional<CompactionInfo> CheckCompaction(std::function<Txn *()> generate_txn);
 
     Vector<SegmentEntry *> PickCompactSegments() const;
 

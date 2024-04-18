@@ -393,16 +393,16 @@ void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
 
 WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 
-//void Txn::Begin() {
-//    TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
-//    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
-//    txn_context_.SetTxnBegin(ts);
-//}
+// void Txn::Begin() {
+//     TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
+//     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+//     txn_context_.SetTxnBegin(ts);
+// }
 
-//void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
-//    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
-//    txn_context_.SetTxnBegin(begin_ts);
-//}
+// void Txn::SetBeginTS(TxnTimeStamp begin_ts) {
+//     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, begin_ts));
+//     txn_context_.SetTxnBegin(begin_ts);
+// }
 
 TxnTimeStamp Txn::Commit() {
     //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
@@ -435,7 +435,9 @@ TxnTimeStamp Txn::Commit() {
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        // Snapshot the physical operations in one txn
+        if (txn_mgr_->enable_compaction()) {
+            txn_store_.MaintainCompactionAlg();
+        }
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }
     return this->CommitTS();
@@ -453,14 +455,13 @@ void Txn::CommitBottom() {
         // prepare to commit txn local data into table
         TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
-        // // check conflict
         txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
 
         txn_context_.SetTxnCommitted();
 
-        txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
+        txn_store_.CommitBottom(txn_id_, commit_ts);
 
-        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
+        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
 
         if (!local_catalog_delta_ops_entry_->operations().empty()) {
             local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
