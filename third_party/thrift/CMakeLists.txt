@@ -28,14 +28,14 @@ endif()
 
 # PACKAGE_VERSION is used by cpack scripts currently
 # Both thrift_VERSION and PACKAGE_VERSION should be the same for now
-set(thrift_VERSION "0.19.0")
+set(thrift_VERSION "0.20.0")
 set(PACKAGE_VERSION ${thrift_VERSION})
 
 project("thrift" VERSION ${PACKAGE_VERSION})
 message(STATUS "Configuring ${CMAKE_PROJECT_NAME} ${thrift_VERSION}")
 
 
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/build_cmake/cmake")
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/build/cmake")
 
 # Some default settings
 include(DefineCMakeDefaults)
