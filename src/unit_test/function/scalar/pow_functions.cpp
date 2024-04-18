@@ -43,7 +43,7 @@ class PowFunctionsTest : public BaseTest {};
 TEST_F(PowFunctionsTest, mul_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/var/infinity/data"));
 
     RegisterPowFunction(catalog_ptr);
 

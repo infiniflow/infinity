@@ -30,9 +30,9 @@ import logical_type;
 
 class CatalogDeltaEntryTest : public BaseTest {
 protected:
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
+    void SetUp() override { system("rm -rf /var/infinity"); }
 
-    void TearDown() override { system("rm -rf /tmp/infinity"); }
+    void TearDown() override { system("rm -rf /var/infinity"); }
 };
 
 using namespace infinity;

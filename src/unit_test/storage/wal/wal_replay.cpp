@@ -68,11 +68,11 @@ protected:
         return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     }
 
-    void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
+    void SetUp() override { system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal"); }
 
     void TearDown() override {
-        // system("tree  /tmp/infinity");
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        // system("tree  /var/infinity");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
     }
 };
 
@@ -602,7 +602,7 @@ TEST_F(WalReplayTest, wal_replay_import) {
 #endif
     }
     // Restart the db instance
-    system("tree  /tmp/infinity");
+    system("tree  /var/infinity");
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -747,7 +747,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 #endif
     }
     // Restart db instance
-    system("tree  /tmp/infinity");
+    system("tree  /var/infinity");
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -859,7 +859,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system("tree  /tmp/infinity");
+    system("tree  /var/infinity");
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -966,7 +966,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system("tree  /tmp/infinity");
+    system("tree  /var/infinity");
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();

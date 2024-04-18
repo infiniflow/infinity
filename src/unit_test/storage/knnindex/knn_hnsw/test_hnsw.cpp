@@ -47,7 +47,7 @@ public:
 public:
     using LabelT = u64;
 
-    const std::string save_dir_ = "/tmp/infinity";
+    const std::string save_dir_ = "/var/infinity";
 
     template <typename Hnsw>
     void TestSimple() {

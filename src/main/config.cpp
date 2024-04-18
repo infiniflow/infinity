@@ -145,7 +145,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
     // Default log config
     SharedPtr<String> default_log_filename = MakeShared<String>("infinity.log");
-    SharedPtr<String> default_log_dir = MakeShared<String>("/tmp/infinity/log");
+    SharedPtr<String> default_log_dir = MakeShared<String>("/var/infinity/log");
     bool default_log_to_stdout = false;
     u64 default_log_max_size = 1024lu * 1024lu * 1024lu; // 1Gib
     u64 default_log_file_rotate_count = 10;
@@ -154,7 +154,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     LogLevel default_log_level = LogLevel::kInfo;
 
     // Default storage config
-    SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
+    SharedPtr<String> default_data_dir = MakeShared<String>("/var/infinity/data");
     u64 default_row_size = 8192lu;
     u64 default_storage_capacity = 64 * 1024lu * 1024lu * 1024lu; // 64Gib
     u64 default_garbage_collection_interval = 0;                  // real-time
@@ -162,7 +162,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
-    SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
+    SharedPtr<String> default_temp_dir = MakeShared<String>("/var/infinity/temp");
 
     // Default wal config
     u64 default_wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
@@ -171,11 +171,11 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     u64 full_checkpoint_interval_sec = FULL_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-    SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
+    SharedPtr<String> default_wal_dir = MakeShared<String>("/var/infinity/wal");
     FlushOption default_flush_at_commit = FlushOption::kOnlyWrite;
 
     // Default resource config
-    String default_resource_dict_path = String("/tmp/infinity/resource");
+    String default_resource_dict_path = String("/var/infinity/resource");
     u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
     bool default_enable_compaction = DEFAULT_ENABLE_COMPACTION;
 

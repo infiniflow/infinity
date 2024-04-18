@@ -53,8 +53,8 @@ TEST_F(LocalFileSystemTest, file_write) {
 TEST_F(LocalFileSystemTest, dir_ops) {
     using namespace infinity;
     LocalFileSystem local_file_system;
-    String dir = "/tmp/infinity/unit_test/";
-    String path = "/tmp/infinity/unit_test/test_file.test";
+    String dir = "/var/infinity/unit_test/";
+    String path = "/var/infinity/unit_test/test_file.test";
 
     local_file_system.CreateDirectory(dir);
 
