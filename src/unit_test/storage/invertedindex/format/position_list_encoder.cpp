@@ -19,7 +19,7 @@ class PositionListEncoderTest : public BaseTest {
 public:
     PositionListEncoderTest() : buffer_pool_(10240), byte_slice_pool_(10240) {}
 
-    void SetUp() override { file_ = "/tmp/position"; }
+    void SetUp() override { file_ = String(GetTmpDir()) + "/position"; }
     void TearDown() override {}
 
 protected:

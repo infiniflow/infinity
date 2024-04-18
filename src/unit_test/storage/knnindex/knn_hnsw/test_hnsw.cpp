@@ -37,17 +37,9 @@ using namespace infinity;
 
 class HnswAlgTest : public BaseTest {
 public:
-    void SetUp() override {
-        system(("rm -rf " + save_dir_).c_str());
-        system(("mkdir -p " + save_dir_).c_str());
-    }
-
-    void TearDown() override { system(("rm -rf " + save_dir_).c_str()); }
-
-public:
     using LabelT = u64;
 
-    const std::string save_dir_ = "/var/infinity";
+    const std::string save_dir_ = GetTmpDir();
 
     template <typename Hnsw>
     void TestSimple() {
