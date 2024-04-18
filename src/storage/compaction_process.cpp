@@ -19,6 +19,7 @@ module;
 module compaction_process;
 
 import stl;
+import bg_task;
 import compact_segments_task;
 import catalog;
 import txn_manager;
@@ -27,21 +28,27 @@ import table_entry;
 import logger;
 import infinity_exception;
 import third_party;
+import blocking_queue;
 
 namespace infinity {
 
-CompactionProcessor::CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr, const std::chrono::seconds &interval)
-    : catalog_(catalog), txn_mgr_(txn_mgr), interval_(interval) {}
+CompactionProcessor::CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr) : catalog_(catalog), txn_mgr_(txn_mgr) {}
 
 void CompactionProcessor::Start() {
-    stop_.store(false);
+    LOG_INFO("Compaction processor is started.");
     processor_thread_ = Thread([this] { Process(); });
 }
 
 void CompactionProcessor::Stop() {
-    stop_.store(true);
+    LOG_INFO("Compaction processor is stopping.");
+    SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
+    this->Submit(stop_task);
+    stop_task->Wait();
     processor_thread_.join();
+    LOG_INFO("Compaction processor is stopped.");
 }
+
+void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
 Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::Scan() {
     auto generate_txn = [this]() { return txn_mgr_->BeginTxn(); };
@@ -69,29 +76,37 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::Scan() {
 }
 
 void CompactionProcessor::Process() {
-    Vector<UniquePtr<CompactSegmentsTask>> compact_tasks;
-    auto prev_time = std::chrono::system_clock::now();
-    while (!stop_.load()) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        auto cur_time = std::chrono::system_clock::now();
-        if (cur_time - prev_time < interval_) {
-            continue;
-        }
-        prev_time = cur_time;
-
-        compact_tasks = this->Scan();
-
-        for (auto &compact_task : compact_tasks) {
-            LOG_INFO(fmt::format("Compact {} start.", compact_task->table_name()));
-            compact_task->Execute();
-            if (compact_task->TryCommitTxn()) {
-                LOG_INFO(fmt::format("Compact {} done.", compact_task->table_name()));
-            } else {
-                LOG_INFO(fmt::format("Compact {} rollback.", compact_task->table_name()));
+    bool running = true;
+    while (running) {
+        Deque<SharedPtr<BGTask>> tasks;
+        task_queue_.DequeueBulk(tasks);
+        for (const auto &bg_task : tasks) {
+            switch (bg_task->type_) {
+                case BGTaskType::kStopProcessor: {
+                    running = false;
+                    break;
+                }
+                case BGTaskType::kNotifyCompact: {
+                    Vector<UniquePtr<CompactSegmentsTask>> compact_tasks;
+                    compact_tasks = this->Scan();
+                    for (auto &compact_task : compact_tasks) {
+                        LOG_INFO(fmt::format("Compact {} start.", compact_task->table_name()));
+                        compact_task->Execute();
+                        if (compact_task->TryCommitTxn()) {
+                            LOG_INFO(fmt::format("Compact {} done.", compact_task->table_name()));
+                        } else {
+                            LOG_INFO(fmt::format("Compact {} rollback.", compact_task->table_name()));
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
+                    break;
+                }
             }
-            break;
+            bg_task->Complete();
         }
-        compact_tasks.clear();
     }
 }
 

@@ -84,7 +84,7 @@ export enum class CompactSegmentsTaskType : i8 {
     kInvalid,
 };
 
-export class CompactSegmentsTask final : public BGTask {
+export class CompactSegmentsTask final {
 public:
     static UniquePtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn);
 
@@ -93,12 +93,6 @@ public:
     explicit CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type);
 
 public:
-    ~CompactSegmentsTask() override = default;
-
-    String ToString() const override { return "Compact segments task"; }
-
-    //    void BeginTxn() { txn_->Begin(); }
-
     bool TryCommitTxn() {
         try {
             txn_->txn_mgr()->CommitTxn(txn_);

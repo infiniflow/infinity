@@ -99,7 +99,7 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 default: {
-                    UnrecoverableError("Invalid background task");
+                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
                     break;
                 }
             }

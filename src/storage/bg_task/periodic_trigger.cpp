@@ -49,8 +49,14 @@ void CheckpointPeriodicTrigger::Trigger() {
     auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
     LOG_INFO(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
-        LOG_TRACE(fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+        LOG_TRACE(
+            fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     }
+}
+
+void CompactSegmentPeriodicTrigger::Trigger() {
+    auto compact_task = MakeShared<NotifyCompactTask>();
+    compact_processor_->Submit(std::move(compact_task));
 }
 
 } // namespace infinity

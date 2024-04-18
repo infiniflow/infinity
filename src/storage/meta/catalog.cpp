@@ -988,8 +988,14 @@ void Catalog::MemIndexCommit() {
 }
 
 void Catalog::MemIndexCommitLoop() {
+    auto prev_time = std::chrono::system_clock::now();
     while (running_.load()) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        auto cur_time = std::chrono::system_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(cur_time - prev_time).count() < 1) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+        prev_time = cur_time;
         MemIndexCommit();
     }
 }

@@ -126,8 +126,8 @@ UniquePtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(Table
 }
 
 CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type)
-    : BGTask(BGTaskType::kCompactSegments, false), task_type_(type), db_name_(table_entry->GetDBName()), table_name_(table_entry->GetTableName()),
-      commit_ts_(table_entry->commit_ts_), segments_(std::move(segments)), txn_(txn) {}
+    : task_type_(type), db_name_(table_entry->GetDBName()), table_name_(table_entry->GetTableName()), commit_ts_(table_entry->commit_ts_),
+      segments_(std::move(segments)), txn_(txn) {}
 
 bool CompactSegmentsTask::Execute() {
     auto [table_entry, status] = txn_->GetTableByName(*db_name_, *table_name_);
@@ -170,8 +170,7 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
-            LOG_INFO(
-                fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
+            LOG_INFO(fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
         }
         segment_data.emplace_back(new_segment, std::move(to_compact_segments));
         old_segments.insert(old_segments.end(), to_compact_segments.begin(), to_compact_segments.end());

@@ -30,7 +30,7 @@ export enum class BGTaskType {
     kAddDeltaEntry,
     kCheckpoint,
     kForceCheckpoint, // Manually triggered by PhysicalFlush
-    kCompactSegments,
+    kNotifyCompact,
     kCleanup,
     kUpdateSegmentBloomFilterData, // Not used
     kInvalid
@@ -46,8 +46,8 @@ export String BGTaskTypeToString(BGTaskType type) {
             return "AddDeltaEntry";
         case BGTaskType::kCheckpoint:
             return "Checkpoint";
-        case BGTaskType::kCompactSegments:
-            return "CompactSegments";
+        case BGTaskType::kNotifyCompact:
+            return "NotifyCompact";
         case BGTaskType::kCleanup:
             return "Cleanup";
         case BGTaskType::kUpdateSegmentBloomFilterData:
@@ -133,7 +133,8 @@ export struct ForceCheckpointTask final : public CheckpointTaskBase {
 export class CleanupTask final : public BGTask {
 public:
     // Try clean up is async task?
-    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
+    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
+        : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 public:
     ~CleanupTask() override = default;
@@ -153,6 +154,15 @@ private:
     const TxnTimeStamp visible_ts_;
 
     BufferManager *buffer_mgr_;
+};
+
+export class NotifyCompactTask final : public BGTask {
+public:
+    NotifyCompactTask() : BGTask(BGTaskType::kNotifyCompact, true) {}
+
+    ~NotifyCompactTask() override = default;
+
+    String ToString() const override { return "NotifyCompactTask"; }
 };
 
 } // namespace infinity

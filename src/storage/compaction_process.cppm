@@ -19,6 +19,8 @@ export module compaction_process;
 import stl;
 import compact_segments_task;
 import txn;
+import bg_task;
+import blocking_queue;
 
 namespace infinity {
 
@@ -27,11 +29,13 @@ class TxnManager;
 
 export class CompactionProcessor {
 public:
-    CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr, const std::chrono::seconds &interval);
+    CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
 
     void Start();
 
     void Stop();
+
+    void Submit(SharedPtr<BGTask> bg_task);
 
 private:
     Vector<UniquePtr<CompactSegmentsTask>> Scan();
@@ -39,12 +43,15 @@ private:
     void Process();
 
 private:
-    Catalog *catalog_{};
-    TxnManager *txn_mgr_{};
+    BlockingQueue<SharedPtr<BGTask>> task_queue_;
+
     Thread processor_thread_{};
 
-    atomic_bool stop_{false};
-    std::chrono::seconds interval_{};
+    Catalog *catalog_{};
+    TxnManager *txn_mgr_{};
+
+    // atomic_bool stop_{false};
+    // std::chrono::seconds interval_{};
 };
 
 } // namespace infinity
