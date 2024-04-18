@@ -971,7 +971,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
 
             if (!sequence_heap_.empty() && sequence_heap_.top() == last_sequence_ + 1) {
                 auto iter = delta_entry_map_.find(sequence_heap_.top());
-                if (iter != delta_entry_map_.end()) {
+                if (iter == delta_entry_map_.end()) {
                     UnrecoverableError(fmt::format("sequence_heap_.top() {} in delta_entry_map_", sequence_heap_.top()));
                 }
                 delta_entry = std::move(iter->second);

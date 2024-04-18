@@ -19,7 +19,7 @@ class TestIndexParallel(TestSdk):
 
     @pytest.mark.parametrize("file_format", ["csv"])
 
-    @pytest.mark.skip(reason="deadlock caused by compaction")
+    # @pytest.mark.skip(reason="deadlock caused by compaction")
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
         def write_worker(connection_pool: ConnectionPool, data, file_path, end_time, thread_id):
