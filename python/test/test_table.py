@@ -299,13 +299,13 @@ class TestTable(TestSdk):
                 - c4 int16
                 - c5 int32
                 - c6 int64
-                - c7 int128
-                - c8 float
-                - c9 float32
-                - c10 double
-                - c11 float64
-                - c12 varchar
-                - c13 integer
+                - c7 float
+                - c8 float32
+                - c9 double
+                - c10 float64
+                - c11 varchar
+                - c12 integer
+                - c13 int128 # invalid now
             - 'my_table'             ❌
                 - c1 int!@#
              - 'my_table'            ❌
@@ -334,8 +334,8 @@ class TestTable(TestSdk):
         tb = db_obj.create_table(
             "test_table_with_different_column_types",
             {"c1": "bool, primary key", "c2": "int", "c3": "int8", "c4": "int16",
-             "c5": "int32", "c6": "int64", "c7": "int128", "c8": "float", "c9": "float32",
-             "c10": "double", "c11": "float64", "c12": "varchar", "c13": "integer"}, ConflictType.Error)
+             "c5": "int32", "c6": "int64", "c7": "float", "c8": "float32",
+             "c9": "double", "c10": "float64", "c11": "varchar", "c12": "integer"}, ConflictType.Error)
         assert tb is not None
 
         for tb_type in common_values.invalid_name_array:
@@ -379,14 +379,14 @@ class TestTable(TestSdk):
         c_count = 10000
 
         types = [
-            "int", "int8", "int16", "int32", "int64", "int128", "float",
+            "int", "int8", "int16", "int32", "int64", "float",
             "float32", "double", "float64", "varchar", "integer", "bool",
         ]
         # make params
         params = {}
-        for i in range(c_count - 13):
+        for i in range(c_count - 12):
             params.update({
-                "c" + str(i): types[i % 13]
+                "c" + str(i): types[i % 12]
             })
 
         # create tb with 10000 columns with various column types
@@ -456,7 +456,7 @@ class TestTable(TestSdk):
         column_count = 10000
 
         types = [
-            "int", "int8", "int16", "int32", "int64", "int128", "float",
+            "int", "int8", "int16", "int32", "int64", "float",
             "float32", "double", "float64", "varchar", "integer", "bool",
         ]
 

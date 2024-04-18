@@ -43,7 +43,7 @@ invalid_name_array = [
 ]
 
 types = [
-            "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+            "integer", "tinyint", "smallint", "bigint", "float",
              "double", "varchar", "boolean"
         ]
 types_example = [
