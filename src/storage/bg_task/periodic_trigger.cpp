@@ -29,10 +29,10 @@ namespace infinity {
 
 void CleanupPeriodicTrigger::Trigger() {
     TxnTimeStamp visible_ts = txn_mgr_->GetMinUnflushedTS();
-    if (visible_ts == last_visible_ts_) {
-        LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
-        return;
-    }
+    // if (visible_ts == last_visible_ts_) {
+    //     LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
+    //     return;
+    // }
     if (visible_ts < last_visible_ts_) {
         UnrecoverableException("The visible timestamp is not monotonic.");
         return;

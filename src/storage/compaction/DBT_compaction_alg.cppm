@@ -57,7 +57,7 @@ public:
 
     void RemoveSegment(SegmentEntry *shrink_segment);
 
-    Vector<SegmentEntry *> SetAllCompacting(TransactionID txn_id);
+    Vector<SegmentEntry *> PickCompacting(TransactionID txn_id, SizeT M);
 
     void CommitCompact(TransactionID txn_id);
 

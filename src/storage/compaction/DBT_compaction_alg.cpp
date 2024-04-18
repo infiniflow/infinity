@@ -46,12 +46,14 @@ void SegmentLayer::RemoveSegment(SegmentEntry *shrink_segment) {
     }
 }
 
-Vector<SegmentEntry *> SegmentLayer::SetAllCompacting(TransactionID txn_id) {
+Vector<SegmentEntry *> SegmentLayer::PickCompacting(TransactionID txn_id, SizeT M) {
     Vector<SegmentEntry *> ret;
-    for (auto &[segment_id, segment_entry] : segments_) {
-        ret.push_back(segment_entry);
+    SizeT pick_n = std::min(M, segments_.size());
+    for (SizeT i = 0; i < pick_n; ++i) {
+        auto iter = segments_.begin();
+        ret.push_back(iter->second);
+        segments_.erase(iter);
     }
-    segments_.clear();                                                      // swap
     auto [iter, insert_ok] = compacting_segments_map_.emplace(txn_id, ret); // copy here
     if (!insert_ok) {
         UnrecoverableError(fmt::format("TransactionID conflict: {}", txn_id));
@@ -100,8 +102,7 @@ Optional<CompactionInfo> DBTCompactionAlg::CheckCompaction(std::function<Txn *()
             }
             Txn *txn = generate_txn();
             TransactionID txn_id = txn->TxnID();
-            Vector<SegmentEntry *> compact_segments = segment_layer.SetAllCompacting(txn_id);
-            // AddSegmentToHigher(compact_segments, layer + 1, txn_id);
+            Vector<SegmentEntry *> compact_segments = segment_layer.PickCompacting(txn_id, config_.m_);
 
             txn_2_layer_.emplace(txn_id, layer);
             return CompactionInfo(std::move(compact_segments), txn);

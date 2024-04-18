@@ -62,8 +62,12 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::Scan() {
     for (auto *db_entry : db_entries) {
         Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
         for (auto *table_entry : table_entries) {
-            auto compaction_info = table_entry->CheckCompaction(generate_txn);
-            if (compaction_info) {
+            while (true) {
+                auto compaction_info = table_entry->CheckCompaction(generate_txn);
+                if (!compaction_info) {
+                    break;
+                }
+
                 UniquePtr<CompactSegmentsTask> compact_task =
                     CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry, std::move(compaction_info->segments_), compaction_info->txn_);
                 compaction_tasks.emplace_back(std::move(compact_task));
