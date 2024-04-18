@@ -112,6 +112,7 @@ export enum class ErrorCode : long {
     kSegmentNotExist = 3070,
     kAggregateFunctionWithEmptyArgs = 3071,
     kBlockNotExist = 3072,
+    kInvalidTopKType = 3073,
 
     // 4. Txn fail
     kTxnRollback = 4001,
