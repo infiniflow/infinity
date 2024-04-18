@@ -145,7 +145,6 @@ class TestIndex(HttpTest):
         return
 
     # create / drop index with invalid options
-    @pytest.mark.skip(reason="skip")
     @pytest.mark.parametrize("column_name",
                              [(1, False), (2.2, False), ((1, 2), False), ([1, 2, 3], False), ("c1", True)])
     @pytest.mark.parametrize("index_type", [
@@ -191,7 +190,7 @@ class TestIndex(HttpTest):
                 },
                 {
                     "status_code": 500,
-                    "error_code": 3022,
+                    "error_code": 3060,
                 }
             )
         else:
