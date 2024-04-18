@@ -26,7 +26,7 @@ import infinity_context;
 class BufferHandleTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -49,25 +49,25 @@ TEST_F(BufferHandleTest, test1) {
     using namespace infinity;
 
     SizeT memory_limit = 1024;
-    auto temp_dir = MakeShared<String>("/tmp/infinity/spill");
-    auto base_dir = MakeShared<String>("/tmp/infinity/data");
+    auto temp_dir = MakeShared<String>("/var/infinity/spill");
+    auto base_dir = MakeShared<String>("/var/infinity/data");
 
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
     SizeT test_size1 = 512;
-    auto file_dir1 = MakeShared<String>("/tmp/infinity/data/dir1");
+    auto file_dir1 = MakeShared<String>("/var/infinity/data/dir1");
     auto test_fname1 = MakeShared<String>("test1");
     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
     auto buf1 = buffer_manager.Allocate(std::move(file_worker1));
 
     SizeT test_size2 = 512;
-    auto file_dir2 = MakeShared<String>("/tmp/infinity/data/dir2");
+    auto file_dir2 = MakeShared<String>("/var/infinity/data/dir2");
     auto test_fname2 = MakeShared<String>("test2");
     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
     auto buf2 = buffer_manager.Allocate(std::move(file_worker2));
 
     SizeT test_size3 = 512;
-    auto file_dir3 = MakeShared<String>("/tmp/infinity/data/dir3");
+    auto file_dir3 = MakeShared<String>("/var/infinity/data/dir3");
     auto test_fname3 = MakeShared<String>("test3");
     auto file_worker3 = MakeUnique<DataFileWorker>(file_dir3, test_fname3, test_size3);
     auto buf3 = buffer_manager.Allocate(std::move(file_worker3));

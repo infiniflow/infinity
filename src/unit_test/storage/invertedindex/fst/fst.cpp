@@ -53,8 +53,8 @@ TEST_F(FstTest, BuildMem) {
 }
 
 TEST_F(FstTest, BuildFile) {
-    std::filesystem::create_directories("/tmp/infinity");
-    std::ofstream ofs("/tmp/infinity/months.fst", std::ios::binary | std::ios::trunc);
+    std::filesystem::create_directories("/var/infinity");
+    std::ofstream ofs("/var/infinity/months.fst", std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder builder(wtr);
     for (auto &month : months) {
@@ -63,7 +63,7 @@ TEST_F(FstTest, BuildFile) {
     builder.Finish();
     u64 written = builder.BytesWritten();
     ofs.close();
-    EXPECT_EQ(std::filesystem::file_size("/tmp/infinity/months.fst"), written + 4);
+    EXPECT_EQ(std::filesystem::file_size("/var/infinity/months.fst"), written + 4);
 }
 
 TEST_F(FstTest, Get) {

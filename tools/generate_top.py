@@ -19,7 +19,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
     if os.path.exists(csv_path) and os.path.exists(slt_path) and generate_if_exists:
-        print("File {} and {} already existed exists. Skip Generating.".format(slt_path, csv_path))
+        print("File {} and {} already existed exists. Skip Generating.".format(
+            slt_path, csv_path))
         return
     with (open(csv_path, "w") as top_csv_file, open(slt_path, "w") as top_slt_file):
         x = [i for i in range(row_n)]
@@ -34,22 +35,26 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
-        top_slt_file.write("CREATE TABLE {} (c1 integer, c2 boolean);\n".format(table_name))
+        top_slt_file.write(
+            "CREATE TABLE {} (c1 integer, c2 boolean);\n".format(table_name))
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
-        top_slt_file.write("COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
+        top_slt_file.write(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
         top_slt_file.write("\nquery I\n")
         top_slt_file.write(
             "SELECT * FROM {} order by c1 - c1, c2 desc, c1 + c1 limit 10 offset 3330;\n".format(table_name))
         top_slt_file.write("----\n")
         top_slt_file.write("9990 true\n9993 true\n9996 true\n9999 true\n")
-        top_slt_file.write("1 false\n2 false\n4 false\n5 false\n7 false\n8 false\n")
+        top_slt_file.write(
+            "1 false\n2 false\n4 false\n5 false\n7 false\n8 false\n")
 
         for lim_off in limit_offset:
             limit = lim_off[0]
             offset = lim_off[1]
             top_slt_file.write("\nquery I\n")
-            top_slt_file.write("SELECT * FROM {} order by c1 limit {} offset {};\n".format(table_name, limit, offset))
+            top_slt_file.write(
+                "SELECT * FROM {} order by c1 limit {} offset {};\n".format(table_name, limit, offset))
             top_slt_file.write("----\n")
 
             limit = min(limit, row_n - offset)
@@ -68,7 +73,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate top data for test")
 
-    parser.add_argument("-g", "--generate", type=bool, default=False, dest="generate_if_exists", )
-    parser.add_argument("-c", "--copy", type=str, default="/tmp/infinity/test_data", dest="copy_dir", )
+    parser.add_argument("-g", "--generate", type=bool,
+                        default=False, dest="generate_if_exists", )
+    parser.add_argument("-c", "--copy", type=str,
+                        default="/var/infinity/test_data", dest="copy_dir", )
     args = parser.parse_args()
     generate(args.generate_if_exists, args.copy_dir)

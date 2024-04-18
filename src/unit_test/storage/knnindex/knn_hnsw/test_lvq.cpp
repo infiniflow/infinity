@@ -43,7 +43,7 @@ public:
 
     static constexpr size_t dim_ = 16;
     static constexpr size_t vec_n_ = 32;
-    const std::string file_dir_ = "/tmp/infinity";
+    const std::string file_dir_ = "/var/infinity/hnsw_lvq_test";
 
     bool dump_ = false;
 

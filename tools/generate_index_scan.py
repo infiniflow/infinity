@@ -18,7 +18,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
     if os.path.exists(csv_path) and os.path.exists(slt_path) and generate_if_exists:
-        print("File {} and {} already existed exists. Skip Generating.".format(slt_path, csv_path))
+        print("File {} and {} already existed exists. Skip Generating.".format(
+            slt_path, csv_path))
         return
     with (open(csv_path, "w") as index_scan_csv_file, open(slt_path, "w") as index_scan_slt_file):
         x = [i for i in range(row_n)]
@@ -29,17 +30,20 @@ def generate(generate_if_exists: bool, copy_dir: str):
             index_scan_csv_file.write("{},{},{}\n".format(i, j, k))
 
         index_scan_slt_file.write("statement ok\n")
-        index_scan_slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
+        index_scan_slt_file.write(
+            "DROP TABLE IF EXISTS {};\n".format(table_name))
 
         index_scan_slt_file.write("\nstatement ok\n")
         index_scan_slt_file.write(
             "CREATE TABLE {} (c1 integer, mod_256_min_128 tinyint, mod_7 tinyint);\n".format(table_name))
 
         index_scan_slt_file.write("\nstatement ok\n")
-        index_scan_slt_file.write("COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
+        index_scan_slt_file.write(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
 
         index_scan_slt_file.write("\nstatement ok\n")
-        index_scan_slt_file.write("CREATE INDEX idx_c1 on {}(c1);\n".format(table_name))
+        index_scan_slt_file.write(
+            "CREATE INDEX idx_c1 on {}(c1);\n".format(table_name))
 
         index_scan_slt_file.write("\n# index scan\n")
         index_scan_slt_file.write("query I\n")
@@ -56,10 +60,12 @@ def generate(generate_if_exists: bool, copy_dir: str):
             "SELECT * FROM {} WHERE ((c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990) AND NOT mod_7 = 1 ORDER BY c1;\n".format(
                 table_name))
         index_scan_slt_file.write("----\n")
-        index_scan_slt_file.write("0 0 0\n2 2 2\n3 3 3\n4 4 4\n10001 17 5\n10002 18 6\n10003 19 0\n19990 22 5\n")
+        index_scan_slt_file.write(
+            "0 0 0\n2 2 2\n3 3 3\n4 4 4\n10001 17 5\n10002 18 6\n10003 19 0\n19990 22 5\n")
 
         index_scan_slt_file.write("\nstatement ok\n")
-        index_scan_slt_file.write("CREATE INDEX idx_mod_7 on {}(mod_7);\n".format(table_name))
+        index_scan_slt_file.write(
+            "CREATE INDEX idx_mod_7 on {}(mod_7);\n".format(table_name))
 
         index_scan_slt_file.write("\n# index scan with 2 index\n")
         index_scan_slt_file.write("query III\n")
@@ -71,11 +77,13 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         index_scan_slt_file.write("\n# index scan large output (8996 rows)\n")
         index_scan_slt_file.write("query IV\n")
-        index_scan_slt_file.write("SELECT * FROM {} WHERE (c1 >= 5) AND (c1 <= 9000) ORDER BY c1;\n".format(table_name))
+        index_scan_slt_file.write(
+            "SELECT * FROM {} WHERE (c1 >= 5) AND (c1 <= 9000) ORDER BY c1;\n".format(table_name))
         index_scan_slt_file.write("----\n")
         # from 5 to 9000 (included), 8996 rows
         for i in range(5, 9001):
-            index_scan_slt_file.write("{} {} {}\n".format(i, ((i + 128) % 256) - 128, i % 7))
+            index_scan_slt_file.write("{} {} {}\n".format(
+                i, ((i + 128) % 256) - 128, i % 7))
 
         index_scan_slt_file.write("\nstatement ok\n")
         index_scan_slt_file.write("DROP TABLE {};\n".format(table_name))
@@ -84,7 +92,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate top data for test")
 
-    parser.add_argument("-g", "--generate", type=bool, default=False, dest="generate_if_exists", )
-    parser.add_argument("-c", "--copy", type=str, default="/tmp/infinity/test_data", dest="copy_dir", )
+    parser.add_argument("-g", "--generate", type=bool,
+                        default=False, dest="generate_if_exists", )
+    parser.add_argument("-c", "--copy", type=str,
+                        default="/var/infinity/test_data", dest="copy_dir", )
     args = parser.parse_args()
     generate(args.generate_if_exists, args.copy_dir)

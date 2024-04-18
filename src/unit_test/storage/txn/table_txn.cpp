@@ -37,7 +37,7 @@ import data_type;
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {
-        system("rm -rf /tmp/infinity");
+        system("rm -rf /var/infinity");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

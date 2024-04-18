@@ -41,4 +41,4 @@ temp_dir                = "/tmp"
 wal_dir                 = "/var/infinity/wal"
 
 [resource]
-dictionary_dir                = "/tmp/infinity/resource"
+dictionary_dir                = "/var/infinity/resource"

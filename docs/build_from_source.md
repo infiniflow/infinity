@@ -33,6 +33,7 @@ docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE
 ### Step3 Start up the Infinity server
 
 ```shell
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 ./cmake-build-debug/src/infinity
 ```
 
@@ -80,6 +81,7 @@ ninja
 ### Step4 Start up the Infinity server
 
 ```shell
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 ./cmake-build-debug/src/infinity
 ```
 
@@ -122,5 +124,6 @@ ninja
 ### Step4 Start up Infinity server
 
 ```shell
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 ./cmake-build-debug/src/infinity
 ```

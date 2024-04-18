@@ -43,7 +43,7 @@ class PlusFunctionsTest : public BaseTest {};
 TEST_F(PlusFunctionsTest, plus_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/var/infinity/data"));
 
     RegisterPlusFunction(catalog_ptr);
 
