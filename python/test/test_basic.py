@@ -23,15 +23,15 @@ import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import copy_data
+from test_sdkbase import TestSdk
 
 test_csv_file = "embedding_int_dim3.csv"
 
-
-class TestCase:
+class TestCase(TestSdk):
     def test_version(self):
         print(infinity.__version__)
-
     def test_connection(self):
+        
         """
         target: test connect and disconnect server ok
         method: connect server
@@ -42,7 +42,8 @@ class TestCase:
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
             assert infinity_obj.disconnect()
-
+    
+    
     def test_create_db_with_invalid_name(self):
         """
         target: test db name limitation
@@ -57,7 +58,8 @@ class TestCase:
                            match=f"DB name '{db_name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"):
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
-
+    
+   
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_basic(self, check_data):
@@ -82,9 +84,15 @@ class TestCase:
         for port in ports:
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
-            infinity_obj.drop_database("my_db", ConflictType.Ignore)
+
+            res = infinity_obj.list_databases()
+            assert res.error_code == ErrorCode.OK
+            for db_name in res.db_names:
+                if db_name != 'default':
+                    infinity_obj.drop_database(db_name, ConflictType.Error)
+
             # infinity
-            db_obj = infinity_obj.create_database("my_db")
+            db_obj = infinity_obj.create_database("my_db", ConflictType.Error)
             assert db_obj is not None
 
             res = infinity_obj.list_databases()
@@ -93,7 +101,7 @@ class TestCase:
             for db in res.db_names:
                 assert db in ['my_db', 'default']
 
-            res = infinity_obj.drop_database("my_db")
+            res = infinity_obj.drop_database("my_db", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
             db_obj = infinity_obj.get_database("default")

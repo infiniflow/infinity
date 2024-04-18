@@ -30,6 +30,8 @@ import statement_common;
 import base_table_ref;
 import logical_type;
 import index_defines;
+import analyzer_pool;
+import analyzer;
 
 namespace infinity {
 
@@ -40,6 +42,7 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
                                          Vector<String> column_names,
                                          const Vector<InitParameter *> &index_param_list) {
     String analyzer{};
+    u64 flag = OPTION_FLAG_ALL;
     SizeT param_count = index_param_list.size();
     for (SizeT param_idx = 0; param_idx < param_count; ++param_idx) {
         InitParameter *parameter = index_param_list[param_idx];
@@ -47,9 +50,18 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
         ToLowerString(para_name);
         if (para_name == "analyzer") {
             analyzer = parameter->param_value_;
+        } else if (para_name == "flag") {
+            flag = std::strtoul(parameter->param_value_.c_str(), nullptr, 10);
         }
     }
-    return MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer);
+    if (analyzer.empty()) {
+        analyzer = "standard";
+    }
+    UniquePtr<Analyzer> ana = AnalyzerPool::instance().Get(analyzer);
+    if (ana.get() == nullptr) {
+        RecoverableError(Status::InvalidIndexDefinition(fmt::format("Attempt to create full-text index using invalid analyer: {}.", analyzer)));
+    }
+    return MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer, (optionflag_t)flag);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {

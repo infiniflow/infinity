@@ -25,9 +25,10 @@ import infinity.index as index
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from utils import start_infinity_service_in_subporcess
+from test_sdkbase import TestSdk
 
 
-class TestInsert:
+class TestInsert(TestSdk):
 
     def test_version(self):
         print(infinity.__version__)
@@ -434,7 +435,6 @@ class TestInsert:
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-
         res = db_obj.drop_table("test_insert_table_with_10000_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -456,7 +456,6 @@ class TestInsert:
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
-
 
         res = db_obj.drop_table("test_insert_with_not_matched_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

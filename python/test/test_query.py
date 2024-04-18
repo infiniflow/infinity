@@ -21,9 +21,10 @@ from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 from infinity.common import ConflictType
+from test_sdkbase import TestSdk
 
 
-class TestQuery:
+class TestQuery(TestSdk):
     def test_query(self):
         conn = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         db = RemoteDatabase(conn, "default")

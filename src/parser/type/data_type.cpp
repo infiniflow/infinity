@@ -20,8 +20,11 @@
 #include "type/info/embedding_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include <iostream>
 #include <charconv>
+#include <ctype.h>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h> 
 
 namespace infinity {
 
@@ -279,6 +282,7 @@ nlohmann::json DataType::Serialize() {
 
 std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
     LogicalType logical_type = data_type_json["data_type"];
+
     std::shared_ptr<TypeInfo> type_info{nullptr};
     if (data_type_json.contains("type_info")) {
         const nlohmann::json &type_info_json = data_type_json["type_info"];
@@ -288,10 +292,10 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
                 type_info = nullptr;
                 break;
             }
-//            case LogicalType::kBitmap: {
-//                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
-//                break;
-//            }
+                //            case LogicalType::kBitmap: {
+                //                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
+                //                break;
+                //            }
             case LogicalType::kDecimal: {
                 type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
                 break;
@@ -313,11 +317,11 @@ std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_ty
     const LogicalType logical_type = Str2LogicalType(data_type_string);
 
     switch (logical_type) {
-            case LogicalType::kArray:
-            case LogicalType::kDecimal:
-            case LogicalType::kEmbedding: {
-                return nullptr;
-            }
+        case LogicalType::kArray:
+        case LogicalType::kDecimal:
+        case LogicalType::kEmbedding: {
+            return nullptr;
+        }
             case LogicalType::kInvalid: {
                 ParserError("Invalid data type");
             }

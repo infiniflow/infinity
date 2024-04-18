@@ -120,7 +120,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
 
 void ChunkIndexEntry::Cleanup() {
     if (buffer_obj_) {
-        buffer_obj_->SetAndTryCleanup();
+        buffer_obj_->Cleanup();
     }
 }
 

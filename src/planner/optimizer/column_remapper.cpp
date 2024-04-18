@@ -45,18 +45,25 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
         }
     };
 
-    if (op.operator_type() == LogicalNodeType::kJoin or op.operator_type() == LogicalNodeType::kKnnScan) {
-        VisitNodeChildren(op);
-        bindings_ = op.GetColumnBindings();
-        output_types_ = op.GetOutputTypes();
-        load_func();
-        VisitNodeExpression(op);
-    } else {
-        VisitNodeChildren(op);
-        load_func();
-        VisitNodeExpression(op);
-        bindings_ = op.GetColumnBindings();
-        output_types_ = op.GetOutputTypes();
+    switch (op.operator_type()) {
+        case LogicalNodeType::kJoin:
+        case LogicalNodeType::kMatch:
+        case LogicalNodeType::kKnnScan: {
+            VisitNodeChildren(op);
+            bindings_ = op.GetColumnBindings();
+            output_types_ = op.GetOutputTypes();
+            load_func();
+            VisitNodeExpression(op);
+            break;
+        }
+        default: {
+            VisitNodeChildren(op);
+            load_func();
+            VisitNodeExpression(op);
+            bindings_ = op.GetColumnBindings();
+            output_types_ = op.GetOutputTypes();
+            break;
+        }
     }
 }
 

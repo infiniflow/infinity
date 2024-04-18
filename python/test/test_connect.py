@@ -17,8 +17,8 @@ from common import common_values
 import infinity
 from infinity.common import NetworkAddress
 
-
-class TestConnection:
+from test_sdkbase import TestSdk
+class TestConnection(TestSdk):
     def test_connect_and_disconnect_ok(self):
         """
         target: test connect and server ok

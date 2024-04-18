@@ -10,12 +10,15 @@ from infinity.common import ConflictType
 from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 
+from test_sdkbase import TestSdk
+
 TEST_DATA_DIR = "/test/data/"
 
 
-class TestIndexParallel:
+class TestIndexParallel(TestSdk):
 
     @pytest.mark.parametrize("file_format", ["csv"])
+
     @pytest.mark.skip(reason="deadlock caused by compaction")
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
@@ -173,7 +176,6 @@ class TestIndexParallel:
     # @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     # @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
     # @pytest.mark.parametrize("file_format", ["csv"])
-
     @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw])
     @pytest.mark.parametrize("index_column_name", ["gender_vector"])
     @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
@@ -247,7 +249,6 @@ class TestIndexParallel:
                                                               "metric", index_distance_type)
                                                       ])], ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
         kInsertThreadNum = 4
         kRuningTime = 10
         threads = []

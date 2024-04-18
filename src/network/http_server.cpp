@@ -45,6 +45,13 @@ import statement_common;
 import extra_ddl_info;
 import update_statement;
 import http_search;
+import knn_expr;
+import type_info;
+import logical_type;
+import embedding_info;
+import decimal_info;
+import status;
+import constant_expr;
 
 namespace {
 
@@ -96,6 +103,10 @@ public:
         String option = body_info_json["create_option"];
         CreateDatabaseOptions create_option;
 
+        if (option == "ignore_if_exists") {
+            create_option.conflict_type_ = ConflictType::kIgnore;
+        }
+
         // create database
         auto result = infinity->CreateDatabase(database_name, create_option);
 
@@ -127,6 +138,10 @@ public:
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
         String option = body_info_json["drop_option"];
         DropDatabaseOptions drop_option;
+
+        if (option == "ignore_if_not_exists") {
+            drop_option.conflict_type_ = ConflictType::kIgnore;
+        }
 
         auto result = infinity->DropDatabase(database_name, drop_option);
 
@@ -211,34 +226,65 @@ public:
         Vector<ColumnDef *> column_definitions;
         i64 id = 0;
 
-        for (auto &field : fields) {
-            for (auto &field_element : field.items()) {
-                String column_name = field_element.key();
-                auto values = field_element.value();
-                String value_type = values["type"];
-                ToLower(value_type);
-                SharedPtr<DataType> column_type = DataType::StringDeserialize(value_type);
-                if (column_type) {
-                    HashSet<ConstraintType> constraints;
-                    for (auto &constraint_json : values["constraints"]) {
-                        String constraint = constraint_json;
-                        ToLower(constraint);
-                        constraints.insert(StringToConstraintType(constraint));
-                    }
-                    ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints);
-                    column_definitions.emplace_back(col_def);
+        for (auto &field : fields.items()) {
+            String column_name = field.key();
+            auto field_element = field.value();
+            String value_type = field_element["type"];
+            ToLower(value_type);
+
+            SharedPtr<DataType> column_type{nullptr};
+            SharedPtr<TypeInfo> type_info{nullptr};
+            if (value_type == "vector") {
+                String etype = field_element["element_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType e_data_type;
+                if (etype == "integer") {
+                    e_data_type = EmbeddingDataType::kElemInt32;
+                } else if (etype == "float") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
                 } else {
-                    infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", values["type"]));
-                    json_response["error_code"] = status.code();
-                    json_response["error_message"] = status.message();
-                    HTTPStatus http_status;
-                    http_status = HTTPStatus::CODE_500;
-                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                    e_data_type = EmbeddingDataType::kElemInvalid;
                 }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);
+            } else if (value_type == "decimal") {
+                type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
+                column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
+            } else if (value_type == "array") {
+                infinity::Status::ParserError("Array isn't implemented here.");
+                type_info = nullptr;
+            } else {
+                column_type = DataType::StringDeserialize(value_type);
+            }
+
+            if (column_type) {
+                HashSet<ConstraintType> constraints;
+                for (auto &constraint_json : field_element["constraints"]) {
+                    String constraint = constraint_json;
+                    ToLower(constraint);
+                    constraints.insert(StringToConstraintType(constraint));
+                }
+                ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints);
+                column_definitions.emplace_back(col_def);
+            } else {
+                infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
+                json_response["error_code"] = status.code();
+                json_response["error_message"] = status.message();
+                HTTPStatus http_status;
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
             }
         }
         Vector<TableConstraint *> table_constraint;
+        String option = body_info_json["create_option"];
         CreateTableOptions create_table_opts;
+        if (option == "ignore_if_exists") {
+            create_table_opts.conflict_type_ = ConflictType::kIgnore;
+        } else if (option == "replace_if_exists") {
+            create_table_opts.conflict_type_ = ConflictType::kReplace;
+        }
 
         auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, create_table_opts);
 
@@ -262,7 +308,15 @@ public:
 
         String database_name = request->getPathVariable("database_name");
         String table_name = request->getPathVariable("table_name");
+        String body_info = request->readBodyToString();
+
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        String option = body_info_json["drop_option"];
         DropTableOptions drop_table_opts;
+        if (option == "ignore_if_not_exists") {
+            drop_table_opts.conflict_type_ = ConflictType::kIgnore;
+        }
+
         auto result = infinity->DropTable(database_name, table_name, drop_table_opts);
 
         HTTPStatus http_status;
@@ -417,19 +471,18 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
-
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body)["data"];
             ImportOptions import_options;
 
             String file_type_str = http_body_json["file_type"];
             ToLower(file_type_str);
-            if(file_type_str == "csv") {
+            if (file_type_str == "csv") {
                 import_options.copy_file_type_ = CopyFileType::kCSV;
-            } else if(file_type_str == "json") {
+            } else if (file_type_str == "json") {
                 import_options.copy_file_type_ = CopyFileType::kJSON;
-            } else if(file_type_str == "jsonl") {
+            } else if (file_type_str == "jsonl") {
                 import_options.copy_file_type_ = CopyFileType::kJSONL;
-            } else if(file_type_str == "fvecs") {
+            } else if (file_type_str == "fvecs") {
                 import_options.copy_file_type_ = CopyFileType::kFVECS;
             } else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
@@ -437,13 +490,13 @@ public:
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            if(import_options.copy_file_type_ == CopyFileType::kCSV) {
-                if(http_body_json.contains("header")) {
+            if (import_options.copy_file_type_ == CopyFileType::kCSV) {
+                if (http_body_json.contains("header")) {
                     import_options.header_ = http_body_json["header"];
                 }
-                if(http_body_json.contains("delimiter")) {
+                if (http_body_json.contains("delimiter")) {
                     String delimiter = http_body_json["delimiter"];
-                    if(delimiter.size() != 1) {
+                    if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
                         json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
                         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -669,7 +722,6 @@ public:
 
                                         const_expr->double_array_.emplace_back(value_ref.template get<double>());
                                     }
-
                                     values_row->emplace_back(const_expr);
                                     const_expr = nullptr;
 
@@ -685,17 +737,9 @@ public:
                                 auto string_value = value.template get<String>();
                                 column_type_map.emplace(key, LiteralType::kString);
 
-                                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-                                ExprParser expr_parser;
-                                expr_parser.Parse(string_value, expr_parsed_result.get());
-                                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                                    json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                    json_response["error_message"] = fmt::format("Invalid expression: {}", string_value);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
-                                values_row->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
-                                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+                                ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
+                                const_expr->str_value_ = strdup(string_value.c_str());
+                                values_row->emplace_back(const_expr);
                                 break;
                             }
                             case nlohmann::json::value_t::object:
@@ -887,17 +931,9 @@ public:
 
                                 auto string_value = value.template get<String>();
 
-                                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-                                ExprParser expr_parser;
-                                expr_parser.Parse(string_value, expr_parsed_result.get());
-                                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                                    json_response["error_code"] = ErrorCode::kInvalidExpression;
-                                    json_response["error_message"] = fmt::format("Invalid expression: {}", string_value);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
-                                (*values_row)[column_id] = expr_parsed_result->exprs_ptr_->at(0);
-                                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+                                ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
+                                const_expr->str_value_ = strdup(string_value.c_str());
+                                (*values_row)[column_id] = const_expr;
 
                                 break;
                             }
@@ -920,8 +956,14 @@ public:
                 auto result = infinity->Insert(database_name, table_name, columns, column_values);
                 columns = nullptr;
                 column_values = nullptr;
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
 
             } else {
                 json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
@@ -966,15 +1008,20 @@ public:
             const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
             expr_parsed_result->exprs_ptr_->at(0) = nullptr;
 
-            // Only one block
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
 
-            // Get sum delete rows
-            Value value = data_block->GetValue(1, 0);
-            json_response["delete_row_count"] = value.value_.big_int;
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-
+                // Only one block
+                DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                // Get sum delete rows
+                Value value = data_block->GetValue(1, 0);
+                json_response["delete_row_count"] = value.value_.big_int;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
             json_response["error_message"] = e.what();
@@ -1000,7 +1047,7 @@ public:
 
             Vector<UpdateExpr *> *update_expr_array = new Vector<UpdateExpr *>();
             DeferFn defer_free_update_expr_array([&]() {
-                if(update_expr_array != nullptr) {
+                if (update_expr_array != nullptr) {
                     for (auto &expr : *update_expr_array) {
                         delete expr;
                     }
@@ -1172,8 +1219,14 @@ public:
             expr_parsed_result->exprs_ptr_->at(0) = nullptr;
             update_expr_array = nullptr;
 
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
 
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
@@ -1339,6 +1392,7 @@ public:
         auto database_name = request->getPathVariable("database_name");
         auto table_name = request->getPathVariable("table_name");
         auto index_name = request->getPathVariable("index_name");
+
         auto result = infinity->DropIndex(database_name, table_name, index_name, DropIndexOptions());
 
         nlohmann::json json_response;
@@ -1489,7 +1543,6 @@ public:
                         json_segment[column_name] = column_value;
                     }
                     json_response["segments"].push_back(json_segment);
-
                 }
             }
             json_response["table_name"] = table_name;
@@ -1535,7 +1588,6 @@ public:
                         json_block[column_name] = column_value;
                     }
                     json_response["blocks"].push_back(json_block);
-
                 }
             }
 
@@ -1635,7 +1687,9 @@ void HTTPServer::Start(u16 port) {
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments", MakeShared<ShowSegmentsListHandler>());
 
     // block
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}", MakeShared<ShowBlockDetailHandler>());
+    router->route("GET",
+                  "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}",
+                  MakeShared<ShowBlockDetailHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks", MakeShared<ShowBlocksListHandler>());
 
     // variable

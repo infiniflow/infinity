@@ -168,12 +168,11 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
         block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
         {
             String ss;
-            ss += "Compacting segments: ";
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
             LOG_INFO(
-                fmt::format("Table {}, type: {}, compacting segments: {}, into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
+                fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
         }
         segment_data.emplace_back(new_segment, std::move(to_compact_segments));
         old_segments.insert(old_segments.end(), to_compact_segments.begin(), to_compact_segments.end());
