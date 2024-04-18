@@ -409,24 +409,22 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         return Status::OK();
     }
 
-    Vector<SegmentEntry *> new_segments;
     {
-        {
-            String ss = "Compact commit: " + *this->GetTableName();
-            for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
-                auto *new_segment = segment_store.segment_entry_;
-                ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
-                for (const auto *old_segment : old_segments) {
-                    ss += std::to_string(old_segment->segment_id_) + " ";
-                }
-            }
-            LOG_INFO(ss);
-        }
+        // {
+        //     String ss = "Compact commit: " + *this->GetTableName();
+        //     for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+        //         auto *new_segment = segment_store.segment_entry_;
+        //         ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
+        //         for (const auto *old_segment : old_segments) {
+        //             ss += std::to_string(old_segment->segment_id_) + " ";
+        //         }
+        //     }
+        //     LOG_INFO(ss);
+        // }
         std::unique_lock lock(this->rw_locker_);
         for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
 
             auto *segment_entry = segment_store.segment_entry_;
-            new_segments.push_back(segment_entry);
 
             segment_entry->CommitSegment(txn_id, commit_ts);
             for (auto *block_entry : segment_store.block_entries_) {
@@ -470,7 +468,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         case CompactSegmentsTaskType::kCompactTable: {
             //  reinitialize compaction_alg_ with new segments and enable it
             LOG_INFO(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
-            compaction_alg_->Enable(new_segments);
+            compaction_alg_->Enable({});
             break;
         }
         default: {
