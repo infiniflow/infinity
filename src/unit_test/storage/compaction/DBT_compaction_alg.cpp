@@ -432,11 +432,10 @@ TEST_F(DBTCompactionTest, RollbackTest) {
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
     DBTCompact.Enable(Vector<SegmentEntry *>{});
 
-    // {1, 2, 2, 3, 5, 3, 6};
     Vector<SharedPtr<SegmentEntry>> segment_entries; // hold lifetime
     MockSegmentEntry *shrink_segment = nullptr;      // the segment in layer[1]
     {
-        auto segment_entry = MockSegmentEntry::Make(1);
+        auto segment_entry = MockSegmentEntry::Make(2);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
         auto ret = DBTCompact.CheckCompaction(GetTxn);
@@ -462,20 +461,17 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto segment_entry = MockSegmentEntry::Make(2);
-        segment_entries.emplace_back(segment_entry);
-        DBTCompact.AddSegment(segment_entry.get());
         auto ret = DBTCompact.CheckCompaction(GetTxn);
         EXPECT_TRUE(ret.has_value());
         const auto &segments = ret->segments_;
         auto *txn = ret->txn_;
 
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 4u);
+        EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 7u);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 6u);
 
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
@@ -486,7 +482,7 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto segment_entry = MockSegmentEntry::Make(7);
+        auto segment_entry = MockSegmentEntry::Make(8);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
         auto ret = DBTCompact.CheckCompaction(GetTxn);
