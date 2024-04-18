@@ -159,6 +159,8 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     u64 default_storage_capacity = 64 * 1024lu * 1024lu * 1024lu; // 64Gib
     u64 default_garbage_collection_interval = 0;                  // real-time
     double default_garbage_collection_storage_ratio = 0;          // disable the function
+    u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
+    u64 default_compact_interval_sec = DEFAULT_COMPACT_INTERVAL_SEC;
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
@@ -176,8 +178,6 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
     // Default resource config
     String default_resource_dict_path = String("/var/infinity/resource");
-    u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
-    u64 default_compact_interval_sec = DEFAULT_COMPACT_INTERVAL_SEC;
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {

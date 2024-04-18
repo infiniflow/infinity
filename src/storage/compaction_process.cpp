@@ -100,6 +100,9 @@ void CompactionProcessor::Process() {
                     }
                     break;
                 }
+                // case BGTaskType::kNotifyOptimize: {
+                //     break;
+                // }
                 default: {
                     UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
                     break;

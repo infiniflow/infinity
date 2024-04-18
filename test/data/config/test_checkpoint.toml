@@ -2,7 +2,7 @@
 version = "0.1.0"
 timezone = "utc-8"
 
-[resource]
+[storage]
 cleanup_interval = 0
 # close auto compaction
 compact_interval = 0
