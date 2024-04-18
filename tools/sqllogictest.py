@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     test_dir = current_path + "/test/sql"
     data_dir = current_path + "/test/data"
-    copy_dir = "/tmp/infinity/test_data"
+    copy_dir = "/var/infinity/test_data"
 
     parser = argparse.ArgumentParser(description="SQL Logic Test For Infinity")
 

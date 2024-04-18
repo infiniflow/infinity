@@ -5,15 +5,15 @@ statement ok
 CREATE TABLE test_compact_with_delete (c1 INT, c2 EMBEDDING(int, 3));
 
 query I
-COPY test_compact_with_delete FROM '/tmp/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+COPY test_compact_with_delete FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
 ----
 
 query I
-COPY test_compact_with_delete FROM '/tmp/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+COPY test_compact_with_delete FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
 ----
 
 query I
-COPY test_compact_with_delete FROM '/tmp/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+COPY test_compact_with_delete FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
 ----
 
 statement ok

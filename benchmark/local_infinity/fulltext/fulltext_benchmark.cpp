@@ -99,7 +99,7 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
         column_defs.push_back(col3_def);
     }
 
-    String data_path = "/tmp/infinity";
+    String data_path = "/var/infinity";
 
     Infinity::LocalInit(data_path);
     // SetLogLevel(LogLevel::kTrace);
@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
 
 // #define DEL_LOCAL_DATA
 #ifdef DEL_LOCAL_DATA
-    system("rm -rf /tmp/infinity/data  /tmp/infinity/log  /tmp/infinity/temp  /tmp/infinity/wal");
+    system("rm -rf /var/infinity/data  /var/infinity/log  /var/infinity/temp  /var/infinity/wal");
 #endif
 
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);

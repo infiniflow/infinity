@@ -37,10 +37,10 @@ import data_type;
 class InfinityTableTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
     }
     void TearDown() override {
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
         BaseTest::TearDown();
     }
 };
@@ -48,7 +48,7 @@ class InfinityTableTest : public BaseTest {
 TEST_F(InfinityTableTest, test1) {
     using namespace infinity;
 
-    String path = "/tmp/infinity";
+    String path = "/var/infinity";
 
     Infinity::LocalInit(path);
 

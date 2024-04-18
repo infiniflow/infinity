@@ -27,7 +27,7 @@ import sql_runner;
 class FragmentTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

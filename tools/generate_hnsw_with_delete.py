@@ -28,7 +28,7 @@ def generate(generate_if_exists: bool, copy: bool):
     csv_name = "{}.csv".format(table_name)
     slt_name = "{}.slt".format(table_name)
 
-    copy_dir = "/tmp/infinity/test_data"
+    copy_dir = "/var/infinity/test_data"
     copy_path = copy_dir + "/" + csv_name
 
     csv_path = csv_dir + "/" + csv_name
@@ -104,7 +104,7 @@ def generate(generate_if_exists: bool, copy: bool):
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '/tmp/infinity/test_data/{}' WITH ( DELIMITER ',' );\n".format(
+            "COPY {} FROM '/var/infinity/test_data/{}' WITH ( DELIMITER ',' );\n".format(
                 table_name, csv_name
             )
         )

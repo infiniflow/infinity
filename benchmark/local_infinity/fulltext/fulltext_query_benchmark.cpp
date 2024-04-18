@@ -91,7 +91,7 @@ int main(int argn, char *argv[]) {
     std::string table_name = "ft_dbpedia_benchmark";
     std::string index_name = "ft_dbpedia_index";
 
-    std::string infinity_path = "/tmp/infinity";
+    std::string infinity_path = "/var/infinity";
     Infinity::LocalInit(infinity_path);
 
     std::unique_ptr<FileHandler> query_file = fs.OpenFile(query_path, FileFlags::READ_FLAG, FileLockType::kReadLock);

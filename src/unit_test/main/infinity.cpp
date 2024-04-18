@@ -33,17 +33,17 @@ import data_type;
 class InfinityTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
     }
     void TearDown() override {
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
         BaseTest::TearDown();
     }
 };
 
 TEST_F(InfinityTest, test1) {
     using namespace infinity;
-    String path = "/tmp/infinity";
+    String path = "/var/infinity";
 
     Infinity::LocalInit(path);
 
@@ -257,7 +257,7 @@ TEST_F(InfinityTest, test1) {
 
 TEST_F(InfinityTest, test2) {
     using namespace infinity;
-    String path = "/tmp/infinity";
+    String path = "/var/infinity";
 
     Infinity::LocalInit(path);
 

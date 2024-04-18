@@ -11,7 +11,7 @@ CREATE TABLE test_index (col1 embedding(float,128));
 
 # import data from fvecs file
 statement ok
-COPY test_index FROM '/tmp/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+COPY test_index FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
 
 statement ok
 CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);

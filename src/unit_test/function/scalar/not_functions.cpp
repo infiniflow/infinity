@@ -43,7 +43,7 @@ class NotFunctionsTest : public BaseTest {};
 TEST_F(NotFunctionsTest, not_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/var/infinity/data"));
 
     RegisterNotFunction(catalog_ptr);
 

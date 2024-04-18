@@ -41,7 +41,7 @@ class MaxFunctionTest : public BaseTest {};
 TEST_F(MaxFunctionTest, max_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/var/infinity/data"));
 
     RegisterMaxFunction(catalog_ptr);
 
