@@ -59,4 +59,9 @@ void CompactSegmentPeriodicTrigger::Trigger() {
     compact_processor_->Submit(std::move(compact_task));
 }
 
+void OptimizeIndexPeriodicTrigger::Trigger() {
+    auto optimize_task = MakeShared<NotifyOptimizeTask>();
+    compact_processor_->Submit(std::move(optimize_task));
+}
+
 } // namespace infinity

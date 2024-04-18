@@ -50,7 +50,7 @@ void CompactionProcessor::Stop() {
 
 void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
-Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::Scan() {
+Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
     auto generate_txn = [this]() { return txn_mgr_->BeginTxn(); };
 
     Txn *scan_txn = txn_mgr_->BeginTxn();
@@ -79,6 +79,22 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::Scan() {
     return compaction_tasks;
 }
 
+void CompactionProcessor::ScanAndOptimize() {
+    Txn *opt_txn = txn_mgr_->BeginTxn();
+    TransactionID txn_id = opt_txn->TxnID();
+    TxnTimeStamp begin_ts = opt_txn->BeginTS();
+
+    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
+    for (auto *db_entry : db_entries) {
+        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
+        for (auto *table_entry : table_entries) {
+            table_entry->OptimizeIndex(opt_txn);
+        }
+    }
+
+    txn_mgr_->CommitTxn(opt_txn);
+}
+
 void CompactionProcessor::Process() {
     bool running = true;
     while (running) {
@@ -92,7 +108,7 @@ void CompactionProcessor::Process() {
                 }
                 case BGTaskType::kNotifyCompact: {
                     Vector<UniquePtr<CompactSegmentsTask>> compact_tasks;
-                    compact_tasks = this->Scan();
+                    compact_tasks = this->ScanForCompact();
                     for (auto &compact_task : compact_tasks) {
                         LOG_INFO(fmt::format("Compact {} start.", compact_task->table_name()));
                         compact_task->Execute();
@@ -104,9 +120,10 @@ void CompactionProcessor::Process() {
                     }
                     break;
                 }
-                // case BGTaskType::kNotifyOptimize: {
-                //     break;
-                // }
+                case BGTaskType::kNotifyOptimize: {
+                    ScanAndOptimize();
+                    break;
+                }
                 default: {
                     UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
                     break;

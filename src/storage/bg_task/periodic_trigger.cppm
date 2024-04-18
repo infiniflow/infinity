@@ -87,4 +87,15 @@ private:
     CompactionProcessor *const compact_processor_{};
 };
 
+export class OptimizeIndexPeriodicTrigger final : public PeriodicTrigger {
+public:
+    explicit OptimizeIndexPeriodicTrigger(std::chrono::seconds interval, CompactionProcessor *compact_processor)
+        : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
+
+    virtual void Trigger() override;
+
+private:
+    CompactionProcessor *const compact_processor_{};
+};
+
 } // namespace infinity

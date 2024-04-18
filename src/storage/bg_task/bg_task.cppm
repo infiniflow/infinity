@@ -31,6 +31,7 @@ export enum class BGTaskType {
     kCheckpoint,
     kForceCheckpoint, // Manually triggered by PhysicalFlush
     kNotifyCompact,
+    kNotifyOptimize,
     kCleanup,
     kUpdateSegmentBloomFilterData, // Not used
     kInvalid
@@ -48,6 +49,8 @@ export String BGTaskTypeToString(BGTaskType type) {
             return "Checkpoint";
         case BGTaskType::kNotifyCompact:
             return "NotifyCompact";
+        case BGTaskType::kNotifyOptimize:
+            return "NotifyOptimize";
         case BGTaskType::kCleanup:
             return "Cleanup";
         case BGTaskType::kUpdateSegmentBloomFilterData:
@@ -163,6 +166,15 @@ public:
     ~NotifyCompactTask() override = default;
 
     String ToString() const override { return "NotifyCompactTask"; }
+};
+
+export class NotifyOptimizeTask final : public BGTask {
+public:
+    NotifyOptimizeTask() : BGTask(BGTaskType::kNotifyOptimize, true) {}
+
+    ~NotifyOptimizeTask() override = default;
+
+    String ToString() const override { return "NotifyOptimizeTask"; }
 };
 
 } // namespace infinity

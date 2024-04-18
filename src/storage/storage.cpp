@@ -78,7 +78,11 @@ void Storage::Init() {
                                       new_catalog_->next_txn_id_,
                                       system_start_ts,
                                       enable_compaction);
-    if (enable_compaction) {
+
+    std::chrono::seconds optimize_interval = config_ptr_->optimize_interval();
+    bool enable_optimize = optimize_interval.count() > 0;
+
+    if (enable_compaction || enable_optimize) {
         compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
     } else {
         LOG_WARN("Compact interval is not set, auto compact is disable");
@@ -108,6 +112,11 @@ void Storage::Init() {
             periodic_trigger_thread_->AddTrigger(MakeUnique<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get()));
         } else {
             LOG_WARN("Compact interval is not set, auto compact task will not be triggered");
+        }
+        if (enable_optimize) {
+            periodic_trigger_thread_->AddTrigger(MakeUnique<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get()));
+        } else {
+            LOG_WARN("Optimize interval is not set, auto optimize task will not be triggered");
         }
 
         std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();

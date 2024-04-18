@@ -87,6 +87,7 @@ export {
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
+    constexpr SizeT DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
 
     constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * GB;
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 30;          // 30 seconds

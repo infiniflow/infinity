@@ -75,6 +75,10 @@ export struct SystemOptions {
     u64 garbage_collection_interval_{}; // unit: seconds, 0 means real-time
     double garbage_collection_storage_ratio_{}; // 0~1.0, 0 means disable the function
 
+    std::chrono::seconds cleanup_interval_{};
+    std::chrono::seconds compact_interval_{};
+    std::chrono::seconds optimize_interval_{};
+
     // Buffer
     u64 buffer_pool_size{};
     SharedPtr<String> temp_dir{};
@@ -90,8 +94,6 @@ export struct SystemOptions {
 
     // Resource
     String resource_dict_path_{};
-    std::chrono::seconds cleanup_interval_{};
-    std::chrono::seconds compact_interval_{};
 };
 
 } // namespace infinity

@@ -38,7 +38,9 @@ public:
     void Submit(SharedPtr<BGTask> bg_task);
 
 private:
-    Vector<UniquePtr<CompactSegmentsTask>> Scan();
+    Vector<UniquePtr<CompactSegmentsTask>> ScanForCompact();
+
+    void ScanAndOptimize();
 
     void Process();
 

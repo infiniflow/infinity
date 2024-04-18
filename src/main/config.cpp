@@ -161,6 +161,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     double default_garbage_collection_storage_ratio = 0;          // disable the function
     u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
     u64 default_compact_interval_sec = DEFAULT_COMPACT_INTERVAL_SEC;
+    u64 default_optimize_interval_sec = DEFAULT_OPTIMIZE_INTERVAL_SEC;
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
@@ -239,6 +240,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             system_option_.garbage_collection_storage_ratio_ = default_garbage_collection_storage_ratio;
             system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
             system_option_.compact_interval_ = std::chrono::seconds(default_compact_interval_sec);
+            system_option_.optimize_interval_ = std::chrono::seconds(default_optimize_interval_sec);
         }
 
         // Buffer
@@ -424,6 +426,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
             system_option_.cleanup_interval_ = std::chrono::seconds(storage_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
             system_option_.compact_interval_ = std::chrono::seconds(storage_config["compact_interval"].value_or(default_compact_interval_sec));
+            system_option_.optimize_interval_ = std::chrono::seconds(storage_config["optimize_interval"].value_or(default_optimize_interval_sec));
         }
 
         // Buffer
@@ -512,7 +515,8 @@ void Config::PrintAll() const {
     fmt::print(" - garbage_collection_interval: {}\n", Utility::FormatTimeInfo(system_option_.garbage_collection_interval_));
     fmt::print(" - garbage_collection_storage_ratio: {}\n", system_option_.garbage_collection_storage_ratio_);
     fmt::print(" - cleanup_interval_sec: {}\n", system_option_.cleanup_interval_.count());
-    fmt::print(" - enable_compaction: {}\n", system_option_.compact_interval_.count());
+    fmt::print(" - compact_interval_sec: {}\n", system_option_.compact_interval_.count());
+    fmt::print(" - optimize_interval_sec: {}\n", system_option_.optimize_interval_.count());
 
     // Buffer
     fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));
