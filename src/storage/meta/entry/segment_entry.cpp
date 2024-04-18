@@ -220,7 +220,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
     while (append_state_ptr->current_block_ < append_block_count && this->row_count_ < this->row_capacity_) {
         DataBlock *input_block = append_state_ptr->blocks_[append_state_ptr->current_block_].get();
 
-        u16 to_append_rows = input_block->row_count();
+        u16 to_append_rows = input_block->row_count() - append_state_ptr->current_block_offset_;
         while (to_append_rows > 0) {
             // Append to_append_rows into block
             if (block_entries_.empty() || block_entries_.back()->GetAvailableCapacity() <= 0) {
@@ -247,7 +247,14 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             total_copied += actual_appended;
             to_append_rows -= actual_appended;
             append_state_ptr->current_count_ += actual_appended;
+            append_state_ptr->current_block_offset_ += actual_appended;
             IncreaseRowCount(actual_appended);
+
+            if(this->row_count_ == this->row_capacity_) {
+                LOG_INFO(fmt::format("Segment {} is full.", segment_id_));
+                break;
+            }
+
             if (this->row_count_ > this->row_capacity_) {
                 UnrecoverableError("Not implemented: append data exceed segment row capacity");
             }
