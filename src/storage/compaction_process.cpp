@@ -70,8 +70,14 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::Scan() {
 
 void CompactionProcessor::Process() {
     Vector<UniquePtr<CompactSegmentsTask>> compact_tasks;
+    auto prev_time = std::chrono::system_clock::now();
     while (!stop_.load()) {
-        std::this_thread::sleep_for(interval_);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        auto cur_time = std::chrono::system_clock::now();
+        if (cur_time - prev_time < interval_) {
+            continue;
+        }
+        prev_time = cur_time;
 
         compact_tasks = this->Scan();
 
