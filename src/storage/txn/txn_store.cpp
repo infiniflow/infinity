@@ -261,12 +261,6 @@ bool TxnTableStore::CheckConflict(Catalog *catalog) const {
 
 // TODO: remove commit_ts
 void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
-    for (auto *sealed_segment : set_sealed_segments_) {
-        if (!sealed_segment->SetSealed()) {
-            UnrecoverableError(fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id()));
-        }
-    }
-
     // Init append state
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
@@ -281,6 +275,12 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
     }
 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
+
+    for (auto *sealed_segment : set_sealed_segments_) {
+        if (!sealed_segment->SetSealed()) {
+            UnrecoverableError(fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id()));
+        }
+    }
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }

@@ -80,6 +80,8 @@ void Storage::Init() {
                                       enable_compaction);
     if (enable_compaction) {
         compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get(), compact_interval);
+    } else {
+        LOG_WARN("Compact interval is not set, auto compact is disable");
     }
 
     txn_mgr_->Start();
@@ -102,8 +104,8 @@ void Storage::Init() {
     {
         periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-        std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval_sec();
-        if (cleanup_interval_sec > 0) {
+        std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();
+        if (cleanup_interval.count() > 0) {
             periodic_trigger_thread_->AddTrigger(
                 MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
         } else {

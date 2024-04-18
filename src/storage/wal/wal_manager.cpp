@@ -439,7 +439,7 @@ i64 WalManager::ReplayWalFile() {
                 break;
             }
 
-            LOG_INFO(wal_entry->ToString());
+            LOG_TRACE(wal_entry->ToString());
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
             if (wal_entry->IsCheckPoint(replay_entries, checkpoint_cmd)) {
@@ -495,7 +495,7 @@ i64 WalManager::ReplayWalFile() {
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
         ReplayWalEntry(*replay_entries[replay_count]);
-        LOG_INFO(replay_entries[replay_count]->ToString());
+        LOG_TRACE(replay_entries[replay_count]->ToString());
     }
 
     LOG_TRACE(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
