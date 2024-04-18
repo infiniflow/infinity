@@ -414,6 +414,10 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             case LogicalType::kFloat:
             case LogicalType::kDouble:
             case LogicalType::kVarchar:
+            case LogicalType::kDate:
+            case LogicalType::kTime:
+            case LogicalType::kTimestamp:
+            case LogicalType::kDateTime:
             case LogicalType::kEmbedding: {
                 break;
             }
