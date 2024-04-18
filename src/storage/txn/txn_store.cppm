@@ -115,7 +115,7 @@ public:
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
 
-    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
+    void MaintainCompactionAlg() const;
 
     void AddSegmentStore(SegmentEntry *segment_entry);
 
@@ -123,11 +123,7 @@ public:
 
     void AddSealedSegment(SegmentEntry *segment_entry);
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
-                    bool enable_compaction,
-                    BGTaskProcessor *bg_task_processor,
-                    TxnManager *txn_mgr,
-                    TxnTimeStamp commit_ts) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts) const;
 
 public: // Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
@@ -172,13 +168,15 @@ public:
 
     TxnTableStore *GetTxnTableStore(const String &table_name);
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, TxnManager *txn_mgr) const;
+
+    void MaintainCompactionAlg() const;
 
     bool CheckConflict() const;
 
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
-    void CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr);
+    void CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 

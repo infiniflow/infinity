@@ -242,7 +242,7 @@ void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
     SegmentID segment_id = new_segment->segment_id();
     segment_map_[segment_id] = new_segment;
     if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegmentNoCheck(new_segment.get());
+        compaction_alg_->AddSegment(new_segment.get());
     }
     next_segment_id_++;
 }
@@ -251,7 +251,7 @@ void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&ini
     SharedPtr<SegmentEntry> new_segment = init_segment();
     segment_map_[segment_id] = new_segment;
     if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->AddSegmentNoCheck(new_segment.get());
+        compaction_alg_->AddSegment(new_segment.get());
     }
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
@@ -409,24 +409,22 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         return Status::OK();
     }
 
-    Vector<SegmentEntry *> new_segments;
     {
-        {
-            String ss = "Compact commit: " + *this->GetTableName();
-            for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
-                auto *new_segment = segment_store.segment_entry_;
-                ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
-                for (const auto *old_segment : old_segments) {
-                    ss += std::to_string(old_segment->segment_id_) + " ";
-                }
-            }
-            LOG_INFO(ss);
-        }
+        // {
+        //     String ss = "Compact commit: " + *this->GetTableName();
+        //     for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+        //         auto *new_segment = segment_store.segment_entry_;
+        //         ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
+        //         for (const auto *old_segment : old_segments) {
+        //             ss += std::to_string(old_segment->segment_id_) + " ";
+        //         }
+        //     }
+        //     LOG_INFO(ss);
+        // }
         std::unique_lock lock(this->rw_locker_);
         for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
 
             auto *segment_entry = segment_store.segment_entry_;
-            new_segments.push_back(segment_entry);
 
             segment_entry->CommitSegment(txn_id, commit_ts);
             for (auto *block_entry : segment_store.block_entries_) {
@@ -470,7 +468,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         case CompactSegmentsTaskType::kCompactTable: {
             //  reinitialize compaction_alg_ with new segments and enable it
             LOG_INFO(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
-            compaction_alg_->Enable(new_segments);
+            compaction_alg_->Enable({});
             break;
         }
         default: {
@@ -997,18 +995,25 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), txn_id);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactAddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
+void TableEntry::AddSegmentToCompactionAlg(SegmentEntry *segment_entry) {
     if (compaction_alg_.get() == nullptr) {
-        return None;
+        return;
     }
-    return compaction_alg_->AddSegment(new_segment, generate_txn);
+    compaction_alg_->AddSegment(segment_entry);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactDeleteRow(SegmentID segment_id, std::function<Txn *()> generate_txn) {
+void TableEntry::AddDeleteToCompactionAlg(SegmentID segment_id) {
+    if (compaction_alg_.get() == nullptr) {
+        return;
+    }
+    compaction_alg_->DeleteInSegment(segment_id);
+}
+
+Optional<CompactionInfo> TableEntry::CheckCompaction(std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }
-    return compaction_alg_->DeleteInSegment(segment_id, generate_txn);
+    return compaction_alg_->CheckCompaction(generate_txn);
 }
 
 Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {

@@ -14,37 +14,46 @@
 
 module;
 
-import wal_manager;
-import blocking_queue;
-import bg_task;
-import stl;
+export module compaction_process;
 
-export module background_process;
+import stl;
+import compact_segments_task;
+import txn;
+import bg_task;
+import blocking_queue;
 
 namespace infinity {
 
 class Catalog;
+class TxnManager;
 
-export class BGTaskProcessor {
+export class CompactionProcessor {
 public:
-    explicit BGTaskProcessor(WalManager *wal_manager, Catalog *catalog);
+    CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
+
     void Start();
+
     void Stop();
 
-public:
     void Submit(SharedPtr<BGTask> bg_task);
 
 private:
+    Vector<UniquePtr<CompactSegmentsTask>> ScanForCompact();
+
+    void ScanAndOptimize();
+
     void Process();
-    void CompactProcess();
 
 private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_;
 
     Thread processor_thread_{};
 
-    WalManager *wal_manager_{};
     Catalog *catalog_{};
+    TxnManager *txn_mgr_{};
+
+    // atomic_bool stop_{false};
+    // std::chrono::seconds interval_{};
 };
 
 } // namespace infinity
