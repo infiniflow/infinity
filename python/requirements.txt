@@ -1,6 +1,6 @@
 sqlglot==11.7.1
 pydantic~=1.10.12
-thrift~=0.16.0
+thrift~=0.20.0
 setuptools~=68.0.0
 pytest~=7.4.0
 pandas~=2.1.1
