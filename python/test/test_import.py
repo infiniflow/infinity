@@ -166,7 +166,6 @@ class TestImport(TestSdk):
 
     # import format unrecognized data
     @pytest.mark.parametrize("file_format", [
-        pytest.param("json"),
         pytest.param("txt")])
     def test_import_format_unrecognized_data(self, get_infinity_db, file_format):
         db_obj = get_infinity_db

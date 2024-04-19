@@ -381,7 +381,6 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
 
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
-    // RecoverableError(Status::NotSupport("Import JSON is not implemented yet."));
 }
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
