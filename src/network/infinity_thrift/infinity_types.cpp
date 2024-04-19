@@ -3161,26 +3161,32 @@ void ConstantExpr::__set_literal_type(const LiteralType::type val) {
 
 void ConstantExpr::__set_bool_value(const bool val) {
   this->bool_value = val;
+__isset.bool_value = true;
 }
 
 void ConstantExpr::__set_i64_value(const int64_t val) {
   this->i64_value = val;
+__isset.i64_value = true;
 }
 
 void ConstantExpr::__set_f64_value(const double val) {
   this->f64_value = val;
+__isset.f64_value = true;
 }
 
 void ConstantExpr::__set_str_value(const std::string& val) {
   this->str_value = val;
+__isset.str_value = true;
 }
 
 void ConstantExpr::__set_i64_array_value(const std::vector<int64_t> & val) {
   this->i64_array_value = val;
+__isset.i64_array_value = true;
 }
 
 void ConstantExpr::__set_f64_array_value(const std::vector<double> & val) {
   this->f64_array_value = val;
+__isset.f64_array_value = true;
 }
 std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj)
 {
@@ -3313,46 +3319,52 @@ uint32_t ConstantExpr::write(::apache::thrift::protocol::TProtocol* oprot) const
   xfer += oprot->writeI32(static_cast<int32_t>(this->literal_type));
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("bool_value", ::apache::thrift::protocol::T_BOOL, 2);
-  xfer += oprot->writeBool(this->bool_value);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("i64_value", ::apache::thrift::protocol::T_I64, 3);
-  xfer += oprot->writeI64(this->i64_value);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("f64_value", ::apache::thrift::protocol::T_DOUBLE, 4);
-  xfer += oprot->writeDouble(this->f64_value);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("str_value", ::apache::thrift::protocol::T_STRING, 5);
-  xfer += oprot->writeString(this->str_value);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("i64_array_value", ::apache::thrift::protocol::T_LIST, 6);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_I64, static_cast<uint32_t>(this->i64_array_value.size()));
-    std::vector<int64_t> ::const_iterator _iter132;
-    for (_iter132 = this->i64_array_value.begin(); _iter132 != this->i64_array_value.end(); ++_iter132)
-    {
-      xfer += oprot->writeI64((*_iter132));
-    }
-    xfer += oprot->writeListEnd();
+  if (this->__isset.bool_value) {
+    xfer += oprot->writeFieldBegin("bool_value", ::apache::thrift::protocol::T_BOOL, 2);
+    xfer += oprot->writeBool(this->bool_value);
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("f64_array_value", ::apache::thrift::protocol::T_LIST, 7);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_DOUBLE, static_cast<uint32_t>(this->f64_array_value.size()));
-    std::vector<double> ::const_iterator _iter133;
-    for (_iter133 = this->f64_array_value.begin(); _iter133 != this->f64_array_value.end(); ++_iter133)
-    {
-      xfer += oprot->writeDouble((*_iter133));
-    }
-    xfer += oprot->writeListEnd();
+  if (this->__isset.i64_value) {
+    xfer += oprot->writeFieldBegin("i64_value", ::apache::thrift::protocol::T_I64, 3);
+    xfer += oprot->writeI64(this->i64_value);
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
+  if (this->__isset.f64_value) {
+    xfer += oprot->writeFieldBegin("f64_value", ::apache::thrift::protocol::T_DOUBLE, 4);
+    xfer += oprot->writeDouble(this->f64_value);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.str_value) {
+    xfer += oprot->writeFieldBegin("str_value", ::apache::thrift::protocol::T_STRING, 5);
+    xfer += oprot->writeString(this->str_value);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.i64_array_value) {
+    xfer += oprot->writeFieldBegin("i64_array_value", ::apache::thrift::protocol::T_LIST, 6);
+    {
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_I64, static_cast<uint32_t>(this->i64_array_value.size()));
+      std::vector<int64_t> ::const_iterator _iter132;
+      for (_iter132 = this->i64_array_value.begin(); _iter132 != this->i64_array_value.end(); ++_iter132)
+      {
+        xfer += oprot->writeI64((*_iter132));
+      }
+      xfer += oprot->writeListEnd();
+    }
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.f64_array_value) {
+    xfer += oprot->writeFieldBegin("f64_array_value", ::apache::thrift::protocol::T_LIST, 7);
+    {
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_DOUBLE, static_cast<uint32_t>(this->f64_array_value.size()));
+      std::vector<double> ::const_iterator _iter133;
+      for (_iter133 = this->f64_array_value.begin(); _iter133 != this->f64_array_value.end(); ++_iter133)
+      {
+        xfer += oprot->writeDouble((*_iter133));
+      }
+      xfer += oprot->writeListEnd();
+    }
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -3395,12 +3407,12 @@ void ConstantExpr::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "ConstantExpr(";
   out << "literal_type=" << to_string(literal_type);
-  out << ", " << "bool_value=" << to_string(bool_value);
-  out << ", " << "i64_value=" << to_string(i64_value);
-  out << ", " << "f64_value=" << to_string(f64_value);
-  out << ", " << "str_value=" << to_string(str_value);
-  out << ", " << "i64_array_value=" << to_string(i64_array_value);
-  out << ", " << "f64_array_value=" << to_string(f64_array_value);
+  out << ", " << "bool_value="; (__isset.bool_value ? (out << to_string(bool_value)) : (out << "<null>"));
+  out << ", " << "i64_value="; (__isset.i64_value ? (out << to_string(i64_value)) : (out << "<null>"));
+  out << ", " << "f64_value="; (__isset.f64_value ? (out << to_string(f64_value)) : (out << "<null>"));
+  out << ", " << "str_value="; (__isset.str_value ? (out << to_string(str_value)) : (out << "<null>"));
+  out << ", " << "i64_array_value="; (__isset.i64_array_value ? (out << to_string(i64_array_value)) : (out << "<null>"));
+  out << ", " << "f64_array_value="; (__isset.f64_array_value ? (out << to_string(f64_array_value)) : (out << "<null>"));
   out << ")";
 }
 
