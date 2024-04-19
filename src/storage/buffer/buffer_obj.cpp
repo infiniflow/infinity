@@ -131,10 +131,6 @@ bool BufferObj::Save() {
         }
         type_ = BufferType::kPersistent;
     }
-    if (write) {
-        file_worker_->Sync();
-        file_worker_->CloseFile();
-    }
     return write;
 }
 
