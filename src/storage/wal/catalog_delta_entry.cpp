@@ -986,6 +986,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
 
 void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { this->AddDeltaEntryInner(delta_entry.get()); }
 
+// background process Checkpoint call this.
 UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
@@ -1015,6 +1016,7 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     return flush_delta_entry;
 }
 
+// background process AddDeltaOp call this.
 void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry) {
     TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
     if (max_commit_ts == UNCOMMIT_TS) {
@@ -1056,9 +1058,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             }
         }
     }
-    if (!delta_entry->txn_ids().empty()) {
-        txn_ids_.insert(delta_entry->txn_ids()[0]);
-    }
+    txn_ids_.insert(delta_entry->txn_ids().begin(), delta_entry->txn_ids().end());
 }
 
 void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
