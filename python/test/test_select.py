@@ -227,7 +227,7 @@ class TestSelect(TestSdk):
         print(res)
         res = table_obj.output(["avg(c2)"]).to_pl()
         print(res)
-        
+
         res = db_obj.drop_table("test_select_aggregate", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -369,7 +369,7 @@ class TestSelect(TestSdk):
 
         if not check_data:
             copy_data("embedding_int_dim3.csv")
-        test_dir = "/tmp/infinity/test_data/"
+        test_dir = "/var/infinity/test_data/"
         test_csv_dir = test_dir + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)
 
@@ -420,7 +420,7 @@ class TestSelect(TestSdk):
 
         table_obj = db_obj.get_table("test_select_embedding_float")
 
-        test_dir = "/tmp/infinity/test_data/"
+        test_dir = "/var/infinity/test_data/"
         test_csv_dir = test_dir + "embedding_float_dim4.csv"
         if not check_data:
             copy_data("embedding_float_dim4.csv")
@@ -445,7 +445,8 @@ class TestSelect(TestSdk):
                                           [0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1])})
                                       .astype({'c1': dtype('float32'), 'c2': dtype('O')}))
 
-        res = db_obj.drop_table("test_select_embedding_float", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_select_embedding_float", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -484,7 +485,7 @@ class TestSelect(TestSdk):
 
         if not check_data:
             copy_data("embedding_int_dim3.csv")
-        test_dir = "/tmp/infinity/test_data/"
+        test_dir = "/var/infinity/test_data/"
         test_csv_dir = test_dir + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)
 
@@ -492,7 +493,8 @@ class TestSelect(TestSdk):
             res = table_obj.import_data(test_csv_dir, None)
             assert res.error_code == ErrorCode.OK
 
-        res = db_obj.drop_table("test_select_big_embedding", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_select_big_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -515,7 +517,6 @@ class TestSelect(TestSdk):
         print(res)
         res = table_obj.output(["c1", "c2", "c1"]).to_df()
         print(res)
-
 
         res = db_obj.drop_table("test_select_same_output", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -575,7 +576,8 @@ class TestSelect(TestSdk):
         select_res_df = table_obj.output(["*"]).filter(filter_list).to_pl()
         print(str(select_res_df))
 
-        res = db_obj.drop_table("test_valid_filter_expression", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_valid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -595,7 +597,8 @@ class TestSelect(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_invalid_filter_expression", ConflictType.Ignore)
+        db_obj.drop_table("test_invalid_filter_expression",
+                          ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_filter_expression", {
             "c1": "int", "c2": "float"}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
@@ -608,7 +611,8 @@ class TestSelect(TestSdk):
             select_res_df = table_obj.output(["*"]).filter(filter_list).to_pl()
             print(str(select_res_df))
 
-        res = db_obj.drop_table("test_invalid_filter_expression", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_invalid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect

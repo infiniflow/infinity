@@ -5,7 +5,7 @@
     "url": "ftp://ftp.irisa.fr/local/texmex/corpus/sift.tar.gz",
     "host": "127.0.0.1:23817",
     "data_type": "fvecs",
-    "data_path": "/tmp/infinity/benchmark/data/sift_1m.fvecs",
+    "data_path": "/var/infinity/benchmark/data/sift_1m.fvecs",
     "vector_index": {
         "type": "HNSW",
         "init_params": {
@@ -17,6 +17,6 @@
         }
     },
     "query_type": "fvecs",
-    "query_path": "/tmp/infinity/benchmark/query/sift_query.fvecs",
+    "query_path": "/var/infinity/benchmark/query/sift_query.fvecs",
     "insert_batch_size": 8192
 }

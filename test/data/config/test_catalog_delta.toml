@@ -2,9 +2,9 @@
 version = "0.1.0"
 timezone = "utc-8"
 
-[resource]
+[storage]
 # close auto compaction
-enable_compaction = false
+compaction_interval = 0
 
 [wal]
 #short checkpoint interval for test

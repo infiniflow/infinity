@@ -23,7 +23,7 @@ include(CMakeDependentOption)
 set(THRIFT_COMPILER "" CACHE FILEPATH "External Thrift compiler to use during build")
 
 # Additional components
-option(BUILD_COMPILER "Build Thrift compiler" OFF)
+option(BUILD_COMPILER "Build Thrift compiler" ON)
 
 if(BUILD_COMPILER OR EXISTS ${THRIFT_COMPILER})
     set(HAVE_COMPILER ON)

@@ -82,7 +82,7 @@ int main() {
     // For Sift1M
     SizeT total_times = 100 * 100;
 
-    String path = "/tmp/infinity";
+    String path = "/var/infinity";
 
     LocalFileSystem fs;
     if (fs.Exists(path)) {

@@ -84,21 +84,15 @@ export enum class CompactSegmentsTaskType : i8 {
     kInvalid,
 };
 
-export class CompactSegmentsTask final : public BGTask {
+export class CompactSegmentsTask final {
 public:
-    static SharedPtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn);
+    static UniquePtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn);
 
-    static SharedPtr<CompactSegmentsTask> MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn);
+    static UniquePtr<CompactSegmentsTask> MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn);
 
     explicit CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type);
 
 public:
-    ~CompactSegmentsTask() override = default;
-
-    String ToString() const override { return "Compact segments task"; }
-
-//    void BeginTxn() { txn_->Begin(); }
-
     bool TryCommitTxn() {
         try {
             txn_->txn_mgr()->CommitTxn(txn_);
@@ -127,6 +121,10 @@ public:
 
     // Apply the delete op commit in process of compacting
     void ApplyDeletes(CompactSegmentsTaskState &state);
+
+public:
+    // Getter
+    const String &table_name() const { return *table_name_; }
 
 private:
     SharedPtr<SegmentEntry> CompactSegmentsToOne(CompactSegmentsTaskState &state, const Vector<SegmentEntry *> &segments);

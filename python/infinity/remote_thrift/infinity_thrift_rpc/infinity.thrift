@@ -169,12 +169,12 @@ struct SearchExpr {
 
 struct ConstantExpr {
 1: LiteralType literal_type,
-2: bool bool_value,
-3: i64 i64_value,
-4: double f64_value,
-5: string str_value,
-6: list<i64> i64_array_value,
-7: list<double> f64_array_value,
+2: optional bool bool_value,
+3: optional i64 i64_value,
+4: optional double f64_value,
+5: optional string str_value,
+6: optional list<i64> i64_array_value,
+7: optional list<double> f64_array_value,
 }
 
 struct FunctionExpr {

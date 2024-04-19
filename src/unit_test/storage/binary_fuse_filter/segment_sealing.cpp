@@ -45,11 +45,11 @@ import block_entry;
 using namespace infinity;
 
 class SealingTaskTest : public BaseTest {
-    void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
+    void SetUp() override { system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal"); }
 
     void TearDown() override {
-        system("tree  /tmp/infinity");
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("tree  /var/infinity");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
     }
 
 protected:
@@ -149,7 +149,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system("tree  /tmp/infinity");
+    system("tree  /var/infinity");
     {
         // test wal
         String table_name = "tbl1";

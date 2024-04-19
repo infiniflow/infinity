@@ -319,10 +319,9 @@ class TestTable(HttpTest):
                 "c3": {"type": "TINYINT", },
                 "c4": {"type": "SMALLINT", },
                 "c5": {"type": "BIGINT", },
-                "c6": {"type": "HUGEINT", },
-                "c7": {"type": "FLOAT", },
-                "c8": {"type": "DOUBLE", },
-                "c9": {"type": "VARCHAR", },
+                "c6": {"type": "FLOAT", },
+                "c7": {"type": "DOUBLE", },
+                "c8": {"type": "VARCHAR", },
                 # "c10":{"type":"ARRAY",},
             }
         )
@@ -331,7 +330,7 @@ class TestTable(HttpTest):
             "error_code": 0,
             "database_name": db_name,
             "table_name": table_name,
-            "column_count": 9,
+            "column_count": 8,
             "segment_count": 0,
             "row_count": 0
         })
@@ -345,7 +344,7 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         c_count = 100
         types = [
-            "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+            "integer", "tinyint", "smallint", "bigint", "float",
             "double", "varchar", "boolean"
         ]
         sz = len(types)

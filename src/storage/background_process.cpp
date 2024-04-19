@@ -55,7 +55,7 @@ void BGTaskProcessor::Process() {
     Deque<SharedPtr<BGTask>> tasks;
     while (running) {
         task_queue_.DequeueBulk(tasks);
-        for(const auto& bg_task: tasks) {
+        for (const auto &bg_task : tasks) {
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
                     LOG_INFO("Stop the background processor");
@@ -84,18 +84,6 @@ void BGTaskProcessor::Process() {
                     LOG_INFO("Checkpoint in background done");
                     break;
                 }
-                case BGTaskType::kCompactSegments: {
-                    LOG_INFO("Compact segments in background");
-                    auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
-//                    task->BeginTxn();
-                    task->Execute();
-                    if (task->TryCommitTxn()) {
-                        LOG_INFO("Compact segments in background done");
-                    } else {
-                        LOG_WARN("Compact segments in background rollbacked");
-                    }
-                    break;
-                }
                 case BGTaskType::kCleanup: {
                     LOG_INFO("Cleanup in background");
                     auto task = static_cast<CleanupTask *>(bg_task.get());
@@ -111,7 +99,7 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 default: {
-                    UnrecoverableError("Invalid background task");
+                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
                     break;
                 }
             }

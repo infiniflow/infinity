@@ -97,7 +97,7 @@ curl --request GET \
 {
     "error_code": 0,
     "database_name": "default"
-    "store_dir": "/tmp/infinity/data/nIHniKeHIB_db_default"
+    "store_dir": "/var/infinity/data/nIHniKeHIB_db_default"
     "table_count": 0
 }
 ```
@@ -306,7 +306,7 @@ curl --request GET \
     "error_code": 0,
     "database_name": "default",
     "table_name": "my_table",
-    "store_dir": "/tmp/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table",
+    "store_dir": "/var/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table",
     "column_count" : 3,
     "segment_count" : 1,
     "row_count" : 5
@@ -480,7 +480,7 @@ curl --request GET \
     "index_type": "IVFFlat",
     "other_parameters": "metric = l2, centroids_count = 128",
     "segment_index_count": "0",
-    "storage_directory": "/tmp/infinity/data/yjamyYqzzt_db_default/CxmfWOUCdN_table_test_index_tbl/inlt9JpOyy_index_idx1"
+    "storage_directory": "/var/infinity/data/yjamyYqzzt_db_default/CxmfWOUCdN_table_test_index_tbl/inlt9JpOyy_index_idx1"
 }
 ```
 
@@ -841,7 +841,7 @@ curl --request GET \
     "actual_row_count": "4",
     "block_count": "1",
     "column_count": "2",
-    "dir": "/tmp/infinity/data/BCvJAOlTOt_db_default/wUxDzXjGjE_table_test1/seg_0",
+    "dir": "/var/infinity/data/BCvJAOlTOt_db_default/wUxDzXjGjE_table_test1/seg_0",
     "id": "0",
     "room": "8388604",
     "row_capacity": "8388608",
@@ -913,7 +913,7 @@ curl --request GET \
     "checkpoint_row_count": "4",
     "checkpoint_ts": "209",
     "column_count": "2",
-    "path": "/tmp/infinity/data/CS4HkE8F0H_db_default/IF5Luj1FdG_table_test1/seg_0/blk_0/version",
+    "path": "/var/infinity/data/CS4HkE8F0H_db_default/IF5Luj1FdG_table_test1/seg_0/blk_0/version",
     "row_capacity": "8192",
     "row_count": "4",
     "size": "192.08KB"

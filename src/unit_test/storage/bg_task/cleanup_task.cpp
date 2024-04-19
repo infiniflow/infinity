@@ -44,7 +44,7 @@ using namespace infinity;
 
 class CleanupTaskTest : public BaseTest {
 protected:
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
+    void SetUp() override { system("rm -rf /var/infinity"); }
 
     void TearDown() override {}
 
