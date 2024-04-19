@@ -151,7 +151,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         // FIXME: need check if there is subquery inside the where conditions
         auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
-        auto common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, static_pointer_cast<BaseTableRef>(table_ref_ptr_));
+        auto common_query_filter =
+            MakeShared<CommonQueryFilter>(filter_expr, static_pointer_cast<BaseTableRef>(table_ref_ptr_), query_context->GetTxn()->BeginTS());
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(search_expr_->match_exprs_.size());
         for (auto &match_expr : search_expr_->match_exprs_) {

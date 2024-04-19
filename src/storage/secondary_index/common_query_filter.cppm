@@ -28,6 +28,7 @@ import buffer_manager;
 namespace infinity {
 
 export struct CommonQueryFilter {
+    TxnTimeStamp begin_ts_;
     SharedPtr<BaseExpression> original_filter_;
     SharedPtr<BaseTableRef> base_table_ref_;
     // input filter
@@ -54,8 +55,8 @@ export struct CommonQueryFilter {
     u32 begin_task_num_ = 0;
     atomic_u32 end_task_num_ = 0;
 
-    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref)
-        : original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
+    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts)
+        : begin_ts_(begin_ts), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
         const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref_->block_index_->segment_index_;
         if (segment_index.empty()) {
             finish_build_.test_and_set(std::memory_order_release);

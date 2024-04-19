@@ -65,6 +65,7 @@ import match_data;
 import filter_value_type_classification;
 import bitmask;
 import segment_entry;
+import knn_filter;
 
 namespace infinity {
 class FilterIterator final : public DocIterator, public EarlyTerminateIterator {
@@ -77,8 +78,10 @@ private:
 
 private:
     SegmentID current_segment_id_ = filter_result_ptr_->size() ? filter_result_ptr_->begin()->first : INVALID_SEGMENT_ID;
-    mutable SegmentOffset cache_segment_offset_ = 0;
     mutable SegmentID cache_segment_id_ = INVALID_SEGMENT_ID;
+    mutable SegmentOffset cache_segment_offset_ = 0;
+    using SegEntryT = const SegmentEntry *;
+    mutable SegEntryT cache_segment_entry_ = nullptr;
 
     // -1: not decoded
     // 0: use Vector<u32>*
@@ -152,7 +155,8 @@ public:
     RowID BlockLastDocID() const override {
         if (current_segment_id_ != cache_segment_id_) {
             cache_segment_id_ = current_segment_id_;
-            cache_segment_offset_ = segment_index_->at(current_segment_id_)->row_count();
+            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
+            cache_segment_offset_ = cache_segment_entry_->row_count();
         }
         return RowID(current_segment_id_, cache_segment_offset_);
     }
@@ -160,6 +164,31 @@ public:
     float BlockMaxBM25Score() override { return 0.0f; }
 
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override {
+        assert(doc_id.segment_id_ == current_segment_id_);
+        assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
+        if (current_segment_id_ != cache_segment_id_) {
+            cache_segment_id_ = current_segment_id_;
+            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
+            cache_segment_offset_ = cache_segment_entry_->row_count();
+        }
+        DeleteFilter delete_filter(cache_segment_entry_, common_query_filter_->begin_ts_);
+        const RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
+        while (true) {
+            if (doc_id > seek_end) {
+                return {false, 0.0f, INVALID_ROWID};
+            }
+            const auto [success, id] = SeekInBlockRangeInner(doc_id, seek_end);
+            if (!success) {
+                return {false, 0.0f, INVALID_ROWID};
+            }
+            if (delete_filter(id.segment_offset_)) {
+                return {true, 0.0f, id};
+            }
+            doc_id = id + 1;
+        }
+    }
+
+    Pair<bool, RowID> SeekInBlockRangeInner(RowID doc_id, RowID doc_id_no_beyond) {
         assert(doc_id_no_beyond <= BlockLastDocID());
         assert(doc_id.segment_id_ == current_segment_id_);
         assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
@@ -200,7 +229,7 @@ public:
                 pos_ = pos;
                 if (pos < doc_id_list_->size()) {
                     if (const u32 offset_in_segment = (*doc_id_list_)[pos]; offset_in_segment <= seek_offset_end) {
-                        return {true, 0.0f, RowID(current_segment_id_, offset_in_segment)};
+                        return {true, RowID(current_segment_id_, offset_in_segment)};
                     }
                 }
                 break;
@@ -210,17 +239,17 @@ public:
                 if (pos_) {
                     // check previous result
                     if (pos_ > seek_offset_end) {
-                        return {false, 0.0f, INVALID_ROWID};
+                        return {false, INVALID_ROWID};
                     }
                     if (pos_ >= seek_offset_start) {
-                        return {true, 0.0f, RowID(current_segment_id_, pos_)};
+                        return {true, RowID(current_segment_id_, pos_)};
                     }
                 }
                 const u64 *data_ptr = doc_id_bitmask_->GetData();
                 if (data_ptr == nullptr) {
                     // all true
                     pos_ = seek_offset_start;
-                    return {true, 0.0f, doc_id};
+                    return {true, doc_id};
                 }
                 const u32 current_64_pos = seek_offset_start / 64;
                 const u32 next_64_pos = (seek_offset_start + 63) / 64;
@@ -236,7 +265,7 @@ public:
                         const u32 pos = current_64_pos * 64 + i;
                         pos_ = pos;
                         if (pos <= seek_offset_end) {
-                            return {true, 0.0f, RowID(current_segment_id_, pos)};
+                            return {true, RowID(current_segment_id_, pos)};
                         }
                     }
                 }
@@ -253,7 +282,7 @@ public:
                         const u32 pos = pos_64 * 64 + i;
                         pos_ = pos;
                         if (pos <= seek_offset_end) {
-                            return {true, 0.0f, RowID(current_segment_id_, pos)};
+                            return {true, RowID(current_segment_id_, pos)};
                         }
                         break;
                     }
@@ -269,7 +298,7 @@ public:
                 break;
             }
         }
-        return {false, 0.0f, INVALID_ROWID};
+        return {false, INVALID_ROWID};
     }
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
