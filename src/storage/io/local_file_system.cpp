@@ -84,7 +84,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
     if (fd == -1) {
         UnrecoverableError(fmt::format("Can't open file: {}: {}", path, strerror(errno)));
     }
-    LOG_TRACE(fmt::format("[+] OPEN FILE: {}", path));
+    // LOG_TRACE(fmt::format("[+] OPEN FILE: {}", path));
 
     if (lock_type != FileLockType::kNoLock) {
         struct flock file_lock {};
@@ -112,7 +112,7 @@ void LocalFileSystem::Close(FileHandler &file_handler) {
     if (close(fd) != 0) {
         UnrecoverableError(fmt::format("Can't close file: {}: {}", file_handler.path_.string(), strerror(errno)));
     }
-    LOG_TRACE(fmt::format("[-] CLOSE FILE: {}", file_handler.path_.string()));
+    // LOG_TRACE(fmt::format("[-] CLOSE FILE: {}", file_handler.path_.string()));
 }
 
 void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
