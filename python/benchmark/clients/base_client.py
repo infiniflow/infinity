@@ -2,6 +2,11 @@ import argparse
 from abc import abstractmethod
 from typing import Any, List, Optional, Dict, Union
 from enum import Enum
+import subprocess
+import sys
+import os
+from urllib.parse import urlparse
+
 class FilterType(str, Enum):
     VALUE_MATCH = "value_match"
     TEXT_MATCH = "text_match"
@@ -40,6 +45,20 @@ class BaseClient:
         The function returns id list.
         """
         pass
+    
+    def download_data(self, url, target_path):
+        """
+        Download dataset and extract it into path.
+        """
+        _, ext = os.path.splitext(url)
+        if ext == '.bz2':
+            bz2_path = target_path + '.bz2'
+            subprocess.run(['wget', '-O', bz2_path, url], check=True)
+            subprocess.run(['bunzip2', bz2_path], check=True)
+            extracted_path = os.path.splitext(bz2_path)[0]
+            os.rename(extracted_path, target_path)
+        else:
+            subprocess.run(['wget', '-O', target_path, url], check=True)
 
     def check_and_save_results(self, results: list[list[Any]]):
         """
