@@ -112,7 +112,7 @@ public:
 
 void ThreadedThriftServer::Init(i32 port_no) {
 
-    std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << std::endl;
+    std::cout << "API server listen on: 0.0.0.0:" << port_no << std::endl;
     server = MakeUnique<TThreadedServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                          MakeShared<TServerSocket>(port_no), // port
                                          MakeShared<TBufferedTransportFactory>(),
@@ -157,7 +157,7 @@ void NonBlockPoolThriftServer::Init(i32 port_no, i32 pool_size) {
     threadManager->threadFactory(thread_factory);
     threadManager->start();
 
-    std::cout << "Non-block pooled thrift server listen on: 0.0.0.0:" << port_no << ", pool size: " << pool_size << std::endl;
+    std::cout << "Non-block API server listen on: 0.0.0.0:" << port_no << ", thread pool: " << pool_size << std::endl;
 
     SharedPtr<TNonblockingServerSocket> non_block_socket = MakeShared<TNonblockingServerSocket>(port_no);
 
