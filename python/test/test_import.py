@@ -164,6 +164,25 @@ class TestImport(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    # import empty JSON file
+    @pytest.mark.parametrize("file_format", ["json", "json", "json"])
+    def test_import_empty_file_json(self, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_import_empty_file_json", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_import_empty_file_json",
+                                        {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        db_obj.drop_table("test_import_empty_file_json", ConflictType.Error)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # import format unrecognized data
     @pytest.mark.parametrize("file_format", [
         pytest.param("txt")])
