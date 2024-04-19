@@ -115,16 +115,16 @@ TEST_F(SkiplistTest, test2) {
 
             String v;
             auto ret = list.Search(key, v);
-            assert(ret == true);
-            assert(v == key);
+            ASSERT_EQ(ret == true);
+            ASSERT_EQ(v == key);
         }
     }
 
     for (std::map<String, String>::iterator it = keys.begin(); it != keys.end(); ++it) {
         String v;
         auto ret = list.Search(it->first, v);
-        assert(ret == true);
-        assert(it->second == v);
+        ASSERT_EQ(ret == true);
+        ASSERT_EQ(it->second == v);
     }
     for (std::map<String, String>::iterator it = keys.begin(); it != keys.end(); ++it) {
         SkipList<String, String, KeyComparator>::Iterator iter = list.Begin(it->first);
