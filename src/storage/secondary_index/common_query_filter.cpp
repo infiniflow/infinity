@@ -192,6 +192,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id, TxnTimeStamp begin_ts, BufferMa
                                                        }},
                                               result_elem);
         result_count) {
+        std::lock_guard lock(result_mutex_);
         filter_result_count_ += result_count;
         filter_result_.emplace(segment_id, std::move(result_elem));
     }

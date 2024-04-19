@@ -45,6 +45,7 @@ export struct CommonQueryFilter {
 
     // result
     atomic_flag finish_build_;
+    std::mutex result_mutex_;
     Map<SegmentID, std::variant<Vector<u32>, Bitmask>> filter_result_;
     SizeT filter_result_count_ = 0;
 

@@ -93,7 +93,7 @@ private:
 
 public:
     explicit FilterIterator(const CommonQueryFilter *common_query_filter) : common_query_filter_(common_query_filter) {
-        doc_freq_ = std::min<SizeT>(filter_result_count_, std::numeric_limits<u32>::max());
+        doc_freq_ = std::numeric_limits<u32>::max();
         DoSeek(0);
     }
 
@@ -317,7 +317,7 @@ public:
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
         os << prefix;
         os << (is_final ? "└──" : "├──");
-        os << "FilterIterator (fake_doc_freq: " << DocFreq() << ") (secondary_index_filter: ";
+        os << "FilterIterator (fake_doc_freq: " << filter_result_count_ << ") (secondary_index_filter: ";
         String filter_str;
         if (secondary_index_filter_) {
             ExplainLogicalPlan::Explain(secondary_index_filter_, filter_str);
