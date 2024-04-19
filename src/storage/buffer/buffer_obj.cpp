@@ -169,6 +169,9 @@ void BufferObj::CleanupFile() {
     if (status_ != BufferStatus::kClean) {
         UnrecoverableError("Invalid status.");
     }
+    if (file_worker_->GetData() != nullptr) {
+        UnrecoverableError("Buffer is not freed.");
+    }
     file_worker_->CleanupFile();
 }
 

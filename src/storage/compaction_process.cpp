@@ -107,8 +107,7 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyCompact: {
-                    Vector<UniquePtr<CompactSegmentsTask>> compact_tasks;
-                    compact_tasks = this->ScanForCompact();
+                    Vector<UniquePtr<CompactSegmentsTask>> compact_tasks = this->ScanForCompact();
                     for (auto &compact_task : compact_tasks) {
                         LOG_INFO(fmt::format("Compact {} start.", compact_task->table_name()));
                         compact_task->Execute();
