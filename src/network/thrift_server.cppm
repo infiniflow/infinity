@@ -21,7 +21,7 @@ export module thrift_server;
 
 import stl;
 import infinity;
-
+import infinity_thrift_service;
 import query_options;
 import thrift;
 
@@ -54,8 +54,6 @@ private:
     UniquePtr<apache::thrift::server::TServer> server{nullptr};
 };
 
-class InfinityServiceHandler;
-
 class NonBlockPoolThriftServer {
 public:
     void Init(i32 port_no, i32 pool_size);
@@ -64,7 +62,7 @@ public:
 
 private:
     //    UniquePtr<TServer> server{nullptr};
-    SharedPtr<InfinityServiceHandler> service_handler_{};
+    SharedPtr<InfinityThriftService> service_handler_{};
     SharedPtr<apache::thrift::concurrency::Thread> server_thread_{};
 };
 
