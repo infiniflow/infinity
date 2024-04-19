@@ -6,13 +6,10 @@ from clients.infinity_client import InfinityClient
 from clients.qdrant_client import QdrantClient
 
 ENGINES = ['infinity', 'qdrant', 'elasticsearch']
-DATA_SETS = ['vector_gist', 'vector_sift', 'vector_cohere_1M', 'vector_cohere_10M', 'fulltext_PMC', 'fulltext_wiki',
-             'hybrid']
-
+DATA_SETS = ['gist', 'sift', 'geonames']
 
 def parse_args() -> argparse.Namespace:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description="Vector Database Benchmark")
-    parser.add_argument('-h', '--help', type=bool, default=False, dest='help')
     parser.add_argument('-e', '--engine', type=str, default='all', dest='engine')
     parser.add_argument('-m', '--mode', type=str, default='all', dest='mode')
     parser.add_argument('-t', '--threads', type=int, default=1, dest='threads')
@@ -21,7 +18,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--limit-ram', type=str, default='16g', dest='limit_ram')
     parser.add_argument('--limit-cpu', type=int, default=8, dest='limit_cpu')
     return parser.parse_args()
-
 
 def generate_config_paths(kwargs: argparse.Namespace) -> list[tuple[str, str]]:
     paths = []
@@ -38,7 +34,6 @@ def generate_config_paths(kwargs: argparse.Namespace) -> list[tuple[str, str]]:
             add_path(engine, mode)
     return paths
 
-
 def get_client(engine: str, config: str, options: argparse.Namespace):
     if engine == 'qdrant':
         return QdrantClient(config, options)
@@ -49,11 +44,15 @@ def get_client(engine: str, config: str, options: argparse.Namespace):
     else:
         raise ValueError(f"Unknown engine: {engine}")
 
-
 if __name__ == '__main__':
     args = parse_args()
     config_paths = generate_config_paths(args)
 
     for path, engine in config_paths:
+        if not os.path.exists(path):
+            print(f"qdrant does not supple full text search")
+            continue
+        print("Running", engine, "with", path)
         client = get_client(engine, path, args)
         client.run_experiment()
+        print("Finished", engine, "with", path)
