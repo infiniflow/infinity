@@ -87,6 +87,6 @@ set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(VERSION ${thrift_VERSION})
 
 # generate a config.h file
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/build_cmake/cmake/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/thrift/config.h")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/thrift/config.h")
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")

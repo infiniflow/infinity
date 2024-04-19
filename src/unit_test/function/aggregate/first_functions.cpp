@@ -40,7 +40,7 @@ class FirstFunctionTest : public BaseTest {};
 TEST_F(FirstFunctionTest, first_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/var/infinity/data"));
 
     RegisterFirstFunction(catalog_ptr);
 

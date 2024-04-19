@@ -103,7 +103,7 @@ private:
     const SizeT max_segment_size_;
 };
 
-SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn) {
+UniquePtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn) {
     if (segments.empty()) {
         UnrecoverableError("No segment to compact");
     }
@@ -116,19 +116,18 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
         }
     }
     LOG_INFO(fmt::format("Add compact task, picked, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
-    auto ret = MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
-    return ret;
+    return MakeUnique<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
 }
 
-SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn) {
+UniquePtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn) {
     Vector<SegmentEntry *> segments = table_entry->PickCompactSegments(); // wait auto compaction to finish and pick segments
     LOG_INFO(fmt::format("Add compact task, whole, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
-    return MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactTable);
+    return MakeUnique<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactTable);
 }
 
 CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type)
-    : BGTask(BGTaskType::kCompactSegments, false), task_type_(type), db_name_(table_entry->GetDBName()), table_name_(table_entry->GetTableName()),
-      commit_ts_(table_entry->commit_ts_), segments_(std::move(segments)), txn_(txn) {}
+    : task_type_(type), db_name_(table_entry->GetDBName()), table_name_(table_entry->GetTableName()), commit_ts_(table_entry->commit_ts_),
+      segments_(std::move(segments)), txn_(txn) {}
 
 bool CompactSegmentsTask::Execute() {
     auto [table_entry, status] = txn_->GetTableByName(*db_name_, *table_name_);
@@ -171,8 +170,7 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
-            LOG_INFO(
-                fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
+            LOG_INFO(fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
         }
         segment_data.emplace_back(new_segment, std::move(to_compact_segments));
         old_segments.insert(old_segments.end(), to_compact_segments.begin(), to_compact_segments.end());

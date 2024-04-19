@@ -55,9 +55,9 @@ using namespace infinity;
 
 class CatalogDeltaReplayTest : public BaseTest {
 protected:
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
+    void SetUp() override { system("rm -rf /var/infinity"); }
 
-    void TearDown() override { system("rm -rf /tmp/infinity"); }
+    void TearDown() override { system("rm -rf /var/infinity"); }
 
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
         // TxnTimeStamp visible_ts = 0;

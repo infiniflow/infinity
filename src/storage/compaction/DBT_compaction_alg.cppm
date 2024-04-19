@@ -53,13 +53,13 @@ class SegmentLayer {
 public:
     SegmentLayer() {}
 
-    void AddSegmentInfo(SegmentEntry *segment_entry) { segments_.emplace_back(segment_entry); }
+    void AddSegment(SegmentEntry *segment_entry);
 
-    Vector<SegmentEntry *> SetAllCompacting(TransactionID txn_id);
+    void RemoveSegment(SegmentEntry *shrink_segment);
 
-    void SetOneCompacting(SegmentEntry *segment_entry, TransactionID txn_id);
+    Vector<SegmentEntry *> PickCompacting(TransactionID txn_id, SizeT M);
 
-    void CommitCompact(TransactionID txn_id) { compacting_segments_map_.erase(txn_id); }
+    void CommitCompact(TransactionID txn_id);
 
     void RollbackCompact(TransactionID txn_id);
 
@@ -68,8 +68,8 @@ public:
     SegmentEntry *FindSegment(SegmentID segment_id);
 
 private:
-    Vector<SegmentEntry *> segments_;
-    MultiHashMap<TransactionID, Vector<SegmentEntry *>> compacting_segments_map_;
+    HashMap<SegmentID, SegmentEntry *> segments_;
+    HashMap<TransactionID, Vector<SegmentEntry *>> compacting_segments_map_;
 };
 
 export class DBTCompactionAlg final : public CompactionAlg {
@@ -78,10 +78,11 @@ public:
         : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry), running_task_n_(0) {
     }
 
-    // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) override;
+    virtual Optional<CompactionInfo> CheckCompaction(std::function<Txn *()> generate_txn) override;
 
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) override;
+    virtual void AddSegment(SegmentEntry *new_segment) override;
+
+    virtual void DeleteInSegment(SegmentID segment_id) override;
 
     virtual void CommitCompact(TransactionID commit_txn_id) override;
 
@@ -91,13 +92,9 @@ public:
 
     virtual void Disable() override;
 
-    virtual void AddSegmentNoCheck(SegmentEntry *new_segment) override;
-
 private:
     // return layer
-    int AddSegmentNoCheckInner(SegmentEntry *new_segment);
-
-    void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id);
+    int AddSegmentInner(SegmentEntry *new_segment);
 
     Pair<SegmentEntry *, int> FindSegmentAndLayer(SegmentID segment_id);
 
@@ -112,6 +109,8 @@ private:
     std::condition_variable cv_;
 
     int running_task_n_;
+
+    HashMap<TransactionID, i32> txn_2_layer_;
 };
 
 } // namespace infinity

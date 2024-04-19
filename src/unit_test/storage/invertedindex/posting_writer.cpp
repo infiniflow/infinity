@@ -35,8 +35,8 @@ public:
     PostingWriterTest() : byte_slice_pool_(10240), buffer_pool_(10240) {}
 
     void SetUp() override {
-        file_ = "/tmp/infinity/posting_writer";
-        system("rm -rf /tmp/infinity/posting_writer");
+        file_ = "/var/infinity/posting_writer";
+        system("rm -rf /var/infinity/posting_writer");
     }
     void TearDown() override {}
 

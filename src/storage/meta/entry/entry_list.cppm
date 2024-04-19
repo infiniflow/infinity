@@ -383,7 +383,9 @@ bool EntryList<Entry>::CheckConflict(std::shared_lock<std::shared_mutex> &&r_loc
 
 template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    std::shared_lock r_lock(rw_locker_);
     auto [entry_ptr, find_res] = this->GetEntryInner1(txn_id, begin_ts);
+    r_lock.unlock();
     return this->GetEntryInner2(entry_ptr, find_res);
 }
 

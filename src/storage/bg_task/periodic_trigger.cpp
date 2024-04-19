@@ -29,10 +29,10 @@ namespace infinity {
 
 void CleanupPeriodicTrigger::Trigger() {
     TxnTimeStamp visible_ts = txn_mgr_->GetMinUnflushedTS();
-    if (visible_ts == last_visible_ts_) {
-        LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
-        return;
-    }
+    // if (visible_ts == last_visible_ts_) {
+    //     LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
+    //     return;
+    // }
     if (visible_ts < last_visible_ts_) {
         UnrecoverableException("The visible timestamp is not monotonic.");
         return;
@@ -49,8 +49,19 @@ void CheckpointPeriodicTrigger::Trigger() {
     auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
     LOG_INFO(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
-        LOG_TRACE(fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+        LOG_TRACE(
+            fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     }
+}
+
+void CompactSegmentPeriodicTrigger::Trigger() {
+    auto compact_task = MakeShared<NotifyCompactTask>();
+    compact_processor_->Submit(std::move(compact_task));
+}
+
+void OptimizeIndexPeriodicTrigger::Trigger() {
+    auto optimize_task = MakeShared<NotifyOptimizeTask>();
+    compact_processor_->Submit(std::move(optimize_task));
 }
 
 } // namespace infinity

@@ -1,4 +1,3 @@
-
 default_url = "http://localhost:23820/"
 expected_status_code = 200
 
@@ -15,9 +14,9 @@ baseData = {
 }
 
 types = [
-            "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
-             "double", "varchar", "boolean"
-        ]
+    "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+    "double", "varchar", "boolean"
+]
 
 baseResponse = {
     "error_code": 0,
@@ -34,34 +33,31 @@ baseDropOptions = {
     "kIgnore": "ignore_if_not_exists",
 }
 
-
 tableDefaultData = {
-    "fields": 
-    {
-        "name": 
+    "fields":
         {
-            "type": "varchar",
-            "constraints": ["not null"]
+            "name":
+                {
+                    "type": "varchar",
+                    "constraints": ["not null"]
+                },
+            "age":
+                {
+                    "type": "integer",
+                    "constraints": ["not null"]
+                },
+            "score":
+                {
+                    "type": "integer",
+                    "constraints": ["not null"]
+                }
         },
-        "age":
+    "properties":
         {
-            "type": "integer",
-            "constraints": ["not null"]
-        },
-        "score":
-        {
-            "type": "integer",
-            "constraints": ["not null"]
+            "bloomfilter_columns":
+                {
+                    "age",
+                    "score"
+                }
         }
-    },
-    "properties": 
-    {
-        "bloomfilter_columns": 
-        {
-            "age",
-            "score"
-        }
-    }
 }
-
-

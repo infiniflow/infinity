@@ -31,7 +31,8 @@ class TestInsert(HttpTest):
         self.insert(db_name, table_name, [{"c1": 0, "c2": 0}])
         self.insert(db_name, table_name, [{"c1": 1, "c2": 1}])
         self.insert(db_name, table_name, [{"c1": 2, "c2": 2}])
-        self.insert(db_name, table_name, [{"c1": 3, "c2": 3}, {"c1": 4, "c2": 4}])
+        self.insert(db_name, table_name, [
+                    {"c1": 3, "c2": 3}, {"c1": 4, "c2": 4}])
 
         self.drop_table(db_name, table_name)
         return
@@ -64,7 +65,8 @@ class TestInsert(HttpTest):
             }
         })
         for i in range(100):
-            self.insert(db_name, table_name, [{"c1": "test_insert_big_varchar" * 1000}])
+            self.insert(db_name, table_name, [
+                        {"c1": "test_insert_big_varchar" * 1000}])
         self.drop_table(db_name, table_name)
         return
 
@@ -175,7 +177,8 @@ class TestInsert(HttpTest):
         db_name = "default"
         table_name = "test_insert_data_into_non_existent_table"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {"type": "integer", }, "c2": {"type": "integer", }})
+        self.create_table(db_name, table_name, {
+                          "c1": {"type": "integer", }, "c2": {"type": "integer", }})
         self.drop_table(db_name, table_name)
 
         values = [{"c1": 1, "c2": 1}]
@@ -256,7 +259,8 @@ class TestInsert(HttpTest):
         })
         # insert
         for i in range(100):
-            values = [{"c1": i * 100 + j, "c2": i * 100 + j + 1} for j in range(100)]
+            values = [{"c1": i * 100 + j, "c2": i * 100 + j + 1}
+                      for j in range(100)]
             self.insert(db_name, table_name, values)
         return
 
@@ -416,7 +420,7 @@ class TestInsert(HttpTest):
     @pytest.mark.complex
     @pytest.mark.skip(reason="TODO")
     def test_insert_and_shutdown_output(self):
-        os.system("rm -fr /tmp/infinity")
+        os.system("rm -fr /var/infinity")
         db_name = "default"
         table_name = "test_insert_and_shutdown_output"
         self.show_database(db_name)

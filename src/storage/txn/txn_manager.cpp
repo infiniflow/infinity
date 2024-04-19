@@ -81,6 +81,13 @@ Txn *TxnManager::GetTxn(TransactionID txn_id) {
     return res;
 }
 
+SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
+    rw_locker_.lock_shared();
+    SharedPtr<Txn> res = txn_map_.at(txn_id);
+    rw_locker_.unlock_shared();
+    return res;
+}
+
 TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
 
 u64 TxnManager::GetNewTxnID() {

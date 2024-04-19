@@ -30,7 +30,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} ( c1 embedding(float, {}));\n".format(table_name, dim)
+            "CREATE TABLE {} ( c1 embedding(float, {}));\n".format(
+                table_name, dim)
         )
         slt_file.write("\n")
         slt_file.write("query I\n")
@@ -60,7 +61,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate fvecs data for test")
+    parser = argparse.ArgumentParser(
+        description="Generate fvecs data for test")
 
     parser.add_argument(
         "-g",
@@ -73,7 +75,7 @@ if __name__ == "__main__":
         "-c",
         "--copy",
         type=str,
-        default="/tmp/infinity/test_data",
+        default="/var/infinity/test_data",
         dest="copy_dir",
     )
     args = parser.parse_args()

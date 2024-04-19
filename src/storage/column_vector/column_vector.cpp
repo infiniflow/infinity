@@ -15,6 +15,7 @@
 module;
 
 #include "type/complex/varchar.h"
+#include "type/logical_type.h"
 #include <sstream>
 
 module column_vector;
@@ -1608,6 +1609,10 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
         UnrecoverableError(fmt::format("Not supported vector_type {}", int(vector_type_)));
+    }
+
+    if(data_type_->type() == LogicalType::kHugeInt) {
+        UnrecoverableError(fmt::format("Attempt to serialize huge integer type"));
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);

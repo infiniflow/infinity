@@ -24,7 +24,7 @@ SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l
 4
 
 statement ok
-COPY test_knn_hnsw_l2 FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_knn_hnsw_l2 FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 
 query I
 SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);

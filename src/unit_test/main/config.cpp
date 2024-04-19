@@ -51,19 +51,19 @@ TEST_F(ConfigTest, test1) {
 
     // Log
     EXPECT_EQ(*config.log_filename(), "infinity.log");
-    EXPECT_EQ(*config.log_dir(), "/tmp/infinity/log");
-    EXPECT_EQ(*config.log_file_path(), "/tmp/infinity/log/infinity.log");
+    EXPECT_EQ(*config.log_dir(), "/var/infinity/log");
+    EXPECT_EQ(*config.log_file_path(), "/var/infinity/log/infinity.log");
     EXPECT_EQ(config.log_to_stdout(), false);
     EXPECT_EQ(config.log_max_size(), 1024ul * 1024ul * 1024ul);
     EXPECT_EQ(config.log_file_rotate_count(), 10ul);
     // EXPECT_EQ(config.log_level(), LogLevel::kTrace);
 
-    EXPECT_EQ(*config.data_dir(), "/tmp/infinity/data");
-    EXPECT_EQ(*config.wal_dir(), "/tmp/infinity/wal");
+    EXPECT_EQ(*config.data_dir(), "/var/infinity/data");
+    EXPECT_EQ(*config.wal_dir(), "/var/infinity/wal");
     EXPECT_EQ(config.default_row_size(), 8192u);
 
     EXPECT_EQ(config.buffer_pool_size(), 4 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(*config.temp_dir(), "/tmp/infinity/temp");
+    EXPECT_EQ(*config.temp_dir(), "/var/infinity/temp");
 }
 
 TEST_F(ConfigTest, test2) {

@@ -66,7 +66,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
       - name: pysdk debug version
         if: ${{ !cancelled() && !failure() }}
@@ -84,7 +84,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
       - name: sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -147,7 +147,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
       - name: pysdk release version
         if: ${{ !cancelled() && !failure() }}
@@ -164,7 +164,7 @@ jobs:
       - name: Start infinity sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
       - name: sqllogictest release version
         if: ${{ !cancelled() && !failure() }}

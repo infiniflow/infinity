@@ -25,7 +25,7 @@ import infinity_context;
 
 class JsonTest : public BaseTest {
     void SetUp() override {
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

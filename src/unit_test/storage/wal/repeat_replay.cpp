@@ -53,9 +53,9 @@ protected:
         return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     }
 
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
+    void SetUp() override { system("rm -rf /var/infinity"); }
 
-    void TearDown() override { system("rm -rf /tmp/infinity"); }
+    void TearDown() override { system("rm -rf /var/infinity"); }
 };
 
 TEST_F(RepeatReplayTest, append) {

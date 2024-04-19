@@ -95,7 +95,7 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
     return segment_info;
 }
 
-void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
+void MockWalFile(const String &wal_file_path = "/var/infinity/wal/wal.log") {
 
     for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
         SizeT row_count = DEFAULT_VECTOR_SIZE;
@@ -126,10 +126,10 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         i32 actual_size = ptr - buf.data();
         EXPECT_EQ(actual_size, expect_size);
 
-        std::filesystem::create_directories("/tmp/infinity/wal");
+        std::filesystem::create_directories("/var/infinity/wal");
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableError("Failed to open wal file: /tmp/infinity/wal/wal.log");
+            UnrecoverableError("Failed to open wal file: /var/infinity/wal/wal.log");
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -148,10 +148,10 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         i32 actual_size = ptr - buf.data();
         EXPECT_EQ(actual_size, expect_size);
 
-        std::filesystem::create_directories("/tmp/infinity/wal");
+        std::filesystem::create_directories("/var/infinity/wal");
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableException("Failed to open wal file: /tmp/infinity/wal/wal.log");
+            UnrecoverableException("Failed to open wal file: /var/infinity/wal/wal.log");
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -159,7 +159,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
+        entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/var/infinity/data/catalog/META_123.full.json"));
         entry->commit_ts_ = 3;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -168,10 +168,10 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         i32 actual_size = ptr - buf.data();
         EXPECT_EQ(actual_size, expect_size);
 
-        std::filesystem::create_directories("/tmp/infinity/wal");
+        std::filesystem::create_directories("/var/infinity/wal");
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableException("Failed to open wal file: /tmp/infinity/wal/wal.log");
+            UnrecoverableException("Failed to open wal file: /var/infinity/wal/wal.log");
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -188,10 +188,10 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         i32 actual_size = ptr - buf.data();
         EXPECT_EQ(actual_size, expect_size);
 
-        std::filesystem::create_directories("/tmp/infinity/wal");
+        std::filesystem::create_directories("/var/infinity/wal");
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableException("Failed to open wal file: /tmp/infinity/wal/wal.log");
+            UnrecoverableException("Failed to open wal file: /var/infinity/wal/wal.log");
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -238,7 +238,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<RowID> row_ids = {RowID(1, 3)};
         entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/var/infinity/data/catalog/META_123.full.json"));
     {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
@@ -263,7 +263,7 @@ void Println(const String &message1, const String &message2) { std::cout << mess
 TEST_F(WalEntryTest, WalEntryIterator) {
     using namespace infinity;
     MockWalFile();
-    String wal_file_path = "/tmp/infinity/wal/wal.log";
+    String wal_file_path = "/var/infinity/wal/wal.log";
     {
         auto iterator1 = WalEntryIterator::Make(wal_file_path);
 
@@ -325,16 +325,16 @@ TEST_F(WalEntryTest, WalEntryIterator) {
         }
     }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
+    EXPECT_EQ(catalog_path, "/var/infinity/data/catalog/META_123.full.json");
     EXPECT_EQ(replay_entries.size(), 1u);
 }
 
 TEST_F(WalEntryTest, WalListIterator) {
     using namespace infinity;
     MockWalFile();
-    MockWalFile("/tmp/infinity/wal/wal2.log");
+    MockWalFile("/var/infinity/wal/wal2.log");
 
-    WalListIterator iterator1({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
+    WalListIterator iterator1({"/var/infinity/wal/wal.log", "/var/infinity/wal/wal2.log"});
 
     while (true) {
         auto wal_entry = iterator1.Next();
@@ -351,7 +351,7 @@ TEST_F(WalEntryTest, WalListIterator) {
     TxnTimeStamp max_commit_ts = 0;
     String catalog_path;
     {
-        WalListIterator iterator({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
+        WalListIterator iterator({"/var/infinity/wal/wal.log", "/var/infinity/wal/wal2.log"});
 
         // phase 1: find the max commit ts and catalog path
         while (true) {
@@ -393,6 +393,6 @@ TEST_F(WalEntryTest, WalListIterator) {
         }
     }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
+    EXPECT_EQ(catalog_path, "/var/infinity/data/catalog/META_123.full.json");
     EXPECT_EQ(replay_entries.size(), 1u);
 }
