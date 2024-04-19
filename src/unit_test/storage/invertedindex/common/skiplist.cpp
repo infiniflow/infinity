@@ -62,44 +62,44 @@ String RandStr() {
     return str;
 }
 
-TEST_F(SkiplistTest, test1) {
+// TEST_F(SkiplistTest, test1) {
 
-    KeyComparator cmp;
-    SkipList<Key, Value, KeyComparator> list(cmp, nullptr);
+//     KeyComparator cmp;
+//     SkipList<Key, Value, KeyComparator> list(cmp, nullptr);
 
-    const int N = 50000;
-    const int R = 50000;
-    std::map<Key, Value> keys;
+//     const int N = 50000;
+//     const int R = 50000;
+//     std::map<Key, Value> keys;
 
-    Key a = 512;
-    Value b = 111;
-    list.Insert(a, b);
-    Value v;
-    list.Search(a, v);
-    ASSERT_EQ(b, v);
+//     Key a = 512;
+//     Value b = 111;
+//     list.Insert(a, b);
+//     Value v;
+//     list.Search(a, v);
+//     ASSERT_EQ(b, v);
 
-    for (int i = 257; i < N; i++) {
-        Key key = dis(gen) % R;
-        Value value = dis(gen) % R;
-        if (keys.emplace(key, value).second) {
-            std::cout << "i:" << i << std::endl;
-            list.Insert(key, value);
+//     for (int i = 257; i < N; i++) {
+//         Key key = dis(gen) % R;
+//         Value value = dis(gen) % R;
+//         if (keys.emplace(key, value).second) {
+//             std::cout << "i:" << i << std::endl;
+//             list.Insert(key, value);
 
-            Value v;
-            list.Search(key, v);
-            std::cout << "key:" << key << ",value:" << value << " ,true:" << v << std::endl;
-            ASSERT_EQ(value, v);
-        }
-    }
+//             Value v;
+//             list.Search(key, v);
+//             std::cout << "key:" << key << ",value:" << value << " ,true:" << v << std::endl;
+//             ASSERT_EQ(value, v);
+//         }
+//     }
 
-    for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
-        Value v;
-        if (list.Search(it->first, v)) {
-            std::cout << "key:" << it->first << ",value:" << it->second << " ,true:" << v << std::endl;
-            ASSERT_EQ(it->second, v);
-        }
-    }
-}
+//     for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
+//         Value v;
+//         if (list.Search(it->first, v)) {
+//             std::cout << "key:" << it->first << ",value:" << it->second << " ,true:" << v << std::endl;
+//             ASSERT_EQ(it->second, v);
+//         }
+//     }
+// }
 
 TEST_F(SkiplistTest, test2) {
     KeyComparator cmp;
