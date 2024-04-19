@@ -19,6 +19,7 @@ module;
 #include <thrift/server/TThreadedServer.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <thrift/protocol/TCompactProtocol.h>
 
 export module thrift;
 
@@ -45,6 +46,7 @@ export namespace apache {
 
         namespace protocol {
             using apache::thrift::protocol::TBinaryProtocolFactory;
+            using apache::thrift::protocol::TCompactProtocolFactory;
             using apache::thrift::protocol::TProtocolFactory;
         }
     }
