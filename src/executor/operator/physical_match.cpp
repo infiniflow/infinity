@@ -77,11 +77,13 @@ private:
     const HashMap<SegmentID, SegmentEntry *> *segment_index_ = &common_query_filter_->base_table_ref_->block_index_->segment_index_;
 
 private:
+    const TxnTimeStamp begin_ts_ = common_query_filter_->begin_ts_;
     SegmentID current_segment_id_ = filter_result_ptr_->size() ? filter_result_ptr_->begin()->first : INVALID_SEGMENT_ID;
     mutable SegmentID cache_segment_id_ = INVALID_SEGMENT_ID;
     mutable SegmentOffset cache_segment_offset_ = 0;
     using SegEntryT = const SegmentEntry *;
     mutable SegEntryT cache_segment_entry_ = nullptr;
+    mutable bool cache_need_check_delete_ = false;
 
     // -1: not decoded
     // 0: use Vector<u32>*
@@ -157,6 +159,7 @@ public:
             cache_segment_id_ = current_segment_id_;
             cache_segment_entry_ = segment_index_->at(cache_segment_id_);
             cache_segment_offset_ = cache_segment_entry_->row_count();
+            cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }
         return RowID(current_segment_id_, cache_segment_offset_);
     }
@@ -170,8 +173,8 @@ public:
             cache_segment_id_ = current_segment_id_;
             cache_segment_entry_ = segment_index_->at(cache_segment_id_);
             cache_segment_offset_ = cache_segment_entry_->row_count();
+            cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }
-        DeleteFilter delete_filter(cache_segment_entry_, common_query_filter_->begin_ts_);
         const RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
         while (true) {
             if (doc_id > seek_end) {
@@ -181,7 +184,12 @@ public:
             if (!success) {
                 return {false, 0.0f, INVALID_ROWID};
             }
-            if (delete_filter(id.segment_offset_)) {
+            if (cache_need_check_delete_) [[unlikely]] {
+                DeleteFilter delete_filter(cache_segment_entry_, common_query_filter_->begin_ts_);
+                if (delete_filter(id.segment_offset_)) {
+                    return {true, 0.0f, id};
+                }
+            } else [[likely]] {
                 return {true, 0.0f, id};
             }
             doc_id = id + 1;
@@ -246,7 +254,7 @@ public:
                     }
                 }
                 const u64 *data_ptr = doc_id_bitmask_->GetData();
-                if (data_ptr == nullptr) {
+                if (data_ptr == nullptr) [[likely]] {
                     // all true
                     pos_ = seek_offset_start;
                     return {true, doc_id};
