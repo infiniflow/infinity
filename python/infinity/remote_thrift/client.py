@@ -141,6 +141,14 @@ class ThriftInfinityClient:
 
         return
 
+    # Can be used in compact mode
+    # def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
+    #     return self.client.Insert(InsertRequest(session_id=self.session_id,
+    #                                             db_name=db_name,
+    #                                             table_name=table_name,
+    #                                             column_names=column_names,
+    #                                             fields=fields))
+
     def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
         return self.client.Import(ImportRequest(session_id=self.session_id,
                                                 db_name=db_name,
