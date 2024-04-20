@@ -132,11 +132,11 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> 
 class QueryBuilderTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
     }
 

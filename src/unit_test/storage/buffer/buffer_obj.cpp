@@ -54,17 +54,16 @@ using namespace infinity;
 class BufferObjTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
 
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -103,19 +102,20 @@ public:
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
     SizeT memory_limit = 1024;
-    auto temp_dir = MakeShared<String>("/var/infinity/spill");
-    auto base_dir = MakeShared<String>("/var/infinity/data");
+    String data_dir(GetDataDir());
+    auto temp_dir = MakeShared<String>(data_dir + "/spill");
+    auto base_dir = MakeShared<String>(GetDataDir());
 
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
     SizeT test_size1 = 1024;
-    auto file_dir1 = MakeShared<String>("/var/infinity/data/dir1");
+    auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
     auto test_fname1 = MakeShared<String>("test1");
     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
     auto buf1 = buffer_manager.Allocate(std::move(file_worker1));
 
     SizeT test_size2 = 1024;
-    auto file_dir2 = MakeShared<String>("/var/infinity/data/dir2");
+    auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
     auto test_fname2 = MakeShared<String>("test2");
     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
     auto buf2 = buffer_manager.Allocate(std::move(file_worker2));
@@ -284,19 +284,20 @@ TEST_F(BufferObjTest, test1) {
 // unit test for BufferStatus::kClean transformation
 // TEST_F(BufferObjTest, test_status_clean) {
 //     SizeT memory_limit = 1024;
-//     auto temp_dir = MakeShared<String>("/var/infinity/spill");
-//     auto base_dir = MakeShared<String>("/var/infinity/data");
+//     String data_dir(GetDataDir());
+//     auto temp_dir = MakeShared<String>(data_dir + "/spill");
+//     auto base_dir = MakeShared<String>(data_dir);
 
 //     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
 //     SizeT test_size1 = 1024;
-//     auto file_dir1 = MakeShared<String>("/var/infinity/data/dir1");
+//     auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
 //     auto test_fname1 = MakeShared<String>("test1");
 //     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
 //     auto *buf1 = buffer_manager.Allocate(std::move(file_worker1));
 
 //     SizeT test_size2 = 1024;
-//     auto file_dir2 = MakeShared<String>("/var/infinity/data/dir2");
+//     auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
 //     auto test_fname2 = MakeShared<String>("test2");
 //     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
 //     auto *buf2 = buffer_manager.Allocate(std::move(file_worker2));
@@ -496,6 +497,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     infinity::GlobalResourceUsage::Init();
 #endif
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
+    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     constexpr u64 kInsertN = 4;

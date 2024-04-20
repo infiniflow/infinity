@@ -70,6 +70,9 @@ public:
 
     void DeleteEmptyDirectory(const String &path) final;
 
+    // Remove everything recursively under given directory. Create it if it doesn't exist.
+    void CleanupDirectory(const String &path) final;
+
     Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) final;
 
     String GetAbsolutePath(const String &path);

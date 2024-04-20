@@ -42,11 +42,6 @@ public:
         delete buffer_pool_;
         delete byte_slice_pool_;
     }
-    void SetUp() override {
-        system("rm -rf /var/infinity/posting_merger");
-        system("mkdir -p /var/infinity/posting_merger");
-    }
-    void TearDown() override {}
 
 public:
     struct ExpectedPosting {
@@ -85,7 +80,7 @@ void PostingMergerTest::CreateIndex() {
     }
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    MemoryIndexer indexer1("/var/infinity/posting_merger",
+    MemoryIndexer indexer1(GetTmpDir(),
                            "chunk1",
                            RowID(0U, 0U),
                            flag_,
@@ -98,7 +93,7 @@ void PostingMergerTest::CreateIndex() {
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    auto indexer2 = MakeUnique<MemoryIndexer>("/var/infinity/posting_merger",
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(),
                                               "chunk2",
                                               RowID(0U, 1U),
                                               flag_,
@@ -115,7 +110,7 @@ TEST_F(PostingMergerTest, Basic) {
     using namespace infinity;
     CreateIndex();
 
-    const String index_dir = "/var/infinity/posting_merger";
+    const String index_dir = GetTmpDir();
 
     String dst_base_name = "merged_index";
     Path path = Path(index_dir) / dst_base_name;

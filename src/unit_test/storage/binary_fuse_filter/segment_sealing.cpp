@@ -45,12 +45,14 @@ import block_entry;
 using namespace infinity;
 
 class SealingTaskTest : public BaseTest {
-    void SetUp() override { system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal"); }
-
-    void TearDown() override {
-        system("tree  /var/infinity");
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
+    void SetUp() override {
+        tree_cmd = "tree ";
+        tree_cmd += GetHomeDir();
     }
+
+    void TearDown() override { system(tree_cmd.c_str()); }
+
+    String tree_cmd;
 
 protected:
     void AppendBlocks(TxnManager *txn_mgr, const String &table_name, u32 row_cnt_input, BufferManager *buffer_mgr) {
@@ -87,6 +89,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -149,12 +152,13 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system("tree  /var/infinity");
+    system(tree_cmd.c_str());
     {
         // test wal
         String table_name = "tbl1";
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
         Storage *storage = infinity::InfinityContext::instance().storage();
         // BufferManager *buffer_manager = storage->buffer_manager();

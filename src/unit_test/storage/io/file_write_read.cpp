@@ -32,7 +32,7 @@ class FileWriteReadTest : public BaseTest {};
 TEST_F(FileWriteReadTest, test1) {
     using namespace infinity;
     LocalFileSystem local_file_system;
-    String path = "/tmp/test_file1.abc";
+    String path = String(GetTmpDir()) + "/test_file1.abc";
     FileWriter file_writer(local_file_system, path, 128);
 
     for (SizeT i = 0; i < 128; ++i) {
@@ -55,7 +55,7 @@ TEST_F(FileWriteReadTest, test1) {
 TEST_F(FileWriteReadTest, test2) {
     using namespace infinity;
     LocalFileSystem local_file_system;
-    String path = "/tmp/test_file2.abc";
+    String path = String(GetTmpDir()) + "/test_file2.abc";
     FileWriter file_writer(local_file_system, path, 128);
 
     for (u32 i = 0; i < 128; ++i) {
@@ -74,7 +74,7 @@ TEST_F(FileWriteReadTest, test2) {
 TEST_F(FileWriteReadTest, test3) {
     using namespace infinity;
     LocalFileSystem local_file_system;
-    String path = "/tmp/test_file3.abc";
+    String path = String(GetTmpDir()) + "/test_file3.abc";
     FileWriter file_writer(local_file_system, path, 128);
 
     for (u32 i = 0; i < 128; ++i) {

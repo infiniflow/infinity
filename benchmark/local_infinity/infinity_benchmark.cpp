@@ -85,10 +85,7 @@ int main() {
     String path = "/var/infinity";
 
     LocalFileSystem fs;
-    if (fs.Exists(path)) {
-        fs.DeleteDirectory(path);
-    }
-    fs.CreateDirectory(path);
+    fs.CleanupDirectory(path);
 
     Infinity::LocalInit(path);
 

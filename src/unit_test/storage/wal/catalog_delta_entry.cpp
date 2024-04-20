@@ -28,17 +28,13 @@ import infinity_context;
 import data_type;
 import logical_type;
 
-class CatalogDeltaEntryTest : public BaseTest {
-protected:
-    void SetUp() override { system("rm -rf /var/infinity"); }
-
-    void TearDown() override { system("rm -rf /var/infinity"); }
-};
+class CatalogDeltaEntryTest : public BaseTest {};
 
 using namespace infinity;
 
 TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
 
     auto db_name = MakeShared<String>("db_test");
@@ -188,6 +184,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
 
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
 
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
