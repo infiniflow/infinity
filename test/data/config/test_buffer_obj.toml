@@ -2,7 +2,7 @@
 version = "0.1.0"
 timezone = "utc-8"
 
-[resource]
+[storage]
 cleanup_interval = 1
 
 [wal]
@@ -11,4 +11,4 @@ delta_checkpoint_interval_sec = 1
 
 [buffer]
 buffer_pool_size = "512kb"
-temp_dir         = "/tmp/infinity/temp"
+temp_dir         = "/var/infinity/tmp"

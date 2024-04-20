@@ -191,11 +191,11 @@ public:
     Tuple<SharedPtr<TableIndexInfo>, Status>
     GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id);
+    static Status RemoveIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id);
 
     static void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
 
-    static void RollbackCreateIndex(TxnIndexStore *txn_index_store);
+    // static void RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn);
 
     // Append related functions
     static void Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
@@ -303,7 +303,7 @@ private: // TODO: remove this
     void MemIndexCommitLoop();
 
 public:
-    void MemIndexRecover(BufferManager* buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager);
 
     void PickCleanup(CleanupScanner *scanner);
 

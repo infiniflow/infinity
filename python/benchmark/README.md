@@ -50,13 +50,12 @@ Options:
 		4c_32g
 	-- mode
 		test mode:  all(default)
-                vector_gist,
-                vector_sift,
-                vector_cohere_1M,
-                vector_cohere_10M,
-                fulltext_PMC,
-                fulltext_wiki,
-                hybrid
+                gist,
+                sift,
+                cohere_1M,
+                cohere_10M,
+                geonames,
+                pmc
   -- limit_ram
     25Gb(default)
   -- limit_cpus
@@ -65,4 +64,4 @@ Options:
     show this message.
 ```
 
-The hardware and mode configurations are saved as JSON files in the "configs" folder. The hardware configuration is for setting up the database server's hardware parameters, while the mode configuration is for setting up the benchmark being used, which includes the dataset, index parameters, queries, and query parameters. Users can customize these configurations, saving them as JSON files, for example, "qdrant_vector_c4.json". To run a test, simply use `-- engines qdrant --mode vector_c4`.
+The hardware and mode configurations are saved as JSON files in the "configs" folder. The hardware configuration is for setting up the database server's hardware parameters, while the mode configuration is for setting up the benchmark being used, which includes the dataset, index parameters, queries, and query parameters. Users can customize these configurations, saving them as JSON files, for example, "elasticsearch_sift.json". To run a test, simply use `-- engines elasticsesarch --mode sift`.

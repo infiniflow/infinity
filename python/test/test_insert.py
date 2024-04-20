@@ -56,7 +56,8 @@ class TestInsert(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
-        db_obj.drop_table(table_name="table_2", conflict_type=ConflictType.Ignore)
+        db_obj.drop_table(table_name="table_2",
+                          conflict_type=ConflictType.Ignore)
         # infinity
         table_obj = db_obj.create_table(
             "table_2", {"c1": "int, primary key, not null", "c2": "int, not null"}, ConflictType.Error)
@@ -216,7 +217,8 @@ class TestInsert(TestSdk):
         res = table_obj.insert([{"c1": [-9999999] * 65535}])
         assert res.error_code == ErrorCode.OK
 
-        res = db_obj.drop_table("test_insert_big_embedding", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_big_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = infinity_obj.disconnect()
@@ -230,7 +232,8 @@ class TestInsert(TestSdk):
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_big_embedding_float", ConflictType.Ignore)
+        db_obj.drop_table("test_insert_big_embedding_float",
+                          ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_big_embedding_float", {
             "c1": "vector,65535,float"}, ConflictType.Error)
         assert table_obj
@@ -243,7 +246,8 @@ class TestInsert(TestSdk):
         res = table_obj.insert([{"c1": [-9999999.988] * 65535}])
         assert res.error_code == ErrorCode.OK
 
-        res = db_obj.drop_table("test_insert_big_embedding_float", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_big_embedding_float", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = infinity_obj.disconnect()
@@ -259,13 +263,15 @@ class TestInsert(TestSdk):
     def test_insert_big_embedding_various_type(self, types, types_examples):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_big_embedding_various_type", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_big_embedding_various_type", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_big_embedding_various_type", {
             "c1": types}, ConflictType.Error)
         res = table_obj.insert(types_examples)
         assert res.error_code == ErrorCode.OK
 
-        res = db_obj.drop_table("test_insert_big_embedding_various_type", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_big_embedding_various_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = infinity_obj.disconnect()
@@ -284,7 +290,8 @@ class TestInsert(TestSdk):
                            match=".*Insert values row count 8193 is larger than default block capacity 8192*"):
             table_obj.insert(values)
 
-        res = db_obj.drop_table("test_insert_exceed_block_size", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_exceed_block_size", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = infinity_obj.disconnect()
@@ -307,7 +314,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        res = db_obj.drop_table("test_insert_data_not_aligned_with_table_definition", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_data_not_aligned_with_table_definition", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -321,12 +329,14 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_data_into_non_existent_table", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_data_into_non_existent_table", ConflictType.Ignore)
 
         # create and drop table
         table_obj = db_obj.create_table("test_insert_data_into_non_existent_table",
                                         {"c1": "int", "c2": "int"}, ConflictType.Error)
-        res = db_obj.drop_table("test_insert_data_into_non_existent_table", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_data_into_non_existent_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # insert
@@ -356,7 +366,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        res = db_obj.drop_table("test_insert_empty_into_table", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_empty_into_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -368,7 +379,8 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_data_into_index_created_table", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_data_into_index_created_table", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_data_into_index_created_table",
                                         {"c1": "vector,1024,float"}, ConflictType.Error)
 
@@ -377,10 +389,14 @@ class TestInsert(TestSdk):
                                [index.IndexInfo("c1",
                                                 index.IndexType.Hnsw,
                                                 [
-                                                    index.InitParameter("M", "16"),
-                                                    index.InitParameter("ef_construction", "50"),
-                                                    index.InitParameter("ef", "50"),
-                                                    index.InitParameter("metric", "l2")
+                                                    index.InitParameter(
+                                                        "M", "16"),
+                                                    index.InitParameter(
+                                                        "ef_construction", "50"),
+                                                    index.InitParameter(
+                                                        "ef", "50"),
+                                                    index.InitParameter(
+                                                        "metric", "l2")
                                                 ])], ConflictType.Error)
 
         table_obj.create_index("my_index_2",
@@ -401,7 +417,8 @@ class TestInsert(TestSdk):
         res = table_obj.drop_index("my_index_2", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        res = db_obj.drop_table("test_insert_data_into_index_created_table", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_data_into_index_created_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -413,13 +430,15 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_table_with_10000_columns", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_table_with_10000_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_table_with_10000_columns", {"c1": "int", "c2": "int"},
                                         ConflictType.Error)
 
         # insert
         for i in range(100):
-            values = [{"c1": i * 100 + j, "c2": i * 100 + j + 1} for j in range(100)]
+            values = [{"c1": i * 100 + j, "c2": i * 100 + j + 1}
+                      for j in range(100)]
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
@@ -435,8 +454,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-
-        res = db_obj.drop_table("test_insert_table_with_10000_columns", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_table_with_10000_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = infinity_obj.disconnect()
@@ -448,7 +467,8 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_with_not_matched_columns", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_with_not_matched_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_with_not_matched_columns",
                                         {"c1": "int", "c2": "int"}, ConflictType.Error)
 
@@ -458,8 +478,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-
-        res = db_obj.drop_table("test_insert_with_not_matched_columns", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_with_not_matched_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -472,7 +492,8 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_with_exceeding_invalid_value_range", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_with_exceeding_invalid_value_range", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_with_exceeding_invalid_value_range",
                                         {"c1": "int", "c2": "int32"}, ConflictType.Error)
 
@@ -481,7 +502,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_pl()
         print(insert_res)
 
-        res = db_obj.drop_table("test_insert_with_exceeding_invalid_value_range", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_with_exceeding_invalid_value_range", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -494,7 +516,8 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_batch_insert_within_limit", ConflictType.Ignore)
+        db_obj.drop_table("test_batch_insert_within_limit",
+                          ConflictType.Ignore)
         table_obj = db_obj.create_table("test_batch_insert_within_limit", {"c1": "int", "c2": "int"},
                                         ConflictType.Error)
 
@@ -504,7 +527,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        res = db_obj.drop_table("test_batch_insert_within_limit", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_batch_insert_within_limit", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -517,7 +541,8 @@ class TestInsert(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_batch_insert", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_batch_insert", {"c1": "int", "c2": "int"}, ConflictType.Error)
+        table_obj = db_obj.create_table(
+            "test_batch_insert", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8192)]
@@ -539,7 +564,8 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_with_invalid_data_type", ConflictType.Ignore)
+        db_obj.drop_table(
+            "test_insert_with_invalid_data_type", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_with_invalid_data_type",
                                         {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
@@ -554,7 +580,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        res = db_obj.drop_table("test_insert_with_invalid_data_type", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_with_invalid_data_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -567,8 +594,10 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_with_invalid_column_count", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_with_invalid_column_count", {"c1": "int"}, ConflictType.Error)
+        db_obj.drop_table(
+            "test_insert_with_invalid_column_count", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_with_invalid_column_count", {
+                                        "c1": "int"}, ConflictType.Error)
 
         # insert
         with pytest.raises(Exception, match=".*input value count mismatch*"):
@@ -578,7 +607,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        res = db_obj.drop_table("test_insert_with_invalid_column_count", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_with_invalid_column_count", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -593,7 +623,8 @@ class TestInsert(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_various_insert_types", ConflictType.Ignore)
-        db_obj.create_table("test_various_insert_types", {"c1": column_types}, ConflictType.Error)
+        db_obj.create_table("test_various_insert_types", {
+                            "c1": column_types}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_various_insert_types")
 
@@ -603,7 +634,8 @@ class TestInsert(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        res = db_obj.drop_table("test_various_insert_types", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_various_insert_types", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect
@@ -614,15 +646,17 @@ class TestInsert(TestSdk):
     @pytest.mark.skip(reason="TODO")
     def test_insert_and_shutdown_output(self):
 
-        os.system("rm -fr /tmp/infinity")
+        os.system("rm -fr /var/infinity")
         # start service
         infinity_service_1 = start_infinity_service_in_subporcess()
 
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_insert_and_shutdown_output", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_and_shutdown_output", {"c1": "int"}, ConflictType.Error)
+        db_obj.drop_table("test_insert_and_shutdown_output",
+                          ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_and_shutdown_output", {
+                                        "c1": "int"}, ConflictType.Error)
 
         for i in range(10):
             values = [{"c1": 1} for _ in range(100)]
@@ -649,7 +683,8 @@ class TestInsert(TestSdk):
         new_insert_res = table_obj.output(["*"]).to_df()
         print(new_insert_res)
 
-        res = db_obj.drop_table("test_insert_and_shutdown_output", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_and_shutdown_output", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # shutdown service
@@ -660,7 +695,8 @@ class TestInsert(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_zero_column", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_zero_column", {"c1": "int"}, ConflictType.Error)
+        table_obj = db_obj.create_table("test_insert_zero_column", {
+                                        "c1": "int"}, ConflictType.Error)
 
         with pytest.raises(Exception, match="ERROR:3065*"):
             table_obj.insert([])
@@ -688,14 +724,16 @@ class TestInsert(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_no_match_column", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_no_match_column", {"c1": "int"}, ConflictType.Error)
+        table_obj = db_obj.create_table("test_insert_no_match_column", {
+                                        "c1": "int"}, ConflictType.Error)
 
         with pytest.raises(Exception, match="ERROR:3024*"):
             table_obj.insert([{column_name: 1}])
             insert_res = table_obj.output(["*"]).to_df()
             print(insert_res)
 
-        res = db_obj.drop_table("test_insert_no_match_column", ConflictType.Error)
+        res = db_obj.drop_table(
+            "test_insert_no_match_column", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # disconnect

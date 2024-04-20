@@ -56,7 +56,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         KnnExpr *knn_expr{nullptr};
         MatchExpr *match_expr{nullptr};
         // SearchExpr *search_expr = new SearchExpr();
-        SearchExpr *search_expr(nullptr);
+        SearchExpr *search_expr{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -141,11 +141,17 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                             return;
                         }
                         knn_expr = ParseKnn(knn_json, http_status, response);
+                        if(knn_expr == nullptr) {
+                            return ;
+                        }
                         search_expr->AddExpr(knn_expr);
                         knn_expr = nullptr;
                     } else if (IsEqual(key, "match")) {
                         auto &match_json = expression.value();
                         match_expr = ParseMatch(match_json, http_status, response);
+                        if(match_expr == nullptr) {
+                            return ;
+                        }
                         search_expr->AddExpr(match_expr);
                         match_expr = nullptr;
                     } else if (IsEqual(key, "method")) {
@@ -180,6 +186,9 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     return;
                 }
                 knn_expr = ParseKnn(knn_json, http_status, response);
+                if(knn_expr == nullptr) {
+                    return ;
+                }
                 search_expr->AddExpr(knn_expr);
                 knn_expr = nullptr;
             } else if (IsEqual(key, "match")) {
@@ -191,6 +200,9 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
                 auto &match_json = elem.value();
                 match_expr = ParseMatch(match_json, http_status, response);
+                if(match_expr == nullptr) {
+                    return ;
+                }
                 search_expr->AddExpr(match_expr);
                 match_expr = nullptr;
             } else {
@@ -317,8 +329,10 @@ KnnExpr *HTTPSearch::ParseKnn(nlohmann::json &knn_json_object, HTTPStatus &http_
         ToLower(key);
         if (IsEqual(key, "fields")) {
             ColumnExpr *column_expr = new ColumnExpr();
-            for(size_t i=0;i<field_json_obj.value().size();i++){
-                column_expr->names_.emplace_back(field_json_obj.value()[i]);
+            const auto& fields_value = field_json_obj.value();
+            SizeT fields_count = fields_value.size();
+            for (SizeT i = 0; i < fields_count; i++) {
+                column_expr->names_.emplace_back(fields_value[i]);
             }
             knn_expr->column_expr_ = column_expr;
             column_expr = nullptr;
@@ -338,7 +352,13 @@ KnnExpr *HTTPSearch::ParseKnn(nlohmann::json &knn_json_object, HTTPStatus &http_
         } else if (IsEqual(key, "element_type")) {
             ;
         } else if (IsEqual(key, "top_k")) {
-            knn_expr->topn_ = field_json_obj.value();
+            if(field_json_obj.value().is_number_unsigned()) {
+                knn_expr->topn_ = field_json_obj.value();
+            } else {
+                response["error_code"] = ErrorCode::kInvalidTopKType;
+                response["error_message"] = "Top K field should be integer";
+                return nullptr;
+            }
         } else if (IsEqual(key, "metric_type")) {
             String metric_type = field_json_obj.value();
             ToLower(metric_type);

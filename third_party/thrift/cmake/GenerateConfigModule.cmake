@@ -24,7 +24,7 @@ set(PACKAGE_BIN_INSTALL_DIR "${exec_prefix}")
 
 # In CYGWIN enviroment below commands does not work properly
 if (NOT CYGWIN)
-		configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/build_cmake/cmake/ThriftConfig.cmake.in"
+		configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ThriftConfig.cmake.in"
 						"${CMAKE_CURRENT_BINARY_DIR}/ThriftConfig.cmake"
 						INSTALL_DESTINATION "${CMAKE_INSTALL_DIR}/thrift"
 						PATH_VARS
@@ -40,6 +40,9 @@ if (NOT CYGWIN)
 
 		install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ThriftConfig.cmake"
 						"${CMAKE_CURRENT_BINARY_DIR}/ThriftConfigVersion.cmake"
-						"${CMAKE_CURRENT_SOURCE_DIR}/build_cmake/cmake/FindLibevent.cmake"
 						DESTINATION "${CMAKE_INSTALL_DIR}/thrift")
+        if(WITH_LIBEVENT)
+            install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindLibevent.cmake"
+                            DESTINATION "${CMAKE_INSTALL_DIR}/thrift")
+        endif()
 endif()

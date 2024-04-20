@@ -1,67 +1,68 @@
-import sys 
-import pytest 
-import time 
+import sys
+import pytest
+import time
 from httpapibase import HttpTest
-from common.common_values import * 
+from common.common_values import *
 
 
 class TestShow(HttpTest):
     def test_show_table(self):
-        dbname = "default"
-        tbname = "test_show_table"
-        self.dropTable(dbname,tbname)
-        self.showTable(dbname,tbname,{
-            "status_code":500,
-            "error_code":3022,
+        db_name = "default"
+        table_name = "test_show_table"
+        self.drop_table(db_name, table_name)
+        self.show_table(db_name, table_name, {
+            "status_code": 500,
+            "error_code": 3022,
         })
-        self.createTable(
-            dbname,tbname,{
-                "num":{
-                    "type":"integer",
+        self.create_table(
+            db_name, table_name, {
+                "num": {
+                    "type": "integer",
                 },
-                 "body":{
-                    "type":"varchar",
-                },"vec":{
-                    "type":"vector",
-                    "dimension":5,
-                    "element_type":"float",
+                "body": {
+                    "type": "varchar",
+                }, "vec": {
+                    "type": "vector",
+                    "dimension": 5,
+                    "element_type": "float",
                 }
             }
         )
-        self.showTable(dbname,tbname,{
-            "error_code":0,
-            "database_name": dbname,
-            "table_name": tbname,
-            "column_count" : 3,
-            "row_count" : 0
+        self.show_table(db_name, table_name, {
+            "error_code": 0,
+            "database_name": db_name,
+            "table_name": table_name,
+            "column_count": 3,
+            "row_count": 0
         })
+        self.drop_table(db_name, table_name)
         return
-    
-    def test_show_cloumns(self):
-        dbname = "default"
-        tbname = "test_show_table"
-        self.showdb(dbname)
-        self.dropTable(dbname,tbname)
-        self.createTable(dbname,tbname,{
-            "num":{
-                "type":"integer",
+
+    def test_show_columns(self):
+        db_name = "default"
+        table_name = "test_show_table"
+        self.show_database(db_name)
+        self.drop_table(db_name, table_name)
+        self.create_table(db_name, table_name, {
+            "num": {
+                "type": "integer",
             },
-            "body":{
-                "type":"varchar",
-            },"vec":{
-                "type":"vector",
-                "dimension":5,
-                "element_type":"float",
+            "body": {
+                "type": "varchar",
+            }, "vec": {
+                "type": "vector",
+                "dimension": 5,
+                "element_type": "float",
             }
         })
 
-        self.showTableColums(dbname,tbname,{
+        self.show_table_columns(db_name, table_name, {
             "error_code": 0,
-            "columns":[
-                {'column_name': 'body', 'column_type': 'Varchar', 'constraint': ''}, 
-                {'column_name': 'num', 'column_type': 'Integer', 'constraint': ''}, 
+            "columns": [
+                {'column_name': 'body', 'column_type': 'Varchar', 'constraint': ''},
+                {'column_name': 'num', 'column_type': 'Integer', 'constraint': ''},
                 {'column_name': 'vec', 'column_type': 'Embedding(float,5)', 'constraint': ''}
             ]
         })
-        return 
-    
+        self.drop_table(db_name, table_name)
+        return

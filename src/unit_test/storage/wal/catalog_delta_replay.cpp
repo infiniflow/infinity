@@ -55,10 +55,6 @@ using namespace infinity;
 
 class CatalogDeltaReplayTest : public BaseTest {
 protected:
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
-
-    void TearDown() override { system("rm -rf /tmp/infinity"); }
-
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
         // TxnTimeStamp visible_ts = 0;
         // auto start = std::chrono::steady_clock::now();
@@ -126,6 +122,7 @@ protected:
 };
 
 TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
+    RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name1 = std::make_shared<std::string>("db1");
@@ -192,6 +189,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
+    RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name = std::make_shared<std::string>("default");
@@ -268,6 +266,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_import) {
+    RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name = std::make_shared<std::string>("default");
@@ -374,6 +373,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_append) {
+    RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name = std::make_shared<std::string>("default");
@@ -463,7 +463,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_delete) {
-
+    RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name = std::make_shared<std::string>("default");
@@ -537,6 +537,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
+    RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
     auto db_name = std::make_shared<std::string>("default");
@@ -715,6 +716,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     String table_name = "tb1";
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     Storage *storage = infinity::InfinityContext::instance().storage();
@@ -784,6 +786,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
+    RemoveDbDirs();
     // this test is for single index,not for joint index
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
@@ -856,7 +859,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
 
         String idx_name = "test_full_idx";
         const String idx_file_name = "test_full_idx.json";
-        String analyzer{};
+        String analyzer{"standard"};
         Vector<String> col_name_list{"col1"};
 
         {
@@ -938,6 +941,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
+    RemoveDbDirs();
     // this test is for single index,not for joint index
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
     std::shared_ptr<std::string> db_entry_dir;
@@ -1022,7 +1026,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
 
         String idx_name = "test_full_idx";
         const String idx_file_name = "test_full_idx.json";
-        String analyzer{};
+        String analyzer{"standard"};
         Vector<String> col_name_list{"col1"};
 
         {
@@ -1104,6 +1108,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
 }
 
 TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
+    RemoveDbDirs();
     // this test is for single index,not for joint index
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
     std::shared_ptr<std::string> db_entry_dir;
@@ -1172,7 +1177,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
         String idx_name = "test_full_idx";
         const String idx_file_name = "test_full_idx.json";
-        String analyzer{};
+        String analyzer{"standard"};
         Vector<String> col_name_list{"col1"};
 
         {

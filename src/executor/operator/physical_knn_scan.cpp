@@ -551,7 +551,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    UnrecoverableError(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    UnrecoverableError(fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {

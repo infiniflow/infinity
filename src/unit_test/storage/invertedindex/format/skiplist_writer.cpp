@@ -53,7 +53,7 @@ TEST_F(SkipListWriterTest, test1) {
     skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = "/tmp/skiplist_writer_test1.txt";
+    String file_path = String(GetTmpDir()) + "/skiplist_writer_test1.txt";
     auto file_writer = CreateFileWriter(file_path);
 
     Vector<u32> expected_values;
@@ -107,7 +107,7 @@ TEST_F(SkipListWriterTest, test2) {
     skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = "/tmp/skiplist_writer_test2.txt";
+    String file_path = String(GetTmpDir()) + "/skiplist_writer_test2.txt";
     auto file_writer = CreateFileWriter(file_path);
 
     Vector<u32> expected_keys;
@@ -189,7 +189,7 @@ TEST_F(SkipListWriterTest, test3) {
     skiplist_writer_->Init(&posting_fields);
     const u32 delta = 10;
 
-    String file_path = "/tmp/skiplist_writer_test3.txt";
+    String file_path = String(GetTmpDir()) + "/skiplist_writer_test3.txt";
     auto file_writer = CreateFileWriter(file_path);
 
     Vector<u32> expected_keys;

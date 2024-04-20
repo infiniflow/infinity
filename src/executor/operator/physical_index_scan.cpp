@@ -102,15 +102,13 @@ bool PhysicalIndexScan::Execute(QueryContext *query_context, OperatorState *oper
 // TODO: replace bitmask with bitmap
 // Vector<u32>: selected rows in segment (used when selected_num <= (segment_row_cnt / 32)), i.e. size(Vector) <= size(Bitmask)
 // Bitmask: selected rows in segment (used when selected_num > (segment_row_cnt / 32))
-class FilterResult {
-private:
+struct FilterResult {
     using SelectedRows = std::variant<Vector<u32>, Bitmask>;
 
     const u32 segment_row_count_{};        // count of rows in segment, include deleted rows
     const u32 segment_row_actual_count_{}; // count of rows in segment, exclude deleted rows
     SelectedRows selected_rows_;           // default to Vector<u32>()
 
-public:
     explicit FilterResult(u32 segment_row_count, u32 segment_row_actual_count)
         : segment_row_count_(segment_row_count), segment_row_actual_count_(segment_row_actual_count) {}
 
@@ -517,6 +515,79 @@ public:
     }
 };
 
+FilterResult SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
+                                       const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
+                                       const SegmentID segment_id,
+                                       const u32 segment_row_count,
+                                       const u32 segment_row_actual_count) {
+    Vector<FilterResult> result_stack;
+    // execute filter_execute_command_ (Reverse Polish notation)
+    for (auto const &elem : filter_execute_command) {
+        std::visit(Overload{[&](FilterExecuteCombineType combine_type) {
+                                switch (combine_type) {
+                                    case FilterExecuteCombineType::kOr: {
+                                        if (auto v_size = result_stack.size(); v_size >= 2) {
+                                            auto &right = result_stack[v_size - 1];
+                                            result_stack[v_size - 2].MergeOr(right);
+                                            result_stack.pop_back();
+                                        } else {
+                                            UnrecoverableError("SolveSecondaryIndexFilter(): filter result stack error.");
+                                        }
+                                        break;
+                                    }
+                                    case FilterExecuteCombineType::kAnd: {
+                                        if (auto v_size = result_stack.size(); v_size >= 2) {
+                                            auto &right = result_stack[v_size - 1];
+                                            result_stack[v_size - 2].MergeAnd(right);
+                                            result_stack.pop_back();
+                                        } else {
+                                            UnrecoverableError("SolveSecondaryIndexFilter(): filter result stack error.");
+                                        }
+                                        break;
+                                    }
+                                }
+                            },
+                            [&](const FilterExecuteSingleRange &single_range) {
+                                result_stack.emplace_back(segment_row_count, segment_row_actual_count);
+                                result_stack.back().ExecuteSingleRange(column_index_map, single_range, segment_id);
+                            }},
+                   elem);
+    }
+    // check if result is valid
+    if (result_stack.size() != 1) {
+        UnrecoverableError("SolveSecondaryIndexFilter(): filter result stack error.");
+    }
+    return std::move(result_stack[0]);
+}
+
+Map<SegmentID, std::variant<Vector<u32>, Bitmask>> SolveSecondaryIndexFilter(const FastRoughFilterEvaluator *fast_rough_filter_evaluator,
+                                                                             const Vector<FilterExecuteElem> &filter_execute_command,
+                                                                             const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
+                                                                             const BaseTableRef *base_table_ref,
+                                                                             TxnTimeStamp begin_ts) {
+    Map<SegmentID, std::variant<Vector<u32>, Bitmask>> result;
+    const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref->block_index_->segment_index_;
+    for (const auto &[segment_id, segment_entry] : segment_index) {
+        if (!fast_rough_filter_evaluator->Evaluate(begin_ts, *segment_entry->GetFastRoughFilter())) {
+            // skip this segment
+            continue;
+        }
+        auto result_elem = SolveSecondaryIndexFilter(filter_execute_command,
+                                                     column_index_map,
+                                                     segment_id,
+                                                     segment_entry->row_count(),
+                                                     segment_entry->actual_row_count());
+        if (std::visit(Overload{[](const Vector<u32> &selected_rows) -> bool { return selected_rows.empty(); },
+                                [](const Bitmask &) -> bool { return false; }},
+                       result_elem.selected_rows_)) {
+            // empty result
+            continue;
+        }
+        result.emplace(segment_id, std::move(result_elem.selected_rows_));
+    }
+    return result;
+}
+
 void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const {
     Txn *txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
@@ -568,47 +639,10 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     const u32 segment_row_count = segment_entry->row_count();               // count of rows in segment, include deleted rows
     const u32 segment_row_actual_count = segment_entry->actual_row_count(); // count of rows in segment, exclude deleted rows
 
-    Vector<FilterResult> result_stack;
-    // execute filter_execute_command_ (Reverse Polish notation)
-    for (auto const &elem : filter_execute_command_) {
-        std::visit(Overload{[&](FilterExecuteCombineType combine_type) {
-                                switch (combine_type) {
-                                    case FilterExecuteCombineType::kOr: {
-                                        if (auto v_size = result_stack.size(); v_size >= 2) {
-                                            auto &right = result_stack[v_size - 1];
-                                            result_stack[v_size - 2].MergeOr(right);
-                                            result_stack.pop_back();
-                                        } else {
-                                            UnrecoverableError("ExecuteInternal(): filter result stack error.");
-                                        }
-                                        break;
-                                    }
-                                    case FilterExecuteCombineType::kAnd: {
-                                        if (auto v_size = result_stack.size(); v_size >= 2) {
-                                            auto &right = result_stack[v_size - 1];
-                                            result_stack[v_size - 2].MergeAnd(right);
-                                            result_stack.pop_back();
-                                        } else {
-                                            UnrecoverableError("ExecuteInternal(): filter result stack error.");
-                                        }
-                                        break;
-                                    }
-                                }
-                            },
-                            [&](const FilterExecuteSingleRange &single_range) {
-                                result_stack.emplace_back(segment_row_count, segment_row_actual_count);
-                                result_stack.back().ExecuteSingleRange(column_index_map_, single_range, segment_id);
-                            }},
-                   elem);
-    }
-    // check if result is valid
-    if (result_stack.size() != 1) {
-        UnrecoverableError("ExecuteInternal(): filter result stack error.");
-    }
     // prepare filter for deleted rows
     DeleteFilter delete_filter(segment_entry, begin_ts);
     // output
-    auto &result = result_stack.back();
+    auto result = SolveSecondaryIndexFilter(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count);
     result.Output(output_data_blocks, segment_id, delete_filter);
 
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, finished", next_idx, segment_ids.size()));

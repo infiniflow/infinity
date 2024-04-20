@@ -223,7 +223,7 @@ db_obj.create_table("test_create_embedding_table",
 
 ## drop_table
 
-**RemoteDatabase.create_table(*table_name, conflict_type = ConflictType.Error*)**
+**RemoteDatabase.drop_table(*table_name, conflict_type = ConflictType.Error*)**
 
 Drops a table by name.
 
@@ -283,7 +283,7 @@ Lists all tables.
 ### Examples
 
 ```python
-res = infinity_obj.list_databases()
+res = infinity_obj.list_tables()
 res.table_names #["test_create_varchar_table"]
 ```
 
@@ -396,9 +396,9 @@ table_obj.create_index("my_index",
                               ], None)
 ```
 
-## create_index
+## drop_index
 
-**RemoteTable.create_index(*index_name, conflict_type = ConflictType.Error*)**
+**RemoteTable.drop_index(*index_name, conflict_type = ConflictType.Error*)**
 
 Drops an index by name.
 
@@ -457,13 +457,13 @@ assert res.error_code == ErrorCode.OK
 res = table_obj.show_index("my_index")
 print(res)
 #ShowIndexResponse(error_code=0, error_msg='', db_name='default', table_name='test_create_index_show_index', index_name='my_index',
-#index_type='IVFFlat', index_column_names='c1', index_column_ids='0', other_parameters='metric = l2, centroids_count = 128', store_dir='/tmp/
+#index_type='IVFFlat', index_column_names='c1', index_column_ids='0', other_parameters='metric = l2, centroids_count = 128', store_dir='/var/
 #infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index', segment_index_count='0')
 ```
 
-## list_indexs
+## list_indexes
 
-**RemoteTable.show_index(*index_name*)**
+**RemoteTable.list_indexes(*index_name*)**
 
 List the index names built on the table
 
@@ -510,7 +510,7 @@ table_obj.insert({"profile": [1.1, 2.2, 3.3], "age": 30, "c3": "Michael"})
 table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7, 8.8, 9.9]}])
 ```
 
-## import
+## import_data
 
 **RemoteTable.import_data(*filpath, import_options = None*)**
 
@@ -564,7 +564,7 @@ table_obj.delete()
 
 ## update
 
-**RemoteTable.delete(*cond = None*)**
+**RemoteTable.update(*cond = None*)**
 
 search for rows that satisfy the condition and update them using the provided values.
 
@@ -617,7 +617,7 @@ supported aggragation functions:
 
 ## filter
 
-**RemoteTable.delete(*cond*)**
+**RemoteTable.filter(*cond*)**
 
 Build a filtering condition expression.
 

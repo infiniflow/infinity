@@ -7,7 +7,7 @@ from typing import List, Optional
 import os
 import h5py
 
-from base_client import BaseClient, FieldValue
+from .base_client import BaseClient, FieldValue
 
 
 class ElasticsearchClient(BaseClient):
@@ -22,6 +22,7 @@ class ElasticsearchClient(BaseClient):
             self.data = json.load(f)
         self.client = Elasticsearch(self.data['connection_url'])
         self.collection_name = self.data['name']
+        self.path_prefix = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def upload_bach(self, actions:List):
         helpers.bulk(self.client, actions)
@@ -30,9 +31,13 @@ class ElasticsearchClient(BaseClient):
         """
         Upload data and build indexes (parameters are parsed by __init__).
         """
+        if self.client.indices.exists(index=self.collection_name):
+            self.client.indices.delete(index=self.collection_name)
         self.client.indices.create(index=self.collection_name, body=self.data['index'])
         batch_size = self.data["insert_batch_size"]
-        dataset_path = os.path.abspath(self.data["data_path"])
+        dataset_path = os.path.join(self.path_prefix, self.data["data_path"])
+        if not os.path.exists(dataset_path):
+            self.download_data(self.data["data_link"], dataset_path)
         _, ext = os.path.splitext(dataset_path)
         if ext == '.json':
             with open(dataset_path, 'r') as f:
@@ -45,18 +50,19 @@ class ElasticsearchClient(BaseClient):
                     actions.append({"_index": self.collection_name, "_source": record})
                 if actions:
                     self.upload_bach(actions)
-        elif ext == '.hdf5':
+        elif ext == '.hdf5' and self.data['mode'] == 'vector':
             with h5py.File(dataset_path, 'r') as f:
                 actions = []
-                # line is vector
                 for i, line in enumerate(f['train']):
                     if i % batch_size == 0 and i != 0:
                         self.upload_bach(actions)
                         actions = []
-                    record = {"embeddings": line}
+                    record = {self.data['vector_name']: line}
                     actions.append({"_index": self.collection_name, "_source": record})
                 if actions:
                     self.upload_bach(actions)
+        else:
+            raise TypeError("Unsupported file type")
 
     def build_condition(
         self, and_subfilters: Optional[List[Any]], or_subfilters: Optional[List[Any]]
@@ -69,7 +75,7 @@ class ElasticsearchClient(BaseClient):
         }
 
     def build_exact_match_filter(self, field_name: str, value: FieldValue) -> Any:
-        return {"match": {field_name: value}}
+        return {"term": {field_name: value}}
     
     def build_text_match_filter(self, field_name: str, text: FieldValue) -> Any:
         return {"match": {field_name: text}}
@@ -89,35 +95,23 @@ class ElasticsearchClient(BaseClient):
         Execute the corresponding query tasks (vector search, full-text search, hybrid search) based on the parsed parameters.
         The function returns id list.
         """
-        query_path = os.path.abspath(self.data["query_path"])
+        query_path = os.path.join(self.path_prefix, self.data["query_path"])
+
         results = []
         _, ext = os.path.splitext(query_path)
         if ext == '.json':
             with open(query_path, 'r') as f:
                 queries = json.load(f)
                 start = time.time()
-                for query in queries:
-                    if 'vector' in query:
-                        knn = {
-                            "field": self.data["vector_name"],
-                            "query_vector": query["vector"],
-                            "k": self.data["topK"],
-                            "num_candidates": 200
-                        }
-                        if 'query_filter' in query:
-                            knn['filter'] = self.parse(query['query_filter'])
-                        result = self.client.search(index=self.collection_name, 
-                                                    source=["_id"],
-                                                    knn=knn, 
-                                                    size = self.data["topK"])
-                    else:
+                if self.data['mode'] == 'fulltext':
+                    for query in queries:
                         result = self.client.search(index=self.collection_name,
                                                     source=["_id"],
-                                                    body=query["body"])
-                    results.append(result)
-            end = time.time()
+                                                    body=query['body'])
+                        results.append(result)
+                end = time.time()
             print("latency:", (end-start)*1000/len(queries))
-        elif ext == '.hdf5':
+        elif ext == '.hdf5' and self.data['mode'] == 'vector':
             with h5py.File(query_path, 'r') as f:
                 start = time.time()
                 for query in f['test']:
@@ -134,4 +128,6 @@ class ElasticsearchClient(BaseClient):
                     results.append(result)
                 end = time.time()
                 print("latency: ", (end-start)*1000/len(f['test']))
+        else:
+            raise TypeError("Unsupported file type")
         return results

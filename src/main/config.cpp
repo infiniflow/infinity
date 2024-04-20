@@ -145,7 +145,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
     // Default log config
     SharedPtr<String> default_log_filename = MakeShared<String>("infinity.log");
-    SharedPtr<String> default_log_dir = MakeShared<String>("/tmp/infinity/log");
+    SharedPtr<String> default_log_dir = MakeShared<String>("/var/infinity/log");
     bool default_log_to_stdout = false;
     u64 default_log_max_size = 1024lu * 1024lu * 1024lu; // 1Gib
     u64 default_log_file_rotate_count = 10;
@@ -154,15 +154,18 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     LogLevel default_log_level = LogLevel::kInfo;
 
     // Default storage config
-    SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
+    SharedPtr<String> default_data_dir = MakeShared<String>("/var/infinity/data");
     u64 default_row_size = 8192lu;
     u64 default_storage_capacity = 64 * 1024lu * 1024lu * 1024lu; // 64Gib
     u64 default_garbage_collection_interval = 0;                  // real-time
     double default_garbage_collection_storage_ratio = 0;          // disable the function
+    u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
+    u64 default_compact_interval_sec = DEFAULT_COMPACT_INTERVAL_SEC;
+    u64 default_optimize_interval_sec = DEFAULT_OPTIMIZE_INTERVAL_SEC;
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
-    SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
+    SharedPtr<String> default_temp_dir = MakeShared<String>("/var/infinity/tmp");
 
     // Default wal config
     u64 default_wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
@@ -171,13 +174,11 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     u64 full_checkpoint_interval_sec = FULL_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-    SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
+    SharedPtr<String> default_wal_dir = MakeShared<String>("/var/infinity/wal");
     FlushOption default_flush_at_commit = FlushOption::kOnlyWrite;
 
     // Default resource config
-    String default_resource_dict_path = String("/tmp/infinity/resource");
-    u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
-    bool default_enable_compaction = DEFAULT_ENABLE_COMPACTION;
+    String default_resource_dict_path = String("/var/infinity/resource");
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
@@ -237,6 +238,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             system_option_.storage_capacity_ = default_storage_capacity;
             system_option_.garbage_collection_interval_ = default_garbage_collection_interval;
             system_option_.garbage_collection_storage_ratio_ = default_garbage_collection_storage_ratio;
+            system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
+            system_option_.compact_interval_ = std::chrono::seconds(default_compact_interval_sec);
+            system_option_.optimize_interval_ = std::chrono::seconds(default_optimize_interval_sec);
         }
 
         // Buffer
@@ -256,11 +260,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         }
 
         // Resource
-        {
-            system_option_.resource_dict_path_ = default_resource_dict_path;
-            system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
-            system_option_.enable_compaction_ = default_enable_compaction;
-        }
+        { system_option_.resource_dict_path_ = default_resource_dict_path; }
     } else {
         fmt::print("Read config from: {}\n", *config_path);
         toml::table config = toml::parse_file(*config_path);
@@ -423,6 +423,10 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
             system_option_.garbage_collection_storage_ratio_ =
                 storage_config["garbage_collection_storage_ratio"].value_or(default_garbage_collection_storage_ratio);
+
+            system_option_.cleanup_interval_ = std::chrono::seconds(storage_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
+            system_option_.compact_interval_ = std::chrono::seconds(storage_config["compact_interval"].value_or(default_compact_interval_sec));
+            system_option_.optimize_interval_ = std::chrono::seconds(storage_config["optimize_interval"].value_or(default_optimize_interval_sec));
         }
 
         // Buffer
@@ -467,8 +471,6 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         {
             auto resource_config = config["resource"];
             system_option_.resource_dict_path_ = resource_config["dictionary_dir"].value_or(default_resource_dict_path);
-            system_option_.cleanup_interval_ = std::chrono::seconds(resource_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
-            system_option_.enable_compaction_  = resource_config["enable_compaction"].value_or(default_enable_compaction);
         }
     }
 
@@ -512,6 +514,9 @@ void Config::PrintAll() const {
     fmt::print(" - storage_capacity: {}\n", Utility::FormatByteSize(system_option_.storage_capacity_));
     fmt::print(" - garbage_collection_interval: {}\n", Utility::FormatTimeInfo(system_option_.garbage_collection_interval_));
     fmt::print(" - garbage_collection_storage_ratio: {}\n", system_option_.garbage_collection_storage_ratio_);
+    fmt::print(" - cleanup_interval_sec: {}\n", system_option_.cleanup_interval_.count());
+    fmt::print(" - compact_interval_sec: {}\n", system_option_.compact_interval_.count());
+    fmt::print(" - optimize_interval_sec: {}\n", system_option_.optimize_interval_.count());
 
     // Buffer
     fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));

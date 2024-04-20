@@ -25,7 +25,7 @@ import infinity_context;
 
 class JsonTest : public BaseTest {
     void SetUp() override {
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

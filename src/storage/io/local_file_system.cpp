@@ -242,20 +242,37 @@ void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
     std::filesystem::remove(p, error_code);
     if (error_code.value() != 0) {
         // log all files in path
-        std::stringstream ss;
-        // recursively traverse the directory
-        std::function<void(const Path &)> list_dir = [&](const Path path) {
-            for (const auto &entry : std::filesystem::directory_iterator{path}) {
-                ss << entry.path().string() << " ";
-                if (entry.is_directory()) {
-                    list_dir(entry.path());
-                }
-            }
-        };
-        list_dir(p);
+        // std::stringstream ss;
+        // // recursively traverse the directory
+        // std::function<void(const Path &)> list_dir = [&](const Path path) {
+        //     for (const auto &entry : std::filesystem::directory_iterator{path}) {
+        //         ss << entry.path().string() << " ";
+        //         if (entry.is_directory()) {
+        //             list_dir(entry.path());
+        //         }
+        //     }
+        // };
+        // list_dir(p);
 
-        u64 removed_count = DeleteDirectory(path);
-        LOG_ERROR(fmt::format("DeleteEmptyDirectory: {} is not empty, files: {}, force deleted: {}", path, ss.str(), removed_count));
+        DeleteDirectory(path);
+        // LOG_ERROR(fmt::format("DeleteEmptyDirectory: {} is not empty, files: {}, force deleted: {}", path, ss.str(), removed_count));
+    }
+}
+
+void LocalFileSystem::CleanupDirectory(const String &path) {
+    std::error_code error_code;
+    Path p{path};
+    if (!fs::exists(p)) {
+        std::filesystem::create_directories(p, error_code);
+        if (error_code.value() != 0) {
+            UnrecoverableError(fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message()));
+        }
+        return;
+    }
+    try {
+        std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
+    } catch (const std::filesystem::filesystem_error &e) {
+        UnrecoverableError(fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what()));
     }
 }
 

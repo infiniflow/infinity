@@ -1,60 +1,54 @@
-import sys 
-import pytest 
+import sys
+import pytest
 from httpapibase import HttpTest
-from common.common_values import * 
+from common.common_values import *
 import infinity.index as index
 
-@pytest.mark.skip(reason="can not insert varchar")
+
 class TestQuery(HttpTest):
     def test_query(self):
-        dbname = "default"
-        tbname = "my_table"
+        db_name = "default"
+        table_name = "my_table"
         idxname = "my_index"
-        self.dropTable(dbname,tbname)
-        self.createTable(
-            dbname,tbname,{
-                "num":{
-                    "type":"integer",
+        self.drop_table(db_name, table_name)
+        self.create_table(
+            db_name, table_name, {
+                "num": {
+                    "type": "integer",
                 },
-                "body":{
-                    "type":"varchar",
+                "body": {
+                    "type": "varchar",
                 },
-                "vec":{
-                    "type": "vector",
+                "vec": {
+                    "type": "varchar",
                     "dimension": 5,
                     "element_type": "float"
                 }
             }
         )
-        self.insert(dbname,tbname,
-            [{"num":1},{"body": "undesirable, unnecessary, and harmful"},{"vec":[1.0]*5}],
-        )
-        self.insert(dbname,tbname,
-            [{"num":2},{"body": "publisher=US National Office for Harmful Algal Blooms"},{"vec":[4.0]*5}],
-        )
-        self.insert(dbname,tbname,
-            [{"num":3},{"body": "in the case of plants, growth and chemical"},{"vec":[7.0]*5}],
-        )
-        self.createIdx(dbname,tbname,idxname,{
-            ["body"],
-            {
-                "type":"FULLTEXT",
-            }
-        })
-        
-        return 
-    
+        self.insert(db_name, table_name,
+                    [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
+        self.insert(db_name, table_name,
+                    [{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
+        self.insert(db_name, table_name,
+                    [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
+        self.create_index(db_name, table_name, idxname, fields=["body"],
+                          index={"column_name": "body", "type": "FULLTEXT"})
+        self.drop_table(db_name, table_name)
+        return
+
     def test_query_builder(self):
-        dbname = "default"
-        tbname = "my_table"
+        db_name = "default"
+        table_name = "my_table"
         idxname = "my_index"
-        self.dropTable(dbname,tbname)
-        self.createTable(
-            dbname,tbname,{
-                "c1":{
-                    "type":"integer",
+        self.drop_table(db_name, table_name)
+        self.create_table(
+            db_name, table_name, {
+                "c1": {
+                    "type": "integer",
                 },
             }
         )
-        self.select(dbname,tbname,
-                ["*"])
+        self.select(db_name, table_name,
+                    ["*"])
+        self.drop_table(db_name, table_name)

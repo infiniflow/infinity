@@ -30,21 +30,12 @@ import column_expr;
 import column_def;
 import data_type;
 
-class InfinityTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
-    }
-    void TearDown() override {
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
-        BaseTest::TearDown();
-    }
-};
+class InfinityTest : public BaseTest {};
 
 TEST_F(InfinityTest, test1) {
     using namespace infinity;
-    String path = "/tmp/infinity";
-
+    String path = GetHomeDir();
+    RemoveDbDirs();
     Infinity::LocalInit(path);
 
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
@@ -257,8 +248,8 @@ TEST_F(InfinityTest, test1) {
 
 TEST_F(InfinityTest, test2) {
     using namespace infinity;
-    String path = "/tmp/infinity";
-
+    String path = GetHomeDir();
+    RemoveDbDirs();
     Infinity::LocalInit(path);
 
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();

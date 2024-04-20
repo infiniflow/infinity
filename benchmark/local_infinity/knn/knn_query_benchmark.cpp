@@ -97,7 +97,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
 int main(int argc, char *argv[]) {
     if (argc < 3) {
         std::cout << "query gist/sift ef=? , with optional test_data_path (default to /infinity/test/data in docker) and optional infinity path "
-                     "(default to /tmp/infinity)"
+                     "(default to /var/infinity)"
                   << std::endl;
         return 1;
     }
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Please input total_times:" << std::endl;
     std::cin >> total_times;
 
-    std::string path = "/tmp/infinity";
+    std::string path = "/var/infinity";
     if (argc >= 5) {
         path = std::string(argv[4]);
     }

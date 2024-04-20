@@ -57,7 +57,8 @@ public:
 
     void CloseFile();
 
-    static void BulkCleanup(const Vector<String> &file_paths);
+    void CleanupFile();
+
 protected:
     virtual void WriteToFileImpl(bool &prepare_success) = 0;
 

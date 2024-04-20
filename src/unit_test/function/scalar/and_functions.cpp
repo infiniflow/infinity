@@ -43,7 +43,7 @@ class AndFunctionsTest : public BaseTest {};
 TEST_F(AndFunctionsTest, and_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity/data"));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
 
     RegisterAndFunction(catalog_ptr);
 

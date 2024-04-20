@@ -47,7 +47,7 @@ export struct IndexScanFilterExpressionPushDownResult {
 export class FilterExpressionPushDown {
 public:
     static IndexScanFilterExpressionPushDownResult
-    PushDownToIndexScan(QueryContext *query_context, const BaseTableRef &base_table_ref, SharedPtr<BaseExpression> &&expression);
+    PushDownToIndexScan(QueryContext *query_context, const BaseTableRef &base_table_ref, const SharedPtr<BaseExpression> &expression);
 
     static UniquePtr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(SharedPtr<BaseExpression> &expression);
 };

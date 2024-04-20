@@ -34,7 +34,9 @@ constexpr std::string_view NGRAM = "ngram";
 constexpr u64 basis = 0xCBF29CE484222325ull;
 constexpr u64 prime = 0x100000001B3ull;
 
-constexpr u64 Str2Int(char const *str, u64 last_value = basis) { return *str ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value; }
+constexpr u64 Str2Int(const char *str, u64 last_value = basis) {
+    return (*str != '\0' && *str != '-') ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value;
+}
 
 UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
     switch (Str2Int(name.data())) {
@@ -55,7 +57,20 @@ UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
             return MakeUnique<StandardAnalyzer>();
         }
         case Str2Int(NGRAM.data()): {
-            u32 ngram = 2; /// TODO config
+            u32 ngram = 0;
+            const char *str = name.data();
+            while (*str != '\0' && *str != '-') {
+                str++;
+            }
+            if (*str == '-') {
+                str++;
+                ngram = std::strtol(str, nullptr, 10);
+            } else {
+                return nullptr;
+            }
+            if (ngram <= 0) {
+                return nullptr;
+            }
             return MakeUnique<NGramAnalyzer>(ngram);
         }
         default:

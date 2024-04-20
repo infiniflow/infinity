@@ -220,7 +220,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
     while (append_state_ptr->current_block_ < append_block_count && this->row_count_ < this->row_capacity_) {
         DataBlock *input_block = append_state_ptr->blocks_[append_state_ptr->current_block_].get();
 
-        u16 to_append_rows = input_block->row_count();
+        u16 to_append_rows = input_block->row_count() - append_state_ptr->current_block_offset_;
         while (to_append_rows > 0) {
             // Append to_append_rows into block
             if (block_entries_.empty() || block_entries_.back()->GetAvailableCapacity() <= 0) {
@@ -247,7 +247,14 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             total_copied += actual_appended;
             to_append_rows -= actual_appended;
             append_state_ptr->current_count_ += actual_appended;
+            append_state_ptr->current_block_offset_ += actual_appended;
             IncreaseRowCount(actual_appended);
+
+            if(this->row_count_ == this->row_capacity_) {
+                LOG_INFO(fmt::format("Segment {} is full.", segment_id_));
+                break;
+            }
+
             if (this->row_count_ > this->row_capacity_) {
                 UnrecoverableError("Not implemented: append data exceed segment row capacity");
             }
@@ -329,18 +336,16 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
 }
 
 void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry) {
-    {
-        std::unique_lock w_lock(rw_locker_);
-        for (auto iter = block_entry.rbegin(); iter != block_entry.rend(); ++iter) {
-            BlockEntry *block = *iter;
-            if (!block->Committed()) {
-                if (block_entries_.empty() || block_entries_.back()->block_id() != block->block_id()) {
-                    UnrecoverableError("BlockEntry rollback order is not correct");
-                }
-                auto &rollback_block = block_entries_.back();
-                rollback_block->Cleanup();
-                block_entries_.pop_back();
+    std::unique_lock w_lock(rw_locker_);
+    for (auto iter = block_entry.rbegin(); iter != block_entry.rend(); ++iter) {
+        BlockEntry *block = *iter;
+        if (!block->Committed()) {
+            if (block_entries_.empty() || block_entries_.back()->block_id() != block->block_id()) {
+                UnrecoverableError("BlockEntry rollback order is not correct");
             }
+            auto &rollback_block = block_entries_.back();
+            rollback_block->Cleanup();
+            block_entries_.pop_back();
         }
     }
 }
@@ -365,7 +370,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 
         json_res["min_row_ts"] = this->min_row_ts_;
-        json_res["max_row_ts"] = this->max_row_ts_;
+        json_res["max_row_ts"] = std::min(this->max_row_ts_, max_commit_ts);
         json_res["deleted"] = this->deleted_;
         json_res["row_count"] = this->row_count_;
         json_res["actual_row_count"] = this->actual_row_count_;

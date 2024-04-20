@@ -10,8 +10,14 @@ CREATE TABLE enwiki(doctitle varchar, docdate varchar, body varchar);
 
 # copy data from csv file
 query I
-COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
+
+statement error
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH (analyzer=jieba);
+
+statement error
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH (analyzer=ngram);
 
 statement ok
 CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT;
@@ -23,7 +29,7 @@ Anarchism 30-APR-2012 03:25:17.000 0 43.240601
 
 # copy data from csv file
 query I
-COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
 
 query TTI
@@ -34,7 +40,7 @@ Anarchism 30-APR-2012 03:25:17.000 4294967296 45.066189
 
 # copy data from csv file
 query I
-COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
 
 query TTI

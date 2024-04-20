@@ -22,6 +22,7 @@ import logical_node_type;
 import logical_filter;
 import logical_table_scan;
 import logical_index_scan;
+import logical_match;
 import query_context;
 import logical_node_visitor;
 import infinity_exception;
@@ -53,7 +54,7 @@ public:
                 auto &fast_rough_filter_evaluator = table_scan.fast_rough_filter_evaluator_;
                 // check if the filter can be pushed down to the table scan
                 IndexScanFilterExpressionPushDownResult index_scan_solve_result =
-                    FilterExpressionPushDown::PushDownToIndexScan(query_context_, *base_table_ref_ptr, std::move(filter_expression));
+                    FilterExpressionPushDown::PushDownToIndexScan(query_context_, *base_table_ref_ptr, filter_expression);
                 auto &column_index_map = index_scan_solve_result.column_index_map_;
                 auto &v_qualified = index_scan_solve_result.index_filter_qualified_;
                 auto &s_leftover = index_scan_solve_result.extra_leftover_filter_;
@@ -84,6 +85,21 @@ public:
                     SharedPtr<LogicalNode> scan = std::move(op->left_node());
                     op = std::move(scan);
                 }
+            }
+        } else if (op->operator_type() == LogicalNodeType::kMatch) {
+            auto &match = static_cast<LogicalMatch &>(*op);
+            if (const auto &filter_expression = match.filter_expression_; filter_expression) {
+                auto &base_table_ref_ptr = match.base_table_ref_;
+                IndexScanFilterExpressionPushDownResult index_scan_solve_result =
+                    FilterExpressionPushDown::PushDownToIndexScan(query_context_, *base_table_ref_ptr, filter_expression);
+                auto &column_index_map = index_scan_solve_result.column_index_map_;
+                auto &v_qualified = index_scan_solve_result.index_filter_qualified_;
+                auto &s_leftover = index_scan_solve_result.extra_leftover_filter_;
+                auto &filter_execute_command = index_scan_solve_result.filter_execute_command_;
+                match.filter_leftover_ = std::move(s_leftover);
+                match.secondary_index_filter_qualified_ = std::move(v_qualified);
+                match.secondary_index_column_index_map_ = std::move(column_index_map);
+                match.filter_execute_command_ = std::move(filter_execute_command);
             }
         }
         // visit children after handling current node

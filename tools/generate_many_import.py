@@ -73,7 +73,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate many import for test")
+    parser = argparse.ArgumentParser(
+        description="Generate many import for test")
 
     parser.add_argument(
         "-g",
@@ -86,7 +87,7 @@ if __name__ == "__main__":
         "-c",
         "--copy",
         type=str,
-        default="/tmp/infinity/test_data",
+        default="/var/infinity/test_data",
         dest="copy_dir",
     )
     args = parser.parse_args()

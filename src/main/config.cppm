@@ -92,6 +92,12 @@ public:
 
     [[nodiscard]] inline double garbage_collection_storage_ratio() const { return system_option_.garbage_collection_storage_ratio_; }
 
+    [[nodiscard]] inline std::chrono::seconds cleanup_interval() const { return system_option_.cleanup_interval_; }
+
+    [[nodiscard]] inline std::chrono::seconds compact_interval() const { return system_option_.compact_interval_; }
+
+    [[nodiscard]] inline std::chrono::seconds optimize_interval() const { return system_option_.optimize_interval_; }
+
     // Buffer
     [[nodiscard]] inline u64 buffer_pool_size() const { return system_option_.buffer_pool_size; }
 
@@ -114,10 +120,6 @@ public:
 
     // Resource
     [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
-
-    [[nodiscard]] inline std::chrono::seconds cleanup_interval() const { return system_option_.cleanup_interval_; }
-
-    [[nodiscard]] inline bool enable_compaction() const { return system_option_.enable_compaction_; }
 
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);

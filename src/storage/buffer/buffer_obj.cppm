@@ -46,8 +46,6 @@ export String BufferStatusToString(BufferStatus status) {
             return "Unloaded";
         case BufferStatus::kFreed:
             return "Freed";
-        case BufferStatus::kClean:
-            return "Clean";
         case BufferStatus::kNew:
             return "New";
         default:
@@ -76,7 +74,9 @@ public:
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();
 
-    void SetAndTryCleanup();
+    void Cleanup();
+
+    void CleanupFile();
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
@@ -114,7 +114,6 @@ protected:
     BufferStatus status_{BufferStatus::kNew};
     BufferType type_{BufferType::kTemp};
     u64 rc_{0};
-    bool wait_for_gc_{false};
     const UniquePtr<FileWorker> file_worker_;
 };
 

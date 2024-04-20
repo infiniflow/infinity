@@ -150,8 +150,15 @@ void CleanScan::VisitNode(LogicalNode &op) {
         }
         case LogicalNodeType::kMatch: {
             auto &match = static_cast<LogicalMatch &>(op);
-            Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
-
+            // Match base table ref has two parts:
+            // 1. the columns used by next operator
+            // 2. the columns used by filter expression in match
+            auto &match_load_metas = *match.load_metas();
+            Vector<LoadMeta> match_columns = std::move(match_load_metas);
+            match_load_metas.clear(); // need to set load_metas of Match to empty vector
+            auto &last_op_load_metas = *last_op_load_metas_;
+            match_columns.insert(match_columns.end(), last_op_load_metas.begin(), last_op_load_metas.end());
+            Vector<SizeT> project_idxs = LoadedColumn(&match_columns, match.base_table_ref_.get());
             scan_table_indexes_.push_back(match.base_table_ref_->table_index_);
             match.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             break;
