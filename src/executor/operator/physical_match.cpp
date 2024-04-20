@@ -353,8 +353,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     } else {
         RecoverableError(Status::SyntaxError("block_max option must be empty, true, false or compare"));
     }
-    use_ordinary_iter = true;
-    use_block_max_iter = false;
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
