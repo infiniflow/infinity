@@ -19,6 +19,7 @@ module;
 #include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TCompactProtocol.h>
 #include <thrift/server/TNonblockingServer.h>
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
@@ -27,7 +28,6 @@ module;
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 
-#include <memory>
 //#include "infinity_thrift/InfinityService.h"
 //#include "infinity_thrift/infinity_types.h"
 //#include "statement/explain_statement.h"
@@ -129,7 +129,8 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
 
     SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(port_no);
 
-    SharedPtr<TBinaryProtocolFactory> binary_protocol_factory = MakeShared<TBinaryProtocolFactory>();
+    SharedPtr<TBinaryProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
+//    SharedPtr<TCompactProtocolFactory> protocol_factory = MakeShared<TCompactProtocolFactory>();
 
     SharedPtr<ThreadFactory> threadFactory = MakeShared<ThreadFactory>();
 
@@ -143,7 +144,7 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
         MakeUnique<TThreadPoolServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                       server_socket,
                                       MakeShared<TBufferedTransportFactory>(),
-                                      binary_protocol_factory,
+                                      protocol_factory,
                                       threadManager);
 }
 
