@@ -43,8 +43,6 @@ bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPostin
 }
 
 bool BlockMaxTermDocIterator::BlockSkipTo(RowID doc_id, float threshold) {
-    fmt::print("BlockMaxTermDocIterator::BlockSkipTo, doc_id: {}, threshold: {}, bm25upperBound: {}\n",
-               doc_id.ToUint64(), threshold, BM25ScoreUpperBound());
     if (threshold > BM25ScoreUpperBound()) [[unlikely]] {
         return false;
     }

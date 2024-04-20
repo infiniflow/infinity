@@ -43,7 +43,6 @@ QueryBuilder::QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPt
     u64 total_row_count = 0;
     for (SegmentEntry *segment_entry : base_table_ref->block_index_->segments_) {
         total_row_count += segment_entry->row_count();
-        fmt::print("total_row_count: {}\n", total_row_count);
     }
 
     scorer_.Init(total_row_count, &index_reader_);

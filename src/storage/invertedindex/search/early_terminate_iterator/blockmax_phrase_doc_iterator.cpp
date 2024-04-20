@@ -16,7 +16,6 @@ import third_party;
 namespace infinity {
 
 bool BlockMaxPhraseDocIterator::BlockSkipTo(RowID doc_id, float threshold) {
-    fmt::print("BlockMaxPhraseDocIterator::BlockSkipTo: doc_id: {}, threshold: {}\n", doc_id.ToUint64(), threshold);
     for (auto &iter : term_doc_iters_) {
         if (!iter->BlockSkipTo(doc_id, threshold)) {
             return false;

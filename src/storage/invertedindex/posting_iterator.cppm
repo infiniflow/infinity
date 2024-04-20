@@ -93,9 +93,6 @@ public:
         pos_t position = 0;
         while (position != INVALID_POSITION) {
             SeekPosition(position, position);
-            if (position != INVALID_POSITION) {
-                fmt::print("row id: {}, position: {}\n", current_row_id_.ToUint64(), position);
-            }
         }
     }
 

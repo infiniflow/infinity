@@ -132,7 +132,6 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
 }
 
 std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const {
-    fmt::print("SearchDriver::AnalyzeAndBuildQueryNode, field = {}, text = {}\n", field, text);
     if (text.empty()) {
         RecoverableError(Status::SyntaxError("Empty query text"));
         return nullptr;
@@ -149,9 +148,6 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
             }
         }
     }
-    for (auto& term : terms) {
-        fmt::print("term = {}\n", term.Text());
-    }
     // 2. build query node
     if (!analyzed) {
         auto result = std::make_unique<TermQueryNode>();
@@ -162,7 +158,6 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         RecoverableError(Status::SyntaxError("Empty terms after analyzing"));
         return nullptr;
     } else if (terms.size() == 1) {
-        fmt::print("Create Term Query Node\n");
         auto result = std::make_unique<TermQueryNode>();
         result->term_ = std::move(terms.front().text_);
         result->column_ = field;
@@ -179,7 +174,6 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         }
         return result;
         */
-        fmt::print("Create Phrase Query Node\n");
         auto result = std::make_unique<PhraseQueryNode>();
         for (auto term : terms) {
             result->AddTerm(term.Text());

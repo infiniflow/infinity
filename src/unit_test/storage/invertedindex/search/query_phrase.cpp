@@ -35,6 +35,7 @@ import match_expr;
 import internal_types;
 import search_options;
 import phrase_doc_iterator;
+import global_resource_usage;
 
 using namespace infinity;
 
@@ -42,13 +43,21 @@ class QueryPhraseTest : public BaseTest {
 protected:
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal /tmp/infinity/temp");
-        InfinityContext::instance().Init(MakeShared<String>(config_path_));
+        BaseTest::RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        infinity::InfinityContext::instance().Init(MakeShared<String>(config_path_));
         InitData();
     }
     void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
         BaseTest::TearDown();
-        InfinityContext::instance().UnInit();
     }
 
     void CreateDBAndTable(const String& db_name, const String& table_name);
@@ -69,7 +78,7 @@ protected:
 
 
 public:
-    const String data_path_ = "/tmp/infinity";
+    const String data_path_ = "/var/infinity";
     const String db_name_ = "default";
     const String table_name_ = "test_table";
     const String index_name_ = "test_fulltext_index";
@@ -152,7 +161,7 @@ void QueryPhraseTest::CreateIndex(const String& db_name, const String& table_nam
 
     TxnManager *txn_mgr = storage->txn_manager();
 
-    String analyzer{};
+    String analyzer{"standard"};
     Vector<String> col_name_list{"text"};
     String index_file_name = index_name + ".json";
     {
@@ -184,8 +193,6 @@ void QueryPhraseTest::CreateIndex(const String& db_name, const String& table_nam
                 names_ptr->emplace_back(column_def->name_);
                 columns.emplace_back(idx);
             }
-
-            fmt::print("columns.size(): {}\n", columns.size());
 
             TxnTimeStamp begin_ts = txn_idx->BeginTS();
             SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);

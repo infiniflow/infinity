@@ -15,7 +15,6 @@ import match_data;
 namespace infinity {
     void PhraseDocIterator::DoSeek(RowID doc_id) {
         assert(iters_.size() > 0);
-        fmt::print("begin seek doc id = {}, doc_freq = {}\n", doc_id.ToUint64(), doc_freq_);
 
         bool need_loop = true;
         while (need_loop) {
@@ -37,7 +36,6 @@ namespace infinity {
             doc_id = max_doc_id;
         }
         doc_id_ = doc_id;
-        fmt::print("seek doc id = {}, doc_freq = {}\n", doc_id.ToUint64(), doc_freq_);
     }
 
     void PhraseDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
@@ -57,12 +55,10 @@ namespace infinity {
 
     bool PhraseDocIterator::CheckBeginPosition(pos_t position) {
         pos_t now_position = position;
-        fmt::print("PhraseDocIterator::CheckBeginPosition: {}\n", position);
         for (SizeT i = 1; i < iters_.size(); ++i) {
             auto& iter = iters_[i];
             pos_t next_position = 0;
             iter->SeekPosition(now_position, next_position);
-            fmt::print("find term {}, position = {}\n", i, next_position);
             if (next_position != now_position + 1) {
                 return false;
             }
@@ -73,18 +69,10 @@ namespace infinity {
 
     bool PhraseDocIterator::GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
         if (doc_id != doc_id_) {
-            fmt::print("query doc id = {}, but now doc id = {}\n", doc_id.ToUint64(), doc_id_.ToUint64());
             return false;
         }
-        fmt::print("PhraseDocIterator::GetPhraseMatchData doc_id = {}\n", doc_id.ToUint64());
-        fmt::print("all doc ids: ");
-        for (auto &doc_id : doc_ids_) {
-            fmt::print("{} ", doc_id.ToUint64());
-        }
-        fmt::print("\n");
         auto& iter = iters_[0];
         pos_t beg_position = 0;
-        fmt::print("GetPhraseMatchData: doc id = {}, doc_freq = {}\n", doc_id.ToUint64(), doc_freq_);
         while (true) {
             pos_t position = INVALID_POSITION;
             iter->SeekPosition(beg_position, position);
@@ -107,7 +95,6 @@ namespace infinity {
                 all_doc_ids_.insert(doc_id_);
                 doc_freq_++;
                 phrase_freq_ += match_data.begin_positions_.size();
-                fmt::print("doc freq = {}, doc_id_ = {}, phrase_freq = {}\n", doc_freq_, doc_id_.ToUint64(), phrase_freq_);
             }
             return true;
         }

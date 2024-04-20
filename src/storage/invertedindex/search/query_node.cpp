@@ -422,12 +422,10 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
     for (auto& term : terms_) {
         auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
         if (nullptr == posting_iterator) {
-            fmt::print("not found term: {}\n", term);
             return nullptr;
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    fmt::print("phrase create search not empty\n");
     auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), column_id, GetWeight());
 
     search->terms_ptr_ = &terms_;
@@ -456,7 +454,6 @@ PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, Index
     for (auto& term : terms_) {
         auto term_doc_iterator = column_index_reader->LookupBlockMax(term, index_reader.session_pool_.get(), GetWeight(), fetch_position);
         if (nullptr == term_doc_iterator) {
-            fmt::print("not found term: {}\n", term);
             return nullptr;
         }
         term_doc_iterators.emplace_back(std::move(term_doc_iterator));

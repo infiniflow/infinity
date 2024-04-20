@@ -88,22 +88,12 @@ float Scorer::Score(RowID doc_id) {
                 PhraseColumnMatchData column_match_data;
                 PhraseDocIterator* phrase_iter = dynamic_cast<PhraseDocIterator*>(column_iters[j]);
                 if (phrase_iter->GetPhraseMatchData(column_match_data, doc_id)) {
-                    auto& begin_positions = column_match_data.begin_positions_;
-                    fmt::print("find phrase in doc {} has {} pos: ", doc_id.ToUint64(), column_match_data.begin_positions_.size());
-                    for (SizeT i = 0; i < begin_positions.size(); ++i) {
-                        auto& position = begin_positions[i];
-                        fmt::print("{} ", position.ToUint64());
-                    }
-                    fmt::print("\n");
-
                     ranker.AddPhraseParam(column_match_data.all_tf_,
                                           phrase_iter->GetAllDF(),
                                           avg_column_length,
                                           column_len,
                                           phrase_iter->GetWeight(),
                                           column_iters.size());
-                } else {
-                    fmt::print("doc = {}, cannot find phrase\n", doc_id.ToUint64());
                 }
             }
         }

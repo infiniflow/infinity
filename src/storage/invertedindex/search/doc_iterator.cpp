@@ -27,13 +27,11 @@ namespace infinity {
 // for term iter
 void DocIterator::PrepareFirstDoc() {
     if (GetType() == DocIteratorType::kTermIterator) {
-        fmt::print("doc iterator PrepareFirstDoc\n");
         auto term_doc_iter = dynamic_cast<TermDocIterator *>(this);
         if (term_doc_iter) {
             term_doc_iter->DoSeek(0);
         }
     } else if (GetType() == DocIteratorType::kPhraseIterator) {
-        fmt::print("phrase iterator PrepareFirstDoc\n");
         auto phrase_doc_iter = dynamic_cast<PhraseDocIterator *>(this);
         if (phrase_doc_iter) {
             phrase_doc_iter->DoSeek(0);

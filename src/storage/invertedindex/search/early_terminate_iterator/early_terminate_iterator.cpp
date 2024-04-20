@@ -49,7 +49,6 @@ Pair<RowID, float> EarlyTerminateIterator::BlockNextWithThreshold(float threshol
         }
         next_skip = std::max(next_skip, BlockMinPossibleDocID());
         assert((next_skip <= BlockLastDocID()));
-        fmt::print("EarlyTerminateIterator::BlockNextWithThreshold next_skip = {}\n", next_skip.ToUint64());
         auto [success, score, id] = SeekInBlockRange(next_skip, BlockLastDocID(), threshold);
         if (success) {
             // success in SeekInBlockRange, inner doc_id_ is updated

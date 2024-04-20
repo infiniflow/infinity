@@ -353,10 +353,11 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     } else {
         RecoverableError(Status::SyntaxError("block_max option must be empty, true, false or compare"));
     }
+    use_ordinary_iter = true;
+    use_block_max_iter = false;
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
-    fmt::print("match_expr_->fields_: {}\n", match_expr_->fields_);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
@@ -438,7 +439,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
                 ++blockmax_loop_cnt;
                 auto score_threshold = result_heap.GetScoreThreshold();
                 auto [id, et_score] = et_iter->BlockNextWithThreshold(score_threshold);
-                fmt::print("score_threshold: {}, id: {}, et_score: {}\n", score_threshold, id.ToUint64(), et_score);
                 if (id == INVALID_ROWID) [[unlikely]] {
                     break;
                 }
@@ -457,9 +457,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     if (use_ordinary_iter) {
         RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->PrepareFirstDoc(), doc_iterator->Doc());
-        if (iter_row_id == INVALID_ROWID) {
-            fmt::print("iter_row_id is INVALID_ROWID\n");
-        }
         if (iter_row_id != INVALID_ROWID) [[likely]] {
             ordinary_score_result = MakeUniqueForOverwrite<float[]>(top_n);
             ordinary_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n);
