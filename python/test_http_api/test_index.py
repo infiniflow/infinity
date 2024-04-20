@@ -207,7 +207,6 @@ class TestIndex(HttpTest):
             )
         return
 
-    @pytest.mark.skip(reason="skip")
     @pytest.mark.parametrize("column_name", [
         (1, False),
         (2.2, False),
@@ -221,9 +220,11 @@ class TestIndex(HttpTest):
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False),
         ((1, 2), False), ({"1": 2}, False), ([], True)
     ])
-    @pytest.mark.parametrize("types", ["integer", "tinyint", "smallint", "bigint", "hugeint", "float",
-                                       "double", "varchar", "boolean",
-                                       {"type": "vector", "dimension": 3, "element_type": "float", }])
+    @pytest.mark.parametrize("types",
+                             [{"type": "integer"}, {"type": "tinyint"}, {"type": "smallint"}, {"type": "bigint"},
+                              {"type": "float"},
+                              {"type": "double"}, {"type": "varchar"}, {"type": "boolean"},
+                              {"type": "vector", "dimension": 3, "element_type": "float", }])
     def test_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type,
                                                                   params, types):
         db_name = "default"
@@ -245,7 +246,7 @@ class TestIndex(HttpTest):
                               },
                               {
                                   "status_code": 500,
-                                  "error_code": 3022,
+                                  "error_code": 3060,
                               }
                               )
         else:
@@ -345,9 +346,8 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    @pytest.mark.skip(reason="skip")
     # create index on different type of column and show index
-    @pytest.mark.parametrize("types", {"type": "vector", "dimension": 3, "element_type": "float", })
+    @pytest.mark.parametrize("types", [{"type": "vector", "dimension": 3, "element_type": "float"}])
     @pytest.mark.parametrize("index_type", [
         ("Hnsw", False, "ERROR:3061*"),
         ("IVFFlat", True),
@@ -358,9 +358,13 @@ class TestIndex(HttpTest):
         table_name = "test_create_index_on_different_type_of_column"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": types}
-                          )
+        self.create_table(
+            db_name,
+            table_name,
+            {
+                "c1": types
+            }
+        )
         if not index_type[1]:
             self.create_index(db_name, table_name, idxname,
                               ["c1"],
@@ -371,7 +375,7 @@ class TestIndex(HttpTest):
                               },
                               {
                                   "status_code": 500,
-                                  "error_code": 3022,
+                                  "error_code": 3060,
                               }
                               )
         else:
@@ -386,7 +390,6 @@ class TestIndex(HttpTest):
             return
         return
 
-    @pytest.mark.skip(reason="skip")
     @pytest.mark.parametrize("index_type", [
         "IVFFlat"
     ])
@@ -404,7 +407,7 @@ class TestIndex(HttpTest):
         self.insert(db_name, table_name, values)
         self.create_index(
             db_name, table_name, idxname,
-            {"c1", }, {"type": index_type, "centroids_count": "128", "metric": "l2", }
+            ["c1"], {"type": index_type, "centroids_count": "128", "metric": "l2", }
         )
         return
 
@@ -508,7 +511,6 @@ class TestIndex(HttpTest):
         return
 
     # ERROR: IVFFlat realtime index is not supported yet
-    @pytest.mark.skip(reason="IVFFlat realtime index is not supported yet")
     def test_insert_data_fulltext_index_search(self):
         httputils.check_data(TEST_TMP_DIR)
         httputils.copy_data("enwiki_99.csv")
@@ -533,7 +535,7 @@ class TestIndex(HttpTest):
             "file_path": test_csv_dir,
             "file_type": "csv",
             "header": False,
-            "delimiter": ","
+            "delimiter": "\t"
         })
 
         return
@@ -576,7 +578,6 @@ class TestIndex(HttpTest):
         return
         # ERROR
 
-    @pytest.mark.skip(reason="error")
     def test_create_index_on_deleted_table(self):
         db_name = "default"
         table_name = "test_create_index_on_deleted_table"
@@ -591,21 +592,22 @@ class TestIndex(HttpTest):
         })
         embedding_data = [float(i) for i in range(128)]
         value = [{"c1": embedding_data} for _ in range(1024)]
-        print("value: ", value)
         self.insert(db_name, table_name, value)
 
         self.drop_table(db_name, table_name)
         self.select(db_name, table_name, ["*"], "", {
         }, {}, {
-                        "error_code": 0,
-                    })
+            "status_code": 500,
+            "error_code": 3022,
+        })
         self.create_index(db_name, table_name, idxname, ["c1"], {
             "type": "IVFFlat",
             "centroids_count": "128",
             "metric": "l2"
         }, {
-                              "status_code": 500,
-                          })
+            "status_code": 500,
+            "error_code": 3022
+        })
         return
 
     # ERROR update error

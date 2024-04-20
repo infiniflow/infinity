@@ -909,7 +909,7 @@ public:
                                             return ResponseFactory::createResponse(http_status, json_response.dump());
                                         }
 
-                                        const_expr->double_array_.emplace_back(value.template get<double>());
+                                        const_expr->double_array_.emplace_back(value_ref.template get<double>());
                                     }
 
                                     (*values_row)[column_id] = const_expr;
