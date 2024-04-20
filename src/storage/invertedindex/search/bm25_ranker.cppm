@@ -17,6 +17,7 @@ module;
 export module bm25_ranker;
 
 import stl;
+import index_defines;
 
 namespace infinity {
 export class BM25Ranker {
@@ -25,6 +26,8 @@ public:
     ~BM25Ranker() = default;
 
     void AddTermParam(u64 tf, u64 df, float avg_column_len, u32 column_len, float weight);
+
+    void AddPhraseParam(const Vector<tf_t>& all_tf, const Vector<u32>& all_df, float avg_column_len, u32 column_len, float weight, SizeT term_num);
 
     float GetScore() { return score_; }
 

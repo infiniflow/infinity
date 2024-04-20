@@ -20,8 +20,9 @@ namespace infinity {
 
 SearchOptions::SearchOptions(const std::string &options_str) {
     options_.clear();
-    if (options_str.empty())
+    if (options_str.empty()) {
         return;
+    }
     size_t begin_idx = 0;
     size_t len = options_str.length();
     while (begin_idx < len) {
@@ -36,16 +37,17 @@ SearchOptions::SearchOptions(const std::string &options_str) {
             begin_idx = sem_idx + 1;
         }
     }
-    return;
 }
 
 bool SearchOptions::operator==(const SearchOptions &rhs) const {
-    if (options_.size() != rhs.options_.size())
+    if (options_.size() != rhs.options_.size()) {
         return false;
+    }
     for (auto &[k, v] : options_) {
         auto it = rhs.options_.find(k);
-        if (it == rhs.options_.end() || it->second != v)
+        if (it == rhs.options_.end() || it->second != v) {
             return false;
+        }
     }
     return true;
 }
@@ -57,8 +59,9 @@ std::string SearchOptions::ToString() {
     auto end = options_.end();
     int cnt = 0;
     for (; it != end; ++it, ++cnt) {
-        if (cnt != 0)
+        if (cnt != 0) {
             oss << ",";
+        }
         oss << it->first << "=" << it->second;
     }
     return oss.str();

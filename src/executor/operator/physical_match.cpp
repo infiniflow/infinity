@@ -112,6 +112,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
+    fmt::print("match_expr_->fields_: {}\n", match_expr_->fields_);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
@@ -184,7 +185,9 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         if (et_iter) {
             while (true) {
                 ++blockmax_loop_cnt;
-                auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
+                auto score_threshold = result_heap.GetScoreThreshold();
+                auto [id, et_score] = et_iter->BlockNextWithThreshold(score_threshold);
+                fmt::print("score_threshold: {}, id: {}, et_score: {}\n", score_threshold, id.ToUint64(), et_score);
                 if (id == INVALID_ROWID) [[unlikely]] {
                     break;
                 }
@@ -203,6 +206,9 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     }
     if (use_ordinary_iter) {
         RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->PrepareFirstDoc(), doc_iterator->Doc());
+        if (iter_row_id == INVALID_ROWID) {
+            fmt::print("iter_row_id is INVALID_ROWID\n");
+        }
         if (iter_row_id != INVALID_ROWID) [[likely]] {
             ordinary_score_result = MakeUniqueForOverwrite<float[]>(top_n);
             ordinary_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n);
@@ -424,8 +430,9 @@ SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {
 SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatch::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
     result_types->reserve(base_table_ref_->column_types_->size() + 2);
-    for (auto &type : *base_table_ref_->column_types_)
+    for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
+    }
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;

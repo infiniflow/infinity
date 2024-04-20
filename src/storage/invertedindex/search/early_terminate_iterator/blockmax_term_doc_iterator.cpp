@@ -28,6 +28,7 @@ import segment_posting;
 import posting_iterator;
 import column_length_io;
 import infinity_exception;
+import third_party;
 
 namespace infinity {
 BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool) : iter_(flag, session_pool) {}
@@ -42,6 +43,8 @@ bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPostin
 }
 
 bool BlockMaxTermDocIterator::BlockSkipTo(RowID doc_id, float threshold) {
+    fmt::print("BlockMaxTermDocIterator::BlockSkipTo, doc_id: {}, threshold: {}, bm25upperBound: {}\n",
+               doc_id.ToUint64(), threshold, BM25ScoreUpperBound());
     if (threshold > BM25ScoreUpperBound()) [[unlikely]] {
         return false;
     }

@@ -31,12 +31,12 @@ enum class QueryNodeType : char {
     NOT,
     // may appear in optimized query tree:
     TERM,
+    PHRASE,
     AND,
     AND_NOT,
     OR,
     // unimplemented:
     WAND,
-    PHRASE,
     PREFIX_TERM,
     SUFFIX_TERM,
     SUBSTRING_TERM,
@@ -99,6 +99,22 @@ struct TermQueryNode final : public QueryNode {
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 };
 
+struct PhraseQueryNode final : public QueryNode {
+    std::vector<std::string> terms_;
+    std::string column_;
+    uint32_t slop_;
+
+    PhraseQueryNode() : QueryNode(QueryNodeType::PHRASE) {}
+
+    void PushDownWeight(float factor) override { MultiplyWeight(factor); }
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
+
+    void AddTerm(const std::string& term) { terms_.emplace_back(term); }
+};
+
 struct MultiQueryNode : public QueryNode {
     std::vector<std::unique_ptr<QueryNode>> children_;
 
@@ -152,7 +168,7 @@ struct OrQueryNode final : public MultiQueryNode {
 
 // unimplemented
 struct WandQueryNode;
-struct PhraseQueryNode;
+// struct PhraseQueryNode;
 struct PrefixTermQueryNode;
 struct SuffixTermQueryNode;
 struct SubstringTermQueryNode;

@@ -20,13 +20,24 @@ import memory_pool;
 import index_defines;
 import internal_types;
 import term_doc_iterator;
-
+import phrase_doc_iterator;
+import third_party;
 namespace infinity {
 
 // for term iter
 void DocIterator::PrepareFirstDoc() {
-    if (auto term_doc_iter = dynamic_cast<TermDocIterator *>(this); term_doc_iter) {
-        term_doc_iter->DoSeek(0);
+    if (GetType() == DocIteratorType::kTermIterator) {
+        fmt::print("doc iterator PrepareFirstDoc\n");
+        auto term_doc_iter = dynamic_cast<TermDocIterator *>(this);
+        if (term_doc_iter) {
+            term_doc_iter->DoSeek(0);
+        }
+    } else if (GetType() == DocIteratorType::kPhraseIterator) {
+        fmt::print("phrase iterator PrepareFirstDoc\n");
+        auto phrase_doc_iter = dynamic_cast<PhraseDocIterator *>(this);
+        if (phrase_doc_iter) {
+            phrase_doc_iter->DoSeek(0);
+        }
     }
     // do nothing for normal "or", "and", "and not" iter
 }

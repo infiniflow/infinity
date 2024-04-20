@@ -29,17 +29,30 @@ export struct TermColumnMatchData {
     docpayload_t doc_payload_;
 };
 
+export struct PhraseColumnMatchData {
+    RowID doc_id_;
+    tf_t tf_;
+    docpayload_t doc_payload_;
+    Vector<RowID> begin_positions_;
+    Vector<tf_t> all_tf_;
+    Vector<docpayload_t> all_doc_payload_;
+};
+
 class TermDocIterator;
 class BlockMaxTermDocIterator;
+class BlockMaxPhraseDocIterator;
+class DocIterator;
 struct IndexReader;
 
 export class Scorer {
 public:
     void Init(u64 num_of_docs, IndexReader *index_reader);
 
-    void AddDocIterator(TermDocIterator *iter, u64 column_id);
+    void AddDocIterator(DocIterator *iter, u64 column_id);
 
     void AddBlockMaxDocIterator(BlockMaxTermDocIterator *iter, u64 column_id);
+
+    void AddBlockMaxPhraseDocIterator(BlockMaxPhraseDocIterator *iter, u64 column_id);
 
     float Score(RowID doc_id);
 
@@ -54,8 +67,9 @@ private:
     u32 column_counter_{0};
     FlatHashMap<u64, u32, Hash> column_index_map_;
     Vector<u64> column_ids_;
-    Vector<Vector<TermDocIterator *>> iterators_;
-    Vector<Vector<BlockMaxTermDocIterator *>> block_max_iterators_;
+    Vector<Vector<DocIterator *>> iterators_;
+    Vector<Vector<BlockMaxTermDocIterator *>> block_max_term_iterators_;
+    Vector<Vector<BlockMaxPhraseDocIterator *>> block_max_phrase_iterators_;
     Vector<float> avg_column_length_;
     ColumnLengthReader column_length_reader_;
     IndexReader *index_reader_ = nullptr;

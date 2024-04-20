@@ -24,12 +24,15 @@ import term_meta;
 import doc_iterator;
 import match_data;
 import internal_types;
+import doc_iterator;
 
 namespace infinity {
 export class TermDocIterator final : public DocIterator {
 public:
     TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight)
-        : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {}
+        : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
+        doc_freq_ = iter_->GetDocFreq();
+    }
 
     void DoSeek(RowID doc_id) override { doc_id_ = iter_->SeekDoc(doc_id); }
 
@@ -48,6 +51,8 @@ public:
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 
+    DocIteratorType GetType() const override { return DocIteratorType::kTermIterator; }
+
     // debug info
     const String *term_ptr_ = nullptr;
     const String *column_name_ptr_ = nullptr;
@@ -55,7 +60,7 @@ public:
 private:
     u64 column_id_;
     UniquePtr<PostingIterator> iter_;
-    u32 doc_freq_ = iter_->GetDocFreq();
+    u32 doc_freq_;
     float weight_;
 };
 } // namespace infinity
