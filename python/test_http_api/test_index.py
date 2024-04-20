@@ -597,17 +597,17 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         self.select(db_name, table_name, ["*"], "", {
         }, {}, {
-            "status_code": 500,
-            "error_code": 3022,
-        })
+                        "status_code": 500,
+                        "error_code": 3022,
+                    })
         self.create_index(db_name, table_name, idxname, ["c1"], {
             "type": "IVFFlat",
             "centroids_count": "128",
             "metric": "l2"
         }, {
-            "status_code": 500,
-            "error_code": 3022
-        })
+                              "status_code": 500,
+                              "error_code": 3022
+                          })
         return
 
     # ERROR update error
@@ -990,9 +990,9 @@ class TestIndex(HttpTest):
                 "ef": "50",
                 "metric": t
             }, {
-                                  "status_code": 500,
-                                  "error_code": 3061,
-                              })
+                "status_code": 500,
+                "error_code": 3061,
+            })
 
         self.drop_table(db_name, table_name)
         return
