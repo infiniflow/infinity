@@ -165,7 +165,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
-    SharedPtr<String> default_temp_dir = MakeShared<String>("/var/infinity/temp");
+    SharedPtr<String> default_temp_dir = MakeShared<String>("/var/infinity/tmp");
 
     // Default wal config
     u64 default_wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;

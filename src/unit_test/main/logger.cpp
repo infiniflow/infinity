@@ -21,7 +21,7 @@ import logger;
 class LoggerTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
+        RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
@@ -36,7 +36,7 @@ class LoggerTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
+        RemoveDbDirs();
         BaseTest::TearDown();
     }
 };

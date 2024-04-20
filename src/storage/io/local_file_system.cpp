@@ -259,6 +259,23 @@ void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
     }
 }
 
+void LocalFileSystem::CleanupDirectory(const String &path) {
+    std::error_code error_code;
+    Path p{path};
+    if (!fs::exists(p)) {
+        std::filesystem::create_directories(p, error_code);
+        if (error_code.value() != 0) {
+            UnrecoverableError(fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message()));
+        }
+        return;
+    }
+    try {
+        std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
+    } catch (const std::filesystem::filesystem_error &e) {
+        UnrecoverableError(fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what()));
+    }
+}
+
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
     Path dir_path(path);
     if (!is_directory(dir_path)) {

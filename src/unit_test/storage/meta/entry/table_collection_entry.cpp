@@ -46,11 +46,11 @@ import table_entry;
 class TableEntryTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -68,7 +68,7 @@ class TableEntryTest : public BaseTest {
 TEST_F(TableEntryTest, test1) {
     using namespace infinity;
 
-    SharedPtr<String> table_dir = MakeShared<String>("/var/infinity/table");
+    SharedPtr<String> table_dir = MakeShared<String>(GetTmpDir());
     SharedPtr<TableDef> table_def{};
 
     // Define columns

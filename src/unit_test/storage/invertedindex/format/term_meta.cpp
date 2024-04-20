@@ -16,7 +16,7 @@ using namespace infinity;
 
 class TermMetaTest : public BaseTest {
 public:
-    void SetUp() override { file_name_ = "/tmp/term_meta"; }
+    void SetUp() override { file_name_ = String(GetTmpDir()) + "/term_meta"; }
     void TearDown() override {}
 
     void DoTest1() {

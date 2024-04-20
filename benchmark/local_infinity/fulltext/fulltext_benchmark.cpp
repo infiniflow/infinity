@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
 
 // #define DEL_LOCAL_DATA
 #ifdef DEL_LOCAL_DATA
-    system("rm -rf /var/infinity/data  /var/infinity/log  /var/infinity/temp  /var/infinity/wal");
+    system("rm -rf /var/infinity/data /var/infinity/wal /var/infinity/log /var/infinity/tmp");
 #endif
 
     SharedPtr<Infinity> infinity = CreateDbAndTable(db_name, table_name);

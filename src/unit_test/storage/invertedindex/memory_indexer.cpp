@@ -62,9 +62,6 @@ protected:
     UniquePtr<MemoryPool> memory_pool_ = MakeUnique<MemoryPool>(1024);
 public:
     void SetUp() override {
-        system("rm -rf /var/infinity/fulltext_tbl1_col1");
-        system("mkdir -p /var/infinity/fulltext_tbl1_col1");
-
         // https://en.wikipedia.org/wiki/Finite-state_transducer
         const char *paragraphs[] = {
             R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",
@@ -111,7 +108,7 @@ public:
 TEST_F(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    MemoryIndexer indexer1("/var/infinity/fulltext_tbl1_col1",
+    MemoryIndexer indexer1(GetTmpDir(),
                            "chunk1",
                            RowID(0U, 0U),
                            flag_,
@@ -124,7 +121,7 @@ TEST_F(MemoryIndexerTest, Insert) {
     indexer1.Insert(column_, 1, 3);
     indexer1.Dump();
 
-    auto indexer2 = MakeUnique<MemoryIndexer>("/var/infinity/fulltext_tbl1_col1",
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(),
                                               "chunk2",
                                               RowID(0U, 4U),
                                               flag_,
@@ -143,13 +140,13 @@ TEST_F(MemoryIndexerTest, Insert) {
     fake_segment_index_entry_1->SetMemoryIndexer(std::move(indexer2));
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
-    reader.Open(flag_, "/var/infinity/fulltext_tbl1_col1", std::move(index_by_segment));
+    reader.Open(flag_, GetTmpDir(), std::move(index_by_segment));
     Check(reader);
 }
 
 TEST_F(MemoryIndexerTest, test2) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    MemoryIndexer indexer1("/var/infinity/fulltext_tbl1_col1",
+    MemoryIndexer indexer1(GetTmpDir(),
                            "chunk1",
                            RowID(0U, 0U),
                            flag_,
@@ -167,14 +164,13 @@ TEST_F(MemoryIndexerTest, test2) {
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
 
     ColumnIndexReader reader;
-    reader.Open(flag_, "/var/infinity/fulltext_tbl1_col1", std::move(index_by_segment));
+    reader.Open(flag_, GetTmpDir(), std::move(index_by_segment));
     Check(reader);
 }
 
 TEST_F(MemoryIndexerTest, SpillLoadTest) {
-    String column_length_file_path = String("/var/infinity/fulltext_tbl1_col1/chunk1") + LENGTH_SUFFIX;
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
-    auto indexer1 = MakeUnique<MemoryIndexer>("/var/infinity/fulltext_tbl1_col1",
+    auto indexer1 = MakeUnique<MemoryIndexer>(GetTmpDir(),
                                               "chunk1",
                                               RowID(0U, 0U),
                                               flag_,
@@ -194,7 +190,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
     }
 
     indexer1->Dump(offline, spill);
-    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>("/var/infinity/fulltext_tbl1_col1",
+    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetTmpDir(),
                                                                         "chunk1",
                                                                         RowID(0U, 0U),
                                                                         flag_,
@@ -229,4 +225,3 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
         }
     }
 }
-

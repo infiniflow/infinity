@@ -39,9 +39,9 @@ protected:
         return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     }
 
-    void SetUp() override { system("rm -rf /var/infinity"); }
+    void SetUp() override { RemoveDbDirs(); }
 
-    void TearDown() override { system("rm -rf /var/infinity"); }
+    void TearDown() override { RemoveDbDirs(); }
 };
 
 TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
