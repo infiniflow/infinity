@@ -113,10 +113,12 @@ public:
 void ThreadedThriftServer::Init(i32 port_no) {
 
     std::cout << "API server listen on: 0.0.0.0:" << port_no << std::endl;
+    SharedPtr<TBinaryProtocolFactory> binary_protocol_factory = MakeShared<TBinaryProtocolFactory>();
+    binary_protocol_factory->setStrict(true, true);
     server = MakeUnique<TThreadedServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                          MakeShared<TServerSocket>(port_no), // port
                                          MakeShared<TBufferedTransportFactory>(),
-                                         MakeShared<TBinaryProtocolFactory>());
+                                             binary_protocol_factory);
 }
 
 void ThreadedThriftServer::Start() { server->serve(); }
@@ -124,6 +126,10 @@ void ThreadedThriftServer::Start() { server->serve(); }
 void ThreadedThriftServer::Shutdown() { server->stop(); }
 
 void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
+
+    SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(port_no);
+
+    SharedPtr<TBinaryProtocolFactory> binary_protocol_factory = MakeShared<TBinaryProtocolFactory>();
 
     SharedPtr<ThreadFactory> threadFactory = MakeShared<ThreadFactory>();
 
@@ -135,9 +141,9 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
 
     server =
         MakeUnique<TThreadPoolServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
-                                      MakeShared<TServerSocket>(port_no),
+                                      server_socket,
                                       MakeShared<TBufferedTransportFactory>(),
-                                      MakeShared<TBinaryProtocolFactory>(),
+                                      binary_protocol_factory,
                                       threadManager);
 }
 
