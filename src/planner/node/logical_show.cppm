@@ -41,6 +41,7 @@ export enum class ShowType {
     kShowSegment,
     kShowBlocks,
     kShowBlock,
+    kShowBlockColumn,
     kShowSessionStatus,
     kShowGlobalStatus,
     kShowVar,
@@ -57,9 +58,10 @@ public:
                          u64 table_index,
                          Optional<u32> segment_id = None,
                          Optional<u16> block_id = None,
+                         Optional<u32> column_id = None,
                          Optional<String> index_name = None)
         : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
-          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), index_name_(index_name) {}
+          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), column_id_(column_id), index_name_(index_name) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -83,6 +85,8 @@ public:
 
     [[nodiscard]] inline const Optional<u16> block_id() const { return block_id_; }
 
+    [[nodiscard]] inline const Optional<u32> column_id() const { return column_id_; }
+
     [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
 
 private:
@@ -92,6 +96,7 @@ private:
     u64 table_index_{};
     Optional<u32> segment_id_{};
     Optional<u16> block_id_{};
+    Optional<u64> column_id_{};
     Optional<String> index_name_{};
 };
 

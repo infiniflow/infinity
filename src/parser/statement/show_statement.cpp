@@ -72,6 +72,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show Block";
             break;
         }
+        case ShowStmtType::kBlockColumn : {
+            ss << "Show Block Column";
+            break;
+        }
         case ShowStmtType::kConfigs: {
             ss << "Show configs";
             break;

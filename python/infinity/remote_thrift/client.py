@@ -217,3 +217,27 @@ class ThriftInfinityClient:
 
     def show_tables(self, db_name: str):
         return self.client.ShowTables(ShowTablesRequest(session_id=self.session_id, db_name=db_name))
+
+    def show_segments(self, db_name: str, table_name: str):
+        return self.client.ShowSegments(
+            ShowSegmentsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+
+    def show_segment(self, db_name: str, table_name: str, segment_id: int):
+        return self.client.ShowSegment(
+            ShowSegmentRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                               segment_id=segment_id))
+
+    def show_blocks(self, db_name: str, table_name: str, segment_id: int):
+        return self.client.ShowBlocks(
+            ShowBlocksRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                              segment_id=segment_id))
+
+    def show_block(self, db_name: str, table_name: str, segment_id: int, block_id: int):
+        return self.client.ShowBlock(
+            ShowBlockRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                             segment_id=segment_id, block_id=block_id))
+
+    def show_block_column(self, db_name: str, table_name: str, segment_id: int, block_id: int, column_id: int):
+        return self.client.ShowBlockColumn(
+            ShowBlockColumnRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                                   segment_id=segment_id, block_id=block_id, column_id=column_id))
