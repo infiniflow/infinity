@@ -6,10 +6,10 @@ from common.common_values import *
 
 
 class TestTable(HttpTest):
-    def test_verison(self):
+    def test_http_verison(self):
         return
 
-    def test_table(self):
+    def test_http_table(self):
         db_name = "default"
         self.show_database(db_name)
         self.drop_table(db_name, "my_table")
@@ -128,13 +128,13 @@ class TestTable(HttpTest):
         return
 
     @pytest.mark.skip(reason="skip")
-    def test_show_tables(self):
+    def test_http_show_tables(self):
         self.show_database("default")
         tblist = self.get_all_tables("default")
         print(tblist)
         return
 
-    def test_create_varchar_table(self):
+    def test_http_create_varchar_table(self):
         '''
             test create table with varchar column
         '''
@@ -159,7 +159,7 @@ class TestTable(HttpTest):
         self.drop_table("default", table_name)
         return
 
-    def test_create_embedding_table(self):
+    def test_http_create_embedding_table(self):
         """
             test create table with embedding column
         """
@@ -180,7 +180,7 @@ class TestTable(HttpTest):
         self.drop_table("default", table_name)
         return
 
-    def test_create_table_with_invalid_column_name(self):
+    def test_http_create_table_with_invalid_column_name(self):
         """
             test create table with invalid column_name
         """
@@ -222,7 +222,7 @@ class TestTable(HttpTest):
             self.drop_table(db_name, table_name)
         return
 
-    def test_create_table_with_invalid_column_name_python(self):
+    def test_http_create_table_with_invalid_column_name_python(self):
         db_name = "default"
         table_name = "my_table"
 
@@ -266,7 +266,7 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_table_with_different_column_name(self):
+    def test_http_table_with_different_column_name(self):
         """
         test create/drop/show/get valid table name with different column names
         """
@@ -305,7 +305,7 @@ class TestTable(HttpTest):
             self.drop_table(db_name, table_name)
         return
 
-    def test_table_with_different_column_types(self):
+    def test_http_table_with_different_column_types(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -337,7 +337,7 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_table_with_various_column_types(self):
+    def test_http_table_with_various_column_types(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -373,7 +373,7 @@ class TestTable(HttpTest):
         return
 
     # INFO:if use invalid options, then infinity will use default options: kInvalid
-    def test_table_with_different_invalid_options(self):
+    def test_http_table_with_different_invalid_options(self):
         db_name = "default"
         table_name = "test_table_with_different_invalid_options"
         self.show_database(db_name)
@@ -403,7 +403,7 @@ class TestTable(HttpTest):
 
     @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
-    def test_various_tables_with_various_columns(self):
+    def test_http_various_tables_with_various_columns(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -433,10 +433,10 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_after_disconnect_use_table(self):
+    def test_http_after_disconnect_use_table(self):
         pass
 
-    def test_create_drop_table(self):
+    def test_http_create_drop_table(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -468,10 +468,10 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
 
     @pytest.mark.skip(reason="Feature request")
-    def test_describe_various_table(self):
+    def test_http_describe_various_table(self):
         pass
 
-    def test_create_1k_table(self):
+    def test_http_create_1k_table(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -508,7 +508,7 @@ class TestTable(HttpTest):
 
     @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times")
-    def test_create_1m_table(self):
+    def test_http_create_1m_table(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -541,7 +541,7 @@ class TestTable(HttpTest):
             self.drop_table(db_name, table_name + str(i))
         return
 
-    def test_create_or_drop_same_table_in_different_thread(self):
+    def test_http_create_or_drop_same_table_in_different_thread(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -569,7 +569,7 @@ class TestTable(HttpTest):
             concurrent.futures.wait(futures)
         return
 
-    def test_create_empty_column_table(self):
+    def test_http_create_empty_column_table(self):
         db_name = "default"
         table_name = "my_table"
         self.show_database(db_name)
@@ -588,7 +588,7 @@ class TestTable(HttpTest):
     #     "varchar",
     #     "bool",
     #     "vector, 3, float"])
-    # def test_create_valid_option(self, types):
+    # def test_http_create_valid_option(self, types):
     #     db_name = "default"
     #     table_name = "test_valid_option"
     #     self.showdb(db_name)
@@ -596,7 +596,7 @@ class TestTable(HttpTest):
     #     self.createTable(db_name,table_name,{"c1":types})
     #     return
 
-    def test_drop_option(self):
+    def test_http_drop_option(self):
         db_name = "default"
         table_name = "test_drop_option"
 
@@ -616,7 +616,7 @@ class TestTable(HttpTest):
         )
         return
 
-    def test_create_same_name_table(self):
+    def test_http_create_same_name_table(self):
         db_name = "default"
         table_name = "test_create_same_name"
         self.show_database(db_name)
@@ -630,7 +630,7 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_drop_same_name_table(self):
+    def test_http_drop_same_name_table(self):
         db_name = "default"
         table_name = "test_drop_same_name"
         self.show_database(db_name)
@@ -642,7 +642,7 @@ class TestTable(HttpTest):
         }, "kError")
         return
 
-    def test_same_column_name(self):
+    def test_http_same_column_name(self):
         db_name = "default"
         table_name = "test_same_column_name"
         self.show_database(db_name)
@@ -656,7 +656,7 @@ class TestTable(HttpTest):
         self.tear_down(r, {})
         return
 
-    def test_column_numbers(self):
+    def test_http_column_numbers(self):
         db_name = "default"
         table_name = "test_same_column_name"
 
@@ -672,7 +672,7 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_table_create_valid_option(self):
+    def test_http_table_create_valid_option(self):
         db_name = "default"
         table_name = "test_table_create_valid_option"
 
@@ -692,7 +692,7 @@ class TestTable(HttpTest):
             self.drop_table(db_name, table_name)
         return
 
-    def test_table_create_invalid_option(self):
+    def test_http_table_create_invalid_option(self):
         db_name = "default"
         table_name = "test_table_create_invalid_option"
         self.show_database(db_name)
@@ -711,7 +711,7 @@ class TestTable(HttpTest):
             self.drop_table(db_name, table_name)
         return
 
-    def test_table_drop_valid_option(self):
+    def test_http_table_drop_valid_option(self):
         db_name = "default"
         table_name = "test_table_drop_valid_option"
         self.show_database(db_name)
@@ -724,7 +724,7 @@ class TestTable(HttpTest):
             }, i)
         return
 
-    def test_table_drop_invalid_option(self):
+    def test_http_table_drop_invalid_option(self):
         db_name = "default"
         table_name = "test_table_drop_invalid_option"
         self.show_database(db_name)
@@ -742,7 +742,7 @@ class TestTable(HttpTest):
             })
         return
 
-    def test_create_duplicated_table_with_ignore_option(self):
+    def test_http_create_duplicated_table_with_ignore_option(self):
         db_name = "default"
         table_name = "test_create_duplicated_table_with_error_option"
         self.show_database(db_name)
@@ -751,7 +751,7 @@ class TestTable(HttpTest):
             self.create_table(db_name, table_name, {"c1": {"type": "integer"}})
         self.drop_table(db_name, table_name)
 
-    def test_create_duplicated_table_with_error_option(self):
+    def test_http_create_duplicated_table_with_error_option(self):
         db_name = "default"
         table_name = "test_create_duplicated_table_with_error_option"
         self.show_database(db_name)
@@ -769,7 +769,7 @@ class TestTable(HttpTest):
 
         # TODO: Replace options
 
-    def test_create_duplicated_table_with_replace_option(self):
+    def test_http_create_duplicated_table_with_replace_option(self):
         db_name = "default"
         table_name = "test_create_duplicated_table_with_error_option"
         self.show_database(db_name)

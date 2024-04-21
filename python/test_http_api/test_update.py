@@ -6,11 +6,11 @@ from common.common_values import *
 
 
 class TestUpdate(HttpTest):
-    def test_version(self):
+    def test_http_version(self):
         return
 
     # PASS
-    def test_update(self):
+    def test_http_update(self):
         db_name = "default"
         table_name = "test_update"
         self.show_database(db_name)
@@ -48,7 +48,7 @@ class TestUpdate(HttpTest):
         return
         # PASS
 
-    def test_update_empty_table(self):
+    def test_http_update_empty_table(self):
         db_name = "default"
         table_name = "test_update_empty_table"
         self.show_database(db_name)
@@ -68,7 +68,7 @@ class TestUpdate(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_update_non_existent_table(self):
+    def test_http_update_non_existent_table(self):
         db_name = "default"
         table_name = "test_update_non_existent_table"
         self.show_database(db_name)
@@ -90,7 +90,7 @@ class TestUpdate(HttpTest):
         return
         # PASS
 
-    def test_update_no_row_is_met_the_condition(self):
+    def test_http_update_no_row_is_met_the_condition(self):
         db_name = "default"
         table_name = "test_update_no_row_is_met_the_condition"
         self.show_database(db_name)
@@ -121,7 +121,7 @@ class TestUpdate(HttpTest):
 
         return
 
-    def test_update_all_row_is_met_the_condition(self):
+    def test_http_update_all_row_is_met_the_condition(self):
         db_name = "default"
         table_name = "test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
@@ -151,7 +151,7 @@ class TestUpdate(HttpTest):
             self.drop_table(db_name, table_name + str(i))
         return
 
-    def test_update_table_with_one_block(self):
+    def test_http_update_table_with_one_block(self):
         db_name = "default"
         table_name = "test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
@@ -167,7 +167,7 @@ class TestUpdate(HttpTest):
         return
 
     # PASS
-    def test_update_table_with_one_segment(self):
+    def test_http_update_table_with_one_segment(self):
         db_name = "default"
         table_name = "test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
@@ -184,7 +184,7 @@ class TestUpdate(HttpTest):
         return
 
     # PASS
-    def test_update_before_delete(self):
+    def test_http_update_before_delete(self):
         db_name = "default"
         table_name = "test_update_before_delete"
         self.show_database(db_name)
@@ -203,7 +203,7 @@ class TestUpdate(HttpTest):
         return
 
     # PASS
-    def test_update_inserted_data(self):
+    def test_http_update_inserted_data(self):
         db_name = "default"
         table_name = "test_update_before_delete"
         self.show_database(db_name)
@@ -221,7 +221,7 @@ class TestUpdate(HttpTest):
 
     @pytest.mark.slow
     @pytest.mark.skip(reason="Taking too much time.")
-    def test_update_inserted_long_before(self):
+    def test_http_update_inserted_long_before(self):
         db_name = "default"
         table_name = "test_update_before_delete"
         self.show_database(db_name)
@@ -240,7 +240,7 @@ class TestUpdate(HttpTest):
         return
         # PASS
 
-    def test_update_dropped_table(self):
+    def test_http_update_dropped_table(self):
         db_name = "default"
         table_name = "test_update_before_delete"
         self.show_database(db_name)
@@ -254,7 +254,7 @@ class TestUpdate(HttpTest):
         return
         # PASS
 
-    def test_update_invalid_value(self):
+    def test_http_update_invalid_value(self):
         db_name = "default"
         table_name = "test_update_before_delete"
         types = [
@@ -280,7 +280,7 @@ class TestUpdate(HttpTest):
         return
         # PASS
 
-    def test_update_new_value(self):
+    def test_http_update_new_value(self):
         types = ["integer", "float"]
         types_example = [1, 1.333, "1"]
         db_name = "default"
@@ -300,7 +300,7 @@ class TestUpdate(HttpTest):
         return
         # PASS
 
-    def test_valid_filter_expression(self):
+    def test_http_valid_filter_expression(self):
         filter_list = [
             "c1 > 10",
             "c2 > 1",
@@ -333,7 +333,7 @@ class TestUpdate(HttpTest):
         return
 
     # PASS
-    def test_invalid_filter_expression(self):
+    def test_http_invalid_filter_expression(self):
         filter_list = [
             "_row_id",
             "#@$%@#f",

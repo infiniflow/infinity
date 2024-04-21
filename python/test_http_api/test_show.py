@@ -6,7 +6,7 @@ from common.common_values import *
 
 
 class TestShow(HttpTest):
-    def test_show_table(self):
+    def test_http_show_table(self):
         db_name = "default"
         table_name = "test_show_table"
         self.drop_table(db_name, table_name)
@@ -38,7 +38,7 @@ class TestShow(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_show_columns(self):
+    def test_http_show_columns(self):
         db_name = "default"
         table_name = "test_show_table"
         self.show_database(db_name)
