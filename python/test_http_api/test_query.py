@@ -6,7 +6,7 @@ import infinity.index as index
 
 
 class TestQuery(HttpTest):
-    def test_query(self):
+    def test_http_query(self):
         db_name = "default"
         table_name = "my_table"
         idxname = "my_index"
@@ -37,7 +37,7 @@ class TestQuery(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_query_builder(self):
+    def test_http_query_builder(self):
         db_name = "default"
         table_name = "my_table"
         idxname = "my_index"
