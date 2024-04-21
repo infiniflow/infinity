@@ -93,6 +93,16 @@ public:
 
     void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) final;
 
+    void ShowSegments(infinity_thrift_rpc::SelectResponse &_return, const infinity_thrift_rpc::ShowSegmentsRequest &request) final;
+
+    void ShowSegment(infinity_thrift_rpc::ShowSegmentResponse &_return, const infinity_thrift_rpc::ShowSegmentRequest &request) final;
+
+    void ShowBlocks(infinity_thrift_rpc::SelectResponse &_return, const infinity_thrift_rpc::ShowBlocksRequest &request) final;
+
+    void ShowBlock(infinity_thrift_rpc::ShowBlockResponse &_return, const infinity_thrift_rpc::ShowBlockRequest &request) final;
+
+    void ShowBlockColumn(infinity_thrift_rpc::ShowBlockColumnResponse &_return, const infinity_thrift_rpc::ShowBlockColumnRequest &request) final;
+
     void GetDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetDatabaseRequest &request) final;
 
     void GetTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetTableRequest &request) final;
@@ -171,14 +181,11 @@ private:
     Status
     ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
-    static void
-    HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    static void HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
-    void
-    HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    void HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
-    void
-    HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+    void HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
     void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
@@ -197,6 +204,12 @@ private:
     static void ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
 
     static void ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+
+    static void ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+
+    static void ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+
+    static void ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
 
     static void
     ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
@@ -221,6 +234,16 @@ private:
 
     static void
     ProcessQueryResult(infinity_thrift_rpc::ShowIndexResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowSegmentResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowBlockResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+
+    static void ProcessQueryResult(infinity_thrift_rpc::ShowBlockColumnResponse &response,
+                                   const QueryResult &result,
+                                   const String error_header = kErrorMsgHeader);
 };
 
 } // namespace infinity
