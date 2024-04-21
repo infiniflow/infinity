@@ -259,12 +259,12 @@ class HttpTest:
 
         # insert data to tables
 
-    def insert(self, db_name, table_name, filter=[], expect={
+    def insert(self, db_name, table_name, values=[], expect={
         "error_code": 0
     }):
         url = f"databases/{db_name}/tables/{table_name}/docs"
         h = self.set_up_header(['accept', "content-type"])
-        r = self.request(url, "post", h, filter)
+        r = self.request(url, "post", h, values)
         self.tear_down(r, expect)
         return
 
