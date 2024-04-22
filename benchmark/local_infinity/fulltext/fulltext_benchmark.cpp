@@ -223,8 +223,7 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
 void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
     //std::vector<std::string> query_vec = {"one of", "is", "a", "\"is a\"", "\"one of\""};// {"Animalia", "Algorithms", "Animalia Algorithms", "network space", "harmful chemical anarchism"};
-    std::vector<std::string> query_vec = {"\"one of\"", "a"};
-
+    std::vector<std::string> query_vec = {"\"harmful chemical\"", "\"one of\"", "harmful chemical"};
     for (auto match_text : query_vec) {
         BaseProfiler profiler;
         profiler.Begin();

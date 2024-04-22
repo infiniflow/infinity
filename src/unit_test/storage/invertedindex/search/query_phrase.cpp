@@ -91,8 +91,8 @@ public:
 void QueryPhraseTest::InitData() {
     datas_ = {
         {"1", "Animalia (book)", "Animalia is an illustrated children's book by Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold.   A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket."},
-        {"2", "Academy Award for Best Production Design", "The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch."},
-        {"3", "Animation", "The American Football Conference (AFC) add test is one of the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots."},
+        {"2", "Academy Award for Best Production Design", "harmful chemical The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch."},
+        {"3", "Animation", "The American Football Conference (AFC) harm chemical add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots."},
     };
 }
 
@@ -101,9 +101,9 @@ TEST_F(QueryPhraseTest, basic) {
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);
     String fields = "text";
-    Vector<String> phrases = {"\"Animalia is an\"", "\"one of\"", "\"are book\"", "\"add test\""};
-    Vector<u32> expected_doc_freq = {1, 2, 0, 2};
-    Vector<u64> expected_phrase_freq = {1, 2, 0, 3};
+    Vector<String> phrases = {"\"Animalia is an\"", "\"one of\"", "\"are book\"", "\"add test\"", "\"harmful chemical\""};
+    Vector<u32> expected_doc_freq = {1, 2, 0, 2, 2};
+    Vector<u64> expected_phrase_freq = {1, 2, 0, 3, 3};
     EXPECT_EQ(phrases.size(), expected_doc_freq.size());
     EXPECT_EQ(phrases.size(), expected_phrase_freq.size());
     for (SizeT i = 0; i < phrases.size(); ++i) {
@@ -116,9 +116,38 @@ TEST_F(QueryPhraseTest, basic) {
 
 void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_terms) {
     UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
+    // (dynamic_cast<CommonLanguageAnalyzer*>(analyzer.get()))->SetExtractEngStem(false);
+    if (analyzer.get() == nullptr) {
+        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name)));
+    }
     Term input_term;
     input_term.text_ = std::move(text);
-    analyzer->Analyze(input_term, output_terms);
+    TermList temp_output_terms;
+    analyzer->Analyze(input_term, temp_output_terms);
+    if (analyzer_name == AnalyzerPool::STANDARD) {
+        // remove duplicates and only keep the root words for query
+        const u32 INVALID_TERM_OFFSET = -1;
+        Term last_term;
+        last_term.word_offset_ = INVALID_TERM_OFFSET;
+        for (const Term &term : temp_output_terms) {
+            if (last_term.word_offset_ != term.word_offset_) {
+                if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+                    output_terms.emplace_back(last_term);
+                }
+                last_term.text_ = term.text_;
+                last_term.word_offset_ = term.word_offset_;
+                last_term.stats_ = term.stats_;
+            } else {
+                if (term.text_.size() < last_term.text_.size()) {
+                    last_term.text_ = term.text_;
+                    last_term.stats_ = term.stats_;
+                }
+            }
+        }
+        if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+            output_terms.emplace_back(last_term);
+        }
+    }
 }
 
 void QueryPhraseTest::CreateDBAndTable(const String& db_name, const String& table_name) {

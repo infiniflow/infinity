@@ -27,9 +27,6 @@ module analyzer_pool;
 
 namespace infinity {
 
-constexpr std::string_view CHINESE = "chinese";
-constexpr std::string_view STANDARD = "standard";
-constexpr std::string_view NGRAM = "ngram";
 
 constexpr u64 basis = 0xCBF29CE484222325ull;
 constexpr u64 prime = 0x100000001B3ull;

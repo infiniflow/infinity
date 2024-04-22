@@ -78,31 +78,12 @@ target_link_libraries(
     atomic.a
 )
 
-# query benchmark
-add_executable(fulltext_query_benchmark
-    ./fulltext/fulltext_query_benchmark.cpp
-)
-
-target_include_directories(fulltext_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-    fulltext_query_benchmark
-    infinity_core
-    benchmark_profiler
-    sql_parser
-    onnxruntime_mlas
-    zsv_parser
-    newpfor
-    fastpfor
-    lz4.a
-    atomic.a
-)
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(infinity_benchmark jemalloc.a)
     target_link_libraries(knn_import_benchmark jemalloc.a)
     target_link_libraries(knn_query_benchmark jemalloc.a)
     target_link_libraries(fulltext_benchmark jemalloc.a)
-    target_link_libraries(fulltext_query_benchmark jemalloc.a)
 endif()
 
 # add_definitions(-march=native)
