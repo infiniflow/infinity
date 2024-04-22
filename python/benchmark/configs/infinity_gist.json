@@ -25,5 +25,6 @@
         }
     },
     "query_path": "datasets/gist/gist-960-euclidean.hdf5",
-    "batch_size": 8192
+    "batch_size": 8192,
+    "ground_truth_path": "datasets/gist/gist-960-euclidean.hdf5"
 }

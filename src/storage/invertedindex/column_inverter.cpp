@@ -60,6 +60,8 @@ SizeT ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 ro
     SizeT term_count_sum = 0;
     for (SizeT i = 0; i < row_count; ++i) {
         String data = column_vector->ToString(row_offset + i);
+        if (data.empty())
+            continue;
         SizeT term_count = InvertColumn(begin_doc_id + i, data);
         column_lengths[i] = term_count;
         term_count_sum += term_count;
@@ -244,7 +246,8 @@ void ColumnInverter::SortForOfflineDump() {
 //                                                            Data within each group
 void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
     // spill sort results for external merge sort
-
+    if (positions_.empty())
+        return;
     // size of this Run in bytes
     u32 data_size = 0;
     u64 data_size_pos = ftell(spill_file);
@@ -269,8 +272,6 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
             term = GetTermFromNum(last_term_num);
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
-        if (record_length > 1024)
-            std::cout << "!!!!!! record_length " << record_length << std::endl;
         fwrite(&record_length, sizeof(u32), 1, spill_file);
         fwrite(term.data(), term.size(), 1, spill_file);
         fwrite(&str_null, sizeof(char), 1, spill_file);

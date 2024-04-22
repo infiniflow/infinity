@@ -152,7 +152,7 @@ void SegmentEntry::RollbackCompact() {
 
 bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id) {
     // hold all locks and check
-    Vector<std::shared_lock<std::shared_mutex>> locks;
+    Vector<std::unique_lock<std::shared_mutex>> locks;
     for (const auto &[segment_entry, delete_offsets] : segments) {
         locks.emplace_back(segment_entry->rw_locker_);
         if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kNoDelete) {

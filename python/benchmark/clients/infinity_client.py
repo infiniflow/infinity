@@ -3,7 +3,8 @@ import json
 import os
 import h5py
 import time
-from typing import Any
+import numpy as np
+from typing import Any, List
 
 import infinity
 import infinity.index as index
@@ -83,6 +84,14 @@ class InfinityClient(BaseClient):
         for i, idx in enumerate(indexs):
             table_obj.create_index(f"index{i}", [idx])
 
+    def parse_fulltext_query(self, query: dict) -> Any:
+        key, value = list(query.items())[0]
+        if key == 'and':
+            ret = '&&'.join(f'{list(d.keys())[0]}:"{list(d.values())[0]}"' for d in value)
+        elif key == 'or':
+            ret = '||'.join(f'{list(d.keys())[0]}:"{list(d.values())[0]}"' for d in value)
+        return ret
+
     def search(self) -> list[list[Any]]:
         """
         Execute the corresponding query tasks (vector search, full-text search, hybrid search) based on the parsed parameters.
@@ -95,10 +104,53 @@ class InfinityClient(BaseClient):
         results = []
         if ext == '.hdf5':
             with h5py.File(query_path, 'r') as f:
-                start = time.time()
                 for line in f['test']:
-                    res = table_obj.output(["_row_id"]).knn(self.data["vector_name"], line.tolist(), "float", self.data['metric_type'], self.data["topK"]).to_pl()
-                    results.append(res)
-                end = time.time()
-                print(f"search latency: {(end-start)*1000/len(f['test'])} ms")
+                    start = time.time()
+                    res, _ = table_obj.output(["_row_id"]).knn(self.data["vector_name"], line.tolist(), "float", self.data['metric_type'], self.data["topK"]).to_result()
+                    latency = (time.time() - start) * 1000
+                    result = [[x[0] for x in res['ROW_ID']]]
+                    result.append(latency)
+                    results.append(result)
+        elif ext == '.json':
+            with open(query_path, 'r') as f:
+                queries = json.load(f)
+                for query in queries:
+                    if self.data['mode'] == 'fulltext':
+                        match_condition = self.parse_fulltext_query(query)
+                    start = time.time()
+                    res, _ = table_obj.output(["_row_id"]).match("", match_condition, f"topn={self.data['topK']}").to_result()
+                    latency = (time.time() - start) * 1000
+                    result = [[x[0] for x in res['ROW_ID']]]
+                    result.append(latency)
+                    results.append(result)
+        else:
+            raise TypeError("Unsupported file type")
         return results
+
+    def check_and_save_results(self, results: List[List[Any]]):
+        ground_truth_path = self.data['ground_truth_path']
+        _, ext = os.path.splitext(ground_truth_path)
+        precisions = []
+        latencies = []
+        if ext == '.hdf5':
+            with h5py.File(ground_truth_path, 'r') as f:
+                expected_result = f['neighbors']
+                assert len(expected_result) == len(results)
+                for i, result in enumerate(results):
+                    ids = set(result[0])
+                    precision = len(ids.intersection(expected_result[i][:self.data['topK']])) / self.data['topK']
+                    precisions.append(precision)
+                    latencies.append(result[-1])
+        elif ext == '.json':
+            with open(ground_truth_path, 'r') as f:
+                expected_results = json.load(f)
+                for i, result in enumerate(results):
+                    ids = set(x[0] for x in result[:-1])
+                    precision = len(ids.intersection(expected_results[i]['expected_results'][:self.data['topK']])) / self.data['topK']
+                    precisions.append(precision)
+                    latencies.append(result[-1])
+        
+        print(f"mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)}, \
+              std_time: {np.std(latencies)}, min_time: {np.min(latencies)}, \
+              max_time: {np.max(latencies)}, p95_time: {np.percentile(latencies, 95)}, \
+              p99_time: {np.percentile(latencies, 99)}")

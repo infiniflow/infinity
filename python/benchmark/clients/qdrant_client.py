@@ -8,7 +8,7 @@ import json
 import h5py
 from typing import Any, List, Optional
 
-from .base_client import BaseClient, FieldValue
+from .base_client import BaseClient
 
 class QdrantClient(BaseClient):
     def __init__(self,
@@ -119,44 +119,6 @@ class QdrantClient(BaseClient):
                     self.upload_bach(list(range(i-len(vectors)+1, i+1)), vectors)
         else:
             raise TypeError("Unsupported file type")
-    # build filter condition
-    def build_condition(
-        self, and_subfilters: Optional[List[Any]], or_subfilters: Optional[List[Any]]
-    ) -> Optional[Any]:
-        return models.Filter(
-            should=or_subfilters,
-            must=and_subfilters,
-        )
-
-    def build_value_match_filter(self, field_name: str, value: FieldValue) -> Any:
-        return models.FieldCondition(
-            key=field_name,
-            match=models.MatchValue(value=value),
-        )
-    
-    def build_text_match_filter(self, field_name: str, text: str) -> Any:
-        return models.FieldCondition(
-            key=field_name,
-            match=models.MatchText(text=text),
-        )
-
-    def build_range_filter(
-        self,
-        field_name: str,
-        lt: Optional[FieldValue],
-        gt: Optional[FieldValue],
-        lte: Optional[FieldValue],
-        gte: Optional[FieldValue],
-    ) -> Any:
-        return models.FieldCondition(
-            key=field_name,
-            range=models.Range(
-                lt=lt,
-                gt=gt,
-                gte=gte,
-                lte=lte,
-            ),
-        )
 
     def search(self) -> list[list[Any]]:
         # get the queries path
