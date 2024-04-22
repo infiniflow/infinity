@@ -84,6 +84,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
     if (fd == -1) {
         UnrecoverableError(fmt::format("Can't open file: {}: {}", path, strerror(errno)));
     }
+    // LOG_TRACE(fmt::format("[+] OPEN FILE: {}", path));
 
     if (lock_type != FileLockType::kNoLock) {
         struct flock file_lock {};
@@ -111,6 +112,7 @@ void LocalFileSystem::Close(FileHandler &file_handler) {
     if (close(fd) != 0) {
         UnrecoverableError(fmt::format("Can't close file: {}: {}", file_handler.path_.string(), strerror(errno)));
     }
+    // LOG_TRACE(fmt::format("[-] CLOSE FILE: {}", file_handler.path_.string()));
 }
 
 void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
@@ -231,32 +233,6 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
     return removed_count;
-}
-
-void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
-    std::error_code error_code;
-    Path p{path};
-    if (!std::filesystem::exists(p, error_code)) {
-        RecoverableError(Status::DirNotFound(path));
-    }
-    std::filesystem::remove(p, error_code);
-    if (error_code.value() != 0) {
-        // log all files in path
-        // std::stringstream ss;
-        // // recursively traverse the directory
-        // std::function<void(const Path &)> list_dir = [&](const Path path) {
-        //     for (const auto &entry : std::filesystem::directory_iterator{path}) {
-        //         ss << entry.path().string() << " ";
-        //         if (entry.is_directory()) {
-        //             list_dir(entry.path());
-        //         }
-        //     }
-        // };
-        // list_dir(p);
-
-        DeleteDirectory(path);
-        // LOG_ERROR(fmt::format("DeleteEmptyDirectory: {} is not empty, files: {}, force deleted: {}", path, ss.str(), removed_count));
-    }
 }
 
 void LocalFileSystem::CleanupDirectory(const String &path) {
