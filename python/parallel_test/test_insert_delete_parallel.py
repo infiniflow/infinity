@@ -15,7 +15,7 @@ kNumThread = 8
 
 
 class TestInsertDeleteParallel:
-    @pytest.mark.skip(reason="varchar bug, No such chunk in heap")
+    # @pytest.mark.skip(reason="varchar bug, No such chunk in heap")
     def test_insert_and_delete_parallel(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
@@ -77,11 +77,11 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
             else:
                 print("delete")
                 delete_index = random.randint(0, len(deleting_list) - 1)
-                detele_id = deleting_list[delete_index]
+                delete_id = deleting_list[delete_index]
                 deleting_list.pop(delete_index)
                 lock.release()
                 try:
-                    table_obj.delete(f"id > {detele_id - 1} and id < {detele_id + 500}")
+                    table_obj.delete(f"id > {delete_id - 1} and id < {delete_id + 500}")
                 except Exception as e:
                     print(e)
 
