@@ -121,7 +121,8 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         auto func = [this, task, inverter](int id) {
             SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             column_length_sum_ += column_length_sum;
-            inverter->SortForOfflineDump();
+            if (column_length_sum > 0)
+                inverter->SortForOfflineDump();
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
         inverting_thread_pool_.push(std::move(func));
@@ -344,6 +345,8 @@ void MemoryIndexer::OfflineDump() {
     // 2. Generate posting
     // 3. Dump disk segment data
     // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}", num_runs_));
+    if (tuple_count_ == 0)
+        return;
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
     SortMerger<TermTuple, u32> *merger = new SortMerger<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
