@@ -50,16 +50,19 @@ void FileWorker::WriteToFile(bool to_spill) {
         LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
     }
     bool prepare_success = false;
+
     DeferFn defer_fn([&]() {
-        if (!prepare_success) {
-            file_handler_->Close();
-            file_handler_ = nullptr;
-        }
+        fs.Close(*file_handler_);
+        file_handler_ = nullptr;
+    });
+
+    WriteToFileImpl(prepare_success);
+    if (prepare_success) {
         if (to_spill) {
             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
         }
-    });
-    WriteToFileImpl(prepare_success);
+        fs.SyncFile(*file_handler_);
+    }
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {
@@ -91,16 +94,6 @@ void FileWorker::MoveFile() {
     //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
     // }
     fs.Rename(src_path, dest_path);
-}
-
-void FileWorker::Sync() {
-    LocalFileSystem fs;
-    fs.SyncFile(*file_handler_);
-}
-
-void FileWorker::CloseFile() {
-    LocalFileSystem fs;
-    fs.Close(*file_handler_);
 }
 
 void FileWorker::CleanupFile() {

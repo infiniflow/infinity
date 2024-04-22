@@ -104,6 +104,9 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
 
                 output_columns = ParseOutput(output_list, http_status, response);
+                if (output_columns == nullptr) {
+                    return;
+                }
             } else if (IsEqual(key, "filter")) {
 
                 if (filter != nullptr) {
@@ -120,6 +123,9 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
 
                 filter = ParseFilter(filter_json, http_status, response);
+                if (filter == nullptr) {
+                    return;
+                }
             } else if (IsEqual(key, "fusion")) {
                 if (fusion_expr != nullptr or knn_expr != nullptr or match_expr != nullptr) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
