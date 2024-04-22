@@ -46,7 +46,7 @@ void RawFileWorker::AllocateInMemory() {
     if (buffer_size_ == 0) {
         UnrecoverableError("Buffer size is 0.");
     }
-    data_ = static_cast<void *>(new char[buffer_size_]{});
+    data_ = static_cast<void *>(new char[buffer_size_]);
 }
 
 void RawFileWorker::FreeInMemory() {
@@ -70,7 +70,7 @@ void RawFileWorker::WriteToFileImpl(bool &prepare_success) {
 void RawFileWorker::ReadFromFileImpl() {
     LocalFileSystem fs;
     buffer_size_ = fs.GetFileSize(*file_handler_);
-    data_ = static_cast<void *>(new char[buffer_size_]{});
+    data_ = static_cast<void *>(new char[buffer_size_]);
     i64 nbytes = fs.Read(*file_handler_, data_, buffer_size_);
     if (nbytes != (i64)buffer_size_) {
         RecoverableError(Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes)));
