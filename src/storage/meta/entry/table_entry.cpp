@@ -644,7 +644,8 @@ void TableEntry::MemIndexDump(Txn *txn, bool spill) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
         if (!status.ok())
             continue;
-        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(spill);
+        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
+        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn_index_store, spill);
         if (chunk_index_entry.get() != nullptr) {
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());

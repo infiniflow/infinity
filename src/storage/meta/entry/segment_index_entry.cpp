@@ -271,17 +271,20 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
 
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            SizeT row_cnt = 0;
             switch (embedding_info->Type()) {
                 case kElemFloat: {
                     AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
                     MemIndexInserterIter<f32> iter(0, block_column_entry, buffer_manager, row_offset, row_count);
-                    abstract_hnsw.InsertVecs(std::move(iter));
+                    auto [start_i, end_i] = abstract_hnsw.InsertVecs(std::move(iter));
+                    row_cnt = end_i;
                     break;
                 }
                 default: {
                     RecoverableError(Status::NotSupport("Not support data type for index hnsw."));
                 }
             }
+            memory_hnsw_indexer_->SetRowCount(row_cnt);
             break;
         }
         case IndexType::kIVFFlat:

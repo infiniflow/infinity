@@ -1,0 +1,9 @@
+[general]
+version = "0.1.0"
+timezone = "utc-8"
+
+[storage]
+# close auto optimize
+optimize_interval = 0
+# close auto compaction
+compaction_interval = 0
