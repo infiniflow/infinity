@@ -30,5 +30,6 @@
           }
         }
       }
-    }
+    },
+    "ground_truth_path": "datasets/sift/sift-128-euclidean.hdf5"
 }

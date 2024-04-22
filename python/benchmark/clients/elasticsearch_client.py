@@ -6,8 +6,10 @@ import time
 from typing import List, Optional
 import os
 import h5py
+import uuid
+import numpy as np
 
-from .base_client import BaseClient, FieldValue
+from .base_client import BaseClient
 
 
 class ElasticsearchClient(BaseClient):
@@ -47,7 +49,7 @@ class ElasticsearchClient(BaseClient):
                         self.upload_bach(actions)
                         actions = []
                     record = json.loads(line)
-                    actions.append({"_index": self.collection_name, "_source": record})
+                    actions.append({"_index": self.collection_name, "_id": uuid.UUID(int=i).hex, "_source": record})
                 if actions:
                     self.upload_bach(actions)
         elif ext == '.hdf5' and self.data['mode'] == 'vector':
@@ -58,37 +60,33 @@ class ElasticsearchClient(BaseClient):
                         self.upload_bach(actions)
                         actions = []
                     record = {self.data['vector_name']: line}
-                    actions.append({"_index": self.collection_name, "_source": record})
+                    actions.append({"_index": self.collection_name, "_id": uuid.UUID(int=i).hex, "_source": record})
                 if actions:
                     self.upload_bach(actions)
         else:
             raise TypeError("Unsupported file type")
+        
+        self.client.indices.forcemerge(index=self.collection_name, wait_for_completion=True)
 
-    def build_condition(
-        self, and_subfilters: Optional[List[Any]], or_subfilters: Optional[List[Any]]
-    ) -> Optional[Any]:
-        return {
-            "bool": {
-                "must": and_subfilters,
-                "should": or_subfilters,
+    def parse_fulltext_query(self, query: dict) -> Any:
+        key, value = list(query.items())[0]
+        if key == 'and':
+            ret = {
+                "query": {
+                    "bool": {
+                        "must": [{"match": item} for item in value]
+                    }
+                }
             }
-        }
-
-    def build_exact_match_filter(self, field_name: str, value: FieldValue) -> Any:
-        return {"term": {field_name: value}}
-    
-    def build_text_match_filter(self, field_name: str, text: FieldValue) -> Any:
-        return {"match": {field_name: text}}
-
-    def build_range_filter(
-        self,
-        field_name: str,
-        lt: Optional[FieldValue],
-        gt: Optional[FieldValue],
-        lte: Optional[FieldValue],
-        gte: Optional[FieldValue],
-    ) -> Any:
-        return {"range": {field_name: {"lt": lt, "gt": gt, "lte": lte, "gte": gte}}}
+        elif key == 'or':
+            ret = {
+                "query": {
+                    "bool": {
+                        "should": [{"match": item} for item in value]
+                    }
+                }
+            } 
+        return ret
 
     def search(self) -> list[list[Any]]:
         """
@@ -102,18 +100,21 @@ class ElasticsearchClient(BaseClient):
         if ext == '.json':
             with open(query_path, 'r') as f:
                 queries = json.load(f)
-                start = time.time()
                 if self.data['mode'] == 'fulltext':
                     for query in queries:
+                        start = time.time()
+                        body = self.parse_fulltext_query(query)
                         result = self.client.search(index=self.collection_name,
-                                                    source=["_id"],
-                                                    body=query['body'])
+                                                    source=["_id", "_score"],
+                                                    body=body,
+                                                    size=self.data['topK'])
+                        end = time.time()
+                        latency = (end-start)*1000
+                        result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
+                        result.append(latency)
                         results.append(result)
-                end = time.time()
-            print("latency:", (end-start)*1000/len(queries))
         elif ext == '.hdf5' and self.data['mode'] == 'vector':
             with h5py.File(query_path, 'r') as f:
-                start = time.time()
                 for query in f['test']:
                     knn = {
                         "field": self.data["vector_name"],
@@ -121,13 +122,40 @@ class ElasticsearchClient(BaseClient):
                         "k": self.data["topK"],
                         "num_candidates": 200
                     }
+                    start = time.time()
                     result = self.client.search(index=self.collection_name,
-                                                source=["_id"],
+                                                source=["_id", "_score"],
                                                 knn=knn,
                                                 size = self.data["topK"])
+                    end = time.time()
+                    latency = (end - start)*1000
+                    result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
+                    result.append(latency)
                     results.append(result)
-                end = time.time()
-                print("latency: ", (end-start)*1000/len(f['test']))
         else:
             raise TypeError("Unsupported file type")
         return results
+    
+    def check_and_save_results(self, results: List[List[Any]]):
+        ground_truth_path = self.data['ground_truth_path']
+        _, ext = os.path.splitext(ground_truth_path)
+        precisions = []
+        latencies = []
+        if ext == '.hdf5':
+            with h5py.File(ground_truth_path, 'r') as f:
+                expected_result = f['neighbors']
+                for i, result in enumerate(results):
+                    ids = set(x[0] for x in result[:-1])
+                    precision = len(ids.intersection(expected_result[i][:self.data['topK']])) / self.data['topK']
+                    precisions.append(precision)
+                    latencies.append(result[-1])
+        elif ext == '.json':
+            with open(ground_truth_path, 'r') as f:
+                expected_results = json.load(f)
+                for i, result in enumerate(results):
+                    ids = set(x[0] for x in result[:-1])
+                    precision = len(ids.intersection(expected_results[i]['expected_results'][:self.data['topK']])) / self.data['topK']
+                    precisions.append(precision)
+                    latencies.append(result[-1])
+        
+        print(f"mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)}, std_time: {np.std(latencies)}, min_time: {np.min(latencies)}, max_time: {np.max(latencies)}")
