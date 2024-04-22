@@ -16,6 +16,7 @@ module;
 
 #include "type/complex/row_id.h"
 #include <cassert>
+#include <sstream>
 #include <vector>
 
 module segment_index_entry;
@@ -56,6 +57,7 @@ import local_file_system;
 import chunk_index_entry;
 import abstract_hnsw;
 import block_column_iter;
+import txn_store;
 
 namespace infinity {
 
@@ -94,6 +96,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            BufferManager *buffer_manager,
                                                                            TxnTimeStamp min_ts,
                                                                            TxnTimeStamp max_ts,
+                                                                           u32 next_chunk_id,
                                                                            TransactionID txn_id,
                                                                            TxnTimeStamp begin_ts,
                                                                            TxnTimeStamp commit_ts) {
@@ -116,6 +119,18 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     }
     segment_index_entry->min_ts_ = min_ts;
     segment_index_entry->max_ts_ = max_ts;
+    segment_index_entry->next_chunk_id_ = next_chunk_id;
+    {
+        LocalFileSystem fs;
+        for (ChunkID chunk_id = next_chunk_id;; ++chunk_id) {
+            String chunk_file_name = ChunkIndexEntry::IndexFileName(segment_id, chunk_id);
+            String file_path = *table_index_entry->index_dir() + "/" + chunk_file_name;
+            if (!fs.Exists(file_path)) {
+                break;
+            }
+            fs.DeleteFile(file_path);
+        }
+    }
     segment_index_entry->commit_ts_.store(commit_ts);
     return segment_index_entry;
 }
@@ -242,8 +257,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         case IndexType::kHnsw: {
             const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
             if (memory_hnsw_indexer_.get() == nullptr) {
-                auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
-                SharedPtr<ChunkIndexEntry> memory_hnsw_indexer = ChunkIndexEntry::NewChunkIndexEntry(this, param.get(), begin_row_id, buffer_manager);
+                SharedPtr<ChunkIndexEntry> memory_hnsw_indexer = CreateChunkIndexEntry(column_def, begin_row_id, buffer_manager);
 
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_hnsw_indexer_ = std::move(memory_hnsw_indexer);
@@ -351,7 +365,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
     TxnTimeStamp begin_ts = txn->BeginTS();
     auto *buffer_mgr = txn->buffer_mgr();
     const IndexBase *index_base = table_index_entry_->index_base();
-    const ColumnDef *column_def = table_index_entry_->column_def().get();
+    SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
@@ -390,7 +404,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
 
             RowID base_rowid(segment_entry->segment_id(), 0);
-            SharedPtr<ChunkIndexEntry> chunk_index_entry = CreateChunkIndexEntry(segment_entry->GetTableEntry(), base_rowid, buffer_mgr);
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = CreateChunkIndexEntry(column_def, base_rowid, buffer_mgr);
             this->AddChunkIndexEntry(chunk_index_entry);
             BufferHandle buffer_handle = chunk_index_entry->GetIndex();
 
@@ -590,6 +604,26 @@ void SegmentIndexEntry::CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp co
     }
 }
 
+void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts) {
+    std::unique_lock lock(rw_locker_);
+
+    max_ts_ = commit_ts;
+    new_chunk->Commit(commit_ts);
+    for (auto *old_chunk : old_chunks) {
+        old_chunk->DeprecateChunk(commit_ts);
+    }
+
+    // std::stringstream ss;
+    // ss << "COMMIT OPTIMIZE: ";
+    // ss << "Segment ID: " << segment_id_ << ". ";
+    // ss << "New index chunk: " << new_chunk->chunk_id_ << ". ";
+    // ss << "Old chunks: ";
+    // for (auto *old_chunk : old_chunks) {
+    //     ss << old_chunk->chunk_id_ << ", ";
+    // }
+    // LOG_INFO(ss.str());
+}
+
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     auto index_type = table_index_entry_->index_base()->index_type_;
     if (index_type == IndexType::kFullText || index_type == IndexType::kHnsw) {
@@ -623,7 +657,19 @@ void SegmentIndexEntry::Cleanup() {
     }
 }
 
-void SegmentIndexEntry::PickCleanup(CleanupScanner *scanner) {}
+void SegmentIndexEntry::PickCleanup(CleanupScanner *scanner) {
+    TxnTimeStamp visible_ts = scanner->visible_ts();
+    std::unique_lock w_lock(rw_locker_);
+    for (auto iter = chunk_index_entries_.begin(); iter != chunk_index_entries_.end();) {
+        auto &chunk_index_entry = *iter;
+        if (chunk_index_entry->CheckDeprecate(visible_ts)) {
+            scanner->AddEntry(std::move(chunk_index_entry));
+            iter = chunk_index_entries_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
 
 UniquePtr<CreateIndexParam>
 SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def) {
@@ -653,6 +699,102 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
     return nullptr;
 }
 
+void SegmentIndexEntry::ReplaceFtChunkIndexEntries(SharedPtr<ChunkIndexEntry> merged_chunk_index_entry) {
+    std::shared_lock lock(rw_locker_);
+    SizeT num_entries = chunk_index_entries_.size();
+    SizeT idx_first = num_entries;
+    for (SizeT i = 0; i < num_entries; i++) {
+        if (chunk_index_entries_[i]->base_rowid_ == merged_chunk_index_entry->base_rowid_) {
+            idx_first = i;
+            break;
+        }
+    }
+    assert(idx_first < num_entries);
+    SizeT idx_last = num_entries;
+    u32 total_row_count = 0;
+    for (SizeT i = idx_first; i < num_entries; i++) {
+        total_row_count += chunk_index_entries_[i]->row_count_;
+        if (total_row_count == merged_chunk_index_entry->row_count_) {
+            idx_last = i;
+            break;
+        }
+    }
+    assert(idx_last < num_entries);
+    chunk_index_entries_[idx_first] = merged_chunk_index_entry;
+    chunk_index_entries_.erase(chunk_index_entries_.begin() + idx_first + 1, chunk_index_entries_.begin() + idx_last + 1);
+}
+
+void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
+                                                 SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
+                                                 Vector<ChunkIndexEntry *> &&old_chunks) {
+    TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
+    chunk_index_entries_.push_back(merged_chunk_index_entry);
+    txn_index_store->optimize_data_.emplace_back(this, merged_chunk_index_entry.get(), std::move(old_chunks));
+}
+
+ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry) {
+    Txn *txn = txn_table_store->txn_;
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    const IndexBase *index_base = table_index_entry_->index_base();
+    SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();
+
+    switch (index_base->index_type_) {
+        case IndexType::kHnsw: {
+            BufferManager *buffer_mgr = txn->buffer_mgr();
+            Vector<ChunkIndexEntry *> old_chunks;
+            u32 row_count = 0;
+            {
+                std::shared_lock lock(rw_locker_);
+                if (chunk_index_entries_.size() <= 1) { // TODO
+                    return nullptr;
+                }
+                for (const auto &chunk_index_entry : chunk_index_entries_) {
+                    if (chunk_index_entry->CheckVisible(begin_ts)) {
+                        row_count += chunk_index_entry->row_count_;
+                        old_chunks.push_back(chunk_index_entry.get());
+                    }
+                }
+            }
+
+            auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                UnrecoverableError("HNSW supports embedding type.");
+            }
+            TypeInfo *type_info = column_def->type()->type_info().get();
+            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+
+            RowID base_rowid(segment_id_, 0);
+            SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = CreateChunkIndexEntry(column_def, base_rowid, buffer_mgr);
+            BufferHandle buffer_handle = merged_chunk_index_entry->GetIndex();
+
+            switch (embedding_info->Type()) {
+                case kElemFloat: {
+                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
+                    OneColumnIterator<float, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                    HnswInsertConfig insert_config;
+                    insert_config.optimize_ = true;
+                    auto [start_i, end_i] = abstract_hnsw.InsertVecs(std::move(iter), insert_config);
+                    if (end_i - start_i != row_count) {
+                        UnrecoverableError("Rebuild HNSW index failed.");
+                    }
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Rebuild HNSW index failed.");
+                }
+            }
+            merged_chunk_index_entry->SetRowCount(row_count);
+            ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+            txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
+            return merged_chunk_index_entry.get();
+        }
+        default: {
+            UnrecoverableError("RebuildChunkIndexEntries is not supported for this index type.");
+        }
+    }
+    return nullptr;
+}
+
 void SegmentIndexEntry::SaveIndexFile() {
     String &index_name = *table_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;
@@ -665,12 +807,11 @@ void SegmentIndexEntry::SaveIndexFile() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateChunkIndexEntry(const TableEntry *table_entry, RowID base_rowid, BufferManager *buffer_mgr) {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateChunkIndexEntry(SharedPtr<ColumnDef> column_def, RowID base_rowid, BufferManager *buffer_mgr) {
     const auto &index_base = table_index_entry_->table_index_def();
-    const auto &column_def = table_entry->GetColumnDefByName(index_base->column_name());
     auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
-
-    return ChunkIndexEntry::NewChunkIndexEntry(this, param.get(), base_rowid, buffer_mgr);
+    ChunkID chunk_id = this->GetNextChunkID();
+    return ChunkIndexEntry::NewChunkIndexEntry(chunk_id, this, param.get(), base_rowid, buffer_mgr);
 }
 
 void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry) {
@@ -686,7 +827,8 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String 
     return chunk_index_entry;
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(TableEntry *table_entry,
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID chunk_id,
+                                                                       TableEntry *table_entry,
                                                                        const String &base_name,
                                                                        RowID base_rowid,
                                                                        u32 row_count,
@@ -696,7 +838,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(TableEntr
     auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
 
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
-        ChunkIndexEntry::NewReplayChunkIndexEntry(this, param.get(), base_name, base_rowid, row_count, buffer_mgr);
+        ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, buffer_mgr);
 
     chunk_index_entries_.push_back(chunk_index_entry); // replay not need lock
     return chunk_index_entry;
@@ -713,6 +855,7 @@ nlohmann::json SegmentIndexEntry::Serialize() {
         index_entry_json["segment_id"] = this->segment_id_;
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
+        index_entry_json["next_chunk_id"] = this->next_chunk_id_;
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
 
         for (auto &chunk_index_entry : chunk_index_entries_) {
@@ -729,7 +872,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
                                                             TableIndexEntry *table_index_entry,
                                                             BufferManager *buffer_mgr,
                                                             TableEntry *table_entry) {
-    u32 segment_id = index_entry_json["segment_id"];
+    SegmentID segment_id = index_entry_json["segment_id"];
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
     if (!status.ok()) {
@@ -747,6 +890,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     }
     segment_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_index_entry->max_ts_ = index_entry_json["max_ts"];
+    segment_index_entry->next_chunk_id_ = index_entry_json["next_chunk_id"];
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
     if (index_entry_json.contains("chunk_index_entries")) {
         for (const auto &chunk_index_entry_json : index_entry_json["chunk_index_entries"]) {

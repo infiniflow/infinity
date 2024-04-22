@@ -767,7 +767,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     SharedPtr<ChunkIndexEntry> chunk_index_entry =
                         ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
                     txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-                    segment_index_entry->ReplaceChunkIndexEntries(chunk_index_entry);
+                    segment_index_entry->ReplaceFtChunkIndexEntries(chunk_index_entry);
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
@@ -776,10 +776,16 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 break;
             }
             case IndexType::kHnsw: {
-                // TODO
-                UniquePtr<String> err_msg =
-                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
-                LOG_WARN(*err_msg);
+                TxnTimeStamp begin_ts = txn->BeginTS();
+                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                    SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
+                    if (segment_entry != nullptr) {
+                        auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);
+                        if (merged_chunk_entry != nullptr) {
+                            merged_chunk_entry->SaveIndexFile();
+                        }
+                    }
+                }
                 break;
             }
             default: {

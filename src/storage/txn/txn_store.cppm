@@ -64,6 +64,8 @@ public:
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const;
 
+    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
 
 public:
@@ -71,6 +73,8 @@ public:
 
     HashMap<SegmentID, SegmentIndexEntry *> index_entry_map_{};
     Vector<ChunkIndexEntry *> chunk_index_entries_{};
+
+    Vector<Tuple<SegmentIndexEntry *, ChunkIndexEntry *, Vector<ChunkIndexEntry *>>> optimize_data_;
 };
 
 export struct TxnCompactStore {
@@ -179,6 +183,8 @@ public:
     void CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
+
+    bool Empty() const;
 
 private:
     // Txn store

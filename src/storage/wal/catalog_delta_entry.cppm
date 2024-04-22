@@ -425,7 +425,7 @@ public:
           db_name_(segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(segment_index_entry->table_index_entry()->table_index_meta()->index_name()), segment_id_(segment_index_entry->segment_id()),
-          min_ts_(segment_index_entry->min_ts()), max_ts_(segment_index_entry->max_ts()) {}
+          min_ts_(segment_index_entry->min_ts()), max_ts_(segment_index_entry->max_ts()), next_chunk_id_(segment_index_entry->next_chunk_id()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY; }
     String GetTypeStr() const final { return "ADD_SEGMENT_INDEX_ENTRY"; }
@@ -435,6 +435,7 @@ public:
         total_size += sizeof(i32) + this->table_name_->size();
         total_size += sizeof(i32) + this->index_name_->size();
         total_size += sizeof(SegmentID) + sizeof(TxnTimeStamp) + sizeof(TxnTimeStamp);
+        total_size += sizeof(ChunkID);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -455,6 +456,7 @@ public:
     SegmentID segment_id_{0};
     TxnTimeStamp min_ts_{0};
     TxnTimeStamp max_ts_{0};
+    ChunkID next_chunk_id_{0};
 };
 
 /// class AddSegmentColumnEntryOperation
@@ -469,8 +471,8 @@ public:
           db_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->index_name()),
-          segment_id_(chunk_index_entry->segment_index_entry_->segment_id()), base_name_(chunk_index_entry->base_name_),
-          base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_) {}
+          segment_id_(chunk_index_entry->segment_index_entry_->segment_id()), chunk_id_(chunk_index_entry->chunk_id_),
+          base_name_(chunk_index_entry->base_name_), base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY; }
     String GetTypeStr() const final { return "ADD_CHUNK_INDEX_ENTRY"; }
@@ -480,6 +482,7 @@ public:
         total_size += sizeof(i32) + this->table_name_->size();
         total_size += sizeof(i32) + this->index_name_->size();
         total_size += sizeof(SegmentID);
+        total_size += sizeof(ChunkID);
         total_size += sizeof(i32) + this->base_name_.size();
         total_size += sizeof(RowID);
         total_size += sizeof(u32);
@@ -488,15 +491,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}#{}#{}#{}#{}@{}",
-                                  *db_name_,
-                                  *table_name_,
-                                  *index_name_,
-                                  segment_id_,
-                                  base_name_,
-                                  base_rowid_.ToUint64(),
-                                  row_count_,
-                                  (u8)(type_)));
+        return String(fmt::format("#{}#{}#{}#{}#{}@{}", *db_name_, *table_name_, *index_name_, segment_id_, chunk_id_, (u8)(type_)));
     }
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
@@ -507,6 +502,7 @@ public:
     SharedPtr<String> table_name_{};
     SharedPtr<String> index_name_{};
     SegmentID segment_id_{0};
+    ChunkID chunk_id_{};
     String base_name_{};
     RowID base_rowid_;
     u32 row_count_{0};

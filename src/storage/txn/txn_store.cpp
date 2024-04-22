@@ -74,6 +74,12 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
     }
 }
 
+void TxnIndexStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+    for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
+        segment_index_entry->CommitOptimize(new_chunk, old_chunks, commit_ts);
+    }
+}
+
 void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     for (const auto &[segment_id, segment_index_entry] : index_entry_map_) {
         segment_index_entry->CommitSegmentIndex(txn_id, commit_ts);
@@ -276,6 +282,10 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
+    for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        txn_index_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
+    }
+
     for (auto *sealed_segment : set_sealed_segments_) {
         if (!sealed_segment->SetSealed()) {
             UnrecoverableError(fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id()));
@@ -470,5 +480,7 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         catalog_->RemoveDBEntry(db_entry, txn_id);
     }
 }
+
+bool TxnStore::Empty() const { return txn_dbs_.empty() && txn_tables_.empty() && txn_tables_store_.empty(); }
 
 } // namespace infinity

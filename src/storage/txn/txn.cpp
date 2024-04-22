@@ -408,7 +408,7 @@ TxnTimeStamp Txn::Commit() {
     //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     //    txn_context_.SetTxnCommitting(commit_ts);
 
-    if (wal_entry_->cmds_.empty()) {
+    if (wal_entry_->cmds_.empty() && txn_store_.Empty()) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp();
         this->SetTxnCommitting(commit_ts);
