@@ -13,10 +13,7 @@
 // limitations under the License.
 
 #include "unit_test/base_test.h"
-#include <assert.h>
-#include <iostream>
 #include <random>
-#include <string.h>
 
 import stl;
 import logger;
@@ -29,25 +26,6 @@ class SkiplistTest : public BaseTest {};
 
 typedef u32 Key;
 typedef u32 Value;
-
-// struct Comparator {
-//     int operator()(const Key &a, const Key &b) const {
-//         if (a < b) {
-//             return -1;
-//         } else if (a > b) {
-//             return +1;
-//         } else {
-//             return 0;
-//         }
-//     }
-// };
-
-// struct StringComparator {
-//     int operator()(const String &lhs, const String &rhs) const {
-//         int ret = strcmp(lhs.c_str(), rhs.c_str());
-//         return ret < 0;
-//     }
-// };
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -62,44 +40,41 @@ String RandStr() {
     return str;
 }
 
-// TEST_F(SkiplistTest, test1) {
+TEST_F(SkiplistTest, test1) {
 
-//     KeyComparator cmp;
-//     SkipList<Key, Value, KeyComparator> list(cmp, nullptr);
+    KeyComparator cmp;
+    SkipList<Key, Value, KeyComparator> list(cmp, nullptr);
 
-//     const int N = 50000;
-//     const int R = 50000;
-//     std::map<Key, Value> keys;
+    const int N = 50000;
+    const int R = 50000;
+    std::map<Key, Value> keys;
 
-//     Key a = 512;
-//     Value b = 111;
-//     list.Insert(a, b);
-//     Value v;
-//     list.Search(a, v);
-//     ASSERT_EQ(b, v);
+    Key a = 512;
+    Value b = 111;
+    list.Insert(a, b);
+    Value v;
+    list.Search(a, v);
+    ASSERT_EQ(b, v);
 
-//     for (int i = 257; i < N; i++) {
-//         Key key = dis(gen) % R;
-//         Value value = dis(gen) % R;
-//         if (keys.emplace(key, value).second) {
-//             std::cout << "i:" << i << std::endl;
-//             list.Insert(key, value);
+    for (int i = 0; i < N; i++) {
+        Key key = dis(gen) % R;
+        Value value = dis(gen) % R;
+        if (keys.emplace(key, value).second) {
+            list.Insert(key, value);
 
-//             Value v;
-//             list.Search(key, v);
-//             std::cout << "key:" << key << ",value:" << value << " ,true:" << v << std::endl;
-//             ASSERT_EQ(value, v);
-//         }
-//     }
+            Value v;
+            list.Search(key, v);
+            ASSERT_EQ(value, v);
+        }
+    }
 
-//     for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
-//         Value v;
-//         if (list.Search(it->first, v)) {
-//             std::cout << "key:" << it->first << ",value:" << it->second << " ,true:" << v << std::endl;
-//             ASSERT_EQ(it->second, v);
-//         }
-//     }
-// }
+    for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        Value v;
+        if (list.Search(it->first, v)) {
+            ASSERT_EQ(it->second, v);
+        }
+    }
+}
 
 TEST_F(SkiplistTest, test2) {
     KeyComparator cmp;
@@ -109,22 +84,21 @@ TEST_F(SkiplistTest, test2) {
 
     for (int i = 0; i < N; i++) {
         String key = RandStr() + std::to_string(i);
-        std::cout << "i: " << i << std::endl;
         if (keys.emplace(key, key).second) {
             list.Insert(key, key);
 
             String v;
             auto ret = list.Search(key, v);
-            ASSERT_EQ(ret == true);
-            ASSERT_EQ(v == key);
+            ASSERT_EQ(ret, true);
+            ASSERT_EQ(v, key);
         }
     }
 
     for (std::map<String, String>::iterator it = keys.begin(); it != keys.end(); ++it) {
         String v;
         auto ret = list.Search(it->first, v);
-        ASSERT_EQ(ret == true);
-        ASSERT_EQ(it->second == v);
+        ASSERT_EQ(ret, true);
+        ASSERT_EQ(it->second, v);
     }
     for (std::map<String, String>::iterator it = keys.begin(); it != keys.end(); ++it) {
         SkipList<String, String, KeyComparator>::Iterator iter = list.Begin(it->first);
