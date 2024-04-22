@@ -433,13 +433,13 @@ TxnTimeStamp Txn::Commit() {
         UnrecoverableError("Transaction isn't in COMMITTED status.");
     }
 
-    // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+    if (txn_mgr_->enable_compaction()) {
+        txn_store_.MaintainCompactionAlg();
+    }
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        if (txn_mgr_->enable_compaction()) {
-            txn_store_.MaintainCompactionAlg();
-        }
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }
+
     return this->CommitTS();
 }
 
@@ -463,9 +463,9 @@ void Txn::CommitBottom() {
 
         txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
 
+        // Don't need to write empty CatalogDeltaEntry (read-only transactions).
         if (!local_catalog_delta_ops_entry_->operations().empty()) {
             local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
-            txn_mgr_->AddWaitFlushTxn(txn_id_);
         }
     }
 
