@@ -118,6 +118,8 @@ void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
         UnrecoverableError("TxnManager is not running, cannot add delta entry");
     }
     i64 wal_size = wal_mgr_->WalSize();
+    const auto &txn_ids = delta_entry->txn_ids();
+    this->AddWaitFlushTxn(txn_ids);
     bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry), wal_size));
 }
 
@@ -160,32 +162,29 @@ TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
+    TransactionID txn_id = txn->TxnID();
     txn->Rollback();
     rw_locker_.lock();
-    txn_map_.erase(txn->TxnID());
+    txn_map_.erase(txn_id);
     rw_locker_.unlock();
 }
 
-void TxnManager::AddWaitFlushTxn(TransactionID txn_id) {
+void TxnManager::AddWaitFlushTxn(const Vector<TransactionID> &txn_ids) {
     // std::stringstream ss;
-    // for (auto txn_id : wait_flush_txns_) {
+    // for (auto txn_id : txn_ids) {
     //     ss << txn_id << " ";
     // }
-    // LOG_INFO(fmt::format("Current wait flush set: {}, add txn: {} to wait flush set", ss.str(), txn_id));
+    // LOG_INFO(fmt::format("Add txns: {} to wait flush set", ss.str()));
     std::unique_lock w_lock(rw_locker_);
-    wait_flush_txns_.insert(txn_id);
+    wait_flush_txns_.insert(txn_ids.begin(), txn_ids.end());
 }
 
 void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
-    // std::stringstream ss1;
-    // for (auto txn_id : wait_flush_txns_) {
-    //     ss1 << txn_id << " ";
-    // }
     // std::stringstream ss2;
     // for (auto txn_id : txn_ids) {
     //     ss2 << txn_id << " ";
     // }
-    // LOG_INFO(fmt::format("Current wait flush set: {}, Remove txn: {} from wait flush set", ss1.str(), ss2.str()));
+    // LOG_INFO(fmt::format("Remove txn: {} from wait flush set", ss2.str()));
     std::unique_lock w_lock(rw_locker_);
     for (auto txn_id : txn_ids) {
         if (!wait_flush_txns_.erase(txn_id)) {
@@ -199,7 +198,7 @@ TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
         auto &[ts, txn_id] = *iter;
         if (txn_map_.find(txn_id) != txn_map_.end()) {
-            LOG_TRACE(fmt::format("Txn: {} not found in txn map", txn_id));
+            LOG_TRACE(fmt::format("Txn: {} found in txn map", txn_id));
             return ts;
         }
         if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {

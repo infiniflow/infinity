@@ -60,3 +60,17 @@ class TestDescribe(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    def test_show_big_databases(self):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+
+        for i in range(8193):
+            infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+
+        for i in range(8193):
+            infinity_obj.create_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+
+        res = infinity_obj.list_databases()
+        assert res.error_code == ErrorCode.OK
+
+        for i in range(8193):
+            infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)

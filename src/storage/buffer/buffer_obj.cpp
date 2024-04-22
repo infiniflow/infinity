@@ -58,11 +58,7 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kFreed: {
             buffer_mgr_->RequestSpace(GetBufferSize());
-            try {
-                file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
-            } catch (const UnrecoverableException &e) {
-                file_worker_->AllocateInMemory();
-            }
+            file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
             if (type_ == BufferType::kEphemeral) {
                 type_ = BufferType::kTemp;
             }
@@ -135,10 +131,6 @@ bool BufferObj::Save() {
         }
         type_ = BufferType::kPersistent;
     }
-    if (write) {
-        file_worker_->Sync();
-        file_worker_->CloseFile();
-    }
     return write;
 }
 
@@ -150,6 +142,9 @@ void BufferObj::Cleanup() {
         case BufferStatus::kNew:
         case BufferStatus::kFreed: {
             status_ = BufferStatus::kClean;
+            if (file_worker_->GetData() != nullptr) {
+                UnrecoverableError("Buffer is not freed.");
+            }
             buffer_mgr_->AddToCleanList(this, false /*free*/);
             break;
         }
@@ -168,6 +163,9 @@ void BufferObj::Cleanup() {
 void BufferObj::CleanupFile() {
     if (status_ != BufferStatus::kClean) {
         UnrecoverableError("Invalid status.");
+    }
+    if (file_worker_->GetData() != nullptr) {
+        UnrecoverableError("Buffer is not freed.");
     }
     file_worker_->CleanupFile();
 }

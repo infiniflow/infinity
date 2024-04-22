@@ -21,6 +21,7 @@ module;
 module catalog;
 
 import stl;
+import defer_op;
 
 import txn_manager;
 import logger;
@@ -910,9 +911,10 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(full_ckp_commit_ts_, max_commit_ts);
 
+    DeferFn defer_fn([&]() { txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids()); });
+
     if (flush_delta_entry->operations().empty()) {
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
-        txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids());
         return true;
     }
     LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
@@ -963,8 +965,6 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     //     LOG_INFO(ss.str());
     // }
     LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
-
-    txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids());
 
     return false;
 }
