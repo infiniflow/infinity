@@ -14,7 +14,7 @@ Infinity can only be compiled natively on Linux. If your operating system is not
 
 ## Prerequisites
 We recommend that you build the project on a machine with 16GB of memory, which will take a few minutes to build the project.
-If your machine can't provide that much memory, make sure you have at least 4GB of memory, and try to reduce the number of ninja parallel compilation jobs as follows.
+If your machine can't provide that much memory, make sure you have at least 6GB of memory, and try to reduce the number of ninja parallel compilation jobs as follows.
 ```shell
 ninja -j1
 ```
