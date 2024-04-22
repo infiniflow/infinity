@@ -50,6 +50,7 @@ CASE            { return CASE; }
 CAST            { return CAST; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
+COLUMN          { return COLUMN; }
 COLUMNS         { return COLUMNS; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }

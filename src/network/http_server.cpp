@@ -1487,7 +1487,7 @@ public:
 
         auto database_name = request->getPathVariable("database_name");
         auto table_name = request->getPathVariable("table_name");
-        auto segment_id = std::atoi(request->getPathVariable("segment_id").get()->c_str());
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
         auto result = infinity->ShowSegment(database_name, table_name, segment_id);
 
         HTTPStatus http_status;
@@ -1572,7 +1572,7 @@ public:
 
         auto database_name = request->getPathVariable("database_name");
         auto table_name = request->getPathVariable("table_name");
-        auto segment_id = std::atoi(request->getPathVariable("segment_id").get()->c_str());
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
         auto result = infinity->ShowBlocks(database_name, table_name, segment_id);
 
         HTTPStatus http_status;
@@ -1618,8 +1618,8 @@ public:
 
         auto database_name = request->getPathVariable("database_name");
         auto table_name = request->getPathVariable("table_name");
-        auto segment_id = std::atoi(request->getPathVariable("segment_id").get()->c_str());
-        auto block_id = std::atoi(request->getPathVariable("block_id").get()->c_str());
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+        auto block_id = std::strtoll(request->getPathVariable("block_id").get()->c_str(), nullptr, 0);
         auto result = infinity->ShowBlock(database_name, table_name, segment_id, block_id);
 
         HTTPStatus http_status;
@@ -1638,6 +1638,53 @@ public:
                         const String &column_value = value.ToString();
                         json_response[column_name] = column_value;
                     }
+                }
+            }
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowBlockColumnHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+        auto block_id = std::strtoll(request->getPathVariable("block_id").get()->c_str(), nullptr, 0);
+        auto column_id = std::strtoll(request->getPathVariable("column_id").get()->c_str(), nullptr, 0);
+        auto result = infinity->ShowBlockColumn(database_name, table_name, segment_id, block_id, column_id);
+
+        nlohmann::json json_response;
+        nlohmann::json json_res;
+        HTTPStatus http_status;
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_table;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_value = value.ToString();
+                        json_table[column_name] = column_value;
+                    }
+                    json_res["tables"].push_back(json_table);
+                }
+                for (auto &element : json_res["tables"]) {
+                    json_response[element["name"]] = element["description"];
                 }
             }
             json_response["error_code"] = 0;
@@ -1694,11 +1741,13 @@ void HTTPServer::Start(u16 port) {
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments", MakeShared<ShowSegmentsListHandler>());
 
     // block
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks", MakeShared<ShowBlocksListHandler>());
     router->route("GET",
                   "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}",
                   MakeShared<ShowBlockDetailHandler>());
-    router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks", MakeShared<ShowBlocksListHandler>());
-
+    router->route("GET",
+                  "/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id}",
+                  MakeShared<ShowBlockColumnHandler>());
     // variable
     router->route("GET", "/variables/{variable_name}", MakeShared<ShowVariableHandler>());
 
