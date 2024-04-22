@@ -537,6 +537,7 @@ class TestIndex(HttpTest):
             "header": False,
             "delimiter": "\t"
         })
+        self.drop_table(db_name, table_name)
 
         return
 
