@@ -12,7 +12,7 @@ max_count = 500 * 20
 kNumThread = 8
 lock = Lock()
 
-class TestInsertDeleteParallel:
+class TestInsertParallel:
     def test_insert_parallel(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()

@@ -43,7 +43,7 @@ public:
 
     static constexpr size_t dim_ = 16;
     static constexpr size_t vec_n_ = 32;
-    const std::string file_dir_ = "/var/infinity/hnsw_lvq_test";
+    const std::string file_dir_ = GetTmpDir();
 
     bool dump_ = false;
 
@@ -164,10 +164,7 @@ TEST_F(HnswLVQTest, test1) {
         std::string file_path = file_dir_ + "/lvq_store1.bin";
 
         LocalFileSystem fs;
-        if (fs.Exists(file_dir_)) {
-            fs.DeleteDirectory(file_dir_);
-        }
-        fs.CreateDirectory(file_dir_);
+        fs.CleanupDirectory(file_dir_);
 
         {
             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;

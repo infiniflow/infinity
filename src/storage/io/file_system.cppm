@@ -82,6 +82,8 @@ public:
 
     virtual void DeleteEmptyDirectory(const String &path) = 0;
 
+    virtual void CleanupDirectory(const String &path) = 0;
+
     virtual Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) = 0;
 
     inline FileSystemType file_system_type() const {

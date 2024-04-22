@@ -331,6 +331,22 @@ class ShowVariableRequest;
 
 class ShowTablesRequest;
 
+class ShowSegmentsRequest;
+
+class ShowSegmentRequest;
+
+class ShowSegmentResponse;
+
+class ShowBlocksRequest;
+
+class ShowBlockRequest;
+
+class ShowBlockResponse;
+
+class ShowBlockColumnRequest;
+
+class ShowBlockColumnResponse;
+
 typedef struct _Property__isset {
   _Property__isset() : key(false), value(false) {}
   bool key :1;
@@ -4243,6 +4259,637 @@ class ShowTablesRequest : public virtual ::apache::thrift::TBase {
 void swap(ShowTablesRequest &a, ShowTablesRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const ShowTablesRequest& obj);
+
+typedef struct _ShowSegmentsRequest__isset {
+  _ShowSegmentsRequest__isset() : session_id(false), db_name(false), table_name(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+} _ShowSegmentsRequest__isset;
+
+class ShowSegmentsRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowSegmentsRequest(const ShowSegmentsRequest&);
+  ShowSegmentsRequest& operator=(const ShowSegmentsRequest&);
+  ShowSegmentsRequest() noexcept
+                      : session_id(0),
+                        db_name(),
+                        table_name() {
+  }
+
+  virtual ~ShowSegmentsRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+
+  _ShowSegmentsRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  bool operator == (const ShowSegmentsRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowSegmentsRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowSegmentsRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowSegmentsRequest &a, ShowSegmentsRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowSegmentsRequest& obj);
+
+typedef struct _ShowSegmentRequest__isset {
+  _ShowSegmentRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+  bool segment_id :1;
+} _ShowSegmentRequest__isset;
+
+class ShowSegmentRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowSegmentRequest(const ShowSegmentRequest&);
+  ShowSegmentRequest& operator=(const ShowSegmentRequest&);
+  ShowSegmentRequest() noexcept
+                     : session_id(0),
+                       db_name(),
+                       table_name(),
+                       segment_id(0) {
+  }
+
+  virtual ~ShowSegmentRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+  int64_t segment_id;
+
+  _ShowSegmentRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_segment_id(const int64_t val);
+
+  bool operator == (const ShowSegmentRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(segment_id == rhs.segment_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowSegmentRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowSegmentRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowSegmentRequest &a, ShowSegmentRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowSegmentRequest& obj);
+
+typedef struct _ShowSegmentResponse__isset {
+  _ShowSegmentResponse__isset() : error_code(false), error_msg(false), segment_id(false), status(false), path(false), size(false), block_count(false), row_capacity(false), row_count(false), room(false), column_count(false) {}
+  bool error_code :1;
+  bool error_msg :1;
+  bool segment_id :1;
+  bool status :1;
+  bool path :1;
+  bool size :1;
+  bool block_count :1;
+  bool row_capacity :1;
+  bool row_count :1;
+  bool room :1;
+  bool column_count :1;
+} _ShowSegmentResponse__isset;
+
+class ShowSegmentResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowSegmentResponse(const ShowSegmentResponse&);
+  ShowSegmentResponse& operator=(const ShowSegmentResponse&);
+  ShowSegmentResponse() noexcept
+                      : error_code(0),
+                        error_msg(),
+                        segment_id(0),
+                        status(),
+                        path(),
+                        size(),
+                        block_count(0),
+                        row_capacity(0),
+                        row_count(0),
+                        room(0),
+                        column_count(0) {
+  }
+
+  virtual ~ShowSegmentResponse() noexcept;
+  int64_t error_code;
+  std::string error_msg;
+  int64_t segment_id;
+  std::string status;
+  std::string path;
+  std::string size;
+  int64_t block_count;
+  int64_t row_capacity;
+  int64_t row_count;
+  int64_t room;
+  int64_t column_count;
+
+  _ShowSegmentResponse__isset __isset;
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_segment_id(const int64_t val);
+
+  void __set_status(const std::string& val);
+
+  void __set_path(const std::string& val);
+
+  void __set_size(const std::string& val);
+
+  void __set_block_count(const int64_t val);
+
+  void __set_row_capacity(const int64_t val);
+
+  void __set_row_count(const int64_t val);
+
+  void __set_room(const int64_t val);
+
+  void __set_column_count(const int64_t val);
+
+  bool operator == (const ShowSegmentResponse & rhs) const
+  {
+    if (!(error_code == rhs.error_code))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(segment_id == rhs.segment_id))
+      return false;
+    if (!(status == rhs.status))
+      return false;
+    if (!(path == rhs.path))
+      return false;
+    if (!(size == rhs.size))
+      return false;
+    if (!(block_count == rhs.block_count))
+      return false;
+    if (!(row_capacity == rhs.row_capacity))
+      return false;
+    if (!(row_count == rhs.row_count))
+      return false;
+    if (!(room == rhs.room))
+      return false;
+    if (!(column_count == rhs.column_count))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowSegmentResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowSegmentResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowSegmentResponse &a, ShowSegmentResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowSegmentResponse& obj);
+
+typedef struct _ShowBlocksRequest__isset {
+  _ShowBlocksRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+  bool segment_id :1;
+} _ShowBlocksRequest__isset;
+
+class ShowBlocksRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowBlocksRequest(const ShowBlocksRequest&);
+  ShowBlocksRequest& operator=(const ShowBlocksRequest&);
+  ShowBlocksRequest() noexcept
+                    : session_id(0),
+                      db_name(),
+                      table_name(),
+                      segment_id(0) {
+  }
+
+  virtual ~ShowBlocksRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+  int64_t segment_id;
+
+  _ShowBlocksRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_segment_id(const int64_t val);
+
+  bool operator == (const ShowBlocksRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(segment_id == rhs.segment_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowBlocksRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowBlocksRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowBlocksRequest &a, ShowBlocksRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowBlocksRequest& obj);
+
+typedef struct _ShowBlockRequest__isset {
+  _ShowBlockRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false), block_id(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+  bool segment_id :1;
+  bool block_id :1;
+} _ShowBlockRequest__isset;
+
+class ShowBlockRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowBlockRequest(const ShowBlockRequest&);
+  ShowBlockRequest& operator=(const ShowBlockRequest&);
+  ShowBlockRequest() noexcept
+                   : session_id(0),
+                     db_name(),
+                     table_name(),
+                     segment_id(0),
+                     block_id(0) {
+  }
+
+  virtual ~ShowBlockRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+  int64_t segment_id;
+  int64_t block_id;
+
+  _ShowBlockRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_segment_id(const int64_t val);
+
+  void __set_block_id(const int64_t val);
+
+  bool operator == (const ShowBlockRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(segment_id == rhs.segment_id))
+      return false;
+    if (!(block_id == rhs.block_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowBlockRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowBlockRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowBlockRequest &a, ShowBlockRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowBlockRequest& obj);
+
+typedef struct _ShowBlockResponse__isset {
+  _ShowBlockResponse__isset() : error_code(false), error_msg(false), block_id(false), path(false), size(false), row_capacity(false), row_count(false), column_count(false) {}
+  bool error_code :1;
+  bool error_msg :1;
+  bool block_id :1;
+  bool path :1;
+  bool size :1;
+  bool row_capacity :1;
+  bool row_count :1;
+  bool column_count :1;
+} _ShowBlockResponse__isset;
+
+class ShowBlockResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowBlockResponse(const ShowBlockResponse&);
+  ShowBlockResponse& operator=(const ShowBlockResponse&);
+  ShowBlockResponse() noexcept
+                    : error_code(0),
+                      error_msg(),
+                      block_id(0),
+                      path(),
+                      size(),
+                      row_capacity(0),
+                      row_count(0),
+                      column_count(0) {
+  }
+
+  virtual ~ShowBlockResponse() noexcept;
+  int64_t error_code;
+  std::string error_msg;
+  int64_t block_id;
+  std::string path;
+  std::string size;
+  int64_t row_capacity;
+  int64_t row_count;
+  int64_t column_count;
+
+  _ShowBlockResponse__isset __isset;
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_block_id(const int64_t val);
+
+  void __set_path(const std::string& val);
+
+  void __set_size(const std::string& val);
+
+  void __set_row_capacity(const int64_t val);
+
+  void __set_row_count(const int64_t val);
+
+  void __set_column_count(const int64_t val);
+
+  bool operator == (const ShowBlockResponse & rhs) const
+  {
+    if (!(error_code == rhs.error_code))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(block_id == rhs.block_id))
+      return false;
+    if (!(path == rhs.path))
+      return false;
+    if (!(size == rhs.size))
+      return false;
+    if (!(row_capacity == rhs.row_capacity))
+      return false;
+    if (!(row_count == rhs.row_count))
+      return false;
+    if (!(column_count == rhs.column_count))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowBlockResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowBlockResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowBlockResponse &a, ShowBlockResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowBlockResponse& obj);
+
+typedef struct _ShowBlockColumnRequest__isset {
+  _ShowBlockColumnRequest__isset() : session_id(false), db_name(false), table_name(false), segment_id(false), block_id(false), column_id(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+  bool segment_id :1;
+  bool block_id :1;
+  bool column_id :1;
+} _ShowBlockColumnRequest__isset;
+
+class ShowBlockColumnRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowBlockColumnRequest(const ShowBlockColumnRequest&);
+  ShowBlockColumnRequest& operator=(const ShowBlockColumnRequest&);
+  ShowBlockColumnRequest() noexcept
+                         : session_id(0),
+                           db_name(),
+                           table_name(),
+                           segment_id(0),
+                           block_id(0),
+                           column_id(0) {
+  }
+
+  virtual ~ShowBlockColumnRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+  int64_t segment_id;
+  int64_t block_id;
+  int64_t column_id;
+
+  _ShowBlockColumnRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_segment_id(const int64_t val);
+
+  void __set_block_id(const int64_t val);
+
+  void __set_column_id(const int64_t val);
+
+  bool operator == (const ShowBlockColumnRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(segment_id == rhs.segment_id))
+      return false;
+    if (!(block_id == rhs.block_id))
+      return false;
+    if (!(column_id == rhs.column_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowBlockColumnRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowBlockColumnRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowBlockColumnRequest &a, ShowBlockColumnRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowBlockColumnRequest& obj);
+
+typedef struct _ShowBlockColumnResponse__isset {
+  _ShowBlockColumnResponse__isset() : error_code(false), error_msg(false), column_name(false), column_id(false), data_type(false), path(false), extra_file_count(false), extra_file_names(false) {}
+  bool error_code :1;
+  bool error_msg :1;
+  bool column_name :1;
+  bool column_id :1;
+  bool data_type :1;
+  bool path :1;
+  bool extra_file_count :1;
+  bool extra_file_names :1;
+} _ShowBlockColumnResponse__isset;
+
+class ShowBlockColumnResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowBlockColumnResponse(const ShowBlockColumnResponse&);
+  ShowBlockColumnResponse& operator=(const ShowBlockColumnResponse&);
+  ShowBlockColumnResponse() noexcept
+                          : error_code(0),
+                            error_msg(),
+                            column_name(),
+                            column_id(0),
+                            data_type(),
+                            path(),
+                            extra_file_count(0),
+                            extra_file_names() {
+  }
+
+  virtual ~ShowBlockColumnResponse() noexcept;
+  int64_t error_code;
+  std::string error_msg;
+  std::string column_name;
+  int64_t column_id;
+  std::string data_type;
+  std::string path;
+  int64_t extra_file_count;
+  std::string extra_file_names;
+
+  _ShowBlockColumnResponse__isset __isset;
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_column_name(const std::string& val);
+
+  void __set_column_id(const int64_t val);
+
+  void __set_data_type(const std::string& val);
+
+  void __set_path(const std::string& val);
+
+  void __set_extra_file_count(const int64_t val);
+
+  void __set_extra_file_names(const std::string& val);
+
+  bool operator == (const ShowBlockColumnResponse & rhs) const
+  {
+    if (!(error_code == rhs.error_code))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(column_name == rhs.column_name))
+      return false;
+    if (!(column_id == rhs.column_id))
+      return false;
+    if (!(data_type == rhs.data_type))
+      return false;
+    if (!(path == rhs.path))
+      return false;
+    if (!(extra_file_count == rhs.extra_file_count))
+      return false;
+    if (!(extra_file_names == rhs.extra_file_names))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowBlockColumnResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowBlockColumnResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowBlockColumnResponse &a, ShowBlockColumnResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowBlockColumnResponse& obj);
 
 } // namespace
 

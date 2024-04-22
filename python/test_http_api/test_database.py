@@ -7,14 +7,16 @@ from common.common_values import *
 
 class TestDataBase(HttpTest):
 
-    def test_verison(self):
+    def test_http_verison(self):
 
         pass
 
-    def test_database(self):
+    def test_http_database(self):
 
         db_name = "my_database"
-        self.create_database("my_database")
+
+        self.drop_database(db_name)
+        self.create_database(db_name)
 
         self.create_database("my_database@#$", {
             "status_code": 500,
@@ -41,7 +43,7 @@ class TestDataBase(HttpTest):
         })
 
         # drop my_database
-        self.drop_database("my_database")
+        self.drop_database(db_name)
 
         # list database
         self.list_database({
@@ -52,7 +54,7 @@ class TestDataBase(HttpTest):
         })
         self.clear_database()
 
-    def test_create_database_invalid_name(self):
+    def test_http_create_database_invalid_name(self):
         '''
             create databse with invalid name
         '''
@@ -66,7 +68,7 @@ class TestDataBase(HttpTest):
                 })
         self.clear_database()
 
-    def test_create_drop_show_1K_databases(self):
+    def test_http_create_drop_show_1K_databases(self):
         '''
             create 1K dbs,show these dbs,drop these dbs
         '''
@@ -99,7 +101,7 @@ class TestDataBase(HttpTest):
         self.clear_database()
 
     @pytest.mark.skip(reason="Cost too much times")
-    def test_create_drop_show_1M_databases(self):
+    def test_http_create_drop_show_1M_databases(self):
         """
         create 1M dbs, show these dbs, drop these dbs
         """
@@ -130,7 +132,7 @@ class TestDataBase(HttpTest):
             print('drop db_name' + str(i))
             self.drop_database('db_name' + str(i))
 
-    def test_repeatedly_create_drop_show_databases(self):
+    def test_http_repeatedly_create_drop_show_databases(self):
         """
         create db, show db and drop db, repeat above ops 100 times
         """
@@ -147,7 +149,7 @@ class TestDataBase(HttpTest):
             self.drop_database('test_repeatedly_create_drop_show_databases')
         self.clear_database()
 
-    def test_drop_database_with_invalid_name(self):
+    def test_http_drop_database_with_invalid_name(self):
         """
         drop database with invalid name
         """
@@ -160,7 +162,7 @@ class TestDataBase(HttpTest):
             })
         self.clear_database()
 
-    def test_get_db(self):
+    def test_http_get_db(self):
         """
         target: get db
         method:
@@ -197,7 +199,7 @@ class TestDataBase(HttpTest):
             })
         self.clear_database()
 
-    def test_drop_non_existent_db(self):
+    def test_http_drop_non_existent_db(self):
         '''
             drop not exist db
         '''
@@ -207,7 +209,7 @@ class TestDataBase(HttpTest):
         })
         self.clear_database()
 
-    def test_get_drop_db_with_two_threads(self):
+    def test_http_get_drop_db_with_two_threads(self):
         '''
             one thread get db, another thread drop this db
         '''
@@ -233,7 +235,7 @@ class TestDataBase(HttpTest):
         self.drop_database("test_get_drop_db_with_two_thread")
         self.clear_database()
 
-    def test_create_same_db_in_different_threads(self):
+    def test_http_create_same_db_in_different_threads(self):
         '''
             create same db in different thread to test conflict and show dbs
         '''
@@ -253,7 +255,7 @@ class TestDataBase(HttpTest):
         self.drop_database("test_get_drop_db_with_two_thread")
         self.clear_database()
 
-    def test_show_database(self):
+    def test_http_show_database(self):
         # create database
         self.drop_database("test_show_database")
         self.create_database("test_show_database")
@@ -266,7 +268,7 @@ class TestDataBase(HttpTest):
         self.drop_database("test_show_database")
         self.clear_database()
 
-    def test_create_option(self):
+    def test_http_create_option(self):
         db_name = "test_create_option"
         # create with option: key ignore
         self.create_database(db_name)
@@ -277,7 +279,7 @@ class TestDataBase(HttpTest):
         assert r.status_code == 500
         self.clear_database()
 
-    def test_drop_option(self):
+    def test_http_drop_option(self):
         db_name = "test_drop_option"
 
         # drop with option: key ignore

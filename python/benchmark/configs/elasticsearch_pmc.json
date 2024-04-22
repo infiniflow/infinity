@@ -1,0 +1,53 @@
+{
+    "name": "elasticsearch_pmc",
+    "app": "elasticsearch",
+    "app_path": "servers/elasticsearch/",
+    "connection_url": "http://localhost:9200",
+    "data_path": "datasets/pmc/documents.json",
+    "insert_batch_size": 8192,
+    "query_path": "datasets/pmc/operations.json",
+    "mode": "fulltext",
+    "index": {
+        "settings": {
+            "index.number_of_shards": 5,
+            "index.number_of_replicas": 0,
+            "index.requests.cache.enable": false
+            },
+            "mappings": {
+            "_source": {
+                "enabled": true
+            },
+            "dynamic": "strict",
+            "properties": {
+                "name": {
+                    "type": "keyword"
+                },
+                "journal": {
+                    "type": "text"
+                },
+                "date": {
+                    "type": "text"
+                },
+                "volume": {
+                    "type": "text"
+                },
+                "issue": {
+                    "type": "text"
+                },
+                "accession": {
+                    "type": "keyword"
+                },
+                "timestamp": {
+                    "type": "date",
+                    "format": "yyyy-MM-dd HH:mm:ss"
+                },
+                "pmid": {
+                    "type": "integer"
+                },
+                "body": {
+                    "type": "text"
+                }
+            }
+        }
+    }
+}

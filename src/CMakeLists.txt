@@ -228,6 +228,8 @@ add_executable(infinity
         network/http_server.cpp
         network/http/http_search.cppm
         network/http/http_search.cpp
+        network/infinity_thrift_service.cpp
+        network/infinity_thrift_service.cppm
 )
 
 target_sources(infinity

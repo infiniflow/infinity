@@ -19,7 +19,7 @@ import fst;
 
 using namespace infinity;
 
-class FstTest : public ::testing::Test {
+class FstTest : public BaseTest {
 public:
     Vector<Pair<String, u64>> months = {{"January", 1},
                                         {"February", 2},
@@ -53,8 +53,8 @@ TEST_F(FstTest, BuildMem) {
 }
 
 TEST_F(FstTest, BuildFile) {
-    std::filesystem::create_directories("/var/infinity");
-    std::ofstream ofs("/var/infinity/months.fst", std::ios::binary | std::ios::trunc);
+    String fst_path = String(GetTmpDir()) + "/months.fst";
+    std::ofstream ofs(fst_path, std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder builder(wtr);
     for (auto &month : months) {
@@ -63,7 +63,7 @@ TEST_F(FstTest, BuildFile) {
     builder.Finish();
     u64 written = builder.BytesWritten();
     ofs.close();
-    EXPECT_EQ(std::filesystem::file_size("/var/infinity/months.fst"), written + 4);
+    EXPECT_EQ(std::filesystem::file_size(fst_path), written + 4);
 }
 
 TEST_F(FstTest, Get) {

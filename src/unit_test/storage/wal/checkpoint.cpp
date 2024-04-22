@@ -61,9 +61,9 @@ protected:
         return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_checkpoint.toml");
     }
 
-    void SetUp() override { system("rm -rf /var/infinity"); }
+    void SetUp() override { RemoveDbDirs(); }
 
-    void TearDown() override { system("rm -rf /var/infinity"); }
+    void TearDown() override { RemoveDbDirs(); }
 
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
         TxnTimeStamp visible_ts = 0;

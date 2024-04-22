@@ -1,0 +1,29 @@
+{
+    "name": "infinity_sift_1m",
+    "app": "infinity",
+    "host": "http://127.0.0.1:23817",
+    "data_path": "datasets/sift/sift-128-euclidean.hdf5",
+    "data_link": "http://ann-benchmarks.com/sift-128-euclidean.hdf5",
+    "topK": 100,
+    "mode": "vector", 
+    "schema": {
+        "embeddings": "vector, 128, float"
+    }, 
+    "vector_size": 128,
+    "vector_name": "embeddings",
+    "metric_type": "l2",
+    "index": {
+        "embeddings": {
+            "type": "HNSW",
+            "params": {
+                "M": 16, 
+                "ef_construction": 200,
+                "ef": 200,
+                "metric": "l2",
+                "encode": "lvq"
+            }
+        }
+    },
+    "query_path": "datasets/sift/sift-128-euclidean.hdf5",
+    "batch_size": 8192
+}

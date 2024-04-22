@@ -14,7 +14,7 @@ from infinity.common import ConflictType
 
 class TestIndexParallel(HttpTest):
     @pytest.mark.skip(reason="segfault")
-    def test_fulltext_index_rw_parallel(self):
+    def test_http_fulltext_index_rw_parallel(self):
         def write_worker(data, file_path, end_time, thread_id):
             db_name = "default"
             table_name = "test_fulltext_index_parallel"

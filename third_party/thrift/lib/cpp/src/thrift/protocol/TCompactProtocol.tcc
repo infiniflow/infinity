@@ -655,6 +655,17 @@ uint32_t TCompactProtocolT<Transport_>::readI64(int64_t& i64) {
   return rsize;
 }
 
+template <typename To, typename From>
+static inline To bitwise_cast(From from) {
+    static_assert(sizeof(From) == sizeof(To), "sizeof(From) == sizeof(To)");
+    union {
+        From f;
+        To t;
+    } u;
+    u.f = from;
+    return u.t;
+}
+
 /**
  * No magic here - just read a double off the wire.
  */

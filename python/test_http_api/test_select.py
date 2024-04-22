@@ -7,12 +7,12 @@ import httputils
 
 
 class TestSelect(HttpTest):
-    def test_version(self):
+    def test_http_version(self):
         httputils.check_data(TEST_TMP_DIR)
         return
         # ERROR
 
-    def test_select(self):
+    def test_http_select(self):
         db_name = "default"
         table_name = "test_select"
         self.show_database(db_name)
@@ -74,7 +74,7 @@ class TestSelect(HttpTest):
         # })
 
     # PASS
-    def test_select_aggregate(self):
+    def test_http_select_aggregate(self):
         db_name = "default"
         table_name = "test_select"
         self.show_database(db_name)
@@ -105,7 +105,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_varchar(self):
+    def test_http_select_varchar(self):
         db_name = "default"
         table_name = "test_select_varchar"
         self.show_database(db_name)
@@ -138,7 +138,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_big(self):
+    def test_http_select_big(self):
         db_name = "default"
         table_name = "test_select_big"
         self.show_database(db_name)
@@ -160,7 +160,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_embedding_int32(self):
+    def test_http_select_embedding_int32(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
         table_name = "test_select_embedding_int32"
@@ -197,7 +197,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_embedding_float(self):
+    def test_http_select_embedding_float(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
         table_name = "test_select_embedding_int32"
@@ -240,7 +240,7 @@ class TestSelect(HttpTest):
         return
 
     # PASS
-    def test_select_big_embedding(self):
+    def test_http_select_big_embedding(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
         table_name = "test_select_embedding_int32"
@@ -278,7 +278,7 @@ class TestSelect(HttpTest):
         return
         # PASS
 
-    def test_select_same_output(self):
+    def test_http_select_same_output(self):
         db_name = "default"
         table_name = "test_select_same_output"
         self.show_database(db_name)
@@ -318,7 +318,7 @@ class TestSelect(HttpTest):
         return
 
     # PASS
-    def test_empty_table(self):
+    def test_http_empty_table(self):
         db_name = "default"
         table_name = "test_empty_table"
         self.show_database(db_name)
@@ -338,7 +338,7 @@ class TestSelect(HttpTest):
         return
         # PASS
 
-    def test_valid_filter_expression(self):
+    def test_http_valid_filter_expression(self):
         filter_list = [
             "c1 > 10",
             "c2 > 1",
@@ -374,7 +374,7 @@ class TestSelect(HttpTest):
         # ERROR
 
     @pytest.mark.skip(reason="invalid filter lead no error")
-    def test_invalid_filter_expression(self):
+    def test_http_invalid_filter_expression(self):
         filter_list = [
             "c1",
             "row_id",

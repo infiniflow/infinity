@@ -1,0 +1,67 @@
+{
+    "name": "infinity_geonames",
+    "app": "infinity",
+    "connection_url": "http://localhost:23817",
+    "data_path": "datasets/geonames/geonames.json",
+    "data_link": "https://rally-tracks.elastic.co/geonames/documents-2.json.bz2",
+    "insert_batch_size": 8192,
+    "query_path": "datasets/geonames/operations.json",
+    "query_link": "to_be_set",
+    "mode": "fulltext",
+    "schema": {"name": "varchar",  
+        "feature_class": "varchar",
+        "cc2": "varchar",
+        "timezone": "varchar",
+        "dem": "varchar",
+        "country_code": "varchar",
+        "admin1_code": "varchar",
+        "admin2_code": "varchar",
+        "admin3_code": "varchar",
+        "admin4_code": "varchar",
+        "feature_code": "varchar",
+        "alternatenames": "varchar",
+        "asciiname": "varchar"
+    },
+    "index": {
+        "name": {
+            "type": "text"
+        },
+        "feature_class": {
+            "type": "text"
+        },
+        "cc2": {
+            "type": "text"
+        },
+        "timezone": {
+            "type": "text"
+        },
+        "dem": {
+            "type": "text"
+        },
+        "country_code": {
+            "type": "text"
+        },
+        "admin1_code": {
+            "type": "text"
+        },
+        "admin2_code": {
+            "type": "text"
+        },
+        "admin3_code": {
+            "type": "text"
+        },
+        "admin4_code": {
+            "type": "text"
+        },
+        "feature_code": {
+            "type": "text"
+        },
+        "alternatenames": {
+            "type": "text"
+        },
+        "asciiname": {
+            "type": "text"
+        }
+    },
+    "batch_size": 8192 
+}

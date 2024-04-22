@@ -36,7 +36,7 @@ TEST_F(BlockVersionTest, SaveAndLoad) {
     block_version.created_.emplace_back(20, 6);
     block_version.deleted_[2] = 30;
     block_version.deleted_[5] = 40;
-    String version_path("/tmp/block_version_test");
+    String version_path = String(GetTmpDir()) + "/block_version_test";
     block_version.SaveToFile(version_path);
 
     BlockVersion block_verson2(8192);

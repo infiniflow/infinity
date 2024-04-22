@@ -63,7 +63,7 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.default_row_size(), 8192u);
 
     EXPECT_EQ(config.buffer_pool_size(), 4 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(*config.temp_dir(), "/var/infinity/temp");
+    EXPECT_EQ(*config.temp_dir(), "/var/infinity/tmp");
 }
 
 TEST_F(ConfigTest, test2) {

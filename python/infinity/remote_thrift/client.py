@@ -13,7 +13,9 @@
 # limitations under the License.
 
 from thrift.protocol import TBinaryProtocol
+from thrift.protocol import TCompactProtocol
 from thrift.transport import TSocket
+from thrift.transport.TTransport import TTransportException
 
 from infinity import URI
 from infinity.infinity import ShowVariable
@@ -23,14 +25,14 @@ from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
-        match uri.port:
-            case 9070:
-                self.transport = TTransport.TFramedTransport(
-                    TSocket.TSocket(uri.ip, uri.port))  # async
-            case _:
-                self.transport = TTransport.TBufferedTransport(
-                    TSocket.TSocket(uri.ip, uri.port))  # sync
+        self.uri = uri
+        self.reconnect()
+
+    def reconnect(self):
+        # self.transport = TTransport.TFramedTransport(TSocket.TSocket(self.uri.ip, self.uri.port))  # async
+        self.transport = TTransport.TBufferedTransport(TSocket.TSocket(self.uri.ip, self.uri.port))  # sync
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
+        # self.protocol = TCompactProtocol.TCompactProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()
         res = self.client.Connect()
@@ -121,11 +123,31 @@ class ThriftInfinityClient:
                                                       table_name=table_name))
 
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
-        return self.client.Insert(InsertRequest(session_id=self.session_id,
-                                                db_name=db_name,
-                                                table_name=table_name,
-                                                column_names=column_names,
-                                                fields=fields))
+        retry = 0
+        while retry <= 1:
+            try:
+                res = self.client.Insert(InsertRequest(session_id=self.session_id,
+                                                       db_name=db_name,
+                                                       table_name=table_name,
+                                                       column_names=column_names,
+                                                       fields=fields))
+                return res
+            except TTransportException as ex:
+                if ex.type == ex.END_OF_FILE:
+                    self.reconnect()
+                    retry += 1
+                else:
+                    break
+
+        return
+
+    # Can be used in compact mode
+    # def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
+    #     return self.client.Insert(InsertRequest(session_id=self.session_id,
+    #                                             db_name=db_name,
+    #                                             table_name=table_name,
+    #                                             column_names=column_names,
+    #                                             fields=fields))
 
     def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
         return self.client.Import(ImportRequest(session_id=self.session_id,
@@ -195,3 +217,27 @@ class ThriftInfinityClient:
 
     def show_tables(self, db_name: str):
         return self.client.ShowTables(ShowTablesRequest(session_id=self.session_id, db_name=db_name))
+
+    def show_segments(self, db_name: str, table_name: str):
+        return self.client.ShowSegments(
+            ShowSegmentsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+
+    def show_segment(self, db_name: str, table_name: str, segment_id: int):
+        return self.client.ShowSegment(
+            ShowSegmentRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                               segment_id=segment_id))
+
+    def show_blocks(self, db_name: str, table_name: str, segment_id: int):
+        return self.client.ShowBlocks(
+            ShowBlocksRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                              segment_id=segment_id))
+
+    def show_block(self, db_name: str, table_name: str, segment_id: int, block_id: int):
+        return self.client.ShowBlock(
+            ShowBlockRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                             segment_id=segment_id, block_id=block_id))
+
+    def show_block_column(self, db_name: str, table_name: str, segment_id: int, block_id: int, column_id: int):
+        return self.client.ShowBlockColumn(
+            ShowBlockColumnRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                                   segment_id=segment_id, block_id=block_id, column_id=column_id))

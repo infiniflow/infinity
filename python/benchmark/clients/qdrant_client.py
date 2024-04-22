@@ -1,11 +1,4 @@
 import argparse
-
-from base_client import BaseClient
-
-import argparse
-
-from base_client import BaseClient
-
 from qdrant_client import QdrantClient as QC
 from qdrant_client import models
 from qdrant_client.models import VectorParams, Distance
@@ -15,7 +8,7 @@ import json
 import h5py
 from typing import Any, List, Optional
 
-from base_client import BaseClient, FieldValue
+from .base_client import BaseClient, FieldValue
 
 class QdrantClient(BaseClient):
     def __init__(self,
@@ -30,6 +23,7 @@ class QdrantClient(BaseClient):
             self.distance = Distance.COSINE
         elif self.data['distance'] == 'L2':
             self.distance = Distance.EUCLID
+        self.path_prefix = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     def upload_bach(self, ids: list[int], vectors, payloads = None):
         self.client.upsert(
@@ -84,7 +78,9 @@ class QdrantClient(BaseClient):
                 self.client.create_payload_index(collection_name=self.collection_name,
                                                 field_name=field_name,
                                                 field_schema=field_schema)
-        dataset_path = os.path.abspath(self.data['data_path'])
+        dataset_path = os.path.join(self.path_prefix, self.data['data_path'])
+        if not os.path.exists(dataset_path):
+            self.download_data(self.data['data_link'], dataset_path)
         vector_name = self.data['vector_name']
         batch_size=self.data['insert_batch_size']
         total_time = 0
@@ -94,7 +90,7 @@ class QdrantClient(BaseClient):
                     vectors = []
                     payloads = []
                     for i, line in enumerate(f):
-                        if i % batch_size == 0 and i > 0:
+                        if i % batch_size == 0 and i != 0:
                             start_time = time.time()
                             self.upload_bach(list(range(i-batch_size, i)), vectors, payloads)
                             end_time = time.time()
@@ -111,8 +107,6 @@ class QdrantClient(BaseClient):
                         self.upload_bach(list(range(i-len(vectors)+1, i+1)), vectors, payloads)
                         end_time = time.time()
                         total_time += end_time - start_time
-                        vectors = []
-                        payloads = []
         elif ext == '.hdf5':
             with h5py.File(dataset_path) as f:
                 vectors = []
@@ -123,7 +117,8 @@ class QdrantClient(BaseClient):
                     vectors.append(line)
                 if vectors:
                     self.upload_bach(list(range(i-len(vectors)+1, i+1)), vectors)
-
+        else:
+            raise TypeError("Unsupported file type")
     # build filter condition
     def build_condition(
         self, and_subfilters: Optional[List[Any]], or_subfilters: Optional[List[Any]]
@@ -165,10 +160,10 @@ class QdrantClient(BaseClient):
 
     def search(self) -> list[list[Any]]:
         # get the queries path
-        query_path = os.path.abspath(self.data['query_path'])
+        query_path = os.path.join(self.path_prefix, self.data['query_path'])
         results = []
         _, ext = os.path.splitext(query_path)
-        if ext == '.json':
+        if ext == '.json' and self.data['mode'] == 'vector':
             with open(query_path, 'r') as f:
                 for line in f.readlines():
                     query = json.loads(line)
@@ -177,15 +172,12 @@ class QdrantClient(BaseClient):
                         collection_name=self.collection_name,
                         query_vector=query['vector'],
                         limit=self.data.get('topK', 10),
-                        query_filter=self.parse(
-                            self.data.get('query_filter', None)
-                        ),
                         with_payload=False
                     )
                     end = time.time()
-                    print(f"latency of search with filter: {(end - start)*1000:.2f} milliseconds")
+                    print(f"latency of search: {(end - start)*1000:.2f} milliseconds")
                     results.append(result)
-        elif ext == '.hdf5':
+        elif ext == '.hdf5' and self.data['mode'] == 'vector':
             with h5py.File(query_path, 'r') as f:
                 start = time.time()
                 for line in f['test']:
@@ -193,11 +185,10 @@ class QdrantClient(BaseClient):
                         collection_name=self.collection_name,
                         query_vector=line,
                         limit=self.data.get('topK', 10),
-                        query_filter=self.parse(
-                            self.data.get('query_filter', None)
-                        )
                     )
                     results.append(result)
                 end = time.time()
                 print(f"latency of KNN search: {(end - start)*1000/len(f['test']):.2f} milliseconds")
+        else:
+            raise TypeError("Unsupported file type")
         return results

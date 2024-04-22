@@ -928,3 +928,39 @@ curl --request GET \
     "error_message": "Block: {block_id} doesn't exist."
 }
 ```
+
+## Show block column
+
+Show block column information
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/segments/{segment_id}/blocks/{block_id}/{column_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 success
+
+```
+{
+    "column_name": "c2",
+    "column_id": "1",
+    "data_type": "Varchar",
+    "storage_path": "/var/infinity/data/nFt3IVEglM_db_default/FXgH6FA0gC_table_t2/seg_0/blk_0/1.col",
+    "extra_file_count": "1",
+    "extra_file_name": "col_1_out_0"
+}
+```
+
+- 500 Error
+
+```
+{
+    "error_code": 3072,
+    "error_message": "Block: {block_id} doesn't exist."
+}
+```
