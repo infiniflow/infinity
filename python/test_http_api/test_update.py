@@ -332,12 +332,13 @@ class TestUpdate(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
     def test_http_invalid_filter_expression(self):
         filter_list = [
-            "_row_id",
-            "#@$%@#f",
-            "c1 + 0.1 and c2 - 1.0", "c1 * 0.1 and c2 / 1.0", "c1 > 0.1 %@#$sf c2 < 1.0",
+            ("_row_id", 3063),
+            ("#@$%@#f", 3063),
+            ("c1 > 0.1 %@#$sf c2 < 1.0", 3063),
+            ("c1 + 0.1 and c2 - 1.0", 3030),
+            ("c1 * 0.1 and c2 / 1.0", 3030),
         ]
         types_example = [1, 1.333]
 
@@ -356,9 +357,9 @@ class TestUpdate(HttpTest):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             self.insert(db_name, table_name, values)
         for i in range(len(filter_list)):
-            self.update(db_name, table_name, {"c2": types_example[i % 2]}, filter_list[i], {
+            self.update(db_name, table_name, {"c2": types_example[i % 2]}, filter_list[i][0], {
                 "status_code": 500,
-                "error_code": 3063,
+                "error_code": filter_list[i][1],
             })
         self.drop_table(db_name, table_name)
         return

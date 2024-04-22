@@ -7,6 +7,7 @@
     "insert_batch_size": 8192,
     "query_path": "datasets/geonames/operations.json",
     "query_link": "to_be_set",
+    "ground_truth_path": "datasets/geonames/ground_truth.json",
     "mode": "fulltext",
     "schema": {"name": "varchar",  
         "feature_class": "varchar",
@@ -22,6 +23,7 @@
         "alternatenames": "varchar",
         "asciiname": "varchar"
     },
+    "topK":10,
     "index": {
         "name": {
             "type": "text"

@@ -53,10 +53,6 @@ public:
     // Get file path. As key of buffer handle.
     String GetFilePath() const { return fmt::format("{}/{}", *file_dir_, *file_name_); }
 
-    void Sync();
-
-    void CloseFile();
-
     void CleanupFile();
 
 protected:

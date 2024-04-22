@@ -93,7 +93,10 @@ void BufferManager::RemoveClean() {
         std::unique_lock lock(w_locker_);
         for (auto *buffer_obj : clean_list) {
             auto file_path = buffer_obj->GetFilename();
-            buffer_map_.erase(file_path);
+            size_t remove_n = buffer_map_.erase(file_path);
+            if (remove_n != 1) {
+                UnrecoverableError(fmt::format("BufferManager::RemoveClean: file {} not found.", file_path.c_str()));
+            }
         }
     }
 }

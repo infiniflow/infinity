@@ -79,8 +79,10 @@ public:
 
     void RollBackTxn(Txn *txn);
 
-    void AddWaitFlushTxn(TransactionID txn_id);
+private:
+    void AddWaitFlushTxn(const Vector<TransactionID> &txn_ids);
 
+public:
     void RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids);
 
     TxnTimeStamp GetMinUnflushedTS();

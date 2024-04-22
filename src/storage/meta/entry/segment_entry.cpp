@@ -152,7 +152,7 @@ void SegmentEntry::RollbackCompact() {
 
 bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id) {
     // hold all locks and check
-    Vector<std::shared_lock<std::shared_mutex>> locks;
+    Vector<std::unique_lock<std::shared_mutex>> locks;
     for (const auto &[segment_entry, delete_offsets] : segments) {
         locks.emplace_back(segment_entry->rw_locker_);
         if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kNoDelete) {
@@ -250,7 +250,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             append_state_ptr->current_block_offset_ += actual_appended;
             IncreaseRowCount(actual_appended);
 
-            if(this->row_count_ == this->row_capacity_) {
+            if (this->row_count_ == this->row_capacity_) {
                 LOG_INFO(fmt::format("Segment {} is full.", segment_id_));
                 break;
             }
@@ -435,9 +435,6 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
 }
 
 void SegmentEntry::FlushNewData(TxnTimeStamp flush_ts) {
-    if (this->min_row_ts_ == UNCOMMIT_TS) {
-        this->min_row_ts_ = flush_ts;
-    }
     for (const auto &block_entry : this->block_entries_) {
         block_entry->FlushForImport(flush_ts);
     }
