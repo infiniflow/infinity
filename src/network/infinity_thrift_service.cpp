@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <cstring>
+#include <vector>
 
 module infinity_thrift_service;
 
@@ -81,8 +81,7 @@ void InfinityThriftService::Disconnect(infinity_thrift_rpc::CommonResponse &resp
     }
 }
 
-void InfinityThriftService::CreateDatabase(infinity_thrift_rpc::CommonResponse &response,
-                                           const infinity_thrift_rpc::CreateDatabaseRequest &request) {
+void InfinityThriftService::CreateDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateDatabaseRequest &request) {
     CreateDatabaseOptions create_database_opts;
     switch (request.create_option.conflict_type) {
         case infinity_thrift_rpc::CreateConflict::Ignore: {
@@ -112,8 +111,7 @@ void InfinityThriftService::CreateDatabase(infinity_thrift_rpc::CommonResponse &
     }
 }
 
-void InfinityThriftService::DropDatabase(infinity_thrift_rpc::CommonResponse &response,
-                                         const infinity_thrift_rpc::DropDatabaseRequest &request) {
+void InfinityThriftService::DropDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropDatabaseRequest &request) {
 
     DropDatabaseOptions drop_database_opts;
     switch (request.drop_option.conflict_type) {
@@ -696,8 +694,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     }
 }
 
-void InfinityThriftService::ShowVariable(infinity_thrift_rpc::SelectResponse &response,
-                                         const infinity_thrift_rpc::ShowVariableRequest &request) {
+void InfinityThriftService::ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
         ProcessStatus(response, infinity_status);
@@ -1156,6 +1153,214 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
     }
 }
 
+void InfinityThriftService::ShowSegments(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowSegmentsRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    const QueryResult result = infinity->ShowSegments(request.db_name, request.table_name);
+    if (result.IsOk()) {
+        auto &columns = response.column_fields;
+        columns.resize(result.result_table_->ColumnCount());
+        ProcessDataBlocks(result, response, columns);
+    } else {
+        ProcessQueryResult(response, result);
+    }
+}
+
+void InfinityThriftService::ShowSegment(infinity_thrift_rpc::ShowSegmentResponse &response, const infinity_thrift_rpc::ShowSegmentRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    const QueryResult result = infinity->ShowSegment(request.db_name, request.table_name, request.segment_id);
+    if (result.IsOk()) {
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 1) {
+            UnrecoverableError("ShowSegment: query result is invalid.");
+        }
+
+        {
+            Value value = data_block->GetValue(0, 0);
+            response.segment_id = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 1);
+            response.status = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(0, 2);
+            response.path = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(0, 3);
+            response.size = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(0, 4);
+            response.block_count = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 5);
+            response.row_capacity = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 6);
+            response.row_count = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 8);
+            response.room = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 9);
+            response.column_count = value.value_.big_int;
+        }
+
+        response.__set_error_code((i64)(result.ErrorCode()));
+    } else {
+        ProcessQueryResult(response, result);
+    }
+}
+
+void InfinityThriftService::ShowBlocks(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowBlocksRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    const QueryResult result = infinity->ShowBlocks(request.db_name, request.table_name, request.segment_id);
+    if (result.IsOk()) {
+        auto &columns = response.column_fields;
+        columns.resize(result.result_table_->ColumnCount());
+        ProcessDataBlocks(result, response, columns);
+    } else {
+        ProcessQueryResult(response, result);
+    }
+}
+
+void InfinityThriftService::ShowBlock(infinity_thrift_rpc::ShowBlockResponse &response, const infinity_thrift_rpc::ShowBlockRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    const QueryResult result = infinity->ShowBlock(request.db_name, request.table_name, request.segment_id, request.block_id);
+    if (result.IsOk()) {
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 1) {
+            UnrecoverableError("ShowSegment: query result is invalid.");
+        }
+
+        {
+            Value value = data_block->GetValue(0, 0);
+            response.block_id = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 1);
+            response.path = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(0, 2);
+            response.size = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(0, 3);
+            response.size = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(0, 4);
+            response.row_capacity = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 5);
+            response.row_count = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(0, 6);
+            response.column_count = value.value_.big_int;
+        }
+
+        response.__set_error_code((i64)(result.ErrorCode()));
+    } else {
+        ProcessQueryResult(response, result);
+    }
+}
+
+void InfinityThriftService::ShowBlockColumn(infinity_thrift_rpc::ShowBlockColumnResponse &response,
+                                            const infinity_thrift_rpc::ShowBlockColumnRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto result = infinity->ShowBlockColumn(request.db_name, request.table_name, request.segment_id, request.block_id, request.column_id);
+
+    if (result.IsOk()) {
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 6) {
+            UnrecoverableError("ShowIndex: query result is invalid.");
+        }
+
+        {
+            Value value = data_block->GetValue(1, 0);
+            response.column_name = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 1);
+            response.column_id = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(1, 2);
+            response.data_type = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 3);
+            response.path = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 4);
+            response.extra_file_count = value.value_.big_int;
+        }
+
+        {
+            Value value = data_block->GetValue(1, 5);
+            response.extra_file_names = value.GetVarchar();
+        }
+
+        response.__set_error_code((i64)(result.ErrorCode()));
+    } else {
+        ProcessQueryResult(response, result);
+    }
+}
 
 Tuple<Infinity *, Status> InfinityThriftService::GetInfinityBySessionID(i64 session_id) {
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
@@ -1644,7 +1849,9 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
     return infinity_thrift_rpc::ElementType::ElementFloat32;
 }
 
-void InfinityThriftService::ProcessDataBlocks(const QueryResult &result, infinity_thrift_rpc::SelectResponse &response, Vector<infinity_thrift_rpc::ColumnField> &columns) {
+void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
+                                              infinity_thrift_rpc::SelectResponse &response,
+                                              Vector<infinity_thrift_rpc::ColumnField> &columns) {
     SizeT blocks_count = result.result_table_->DataBlockCount();
     for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
         auto data_block = result.result_table_->GetDataBlockById(block_idx);
@@ -1657,7 +1864,8 @@ void InfinityThriftService::ProcessDataBlocks(const QueryResult &result, infinit
     HandleColumnDef(response, result.result_table_->ColumnCount(), result.result_table_->definition_ptr_, columns);
 }
 
-Status InfinityThriftService::ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<infinity_thrift_rpc::ColumnField> &columns) {
+Status
+InfinityThriftService::ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<infinity_thrift_rpc::ColumnField> &columns) {
     auto row_count = data_block->row_count();
     for (SizeT col_index = 0; col_index < column_count; ++col_index) {
         auto &result_column_vector = data_block->column_vectors[col_index];
@@ -1693,7 +1901,9 @@ void InfinityThriftService::HandleColumnDef(infinity_thrift_rpc::SelectResponse 
     response.__set_error_code((i64)(ErrorCode::kOk));
 }
 
-Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                                     SizeT row_count,
+                                                     const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean:
         case LogicalType::kTinyInt:
@@ -1725,8 +1935,9 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
     return Status::OK();
 }
 
-void
-InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                          SizeT row_count,
+                                          const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     String dst;
     dst.resize(size);
@@ -1734,7 +1945,9 @@ InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &output_co
     output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
-void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                              SizeT row_count,
+                                              const SharedPtr<ColumnVector> &column_vector) {
     String dst;
     SizeT total_varchar_data_size = 0;
     for (SizeT index = 0; index < row_count; ++index) {
@@ -1768,7 +1981,9 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
 }
 
-void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                                SizeT row_count,
+                                                const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     String dst;
     dst.resize(size);
@@ -1788,9 +2003,7 @@ void InfinityThriftService::HandleRowIDType(infinity_thrift_rpc::ColumnField &ou
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::CommonResponse &response,
-                                          const Status &status,
-                                          const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const String error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1806,9 +2019,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseRespo
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response,
-                                          const Status &status,
-                                          const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const String error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1816,9 +2027,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response,
-                                          const Status &status,
-                                          const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response, const Status &status, const String error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1826,9 +2035,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::SelectResponse &response,
-                                          const Status &status,
-                                          const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const String error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1844,9 +2051,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListDatabaseRespo
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse &response,
-                                          const Status &status,
-                                          const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const String error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1854,9 +2059,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response,
-                                          const Status &status,
-                                          const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const String error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1864,8 +2067,31 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response, const Status &status, const String error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response, const Status &status, const String error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const String error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -1873,8 +2099,7 @@ InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &r
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -1882,8 +2107,9 @@ InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &r
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListDatabaseResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListDatabaseResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -1891,8 +2117,9 @@ InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListDatabaseRespo
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -1900,8 +2127,9 @@ InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListTableResponse
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListIndexResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListIndexResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -1909,8 +2137,9 @@ InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListIndexResponse
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -1918,8 +2147,9 @@ InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseRespo
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -1927,8 +2157,39 @@ InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse
     }
 }
 
-void
-InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowIndexResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowIndexResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSegmentResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockColumnResponse &response,
+                                               const QueryResult &result,
+                                               const String error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());

@@ -45,6 +45,11 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  SelectResponse ShowColumns(ShowColumnsRequest request)')
     print('  ShowDatabaseResponse ShowDatabase(ShowDatabaseRequest request)')
     print('  SelectResponse ShowTables(ShowTablesRequest request)')
+    print('  SelectResponse ShowSegments(ShowSegmentsRequest request)')
+    print('  ShowSegmentResponse ShowSegment(ShowSegmentRequest request)')
+    print('  SelectResponse ShowBlocks(ShowBlocksRequest request)')
+    print('  ShowBlockResponse ShowBlock(ShowBlockRequest request)')
+    print('  ShowBlockColumnResponse ShowBlockColumn(ShowBlockColumnRequest request)')
     print('  CommonResponse GetDatabase(GetDatabaseRequest request)')
     print('  CommonResponse GetTable(GetTableRequest request)')
     print('  CommonResponse CreateIndex(CreateIndexRequest request)')
@@ -254,6 +259,36 @@ elif cmd == 'ShowTables':
         print('ShowTables requires 1 args')
         sys.exit(1)
     pp.pprint(client.ShowTables(eval(args[0]),))
+
+elif cmd == 'ShowSegments':
+    if len(args) != 1:
+        print('ShowSegments requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowSegments(eval(args[0]),))
+
+elif cmd == 'ShowSegment':
+    if len(args) != 1:
+        print('ShowSegment requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowSegment(eval(args[0]),))
+
+elif cmd == 'ShowBlocks':
+    if len(args) != 1:
+        print('ShowBlocks requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowBlocks(eval(args[0]),))
+
+elif cmd == 'ShowBlock':
+    if len(args) != 1:
+        print('ShowBlock requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowBlock(eval(args[0]),))
+
+elif cmd == 'ShowBlockColumn':
+    if len(args) != 1:
+        print('ShowBlockColumn requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowBlockColumn(eval(args[0]),))
 
 elif cmd == 'GetDatabase':
     if len(args) != 1:

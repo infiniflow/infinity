@@ -6136,6 +6136,913 @@ class ShowTablesRequest(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+
+class ShowSegmentsRequest(object):
+    """
+    Attributes:
+     - session_id
+     - db_name
+     - table_name
+
+    """
+
+
+    def __init__(self, session_id=None, db_name=None, table_name=None,):
+        self.session_id = session_id
+        self.db_name = db_name
+        self.table_name = table_name
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowSegmentsRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 2)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 3)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowSegmentRequest(object):
+    """
+    Attributes:
+     - session_id
+     - db_name
+     - table_name
+     - segment_id
+
+    """
+
+
+    def __init__(self, session_id=None, db_name=None, table_name=None, segment_id=None,):
+        self.session_id = session_id
+        self.db_name = db_name
+        self.table_name = table_name
+        self.segment_id = segment_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.segment_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowSegmentRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 2)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 3)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.segment_id is not None:
+            oprot.writeFieldBegin('segment_id', TType.I64, 4)
+            oprot.writeI64(self.segment_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowSegmentResponse(object):
+    """
+    Attributes:
+     - error_code
+     - error_msg
+     - segment_id
+     - status
+     - path
+     - size
+     - block_count
+     - row_capacity
+     - row_count
+     - room
+     - column_count
+
+    """
+
+
+    def __init__(self, error_code=None, error_msg=None, segment_id=None, status=None, path=None, size=None, block_count=None, row_capacity=None, row_count=None, room=None, column_count=None,):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        self.segment_id = segment_id
+        self.status = status
+        self.path = path
+        self.size = size
+        self.block_count = block_count
+        self.row_capacity = row_capacity
+        self.row_count = row_count
+        self.room = room
+        self.column_count = column_count
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I64:
+                    self.segment_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRING:
+                    self.status = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRING:
+                    self.path = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.STRING:
+                    self.size = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 7:
+                if ftype == TType.I64:
+                    self.block_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 8:
+                if ftype == TType.I64:
+                    self.row_capacity = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 9:
+                if ftype == TType.I64:
+                    self.row_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 10:
+                if ftype == TType.I64:
+                    self.room = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 11:
+                if ftype == TType.I64:
+                    self.column_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowSegmentResponse')
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
+            oprot.writeFieldEnd()
+        if self.error_msg is not None:
+            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
+            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
+            oprot.writeFieldEnd()
+        if self.segment_id is not None:
+            oprot.writeFieldBegin('segment_id', TType.I64, 3)
+            oprot.writeI64(self.segment_id)
+            oprot.writeFieldEnd()
+        if self.status is not None:
+            oprot.writeFieldBegin('status', TType.STRING, 4)
+            oprot.writeString(self.status.encode('utf-8') if sys.version_info[0] == 2 else self.status)
+            oprot.writeFieldEnd()
+        if self.path is not None:
+            oprot.writeFieldBegin('path', TType.STRING, 5)
+            oprot.writeString(self.path.encode('utf-8') if sys.version_info[0] == 2 else self.path)
+            oprot.writeFieldEnd()
+        if self.size is not None:
+            oprot.writeFieldBegin('size', TType.STRING, 6)
+            oprot.writeString(self.size.encode('utf-8') if sys.version_info[0] == 2 else self.size)
+            oprot.writeFieldEnd()
+        if self.block_count is not None:
+            oprot.writeFieldBegin('block_count', TType.I64, 7)
+            oprot.writeI64(self.block_count)
+            oprot.writeFieldEnd()
+        if self.row_capacity is not None:
+            oprot.writeFieldBegin('row_capacity', TType.I64, 8)
+            oprot.writeI64(self.row_capacity)
+            oprot.writeFieldEnd()
+        if self.row_count is not None:
+            oprot.writeFieldBegin('row_count', TType.I64, 9)
+            oprot.writeI64(self.row_count)
+            oprot.writeFieldEnd()
+        if self.room is not None:
+            oprot.writeFieldBegin('room', TType.I64, 10)
+            oprot.writeI64(self.room)
+            oprot.writeFieldEnd()
+        if self.column_count is not None:
+            oprot.writeFieldBegin('column_count', TType.I64, 11)
+            oprot.writeI64(self.column_count)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowBlocksRequest(object):
+    """
+    Attributes:
+     - session_id
+     - db_name
+     - table_name
+     - segment_id
+
+    """
+
+
+    def __init__(self, session_id=None, db_name=None, table_name=None, segment_id=None,):
+        self.session_id = session_id
+        self.db_name = db_name
+        self.table_name = table_name
+        self.segment_id = segment_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.segment_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowBlocksRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 2)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 3)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.segment_id is not None:
+            oprot.writeFieldBegin('segment_id', TType.I64, 4)
+            oprot.writeI64(self.segment_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowBlockRequest(object):
+    """
+    Attributes:
+     - session_id
+     - db_name
+     - table_name
+     - segment_id
+     - block_id
+
+    """
+
+
+    def __init__(self, session_id=None, db_name=None, table_name=None, segment_id=None, block_id=None,):
+        self.session_id = session_id
+        self.db_name = db_name
+        self.table_name = table_name
+        self.segment_id = segment_id
+        self.block_id = block_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.segment_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.I64:
+                    self.block_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowBlockRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 2)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 3)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.segment_id is not None:
+            oprot.writeFieldBegin('segment_id', TType.I64, 4)
+            oprot.writeI64(self.segment_id)
+            oprot.writeFieldEnd()
+        if self.block_id is not None:
+            oprot.writeFieldBegin('block_id', TType.I64, 5)
+            oprot.writeI64(self.block_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowBlockResponse(object):
+    """
+    Attributes:
+     - error_code
+     - error_msg
+     - block_id
+     - path
+     - size
+     - row_capacity
+     - row_count
+     - column_count
+
+    """
+
+
+    def __init__(self, error_code=None, error_msg=None, block_id=None, path=None, size=None, row_capacity=None, row_count=None, column_count=None,):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        self.block_id = block_id
+        self.path = path
+        self.size = size
+        self.row_capacity = row_capacity
+        self.row_count = row_count
+        self.column_count = column_count
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I64:
+                    self.block_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRING:
+                    self.path = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRING:
+                    self.size = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.I64:
+                    self.row_capacity = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 7:
+                if ftype == TType.I64:
+                    self.row_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 8:
+                if ftype == TType.I64:
+                    self.column_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowBlockResponse')
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
+            oprot.writeFieldEnd()
+        if self.error_msg is not None:
+            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
+            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
+            oprot.writeFieldEnd()
+        if self.block_id is not None:
+            oprot.writeFieldBegin('block_id', TType.I64, 3)
+            oprot.writeI64(self.block_id)
+            oprot.writeFieldEnd()
+        if self.path is not None:
+            oprot.writeFieldBegin('path', TType.STRING, 4)
+            oprot.writeString(self.path.encode('utf-8') if sys.version_info[0] == 2 else self.path)
+            oprot.writeFieldEnd()
+        if self.size is not None:
+            oprot.writeFieldBegin('size', TType.STRING, 5)
+            oprot.writeString(self.size.encode('utf-8') if sys.version_info[0] == 2 else self.size)
+            oprot.writeFieldEnd()
+        if self.row_capacity is not None:
+            oprot.writeFieldBegin('row_capacity', TType.I64, 6)
+            oprot.writeI64(self.row_capacity)
+            oprot.writeFieldEnd()
+        if self.row_count is not None:
+            oprot.writeFieldBegin('row_count', TType.I64, 7)
+            oprot.writeI64(self.row_count)
+            oprot.writeFieldEnd()
+        if self.column_count is not None:
+            oprot.writeFieldBegin('column_count', TType.I64, 8)
+            oprot.writeI64(self.column_count)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowBlockColumnRequest(object):
+    """
+    Attributes:
+     - session_id
+     - db_name
+     - table_name
+     - segment_id
+     - block_id
+     - column_id
+
+    """
+
+
+    def __init__(self, session_id=None, db_name=None, table_name=None, segment_id=None, block_id=None, column_id=None,):
+        self.session_id = session_id
+        self.db_name = db_name
+        self.table_name = table_name
+        self.segment_id = segment_id
+        self.block_id = block_id
+        self.column_id = column_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.segment_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.I64:
+                    self.block_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.I64:
+                    self.column_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowBlockColumnRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 2)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 3)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.segment_id is not None:
+            oprot.writeFieldBegin('segment_id', TType.I64, 4)
+            oprot.writeI64(self.segment_id)
+            oprot.writeFieldEnd()
+        if self.block_id is not None:
+            oprot.writeFieldBegin('block_id', TType.I64, 5)
+            oprot.writeI64(self.block_id)
+            oprot.writeFieldEnd()
+        if self.column_id is not None:
+            oprot.writeFieldBegin('column_id', TType.I64, 6)
+            oprot.writeI64(self.column_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowBlockColumnResponse(object):
+    """
+    Attributes:
+     - error_code
+     - error_msg
+     - column_name
+     - column_id
+     - data_type
+     - path
+     - extra_file_count
+     - extra_file_names
+
+    """
+
+
+    def __init__(self, error_code=None, error_msg=None, column_name=None, column_id=None, data_type=None, path=None, extra_file_count=None, extra_file_names=None,):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        self.column_name = column_name
+        self.column_id = column_id
+        self.data_type = data_type
+        self.path = path
+        self.extra_file_count = extra_file_count
+        self.extra_file_names = extra_file_names
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.column_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.column_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRING:
+                    self.data_type = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.STRING:
+                    self.path = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 7:
+                if ftype == TType.I64:
+                    self.extra_file_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 8:
+                if ftype == TType.STRING:
+                    self.extra_file_names = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowBlockColumnResponse')
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
+            oprot.writeFieldEnd()
+        if self.error_msg is not None:
+            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
+            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
+            oprot.writeFieldEnd()
+        if self.column_name is not None:
+            oprot.writeFieldBegin('column_name', TType.STRING, 3)
+            oprot.writeString(self.column_name.encode('utf-8') if sys.version_info[0] == 2 else self.column_name)
+            oprot.writeFieldEnd()
+        if self.column_id is not None:
+            oprot.writeFieldBegin('column_id', TType.I64, 4)
+            oprot.writeI64(self.column_id)
+            oprot.writeFieldEnd()
+        if self.data_type is not None:
+            oprot.writeFieldBegin('data_type', TType.STRING, 5)
+            oprot.writeString(self.data_type.encode('utf-8') if sys.version_info[0] == 2 else self.data_type)
+            oprot.writeFieldEnd()
+        if self.path is not None:
+            oprot.writeFieldBegin('path', TType.STRING, 6)
+            oprot.writeString(self.path.encode('utf-8') if sys.version_info[0] == 2 else self.path)
+            oprot.writeFieldEnd()
+        if self.extra_file_count is not None:
+            oprot.writeFieldBegin('extra_file_count', TType.I64, 7)
+            oprot.writeI64(self.extra_file_count)
+            oprot.writeFieldEnd()
+        if self.extra_file_names is not None:
+            oprot.writeFieldBegin('extra_file_names', TType.STRING, 8)
+            oprot.writeString(self.extra_file_names.encode('utf-8') if sys.version_info[0] == 2 else self.extra_file_names)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
 all_structs.append(Property)
 Property.thrift_spec = (
     None,  # 0
@@ -6639,6 +7546,87 @@ ShowTablesRequest.thrift_spec = (
     None,  # 0
     (1, TType.I64, 'session_id', None, None, ),  # 1
     (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+)
+all_structs.append(ShowSegmentsRequest)
+ShowSegmentsRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
+)
+all_structs.append(ShowSegmentRequest)
+ShowSegmentRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'segment_id', None, None, ),  # 4
+)
+all_structs.append(ShowSegmentResponse)
+ShowSegmentResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'error_code', None, None, ),  # 1
+    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
+    (3, TType.I64, 'segment_id', None, None, ),  # 3
+    (4, TType.STRING, 'status', 'UTF8', None, ),  # 4
+    (5, TType.STRING, 'path', 'UTF8', None, ),  # 5
+    (6, TType.STRING, 'size', 'UTF8', None, ),  # 6
+    (7, TType.I64, 'block_count', None, None, ),  # 7
+    (8, TType.I64, 'row_capacity', None, None, ),  # 8
+    (9, TType.I64, 'row_count', None, None, ),  # 9
+    (10, TType.I64, 'room', None, None, ),  # 10
+    (11, TType.I64, 'column_count', None, None, ),  # 11
+)
+all_structs.append(ShowBlocksRequest)
+ShowBlocksRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'segment_id', None, None, ),  # 4
+)
+all_structs.append(ShowBlockRequest)
+ShowBlockRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'segment_id', None, None, ),  # 4
+    (5, TType.I64, 'block_id', None, None, ),  # 5
+)
+all_structs.append(ShowBlockResponse)
+ShowBlockResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'error_code', None, None, ),  # 1
+    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
+    (3, TType.I64, 'block_id', None, None, ),  # 3
+    (4, TType.STRING, 'path', 'UTF8', None, ),  # 4
+    (5, TType.STRING, 'size', 'UTF8', None, ),  # 5
+    (6, TType.I64, 'row_capacity', None, None, ),  # 6
+    (7, TType.I64, 'row_count', None, None, ),  # 7
+    (8, TType.I64, 'column_count', None, None, ),  # 8
+)
+all_structs.append(ShowBlockColumnRequest)
+ShowBlockColumnRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'db_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'table_name', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'segment_id', None, None, ),  # 4
+    (5, TType.I64, 'block_id', None, None, ),  # 5
+    (6, TType.I64, 'column_id', None, None, ),  # 6
+)
+all_structs.append(ShowBlockColumnResponse)
+ShowBlockColumnResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'error_code', None, None, ),  # 1
+    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'column_name', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'column_id', None, None, ),  # 4
+    (5, TType.STRING, 'data_type', 'UTF8', None, ),  # 5
+    (6, TType.STRING, 'path', 'UTF8', None, ),  # 6
+    (7, TType.I64, 'extra_file_count', None, None, ),  # 7
+    (8, TType.STRING, 'extra_file_names', 'UTF8', None, ),  # 8
 )
 fix_spec(all_structs)
 del all_structs
