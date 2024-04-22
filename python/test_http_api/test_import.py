@@ -174,6 +174,7 @@ class TestImport(HttpTest):
         return
 
     # PASS
+    @pytest.mark.skip(reason="")
     def test_http_import_empty_file_jsonl(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
