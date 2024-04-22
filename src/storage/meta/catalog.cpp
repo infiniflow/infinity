@@ -745,6 +745,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto segment_id = add_segment_index_entry_op->segment_id_;
                 auto min_ts = add_segment_index_entry_op->min_ts_;
                 auto max_ts = add_segment_index_entry_op->max_ts_;
+                auto next_chunk_id = add_segment_index_entry_op->next_chunk_id_;
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
@@ -761,6 +762,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                                              buffer_mgr,
                                                                                              min_ts,
                                                                                              max_ts,
+                                                                                             next_chunk_id,
                                                                                              txn_id,
                                                                                              begin_ts,
                                                                                              commit_ts);
@@ -777,6 +779,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 const auto &table_name = add_chunk_index_entry_op->table_name_;
                 const auto &index_name = add_chunk_index_entry_op->index_name_;
                 auto segment_id = add_chunk_index_entry_op->segment_id_;
+                auto chunk_id = add_chunk_index_entry_op->chunk_id_;
                 const auto &base_name = add_chunk_index_entry_op->base_name_;
                 auto base_rowid = add_chunk_index_entry_op->base_rowid_;
                 auto row_count = add_chunk_index_entry_op->row_count_;
@@ -795,7 +798,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
                     }
                     auto *segment_index_entry = iter2->second.get();
-                    segment_index_entry->AddChunkIndexEntryReplay(table_entry, base_name, base_rowid, row_count, buffer_mgr);
+                    segment_index_entry->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, buffer_mgr);
                 }
                 break;
             }

@@ -38,19 +38,19 @@ import infinity_exception;
 
 namespace infinity {
 
-ChunkIndexEntry::ChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count)
-    : BaseEntry(EntryType::kChunkIndex, false), segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid),
-      row_count_(row_count){};
+ChunkIndexEntry::ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count)
+    : BaseEntry(EntryType::kChunkIndex, false), chunk_id_(chunk_id), segment_index_entry_(segment_index_entry), base_name_(base_name),
+      base_rowid_(base_rowid), row_count_(row_count){};
 
 UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const IndexBase *index_base,
                                                              const SharedPtr<String> &index_dir,
                                                              CreateIndexParam *param,
                                                              SegmentID segment_id,
-                                                             RowID base_rowid) {
+                                                             ChunkID chunk_id) {
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
             auto *create_hnsw_param = static_cast<CreateHnswParam *>(param);
-            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, base_rowid));
+            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
             return MakeUnique<HnswFileWorker>(index_dir, index_file_name, create_hnsw_param);
         }
         default: {
@@ -60,39 +60,43 @@ UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const IndexBase *in
     }
 }
 
-String ChunkIndexEntry::IndexFileName(SegmentID segment_id, const RowID &rowid) { return fmt::format("seg{}_{}.idx", segment_id, rowid.ToUint64()); }
+String ChunkIndexEntry::IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
 
-SharedPtr<ChunkIndexEntry>
-ChunkIndexEntry::NewChunkIndexEntry(SegmentIndexEntry *segment_index_entry, CreateIndexParam *param, RowID base_rowid, BufferManager *buffer_mgr) {
-    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(segment_index_entry, "", base_rowid, -1));
+SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewChunkIndexEntry(ChunkID chunk_id,
+                                                               SegmentIndexEntry *segment_index_entry,
+                                                               CreateIndexParam *param,
+                                                               RowID base_rowid,
+                                                               BufferManager *buffer_mgr) {
+    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(chunk_id, segment_index_entry, "", base_rowid, -1));
 
     const auto &index_dir = segment_index_entry->index_dir();
     const auto &index_base = param->index_base_;
     SegmentID segment_id = segment_index_entry->segment_id();
 
-    auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, base_rowid);
+    auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, chunk_id);
     chunk_index_entry->buffer_obj_ = buffer_mgr->Allocate(std::move(file_worker));
     return chunk_index_entry;
 }
 
 SharedPtr<ChunkIndexEntry>
 ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count) {
-    return SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(segment_index_entry, base_name, base_rowid, row_count));
+    return SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(0, segment_index_entry, base_name, base_rowid, row_count));
 }
 
-SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(SegmentIndexEntry *segment_index_entry,
+SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chunk_id,
+                                                                     SegmentIndexEntry *segment_index_entry,
                                                                      CreateIndexParam *param,
                                                                      const String &base_name,
                                                                      RowID base_rowid,
                                                                      u32 row_count,
                                                                      BufferManager *buffer_mgr) {
-    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(segment_index_entry, base_name, base_rowid, row_count));
+    auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count));
     if (param->index_base_->index_type_ != IndexType::kFullText) {
         const auto &index_dir = segment_index_entry->index_dir();
         const auto &index_base = param->index_base_;
         SegmentID segment_id = segment_index_entry->segment_id();
 
-        auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, base_rowid);
+        auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, chunk_id);
         chunk_index_entry->buffer_obj_ = buffer_mgr->Get(std::move(file_worker));
     }
     return chunk_index_entry;
@@ -102,6 +106,7 @@ BufferHandle ChunkIndexEntry::GetIndex() { return buffer_obj_->Load(); }
 
 nlohmann::json ChunkIndexEntry::Serialize() {
     nlohmann::json index_entry_json;
+    index_entry_json["chunk_id"] = this->chunk_id_;
     index_entry_json["base_name"] = this->base_name_;
     index_entry_json["base_rowid"] = this->base_rowid_.ToUint64();
     index_entry_json["row_count"] = this->row_count_;
@@ -112,10 +117,11 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
                                                         SegmentIndexEntry *segment_index_entry,
                                                         CreateIndexParam *param,
                                                         BufferManager *buffer_mgr) {
+    ChunkID chunk_id = index_entry_json["chunk_id"];
     String base_name = index_entry_json["base_name"];
     RowID base_rowid = RowID::FromUint64(index_entry_json["base_rowid"]);
     u32 row_count = index_entry_json["row_count"];
-    return NewReplayChunkIndexEntry(segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
+    return NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
 }
 
 void ChunkIndexEntry::Cleanup() {

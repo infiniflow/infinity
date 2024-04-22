@@ -29,11 +29,15 @@ import third_party;
 
 namespace infinity {
 
-CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr) : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
+CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
+    : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
 
-void CleanupScanner::Scan() { catalog_->PickCleanup(this); }
+void CleanupScanner::Scan() {
+    LOG_INFO(fmt::format("CleanupScanner: Start scanning, ts: {}", visible_ts_));
+    catalog_->PickCleanup(this);
+}
 
 void CleanupScanner::Cleanup() && {
     for (auto &entry : entries_) {

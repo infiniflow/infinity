@@ -355,6 +355,7 @@ UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(char *&ptr) {
     add_segment_index_op->segment_id_ = ReadBufAdv<SegmentID>(ptr);
     add_segment_index_op->min_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     add_segment_index_op->max_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    add_segment_index_op->next_chunk_id_ = ReadBufAdv<ChunkID>(ptr);
     return add_segment_index_op;
 }
 
@@ -366,6 +367,7 @@ UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
     add_chunk_index_op->table_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
     add_chunk_index_op->index_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
     add_chunk_index_op->segment_id_ = ReadBufAdv<SegmentID>(ptr);
+    add_chunk_index_op->chunk_id_ = ReadBufAdv<ChunkID>(ptr);
     add_chunk_index_op->base_name_ = ReadBufAdv<String>(ptr);
     add_chunk_index_op->base_rowid_ = RowID::FromUint64(ReadBufAdv<u64>(ptr));
     add_chunk_index_op->row_count_ = ReadBufAdv<u32>(ptr);
@@ -483,6 +485,7 @@ void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->min_ts_);
     WriteBufAdv(buf, this->max_ts_);
+    WriteBufAdv(buf, this->next_chunk_id_);
 }
 
 void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
@@ -491,6 +494,7 @@ void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->chunk_id_);
     WriteBufAdv(buf, this->base_name_);
     WriteBufAdv(buf, this->base_rowid_.ToUint64());
     WriteBufAdv(buf, this->row_count_);
@@ -596,25 +600,28 @@ const String AddTableIndexEntryOp::ToString() const {
 }
 
 const String AddSegmentIndexEntryOp::ToString() const {
-    return fmt::format("AddSegmentIndexEntryOp {} db_name: {} table_name: {} index_name: {} segment_id: {} min_ts: {} max_ts: {}",
+    return fmt::format("AddSegmentIndexEntryOp {} db_name: {} table_name: {} index_name: {} segment_id: {} min_ts: {} max_ts: {}, next_chunk_id: {}",
                        CatalogDeltaOperation::ToString(),
                        *db_name_,
                        *table_name_,
                        *index_name_,
                        segment_id_,
                        min_ts_,
-                       max_ts_);
+                       max_ts_,
+                       next_chunk_id_);
 }
 
 const String AddChunkIndexEntryOp::ToString() const {
-    return fmt::format("AddChunkIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} base_name: {} base_rowid: {} row_count: {}",
-                       *db_name_,
-                       *table_name_,
-                       *index_name_,
-                       segment_id_,
-                       base_name_,
-                       base_rowid_.ToUint64(),
-                       row_count_);
+    return fmt::format(
+        "AddChunkIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} chunk_id: {} base_name: {} base_rowid: {} row_count: {}",
+        *db_name_,
+        *table_name_,
+        *index_name_,
+        segment_id_,
+        chunk_id_,
+        base_name_,
+        base_rowid_.ToUint64(),
+        row_count_);
 }
 
 const String SetSegmentStatusSealedOp::ToString() const {
@@ -692,14 +699,15 @@ bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const 
     auto *rhs_op = dynamic_cast<const AddSegmentIndexEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
            IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_) && segment_id_ == rhs_op->segment_id_ &&
-           min_ts_ == rhs_op->min_ts_ && max_ts_ == rhs_op->max_ts_;
+           min_ts_ == rhs_op->min_ts_ && max_ts_ == rhs_op->max_ts_ && next_chunk_id_ == rhs_op->next_chunk_id_;
 }
 
 bool AddChunkIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddChunkIndexEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
            IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_) && segment_id_ == rhs_op->segment_id_ &&
-           base_name_ == rhs_op->base_name_ && base_rowid_ == rhs_op->base_rowid_ && row_count_ == rhs_op->row_count_;
+           chunk_id_ == rhs_op->chunk_id_ && base_name_ == rhs_op->base_name_ && base_rowid_ == rhs_op->base_rowid_ &&
+           row_count_ == rhs_op->row_count_;
 }
 
 bool SetSegmentStatusSealedOp::operator==(const CatalogDeltaOperation &rhs) const {

@@ -235,10 +235,11 @@ void TableIndexEntry::MemIndexCommit() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(bool spill) {
+SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_index_store, bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     if (last_segment_.get() != nullptr) {
         chunk_index_entry = last_segment_->MemIndexDump();
+        txn_index_store->chunk_index_entries_.push_back(chunk_index_entry.get());
     }
     return chunk_index_entry;
 }
@@ -313,7 +314,12 @@ void TableIndexEntry::Cleanup() {
     LOG_TRACE(fmt::format("Cleaned dir: {}", *index_dir_));
 }
 
-void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
+void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
+    std::shared_lock r_lock(rw_locker_);
+    for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        segment_index_entry->PickCleanup(scanner);
+    }
+}
 
 void TableIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
     std::unique_lock w_lock(rw_locker_);
