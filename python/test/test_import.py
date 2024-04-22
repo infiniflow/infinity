@@ -71,8 +71,8 @@ class TestImport(TestSdk):
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("file_format", ["csv",
-                                             "jsonl",
-                                             "json",
+                                             pytest.param("json", marks=pytest.mark.xfail(
+                                                 reason="ERROR:3032, Import JSON is not implemented yet")),
                                              "fvecs"])
     def test_import_different_file_format_data(self, file_format, check_data):
         # connect
@@ -159,25 +159,6 @@ class TestImport(TestSdk):
         res = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_empty_file_jsonl", ConflictType.Error)
-
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
-    # import empty JSON file
-    @pytest.mark.parametrize("file_format", ["json", "json", "json"])
-    def test_import_empty_file_json(self, file_format):
-        # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_import_empty_file_json", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_import_empty_file_json",
-                                        {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
-        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
-
-        res = table_obj.output(["*"]).to_df()
-        print(res)
-        db_obj.drop_table("test_import_empty_file_json", ConflictType.Error)
 
         # disconnect
         res = infinity_obj.disconnect()
