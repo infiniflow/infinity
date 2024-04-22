@@ -1,0 +1,125 @@
+# NOTICE: This Dockerfile depends on BuildKit
+# NOTICE: You should prepare the following files
+# NOTICE: You can use the download_deps_infinity_builder_centos7.sh script to download them
+# bison-3.8.2.tar.xz
+# binutils-2.41.tar.xz
+# gcc-13.2.0.tar.xz
+# cmake-3.29.0-linux-x86_64.tar.gz
+# ninja-linux.zip
+# llvm-project-17.0.6.src.tar.xz
+# boost_1_81_0.tar.bz2
+# flex-2.6.4.tar.gz
+# liburing-2.5.tar.gz
+# libevent-2.1.12-stable.tar.gz
+# lz4-1.9.4.tar.gz
+
+FROM opencloudos/opencloudos:9.0
+
+RUN dnf -y upgrade \
+    && dnf -y install git make wget which vim file gcc-c++ \
+        python3 python3-devel gettext-devel openssl-devel \
+        unzip bzip2 libtool m4 tree rpm-build postgresql \
+    && echo '/usr/local/lib' >> /etc/ld.so.conf.d/local.conf \
+    && echo '/usr/local/lib64' >> /etc/ld.so.conf.d/local.conf
+
+# Install bison-3.8.2
+RUN --mount=type=bind,source=bison-3.8.2.tar.xz,target=/root/bison-3.8.2.tar.xz \
+    cd /root && tar xf bison-3.8.2.tar.xz && cd bison-3.8.2 \
+    && ./configure && make -j && make install \
+    && ldconfig && cd /root && rm -rf bison-3.8.2
+
+# Install binutils-2.41
+RUN --mount=type=bind,source=binutils-2.41.tar.xz,target=/root/binutils-2.41.tar.xz \
+    cd /root && tar xf binutils-2.41.tar.xz && cd binutils-2.41 \
+    && ./configure --enable-gold \
+    && make -j && make install-strip \
+    && ldconfig && cd /root && rm -rf binutils-2.41
+
+# Install gcc-13.2.0
+RUN --mount=type=bind,source=gcc-13.2.0.tar.xz,target=/root/gcc-13.2.0.tar.xz \
+    cd /root && tar xf gcc-13.2.0.tar.xz \
+    && cd gcc-13.2.0 && ./contrib/download_prerequisites \
+    && cd /root && mkdir build-gcc && cd build-gcc \
+    && ../gcc-13.2.0/configure --enable-languages=c,c++ \
+        --disable-multilib --with-pic \
+    && make -j12 && make install-strip \
+    && cd /root && rm -rf build-gcc && rm -rf gcc-13.2.0 \
+    && ln -s gcc /usr/local/bin/cc && ldconfig
+
+ENV LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
+
+# Install cmake-3.29.0
+RUN --mount=type=bind,source=cmake-3.29.0-linux-x86_64.tar.gz,target=/root/cmake-3.29.0-linux-x86_64.tar.gz \
+    cd /root && tar xf cmake-3.29.0-linux-x86_64.tar.gz \
+    && cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin \
+    && cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share \
+    && rm -rf cmake-3.29.0-linux-x86_64
+
+# Install ninja-1.11.1
+RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
+    cd /root && unzip ninja-linux.zip \
+    && cp ninja /usr/local/bin && rm ninja
+
+# Install clang-17.0.6
+# Add -DCLANG_DEFAULT_LINKER=lld to use lld by default
+# infinity seems to be incompatible with the lld linker
+RUN --mount=type=bind,source=llvm-project-17.0.6.src.tar.xz,target=/root/llvm-project-17.0.6.src.tar.xz \
+    cd /root && tar xf llvm-project-17.0.6.src.tar.xz \
+    && cd llvm-project-17.0.6.src && mkdir build && cd build \
+    && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_JOB_POOLS:STRING=link_pool=1 \
+        -DCMAKE_JOB_POOL_LINK:STRING=link_pool \
+        -DGCC_INSTALL_PREFIX=/usr/local \
+        -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;lldb" \
+        -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
+        -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
+        -DLLVM_TARGETS_TO_BUILD=X86 ../llvm \
+    && ninja -j12 install/strip \
+    && ldconfig && cd /root && rm -rf llvm-project-17.0.6.src
+
+# Install boost-1.81.0
+RUN --mount=type=bind,source=boost_1_81_0.tar.bz2,target=/root/boost_1_81_0.tar.bz2 \
+    cd /root && tar xf boost_1_81_0.tar.bz2 \
+    && cd boost_1_81_0 && ./bootstrap.sh --with-python=python3 \
+    && ./b2 -j12 install \
+    && ldconfig && cd /root && rm -rf boost_1_81_0
+
+# Install flex-2.6.4
+RUN --mount=type=bind,source=flex-2.6.4.tar.gz,target=/root/flex-2.6.4.tar.gz  \
+    cd /root && tar xf flex-2.6.4.tar.gz \
+    && cd flex-2.6.4 && ./autogen.sh && ./configure \
+    && make -j && make install \
+    && ldconfig && cd /root && rm -rf flex-2.6.4
+
+# Install liburing-2.5
+RUN --mount=type=bind,source=liburing-2.5.tar.gz,target=/root/liburing-2.5.tar.gz  \
+    cd /root && tar xf liburing-2.5.tar.gz \
+    && cd liburing-liburing-2.5 && make -j install \
+    && ldconfig && cd /root && rm -rf liburing-liburing-2.5
+
+# Install libevent-2.1.12
+RUN --mount=type=bind,source=libevent-2.1.12-stable.tar.gz,target=/root/libevent-2.1.12-stable.tar.gz  \
+    cd /root && tar xf libevent-2.1.12-stable.tar.gz \
+    && cd libevent-2.1.12-stable && mkdir build && cd build \
+    && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_FLAGS="-fPIC" .. \
+    && ninja -j0 install \
+    && ldconfig && cd /root && rm -rf libevent-2.1.12-stable
+
+# Install lz4-1.9.4
+RUN --mount=type=bind,source=lz4-1.9.4.tar.gz,target=/root/lz4-1.9.4.tar.gz  \
+    cd /root && tar xf lz4-1.9.4.tar.gz \
+    && cd lz4-1.9.4 && CFLAGS="-fPIC" make -j install \
+    && ldconfig && cd /root && rm -rf lz4-1.9.4
+
+# Install jemalloc-5.3.0
+# Known issue: Composition of `-fsanitize=address`, staticly linked jemalloc and `mallctl` cause crash at initialization.
+# Refers to https://github.com/jemalloc/jemalloc/issues/2454
+RUN --mount=type=bind,source=jemalloc-5.3.0.tar.bz2,target=/root/jemalloc-5.3.0.tar.bz2  \
+    cd /root && tar xjf jemalloc-5.3.0.tar.bz2 \
+    && cd jemalloc-5.3.0 && CFLAGS="-fPIE" CXXFLAGS="-fPIE" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind && make -j install \
+    && ldconfig && cd /root && rm -rf jemalloc-5.3.0
+
+ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
+
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
