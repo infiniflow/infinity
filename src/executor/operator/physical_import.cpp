@@ -285,20 +285,6 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
     }
     while (true) {
-        // if (start_pos >= file_size) {
-        //     if (block_entry->row_count() == 0) {
-        //         std::move(*block_entry).Cleanup();
-        //     } else {
-        //         segment_entry->AppendBlockEntry(std::move(block_entry));
-        //     }
-        //     if (segment_entry->row_count() == 0) {
-        //         std::move(*segment_entry).Cleanup();
-        //     } else {
-        //         SaveSegmentData(table_entry_, txn, segment_entry);
-        //     }
-        //     break;
-        // }
-
         SizeT end_pos = jsonl_str.find('\n', start_pos);
         if (end_pos == String::npos) {
             end_pos = file_size;

@@ -71,8 +71,7 @@ class TestImport(TestSdk):
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("file_format", ["csv",
-                                             pytest.param("json", marks=pytest.mark.xfail(
-                                                 reason="ERROR:3032, Import JSON is not implemented yet")),
+                                             "json",
                                              "fvecs"])
     def test_import_different_file_format_data(self, file_format, check_data):
         # connect
