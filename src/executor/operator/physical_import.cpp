@@ -285,16 +285,16 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
     }
     while (true) {
+        if (start_pos >= file_size) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            SaveSegmentData(table_entry_, txn, segment_entry);
+            break;
+        }
         SizeT end_pos = jsonl_str.find('\n', start_pos);
         if (end_pos == String::npos) {
             end_pos = file_size;
         }
         std::string_view json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
-        if (end_pos == file_size && start_pos >= end_pos) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
-            break;
-        }
         start_pos = end_pos + 1;
 
         nlohmann::json line_json = nlohmann::json::parse(json_sv);
