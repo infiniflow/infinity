@@ -11,6 +11,14 @@ Infinity can only be compiled natively on Linux. If your operating system is not
 - [Build from source on Ubuntu 22.04](#build-from-source-on-ubuntu-2204)
 - [Build from source on Ubuntu 23.10](#build-from-source-on-ubuntu-2310)
 
+
+## Prerequisites
+We recommend that you build the project on a machine with 16GB of memory, which will take a few minutes to build the project.
+If your machine can't provide that much memory, make sure you have at least 6GB of memory, and try to reduce the number of ninja parallel compilation jobs as follows.
+```shell
+ninja -j1
+```
+
 ## Build from source on Linux using Docker
 
 This section provides instructions on building Infinity from source on Linux using Docker.
