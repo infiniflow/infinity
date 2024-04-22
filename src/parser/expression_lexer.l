@@ -28,6 +28,26 @@ static thread_local std::stringstream string_buffer;
 
 [ \t\n]+        /* ignore \t\n and space */;
 
+AND             { return AND; }
+AS              { return AS; }
+BETWEEN         { return BETWEEN; }
+CAST            { return CAST; }
+DISTINCT        { return DISTINCT; }
+EXTRACT         { return EXTRACT; }
+FALSE           { return FALSE; }
+FROM            { return FROM; }
+FUSION          { return FUSION; }
+IN              { return IN; }
+INTERVAL        { return INTERVAL; }
+IS              { return IS; }
+LIKE            { return LIKE; }
+MATCH           { return MATCH; }
+NOT             { return NOT; }
+NULL            { return NULLABLE; }
+OR              { return OR; }
+QUERY           { return QUERY; }
+TRUE            { return TRUE; }
+
 "=="            { return EQUAL; }
 "!="            { return NOT_EQ; }
 "<>"            { return NOT_EQ; }
