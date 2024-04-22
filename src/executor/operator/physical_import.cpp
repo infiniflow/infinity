@@ -286,8 +286,16 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     }
     while (true) {
         if (start_pos >= file_size) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
+            if (block_entry->row_count() == 0) {
+                std::move(*block_entry).Cleanup();
+            } else {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+            }
+            if (segment_entry->row_count() == 0) {
+                std::move(*segment_entry).Cleanup();
+            } else {
+                SaveSegmentData(table_entry_, txn, segment_entry);
+            }
             break;
         }
         SizeT end_pos = jsonl_str.find('\n', start_pos);
@@ -354,9 +362,6 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
     }
 
     for (const auto& json_entry : json_arr){
-        JSONLRowHandler(json_entry, column_vectors);
-        block_entry->IncreaseRowCount(1);
-
         if (block_entry->GetAvailableCapacity() <= 0) {
             LOG_INFO(fmt::format("Block {} saved", block_entry->block_id()));
             segment_entry->AppendBlockEntry(std::move(block_entry));
@@ -374,11 +379,21 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
                 column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
             }
         }
+
+        JSONLRowHandler(json_entry, column_vectors);
+        block_entry->IncreaseRowCount(1);
     }
 
-    segment_entry->AppendBlockEntry(std::move(block_entry));
-    SaveSegmentData(table_entry_, txn, segment_entry);    
-
+    if (block_entry->row_count() == 0) {
+        std::move(*block_entry).Cleanup();
+    } else {
+        segment_entry->AppendBlockEntry(std::move(block_entry));
+    }
+    if (segment_entry->row_count() == 0) {
+        std::move(*segment_entry).Cleanup();
+    } else {
+        SaveSegmentData(table_entry_, txn, segment_entry);
+    }
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
