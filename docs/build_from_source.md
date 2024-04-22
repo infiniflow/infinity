@@ -14,7 +14,7 @@ Infinity can only be compiled natively on Linux. If your operating system is not
 
 ## Prerequisites
 
-A RAM of 16GB is advised to properly build the project. If your machine does not have much memory capacity, ensure that there is a minimum of 6GB of RAM and limit the number of ninja parallel compilation jobs to one: 
+A RAM of 16GB is advised to properly build the project. If your machine does not have that much memory capacity, ensure that there is a minimum of 6GB of RAM and limit the number of ninja parallel compilation jobs to one: 
 
 ```shell
 ninja -j1
