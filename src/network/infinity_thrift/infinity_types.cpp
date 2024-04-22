@@ -10428,4 +10428,1560 @@ void ShowTablesRequest::printTo(std::ostream& out) const {
   out << ")";
 }
 
+
+ShowSegmentsRequest::~ShowSegmentsRequest() noexcept {
+}
+
+
+void ShowSegmentsRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void ShowSegmentsRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void ShowSegmentsRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowSegmentsRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowSegmentsRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowSegmentsRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowSegmentsRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowSegmentsRequest &a, ShowSegmentsRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.__isset, b.__isset);
+}
+
+ShowSegmentsRequest::ShowSegmentsRequest(const ShowSegmentsRequest& other358) {
+  session_id = other358.session_id;
+  db_name = other358.db_name;
+  table_name = other358.table_name;
+  __isset = other358.__isset;
+}
+ShowSegmentsRequest& ShowSegmentsRequest::operator=(const ShowSegmentsRequest& other359) {
+  session_id = other359.session_id;
+  db_name = other359.db_name;
+  table_name = other359.table_name;
+  __isset = other359.__isset;
+  return *this;
+}
+void ShowSegmentsRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowSegmentsRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ")";
+}
+
+
+ShowSegmentRequest::~ShowSegmentRequest() noexcept {
+}
+
+
+void ShowSegmentRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void ShowSegmentRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void ShowSegmentRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+
+void ShowSegmentRequest::__set_segment_id(const int64_t val) {
+  this->segment_id = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowSegmentRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowSegmentRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->segment_id);
+          this->__isset.segment_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowSegmentRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowSegmentRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("segment_id", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->segment_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowSegmentRequest &a, ShowSegmentRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.segment_id, b.segment_id);
+  swap(a.__isset, b.__isset);
+}
+
+ShowSegmentRequest::ShowSegmentRequest(const ShowSegmentRequest& other360) {
+  session_id = other360.session_id;
+  db_name = other360.db_name;
+  table_name = other360.table_name;
+  segment_id = other360.segment_id;
+  __isset = other360.__isset;
+}
+ShowSegmentRequest& ShowSegmentRequest::operator=(const ShowSegmentRequest& other361) {
+  session_id = other361.session_id;
+  db_name = other361.db_name;
+  table_name = other361.table_name;
+  segment_id = other361.segment_id;
+  __isset = other361.__isset;
+  return *this;
+}
+void ShowSegmentRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowSegmentRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ", " << "segment_id=" << to_string(segment_id);
+  out << ")";
+}
+
+
+ShowSegmentResponse::~ShowSegmentResponse() noexcept {
+}
+
+
+void ShowSegmentResponse::__set_error_code(const int64_t val) {
+  this->error_code = val;
+}
+
+void ShowSegmentResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
+}
+
+void ShowSegmentResponse::__set_segment_id(const int64_t val) {
+  this->segment_id = val;
+}
+
+void ShowSegmentResponse::__set_status(const std::string& val) {
+  this->status = val;
+}
+
+void ShowSegmentResponse::__set_path(const std::string& val) {
+  this->path = val;
+}
+
+void ShowSegmentResponse::__set_size(const std::string& val) {
+  this->size = val;
+}
+
+void ShowSegmentResponse::__set_block_count(const int64_t val) {
+  this->block_count = val;
+}
+
+void ShowSegmentResponse::__set_row_capacity(const int64_t val) {
+  this->row_capacity = val;
+}
+
+void ShowSegmentResponse::__set_row_count(const int64_t val) {
+  this->row_count = val;
+}
+
+void ShowSegmentResponse::__set_room(const int64_t val) {
+  this->room = val;
+}
+
+void ShowSegmentResponse::__set_column_count(const int64_t val) {
+  this->column_count = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowSegmentResponse& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowSegmentResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->error_code);
+          this->__isset.error_code = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->segment_id);
+          this->__isset.segment_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->status);
+          this->__isset.status = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->path);
+          this->__isset.path = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->size);
+          this->__isset.size = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->block_count);
+          this->__isset.block_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->row_capacity);
+          this->__isset.row_capacity = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 9:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->row_count);
+          this->__isset.row_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 10:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->room);
+          this->__isset.room = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 11:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->column_count);
+          this->__isset.column_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowSegmentResponse::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowSegmentResponse");
+
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->error_code);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("segment_id", ::apache::thrift::protocol::T_I64, 3);
+  xfer += oprot->writeI64(this->segment_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("status", ::apache::thrift::protocol::T_STRING, 4);
+  xfer += oprot->writeString(this->status);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("path", ::apache::thrift::protocol::T_STRING, 5);
+  xfer += oprot->writeString(this->path);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("size", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->size);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("block_count", ::apache::thrift::protocol::T_I64, 7);
+  xfer += oprot->writeI64(this->block_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("row_capacity", ::apache::thrift::protocol::T_I64, 8);
+  xfer += oprot->writeI64(this->row_capacity);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("row_count", ::apache::thrift::protocol::T_I64, 9);
+  xfer += oprot->writeI64(this->row_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("room", ::apache::thrift::protocol::T_I64, 10);
+  xfer += oprot->writeI64(this->room);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("column_count", ::apache::thrift::protocol::T_I64, 11);
+  xfer += oprot->writeI64(this->column_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowSegmentResponse &a, ShowSegmentResponse &b) {
+  using ::std::swap;
+  swap(a.error_code, b.error_code);
+  swap(a.error_msg, b.error_msg);
+  swap(a.segment_id, b.segment_id);
+  swap(a.status, b.status);
+  swap(a.path, b.path);
+  swap(a.size, b.size);
+  swap(a.block_count, b.block_count);
+  swap(a.row_capacity, b.row_capacity);
+  swap(a.row_count, b.row_count);
+  swap(a.room, b.room);
+  swap(a.column_count, b.column_count);
+  swap(a.__isset, b.__isset);
+}
+
+ShowSegmentResponse::ShowSegmentResponse(const ShowSegmentResponse& other362) {
+  error_code = other362.error_code;
+  error_msg = other362.error_msg;
+  segment_id = other362.segment_id;
+  status = other362.status;
+  path = other362.path;
+  size = other362.size;
+  block_count = other362.block_count;
+  row_capacity = other362.row_capacity;
+  row_count = other362.row_count;
+  room = other362.room;
+  column_count = other362.column_count;
+  __isset = other362.__isset;
+}
+ShowSegmentResponse& ShowSegmentResponse::operator=(const ShowSegmentResponse& other363) {
+  error_code = other363.error_code;
+  error_msg = other363.error_msg;
+  segment_id = other363.segment_id;
+  status = other363.status;
+  path = other363.path;
+  size = other363.size;
+  block_count = other363.block_count;
+  row_capacity = other363.row_capacity;
+  row_count = other363.row_count;
+  room = other363.room;
+  column_count = other363.column_count;
+  __isset = other363.__isset;
+  return *this;
+}
+void ShowSegmentResponse::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowSegmentResponse(";
+  out << "error_code=" << to_string(error_code);
+  out << ", " << "error_msg=" << to_string(error_msg);
+  out << ", " << "segment_id=" << to_string(segment_id);
+  out << ", " << "status=" << to_string(status);
+  out << ", " << "path=" << to_string(path);
+  out << ", " << "size=" << to_string(size);
+  out << ", " << "block_count=" << to_string(block_count);
+  out << ", " << "row_capacity=" << to_string(row_capacity);
+  out << ", " << "row_count=" << to_string(row_count);
+  out << ", " << "room=" << to_string(room);
+  out << ", " << "column_count=" << to_string(column_count);
+  out << ")";
+}
+
+
+ShowBlocksRequest::~ShowBlocksRequest() noexcept {
+}
+
+
+void ShowBlocksRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void ShowBlocksRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void ShowBlocksRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+
+void ShowBlocksRequest::__set_segment_id(const int64_t val) {
+  this->segment_id = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowBlocksRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowBlocksRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->segment_id);
+          this->__isset.segment_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowBlocksRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowBlocksRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("segment_id", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->segment_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowBlocksRequest &a, ShowBlocksRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.segment_id, b.segment_id);
+  swap(a.__isset, b.__isset);
+}
+
+ShowBlocksRequest::ShowBlocksRequest(const ShowBlocksRequest& other364) {
+  session_id = other364.session_id;
+  db_name = other364.db_name;
+  table_name = other364.table_name;
+  segment_id = other364.segment_id;
+  __isset = other364.__isset;
+}
+ShowBlocksRequest& ShowBlocksRequest::operator=(const ShowBlocksRequest& other365) {
+  session_id = other365.session_id;
+  db_name = other365.db_name;
+  table_name = other365.table_name;
+  segment_id = other365.segment_id;
+  __isset = other365.__isset;
+  return *this;
+}
+void ShowBlocksRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowBlocksRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ", " << "segment_id=" << to_string(segment_id);
+  out << ")";
+}
+
+
+ShowBlockRequest::~ShowBlockRequest() noexcept {
+}
+
+
+void ShowBlockRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void ShowBlockRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void ShowBlockRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+
+void ShowBlockRequest::__set_segment_id(const int64_t val) {
+  this->segment_id = val;
+}
+
+void ShowBlockRequest::__set_block_id(const int64_t val) {
+  this->block_id = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowBlockRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowBlockRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->segment_id);
+          this->__isset.segment_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->block_id);
+          this->__isset.block_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowBlockRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowBlockRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("segment_id", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->segment_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("block_id", ::apache::thrift::protocol::T_I64, 5);
+  xfer += oprot->writeI64(this->block_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowBlockRequest &a, ShowBlockRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.segment_id, b.segment_id);
+  swap(a.block_id, b.block_id);
+  swap(a.__isset, b.__isset);
+}
+
+ShowBlockRequest::ShowBlockRequest(const ShowBlockRequest& other366) {
+  session_id = other366.session_id;
+  db_name = other366.db_name;
+  table_name = other366.table_name;
+  segment_id = other366.segment_id;
+  block_id = other366.block_id;
+  __isset = other366.__isset;
+}
+ShowBlockRequest& ShowBlockRequest::operator=(const ShowBlockRequest& other367) {
+  session_id = other367.session_id;
+  db_name = other367.db_name;
+  table_name = other367.table_name;
+  segment_id = other367.segment_id;
+  block_id = other367.block_id;
+  __isset = other367.__isset;
+  return *this;
+}
+void ShowBlockRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowBlockRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ", " << "segment_id=" << to_string(segment_id);
+  out << ", " << "block_id=" << to_string(block_id);
+  out << ")";
+}
+
+
+ShowBlockResponse::~ShowBlockResponse() noexcept {
+}
+
+
+void ShowBlockResponse::__set_error_code(const int64_t val) {
+  this->error_code = val;
+}
+
+void ShowBlockResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
+}
+
+void ShowBlockResponse::__set_block_id(const int64_t val) {
+  this->block_id = val;
+}
+
+void ShowBlockResponse::__set_path(const std::string& val) {
+  this->path = val;
+}
+
+void ShowBlockResponse::__set_size(const std::string& val) {
+  this->size = val;
+}
+
+void ShowBlockResponse::__set_row_capacity(const int64_t val) {
+  this->row_capacity = val;
+}
+
+void ShowBlockResponse::__set_row_count(const int64_t val) {
+  this->row_count = val;
+}
+
+void ShowBlockResponse::__set_column_count(const int64_t val) {
+  this->column_count = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowBlockResponse& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowBlockResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->error_code);
+          this->__isset.error_code = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->block_id);
+          this->__isset.block_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->path);
+          this->__isset.path = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->size);
+          this->__isset.size = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->row_capacity);
+          this->__isset.row_capacity = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->row_count);
+          this->__isset.row_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->column_count);
+          this->__isset.column_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowBlockResponse::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowBlockResponse");
+
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->error_code);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("block_id", ::apache::thrift::protocol::T_I64, 3);
+  xfer += oprot->writeI64(this->block_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("path", ::apache::thrift::protocol::T_STRING, 4);
+  xfer += oprot->writeString(this->path);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("size", ::apache::thrift::protocol::T_STRING, 5);
+  xfer += oprot->writeString(this->size);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("row_capacity", ::apache::thrift::protocol::T_I64, 6);
+  xfer += oprot->writeI64(this->row_capacity);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("row_count", ::apache::thrift::protocol::T_I64, 7);
+  xfer += oprot->writeI64(this->row_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("column_count", ::apache::thrift::protocol::T_I64, 8);
+  xfer += oprot->writeI64(this->column_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowBlockResponse &a, ShowBlockResponse &b) {
+  using ::std::swap;
+  swap(a.error_code, b.error_code);
+  swap(a.error_msg, b.error_msg);
+  swap(a.block_id, b.block_id);
+  swap(a.path, b.path);
+  swap(a.size, b.size);
+  swap(a.row_capacity, b.row_capacity);
+  swap(a.row_count, b.row_count);
+  swap(a.column_count, b.column_count);
+  swap(a.__isset, b.__isset);
+}
+
+ShowBlockResponse::ShowBlockResponse(const ShowBlockResponse& other368) {
+  error_code = other368.error_code;
+  error_msg = other368.error_msg;
+  block_id = other368.block_id;
+  path = other368.path;
+  size = other368.size;
+  row_capacity = other368.row_capacity;
+  row_count = other368.row_count;
+  column_count = other368.column_count;
+  __isset = other368.__isset;
+}
+ShowBlockResponse& ShowBlockResponse::operator=(const ShowBlockResponse& other369) {
+  error_code = other369.error_code;
+  error_msg = other369.error_msg;
+  block_id = other369.block_id;
+  path = other369.path;
+  size = other369.size;
+  row_capacity = other369.row_capacity;
+  row_count = other369.row_count;
+  column_count = other369.column_count;
+  __isset = other369.__isset;
+  return *this;
+}
+void ShowBlockResponse::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowBlockResponse(";
+  out << "error_code=" << to_string(error_code);
+  out << ", " << "error_msg=" << to_string(error_msg);
+  out << ", " << "block_id=" << to_string(block_id);
+  out << ", " << "path=" << to_string(path);
+  out << ", " << "size=" << to_string(size);
+  out << ", " << "row_capacity=" << to_string(row_capacity);
+  out << ", " << "row_count=" << to_string(row_count);
+  out << ", " << "column_count=" << to_string(column_count);
+  out << ")";
+}
+
+
+ShowBlockColumnRequest::~ShowBlockColumnRequest() noexcept {
+}
+
+
+void ShowBlockColumnRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void ShowBlockColumnRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void ShowBlockColumnRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+
+void ShowBlockColumnRequest::__set_segment_id(const int64_t val) {
+  this->segment_id = val;
+}
+
+void ShowBlockColumnRequest::__set_block_id(const int64_t val) {
+  this->block_id = val;
+}
+
+void ShowBlockColumnRequest::__set_column_id(const int64_t val) {
+  this->column_id = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowBlockColumnRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowBlockColumnRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->segment_id);
+          this->__isset.segment_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->block_id);
+          this->__isset.block_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->column_id);
+          this->__isset.column_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowBlockColumnRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowBlockColumnRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("segment_id", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->segment_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("block_id", ::apache::thrift::protocol::T_I64, 5);
+  xfer += oprot->writeI64(this->block_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("column_id", ::apache::thrift::protocol::T_I64, 6);
+  xfer += oprot->writeI64(this->column_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowBlockColumnRequest &a, ShowBlockColumnRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.segment_id, b.segment_id);
+  swap(a.block_id, b.block_id);
+  swap(a.column_id, b.column_id);
+  swap(a.__isset, b.__isset);
+}
+
+ShowBlockColumnRequest::ShowBlockColumnRequest(const ShowBlockColumnRequest& other370) {
+  session_id = other370.session_id;
+  db_name = other370.db_name;
+  table_name = other370.table_name;
+  segment_id = other370.segment_id;
+  block_id = other370.block_id;
+  column_id = other370.column_id;
+  __isset = other370.__isset;
+}
+ShowBlockColumnRequest& ShowBlockColumnRequest::operator=(const ShowBlockColumnRequest& other371) {
+  session_id = other371.session_id;
+  db_name = other371.db_name;
+  table_name = other371.table_name;
+  segment_id = other371.segment_id;
+  block_id = other371.block_id;
+  column_id = other371.column_id;
+  __isset = other371.__isset;
+  return *this;
+}
+void ShowBlockColumnRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowBlockColumnRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ", " << "segment_id=" << to_string(segment_id);
+  out << ", " << "block_id=" << to_string(block_id);
+  out << ", " << "column_id=" << to_string(column_id);
+  out << ")";
+}
+
+
+ShowBlockColumnResponse::~ShowBlockColumnResponse() noexcept {
+}
+
+
+void ShowBlockColumnResponse::__set_error_code(const int64_t val) {
+  this->error_code = val;
+}
+
+void ShowBlockColumnResponse::__set_error_msg(const std::string& val) {
+  this->error_msg = val;
+}
+
+void ShowBlockColumnResponse::__set_column_name(const std::string& val) {
+  this->column_name = val;
+}
+
+void ShowBlockColumnResponse::__set_column_id(const int64_t val) {
+  this->column_id = val;
+}
+
+void ShowBlockColumnResponse::__set_data_type(const std::string& val) {
+  this->data_type = val;
+}
+
+void ShowBlockColumnResponse::__set_path(const std::string& val) {
+  this->path = val;
+}
+
+void ShowBlockColumnResponse::__set_extra_file_count(const int64_t val) {
+  this->extra_file_count = val;
+}
+
+void ShowBlockColumnResponse::__set_extra_file_names(const std::string& val) {
+  this->extra_file_names = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowBlockColumnResponse& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowBlockColumnResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->error_code);
+          this->__isset.error_code = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->error_msg);
+          this->__isset.error_msg = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->column_name);
+          this->__isset.column_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->column_id);
+          this->__isset.column_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->data_type);
+          this->__isset.data_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->path);
+          this->__isset.path = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->extra_file_count);
+          this->__isset.extra_file_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->extra_file_names);
+          this->__isset.extra_file_names = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowBlockColumnResponse::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowBlockColumnResponse");
+
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->error_code);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->error_msg);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("column_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->column_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("column_id", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->column_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("data_type", ::apache::thrift::protocol::T_STRING, 5);
+  xfer += oprot->writeString(this->data_type);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("path", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->path);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("extra_file_count", ::apache::thrift::protocol::T_I64, 7);
+  xfer += oprot->writeI64(this->extra_file_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("extra_file_names", ::apache::thrift::protocol::T_STRING, 8);
+  xfer += oprot->writeString(this->extra_file_names);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowBlockColumnResponse &a, ShowBlockColumnResponse &b) {
+  using ::std::swap;
+  swap(a.error_code, b.error_code);
+  swap(a.error_msg, b.error_msg);
+  swap(a.column_name, b.column_name);
+  swap(a.column_id, b.column_id);
+  swap(a.data_type, b.data_type);
+  swap(a.path, b.path);
+  swap(a.extra_file_count, b.extra_file_count);
+  swap(a.extra_file_names, b.extra_file_names);
+  swap(a.__isset, b.__isset);
+}
+
+ShowBlockColumnResponse::ShowBlockColumnResponse(const ShowBlockColumnResponse& other372) {
+  error_code = other372.error_code;
+  error_msg = other372.error_msg;
+  column_name = other372.column_name;
+  column_id = other372.column_id;
+  data_type = other372.data_type;
+  path = other372.path;
+  extra_file_count = other372.extra_file_count;
+  extra_file_names = other372.extra_file_names;
+  __isset = other372.__isset;
+}
+ShowBlockColumnResponse& ShowBlockColumnResponse::operator=(const ShowBlockColumnResponse& other373) {
+  error_code = other373.error_code;
+  error_msg = other373.error_msg;
+  column_name = other373.column_name;
+  column_id = other373.column_id;
+  data_type = other373.data_type;
+  path = other373.path;
+  extra_file_count = other373.extra_file_count;
+  extra_file_names = other373.extra_file_names;
+  __isset = other373.__isset;
+  return *this;
+}
+void ShowBlockColumnResponse::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowBlockColumnResponse(";
+  out << "error_code=" << to_string(error_code);
+  out << ", " << "error_msg=" << to_string(error_msg);
+  out << ", " << "column_name=" << to_string(column_name);
+  out << ", " << "column_id=" << to_string(column_id);
+  out << ", " << "data_type=" << to_string(data_type);
+  out << ", " << "path=" << to_string(path);
+  out << ", " << "extra_file_count=" << to_string(extra_file_count);
+  out << ", " << "extra_file_names=" << to_string(extra_file_names);
+  out << ")";
+}
+
 } // namespace

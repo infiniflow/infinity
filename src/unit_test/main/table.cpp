@@ -34,22 +34,13 @@ import column_def;
 import explain_statement;
 import data_type;
 
-class InfinityTableTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
-    }
-    void TearDown() override {
-        system("rm -rf /var/infinity/log /var/infinity/data /var/infinity/wal");
-        BaseTest::TearDown();
-    }
-};
+class InfinityTableTest : public BaseTest {};
 
 TEST_F(InfinityTableTest, test1) {
     using namespace infinity;
 
-    String path = "/var/infinity";
-
+    String path = GetHomeDir();
+    RemoveDbDirs();
     Infinity::LocalInit(path);
 
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();

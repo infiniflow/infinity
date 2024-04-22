@@ -56,6 +56,8 @@ String ToString(ShowType type) {
             return "Show blocks";
         case ShowType::kShowBlock:
             return "Show block";
+        case ShowType::kShowBlockColumn:
+            return "Show block column";
         case ShowType::kShowSessionStatus:
             return "Show session status";
         case ShowType::kShowGlobalStatus:

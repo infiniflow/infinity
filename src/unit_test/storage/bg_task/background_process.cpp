@@ -34,7 +34,7 @@ import bg_task;
 
 class BGProcessTest : public BaseTest {
     void SetUp() override {
-        system("rm -rf /var/infinity");
+        RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif

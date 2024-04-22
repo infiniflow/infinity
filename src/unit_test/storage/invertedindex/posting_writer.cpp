@@ -34,10 +34,7 @@ class PostingWriterTest : public BaseTest {
 public:
     PostingWriterTest() : byte_slice_pool_(10240), buffer_pool_(10240) {}
 
-    void SetUp() override {
-        file_ = "/var/infinity/posting_writer";
-        system("rm -rf /var/infinity/posting_writer");
-    }
+    void SetUp() override { file_ = String(GetTmpDir()) + "/posting_writer"; }
     void TearDown() override {}
 
 protected:

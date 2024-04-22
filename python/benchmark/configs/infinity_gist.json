@@ -1,0 +1,30 @@
+{
+    "name": "infinity_gist_1m",
+    "app": "infinity",
+    "host": "127.0.0.1:23817",
+    "data_path": "datasets/gist/gist-960-euclidean.hdf5",
+    "data_link": "http://ann-benchmarks.com/gist-960-euclidean.hdf5",
+    "topK": 100,
+    "mode": "vector", 
+    "schema": {
+        "embeddings": "vector, 960, float"
+    }, 
+    "metric_type": "l2",
+    "vector_size": 960,
+    "vector_name": "embeddings",
+    "index": {
+        "embeddings": {
+            "type": "HNSW",
+            "params": {
+                "M": 16, 
+                "ef_construction": 200,
+                "ef": 200,
+                "metric": "l2",
+                "encode": "lvq"
+            }
+        }
+    },
+    "query_path": "datasets/gist/gist-960-euclidean.hdf5",
+    "batch_size": 8192,
+    "ground_truth_path": "datasets/gist/gist-960-euclidean.hdf5"
+}

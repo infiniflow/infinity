@@ -44,10 +44,6 @@ using namespace infinity;
 
 class CleanupTaskTest : public BaseTest {
 protected:
-    void SetUp() override { system("rm -rf /var/infinity"); }
-
-    void TearDown() override {}
-
     void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
@@ -74,6 +70,7 @@ TEST_F(CleanupTaskTest, test_delete_db_simple) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
@@ -108,6 +105,7 @@ TEST_F(CleanupTaskTest, test_delete_db_complex) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
@@ -158,6 +156,7 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
@@ -207,6 +206,7 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
@@ -277,9 +277,10 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
     constexpr int kImportN = 5;
     constexpr int kImportSize = 100;
 
-    // close auto cleanup task
+    // disable auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
@@ -370,6 +371,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
+    RemoveDbDirs();
     InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);

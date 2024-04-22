@@ -1,13 +1,16 @@
 {
     "name": "elasticsearch_geonames",
     "app": "elasticsearch",
-    "app_path": "python/benchmark/servers/elasticsearch/",
+    "app_path": "servers/elasticsearch/",
     "connection_url": "http://localhost:9200",
-    "data_path": "python/benchmark/datasets/geonames/geonames.json",
-    "data_link": "to_be_set",
-    "insert_batch_size": 1024,
-    "query_path": "python/benchmark/datasets/geonames/operations.json",
+    "data_path": "datasets/geonames/geonames.json",
+    "data_link": "https://rally-tracks.elastic.co/geonames/documents-2.json.bz2",
+    "insert_batch_size": 8192,
+    "query_path": "datasets/geonames/operations.json",
+    "ground_truth_path": "datasets/geonames/ground_truth.json",
     "query_link": "to_be_set",
+    "mode": "fulltext",
+    "topK": 10,
     "index": {
         "settings": {
         "index.number_of_shards": 5,

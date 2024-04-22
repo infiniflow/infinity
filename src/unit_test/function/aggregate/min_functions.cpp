@@ -41,7 +41,7 @@ class MinFunctionTest : public BaseTest {};
 TEST_F(MinFunctionTest, min_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>("/var/infinity/data"));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
 
     RegisterMinFunction(catalog_ptr);
 

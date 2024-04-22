@@ -52,7 +52,7 @@ garbage_collection_storage_ratio = 0.1
 
 [buffer]
 buffer_pool_size        = "4GB"
-temp_dir                = "/var/infinity/temp"
+temp_dir                = "/var/infinity/tmp"
 
 [wal]
 wal_dir                 = "/var/infinity/wal"

@@ -34,7 +34,7 @@ using namespace std;
 
 namespace infinity {
 
-class ThreadedThriftServer {
+export class ThreadedThriftServer {
 public:
     void Init(i32 port_no);
     void Start();
@@ -54,7 +54,7 @@ private:
     UniquePtr<apache::thrift::server::TServer> server{nullptr};
 };
 
-class NonBlockPoolThriftServer {
+export class NonBlockPoolThriftServer {
 public:
     void Init(i32 port_no, i32 pool_size);
     void Start();

@@ -285,6 +285,18 @@ void PhysicalShow::Init() {
             break;
         }
 
+        case ShowType::kShowBlockColumn: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("description");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+
         case ShowType::kShowSessionStatus: {
             output_names_->reserve(2);
             output_types_->reserve(2);
@@ -375,6 +387,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowBlock: {
             ExecuteShowBlockDetail(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowBlockColumn: {
+            ExecuteShowBlockColumn(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowViews: {
@@ -785,10 +801,14 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type};
-
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     for (auto &database_detail : databases_detail) {
+        if (!output_block_ptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
 
         SizeT column_id = 0;
         {
@@ -798,10 +818,19 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+
+        if (++row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
     }
 
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 /**
@@ -830,10 +859,15 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
-
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     for (auto &table_detail : table_collections_detail) {
+        // Initialize the output data block
+        if (!output_block_ptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
 
         SizeT column_id = 0;
         {
@@ -942,10 +976,19 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+
+        if (++row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
     }
 
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -967,10 +1010,14 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
-
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     for (auto &view_detail : views_detail) {
+        if (!output_block_ptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
 
         SizeT column_id = 0;
         {
@@ -997,10 +1044,19 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+
+        if (++row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
     }
 
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -1037,10 +1093,15 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
                                              varchar_type,
                                              varchar_type,
                                              varchar_type};
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     auto records = catalog->GetProfilerRecords();
     for (SizeT i = 0; i < records.size(); ++i) {
+        if (!output_block_ptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
 
         // Output record no
         ValueExpression record_no_expr(Value::MakeVarchar(fmt::format("{}", i)));
@@ -1062,9 +1123,19 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
         NanoSeconds total_duration(total_cost);
         ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(total_duration)));
         phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors.back());
+
+        if (++row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
     }
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 /**
@@ -1100,11 +1171,16 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         varchar_type,
         varchar_type,
     };
-
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     SizeT column_count = table_entry->ColumnCount();
     for (SizeT input_column_id = 0; input_column_id < column_count; ++input_column_id) {
+        if (!output_block_ptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
         const ColumnDef *column = table_entry->GetColumnDefByID(input_column_id);
 
         SizeT output_column_idx = 0;
@@ -1144,10 +1220,19 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
-    }
-    output_block_ptr->Finalize();
 
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+        if (++row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -1168,9 +1253,15 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         varchar_type,
         varchar_type,
     };
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     for (auto &[_, segment_entry] : table_entry->segment_map()) {
+        if (!output_block_ptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
         SizeT column_id = 0;
         {
             Value value = Value::MakeBigInt(segment_entry->segment_id());
@@ -1192,10 +1283,19 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+
+        if (++row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
     }
 
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -1211,18 +1311,16 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    Vector<SharedPtr<DataType>> column_types{
-        bigint_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        bigint_type
-    };
+    Vector<SharedPtr<DataType>> column_types{bigint_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             bigint_type,
+                                             bigint_type,
+                                             bigint_type,
+                                             bigint_type,
+                                             bigint_type,
+                                             bigint_type};
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
@@ -1299,7 +1397,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-    }else {
+    } else {
         RecoverableError(Status::SegmentNotExist(*segment_id_));
         return;
     }
@@ -1327,6 +1425,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
         varchar_type,
         bigint_type,
     };
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
@@ -1336,6 +1435,11 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     }
     auto block_entry_iter = BlockEntryIter(segment_entry.get());
     for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+        if (!output_block_ptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
         SizeT column_id = 0;
         {
             Value value = Value::MakeBigInt(block_entry->block_id());
@@ -1357,10 +1461,19 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
+
+        if (++row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
     }
 
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -1377,16 +1490,8 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
-        bigint_type,
-        varchar_type,
-        varchar_type,
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        bigint_type,
-        bigint_type
-    };
+    Vector<SharedPtr<DataType>>
+        column_types{bigint_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
     output_block_ptr->Init(column_types);
 
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
@@ -1462,6 +1567,158 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
+void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    auto txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
+
+    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
+        return;
+    }
+
+    SizeT column_count = table_entry->ColumnCount();
+    SizeT table_column_id = *column_id_;
+
+    if (table_column_id >= column_count) {
+        RecoverableError(Status::ColumnNotExist(fmt::format("index {}", table_column_id)));
+        return;
+    }
+
+    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
+    if (!segment_entry) {
+        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        return;
+    }
+
+    auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
+    if (!block_entry) {
+        RecoverableError(Status::BlockNotExist(*block_id_));
+        return;
+    }
+
+    auto column_block_entry = block_entry->GetColumnBlockEntry(table_column_id);
+    if (!column_block_entry) {
+        UnrecoverableError(fmt::format("Attempt to get column {} from block {}", table_column_id, *block_id_));
+        return;
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("column_name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            const ColumnDef *column_def = table_entry->GetColumnDefByID(table_column_id);
+            Value value = Value::MakeVarchar(column_def->name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("column_id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(table_column_id));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("data_type");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(column_block_entry->column_type()->ToString());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage_path");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(column_block_entry->FilePath());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    SizeT outline_count = column_block_entry->OutlineBufferCount();
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("extra_file_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(outline_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("extra_file_name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String outline_storage;
+            for (SizeT idx = 0; idx < outline_count; ++idx) {
+                outline_storage += *(column_block_entry->OutlineFilename(idx));
+                outline_storage += ";";
+            }
+
+            Value value = Value::MakeVarchar(outline_storage);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
 
 // Execute show system table
 void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -2022,11 +2279,17 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
+    SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     {
         auto map_guard = table_entry->IndexMetaMap();
         for (const auto &[index_name, index_meta] : *map_guard) {
+            if (!output_block_ptr) {
+                output_block_ptr = DataBlock::MakeUniquePtr();
+                output_block_ptr->Init(column_types);
+            }
+
             auto [table_index_entry, status] = index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
             if (!status.ok()) {
                 // Index isn't found.
@@ -2093,15 +2356,25 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index other parameters to the fourth column
-                String other_parameters= index_base->BuildOtherParamsString();
+                String other_parameters = index_base->BuildOtherParamsString();
                 Value value = Value::MakeVarchar(other_parameters);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
+
+            if (++row_count == output_block_ptr->capacity()) {
+                output_block_ptr->Finalize();
+                show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+                output_block_ptr = nullptr;
+                row_count = 0;
+            }
         }
     }
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+
+    if (output_block_ptr) {
+        output_block_ptr->Finalize();
+        show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+    }
 }
 
 void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,

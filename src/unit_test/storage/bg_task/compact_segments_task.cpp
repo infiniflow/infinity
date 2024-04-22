@@ -45,10 +45,6 @@ import block_entry;
 using namespace infinity;
 
 class CompactTaskTest : public BaseTest {
-    void SetUp() override { system("rm -rf /var/infinity"); }
-
-    void TearDown() override { system("rm -rf /var/infinity"); }
-
 protected:
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
@@ -92,6 +88,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -168,6 +165,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -248,6 +246,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -347,6 +346,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -475,6 +475,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -635,6 +636,7 @@ TEST_F(CompactTaskTest, compact_not_exist_table) {
     infinity::GlobalResourceUsage::Init();
 #endif
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     Storage *storage = infinity::InfinityContext::instance().storage();

@@ -37,11 +37,11 @@ import data_type;
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {
-        system("rm -rf /var/infinity");
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
     }
 

@@ -56,7 +56,7 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/test_main"
+        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main"
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -68,11 +68,15 @@ jobs:
           # Run a command in the background
           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
-      - name: pysdk debug version
+      - name: pysdk test debug version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
 
-      - name: http_api debug version
+      - name: parallel test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
+
+      - name: http_api test debug version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
 
@@ -137,7 +141,7 @@ jobs:
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/test_main"
+        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main"
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -149,11 +153,15 @@ jobs:
           # Run a command in the background
            sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
-      - name: pysdk release version
+      - name: pysdk test release version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
 
-      - name: http_api release version
+      - name: parallel test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
+
+      - name: http_api test release version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
 

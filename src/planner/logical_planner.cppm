@@ -128,6 +128,8 @@ public:
 
     Status BuildShowBlock(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowBlockColumn(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

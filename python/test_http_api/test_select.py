@@ -7,12 +7,11 @@ import httputils
 
 
 class TestSelect(HttpTest):
-    def test_version(self):
+    def test_http_version(self):
         httputils.check_data(TEST_TMP_DIR)
         return
-        # ERROR
 
-    def test_select(self):
+    def test_http_select(self):
         db_name = "default"
         table_name = "test_select"
         self.show_database(db_name)
@@ -61,20 +60,18 @@ class TestSelect(HttpTest):
             "error_code": 0,
             "output": [{'(c1 + c2)': '6'}]
         })
+        self.select(db_name, table_name, ["c1"], "c1 > 2 AND c2 < 4", {}, {}, {
+            "error_code": 0,
+            "output": [{'c1': '3'}]
+        })
+        self.select(db_name, table_name, ["c2"], "(c1 > -7 OR c1 >= 9) AND c1 = 3", {}, {}, {
+            "error_code": 0,
+            "output": [{'c2': '3'}]
+        })
         self.drop_table(db_name, table_name)
-        # TODO: fix me
-
-        # self.select(db_name, table_name, ["c1"], "c1 > 2 AND c2 < 4", {}, {}, {
-        #     "error_code": 0,
-        #     "output": [{'c1': '3'}, {'c1': '7'}, {'c1': '8'}, {'c1': '9'}]
-        # })
-        # self.select(db_name, table_name, ["c2"], "(c1 > -7 OR c1 >= 9) AND c1 = 3", {}, {}, {
-        #     "error_code": 0,
-        #     "output": [{'c2': (3,)}]
-        # })
 
     # PASS
-    def test_select_aggregate(self):
+    def test_http_select_aggregate(self):
         db_name = "default"
         table_name = "test_select"
         self.show_database(db_name)
@@ -105,7 +102,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_varchar(self):
+    def test_http_select_varchar(self):
         db_name = "default"
         table_name = "test_select_varchar"
         self.show_database(db_name)
@@ -138,7 +135,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_big(self):
+    def test_http_select_big(self):
         db_name = "default"
         table_name = "test_select_big"
         self.show_database(db_name)
@@ -160,7 +157,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_embedding_int32(self):
+    def test_http_select_embedding_int32(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
         table_name = "test_select_embedding_int32"
@@ -197,7 +194,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    def test_select_embedding_float(self):
+    def test_http_select_embedding_float(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
         table_name = "test_select_embedding_int32"
@@ -239,8 +236,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
-    def test_select_big_embedding(self):
+    def test_http_select_big_embedding(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
         table_name = "test_select_embedding_int32"
@@ -276,9 +272,8 @@ class TestSelect(HttpTest):
                     })
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
-    def test_select_same_output(self):
+    def test_http_select_same_output(self):
         db_name = "default"
         table_name = "test_select_same_output"
         self.show_database(db_name)
@@ -317,8 +312,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    # PASS
-    def test_empty_table(self):
+    def test_http_empty_table(self):
         db_name = "default"
         table_name = "test_empty_table"
         self.show_database(db_name)
@@ -336,9 +330,8 @@ class TestSelect(HttpTest):
         self.select(db_name, table_name, ["c1", "c2"])
         self.drop_table(db_name, table_name)
         return
-        # PASS
 
-    def test_valid_filter_expression(self):
+    def test_http_valid_filter_expression(self):
         filter_list = [
             "c1 > 10",
             "c2 > 1",
@@ -371,19 +364,17 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-        # ERROR
-
-    @pytest.mark.skip(reason="invalid filter lead no error")
-    def test_invalid_filter_expression(self):
-        filter_list = [
-            "c1",
-            "row_id",
-            "*",
-            "#@$%@#f",
-            "c1 + 0.1 and c2 - 1.0",
-            "c1 * 0.1 and c2 / 1.0",
-            "c1 > 0.1 %@#$sf c2 < 1.0",
-        ]
+    @pytest.mark.parametrize("invalid_filter_list", [
+        "c1",
+        "row_id",
+        "*",
+        "#@$%@#f",
+        "c1 > 0.1 %@#$sf c2 < 1.0",
+        "c1 + 0.1 and c2 - 1.0",
+        "c1 * 0.1 and c2 / 1.0",
+        "c3 > 0",
+    ])
+    def test_http_invalid_filter_expression(self, invalid_filter_list):
         db_name = "default"
         table_name = "test_valid_filter_expression"
         self.show_database(db_name)
@@ -397,15 +388,13 @@ class TestSelect(HttpTest):
             }
         }
                           )
-        # TODO:fix
         self.insert(db_name, table_name, [{"c1": 1, "c2": 2.0},
                                           {"c1": 10, "c2": 2.0},
                                           {"c1": 100, "c2": 2.0},
                                           {"c1": 1000, "c2": 2.0},
                                           {"c1": 10000, "c2": 2.0}])
-        for f in filter_list:
-            self.select(db_name, table_name, ["*"], f, {}, {}, {
-                "status_code": 500,
-            })
+        self.select(db_name, table_name, ["*"], invalid_filter_list, {}, {}, {
+            "status_code": 500,
+        })
         self.drop_table(db_name, table_name)
         return

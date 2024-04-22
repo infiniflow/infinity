@@ -58,15 +58,11 @@ public:
 
 SegmentID MockSegmentEntry::cur_segment_id_ = 0;
 
-class DBTCompactionTest : public BaseTest {
-public:
-    void SetUp() override { system("rm -rf /var/infinity"); }
-
-    void TearDown() override { system("rm -rf /var/infinity"); }
-};
+class DBTCompactionTest : public BaseTest {};
 
 TEST_F(DBTCompactionTest, AddSegments) {
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     Storage *storage = infinity::InfinityContext::instance().storage();
@@ -208,6 +204,7 @@ TEST_F(DBTCompactionTest, AddSegments) {
 
 TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     Storage *storage = infinity::InfinityContext::instance().storage();
@@ -341,6 +338,7 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
 
 TEST_F(DBTCompactionTest, FillSegmentCapacity) {
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     Storage *storage = infinity::InfinityContext::instance().storage();
@@ -420,6 +418,7 @@ TEST_F(DBTCompactionTest, FillSegmentCapacity) {
 // add rollback test, rollback every compact operation once before success commit it
 TEST_F(DBTCompactionTest, RollbackTest) {
     std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
     Storage *storage = infinity::InfinityContext::instance().storage();

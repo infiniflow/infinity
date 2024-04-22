@@ -252,6 +252,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
     SizeT index_task_n = knn_scan_shared_data->index_entries_->size();
     SizeT brute_task_n = knn_scan_shared_data->block_column_entries_->size();
+    BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
     if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
@@ -459,7 +460,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                     std::tie(result_n1, d_ptr, l_ptr) =
                                         abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, with_lock);
                                 } else {
-                                    std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, with_lock);
+                                    if (!with_lock) {
+                                        std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, false);
+                                    } else {
+                                        AppendFilter filter(block_index->GetSegmentOffset(segment_id));
+                                        std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, true);
+                                    }
                                 }
                             }
 
@@ -488,7 +494,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                             auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
                             for (i64 i = 0; i < result_n; ++i) {
-                                row_ids[i] = RowID{segment_entry->segment_id(), l_ptr[i]};
+                                row_ids[i] = RowID{segment_id, l_ptr[i]};
                             }
                             merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                         }
@@ -515,7 +521,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} task finished", knn_scan_function_data->task_id_));
         // all task Complete
-        BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
         merge_heap->End();
         i64 result_n = std::min(knn_scan_shared_data->topk_, merge_heap->total_count());

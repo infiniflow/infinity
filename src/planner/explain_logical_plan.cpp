@@ -1508,6 +1508,36 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowType::kShowBlockColumn: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW BLOCK COLUMN";
+            } else {
+                show_str = "SHOW BLOCK COLUMN";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String show_segment_str = String(intent_size, ' ');
+            show_segment_str += " - segment: " + std::to_string(*show_node->segment_id());
+            result->emplace_back(MakeShared<String>(show_segment_str));
+
+            String show_block_str = String(intent_size, ' ');
+            show_block_str += " - block: " + std::to_string(*show_node->block_id());
+            result->emplace_back(MakeShared<String>(show_block_str));
+
+            String show_column_str = String(intent_size, ' ');
+            show_column_str += " - column: " + std::to_string(*show_node->column_id());
+            result->emplace_back(MakeShared<String>(show_column_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [id, path, size, row_capacity, row_count, checkpoint_row_count, column_count, checkpoint_ts]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kShowSessionStatus: {
             String show_str;
             if (intent_size != 0) {

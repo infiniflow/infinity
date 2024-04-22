@@ -505,11 +505,10 @@ class TestIndex(TestSdk):
                              indirect=True)
     def test_fulltext_match_with_invalid_analyzer(self, get_infinity_db, check_data):
         db_obj = get_infinity_db
-        res = db_obj.drop_table(
-            "test_with_fulltext_match", ConflictType.Ignore)
+        res = db_obj.drop_table("test_fulltext_match_with_invalid_analyzer", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
-        table_obj = db_obj.create_table("test_with_fulltext_match",
+        table_obj = db_obj.create_table("test_fulltext_match_with_invalid_analyzer",
                                         {"doctitle": "varchar",
                                          "docdate": "varchar",
                                          "body": "varchar", })
@@ -521,6 +520,8 @@ class TestIndex(TestSdk):
                                                     index.IndexType.FullText,
                                                     [index.InitParameter("ANALYZER", "segmentation")]),
                                     ], ConflictType.Error)
+        res = db_obj.drop_table("test_fulltext_match_with_invalid_analyzer", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
 
     # create index on all data are deleted table.
     def test_create_index_on_deleted_table(self, get_infinity_db):

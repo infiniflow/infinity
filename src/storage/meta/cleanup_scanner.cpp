@@ -45,7 +45,7 @@ void CleanupScanner::Cleanup() && {
 void CleanupScanner::CleanupDir(const String &dir) {
     LocalFileSystem fs;
     try {
-        fs.DeleteEmptyDirectory(dir);
+        fs.DeleteDirectory(dir);
     } catch (const RecoverableException &e) {
         if (e.ErrorCode() == ErrorCode::kDirNotFound) {
             // this happen when delta checkpoint records "drop table/db/...", and cleanup is called.

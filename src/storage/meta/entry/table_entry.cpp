@@ -731,51 +731,62 @@ void TableEntry::OptimizeIndex(Txn *txn) {
             continue;
         }
         const IndexBase *index_base = table_index_entry->index_base();
-        if (index_base->index_type_ != IndexType::kFullText) {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_WARN(*err_msg);
-            continue;
-        }
-        const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-        for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
-            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
-            if (chunk_index_entries.size() <= 1) {
-                continue;
-            }
+        switch (index_base->index_type_) {
+            case IndexType::kFullText: {
+                const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+                    if (chunk_index_entries.size() <= 1) {
+                        continue;
+                    }
 
-            Vector<String> base_names;
-            Vector<RowID> base_rowids;
-            RowID base_rowid = chunk_index_entries[0]->base_rowid_;
-            u32 total_row_count = 0;
-            for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
-                auto &chunk_index_entry = chunk_index_entries[i];
-                base_names.push_back(chunk_index_entry->base_name_);
-                base_rowids.push_back(chunk_index_entry->base_rowid_);
-                total_row_count += chunk_index_entry->row_count_;
-            }
-            String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
-            ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
-                                                  index_fulltext->flag_,
-                                                  &table_index_entry->GetFulltextByteSlicePool(),
-                                                  &table_index_entry->GetFulltextBufferPool());
-            column_index_merger.Merge(base_names, base_rowids, dst_base_name);
+                    Vector<String> base_names;
+                    Vector<RowID> base_rowids;
+                    RowID base_rowid = chunk_index_entries[0]->base_rowid_;
+                    u32 total_row_count = 0;
+                    for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
+                        auto &chunk_index_entry = chunk_index_entries[i];
+                        base_names.push_back(chunk_index_entry->base_name_);
+                        base_rowids.push_back(chunk_index_entry->base_rowid_);
+                        total_row_count += chunk_index_entry->row_count_;
+                    }
+                    String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
+                    ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
+                                                          index_fulltext->flag_,
+                                                          &table_index_entry->GetFulltextByteSlicePool(),
+                                                          &table_index_entry->GetFulltextBufferPool());
+                    column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
-            for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
-                auto &chunk_index_entry = chunk_index_entries[i];
-                // TODO yzc: txn_store.cpp:87
-                // chunk_index_entry->deleted_ = true;
-                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                    for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
+                        auto &chunk_index_entry = chunk_index_entries[i];
+                        // TODO yzc: txn_store.cpp:87
+                        // chunk_index_entry->deleted_ = true;
+                        txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                    }
+                    SharedPtr<ChunkIndexEntry> chunk_index_entry =
+                        ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
+                    txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                    segment_index_entry->ReplaceChunkIndexEntries(chunk_index_entry);
+                    // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
+                    TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
+                    assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
+                    table_index_entry->UpdateFulltextSegmentTs(ts);
+                }
+                break;
             }
-            SharedPtr<ChunkIndexEntry> chunk_index_entry =
-                ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
-            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-            segment_index_entry->ReplaceChunkIndexEntries(chunk_index_entry);
-            // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
-            TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
-            assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
-            table_index_entry->UpdateFulltextSegmentTs(ts);
+            case IndexType::kHnsw: {
+                // TODO
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                LOG_WARN(*err_msg);
+                break;
+            }
+            default: {
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                LOG_WARN(*err_msg);
+            }
         }
     }
 }

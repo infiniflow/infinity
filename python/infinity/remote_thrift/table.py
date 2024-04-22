@@ -52,6 +52,7 @@ class RemoteTable(Table, ABC):
                                                                                           params[kwarg].annotation):
                     raise TypeError(f"TypeError: Argument {kwarg} must be {params[kwarg].annotation}")
             return func(*args, **kwargs)
+
         return wrapper
 
     @name_validity_check("index_name", "Index")
@@ -118,6 +119,43 @@ class RemoteTable(Table, ABC):
 
     def list_indexes(self):
         res = self._conn.list_indexes(db_name=self._db_name, table_name=self._table_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_segments(self):
+        res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
+        if res.error_code == ErrorCode.OK:
+            return select_res_to_polars(res)
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_segment(self, segment_id: int):
+        res = self._conn.show_segment(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_blocks(self, segment_id: int):
+        res = self._conn.show_blocks(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
+        if res.error_code == ErrorCode.OK:
+            return select_res_to_polars(res)
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_block(self, segment_id: int, block_id: int):
+        res = self._conn.show_block(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
+                                    block_id=block_id)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_block_column(self, segment_id: int, block_id: int, column_id: int):
+        res = self._conn.show_block_column(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
+                                           block_id=block_id, column_id=column_id)
         if res.error_code == ErrorCode.OK:
             return res
         else:
