@@ -190,20 +190,46 @@ class TestImport(HttpTest):
             }
         })
 
+        file_path = self.get_project_path() + TEST_DATA_DIR + "jsonl/test_empty.jsonl"
+        self.import_data(db_name, table_name, {
+            "file_path": file_path, "file_type": "jsonl", "header": False, "delimiter": ","
+        }, {
+                             "status_code": 200, "error_code": 0,
+                         })
+        assert os.path.exists(file_path)
+        self.drop_table(db_name, table_name)
+        return
+
+    def test_http_import_empty_file_json(self):
+        httputils.check_data(TEST_TMP_DIR)
+        db_name = "default"
+        table_name = "test_import_different_file_format_data"
+
+        self.show_database(db_name)
+        self.drop_table(db_name, table_name)
+        self.create_table(db_name, table_name, {
+            "c1": {
+                "type": "integer",
+            },
+            "c2": {
+                "type": "vector", "dimension": 3, "element_type": "integer",
+            }
+        })
+
         file_path = self.get_project_path() + TEST_DATA_DIR + "json/test_empty.json"
+        assert os.path.exists(file_path)
         self.import_data(db_name, table_name, {
             "file_path": file_path, "file_type": "json", "header": False, "delimiter": ","
         }, {
-                             "status_code": 500, "error_code": 3032,
-                         })
-        assert os.path.exists(file_path)
+            "status_code": 200, "error_code": 0,
+        })
         self.drop_table(db_name, table_name)
         return
 
     # PASS
     def test_http_import_format_unrecognized_data(self):
         httputils.check_data(TEST_TMP_DIR)
-        file_format = ["json", "txt"]
+        file_format = ["txt"]
         db_name = "default"
         table_name = "test_import_format_unrecognized_data"
         self.show_database(db_name)

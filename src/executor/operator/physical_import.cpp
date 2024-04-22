@@ -273,6 +273,12 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
     }
 
+    if (read_n == 0) {
+        auto result_msg = MakeUnique<String>(fmt::format("Empty JSONL file, IMPORT 0 Rows"));
+        import_op_state->result_msg_ = std::move(result_msg);
+        return ;
+    }
+
     Txn *txn = query_context->GetTxn();
     u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
@@ -285,16 +291,24 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
     }
     while (true) {
+        if (start_pos >= file_size) {
+            if (block_entry->row_count() == 0) {
+                std::move(*block_entry).Cleanup();
+            } else {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+            }
+            if (segment_entry->row_count() == 0) {
+                std::move(*segment_entry).Cleanup();
+            } else {
+                SaveSegmentData(table_entry_, txn, segment_entry);
+            }
+            break;
+        }
         SizeT end_pos = jsonl_str.find('\n', start_pos);
         if (end_pos == String::npos) {
             end_pos = file_size;
         }
         std::string_view json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
-        if (end_pos == file_size) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
-            break;
-        }
         start_pos = end_pos + 1;
 
         nlohmann::json line_json = nlohmann::json::parse(json_sv);
@@ -325,8 +339,74 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) {
-    RecoverableError(Status::NotSupport("Import JSON is not implemented yet."));
+void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    nlohmann::json json_arr;
+    {
+        LocalFileSystem fs;
+        UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+        DeferFn file_defer([&]() { fs.Close(*file_handler); });
+
+        SizeT file_size = fs.GetFileSize(*file_handler);
+        String json_str(file_size, 0);
+        SizeT read_n = file_handler->Read(json_str.data(), file_size);
+        if (read_n != file_size) {
+            UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        }
+
+        if (read_n == 0) {
+            auto result_msg = MakeUnique<String>(fmt::format("Empty JSON file, IMPORT 0 Rows"));
+            import_op_state->result_msg_ = std::move(result_msg);
+            return ;
+        }
+
+        json_arr = nlohmann::json::parse(json_str);
+    }
+
+    Txn *txn = query_context->GetTxn();
+    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+
+    Vector<ColumnVector> column_vectors;
+    for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+    }
+
+    if(!json_arr.is_array()) {
+        auto result_msg = MakeUnique<String>(fmt::format("Invalid json format, IMPORT 0 rows"));
+        import_op_state->result_msg_ = std::move(result_msg);
+        return ;
+    }
+
+    for (const auto &json_entry : json_arr) {
+        if (block_entry->GetAvailableCapacity() <= 0) {
+            LOG_INFO(fmt::format("Block {} saved", block_entry->block_id()));
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            if (segment_entry->Room() <= 0) {
+                LOG_INFO(fmt::format("Segment {} saved", segment_entry->segment_id()));
+                SaveSegmentData(table_entry_, txn, segment_entry);
+                u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+            }
+
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+            column_vectors.clear();
+            for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+                auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+            }
+        }
+
+        JSONLRowHandler(json_entry, column_vectors);
+        block_entry->IncreaseRowCount(1);
+    }
+
+    segment_entry->AppendBlockEntry(std::move(block_entry));
+    SaveSegmentData(table_entry_, txn, segment_entry);
+
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
