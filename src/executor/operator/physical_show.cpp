@@ -799,9 +799,10 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     Vector<DatabaseDetail> databases_detail = txn->ListDatabases();
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type};
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     for (auto &database_detail : databases_detail) {
         if (!output_block_ptr) {
@@ -855,10 +856,11 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     for (auto &table_detail : table_collections_detail) {
         // Initialize the output data block
@@ -1005,10 +1007,11 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     }
 
     // Prepare the output data block
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     for (auto &view_detail : views_detail) {
         if (!output_block_ptr) {
@@ -1078,7 +1081,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("profiles"), column_defs);
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type,
                                              varchar_type,
                                              varchar_type,
@@ -1091,6 +1094,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
                                              varchar_type,
                                              varchar_type};
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     auto records = catalog->GetProfilerRecords();
     for (SizeT i = 0; i < records.size(); ++i) {
@@ -1161,13 +1165,14 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
         varchar_type,
         varchar_type,
     };
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     SizeT column_count = table_entry->ColumnCount();
     for (SizeT input_column_id = 0; input_column_id < column_count; ++input_column_id) {
@@ -1242,13 +1247,14 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         varchar_type,
     };
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     for (auto &[_, segment_entry] : table_entry->segment_map()) {
         if (!output_block_ptr) {
@@ -1413,13 +1419,14 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
         bigint_type,
         varchar_type,
         bigint_type,
     };
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
     if (!segment_entry) {
@@ -2270,9 +2277,10 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     auto table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
 
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
     SizeT row_count = 0;
+    output_block_ptr->Init(column_types);
 
     {
         auto map_guard = table_entry->IndexMetaMap();
