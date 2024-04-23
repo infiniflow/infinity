@@ -36,6 +36,7 @@ import memory_indexer;
 namespace infinity {
 
 class Txn;
+class TxnTableStore;
 struct TableIndexEntry;
 struct BlockEntry;
 struct TableEntry;
@@ -60,6 +61,7 @@ public:
                                                                    BufferManager *buffer_manager,
                                                                    TxnTimeStamp min_ts,
                                                                    TxnTimeStamp max_ts,
+                                                                   u32 next_chunk_id,
                                                                    TransactionID txn_id,
                                                                    TxnTimeStamp begin_ts,
                                                                    TxnTimeStamp commit_ts);
@@ -84,6 +86,8 @@ public:
 
     void CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp commit_ts);
 
+    void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
+
     bool Flush(TxnTimeStamp checkpoint_ts);
 
     void Cleanup() final;
@@ -97,6 +101,7 @@ public:
     inline SegmentID segment_id() const { return segment_id_; }
     inline TxnTimeStamp min_ts() const { return min_ts_; }
     inline TxnTimeStamp max_ts() const { return max_ts_; }
+    inline ChunkID next_chunk_id() const { return next_chunk_id_; }
     const SharedPtr<String> &index_dir() const;
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
@@ -137,30 +142,13 @@ public:
                                    chunk_index_entries_.end());
     }
 
-    void ReplaceChunkIndexEntries(SharedPtr<ChunkIndexEntry> merged_chunk_index_entry) {
-        std::shared_lock lock(rw_locker_);
-        SizeT num_entries = chunk_index_entries_.size();
-        SizeT idx_first = num_entries;
-        for (SizeT i = 0; i < num_entries; i++) {
-            if (chunk_index_entries_[i]->base_rowid_ == merged_chunk_index_entry->base_rowid_) {
-                idx_first = i;
-                break;
-            }
-        }
-        assert(idx_first < num_entries);
-        SizeT idx_last = num_entries;
-        u32 total_row_count = 0;
-        for (SizeT i = idx_first; i < num_entries; i++) {
-            total_row_count += chunk_index_entries_[i]->row_count_;
-            if (total_row_count == merged_chunk_index_entry->row_count_) {
-                idx_last = i;
-                break;
-            }
-        }
-        assert(idx_last < num_entries);
-        chunk_index_entries_[idx_first] = merged_chunk_index_entry;
-        chunk_index_entries_.erase(chunk_index_entries_.begin() + idx_first + 1, chunk_index_entries_.begin() + idx_last + 1);
-    }
+    void ReplaceFtChunkIndexEntries(SharedPtr<ChunkIndexEntry> merged_chunk_index_entry);
+
+    void ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
+                                  SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
+                                  Vector<ChunkIndexEntry *> &&old_chunks);
+
+    ChunkIndexEntry *RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry);
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<MemoryIndexer>> GetFullTextIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
@@ -186,14 +174,18 @@ public:
     }
 
 public:
-    SharedPtr<ChunkIndexEntry> CreateChunkIndexEntry(const TableEntry *table_entry, RowID base_rowid, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> CreateChunkIndexEntry(SharedPtr<ColumnDef> column_def, RowID base_rowid, BufferManager *buffer_mgr);
 
     void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
     SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
 
-    SharedPtr<ChunkIndexEntry>
-    AddChunkIndexEntryReplay(TableEntry *table_entry, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> AddChunkIndexEntryReplay(ChunkID chunk_id,
+                                                        TableEntry *table_entry,
+                                                        const String &base_name,
+                                                        RowID base_rowid,
+                                                        u32 row_count,
+                                                        BufferManager *buffer_mgr);
 
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
@@ -206,6 +198,8 @@ private:
     static UniquePtr<SegmentIndexEntry>
     LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
 
+    ChunkID GetNextChunkID() { return next_chunk_id_++; }
+
 private:
     TableIndexEntry *table_index_entry_;
     const SegmentID segment_id_{};
@@ -217,6 +211,7 @@ private:
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this SegmentIndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry
     TxnTimeStamp checkpoint_ts_{0};
+    ChunkID next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
     SharedPtr<ChunkIndexEntry> memory_hnsw_indexer_{};

@@ -164,10 +164,6 @@ void WalManager::Flush() {
                 running_ = false;
                 break;
             }
-            if (entry->cmds_.empty()) {
-                UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
-            }
-
             SharedPtr<Txn> txn = txn_mgr->GetTxnPtr(entry->txn_id_);
             // Commit sequentially so they get visible in the same order with wal.
             bool conflict = txn->CheckConflict();
@@ -175,6 +171,11 @@ void WalManager::Flush() {
             if (conflict) {
                 txn->SetTxnToRollback();
                 continue;
+            }
+
+            if (entry->cmds_.empty()) {
+                continue;
+                // UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
 
             i32 exp_size = entry->GetSizeInBytes();
