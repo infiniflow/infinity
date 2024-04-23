@@ -328,7 +328,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
             std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
         } else {
             std::memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
-            auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
+            auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
                                                                                        src_ptr->vector_.chunk_id_,
                                                                                        src_ptr->vector_.chunk_offset_,
                                                                                        varchar_len);
