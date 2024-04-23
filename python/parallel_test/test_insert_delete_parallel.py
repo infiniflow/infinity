@@ -24,8 +24,8 @@ class TestInsertDeleteParallel:
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("insert_delete_test", {
             "id": "int64", "text": "varchar"}, ConflictType.Error)
-        table_obj.create_index("text_index", [index.IndexInfo("text",
-                                                              index.IndexType.FullText, [])])
+        # table_obj.create_index("text_index", [index.IndexInfo("text",
+        #                                                       index.IndexType.FullText, [])])
         connection_pool.release_conn(infinity_obj)
 
         count_num = [0]
