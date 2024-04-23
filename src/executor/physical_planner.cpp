@@ -839,12 +839,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
     return MakeUnique<PhysicalMatch>(logical_match->node_id(),
                                      logical_match->base_table_ref_,
                                      logical_match->match_expr_,
-                                     static_cast<bool>(logical_match->filter_expression_),
-                                     std::move(logical_match->fast_rough_filter_evaluator_),
-                                     logical_match->filter_leftover_,
-                                     logical_match->secondary_index_filter_qualified_,
-                                     std::move(logical_match->secondary_index_column_index_map_),
-                                     std::move(logical_match->filter_execute_command_),
+                                     logical_match->common_query_filter_,
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas());
 }
@@ -873,8 +868,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
     UniquePtr<PhysicalKnnScan> knn_scan_op = MakeUnique<PhysicalKnnScan>(logical_knn_scan->node_id(),
                                                                          logical_knn_scan->base_table_ref_,
                                                                          logical_knn_scan->knn_expression_,
-                                                                         logical_knn_scan->filter_expression_,
-                                                                         std::move(logical_knn_scan->fast_rough_filter_evaluator_),
+                                                                         logical_knn_scan->common_query_filter_,
                                                                          logical_knn_scan->GetOutputNames(),
                                                                          logical_knn_scan->GetOutputTypes(),
                                                                          logical_knn_scan->knn_table_index_,

@@ -96,6 +96,14 @@ public:
         }
     }
 
+    void UnstartTask() {
+        std::unique_lock<std::mutex> lk(locker_);
+        --start_task_n_;
+        if (this->Check()) {
+            cv_.notify_one();
+        }
+    }
+
     FragmentContext *error_fragment_ctx() const { return error_fragment_ctx_; }
 };
 

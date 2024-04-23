@@ -71,7 +71,8 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_))));
+            RecoverableError(Status::NotSupport(
+                fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_))));
         }
     }
 }
@@ -99,13 +100,6 @@ void KnnScanFunctionData::Init() {
     }
 
     knn_distance_ = MakeUnique<KnnDistance1<DataType>>(knn_scan_shared_data_->knn_distance_type_);
-
-    if (knn_scan_shared_data_->filter_expression_) {
-        filter_state_ = ExpressionState::CreateState(knn_scan_shared_data_->filter_expression_);
-        db_for_filter_ = MakeUnique<DataBlock>();
-        db_for_filter_->Init(*(knn_scan_shared_data_->table_ref_->column_types_));                // default capacity
-        bool_column_ = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean)); // default capacity
-    }
 }
 
 } // namespace infinity

@@ -664,7 +664,7 @@ private:
 
 private:
     u64 last_sequence_{0};
-    std::priority_queue<u64> sequence_heap_;
+    std::priority_queue<u64, Vector<u64>, std::greater<u64>> sequence_heap_;
     Map<u64, UniquePtr<CatalogDeltaEntry>> delta_entry_map_;
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
