@@ -5310,7 +5310,7 @@ yyreduce:
     } else if(strcmp((yyvsp[-6].str_value), "tinyint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
         knn_expr->dimension_ = (yyvsp[-8].const_expr_t)->long_array_.size();
         knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt8;
-        knn_expr->embedding_data_ptr_ = new char[knn_expr->dimension_]{};
+        knn_expr->embedding_data_ptr_ = new char[knn_expr->dimension_];
 
         for(long i = 0; i < knn_expr->dimension_; ++ i) {
             ((char*)knn_expr->embedding_data_ptr_)[i] = (yyvsp[-8].const_expr_t)->long_array_[i];
@@ -5356,7 +5356,7 @@ yyreduce:
         if(knn_expr->dimension_ % 8 == 0) {
             knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemBit;
             long embedding_size = knn_expr->dimension_ / 8;
-            knn_expr->embedding_data_ptr_ = new char[embedding_size]{};
+            knn_expr->embedding_data_ptr_ = new char[embedding_size];
 
             for(long i = 0; i < embedding_size; ++ i) {
                 char embedding_unit = 0;

@@ -149,7 +149,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     EXPECT_EQ(bt2.count, 0);
 
     // Constructor
-    u64 *ptr = new u64[2]{};
+    u64 *ptr = new u64[2];
 
     BitmapT bt6(ptr, 100);
     for (u64 i = 0; i < 100; ++i) {
@@ -294,7 +294,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     EXPECT_EQ(bt2.count, 0);
 
     // Constructor
-    u64 *ptr = new u64[2]{};
+    u64 *ptr = new u64[2];
 
     BitmapT bt6(ptr, 100);
     for (u64 i = 0; i < 100; ++i) {
