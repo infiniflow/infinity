@@ -66,15 +66,17 @@ protected:
     void TearDown() override { RemoveDbDirs(); }
 
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        LOG_INFO("Waiting flush delta op");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
+            time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
+                LOG_INFO(fmt::format("Flush delta op finished after {}", end - start));
                 break;
             }
             // wait for at most 10s
-            time_t end = time(nullptr);
             if (end - start > 10) {
                 UnrecoverableException("WaitFlushDeltaOp timeout");
             }
@@ -82,15 +84,17 @@ protected:
     }
 
     void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
+            time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
+                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
                 break;
             }
             // wait for at most 10s
-            time_t end = time(nullptr);
             if (end - start > 10) {
                 UnrecoverableException("WaitCleanup timeout");
             }
