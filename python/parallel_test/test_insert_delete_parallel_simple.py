@@ -1,15 +1,11 @@
 import time
 
-import infinity.index as index
 import pytest
 import random
-import pandas
 from threading import Thread, Lock
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
-from infinity.db import Database
-from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
 max_count = 500 * 2000
 lock = Lock()
@@ -17,7 +13,6 @@ deleting_list = []
 kNumThread = 8
 
 class TestInsertDeleteParallelSimple:
-    # @pytest.mark.skip(reason="segment fault")
     def test_insert_and_delete_parallel_simple(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
@@ -52,8 +47,6 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
     while (True):
         lock.acquire()
         if (count_num[0] < max_count and random.randint(0, 1) == 0):
-            # print("insert")
-            # print(count_num[0])
             count_num[0] += 500
             lock.release()
             value = []

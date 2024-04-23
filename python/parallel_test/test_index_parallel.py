@@ -13,13 +13,13 @@ from infinity.errors import ErrorCode
 from test_sdkbase import TestSdk
 
 TEST_DATA_DIR = "/test/data/"
-
+kInsertThreadNum = 4
+kRuningTime = 30
 
 class TestIndexParallel(TestSdk):
 
     @pytest.mark.parametrize("file_format", ["csv"])
 
-    @pytest.mark.skip(reason="deadlock caused by compaction")
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
         def write_worker(connection_pool: ConnectionPool, data, file_path, end_time, thread_id):
@@ -84,8 +84,6 @@ class TestIndexParallel(TestSdk):
                                                       [])])
         assert res.error_code == ErrorCode.OK
 
-        kInsertThreadNum = 4
-        kRuningTime = 60
         threads = []
         end_time = time.time()+kRuningTime
         for i in range(kInsertThreadNum):
