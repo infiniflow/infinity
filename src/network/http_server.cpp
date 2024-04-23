@@ -872,11 +872,11 @@ public:
 
                                         switch (value_type) {
                                             case nlohmann::json::value_t::number_integer: {
-                                                const_expr->long_array_.emplace_back(value.template get<i64>());
+                                                const_expr->long_array_.emplace_back(value_ref.template get<i64>());
                                                 break;
                                             }
                                             case nlohmann::json::value_t::number_unsigned: {
-                                                const_expr->long_array_.emplace_back(value.template get<u64>());
+                                                const_expr->long_array_.emplace_back(value_ref.template get<u64>());
                                                 break;
                                             }
                                             default: {
