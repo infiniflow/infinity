@@ -116,6 +116,20 @@ void MergeIntoBitmask(const VectorBuffer *input_bool_column_buffer,
     }
 }
 
+CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts)
+    : begin_ts_(begin_ts), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
+    const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref_->block_index_->segment_index_;
+    if (segment_index.empty()) {
+        finish_build_.test_and_set(std::memory_order_release);
+    } else {
+        tasks_.reserve(segment_index.size());
+        for (const auto &[segment_id, _] : segment_index) {
+            tasks_.push_back(segment_id);
+        }
+        total_task_num_ = tasks_.size();
+    }
+}
+
 void CommonQueryFilter::BuildFilter(u32 task_id, TxnTimeStamp begin_ts, BufferManager *buffer_mgr) {
     const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref_->block_index_->segment_index_;
     const SegmentID segment_id = tasks_[task_id];
