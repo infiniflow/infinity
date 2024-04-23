@@ -93,7 +93,7 @@ public:
 
     void RollbackCompact();
 
-    void FlushNewData(TxnTimeStamp flush_ts);
+    void FlushNewData();
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 

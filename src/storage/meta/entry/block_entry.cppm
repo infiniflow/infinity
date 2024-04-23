@@ -29,6 +29,7 @@ import block_column_entry;
 import block_version;
 import fast_rough_filter;
 import value;
+import buffer_obj;
 
 namespace infinity {
 
@@ -76,9 +77,9 @@ public:
 
     void Cleanup();
 
-    void Flush(TxnTimeStamp checkpoint_ts, bool check_commit = true);
+    void Flush(TxnTimeStamp checkpoint_ts);
 
-    void FlushForImport(TxnTimeStamp checkpoint_ts);
+    void FlushForImport();
 
     void LoadFilterBinaryData(const String &block_filter_data);
 
@@ -144,9 +145,9 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 private:
-    void FlushData(i64 checkpoint_row_count);
+    void FlushData(SizeT start_row_count, SizeT checkpoint_row_count);
 
-    void FlushVersion(BlockVersion &checkpoint_version);
+    bool FlushVersion(TxnTimeStamp checkpoint_ts);
 
 protected:
     mutable std::shared_mutex rw_locker_{};
@@ -158,7 +159,8 @@ protected:
     u16 row_count_{};
     u16 row_capacity_{};
 
-    UniquePtr<BlockVersion> block_version_{};
+    // UniquePtr<BlockVersion> block_version_{};
+    BufferObj *block_version_{};
 
     // check if a value must not exist in the block
     FastRoughFilter fast_rough_filter_;

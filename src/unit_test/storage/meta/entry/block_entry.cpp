@@ -26,6 +26,9 @@ import value;
 import default_values;
 import block_entry;
 import block_version;
+import file_system;
+import local_file_system;
+import file_system_type;
 
 class BlockVersionTest : public BaseTest {};
 
@@ -37,9 +40,19 @@ TEST_F(BlockVersionTest, SaveAndLoad) {
     block_version.deleted_[2] = 30;
     block_version.deleted_[5] = 40;
     String version_path = String(GetTmpDir()) + "/block_version_test";
-    block_version.SaveToFile(version_path);
+    LocalFileSystem fs;
 
-    BlockVersion block_verson2(8192);
-    block_verson2.LoadFromFile(version_path);
-    ASSERT_EQ(block_version, block_verson2);
+    {
+        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+        auto file_handler = fs.OpenFile(version_path, file_flags, FileLockType::kNoLock);
+        block_version.SpillToFile(*file_handler);
+    }
+
+    {
+        u8 file_flags = FileFlags::READ_FLAG;
+        auto file_handler = fs.OpenFile(version_path, file_flags, FileLockType::kNoLock);
+        BlockVersion block_verson2(8192);
+        block_verson2.LoadFromFile(*file_handler);
+        ASSERT_EQ(block_version, block_verson2);
+    }
 }

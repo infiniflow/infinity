@@ -440,9 +440,9 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     return segment_entry;
 }
 
-void SegmentEntry::FlushNewData(TxnTimeStamp flush_ts) {
+void SegmentEntry::FlushNewData() {
     for (const auto &block_entry : this->block_entries_) {
-        block_entry->FlushForImport(flush_ts);
+        block_entry->FlushForImport();
     }
 }
 

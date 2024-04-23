@@ -82,6 +82,8 @@ public:
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
 
+    FileWorker *file_worker() { return file_worker_.get(); }
+
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.
     friend class BufferHandle;
