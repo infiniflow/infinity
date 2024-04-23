@@ -164,6 +164,8 @@ public:
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
+    void CommitFlushed(TxnTimeStamp commit_ts);
+
     void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry);
