@@ -87,7 +87,7 @@ TEST_F(OptimizeKnnTest, test1) {
     Catalog *catalog = storage->catalog();
     TxnManager *txn_mgr = storage->txn_manager();
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});

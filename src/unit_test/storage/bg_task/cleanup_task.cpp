@@ -171,7 +171,7 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     {
 
@@ -221,7 +221,7 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     {
 
@@ -296,7 +296,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     {
 
@@ -381,7 +381,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     auto index_name = MakeShared<String>("idx1");
     auto column_name = MakeShared<String>("col1");

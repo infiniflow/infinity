@@ -21,7 +21,7 @@ class TestInsertDeleteParallelSimple:
     def test_insert_and_delete_parallel_simple(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("insert_delete_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("insert_delete_test", {
@@ -38,7 +38,7 @@ class TestInsertDeleteParallelSimple:
             threads[i].join()
 
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("insert_delete_test")
         res = table_obj.output(['*']).to_df()
         print(res)
@@ -47,7 +47,7 @@ class TestInsertDeleteParallelSimple:
 
 def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     table_obj = db_obj.get_table("insert_delete_test")
     while (True):
         lock.acquire()

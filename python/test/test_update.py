@@ -62,7 +62,7 @@ class TestUpdate(TestSdk):
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table(table_name="test_update", conflict_type=ConflictType.Ignore)
 
@@ -105,7 +105,7 @@ class TestUpdate(TestSdk):
 
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_empty_table", ConflictType.Ignore)
 
         try:
@@ -135,7 +135,7 @@ class TestUpdate(TestSdk):
 
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_non_existent_table", ConflictType.Ignore)
 
         db_obj.create_table("test_update_non_existent_table", {"c1": "int", "c2": "int", "c3": "int"},
@@ -165,7 +165,7 @@ class TestUpdate(TestSdk):
 
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i), ConflictType.Ignore)
 
@@ -209,7 +209,7 @@ class TestUpdate(TestSdk):
 
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i), ConflictType.Ignore)
 
@@ -252,7 +252,7 @@ class TestUpdate(TestSdk):
     def test_update_table_with_one_block(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_table_with_one_block", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_table_with_one_block", {"c1": "int", "c2": "int"},
                                         ConflictType.Error)
@@ -280,7 +280,7 @@ class TestUpdate(TestSdk):
     def test_update_table_with_one_segment(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_table_with_one_segment", {"c1": "int", "c2": "int"},
                                         ConflictType.Error)
@@ -308,7 +308,7 @@ class TestUpdate(TestSdk):
     def test_update_before_delete(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_before_delete", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_before_delete", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
@@ -339,7 +339,7 @@ class TestUpdate(TestSdk):
     def test_update_inserted_data(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_inserted_data", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_inserted_data", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
@@ -367,7 +367,7 @@ class TestUpdate(TestSdk):
     def test_update_inserted_long_before(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_inserted_long_before", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"},
                                         ConflictType.Error)
@@ -396,7 +396,7 @@ class TestUpdate(TestSdk):
     def test_update_dropped_table(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_dropped_table", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_dropped_table", {"c1": "int", "c2": "int"}, ConflictType.Error)
         res = db_obj.drop_table("test_update_dropped_table", ConflictType.Error)
@@ -418,7 +418,7 @@ class TestUpdate(TestSdk):
     def test_update_invalid_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
         # update
@@ -443,7 +443,7 @@ class TestUpdate(TestSdk):
     def test_update_new_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_new_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_new_value", {"c1": "int", "c2": types}, ConflictType.Error)
 
@@ -466,7 +466,7 @@ class TestUpdate(TestSdk):
     def test_update_invalid_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
 
