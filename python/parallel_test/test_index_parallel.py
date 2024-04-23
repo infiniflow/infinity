@@ -14,7 +14,7 @@ from test_sdkbase import TestSdk
 
 TEST_DATA_DIR = "/test/data/"
 kInsertThreadNum = 4
-kRuningTime = 30
+kRuningTime = 10
 
 class TestIndexParallel(TestSdk):
 

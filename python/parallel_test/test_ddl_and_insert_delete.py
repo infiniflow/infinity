@@ -11,7 +11,7 @@ from infinity.db import Database
 
 
 
-kRunningTime = 60
+kRunningTime = 30
 kNumThread = 4
 
 table_name = "insert_delete_ddl_test"

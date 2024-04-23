@@ -38,6 +38,15 @@ class TestDDLParallel:
             threads[i].start()
         for i in range(len(threads)):
             threads[i].join()
+        
+        infinity_obj = connection_pool.get_conn()
+        infinity_obj.get_database("default")
+        databases = infinity_obj.list_databases().db_names
+        print(databases)
+        for db_name in databases:
+            if db_name != "default":
+                infinity_obj.drop_database(db_name, conflict_type = ConflictType.Ignore)
+        print(infinity_obj.list_databases().db_names)
 
 
 def random_exec(connection_pool:ConnectionPool, end_time, thread_id):
