@@ -14,19 +14,15 @@
 
 module;
 
-#include <type_traits>
-
 export module secondary_index_data;
 
 import stl;
-
 import default_values;
 import file_system;
 import file_system_type;
 import infinity_exception;
 import column_vector;
 import third_party;
-import buffer_manager;
 import secondary_index_pgm;
 import logical_type;
 import internal_types;
@@ -34,6 +30,7 @@ import data_type;
 import segment_entry;
 
 namespace infinity {
+class ChunkIndexEntry;
 
 template <typename T>
 concept KeepOrderedSelf = IsAnyOf<T, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
@@ -91,7 +88,7 @@ ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) 
 }
 
 template <typename T>
-LogicalType GetLogicalType = kInvalid;
+LogicalType GetLogicalType = LogicalType::kInvalid;
 
 template <>
 LogicalType GetLogicalType<FloatT> = LogicalType::kFloat;
@@ -111,122 +108,36 @@ LogicalType GetLogicalType<IntegerT> = LogicalType::kInteger;
 template <>
 LogicalType GetLogicalType<BigIntT> = LogicalType::kBigInt;
 
-export class SecondaryIndexDataHead;
-
-export class SecondaryIndexDataPart;
-
-class SecondaryIndexDataBuilderBase {
-public:
-    SecondaryIndexDataBuilderBase() = default;
-    virtual ~SecondaryIndexDataBuilderBase() = default;
-    virtual void
-    LoadSegmentData(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp begin_ts, bool check_ts) = 0;
-    virtual void StartOutput() = 0;
-    virtual void EndOutput() = 0;
-    virtual void OutputToHeader(SecondaryIndexDataHead *index_head) = 0;
-    virtual void OutputToPart(SecondaryIndexDataPart *index_part) = 0;
-};
-
-// create a secondary index on each segment
-// now only support index for single column
-// now only support create index for POD type with size <= sizeof(i64)
-// need to convert values in column into ordered number type
-// data_num : number of rows in the segment, except those deleted
-export UniquePtr<SecondaryIndexDataBuilderBase>
-GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 full_data_num, u32 part_capacity);
-
-// includes: metadata and PGM index
-class SecondaryIndexDataHead {
-    friend class SecondaryIndexDataBuilderBase;
-    template <typename ValueT>
-    friend class SecondaryIndexDataBuilder;
-
-private:
-    bool loaded_{false};  // whether data of this part is in memory
-    u32 part_capacity_{}; // number of rows in each full part
-    u32 part_num_{};      // number of parts
-    u32 full_data_num_{}; // number of rows in the segment (include those deleted)
-    u32 data_num_{};      // number of rows in the segment (except those deleted), init as 0
-    // sorted values in segment
-    LogicalType data_type_raw_ = LogicalType::kInvalid; // type of original data
-    LogicalType data_type_key_ = LogicalType::kInvalid; // type of data stored in the raw index
-    // offset of each value in segment
-    // type: IntegerT (its size matches with the type u32 of the segment_offset_)
-    LogicalType data_type_offset_ = LogicalType::kInvalid;
+export class SecondaryIndexData {
+protected:
+    u32 chunk_row_count_ = 0;
     // pgm index
+    // will always be loaded
     UniquePtr<SecondaryPGMIndex> pgm_index_;
 
 public:
-    // will be called when an old index is loaded
-    // used in SecondaryIndexFileWorker::ReadFromFileImpl()
-    SecondaryIndexDataHead() = default;
+    explicit SecondaryIndexData(u32 chunk_row_count) : chunk_row_count_(chunk_row_count) {}
 
-    // will be called when a new index is created
-    // used in SecondaryIndexFileWorker::AllocateInMemory()
-    explicit SecondaryIndexDataHead(u32 part_capacity, u32 full_data_num, const SharedPtr<DataType> &data_type)
-        : part_capacity_(part_capacity), full_data_num_(full_data_num) {
-        part_num_ = (full_data_num + part_capacity_ - 1) / part_capacity_;
-        data_type_raw_ = data_type->type();
-    }
+    virtual ~SecondaryIndexData() = default;
 
-    ~SecondaryIndexDataHead() = default;
-
-    [[nodiscard]] u32 GetPartCapacity() const { return part_capacity_; }
-    [[nodiscard]] u32 GetPartNum() const { return part_num_; }
-    [[nodiscard]] u32 GetDataNum() const { return data_num_; }
-
-    [[nodiscard]] auto SearchPGM(const void *val_ptr) const {
+    [[nodiscard]] inline auto SearchPGM(const void *val_ptr) const {
         if (!pgm_index_) {
             UnrecoverableError("Not initialized yet.");
         }
         return pgm_index_->SearchIndex(val_ptr);
     }
 
-    void SaveIndexInner(FileHandler &file_handler) const;
+    [[nodiscard]] inline u32 GetChunkRowCount() const { return chunk_row_count_; }
 
-    void ReadIndexInner(FileHandler &file_handler);
+    virtual void SaveIndexInner(FileHandler &file_handler) const = 0;
+
+    virtual void ReadIndexInner(FileHandler &file_handler) = 0;
+
+    virtual void InsertData(void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) = 0;
 };
 
-// an index may include several parts
-// includes: a part of keys and corresponding offsets in the segment
-class SecondaryIndexDataPart {
-    friend class SecondaryIndexDataBuilderBase;
-    template <typename ValueT>
-    friend class SecondaryIndexDataBuilder;
+export SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
-private:
-    bool loaded_{false}; // whether data of this part is in memory
-    u32 part_id_{};      // id of this part
-    u32 part_size_{};    // number of rows in this part
-    // data type
-    LogicalType data_type_key_ = LogicalType::kInvalid;
-    LogicalType data_type_offset_ = LogicalType::kInvalid;
-    // key-offset pairs
-    UniquePtr<ColumnVector> column_key_;
-    UniquePtr<ColumnVector> column_offset_;
-
-public:
-    // will be called when an old index is loaded
-    // used in SecondaryIndexFileWorker::ReadFromFileImpl()
-    SecondaryIndexDataPart() = default;
-
-    // will be called when a new index is created
-    // used in SecondaryIndexFileWorker::AllocateInMemory()
-    explicit SecondaryIndexDataPart(u32 part_id, u32 part_size) : part_id_(part_id), part_size_(part_size) {}
-
-    ~SecondaryIndexDataPart() = default;
-
-    [[nodiscard]] u32 GetPartId() const { return part_id_; }
-
-    [[nodiscard]] u32 GetPartSize() const { return part_size_; }
-
-    [[nodiscard]] const void *GetColumnKeyData() const { return column_key_->data(); }
-
-    [[nodiscard]] const void *GetColumnOffsetData() const { return column_offset_->data(); }
-
-    void SaveIndexInner(FileHandler &file_handler) const;
-
-    void ReadIndexInner(FileHandler &file_handler);
-};
+export u32 GetSecondaryIndexDataPairSize(const SharedPtr<DataType> &data_type);
 
 } // namespace infinity

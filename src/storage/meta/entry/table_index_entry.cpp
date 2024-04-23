@@ -267,8 +267,15 @@ SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_inde
 }
 
 SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
-    if (index_base_->index_type_ != IndexType::kFullText && index_base_->index_type_ != IndexType::kHnsw) {
-        return nullptr;
+    switch (index_base_->index_type_) {
+        case IndexType::kHnsw:
+        case IndexType::kFullText:
+        case IndexType::kSecondary: {
+            break;
+        }
+        default: {
+            return nullptr;
+        }
     }
     auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_capacity(), column_def_);
     u32 segment_id = segment_entry->segment_id();
