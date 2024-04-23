@@ -114,7 +114,7 @@ void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input
     column_vector.AppendWith(*input_column_vector, input_column_vector_offset, append_rows);
 }
 
-void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpoint_row_count) {
+void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count) {
     // TODO: Opt, Flush certain row_count content
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {

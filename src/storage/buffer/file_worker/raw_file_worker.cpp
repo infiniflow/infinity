@@ -57,7 +57,7 @@ void RawFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void RawFileWorker::WriteToFileImpl(bool &prepare_success) {
+void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     assert(data_ != nullptr && buffer_size_ > 0);
     LocalFileSystem fs;
     i64 nbytes = fs.Write(*file_handler_, data_, buffer_size_);

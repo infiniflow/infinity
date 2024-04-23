@@ -56,7 +56,7 @@ void FileWorker::WriteToFile(bool to_spill) {
         file_handler_ = nullptr;
     });
 
-    WriteToFileImpl(prepare_success);
+    WriteToFileImpl(to_spill, prepare_success);
     if (prepare_success) {
         if (to_spill) {
             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));

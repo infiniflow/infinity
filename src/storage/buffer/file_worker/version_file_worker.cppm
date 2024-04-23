@@ -14,25 +14,27 @@
 
 module;
 
-export module data_file_worker;
+export module version_file_worker;
 
 import stl;
 import file_worker;
 
 namespace infinity {
 
-export class DataFileWorker : public FileWorker {
+export class VersionFileWorker : public FileWorker {
 public:
-    explicit DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size);
+    explicit VersionFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT capacity);
 
-    virtual ~DataFileWorker() override;
+    virtual ~VersionFileWorker() override;
 
 public:
     void AllocateInMemory() override;
 
     void FreeInMemory() override;
 
-    SizeT GetMemoryCost() const override { return buffer_size_; }
+    SizeT GetMemoryCost() const override;
+
+    void SetCheckpointTS(TxnTimeStamp ts) { checkpoint_ts_ = ts; }
 
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
@@ -40,6 +42,8 @@ protected:
     void ReadFromFileImpl() override;
 
 private:
-    const SizeT buffer_size_;
+    SizeT capacity_{};
+    TxnTimeStamp checkpoint_ts_{};
 };
+
 } // namespace infinity
