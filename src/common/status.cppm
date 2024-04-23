@@ -113,6 +113,8 @@ export enum class ErrorCode : long {
     kAggregateFunctionWithEmptyArgs = 3071,
     kBlockNotExist = 3072,
     kInvalidTopKType = 3073,
+    kInvalidCreateOption = 3074,
+    kInvalidDropOption = 3075,
 
     // 4. Txn fail
     kTxnRollback = 4001,
