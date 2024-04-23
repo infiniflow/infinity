@@ -11,26 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-
-
 module;
-#include <algorithm>
-#include <atomic>
-#include <random>
-#include <cassert>
 export module skiplist;
 
 import stl;
 import memory_pool;
 
 namespace infinity {
-
-constexpr int MAX_LEVEL = 20;
-//const int INT_MAX = 2147483647;
+constexpr i32 MAX_NUM = 2147483647;
+constexpr i32 MAX_LEVEL = 20;
 std::random_device rd;
 std::mt19937 gen(rd());
-std::uniform_real_distribution<> dis(0, INT_MAX);
+std::uniform_real_distribution<> dis(0, MAX_NUM);
 
 export template <typename KeyType, typename ValueType>
 class Arena;
@@ -45,7 +37,7 @@ Pair<u32, u32> DecodeVal(u64 value) {
 
 export class KeyComparator {
 public:
-    int operator()(const Pair<const char *, u16> &lhs, const Pair<const char *, u16> &rhs) const {
+    i32 operator()(const Pair<const char *, u16> &lhs, const Pair<const char *, u16> &rhs) const {
         return std::memcmp(lhs.first, rhs.first, std::min(lhs.second, rhs.second));
     }
 };
@@ -63,13 +55,13 @@ public:
         return arena->GetVal(valOffset, valSize);
     }
 
-    void SetValue(u64 valueoffset) { std::atomic_store(&value_, valueoffset); }
+    void SetValue(u64 valueoffset) { atomic_store(&value_, valueoffset); }
 
     Pair<const char *, u16> Key(Arena<KeyType, ValueType> *arena) { return {arena->GetKey(key_offset_, key_size_), key_size_}; }
 
-    u32 GetNextOffset(int h) { return next_[h].load(std::memory_order_relaxed); }
+    u32 GetNextOffset(i32 h) { return next_[h].load(std::memory_order_relaxed); }
 
-    bool CasNextOffset(int h, u32 old, u32 val) { return next_[h].compare_exchange_strong(old, val); }
+    bool CasNextOffset(i32 h, u32 old, u32 val) { return atomic_compare_exchange_strong(&next_[h], &old, val); }
 
 public:
     Atomic<u64> value_;
@@ -101,7 +93,7 @@ public:
         u32 next[MAX_LEVEL + 1] = {0};
         // update all level's prev and next
         prev[curh] = head_offset_;
-        for (int i = int(curh) - 1; i >= 0; i--) {
+        for (i32 i = i32(curh) - 1; i >= 0; i--) {
             auto ret = FindSpliceForLevel(key, prev[i + 1], i);
             prev[i] = ret.first;
             next[i] = ret.second;
@@ -120,7 +112,7 @@ public:
 
         // try update skiplist height_ (CAS)
         curh = GetHeight();
-        while (h > int(curh)) {
+        while (h > i32(curh)) {
             if (height_.compare_exchange_strong(curh, h)) {
                 break;
             }
@@ -128,14 +120,13 @@ public:
         }
 
         // insert and update skiplist
-        for (int i = 0; i < h; i++) {
+        for (i32 i = 0; i < h; i++) {
             while (1) {
                 if (arena_->GetNode(prev[i]) == nullptr) {
-                    assert(i > 1);
+
                     auto ret = FindSpliceForLevel(key, head_offset_, i);
                     prev[i] = ret.first;
                     next[i] = ret.second;
-                    assert(prev[i] != next[i]);
                 }
                 x->next_[i] = next[i];
                 auto pnode = arena_->GetNode(prev[i]);
@@ -149,7 +140,7 @@ public:
                 next[i] = ret.second;
 
                 if (prev[i] == next[i]) {
-                    assert(i == 0);
+
                     auto valueoffset = arena_->AddVal(value);
                     auto encVal = EncodeValue(valueoffset, GetTargetLen(value));
                     auto preNode = arena_->GetNode(prev[i]);
@@ -169,7 +160,7 @@ public:
 
         auto nextKey = arena_->GetKey(n->key_offset_, n->key_size_);
         const char* mk = nullptr;
-        int l = 0;
+        i32 l = 0;
         ParseKey(key,mk,l);
         if (0 != comparator_({mk,l}, {nextKey, n->key_size_})) {
             return false;
@@ -231,7 +222,7 @@ public:
     Iterator FindForPrev(const KeyType &key) { return Iterator(FindNear(key, true, true).first, this); }
 
 private:
-    Node *NewNode(KeyType key, ValueType value, int h) {
+    Node *NewNode(KeyType key, ValueType value, i32 h) {
         auto nodeOffset = arena_->AddNode(h);
         auto keyOffset = arena_->AddKey(key);
         auto val = EncodeValue(arena_->AddVal(value), GetTargetLen(value));
@@ -248,9 +239,9 @@ private:
         return node;
     }
 
-    int RandomLevel() {
-        int new_level = 1;
-        while (dis(gen) < INT_MAX / 3 && new_level < MAX_LEVEL) {
+    i32 RandomLevel() {
+        i32 new_level = 1;
+        while (dis(gen) < MAX_NUM / 3 && new_level < MAX_LEVEL) {
             new_level++;
         }
         return new_level;
@@ -264,7 +255,7 @@ private:
         }
     }
 
-    void ParseKey(const KeyType &key, const char * &mk, int& l) {
+    void ParseKey(const KeyType &key, const char *&mk, i32 &l) {
         if constexpr (std::is_same_v<KeyType, String>) {
             mk = key.data();
             l = key.size();
@@ -274,7 +265,7 @@ private:
         }
     }
 
-    Node *GetNext(Node *node, int h) { return arena_->GetNode(node->GetNextOffset(h)); }
+    Node *GetNext(Node *node, i32 h) { return arena_->GetNode(node->GetNextOffset(h)); }
 
     Node *GetHead() { return arena_->GetNode(head_offset_); }
 
@@ -282,7 +273,7 @@ private:
 
     Pair<Node *, bool> FindNear(const KeyType &k, bool less, bool allowEqual) {
         auto x = GetHead();
-        auto level = int(GetHeight() - 1);
+        auto level = i32(GetHeight() - 1);
 
         while (1) {
             auto next = GetNext(x, level);
@@ -303,9 +294,9 @@ private:
 
             auto nextkey = next->Key(arena_);
             const char* mk = nullptr;
-            int l = 0;
+            i32 l = 0;
             ParseKey(k,mk,l);
-            int cmp = comparator_({mk,l}, nextkey);
+            i32 cmp = comparator_({mk, l}, nextkey);
 
             if (cmp > 0) {
                 x = next;
@@ -343,7 +334,7 @@ private:
         }
     }
 
-    Pair<u32, u32> FindSpliceForLevel(const KeyType &k, u32 before, int level) {
+    Pair<u32, u32> FindSpliceForLevel(const KeyType &k, u32 before, i32 level) {
         while (1) {
             auto beforeNode = arena_->GetNode(before);
             auto nextOffset = beforeNode->GetNextOffset(level);
@@ -355,7 +346,7 @@ private:
 
             auto nextKey = nextNode->Key(arena_);
             const char *mk = nullptr;
-            int l = 0;
+            i32 l = 0;
             if constexpr (std::is_same_v<KeyType, String>) {
                 mk = k.data();
                 l = k.size();
@@ -363,7 +354,7 @@ private:
                 mk = reinterpret_cast<const char *>(&k);
                 l = sizeof(k);
             }
-            int cmp = comparator_({mk, l}, nextKey);
+            i32 cmp = comparator_({mk, l}, nextKey);
 
             if (cmp == 0) {
                 return {nextOffset, nextOffset};
@@ -376,7 +367,7 @@ private:
 
     Node *FindLast() {
         auto n = GetHead();
-        auto level = int(GetHeight()) - 1;
+        auto level = i32(GetHeight()) - 1;
         while (1) {
             auto next = GetNext(n, level);
             if (next != nullptr) {
@@ -443,7 +434,7 @@ public:
         return n_ - sz;
     }
 
-    u32 AddNode(int height) {
+    u32 AddNode(i32 height) {
         SizeT len = MAX_NODE_SIZE - ((MAX_LEVEL - height) * OFFSET_SIZE) + NODE_ALIGN;
         u32 n = Allocate(len);
         u32 alignN = (n + NODE_ALIGN) & ~(NODE_ALIGN);
@@ -523,7 +514,7 @@ public:
         Vector<char>().swap(buf_);
     }
 
-    char Buf(int idx) {
+    char Buf(i32 idx) {
         if (i64(idx) > buf_.size()) {
             return ' ';
         }
