@@ -766,7 +766,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                     }
                     SharedPtr<ChunkIndexEntry> chunk_index_entry =
-                        ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
+                        ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count, txn->buffer_mgr());
                     txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                     segment_index_entry->ReplaceFtChunkIndexEntries(chunk_index_entry);
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.

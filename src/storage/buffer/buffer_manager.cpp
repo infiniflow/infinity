@@ -54,7 +54,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
 
 BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
-    LOG_TRACE(fmt::format("Get buffer object: {}", file_path));
+    // LOG_TRACE(fmt::format("Get buffer object: {}", file_path));
 
     std::unique_lock lock(w_locker_);
     if (auto iter1 = buffer_map_.find(file_path); iter1 != buffer_map_.end()) {
