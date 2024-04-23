@@ -115,6 +115,8 @@ public:
 
     bool CheckConflict(Catalog *catalog) const;
 
+    void PrepareCommit1();
+
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
@@ -136,6 +138,7 @@ public: // Getter
 
 private:
     HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
+    Vector<SegmentEntry *> flushed_segments_{};
     Vector<SegmentEntry *> set_sealed_segments_{};
 
     int ptr_seq_n_;
@@ -177,6 +180,8 @@ public:
     void MaintainCompactionAlg() const;
 
     bool CheckConflict() const;
+
+    void PrepareCommit1();
 
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 

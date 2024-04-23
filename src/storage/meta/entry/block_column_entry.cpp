@@ -157,7 +157,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 
             std::shared_lock lock(block_column_entry->mutex_);
             for (auto *outline_buffer : block_column_entry->outline_buffers_) {
-                if(outline_buffer != nullptr) {
+                if (outline_buffer != nullptr) {
                     outline_buffer->Save();
                 }
             }
@@ -223,10 +223,11 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 }
 
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
-    if (!this->Committed()) {
-        this->txn_id_ = txn_id;
-        this->Commit(commit_ts);
+    if (this->Committed()) {
+        UnrecoverableError("Column already committed");
     }
+    this->txn_id_ = txn_id;
+    this->Commit(commit_ts);
 }
 
 Vector<String> BlockColumnEntry::OutlinePaths() const {

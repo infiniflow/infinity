@@ -88,6 +88,8 @@ protected:
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
+    void CommitFlushed(TxnTimeStamp commit_ts);
+
     void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
