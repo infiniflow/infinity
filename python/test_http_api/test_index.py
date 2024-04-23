@@ -226,7 +226,7 @@ class TestIndex(HttpTest):
                               {"type": "double"}, {"type": "varchar"}, {"type": "boolean"},
                               {"type": "vector", "dimension": 3, "element_type": "float", }])
     def test_http_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type,
-                                                                  params, types):
+                                                                       params, types):
         db_name = "default"
         table_name = "test_create_drop_different_fulltext_index_invalid_options"
         idxname = "my_index"
@@ -661,7 +661,7 @@ class TestIndex(HttpTest):
                 "type": "integer",
             }
         })
-        idx_option = ["kError", "kIgnore"]
+        idx_option = ["error", "ignore_if_exists"]
         for opt in idx_option:
             self.create_index(db_name, table_name, idxname, ["c1"], {
                 "type": "HNSW",
