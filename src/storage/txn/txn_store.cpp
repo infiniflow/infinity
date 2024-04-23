@@ -110,6 +110,7 @@ void TxnCompactStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStam
 Tuple<UniquePtr<String>, Status> TxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     this->AddSegmentStore(segment_entry.get());
     this->AddSealedSegment(segment_entry.get());
+    this->flushed_segments_.emplace_back(segment_entry.get());
     table_entry_->Import(std::move(segment_entry), txn);
     return {nullptr, Status::OK()};
 }
@@ -226,6 +227,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 
         this->AddSegmentStore(new_segment.get());
         this->AddSealedSegment(new_segment.get());
+        this->flushed_segments_.emplace_back(new_segment.get());
         table_entry_->AddCompactNew(std::move(new_segment));
     }
     return {nullptr, Status::OK()};
@@ -263,6 +265,13 @@ bool TxnTableStore::CheckConflict(Catalog *catalog) const {
         UnrecoverableError(fmt::format("Table entry should conflict, table name: {}", table_name));
     }
     return false;
+}
+
+void TxnTableStore::PrepareCommit1() {
+    TxnTimeStamp commit_ts = txn_->CommitTS();
+    for (auto *segment_entry : flushed_segments_) {
+        segment_entry->CommitFlushed(commit_ts);
+    }
 }
 
 // TODO: remove commit_ts
@@ -438,6 +447,12 @@ bool TxnStore::CheckConflict() const {
         }
     }
     return false;
+}
+
+void TxnStore::PrepareCommit1() {
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->PrepareCommit1();
+    }
 }
 
 void TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {

@@ -162,6 +162,9 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
 
     this->row_count_ += actual_copied;
 
+    auto &block_version = this->block_version_;
+    block_version->created_.emplace_back(commit_ts, this->row_count_);
+
     return actual_copied;
 }
 
@@ -185,6 +188,16 @@ void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const 
     LOG_TRACE(fmt::format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));
 }
 
+void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+    auto &block_version = this->block_version_;
+    if (!block_version->created_.empty()) {
+        UnrecoverableError("BlockEntry::CommitFlushed: block_version->created_ is not empty");
+    }
+    block_version->created_.emplace_back(commit_ts, this->row_count_);
+
+    FlushVersion(*block_version);
+}
+
 void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     std::unique_lock w_lock(this->rw_locker_);
 
@@ -202,14 +215,9 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (!this->Committed()) {
         txn_id_ = txn_id;
         this->Commit(commit_ts);
-    }
-
-    auto &block_version = this->block_version_;
-    if (block_version->created_.empty() || block_version->created_.back().create_ts_ != commit_ts) {
-        block_version->created_.emplace_back(commit_ts, i32(this->row_count_));
-    }
-    for (auto &column : columns_) {
-        column->CommitColumn(txn_id, commit_ts);
+        for (auto &column : columns_) {
+            column->CommitColumn(txn_id, commit_ts);
+        }
     }
 }
 

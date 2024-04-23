@@ -322,6 +322,12 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
     }
 }
 
+void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+    for (auto &block_entry : block_entries_) {
+        block_entry->CommitFlushed(commit_ts);
+    }
+}
+
 void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
     std::unique_lock w_lock(rw_locker_);
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
