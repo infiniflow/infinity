@@ -410,7 +410,7 @@ class TestInsert(HttpTest):
 
         values = [{"c1": [1, 2, 3]} for _ in range(5)]
         self.insert(db_name, table_name, values, {
-            "status_code": 500,
+            "status_code": 200,
         })
 
         self.drop_table(db_name, table_name)
