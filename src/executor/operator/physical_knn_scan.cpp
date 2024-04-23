@@ -502,8 +502,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                     auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetHnswIndexSnapshot();
                     for (auto &chunk_index_entry : chunk_index_entries) {
-                        BufferHandle index_handle = chunk_index_entry->GetIndex();
-                        hnsw_search(index_handle, false);
+                        if (chunk_index_entry->CheckVisible(begin_ts)) {
+                            BufferHandle index_handle = chunk_index_entry->GetIndex();
+                            hnsw_search(index_handle, false);
+                        }
                     }
                     if (memory_index_entry.get() != nullptr) {
                         BufferHandle index_handle = memory_index_entry->GetIndex();

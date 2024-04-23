@@ -359,6 +359,7 @@ namespace infinity {
 
     // Entry
     using SegmentID = uint32_t;
+    using ChunkID = uint32_t;
     using BlockID = uint16_t;
     using ColumnID = uint64_t;
 
