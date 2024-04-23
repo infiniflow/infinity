@@ -216,6 +216,37 @@ inline void RewriteCompareT(TIME &right_val_time, FilterCompareType &compare_typ
     std::construct_at(&right_val_time, right_val);
 }
 
+template <typename Varchar>
+    requires IsAnyOf<Varchar, String>
+inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type) {
+    // used when try to convert "<" into "<=", or ">" into ">="
+    switch (compare_type) {
+        case FilterCompareType::kLess: {
+            if (right_val.empty()) {
+                compare_type = FilterCompareType::kAlwaysFalse;
+            } else {
+                // can only be used in minmax filter
+                if (right_val.back() == std::numeric_limits<char>::lowest()) {
+                    right_val.pop_back();
+                } else {
+                    --right_val.back();
+                    right_val += String(16, std::numeric_limits<char>::max());
+                }
+                compare_type = FilterCompareType::kLessEqual;
+            }
+            break;
+        }
+        case FilterCompareType::kGreater: {
+            right_val += std::numeric_limits<char>::lowest();
+            compare_type = FilterCompareType::kGreaterEqual;
+            break;
+        }
+        default: {
+            UnrecoverableError("RewriteCompareT(): compare type error.");
+        }
+    }
+}
+
 inline void RewriteCompare(Value &right_val, FilterCompareType &compare_type) {
     switch (right_val.type().type()) {
         case LogicalType::kTinyInt: {
@@ -276,6 +307,12 @@ inline void RewriteCompare(Value &right_val, FilterCompareType &compare_type) {
             auto right_val_timestamp = right_val.GetValue<TimestampT>();
             RewriteCompareT(right_val_timestamp, compare_type);
             right_val = Value::MakeTimestamp(right_val_timestamp);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            String right_val_varchar = right_val.GetVarchar();
+            RewriteCompareT(right_val_varchar, compare_type);
+            right_val = Value::MakeVarchar(right_val_varchar);
             break;
         }
         default: {
