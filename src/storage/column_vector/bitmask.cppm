@@ -77,6 +77,7 @@ public:
 
     bool operator==(const Bitmask &other) const;
     bool operator!=(const Bitmask &other) const { return !(*this == other); }
+    Bitmask &operator=(Bitmask &&right);
 
     // Estimated serialized size in bytes
     i32 GetSizeInBytes() const;

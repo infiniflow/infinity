@@ -144,7 +144,8 @@ void CommonQueryFilter::BuildFilter(u32 task_id, TxnTimeStamp begin_ts, BufferMa
                                                  secondary_index_column_index_map_,
                                                  segment_id,
                                                  segment_row_count,
-                                                 segment_actual_row_count);
+                                                 segment_actual_row_count,
+                                                 begin_ts);
     if (std::visit(Overload{[](const Vector<u32> &v) -> bool { return v.empty(); }, [](const Bitmask &) -> bool { return false; }}, result_elem)) {
         // empty result
         return;
