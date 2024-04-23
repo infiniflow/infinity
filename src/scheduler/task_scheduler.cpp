@@ -273,7 +273,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
             --worker_workloads_[worker_id];
             iter = task_lists.erase(iter);
         }
-        if (finish) {
+        if (finish || error) {
             fragment_ctx->notifier()->FinishTask(error, fragment_ctx);
         } else {
             fragment_ctx->notifier()->UnstartTask();
