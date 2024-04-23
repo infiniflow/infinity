@@ -91,7 +91,7 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
+void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     if (!data_) {
         UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
