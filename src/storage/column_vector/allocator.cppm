@@ -27,7 +27,7 @@ public:
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrRawMemCount("Allocator");
 #endif
-        return new char[bytes]{};
+        return new char[bytes];
     }
 
     static void deallocate(ptr_t ptr) {

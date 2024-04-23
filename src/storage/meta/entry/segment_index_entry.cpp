@@ -63,11 +63,15 @@ namespace infinity {
 
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
     : BaseEntry(EntryType::kSegmentIndex, false), table_index_entry_(table_index_entry), segment_id_(segment_id),
-      vector_buffer_(std::move(vector_buffer)){};
+      vector_buffer_(std::move(vector_buffer)) {
+    if (table_index_entry != nullptr)
+        index_dir_ = table_index_entry->index_dir();
+};
 
-SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry() {
+SharedPtr<SegmentIndexEntry> SegmentIndexEntry::CreateFakeEntry(const String &index_dir) {
     SharedPtr<SegmentIndexEntry> fake_entry;
     fake_entry.reset(new SegmentIndexEntry(static_cast<TableIndexEntry *>(nullptr), SegmentID(0), Vector<BufferObj *>()));
+    fake_entry->index_dir_ = MakeShared<String>(index_dir);
     return fake_entry;
 }
 
@@ -86,6 +90,7 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     segment_index_entry->min_ts_ = begin_ts;
     segment_index_entry->max_ts_ = begin_ts;
     segment_index_entry->begin_ts_ = begin_ts;
+    segment_index_entry->buffer_manager_ = buffer_mgr;
 
     return segment_index_entry;
 }
@@ -100,7 +105,6 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            TransactionID txn_id,
                                                                            TxnTimeStamp begin_ts,
                                                                            TxnTimeStamp commit_ts) {
-
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -132,11 +136,11 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
         }
     }
     segment_index_entry->commit_ts_.store(commit_ts);
+    segment_index_entry->buffer_manager_ = buffer_manager;
     return segment_index_entry;
 }
 
-Vector<UniquePtr<IndexFileWorker>>
-SegmentIndexEntry::CreateFileWorkers(const SharedPtr<String> &index_dir, CreateIndexParam *param, SegmentID segment_id) {
+Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id) {
     Vector<UniquePtr<IndexFileWorker>> vector_file_worker;
     // reference file_worker will be invalidated when vector_file_worker is resized
     const auto index_base = param->index_base_;
@@ -214,8 +218,6 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
 BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
 
 BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
-
-const SharedPtr<String> &SegmentIndexEntry::index_dir() const { return table_index_entry_->index_dir(); }
 
 void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_offset,
@@ -604,6 +606,10 @@ void SegmentIndexEntry::CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp co
         txn_id_ = txn_id;
         checkpoint_ts_ = commit_ts;
         this->Commit(commit_ts);
+
+        for (auto &chunk_index_entry : chunk_index_entries_) {
+            chunk_index_entry->Commit(commit_ts);
+        }
     }
 }
 
@@ -825,7 +831,7 @@ void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_inde
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
     assert(chunk_index_entries_.empty() || base_rowid == chunk_index_entries_.back()->base_rowid_ + chunk_index_entries_.back()->row_count_);
-    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count);
+    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
 }
@@ -856,6 +862,7 @@ nlohmann::json SegmentIndexEntry::Serialize() {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         index_entry_json["segment_id"] = this->segment_id_;
+        index_entry_json["commit_ts"] = this->commit_ts_.load();
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
         index_entry_json["next_chunk_id"] = this->next_chunk_id_;
@@ -893,6 +900,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     }
     segment_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_index_entry->max_ts_ = index_entry_json["max_ts"];
+    segment_index_entry->commit_ts_.store(index_entry_json["commit_ts"]);
     segment_index_entry->next_chunk_id_ = index_entry_json["next_chunk_id"];
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
     if (index_entry_json.contains("chunk_index_entries")) {

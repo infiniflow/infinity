@@ -107,7 +107,7 @@ public:
 
 TEST_F(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
     MemoryIndexer indexer1(GetTmpDir(),
                            "chunk1",
                            RowID(0U, 0U),
@@ -145,7 +145,7 @@ TEST_F(MemoryIndexerTest, Insert) {
 }
 
 TEST_F(MemoryIndexerTest, test2) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
     MemoryIndexer indexer1(GetTmpDir(),
                            "chunk1",
                            RowID(0U, 0U),
@@ -169,7 +169,7 @@ TEST_F(MemoryIndexerTest, test2) {
 }
 
 TEST_F(MemoryIndexerTest, SpillLoadTest) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
     auto indexer1 = MakeUnique<MemoryIndexer>(GetTmpDir(),
                                               "chunk1",
                                               RowID(0U, 0U),
