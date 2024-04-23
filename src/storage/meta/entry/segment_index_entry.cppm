@@ -66,7 +66,7 @@ public:
                                                                    TxnTimeStamp begin_ts,
                                                                    TxnTimeStamp commit_ts);
 
-    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(const SharedPtr<String> &index_dir, CreateIndexParam *param, SegmentID segment_id);
+    static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
 
     static String IndexFileName(SegmentID segment_id);
 
@@ -102,7 +102,7 @@ public:
     inline TxnTimeStamp min_ts() const { return min_ts_; }
     inline TxnTimeStamp max_ts() const { return max_ts_; }
     inline ChunkID next_chunk_id() const { return next_chunk_id_; }
-    const SharedPtr<String> &index_dir() const;
+    SharedPtr<String> index_dir() const { return index_dir_; }
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager *buffer_manager);
@@ -190,7 +190,7 @@ public:
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
     void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
-    static SharedPtr<SegmentIndexEntry> CreateFakeEntry();
+    static SharedPtr<SegmentIndexEntry> CreateFakeEntry(const String &index_dir);
 
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
@@ -201,7 +201,9 @@ private:
     ChunkID GetNextChunkID() { return next_chunk_id_++; }
 
 private:
+    BufferManager *buffer_manager_{};
     TableIndexEntry *table_index_entry_;
+    SharedPtr<String> index_dir_{};
     const SegmentID segment_id_{};
 
     Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().

@@ -58,7 +58,7 @@ public:
                                                          BufferManager *buffer_mgr);
 
     static SharedPtr<ChunkIndexEntry>
-    NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
+    NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
     static SharedPtr<ChunkIndexEntry> NewReplayChunkIndexEntry(ChunkID chunk_id,
                                                                SegmentIndexEntry *segment_index_entry,
@@ -82,6 +82,8 @@ public:
     virtual void PickCleanup(CleanupScanner *scanner) override {}
 
     void SaveIndexFile();
+
+    BufferObj *GetBufferObj() { return buffer_obj_; }
 
     void DeprecateChunk(TxnTimeStamp commit_ts) { deprecate_ts_.store(commit_ts); }
 

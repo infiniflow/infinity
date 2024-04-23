@@ -79,7 +79,7 @@ void PostingMergerTest::CreateIndex() {
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
     MemoryIndexer indexer1(GetTmpDir(),
                            "chunk1",
                            RowID(0U, 0U),

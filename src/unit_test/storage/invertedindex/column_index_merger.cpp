@@ -107,7 +107,7 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(index_dir);
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
         MemoryIndexer indexer(index_dir,
                               chunk_names[i],
@@ -142,7 +142,7 @@ void ColumnIndexMergerTest::MergeAndCheckIndex(const String& index_dir,
     auto column_index_merger = MakeShared<ColumnIndexMerger>(index_dir, flag_, memory_pool_, buffer_pool_);
     column_index_merger->Merge(base_names, base_row_ids, dst_base_name);
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry();
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(index_dir);
     fake_segment_index_entry_1->AddFtChunkIndexEntry(dst_base_name, RowID(0U, 0U), 0U);
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
