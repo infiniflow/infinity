@@ -15,6 +15,10 @@
 #include "constant_expr.h"
 #include "parser_assert.h"
 #include "spdlog/fmt/fmt.h"
+#include "type/datetime/interval_type.h"
+#include "type/serialize.h"
+#include <cstdint>
+#include <cstring>
 #include <sstream>
 
 namespace infinity {
@@ -48,7 +52,7 @@ std::string ConstantExpr::ToString() const {
         case LiteralType::kInteger:
             return fmt::format("{}", integer_value_);
         case LiteralType::kNull: {
-            ParserError("Null constant value");
+            return fmt::format("Null");
         }
         case LiteralType::kDate:
         case LiteralType::kTime:
@@ -107,6 +111,122 @@ std::string ConstantExpr::ToString() const {
         }
     }
     ParserError("Unexpected branch");
+}
+
+void ConstantExpr::WriteAdv(char *&ptr) const {
+    WriteBufAdv<LiteralType>(ptr, literal_type_);
+    switch (literal_type_) {
+        case LiteralType::kBoolean: {
+            WriteBufAdv<bool>(ptr, bool_value_);
+            break;
+        }
+        case LiteralType::kDouble: {
+            WriteBufAdv<double>(ptr, double_value_);
+            break;
+        }
+        case LiteralType::kString: {
+            WriteBufAdv<std::string>(ptr, std::string(str_value_));
+            break;
+        }
+        case LiteralType::kInteger: {
+            WriteBufAdv<int64_t>(ptr, integer_value_);
+            break;
+        }
+        case LiteralType::kNull: {
+            break;
+        }
+        case LiteralType::kDate:
+        case LiteralType::kTime:
+        case LiteralType::kDateTime:
+        case LiteralType::kTimestamp: {
+            WriteBufAdv<std::string>(ptr, std::string(date_value_));
+            break;
+        }
+        case LiteralType::kIntegerArray: {
+            WriteBufAdv<int64_t>(ptr, long_array_.size());
+            for (const auto &val : long_array_) {
+                WriteBufAdv<int64_t>(ptr, val);
+            }
+            break;
+        }
+        case LiteralType::kDoubleArray: {
+            WriteBufAdv<int64_t>(ptr, double_array_.size());
+            for (const auto &val : double_array_) {
+                WriteBufAdv<double>(ptr, val);
+            }
+            break;
+        }
+        case LiteralType::kInterval: {
+            WriteBufAdv<TimeUnit>(ptr, interval_type_);
+            WriteBufAdv<int64_t>(ptr, integer_value_);
+            break;
+        }
+    }
+}
+
+std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) {
+    char *const ptr_end = ptr + maxbytes;
+    LiteralType literal_type = ReadBufAdv<LiteralType>(ptr);
+    auto const_expr = new ConstantExpr(literal_type);
+    switch (literal_type) {
+        case LiteralType::kBoolean: {
+            bool bool_value = ReadBufAdv<bool>(ptr);
+            const_expr->bool_value_ = bool_value;
+            break;
+        }
+        case LiteralType::kDouble: {
+            double double_value = ReadBufAdv<double>(ptr);
+            const_expr->double_value_ = double_value;
+            break;
+        }
+        case LiteralType::kString: {
+            std::string str_value = ReadBufAdv<std::string>(ptr);
+            const_expr->str_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kInteger: {
+            int64_t integer_value = ReadBufAdv<int64_t>(ptr);
+            const_expr->integer_value_ = integer_value;
+            break;
+        }
+        case LiteralType::kNull: {
+            break;
+        }
+        case LiteralType::kDate:
+        case LiteralType::kTime:
+        case LiteralType::kDateTime:
+        case LiteralType::kTimestamp: {
+            std::string date_value = ReadBufAdv<std::string>(ptr);
+            const_expr->date_value_ = strdup(date_value.c_str());
+            break;
+        }
+        case LiteralType::kIntegerArray: {
+            size_t len = ReadBufAdv<int64_t>(ptr);
+            for (size_t i = 0; i < len; ++i) {
+                int64_t val = ReadBufAdv<int64_t>(ptr);
+                const_expr->long_array_.push_back(val);
+            }
+            break;
+        }
+        case LiteralType::kDoubleArray: {
+            size_t len = ReadBufAdv<int64_t>(ptr);
+            for (size_t i = 0; i < len; ++i) {
+                double val = ReadBufAdv<double>(ptr);
+                const_expr->double_array_.push_back(val);
+            }
+            break;
+        }
+        case LiteralType::kInterval: {
+            TimeUnit interval_type = ReadBufAdv<TimeUnit>(ptr);
+            int64_t integer_value = ReadBufAdv<int64_t>(ptr);
+            const_expr->interval_type_ = interval_type;
+            const_expr->integer_value_ = integer_value;
+            break;
+        }
+    }
+    maxbytes = ptr_end - ptr;
+    ParserAssert(maxbytes >= 0, "ptr goes out of range when reading constant expression");
+    return std::shared_ptr<ParsedExpr>(const_expr);
 }
 
 } // namespace infinity

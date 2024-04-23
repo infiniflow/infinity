@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "column_def.h"
+#include "expr/constant_expr.h"
+#include "expr/parsed_expr.h"
 #include "type/data_type.h"
 
 namespace infinity {
@@ -43,19 +45,35 @@ std::string ConstrainTypeToString(ConstraintType type) {
 
 ConstraintType StringToConstraintType(const std::string &type) {
     auto iter = string_to_constraint_type.find(type);
-    if(iter != string_to_constraint_type.end()) {
+    if (iter != string_to_constraint_type.end()) {
         return iter->second;
     } else {
         return ConstraintType::kInvalid;
     }
 }
 
-ColumnDef::ColumnDef(int64_t id, std::shared_ptr<DataType> column_type, std::string column_name, std::unordered_set<ConstraintType> constraints)
+ColumnDef::ColumnDef(int64_t id,
+                     std::shared_ptr<DataType> column_type,
+                     std::string column_name,
+                     std::unordered_set<ConstraintType> constraints,
+                     std::shared_ptr<ParsedExpr> default_expr)
     : TableElement(TableElementType::kColumn), id_(id), column_type_(std::move(column_type)), name_(std::move(column_name)),
-      constraints_(std::move(constraints)) {}
+      constraints_(std::move(constraints)), default_expr_(std::move(default_expr)) {
+    // TODO: type check for default_expr
+    if (!default_expr_) {
+        auto const_expr = new ConstantExpr(LiteralType::kNull);
+        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+    }
+}
 
-ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr)
-    : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)) {}
+ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr, std::shared_ptr<ParsedExpr> default_expr)
+    : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)),
+      default_expr_(std::move(default_expr)) {
+    if (!default_expr_) {
+        auto const_expr = new ConstantExpr(LiteralType::kNull);
+        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+    }
+}
 
 bool ColumnDef::operator==(const ColumnDef &other) const {
     bool res = type_ == other.type_ && id_ == other.id_ && name_ == other.name_ && column_type_ != nullptr && other.column_type_ != nullptr &&
@@ -77,6 +95,9 @@ std::string ColumnDef::ToString() const {
     ss << name_ << " " << column_type_->ToString();
     for (auto &constraint : constraints_) {
         ss << " " << ConstrainTypeToString(constraint);
+    }
+    if (default_expr_ != nullptr) {
+        ss << " default " << default_expr_->ToString();
     }
     return ss.str();
 }

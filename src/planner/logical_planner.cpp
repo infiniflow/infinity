@@ -252,9 +252,6 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                                                                  value_list.size())));
             }
 
-            //        Value null_value = Value::MakeNullData();
-            //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
-
             SizeT table_column_count = table_entry->ColumnCount();
 
             // Create value list with table column size and null value
@@ -294,6 +291,15 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             value_list = rewrite_value_list;
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
+            for (SizeT column_idx = value_list.size(); column_idx < table_column_count; ++column_idx) {
+                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                if (column_def->has_default_value()) {
+                    SharedPtr<BaseExpression> value_expr =
+                        bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
+                    value_list.emplace_back(value_expr);
+                }
+            }
+
             if (value_list.size() != table_column_count) {
                 RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
                                                                  "input value count mismatch ({})",
@@ -405,7 +411,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             }
         }
 
-        switch(create_table_info->column_defs_[idx]->type()->type()) {
+        switch (create_table_info->column_defs_[idx]->type()->type()) {
             case LogicalType::kBoolean:
             case LogicalType::kTinyInt:
             case LogicalType::kSmallInt:
@@ -426,11 +432,11 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             }
         }
 
-
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 create_table_info->column_defs_[idx]->name(),
-                                                                create_table_info->column_defs_[idx]->constraints_);
+                                                                create_table_info->column_defs_[idx]->constraints_,
+                                                                std::move(create_table_info->column_defs_[idx]->default_expr_));
         columns.emplace_back(column_def);
     }
 

@@ -26,6 +26,8 @@ import table_def;
 import index_base;
 import infinity_exception;
 import internal_types;
+import parsed_expr;
+import constant_expr;
 import stl;
 import data_type;
 
@@ -272,7 +274,8 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
             ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
             constraints.insert(ct);
         }
-        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints);
+        SharedPtr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, max_bytes);
+        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, std::move(default_expr));
         columns.push_back(cd);
     }
     add_table_op->column_defs_ = std::move(columns);
@@ -420,6 +423,7 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
         for (const auto &cons : cd.constraints_) {
             WriteBufAdv(buf, cons);
         }
+        (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->WriteAdv(buf);
     }
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->unsealed_id_);

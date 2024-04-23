@@ -75,7 +75,7 @@ class TestDataBase(HttpTest):
         dbs = self.get_database()
         # list all databases
         for db_name in dbs:
-            if db_name == 'default':
+            if db_name == "default":
                 continue
             self.drop_database(db_name)
 
@@ -108,7 +108,7 @@ class TestDataBase(HttpTest):
         dbs = self.get_database()
         # list all databases
         for db_name in dbs:
-            if db_name == 'default':
+            if db_name == "default":
                 continue
             self.drop_database(db_name)
 
@@ -143,7 +143,7 @@ class TestDataBase(HttpTest):
             # show database
             dbs = self.get_database()
             for db_name in dbs:
-                assert db_name in ['test_repeatedly_create_drop_show_databases', 'default']
+                assert db_name in ['test_repeatedly_create_drop_show_databases', "default"]
             assert len(dbs) == 2
             # drop databses
             self.drop_database('test_repeatedly_create_drop_show_databases')

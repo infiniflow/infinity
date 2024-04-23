@@ -16,11 +16,13 @@
 
 #include "parsed_expr.h"
 #include "type/datetime/interval_type.h"
+
+#include <memory>
 #include <vector>
 
 namespace infinity {
 
-enum class LiteralType {
+enum class LiteralType : int32_t {
     kBoolean,
     kDouble,
     kString,
@@ -42,6 +44,10 @@ public:
     ~ConstantExpr() override;
 
     [[nodiscard]] std::string ToString() const override;
+
+    void WriteAdv(char *&ptr) const;
+
+    static std::shared_ptr<ParsedExpr> ReadAdv(char *&ptr, int32_t maxbytes);
 
 public:
     LiteralType literal_type_;
