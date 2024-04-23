@@ -392,18 +392,10 @@ namespace infinity {
     template<typename T>
     using Atomic = std::atomic<T>;
 
-    template <typename _ITp>
-    inline void atomic_store(std::atomic<_ITp> * __a, std::__atomic_val_t<_ITp> __i) noexcept {
-        std::atomic_store_explicit(__a, __i, std::memory_order_seq_cst);
-    }
-
-    template <typename _ITp>
-    inline bool atomic_compare_exchange_strong(std::atomic<_ITp> * __a, std::__atomic_val_t<_ITp> * __i1, std::__atomic_val_t<_ITp> __i2) noexcept {
-        return atomic_compare_exchange_strong_explicit(__a, __i1, __i2, std::memory_order_seq_cst, std::memory_order_seq_cst);
-    }
+    using std::atomic_compare_exchange_strong;
+    using std::atomic_store;
 
     // Smart ptr
-
     template<typename T>
     using SharedPtr = std::shared_ptr<T>;
 

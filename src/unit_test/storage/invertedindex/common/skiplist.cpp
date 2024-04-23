@@ -45,8 +45,8 @@ TEST_F(SkiplistTest, test1) {
     KeyComparator cmp;
     SkipList<Key, Value, KeyComparator> list(cmp, nullptr);
 
-    const int N = 50000;
-    const int R = 50000;
+    constexpr int N = 50000;
+    constexpr int R = 50000;
     std::map<Key, Value> keys;
 
     Key a = 512;
@@ -79,7 +79,7 @@ TEST_F(SkiplistTest, test1) {
 TEST_F(SkiplistTest, test2) {
     KeyComparator cmp;
     SkipList<String, String, KeyComparator> list(cmp, nullptr);
-    const int N = 200;
+    constexpr int N = 200;
     std::map<String, String> keys;
 
     for (int i = 0; i < N; i++) {
@@ -119,8 +119,8 @@ void InitRamdomList(int num_elements, int max_value) {
     }
 }
 
-const int NUM_THREADS = 4;
-const int NUM_OPERATIONS = 1000;
+constexpr int NUM_THREADS = 4;
+constexpr int NUM_OPERATIONS = 1000;
 KeyComparator cmp;
 SkipList<String, String, KeyComparator> s(cmp, nullptr);
 void PerformOperations(int thread_id) {
