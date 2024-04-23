@@ -114,21 +114,21 @@ String LogicalMatch::ToString(i64 &space) const {
         String filter_str;
         ExplainLogicalPlan::Explain(filter_expression_.get(), filter_str);
         ss << filter_str << '\n';
-        if (fast_rough_filter_evaluator_) {
+        if (common_query_filter_) {
             ss << String(space, ' ');
             ss << " - filter for secondary index: ";
-            if (secondary_index_filter_qualified_) {
+            if (common_query_filter_->secondary_index_filter_qualified_) {
                 String filter_str;
-                ExplainLogicalPlan::Explain(secondary_index_filter_qualified_.get(), filter_str);
+                ExplainLogicalPlan::Explain(common_query_filter_->secondary_index_filter_qualified_.get(), filter_str);
                 ss << filter_str << '\n';
             } else {
                 ss << "None\n";
             }
             ss << String(space, ' ');
             ss << " - filter except secondary index: ";
-            if (filter_leftover_) {
+            if (common_query_filter_->filter_leftover_) {
                 String filter_str;
-                ExplainLogicalPlan::Explain(filter_leftover_.get(), filter_str);
+                ExplainLogicalPlan::Explain(common_query_filter_->filter_leftover_.get(), filter_str);
                 ss << filter_str << '\n';
             } else {
                 ss << "None\n";

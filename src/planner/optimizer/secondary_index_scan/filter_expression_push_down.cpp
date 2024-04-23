@@ -254,8 +254,8 @@ private:
             for (auto &[index_name, table_index_meta] : *map_guard) {
                 auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
                 if (!status.ok()) {
-                    // Table index entry isn't found
-                    RecoverableError(status);
+                    // skip invalid entry, for example, the index is deleted
+                    continue;
                 }
                 const IndexBase *index_base = table_index_entry->index_base();
                 if (index_base->index_type_ != IndexType::kSecondary) {
@@ -673,7 +673,7 @@ public:
                 } else if (f_name == "=") {
                     // maybe known expression 1
                     auto is_valid_column = [](const SharedPtr<BaseExpression> &expr, u32 depth) -> bool {
-                        if (expr->Type().SupportBloomFilter()) {
+                        if (expr->Type().SupportBloomFilter() or expr->Type().SupportMinMaxFilter()) {
                             return true;
                         } else {
                             // Unsupported type
@@ -695,6 +695,15 @@ public:
                                     case kBoolean:
                                     case kDecimal: {
                                         return MakeUnique<FastRoughFilterEvaluatorProbabilisticDataFilter>(column_id, std::move(value));
+                                    }
+                                    case kFloat:
+                                    case kDouble: {
+                                        auto minmax_filter_le =
+                                            MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kLessEqual);
+                                        auto minmax_filter_ge =
+                                            MakeUnique<FastRoughFilterEvaluatorMinMaxFilter>(column_id, value, FilterCompareType::kGreaterEqual);
+                                        return MakeUnique<FastRoughFilterEvaluatorCombineAnd>(std::move(minmax_filter_le),
+                                                                                              std::move(minmax_filter_ge));
                                     }
                                     default: {
                                         auto minmax_filter_le =

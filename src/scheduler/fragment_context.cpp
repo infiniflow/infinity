@@ -541,7 +541,6 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
             serial_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              knn_scan_operator->filter_expression_,
                                               std::move(knn_scan_operator->block_column_entries_),
                                               std::move(knn_scan_operator->index_entries_),
                                               std::move(knn_expr->opt_params_),
@@ -557,7 +556,6 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              knn_scan_operator->filter_expression_,
                                               std::move(knn_scan_operator->block_column_entries_),
                                               std::move(knn_scan_operator->index_entries_),
                                               std::move(knn_expr->opt_params_),
