@@ -75,7 +75,7 @@ protected:
     }
 
     void TearDown() override {
-        system(tree_cmd.c_str());
+        // system(tree_cmd.c_str());
         RemoveDbDirs();
     }
 
