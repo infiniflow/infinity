@@ -13,8 +13,7 @@
 // limitations under the License.
 
 #include "unit_test/base_test.h"
-#include <iostream>
-#include <string.h>
+#include <random>
 
 import stl;
 import logger;
@@ -25,117 +24,120 @@ using namespace infinity;
 
 class SkiplistTest : public BaseTest {};
 
-typedef u64 Key;
-typedef u64 Value;
+typedef u32 Key;
+typedef u32 Value;
 
-struct Comparator {
-    int operator()(const Key &a, const Key &b) const {
-        if (a < b) {
-            return -1;
-        } else if (a > b) {
-            return +1;
-        } else {
-            return 0;
-        }
-    }
-};
-
-struct StringComparator {
-    int operator()(const String &lhs, const String &rhs) const {
-        int ret = strcmp(lhs.c_str(), rhs.c_str());
-        return ret < 0;
-    }
-};
+std::random_device rd;
+std::mt19937 gen(rd());
+std::uniform_int_distribution<int> dis(INT32_MAX / 2, INT32_MAX);
 
 String RandStr() {
-    u32 len = rand() % 100;
+    u32 len = dis(gen) % 100 + 50;
     String str;
     str.reserve(len);
     for (u32 i = 0; i < len; ++i)
-        str.push_back('a' + rand() % 26);
+        str.push_back('a' + dis(gen) % 26);
     return str;
 }
 
 TEST_F(SkiplistTest, test1) {
-    MemoryPool memory_pool;
-    Comparator cmp;
-    SkipList<Key, Value, Comparator> list(cmp, &memory_pool);
 
-    const int N = 2000;
-    const int R = 5000;
+    KeyComparator cmp;
+    SkipList<Key, Value, KeyComparator> list(cmp, nullptr);
+
+    constexpr int N = 50000;
+    constexpr int R = 50000;
     std::map<Key, Value> keys;
 
-    for (int i = 0; i < N; i++) {
-        Key key = rand() % R;
-        Value value = rand() % R;
-        if (keys.emplace(key, value).second) {
-            list.Insert(key, value);
-        }
-    }
-
-    for (int i = 0; i < R; i++) {
-        // SkipList<Key, Value, Comparator>::Iterator iter = list.Find(i);
-        Value v;
-        if (list.Search(i, v)) {
-            ASSERT_EQ(keys[i], v);
-            ASSERT_EQ(keys.count(i), (unsigned)1);
-        } else {
-            ASSERT_EQ(keys.count(i), (unsigned)0);
-        }
-    }
-}
-
-TEST_F(SkiplistTest, test2) {
-    MemoryPool memory_pool;
-    StringComparator cmp;
-    SkipList<String, Value, StringComparator> list(cmp, &memory_pool);
-
-    const int N = 200;
-    const int R = 5000;
-    std::map<String, Value> keys;
+    Key a = 512;
+    Value b = 111;
+    list.Insert(a, b);
+    Value v;
+    list.Search(a, v);
+    ASSERT_EQ(b, v);
 
     for (int i = 0; i < N; i++) {
-        String key = RandStr();
-        Value value = rand() % R;
+        Key key = dis(gen) % R;
+        Value value = dis(gen) % R;
         if (keys.emplace(key, value).second) {
             list.Insert(key, value);
+
+            Value v;
+            list.Search(key, v);
+            ASSERT_EQ(value, v);
         }
     }
 
-    for (std::map<String, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
+    for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
         Value v;
         if (list.Search(it->first, v)) {
             ASSERT_EQ(it->second, v);
         }
     }
+}
 
-    for (std::map<String, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
-        SkipList<String, Value, StringComparator>::Iterator iter = list.Begin(it->first);
+TEST_F(SkiplistTest, test2) {
+    KeyComparator cmp;
+    SkipList<String, String, KeyComparator> list(cmp, nullptr);
+    constexpr int N = 200;
+    std::map<String, String> keys;
+
+    for (int i = 0; i < N; i++) {
+        String key = RandStr() + std::to_string(i);
+        if (keys.emplace(key, key).second) {
+            list.Insert(key, key);
+
+            String v;
+            auto ret = list.Search(key, v);
+            ASSERT_EQ(ret, true);
+            ASSERT_EQ(v, key);
+        }
+    }
+
+    for (std::map<String, String>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        String v;
+        auto ret = list.Search(it->first, v);
+        ASSERT_EQ(ret, true);
+        ASSERT_EQ(it->second, v);
+    }
+    for (std::map<String, String>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        SkipList<String, String, KeyComparator>::Iterator iter = list.Begin(it->first);
         if (iter != list.End()) {
             ASSERT_EQ(it->second, iter.Value());
         }
     }
 }
 
-const int NUM_THREADS = 4;
-const int NUM_OPERATIONS = 1000;
-Comparator cmp;
-MemoryPool arena;
-SkipList<int, int, Comparator> skipList(cmp, &arena);
+std::vector<int> num_list;
+void InitRamdomList(int num_elements, int max_value) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis(max_value / 2, max_value);
 
+    for (int i = 0; i < num_elements; i++) {
+        num_list.push_back(dis(gen));
+    }
+}
+
+constexpr int NUM_THREADS = 4;
+constexpr int NUM_OPERATIONS = 1000;
+KeyComparator cmp;
+SkipList<String, String, KeyComparator> s(cmp, nullptr);
 void PerformOperations(int thread_id) {
     for (int i = 0; i < NUM_OPERATIONS; ++i) {
         if (thread_id == 0) {
-            int key = rand() % 100;
-            skipList.Insert(key, key);
-            int result;
-            bool ret = skipList.Search(key, result);
-            ASSERT_EQ(ret, true) << "Insertion failed";
+            String key = RandStr();
+            s.Insert(key, key);
+
+            String result;
+            bool ret = s.Search(key, result);
+            ASSERT_EQ(ret, true);
             ASSERT_EQ(result, key);
+
         } else {
-            int key = rand() % 100;
-            int result;
-            bool ret = skipList.Search(key, result);
+            String key = RandStr();
+            String result;
+            bool ret = s.Search(key, result);
             if (ret) {
                 ASSERT_EQ(result, key);
             }

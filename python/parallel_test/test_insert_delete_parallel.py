@@ -8,30 +8,35 @@ from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.connection_pool import ConnectionPool
 
-max_count = 500 * 2000
+batch_size = 500
+max_count = batch_size * 200
 lock = Lock()
 deleting_list = []
 kNumThread = 8
 
 
 class TestInsertDeleteParallel:
-    @pytest.mark.skip(reason="varchar bug, No such chunk in heap")
+    # @pytest.mark.skip(reason="varchar bug, No such chunk in heap")
     def test_insert_and_delete_parallel(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("insert_delete_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        table_obj = db_obj.create_table("insert_delete_test", {
-            "id": "int64", "text": "varchar"}, ConflictType.Error)
-        table_obj.create_index("text_index", [index.IndexInfo("text",
-                                                              index.IndexType.FullText, [])])
+        table_obj = db_obj.create_table(
+            "insert_delete_test", {"id": "int64", "text": "varchar"}, ConflictType.Error
+        )
+        table_obj.create_index(
+            "text_index", [index.IndexInfo("text", index.IndexType.FullText, [])]
+        )
         connection_pool.release_conn(infinity_obj)
 
         count_num = [0]
         threads = []
         for i in range(kNumThread):
-            threads.append(Thread(target=worker_thread, args=[connection_pool, count_num, i]))
+            threads.append(
+                Thread(target=worker_thread, args=[connection_pool, count_num, i])
+            )
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):
@@ -40,7 +45,7 @@ class TestInsertDeleteParallel:
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("insert_delete_test")
-        res = table_obj.output(['*']).to_df()
+        res = table_obj.output(["*"]).to_df()
         print(res)
         assert len(res) == 0
 
@@ -52,36 +57,39 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
     infinity_obj = connection_pool.get_conn()
     db_obj = infinity_obj.get_database("default_db")
     table_obj = db_obj.get_table("insert_delete_test")
-    while (True):
+    while True:
         choice = random.randint(0, 1)
+        start_i = 0
         lock.acquire()
-        if (count_num[0] < max_count and random.randint(0, 1) == 0):
-            print("insert")
-            print(count_num[0])
-            count_num[0] += 500
+        if count_num[0] < max_count and random.randint(0, 1) == 0:
+            start_i = count_num[0]
+            count_num[0] += batch_size
             lock.release()
             value = []
-            for i in range(count_num[0] - 500, count_num[0]):
+            for i in range(start_i, start_i + batch_size):
                 value.append({"id": i, "text": str(random.uniform(0, 10))})
             table_obj.insert(value)
             lock.acquire()
-            deleting_list.append(count_num[0] - 500)
+            deleting_list.append(start_i)
+            print("insert from ", start_i, deleting_list)
             lock.release()
         else:
-            if (len(deleting_list) == 0):
+            if len(deleting_list) == 0:
                 lock.release()
-                if (count_num[0] == max_count):
+                if count_num[0] == max_count:
                     break
                 else:
                     continue
             else:
-                print("delete")
                 delete_index = random.randint(0, len(deleting_list) - 1)
-                detele_id = deleting_list[delete_index]
+                delete_id = deleting_list[delete_index]
                 deleting_list.pop(delete_index)
+                print("delete at ", delete_id, deleting_list)
                 lock.release()
                 try:
-                    table_obj.delete(f"id > {detele_id - 1} and id < {detele_id + 500}")
+                    table_obj.delete(
+                        f"id > {delete_id - 1} and id < {delete_id + batch_size}"
+                    )
                 except Exception as e:
                     print(e)
 

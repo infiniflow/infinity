@@ -39,7 +39,6 @@ namespace infinity {
 export class KnnScanSharedData {
 public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
-                      SharedPtr<BaseExpression> filter_expression,
                       UniquePtr<Vector<BlockColumnEntry *>> block_column_entries,
                       UniquePtr<Vector<SegmentIndexEntry *>> index_entries,
                       Vector<InitParameter> opt_params,
@@ -49,14 +48,12 @@ public:
                       void *query_embedding,
                       EmbeddingDataType elem_type,
                       KnnDistanceType knn_distance_type)
-        : table_ref_(table_ref), filter_expression_(filter_expression), block_column_entries_(std::move(block_column_entries)),
-          index_entries_(std::move(index_entries)), opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension),
-          query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
+        : table_ref_(table_ref), block_column_entries_(std::move(block_column_entries)), index_entries_(std::move(index_entries)),
+          opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension), query_count_(query_embedding_count),
+          query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
-
-    const SharedPtr<BaseExpression> filter_expression_{};
 
     const UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
     const UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
