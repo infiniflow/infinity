@@ -465,13 +465,29 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     if (use_block_max_iter) {
         et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+        if (et_iter and dynamic_cast<FilterIterator *>(et_iter.get())) {
+            // no valid query iterator
+            et_iter.reset();
+        }
     }
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context);
+        if (doc_iterator and dynamic_cast<FilterIterator *>(doc_iterator.get())) {
+            // no valid query iterator
+            doc_iterator.reset();
+        }
     }
     if (use_block_max_iter and use_ordinary_iter) {
         et_iter_2 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+        if (et_iter_2 and dynamic_cast<FilterIterator *>(et_iter_2.get())) {
+            // no valid query iterator
+            et_iter_2.reset();
+        }
         et_iter_3 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+        if (et_iter_3 and dynamic_cast<FilterIterator *>(et_iter_3.get())) {
+            // no valid query iterator
+            et_iter_3.reset();
+        }
     }
 
     // 3 full text search
