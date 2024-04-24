@@ -491,7 +491,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
 }
 
 void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr) {
-    auto delta_entry = global_catalog_delta_entry_->PickFlushEntry(full_ckp_commit_ts_, max_commit_ts);
+    auto delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
 
     auto &delta_ops = delta_entry->operations();
     for (auto &op : delta_ops) {
@@ -912,7 +912,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     delta_catalog_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
     // Check the SegmentEntry's for flush the data to disk.
-    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(full_ckp_commit_ts_, max_commit_ts);
+    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
 
     DeferFn defer_fn([&]() { txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids()); });
 
