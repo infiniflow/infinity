@@ -57,7 +57,7 @@ class TestDelete(TestSdk):
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         # infinity
         db_obj.drop_table(table_name="test_delete", conflict_type = ConflictType.Ignore)

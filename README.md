@@ -108,7 +108,7 @@ infinity_obj = infinity.connect(REMOTE_HOST)
 ### Get a database
 
 ```python
-db = infinity_obj.get_database("default")
+db = infinity_obj.get_database("default_db")
 ```
 
 

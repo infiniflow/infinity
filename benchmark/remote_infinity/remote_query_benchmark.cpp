@@ -190,7 +190,7 @@ int main() {
             {
                 req.session_id = client.session_id;
                 req.__isset.session_id = true;
-                req.db_name = "default";
+                req.db_name = "default_db";
                 req.__isset.db_name = true;
                 req.table_name = "sift_benchmark";
                 req.__isset.table_name = true;

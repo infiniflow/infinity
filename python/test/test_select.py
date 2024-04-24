@@ -82,7 +82,7 @@ class TestSelect(TestSdk):
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         # infinity
         db_obj.drop_table("test_select", ConflictType.Ignore)
@@ -195,7 +195,7 @@ class TestSelect(TestSdk):
                 - 2.387692308
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         # infinity
         db_obj.drop_table("test_select_aggregate", ConflictType.Ignore)
@@ -285,7 +285,7 @@ class TestSelect(TestSdk):
 
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_varchar", ConflictType.Ignore)
         db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
                             ConflictType.Error)
@@ -321,7 +321,7 @@ class TestSelect(TestSdk):
 
     def test_select_big(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_select_big", ConflictType.Ignore)
         db_obj.create_table("test_select_big", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
                             ConflictType.Error)
@@ -358,7 +358,7 @@ class TestSelect(TestSdk):
 
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_embedding", ConflictType.Ignore)
 
@@ -411,7 +411,7 @@ class TestSelect(TestSdk):
 
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_embedding_float", ConflictType.Ignore)
 
@@ -474,7 +474,7 @@ class TestSelect(TestSdk):
         test_select_big_embedding()
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_big_embedding", ConflictType.Ignore)
 
@@ -503,7 +503,7 @@ class TestSelect(TestSdk):
 
     def test_select_same_output(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_same_output", ConflictType.Ignore)
         db_obj.create_table("test_select_same_output", {
             "c1": "int", "c2": "int"}, ConflictType.Error)
@@ -527,7 +527,7 @@ class TestSelect(TestSdk):
 
     def test_empty_table(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_empty_table", ConflictType.Ignore)
         db_obj.create_table("test_empty_table", {
             "c1": "int", "c2": "int"}, ConflictType.Error)
@@ -563,7 +563,7 @@ class TestSelect(TestSdk):
     def test_valid_filter_expression(self, filter_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_valid_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_filter_expression", {
             "c1": "int", "c2": "float"}, ConflictType.Error)
@@ -596,7 +596,7 @@ class TestSelect(TestSdk):
     def test_invalid_filter_expression(self, filter_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_filter_expression",
                           ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_filter_expression", {

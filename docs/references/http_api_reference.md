@@ -96,7 +96,7 @@ curl --request GET \
 ```
 {
     "error_code": 0,
-    "database_name": "default"
+    "database_name": "default_db"
     "store_dir": "/var/infinity/data/nIHniKeHIB_db_default"
     "table_count": 0
 }
@@ -131,7 +131,7 @@ curl --request GET \
 {
     "error_code": 0,
     "databases": [
-        "default",
+        "default_db",
         "my_db"
     ]  
 }
@@ -304,7 +304,7 @@ curl --request GET \
 ```
 {
     "error_code": 0,
-    "database_name": "default",
+    "database_name": "default_db",
     "table_name": "my_table",
     "store_dir": "/var/infinity/data/nIHniKeHIB_db_default/h1abZcWuBs_table_my_table",
     "column_count" : 3,
@@ -431,7 +431,12 @@ Drops an index.
 ```
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
-     --header 'accept: application/json'
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' \
+{
+    "drop_option": "ignore_if_not_exists"
+} '
 ```
 
 #### Response
@@ -472,7 +477,7 @@ curl --request GET \
 ```
 {
     "error_code": 0,
-    "database_name": "default",
+    "database_name": "default_db",
     "table_name": "test_index_tbl",
     "index_name": "idx1",
     "index_column_ids": "0",

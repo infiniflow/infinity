@@ -27,7 +27,7 @@ from infinity.common import ConflictType
 class RemoteThriftInfinityConnection(InfinityConnection, ABC):
     def __init__(self, uri):
         super().__init__(uri)
-        self.db_name = "default"
+        self.db_name = "default_db"
         self._client = ThriftInfinityClient(uri)
         self._is_connected = True
 

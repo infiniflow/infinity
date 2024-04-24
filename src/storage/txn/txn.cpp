@@ -427,8 +427,10 @@ TxnTimeStamp Txn::Commit() {
 
     if (txn_context_.GetTxnState() == TxnState::kToRollback) {
         // abort because of conflict
-        RecoverableError(Status::TxnRollback(txn_id_));
+        LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, this->CommitTS()));
+        return this->CommitTS();
     }
+
     if (txn_context_.GetTxnState() != TxnState::kCommitted) {
         UnrecoverableError("Transaction isn't in COMMITTED status.");
     }

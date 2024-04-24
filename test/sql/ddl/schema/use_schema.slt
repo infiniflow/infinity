@@ -32,7 +32,7 @@ SELECT * FROM t1;
 1 2 3
 
 statement ok
-USE default;
+USE default_db;
 
 statement ok
 CREATE TABLE t1 (c1 INT, c2 INT, c3 INT);

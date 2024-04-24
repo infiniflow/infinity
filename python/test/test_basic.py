@@ -88,7 +88,7 @@ class TestCase(TestSdk):
             res = infinity_obj.list_databases()
             assert res.error_code == ErrorCode.OK
             for db_name in res.db_names:
-                if db_name != 'default':
+                if db_name != "default_db":
                     infinity_obj.drop_database(db_name, ConflictType.Error)
 
             # infinity
@@ -99,12 +99,12 @@ class TestCase(TestSdk):
             assert res.error_code == ErrorCode.OK
 
             for db in res.db_names:
-                assert db in ['my_db', 'default']
+                assert db in ['my_db', "default_db"]
 
             res = infinity_obj.drop_database("my_db", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
-            db_obj = infinity_obj.get_database("default")
+            db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table("my_table1", ConflictType.Ignore)
             table_obj = db_obj.create_table(
                 "my_table1", {"c1": "int, primary key"}, ConflictType.Error)

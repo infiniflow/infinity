@@ -39,11 +39,11 @@ class TestDatabase(TestSdk):
             - ''                    ❌
         2. list databases
             - 'my_database'
-            - 'default'
+            - "default_db"
         3. drop databases
             - 'my_database'
         4. list tables:
-            - 'default'
+            - "default_db"
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -71,20 +71,20 @@ class TestDatabase(TestSdk):
 
         res.db_names.sort()
 
-        assert res.db_names[0] == 'default'
+        assert res.db_names[0] == "default_db"
         assert res.db_names[1] == 'my_database'
 
         res = infinity_obj.drop_database("my_database")
         assert res.error_code == ErrorCode.OK
 
-        # res = infinity_obj.drop_database("default")
+        # res = infinity_obj.drop_database("default_db")
         # assert not res.success
 
         res = infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
 
         for db in res.db_names:
-            assert db == 'default'
+            assert db == "default_db"
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -237,7 +237,7 @@ class TestDatabase(TestSdk):
             # 2.2 show database
             dbs = infinity_obj.list_databases()
             for db_name in dbs.db_names:
-                assert db_name in ['test_repeatedly_create_drop_show_databases', 'default']
+                assert db_name in ['test_repeatedly_create_drop_show_databases', "default_db"]
             assert len(dbs.db_names) == 2
 
             # 2.3 drop database
@@ -300,8 +300,8 @@ class TestDatabase(TestSdk):
         db = infinity_obj.get_database("my_database")
         print(db._db_name)
 
-        # 3. get 'default' db(using default), if not switch to default, my_database can't be dropped.
-        db = infinity_obj.get_database("default")
+        # 3. get "default_db" db(using default), if not switch to default, my_database can't be dropped.
+        db = infinity_obj.get_database("default_db")
         print(db._db_name)
 
         # 4.
