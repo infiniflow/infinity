@@ -448,7 +448,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
         }
     }
 
-    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
+    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>(create_table_info->table_name_), columns);
     for (HashSet<String> visited_param_names; auto *property_ptr : create_table_info->properties_) {
         auto &[param_name, param_value] = *property_ptr;
         if (auto [_, success] = visited_param_names.insert(param_name); !success) {
@@ -687,7 +687,7 @@ Status LogicalPlanner::BuildDropTable(const DropStatement *statement, SharedPtr<
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if (drop_table_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("default");
+        schema_name_ptr = MakeShared<String>("default_db");
     } else {
         schema_name_ptr = MakeShared<String>(drop_table_info->schema_name_);
     }
@@ -707,7 +707,7 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if (drop_collection_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("default");
+        schema_name_ptr = MakeShared<String>("default_db");
     } else {
         schema_name_ptr = MakeShared<String>(drop_collection_info->schema_name_);
     }

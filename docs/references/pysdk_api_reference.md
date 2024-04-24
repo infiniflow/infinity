@@ -456,7 +456,7 @@ res = table_obj.create_index("my_index",[index.IndexInfo("c1",  index.IndexType.
 assert res.error_code == ErrorCode.OK
 res = table_obj.show_index("my_index")
 print(res)
-#ShowIndexResponse(error_code=0, error_msg='', db_name='default', table_name='test_create_index_show_index', index_name='my_index',
+#ShowIndexResponse(error_code=0, error_msg='', db_name="default_db", table_name='test_create_index_show_index', index_name='my_index',
 #index_type='IVFFlat', index_column_names='c1', index_column_ids='0', other_parameters='metric = l2, centroids_count = 128', store_dir='/var/
 #infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index', segment_index_count='0')
 ```

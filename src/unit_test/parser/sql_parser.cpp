@@ -534,7 +534,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
 //
 //        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
 //        EXPECT_EQ(create_index_info->index_name_, "");
-//        EXPECT_EQ(create_index_info->schema_name_, "default");
+//        EXPECT_EQ(create_index_info->schema_name_, "default_db");
 //        EXPECT_EQ(create_index_info->table_name_, "t1");
 //
 //        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);

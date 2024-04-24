@@ -87,7 +87,7 @@ int main(int argn, char *argv[]) {
         return 1;
     }
 
-    std::string db_name = "default";
+    std::string db_name = "default_db";
     std::string table_name = "ft_dbpedia_benchmark";
     std::string index_name = "ft_dbpedia_index";
 

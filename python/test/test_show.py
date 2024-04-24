@@ -25,7 +25,7 @@ class TestDescribe(TestSdk):
     def test_show_table(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table(
             "test_show_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
@@ -43,7 +43,7 @@ class TestDescribe(TestSdk):
     def test_show_columns(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_columns", ConflictType.Ignore)
         db_obj.create_table(
             "test_show_columns", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)

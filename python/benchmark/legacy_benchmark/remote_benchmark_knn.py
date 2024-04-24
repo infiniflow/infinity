@@ -116,7 +116,7 @@ def work(queries, topk, metric_type, column_name, data_type, table_name="sift_be
     conn = ThriftInfinityClient(REMOTE_HOST)
     for query in queries:
         # print(len(query))
-        table = RemoteTable(conn, "default", table_name)
+        table = RemoteTable(conn, "default_db", table_name)
         # table.knn(column_name, query_vec, data_type, metric_type, topk).output(["_row_id"]).to_result()
         query_builder = InfinityThriftQueryBuilder(table)
         query_builder.output(["_row_id"])
@@ -179,7 +179,7 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
 
     for i in range(rounds):
         conn = ThriftInfinityClient(REMOTE_HOST)
-        table = RemoteTable(conn, "default", table_name)
+        table = RemoteTable(conn, "default_db", table_name)
 
         query_results = [[] for _ in range(len(queries))]
 

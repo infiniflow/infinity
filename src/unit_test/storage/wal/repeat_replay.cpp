@@ -61,7 +61,7 @@ protected:
 TEST_F(RepeatReplayTest, append) {
     std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config();
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
     auto column_def2 =
@@ -177,7 +177,7 @@ TEST_F(RepeatReplayTest, append) {
 TEST_F(RepeatReplayTest, import) {
     std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config();
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
     auto column_def2 =
