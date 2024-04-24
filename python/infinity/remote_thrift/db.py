@@ -15,6 +15,7 @@
 from abc import ABC
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+import numpy as np
 from infinity.db import Database
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.table import RemoteTable
@@ -22,10 +23,12 @@ from infinity.remote_thrift.utils import check_valid_name, name_validity_check, 
 from infinity.common import ConflictType
 
 
-def get_ordinary_info(column_big_info, column_defs, column_name, index):
-    # "c1": "int, primary key"
-    datatype = column_big_info[0]
-    constraints = column_big_info[1:]
+def get_ordinary_info(column_info, column_defs, column_name, index):
+    # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
+    datatype = column_info["type"]
+    constraints = column_info["constraints"]
+    default = column_info["default"]
+
     # process column definition
     proto_column_def = ttypes.ColumnDef()
     proto_column_def.id = index
@@ -66,6 +69,39 @@ def get_ordinary_info(column_big_info, column_defs, column_name, index):
             proto_column_def.constraints.append(ttypes.Constraint.Unique)
         else:
             raise Exception(f"unknown constraint: {constraint}")
+
+    # process constant expression
+    if "default" not in column_name:
+        default = None
+    else:
+        default = column_name["default"]
+
+    if not default:
+        constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Null)
+        proto_column_def.constant_expr = constant_exp
+    else:
+        constant_expression = None
+        if isinstance(default, str):
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
+                                                      str_value=default)
+
+        elif isinstance(default, int):
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
+                                                      i64_value=default)
+
+        elif isinstance(default, float) or isinstance(default, np.float32):
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
+                                                      f64_value=default)
+        elif isinstance(default, list):
+            if isinstance(default[0], int):
+                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
+                                                          i64_array_value=default)
+            elif isinstance(default[0], float):
+                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
+                                                          f64_array_value=default)
+        else:
+            raise Exception("Invalid constant expression")
+        proto_column_def.constant_expr = constant_expression
     column_defs.append(proto_column_def)
 
 
@@ -73,6 +109,7 @@ def get_embedding_info(column_big_info, column_defs, column_name, index):
     # "vector,1024,float32"
     length = column_big_info[1]
     element_type = column_big_info[2]
+
     proto_column_def = ttypes.ColumnDef()
     proto_column_def.id = index
     proto_column_def.name = column_name
@@ -103,6 +140,40 @@ def get_embedding_info(column_big_info, column_defs, column_name, index):
     physical_type.embedding_type = embedding_type
     column_type.physical_type = physical_type
     proto_column_def.data_type = column_type
+
+    # process constant expression
+    if "default" not in column_name:
+        default = None
+    else:
+        default = column_name["default"]
+
+    if not default:
+        constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Null)
+        proto_column_def.constant_expr = constant_expression
+    else:
+        constant_expression = None
+        if isinstance(default, str):
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
+                                                      str_value=default)
+
+        elif isinstance(default, int):
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
+                                                      i64_value=default)
+
+        elif isinstance(default, float) or isinstance(default, np.float32):
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
+                                                      f64_value=default)
+        elif isinstance(default, list):
+            if isinstance(default[0], int):
+                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
+                                                          i64_array_value=default)
+            elif isinstance(default[0], float):
+                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
+                                                          f64_array_value=default)
+        else:
+            raise Exception("Invalid constant expression")
+        proto_column_def.constant_expr = constant_expression
+
     column_defs.append(proto_column_def)
 
 
@@ -112,23 +183,36 @@ class RemoteDatabase(Database, ABC):
         self._db_name = name
 
     @name_validity_check("table_name", "Table")
-    def create_table(self, table_name: str, columns_definition: dict[str, str],
+    def create_table(self, table_name: str, columns_definition: dict[dict[str, str]],
                      conflict_type: ConflictType = ConflictType.Error):
         # process column definitions
-        # {"c1":'int, primary key',"c2":'vector,1024,float32'}
-        # db_obj.create_table("my_table", {"c1": "int, primary key", "c2": "vector,1024,float32"}, None)
+        """
+        db_obj.create_table("my_table", {
+            "c1": {
+                "type": "int",
+                "constraints":["primary key", ...],
+                "default"(optional): 1/"asdf"/[1,2]/...
+            },
+            "c2": {
+                "type":"vector,1024,float32",
+                }
+            }, None)
+        """
         # to column_defs
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
+            print(column_info)
             check_valid_name(column_name, "Column")
-            column_big_info = [item.strip() for item in column_info.split(",")]
+            # column_big_info = [item.strip() for item in column_info.split(",")]
+            column_big_info = [item.strip() for item in column_info["type"].split(",")]
+            print(column_big_info)
             if column_big_info[0] == "vector":
                 get_embedding_info(
                     column_big_info, column_defs, column_name, index)
 
             else:  # numeric or varchar
                 get_ordinary_info(
-                    column_big_info, column_defs, column_name, index)
+                    column_info, column_defs, column_name, index)
 
         create_table_conflict: ttypes.CreateConflict
         if conflict_type == ConflictType.Error:

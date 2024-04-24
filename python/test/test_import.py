@@ -95,8 +95,9 @@ class TestImport(TestSdk):
             print(res)
         else:
             print(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
-            table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
-                                  {"file_type": file_format})
+            table_obj.import_data(
+                os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
+                {"file_type": file_format})
             res = table_obj.output(["*"]).to_df()
             print(res)
 
@@ -175,8 +176,9 @@ class TestImport(TestSdk):
                                         ConflictType.Error)
 
         with pytest.raises(Exception):
-            table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
-                                  {"file_type": file_format})
+            table_obj.import_data(
+                os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
+                {"file_type": file_format})
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -211,9 +213,9 @@ class TestImport(TestSdk):
             table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": types, "c2": types},
                                             ConflictType.Error)
             table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_" + delimiter[0] + ".csv",
-                                import_options={
-                                    "delimiter": delimiter[1]
-                                })
+                                  import_options={
+                                      "delimiter": delimiter[1]
+                                  })
             res = table_obj.output(["*"]).to_df()
             print(res)
             db_obj.drop_table("test_csv_with_different_delimiter", ConflictType.Error)
@@ -222,9 +224,9 @@ class TestImport(TestSdk):
                                             ConflictType.Error)
             with pytest.raises(Exception, match=f"ERROR:{types[1]}*"):
                 table_obj.import_data(common_values.TEST_TMP_DIR + "/pysdk_test_" + delimiter[0] + ".csv",
-                                    import_options={
-                                        "delimiter": delimiter[1]
-                                    })
+                                      import_options={
+                                          "delimiter": delimiter[1]
+                                      })
             db_obj.drop_table("test_csv_with_different_delimiter", ConflictType.Error)
 
     # import csv with delimiter more than one character
@@ -398,7 +400,8 @@ class TestImport(TestSdk):
         table_obj = db_obj.create_table("test_table_with_not_matched_columns", columns)
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_commas.csv"
-        with pytest.raises(Exception, match="ERROR:3039, Column count mismatch: CSV file row count isn't match with table schema*"):
+        with pytest.raises(Exception,
+                           match="ERROR:3039, Column count mismatch: CSV file row count isn't match with table schema*"):
             res = table_obj.import_data(test_csv_dir)
             assert res.error_code == ErrorCode.OK
 
@@ -408,7 +411,7 @@ class TestImport(TestSdk):
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_import_with_different_size.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("data_size", [1, 8191, 8192, 8193, 16*8192])
+    @pytest.mark.parametrize("data_size", [1, 8191, 8192, 8193, 16 * 8192])
     def test_import_with_different_size(self, get_infinity_db, check_data, data_size):
         generate_big_rows_csv(data_size, "pysdk_test_import_with_different_size.csv")
         copy_data("pysdk_test_import_with_different_size.csv")
@@ -466,3 +469,43 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_exceeding_columns", ConflictType.Error)
 
     # TODO: JSON file type import test
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.jsonl",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_jsonl_file(self, get_infinity_db, check_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_jsonl_file", ConflictType.Ignore)
+        if not check_data:
+            copy_data("pysdk_test.jsonl")
+
+        # columns = {"c" + str(i): "int" for i in range(1024)}
+        columns = {
+            "c1": {
+                "type": "int",
+                "constraints": ["primary key"],
+                "default": 12,
+            },
+            "c2": {
+                "type": "int",
+                "constraints": ["primary key"],
+                "default": 12,
+            },
+            "c3": {
+                "type": "int",
+                "constraints": ["primary key"],
+                "default": 12,
+            },
+            # "c2": {
+            #     "type": "vector, 3, float",
+            #     "constraints": ["primary key"],
+            #     # "default": [1, 2, 3],
+            # }
+        }
+        table_obj = db_obj.create_table("test_import_jsonl_file", columns, ConflictType.Error)
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.jsonl"
+        res = table_obj.import_data(test_csv_dir, import_options={"file_type": "jsonl"})
+        assert res.error_code == ErrorCode.OK
+        # table_obj.insert_data("pysdk_test_json_file.json")
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
+        db_obj.drop_table("test_import_jsonl_file", ConflictType.Error)
