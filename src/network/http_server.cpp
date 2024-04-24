@@ -1475,7 +1475,7 @@ public:
 
         nlohmann::json json_response;
         HTTPStatus http_status;
-        DropIndexOptions options;
+        DropIndexOptions options{ConflictType::kInvalid};
         if(body_info_json.contains("drop_option")) {
             auto drop_option = body_info_json["drop_option"];
             if(drop_option.is_string()) {
