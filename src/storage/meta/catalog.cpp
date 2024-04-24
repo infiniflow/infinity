@@ -415,7 +415,8 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["data_dir"] = *this->data_dir_;
-        json_res["next_txn_id"] = this->next_txn_id_;
+        TransactionID next_txn_id = this->next_txn_id_;
+        json_res["next_txn_id"] = next_txn_id;
         json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
         databases.reserve(this->db_meta_map().size());
         for (auto &db_meta : this->db_meta_map()) {

@@ -153,6 +153,11 @@ export enum class SysVar {
     kLogFlushPolicy,
     kWALLogSize,
     kDeltaLogCount,
+    kNextTxnID,
+    kBufferedObjectCount,
+    kGCListSizeOfBufferPool,
+    kActiveTxnCount,
+    kCurrentTs,
     kInvalid,
 };
 

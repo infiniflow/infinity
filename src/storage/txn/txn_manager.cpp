@@ -42,8 +42,8 @@ TxnManager::TxnManager(Catalog *catalog,
                        TransactionID start_txn_id,
                        TxnTimeStamp start_ts,
                        bool enable_compaction)
-    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_txn_id_(start_txn_id),
-      start_ts_(start_ts), is_running_(false), enable_compaction_(enable_compaction) {
+    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false),
+      enable_compaction_(enable_compaction) {
     catalog_->SetTxnMgr(this);
 }
 
@@ -89,11 +89,6 @@ SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
 }
 
 TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
-
-u64 TxnManager::GetNewTxnID() {
-    u64 new_txn_id = ++catalog_->next_txn_id_;
-    return new_txn_id;
-}
 
 TxnTimeStamp TxnManager::GetTimestamp() {
     TxnTimeStamp ts = ++start_ts_;
@@ -168,6 +163,13 @@ void TxnManager::RollBackTxn(Txn *txn) {
     txn_map_.erase(txn_id);
     rw_locker_.unlock();
 }
+
+SizeT TxnManager::ActiveTxnCount() {
+    std::unique_lock w_lock(rw_locker_);
+    return txn_map_.size();
+}
+
+TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
 void TxnManager::AddWaitFlushTxn(const Vector<TransactionID> &txn_ids) {
     // std::stringstream ss;
