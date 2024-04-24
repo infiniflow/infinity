@@ -53,8 +53,6 @@ import query_node;
 import query_builder;
 import doc_iterator;
 import logger;
-import analyzer_pool;
-import analyzer;
 import term;
 import early_terminate_iterator;
 import fulltext_score_result_heap;
@@ -379,16 +377,6 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     }
 }
 
-void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_terms) {
-    UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
-    if (analyzer.get() == nullptr) {
-        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name)));
-    }
-    Term input_term;
-    input_term.text_ = std::move(text);
-    analyzer->Analyze(input_term, output_terms);
-}
-
 bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
     using TimeDurationType = std::chrono::duration<float, std::milli>;
     auto execute_start_time = std::chrono::high_resolution_clock::now();
@@ -419,7 +407,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
-    driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));

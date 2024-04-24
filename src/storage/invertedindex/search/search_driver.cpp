@@ -27,6 +27,8 @@ import term;
 import infinity_exception;
 import status;
 import logger;
+import analyzer;
+import analyzer_pool;
 
 namespace infinity {
 
@@ -134,27 +136,30 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         RecoverableError(Status::SyntaxError("Empty query text"));
         return nullptr;
     }
+    Term input_term;
+    input_term.text_ = std::move(text);
     TermList terms;
     // 1. analyze
-    bool analyzed = false;
+    std::string analyzer_name = "standard";
     if (!field.empty()) {
         if (auto it = field2analyzer_.find(field); it != field2analyzer_.end()) {
-            if (const std::string &analyzer_name = it->second; !analyzer_name.empty()) {
-                auto analyzer_func = reinterpret_cast<void (*)(const std::string &, std::string &&, TermList &)>(analyze_func_);
-                analyzer_func(analyzer_name, std::move(text), terms);
-                analyzed = true;
-            }
+            analyzer_name = it->second;
         }
     }
+    UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
+    if (analyzer.get() == nullptr) {
+        RecoverableError(Status::UnexpectedError(String("Failed to get or initialize analyzer: ") + analyzer_name));
+    }
+    analyzer->Analyze(input_term, terms);
+    if (terms.empty()) {
+        std::cerr << "Analyzer " << analyzer_name << " analyzes following text as empty terms: " << input_term.text_ << std::endl;
+    }
     // 2. build query node
-    if (!analyzed) {
+    if (terms.empty()) {
         auto result = std::make_unique<TermQueryNode>();
-        result->term_ = std::move(text);
+        result->term_ = std::move(input_term.text_);
         result->column_ = field;
         return result;
-    } else if (terms.empty()) {
-        RecoverableError(Status::SyntaxError("Empty terms after analyzing"));
-        return nullptr;
     } else if (terms.size() == 1) {
         auto result = std::make_unique<TermQueryNode>();
         result->term_ = std::move(terms.front().text_);
