@@ -210,6 +210,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto op2 = MakeUnique<AddDBEntryOp>();
         auto op1_same_name = MakeUnique<AddDBEntryOp>();
 
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = fmt::format("#{}", *db_name);
+
         op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
 
         op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
@@ -229,6 +231,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto op1 = MakeUnique<AddTableEntryOp>();
         auto op2 = MakeUnique<AddTableEntryOp>();
         auto op1_same_name = MakeUnique<AddTableEntryOp>();
+
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = fmt::format("#{}#{}", *db_name, *table_name);
 
         op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
         op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
@@ -251,6 +255,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto op1 = MakeUnique<AddSegmentEntryOp>();
         auto op2 = MakeUnique<AddSegmentEntryOp>();
         auto op1_same_name = MakeUnique<AddSegmentEntryOp>();
+
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id);
 
         op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
         op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
@@ -283,6 +289,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto op1 = MakeUnique<AddBlockEntryOp>();
         auto op1_same_name = MakeUnique<AddBlockEntryOp>();
 
+        op1_same_name->encode_ = op1->encode_ = fmt::format("#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id);
+
         op1_same_name->db_name_ = op1->db_name_ = db_name;
         op1_same_name->table_name_ = op1->table_name_ = table_name;
         op1_same_name->segment_id_ = op1->segment_id_ = segment_id;
@@ -303,6 +311,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto op1 = MakeUnique<AddColumnEntryOp>();
         auto op1_same_name = MakeUnique<AddColumnEntryOp>();
 
+        op1_same_name->encode_ = op1->encode_ = fmt::format("#{}#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id, column_id);
+
         op1_same_name->db_name_ = op1->db_name_ = db_name;
         op1_same_name->table_name_ = op1->table_name_ = table_name;
         op1_same_name->segment_id_ = op1->segment_id_ = segment_id;
@@ -321,6 +331,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto op1 = MakeUnique<AddTableIndexEntryOp>();
         auto op2 = MakeUnique<AddTableIndexEntryOp>();
         auto op1_same_name = MakeUnique<AddTableIndexEntryOp>();
+
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = fmt::format("#{}#{}#{}", *db_name, *table_name, *index_name);
 
         op1_same_name->db_name_ = op2->db_name_ = op1->db_name_ = db_name;
         op1_same_name->table_name_ = op2->table_name_ = op1->table_name_ = table_name;
@@ -347,6 +359,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto op1 = MakeUnique<AddSegmentIndexEntryOp>();
         auto op1_same_name = MakeUnique<AddSegmentIndexEntryOp>();
 
+        op1_same_name->encode_ = op1->encode_ = fmt::format("#{}#{}#{}#{}", *db_name, *table_name, *index_name, segment_id);
+
         op1_same_name->db_name_ = op1->db_name_ = db_name;
         op1_same_name->table_name_ = op1->table_name_ = table_name;
         op1_same_name->index_name_ = op1->index_name_ = index_name;
@@ -364,6 +378,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     {
         auto op1 = MakeUnique<AddSegmentEntryOp>();
 
+        op1->encode_ = fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id);
+
         op1->db_name_ = db_name;
         op1->table_name_ = table_name;
         op1->segment_id_ = segment_id;
@@ -375,6 +391,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     }
     {
         auto op1 = MakeUnique<AddBlockEntryOp>();
+
+        op1->encode_ = fmt::format("#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id);
 
         op1->db_name_ = db_name;
         op1->table_name_ = table_name;
@@ -388,6 +406,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     }
     {
         auto op = MakeUnique<AddSegmentEntryOp>();
+
+        op->encode_ = fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id);
 
         op->db_name_ = db_name;
         op->table_name_ = table_name;
@@ -419,7 +439,9 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto AddDBEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag, TxnTimeStamp commit_ts) {
         auto op1 = MakeUnique<AddDBEntryOp>();
-        op1->db_name_ = db_name;
+        op1->encode_ = fmt::format("#{}", *db_name);
+
+                           op1->db_name_ = db_name;
         op1->db_entry_dir_ = db_dir;
         op1->merge_flag_ = merge_flag;
         op1->commit_ts_ = commit_ts;
@@ -427,6 +449,8 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
     };
     auto AddTableEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag, TxnTimeStamp commit_ts) {
         auto op1 = MakeUnique<AddTableEntryOp>();
+        op1->encode_ = fmt::format("#{}#{}", *db_name, *table_name);
+
         op1->db_name_ = db_name;
         op1->table_name_ = table_name;
         op1->table_entry_dir_ = table_entry_dir;
