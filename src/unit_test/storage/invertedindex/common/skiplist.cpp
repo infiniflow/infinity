@@ -40,10 +40,22 @@ String RandStr() {
     return str;
 }
 
+class NumComparator {
+public:
+    i32 operator()(const int &lhs, const int &rhs) const {
+        if (lhs < rhs)
+            return -1;
+        else if (lhs == rhs)
+            return 0;
+        else
+            return 1;
+    }
+};
+
 TEST_F(SkiplistTest, test1) {
 
-    KeyComparator cmp;
-    SkipList<Key, Value, KeyComparator> list(cmp, nullptr);
+    NumComparator cmp;
+    SkipList<Key, Value, NumComparator> list(cmp, nullptr);
 
     constexpr int N = 50000;
     constexpr int R = 50000;
@@ -72,6 +84,13 @@ TEST_F(SkiplistTest, test1) {
         Value v;
         if (list.Search(it->first, v)) {
             ASSERT_EQ(it->second, v);
+        }
+    }
+
+    for (std::map<Key, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        SkipList<Key, Value, NumComparator>::Iterator iter = list.Begin(it->first);
+        if (iter != list.End()) {
+            ASSERT_EQ(it->second, iter.Value());
         }
     }
 }
