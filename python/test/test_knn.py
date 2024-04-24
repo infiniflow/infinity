@@ -38,7 +38,7 @@ class TestKnn(TestSdk):
         #
         # infinity
         #
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("fix_tmp_20240116",
                           conflict_type=ConflictType.Ignore)
@@ -93,7 +93,7 @@ class TestKnn(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         with pytest.raises(Exception, match=r".*value count mismatch*"):
-            db_obj = infinity_obj.get_database("default")
+            db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert_multi_column",
                               conflict_type=ConflictType.Ignore)
             table = db_obj.create_table("test_insert_multi_column", {

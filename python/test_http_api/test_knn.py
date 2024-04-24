@@ -11,7 +11,7 @@ class TestKnn(HttpTest):
     @pytest.mark.skip(reason="can not import tmp_20240116.csv")
     def test_http_knn(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_knn"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -40,7 +40,7 @@ class TestKnn(HttpTest):
         return
 
     def test_http_insert_multi_column(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_knn"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -72,7 +72,7 @@ class TestKnn(HttpTest):
 
     # PASS
     def test_http_knn_on_vector_column(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_knn_on_vector_column"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -125,7 +125,7 @@ class TestKnn(HttpTest):
 
     # PASS
     def test_http_knn_on_non_vector_column(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_knn_on_vector_column"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -179,7 +179,7 @@ class TestKnn(HttpTest):
 
     # PASS
     def test_http_valid_embedding_data(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_valid_embedding_data"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -241,7 +241,7 @@ class TestKnn(HttpTest):
             pytest.param((1, 2, 3)),
             pytest.param({"c": "12"}),
         ]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_invalid_embedding_data"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -294,7 +294,7 @@ class TestKnn(HttpTest):
 
     # PASS
     def test_http_valid_embedding_data_type(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_valid_embedding_data_type"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -361,7 +361,7 @@ class TestKnn(HttpTest):
 
     @pytest.mark.skip(reason="knn use element_type:integer leads to segment fault")
     def test_http_invalid_embedding_data_type(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_invalid_embedding_data_type"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -409,7 +409,7 @@ class TestKnn(HttpTest):
         distance_type = [
             "l2", "cosine", "hamming"
         ]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_various_distance_type"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -467,7 +467,7 @@ class TestKnn(HttpTest):
 
     @pytest.mark.parametrize("topn", [0, -1, "test", {}, (), [1] * 4])
     def test_http_various_topn(self, topn):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_various_topn"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -507,7 +507,7 @@ class TestKnn(HttpTest):
         return
 
     def test_http_with_index_before(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_index_before"
         idxname = "my_index"
         self.show_database(db_name)
@@ -569,7 +569,7 @@ class TestKnn(HttpTest):
         return
 
     def test_http_with_index_after(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_index_after"
         idxname = "my_index"
         self.show_database(db_name)
@@ -633,7 +633,7 @@ class TestKnn(HttpTest):
     def test_http_with_fulltext_match_with_valid_columns(self):
         httputils.check_data(TEST_TMP_DIR)
         match_param_1 = ["doctitle", "num", "body"]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_fulltext_match_with_valid_columns"
         idxname = "my_index"
         self.show_database(db_name)
@@ -680,7 +680,7 @@ class TestKnn(HttpTest):
 
     def test_http_with_fulltext_match_with_invalid_columns(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_fulltext_match_with_invalid_columns"
 
         self.show_database(db_name)
@@ -729,7 +729,7 @@ class TestKnn(HttpTest):
     def test_http_with_fulltext_match_with_valid_words(self):
         httputils.check_data(TEST_TMP_DIR)
         match_param_2 = ["a word a segment", "body=Greek"]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_fulltext_match_with_valid_words"
 
         self.show_database(db_name)
@@ -778,7 +778,7 @@ class TestKnn(HttpTest):
     def test_http_with_fulltext_match_with_invalid_words(self):
         httputils.check_data(TEST_TMP_DIR)
         match_param_2 = [1, 1.1, [], {}, ()]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_fulltext_match_with_valid_words"
 
         self.show_database(db_name)
@@ -827,7 +827,7 @@ class TestKnn(HttpTest):
     def test_http_with_fulltext_match_with_options(self):
         httputils.check_data(TEST_TMP_DIR)
         match_param_3 = ["@#$!#@$SDa^sdf3!@#$", "topn=1", "1"]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_fulltext_match_with_options"
 
         self.show_database(db_name)
@@ -876,7 +876,7 @@ class TestKnn(HttpTest):
     def test_http_with_fulltext_match_with_invalid_options(self):
         httputils.check_data(TEST_TMP_DIR)
         match_param_3 = [1, 1.1, [], {}, ()]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_with_fulltext_match_with_invalid_words"
 
         self.show_database(db_name)

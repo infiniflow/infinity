@@ -211,29 +211,29 @@ TEST_F(WalReplayTest, wal_replay_tables) {
         BGTaskProcessor *bg_processor = storage->bg_processor();
 
         {
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl2"), columns);
             auto *txn2 = txn_mgr->BeginTxn();
-            Status status2 = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            Status status2 = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status2.ok());
             txn_mgr->CommitTxn(txn2);
         }
         {
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->DropTableCollectionByName("default", "tbl2", ConflictType::kIgnore);
+            Status status = txn->DropTableCollectionByName("default_db", "tbl2", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
+            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->BeginTxn();
-            Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn3);
         }
@@ -263,15 +263,15 @@ TEST_F(WalReplayTest, wal_replay_tables) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl2"), columns);
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->DropTableCollectionByName("default", "tbl3", ConflictType::kIgnore);
+            Status status = txn->DropTableCollectionByName("default_db", "tbl3", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -326,23 +326,23 @@ TEST_F(WalReplayTest, wal_replay_append) {
         }
 
         {
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
+            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->BeginTxn();
-            Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn3);
         }
         {
-            auto tbl4_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl4"), columns);
+            auto tbl4_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl4"), columns);
             auto *txn4 = txn_mgr->BeginTxn();
-            Status status = txn4->CreateTable("default", std::move(tbl4_def), ConflictType::kIgnore);
+            Status status = txn4->CreateTable("default_db", std::move(tbl4_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn4);
         }
@@ -370,7 +370,7 @@ TEST_F(WalReplayTest, wal_replay_append) {
             }
             input_block->Finalize();
             EXPECT_EQ(input_block->Finalized(), true);
-            txn5->Append("default", "tbl4", input_block);
+            txn5->Append("default_db", "tbl4", input_block);
             txn_mgr->CommitTxn(txn5);
         }
         {
@@ -411,10 +411,10 @@ TEST_F(WalReplayTest, wal_replay_append) {
             }
         }
         {
-            auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl5"), columns);
+            auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl5"), columns);
             auto *txn = txn_mgr->BeginTxn();
 
-            Status status = txn->CreateTable("default", std::move(tbl5_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl5_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -422,7 +422,7 @@ TEST_F(WalReplayTest, wal_replay_append) {
         {
             auto *txn = txn_mgr->BeginTxn();
             TxnTimeStamp begin_ts = txn->BeginTS();
-            auto [table_entry, status] = txn->GetTableByName("default", "tbl4");
+            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl4");
             EXPECT_NE(table_entry, nullptr);
 
             auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
@@ -506,16 +506,16 @@ TEST_F(WalReplayTest, wal_replay_import) {
         int column_count = columns.size();
 
         {
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl2"), columns);
             auto *txn2 = txn_mgr->BeginTxn();
-            Status status = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            Status status = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn2);
         }
@@ -528,15 +528,15 @@ TEST_F(WalReplayTest, wal_replay_import) {
         }
         {
             auto *txn = txn_mgr->BeginTxn();
-            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
-            Status status = txn->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl3"), columns);
+            Status status = txn->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
             auto txn4 = txn_mgr->BeginTxn();
 
-            auto [table_entry, status] = txn4->GetTableByName("default", "tbl1");
+            auto [table_entry, status] = txn4->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = Catalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0u);
@@ -625,7 +625,7 @@ TEST_F(WalReplayTest, wal_replay_import) {
             TxnTimeStamp begin_ts = txn->BeginTS();
 
             Vector<ColumnID> column_ids{0, 1, 2};
-            auto [table_entry, status] = txn->GetTableByName("default", "tbl1");
+            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
             auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
             EXPECT_NE(segment_entry, nullptr);
@@ -690,10 +690,10 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         }
         int column_count = 1;
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->BeginTxn();
 
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -702,7 +702,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         for (u64 i = 0; i < test_segment_n; ++i) { // add 2 segments
             auto txn2 = txn_mgr->BeginTxn();
 
-            auto [table_entry, status] = txn2->GetTableByName("default", "tbl1");
+            auto [table_entry, status] = txn2->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
@@ -738,7 +738,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         { // add compact
             auto txn4 = txn_mgr->BeginTxn();
 
-            auto [table_entry, status] = txn4->GetTableByName("default", "tbl1");
+            auto [table_entry, status] = txn4->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -768,7 +768,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
             auto txn = txn_mgr->BeginTxn();
             TxnTimeStamp begin_ts = txn->BeginTS();
 
-            auto [table_entry, status] = txn->GetTableByName("default", "tbl1");
+            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             for (u64 i = 0; i < test_segment_n; ++i) {
@@ -816,9 +816,9 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
                     MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
                 columns.emplace_back(column_def_ptr);
             }
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("test_annivfflat"), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_annivfflat"), columns);
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kError);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -837,7 +837,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
                 delete init_parameter;
             }
 
-            const String &db_name = "default";
+            const String &db_name = "default_db";
             const String &table_name = "test_annivfflat";
             ConflictType conflict_type = ConflictType::kError;
             bool prepare = false;
@@ -879,7 +879,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
         {
             auto txn = txn_mgr->BeginTxn();
             Vector<ColumnID> column_ids{0};
-            auto [table_entry, status1] = txn->GetTableByName("default", "test_annivfflat");
+            auto [table_entry, status1] = txn->GetTableByName("default_db", "test_annivfflat");
             EXPECT_TRUE(status1.ok());
             auto [index_entry, status2] = table_entry->GetIndex("idx1", txn->TxnID(), txn->BeginTS());
             ASSERT_TRUE(status2.ok());
@@ -920,9 +920,9 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
                     MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
                 columns.emplace_back(column_def_ptr);
             }
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("test_hnsw"), columns);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), columns);
             auto *txn = txn_mgr->BeginTxn();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kError);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -944,7 +944,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
                 delete init_parameter;
             }
 
-            const String &db_name = "default";
+            const String &db_name = "default_db";
             const String &table_name = "test_hnsw";
             ConflictType conflict_type = ConflictType::kError;
             bool prepare = false;
@@ -986,7 +986,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
         {
             auto txn = txn_mgr->BeginTxn();
             Vector<ColumnID> column_ids{0};
-            auto [table_entry, status] = txn->GetTableByName("default", "test_hnsw");
+            auto [table_entry, status] = txn->GetTableByName("default_db", "test_hnsw");
             EXPECT_NE(table_entry, nullptr);
             auto table_index_meta = table_entry->index_meta_map()["hnsw_index"].get();
             EXPECT_NE(table_index_meta, nullptr);

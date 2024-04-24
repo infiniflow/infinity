@@ -40,7 +40,7 @@ def get_infinity_db():
     # connect
     infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-    yield infinity_obj.get_database("default")
+    yield infinity_obj.get_database("default_db")
 
     # disconnect
     res = infinity_obj.disconnect()

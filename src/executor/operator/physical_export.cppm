@@ -81,7 +81,7 @@ private:
     CopyFileType file_type_{CopyFileType::kCSV};
     String file_path_{};
     String table_name_{};
-    String schema_name_{"default"};
+    String schema_name_{"default_db"};
     bool header_{false};
     char delimiter_{','};
 };

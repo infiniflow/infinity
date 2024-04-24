@@ -515,7 +515,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("test_hnsw");
     auto index_name = MakeShared<String>("hnsw_index");
     auto column_name = MakeShared<String>("col1");
@@ -532,9 +532,9 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
                 MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embedding_info), "col1", constraints);
             column_defs.emplace_back(column_def_ptr);
         }
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("test_hnsw"), column_defs);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), column_defs);
         auto *txn = txn_mgr->BeginTxn();
-        Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kError);
+        Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
@@ -554,7 +554,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             delete init_parameter;
         }
 
-        const String &db_name = "default";
+        const String &db_name = "default_db";
         const String &table_name = "test_hnsw";
         ConflictType conflict_type = ConflictType::kError;
         bool prepare = false;
@@ -672,7 +672,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
 
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     auto index_name = MakeShared<String>("idx1");
     auto column_name = MakeShared<String>("col1");
@@ -753,7 +753,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
 
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     auto index_name = MakeShared<String>("idx1");
     auto column_name = MakeShared<String>("col1");

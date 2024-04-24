@@ -44,7 +44,7 @@ def insert_sift_1m(path):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("sift_benchmark")
     db_obj.create_table("sift_benchmark", {"col1": "vector,128,float"})
@@ -83,7 +83,7 @@ def insert_gist_1m(path):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("gist_benchmark")
     db_obj.create_table("gist_benchmark", {"col1": "vector,960,float"})
@@ -121,7 +121,7 @@ def insert_gist_1m(path):
 
 def create_index(table_name):
     conn = ThriftInfinityClient(REMOTE_HOST)
-    table = RemoteTable(conn, "default", table_name)
+    table = RemoteTable(conn, "default_db", table_name)
     res = table.create_index("hnsw_index",
                              [index.IndexInfo("col1",
                                               index.IndexType.Hnsw,
@@ -139,7 +139,7 @@ def create_index(table_name):
 def work(vectors, table_name, column_name):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     table_obj = db_obj.get_table(table_name)
     assert table_obj
@@ -156,7 +156,7 @@ def process_pool(threads, path, table_name):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table(table_name)
     db_obj.create_table(table_name, {"col1": "vector,128,float"})

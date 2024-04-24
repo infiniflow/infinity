@@ -55,7 +55,7 @@ public:
     [[nodiscard]] char delimiter() const { return delimiter_; }
 
 private:
-    String schema_name_{"default"};
+    String schema_name_{"default_db"};
     String table_name_{};
     String file_path_{};
     bool header_{false};
