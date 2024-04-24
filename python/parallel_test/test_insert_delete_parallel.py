@@ -46,7 +46,6 @@ class TestInsertDeleteParallel:
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("insert_delete_test")
         res = table_obj.output(["*"]).to_df()
-        print(res)
         assert len(res) == 0
 
         res = db_obj.drop_table("insert_delete_test", ConflictType.Error)
@@ -71,7 +70,6 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
             table_obj.insert(value)
             lock.acquire()
             deleting_list.append(start_i)
-            print("insert from ", start_i, deleting_list)
             lock.release()
         else:
             if len(deleting_list) == 0:
@@ -84,13 +82,12 @@ def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
                 delete_index = random.randint(0, len(deleting_list) - 1)
                 delete_id = deleting_list[delete_index]
                 deleting_list.pop(delete_index)
-                print("delete at ", delete_id, deleting_list)
                 lock.release()
                 try:
                     table_obj.delete(
                         f"id > {delete_id - 1} and id < {delete_id + batch_size}"
                     )
                 except Exception as e:
-                    print(e)
+                    return
 
     connection_pool.release_conn(infinity_obj)
