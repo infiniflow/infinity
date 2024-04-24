@@ -58,9 +58,7 @@ class TestIndex(HttpTest):
             }
         )
         self.create_index(db_name, table_name, idxname,
-                          [
-                              "c1",
-                          ],
+                          ["c1",],
                           {
                               "type": "HNSW",
                               "M": "16",
