@@ -30,7 +30,8 @@ class TestInsert(HttpTest):
         self.insert(db_name, table_name, [{"c1": 0, "c2": 0}])
         self.insert(db_name, table_name, [{"c1": 1, "c2": 1}])
         self.insert(db_name, table_name, [{"c1": 2, "c2": 2}])
-        self.insert(db_name, table_name, [{"c1": 3, "c2": 3}, {"c1": 4, "c2": 4}])
+        self.insert(db_name, table_name, [
+            {"c1": 3, "c2": 3}, {"c1": 4, "c2": 4}])
 
         self.drop_table(db_name, table_name)
         return
@@ -64,7 +65,7 @@ class TestInsert(HttpTest):
         })
         for i in range(100):
             self.insert(db_name, table_name, [
-                        {"c1": "test_insert_big_varchar" * 1000}])
+                {"c1": "test_insert_big_varchar" * 1000}])
         self.drop_table(db_name, table_name)
         return
 
@@ -175,7 +176,7 @@ class TestInsert(HttpTest):
         table_name = "test_insert_data_into_non_existent_table"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, {
-                          "c1": {"type": "integer", }, "c2": {"type": "integer", }})
+            "c1": {"type": "integer", }, "c2": {"type": "integer", }})
         self.drop_table(db_name, table_name)
 
         values = [{"c1": 1, "c2": 1}]
@@ -346,7 +347,6 @@ class TestInsert(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    @pytest.mark.skip("insert vector lead to erroor_code")
     @pytest.mark.parametrize("batch", [10, 1024])
     @pytest.mark.parametrize("types", [(1, False), (1.1, False), ("1#$@!adf", False), ([1, 2, 3], True)])
     def test_http_insert_with_invalid_data_type(self, batch, types):
@@ -409,7 +409,7 @@ class TestInsert(HttpTest):
 
         values = [{"c1": [1, 2, 3]} for _ in range(5)]
         self.insert(db_name, table_name, values, {
-            "status_code": 500,
+            "status_code": 200,
         })
 
         self.drop_table(db_name, table_name)

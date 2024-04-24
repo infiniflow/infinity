@@ -431,7 +431,12 @@ Drops an index.
 ```
 curl --request DELETE \
      --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
-     --header 'accept: application/json'
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' \
+{
+    "drop_option": "ignore_if_not_exists"
+} '
 ```
 
 #### Response

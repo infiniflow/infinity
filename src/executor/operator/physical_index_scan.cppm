@@ -105,10 +105,10 @@ private:
     mutable Vector<SizeT> column_ids_{};
 };
 
-export Map<SegmentID, std::variant<Vector<u32>, Bitmask>> SolveSecondaryIndexFilter(const FastRoughFilterEvaluator *fast_rough_filter_evaluator,
-                                                                                    const Vector<FilterExecuteElem> &filter_execute_command,
-                                                                                    const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
-                                                                                    const BaseTableRef *base_table_ref,
-                                                                                    TxnTimeStamp begin_ts);
+export std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
+                                                                    const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
+                                                                    const SegmentID segment_id,
+                                                                    const u32 segment_row_count,
+                                                                    const u32 segment_row_actual_count);
 
 } // namespace infinity

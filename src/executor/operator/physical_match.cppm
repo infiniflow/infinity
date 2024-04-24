@@ -30,10 +30,7 @@ import load_meta;
 import infinity_exception;
 import internal_types;
 import data_type;
-import table_index_entry;
-import fast_rough_filter;
-import secondary_index_scan_execute_expression;
-import bitmask;
+import common_query_filter;
 
 namespace infinity {
 
@@ -42,12 +39,7 @@ public:
     explicit PhysicalMatch(u64 id,
                            SharedPtr<BaseTableRef> base_table_ref,
                            SharedPtr<MatchExpression> match_expr,
-                           bool have_filter,
-                           UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
-                           const SharedPtr<BaseExpression> &filter_leftover,
-                           const SharedPtr<BaseExpression> &secondary_index_filter_qualified,
-                           HashMap<ColumnID, TableIndexEntry *> &&secondary_index_column_index_map,
-                           Vector<FilterExecuteElem> &&filter_execute_command,
+                           const SharedPtr<CommonQueryFilter> &common_query_filter,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas);
 
@@ -80,11 +72,7 @@ public:
 
     [[nodiscard]] inline MatchExpression *match_expr() const { return match_expr_.get(); }
 
-    [[nodiscard]] inline bool have_filter() const { return have_filter_; }
-
-    [[nodiscard]] inline const BaseExpression *filter_leftover_expr() const { return filter_leftover_.get(); }
-
-    [[nodiscard]] inline const BaseExpression *filter_secondary_index_expr() const { return secondary_index_filter_qualified_.get(); }
+    [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
 
 private:
     u64 table_index_ = 0;
@@ -92,17 +80,7 @@ private:
     SharedPtr<MatchExpression> match_expr_;
 
     // for filter
-    bool have_filter_ = false;
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
-    // TODO: filter_leftover_ is not handled now
-    SharedPtr<BaseExpression> filter_leftover_;
-    SharedPtr<BaseExpression> secondary_index_filter_qualified_;
-    HashMap<ColumnID, TableIndexEntry *> secondary_index_column_index_map_;
-    // secondary index filter execute expression
-    Vector<FilterExecuteElem> filter_execute_command_;
-    // filter result, form an iterator
-    Map<SegmentID, std::variant<Vector<u32>, Bitmask>> filter_result_;
-    SizeT filter_result_count_ = 0;
+    SharedPtr<CommonQueryFilter> common_query_filter_;
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
     bool ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state);

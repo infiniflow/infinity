@@ -60,13 +60,11 @@ public:
         } else if (op->operator_type() == LogicalNodeType::kKnnScan) {
             // also need to apply filter
             auto &knn_scan = static_cast<LogicalKnnScan &>(*op);
-            auto &filter_expression = knn_scan.filter_expression_;
-            knn_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
+            knn_scan.common_query_filter_->TryApplyFastRoughFilterOptimizer();
         } else if (op->operator_type() == LogicalNodeType::kMatch) {
             // also need to apply filter
             auto &match = static_cast<LogicalMatch &>(*op);
-            auto &filter_expression = match.filter_expression_;
-            match.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
+            match.common_query_filter_->TryApplyFastRoughFilterOptimizer();
         } else if (op->operator_type() == LogicalNodeType::kIndexScan) {
             UnrecoverableError("ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.");
         }
