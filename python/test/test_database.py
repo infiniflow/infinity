@@ -465,6 +465,9 @@ class TestDatabase(TestSdk):
         infinity_obj.drop_database("test_create_option", ConflictType.Ignore)
         infinity_obj.create_database("test_create_option", conflict_type)
 
+        # infinity_obj.create_database("test_create_option", ConflictType.Ignore)
+        # infinity_obj.create_database("test_create_option", ConflictType.Replace)
+
         infinity_obj.drop_database("test_create_option")
 
         # disconnect

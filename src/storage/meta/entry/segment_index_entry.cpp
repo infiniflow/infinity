@@ -854,7 +854,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
     return chunk_index_entry;
 }
 
-nlohmann::json SegmentIndexEntry::Serialize() {
+nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     if (this->deleted_) {
         UnrecoverableError("Segment Column index entry can't be deleted.");
     }
@@ -870,7 +870,9 @@ nlohmann::json SegmentIndexEntry::Serialize() {
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
 
         for (auto &chunk_index_entry : chunk_index_entries_) {
-            index_entry_json["chunk_index_entries"].push_back(chunk_index_entry->Serialize());
+            if (chunk_index_entry->commit_ts_ <= max_commit_ts) {
+                index_entry_json["chunk_index_entries"].push_back(chunk_index_entry->Serialize());
+            }
         }
         index_entry_json["ft_column_len_sum"] = this->ft_column_len_sum_;
         index_entry_json["ft_column_len_cnt"] = this->ft_column_len_cnt_;

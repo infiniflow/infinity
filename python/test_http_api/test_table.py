@@ -127,7 +127,6 @@ class TestTable(HttpTest):
         self.list_tables("default_db")
         return
 
-    @pytest.mark.skip(reason="skip")
     def test_http_show_tables(self):
         self.show_database("default_db")
         tblist = self.get_all_tables("default_db")
@@ -504,8 +503,7 @@ class TestTable(HttpTest):
             self.drop_table(db_name, table_name + str(i))
         return
 
-        # create/drop/list/get 1M table to reach the limit
-
+    # create/drop/list/get 1M table to reach the limit
     @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times")
     def test_http_create_1m_table(self):

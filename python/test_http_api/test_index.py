@@ -567,13 +567,13 @@ class TestIndex(HttpTest):
             "type": "FULLTEXT",
             "ANALYZER": "segmentation"
         }, {
-                              "status_code": 500,
-                          })
+            "status_code": 500,
+        })
 
         self.select(db_name, table_name, ["*"], "", {
         }, {}, {
-                        "error_code": 0,
-                    })
+            "error_code": 0,
+        })
         self.drop_table(db_name, table_name)
         return
         # ERROR
@@ -605,14 +605,14 @@ class TestIndex(HttpTest):
             "centroids_count": "128",
             "metric": "l2"
         }, {
-                              "status_code": 500,
-                              "error_code": 3022
-                          })
+            "status_code": 500,
+            "error_code": 3022
+        })
         return
 
     # ERROR update error
     @pytest.mark.skip
-    @pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
+    #@pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
     def test_http_create_index_on_update_table(self):
         db_name = "default_db"
         table_name = "test_create_index_on_update_table"
@@ -634,6 +634,7 @@ class TestIndex(HttpTest):
             self.insert(db_name, table_name, [{"c1": embedding_data, "c2": i}])
 
         embedding_data = [(float(i) + 0.1) for i in range(4)]
+    
         for i in range(10):
             self.update(db_name, table_name, {"c1": embedding_data}, "c2 = " + str(i))
         self.drop_table(db_name, table_name)
@@ -737,8 +738,7 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-        # PASS
-
+    # PASS
     def test_http_create_duplicated_index_with_valid_error_options(self):
         db_name = "default_db"
         table_name = "test_create_duplicated_index_with_valid_error_options"
@@ -760,8 +760,8 @@ class TestIndex(HttpTest):
             "ef": "50",
             "metric": "l2"
         }, {
-                              "error_code": 0
-                          }, "kError")
+            "error_code": 0
+        }, "kError")
 
         self.create_index(db_name, table_name, idxname, ["c1"], {
             "type": "HNSW",
@@ -770,9 +770,9 @@ class TestIndex(HttpTest):
             "ef": "50",
             "metric": "l2"
         }, {
-                              "status_code": 500,
-                              "error_code": 3018
-                          }, "kReplace")
+            "status_code": 500,
+            "error_code": 3018
+        }, "kReplace")
 
         self.drop_index(db_name, table_name, idxname)
         self.drop_table(db_name, table_name)
@@ -867,8 +867,7 @@ class TestIndex(HttpTest):
         self.drop_index(db_name, table_name, idxname)
         self.drop_table(db_name, table_name)
         return
-        # PASS
-
+    # PASS
     def test_http_list_index(self):
         db_name = "default_db"
         table_name = "test_list_index"
@@ -931,14 +930,34 @@ class TestIndex(HttpTest):
         })
         self.drop_table(db_name, table_name)
         return
-
-    @pytest.mark.skip
-    @pytest.mark.xfail(reason="no apt for dropTable actually")
+    
+    @pytest.mark.skip("no opt for droping index actually")
+    @pytest.mark.xfail(reason="no opt for drop index actually")
     def test_http_drop_index_with_invalid_options(self):
+        db_name = "default"
+        table_name = "test_http_drop_index_with_invalid_options"
+        idx_name = "my_idx"
+        self.show_database(db_name)
+        self.drop_table(db_name, table_name)
+        self.create_table(db_name, table_name, {
+            "c1": {
+                "type": "vector",
+                "dimension": 1024,
+                "element_type": "float",
+            },
+        })
+        self.create_index(db_name, table_name, idx_name, ["c1"], {
+                "type": "HNSW",
+                "M": "16",
+                "ef_construction": "50",
+                "ef": "50",
+                "metric": "l2"
+        })
+        self.drop_index(db_name,table_name,idx_name)
+        self.drop_table(db_name,table_name)
         return
 
-        # PASS
-
+    # PASS
     def test_http_supported_vector_index(self):
         db_name = "default_db"
         table_name = "test_drop_index_with_invalid_options"
