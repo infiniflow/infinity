@@ -532,8 +532,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         },
                         txn_id,
                         begin_ts);
-                }
-                if (merge_flag == MergeFlag::kUpdate) {
+                } else if (merge_flag == MergeFlag::kUpdate) {
                     UnrecoverableError("Update database entry is not supported.");
                 }
                 break;
@@ -571,45 +570,24 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         txn_id,
                         begin_ts);
                 }
+                auto init_table_entry = [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                    return TableEntry::ReplayTableEntry(false,
+                                                        table_meta,
+                                                        table_entry_dir,
+                                                        table_name,
+                                                        column_defs,
+                                                        entry_type,
+                                                        txn_id,
+                                                        begin_ts,
+                                                        commit_ts,
+                                                        row_count,
+                                                        unsealed_id,
+                                                        next_segment_id);
+                };
                 if (merge_flag == MergeFlag::kNew || merge_flag == MergeFlag::kDeleteAndNew) {
-                    db_entry->CreateTableReplay(
-                        table_name,
-                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableEntry::ReplayTableEntry(false,
-                                                                table_meta,
-                                                                table_entry_dir,
-                                                                table_name,
-                                                                column_defs,
-                                                                entry_type,
-                                                                txn_id,
-                                                                begin_ts,
-                                                                commit_ts,
-                                                                row_count,
-                                                                unsealed_id,
-                                                                next_segment_id);
-                        },
-                        txn_id,
-                        begin_ts);
-                }
-                if (merge_flag == MergeFlag::kUpdate) {
-                    db_entry->UpdateTableReplay(
-                        table_name,
-                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableEntry::ReplayTableEntry(false,
-                                                                table_meta,
-                                                                table_entry_dir,
-                                                                table_name,
-                                                                column_defs,
-                                                                entry_type,
-                                                                txn_id,
-                                                                begin_ts,
-                                                                commit_ts,
-                                                                row_count,
-                                                                unsealed_id,
-                                                                next_segment_id);
-                        },
-                        txn_id,
-                        begin_ts);
+                    db_entry->CreateTableReplay(table_name, init_table_entry, txn_id, begin_ts);
+                } else if (merge_flag == MergeFlag::kUpdate) {
+                    db_entry->UpdateTableReplay(table_name, init_table_entry, txn_id, begin_ts);
                 }
                 break;
             }
@@ -626,28 +604,35 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto min_row_ts = add_segment_entry_op->min_row_ts_;
                 auto max_row_ts = add_segment_entry_op->max_row_ts_;
                 auto deprecate_ts = add_segment_entry_op->deprecate_ts_;
+                auto segment_filter_binary_data = add_segment_entry_op->segment_filter_binary_data_;
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
 
-                table_entry->AddSegmentReplay(
-                    [&]() {
-                        auto segment = SegmentEntry::NewReplaySegmentEntry(table_entry,
-                                                                           segment_id,
-                                                                           segment_status,
-                                                                           column_count,
-                                                                           row_count,
-                                                                           actual_row_count,
-                                                                           row_capacity,
-                                                                           min_row_ts,
-                                                                           max_row_ts,
-                                                                           commit_ts,
-                                                                           deprecate_ts,
-                                                                           begin_ts,
-                                                                           txn_id);
-                        return segment;
-                    },
-                    segment_id);
+                auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry,
+                                                                         segment_id,
+                                                                         segment_status,
+                                                                         column_count,
+                                                                         row_count,
+                                                                         actual_row_count,
+                                                                         row_capacity,
+                                                                         min_row_ts,
+                                                                         max_row_ts,
+                                                                         commit_ts,
+                                                                         deprecate_ts,
+                                                                         begin_ts,
+                                                                         txn_id);
+
+                if (merge_flag == MergeFlag::kNew) {
+                    if (!segment_filter_binary_data.empty()) {
+                        segment_entry->LoadFilterBinaryData(std::move(segment_filter_binary_data));
+                    }
+                    table_entry->AddSegmentReplay(segment_entry);
+                } else if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kUpdate) {
+                    table_entry->UpdateSegmentReplay(segment_entry, std::move(segment_filter_binary_data));
+                } else {
+                    UnrecoverableError(fmt::format("Unsupported merge flag {} for segment entry", (i8)merge_flag));
+                }
                 break;
             }
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
@@ -662,22 +647,33 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto max_row_ts = add_block_entry_op->max_row_ts_;
                 auto check_point_ts = add_block_entry_op->checkpoint_ts_;
                 auto check_point_row_count = add_block_entry_op->checkpoint_row_count_;
+                auto block_filter_binary_data = add_block_entry_op->block_filter_binary_data_;
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
 
-                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
-                segment_entry->AddBlockReplay(BlockEntry::NewReplayBlockEntry(segment_entry,
-                                                                              block_id,
-                                                                              row_count,
-                                                                              row_capacity,
-                                                                              min_row_ts,
-                                                                              max_row_ts,
-                                                                              commit_ts,
-                                                                              check_point_ts,
-                                                                              check_point_row_count,
-                                                                              buffer_mgr),
-                                              block_id);
+                auto new_block = BlockEntry::NewReplayBlockEntry(segment_entry,
+                                                                 block_id,
+                                                                 row_count,
+                                                                 row_capacity,
+                                                                 min_row_ts,
+                                                                 max_row_ts,
+                                                                 commit_ts,
+                                                                 check_point_ts,
+                                                                 check_point_row_count,
+                                                                 buffer_mgr);
+
+                if (merge_flag == MergeFlag::kNew) {
+                    if (!block_filter_binary_data.empty()) {
+                        new_block->LoadFilterBinaryData(std::move(block_filter_binary_data));
+                    }
+                    segment_entry->AddBlockReplay(std::move(new_block));
+                } else if (merge_flag == MergeFlag::kUpdate) {
+                    segment_entry->UpdateBlockReplay(std::move(new_block), std::move(block_filter_binary_data));
+                } else {
+                    UnrecoverableError(fmt::format("Unsupported merge flag {} for block entry", (i8)merge_flag));
+                }
                 break;
             }
             case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
@@ -733,8 +729,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         },
                         txn_id,
                         begin_ts);
-                }
-                if (merge_flag == MergeFlag::kUpdate) {
+                } else if (merge_flag == MergeFlag::kUpdate) {
                     table_entry->UpdateIndexReplay(*index_name, txn_id, begin_ts, commit_ts);
                 }
                 break;
@@ -802,35 +797,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     auto *segment_index_entry = iter2->second.get();
                     segment_index_entry->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, buffer_mgr);
                 }
-                break;
-            }
-            case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
-                auto *set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
-                const auto &db_name = set_segment_status_sealed_op->db_name_;
-                const auto &table_name = set_segment_status_sealed_op->table_name_;
-                auto segment_id = set_segment_status_sealed_op->segment_id_;
-                const auto &segment_filter_binary = set_segment_status_sealed_op->segment_filter_binary_data_;
-
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
-                auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
-                segment_entry->SetSealed(); // ignore the return value.
-                segment_entry->LoadFilterBinaryData(segment_filter_binary);
-                break;
-            }
-            case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: {
-                auto *set_block_status_sealed_op = static_cast<SetBlockStatusSealedOp *>(op.get());
-                const auto &db_name = set_block_status_sealed_op->db_name_;
-                const auto &table_name = set_block_status_sealed_op->table_name_;
-                auto segment_id = set_block_status_sealed_op->segment_id_;
-                auto block_id = set_block_status_sealed_op->block_id_;
-                const auto &block_filter_binary = set_block_status_sealed_op->block_filter_binary_data_;
-
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
-                auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
-                block_entry->LoadFilterBinaryData(block_filter_binary);
                 break;
             }
             default:

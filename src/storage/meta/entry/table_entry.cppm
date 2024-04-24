@@ -135,7 +135,9 @@ private:
     void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);
 
 public:
-    void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id);
+    void AddSegmentReplay(SharedPtr<SegmentEntry> segment_entry);
+
+    void UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data);
 
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }

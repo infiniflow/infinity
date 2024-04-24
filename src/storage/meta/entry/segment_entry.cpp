@@ -99,6 +99,18 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
+void SegmentEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data) {
+    status_ = segment_entry->status_;
+    row_count_ = segment_entry->row_count_;
+    actual_row_count_ = segment_entry->actual_row_count_;
+    min_row_ts_ = segment_entry->min_row_ts_;
+    max_row_ts_ = segment_entry->max_row_ts_;
+    deprecate_ts_ = segment_entry->deprecate_ts_;
+    if (!segment_filter_binary_data.empty()) {
+        LoadFilterBinaryData(segment_filter_binary_data);
+    }
+}
+
 bool SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
@@ -108,12 +120,24 @@ bool SegmentEntry::SetSealed() {
     return true;
 }
 
-void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id) {
+void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry) {
+    BlockID block_id = block_entry->block_id();
     BlockID cur_blocks_size = block_entries_.size();
     if (block_id >= cur_blocks_size) {
         block_entries_.resize(block_id + 1);
     }
+    if (block_entries_[block_id].get() != nullptr) {
+        UnrecoverableError(fmt::format("BlockEntry {} already exists in SegmentEntry {}", block_id, segment_id_));
+    }
     block_entries_[block_id] = std::move(block_entry);
+}
+
+void SegmentEntry::UpdateBlockReplay(SharedPtr<BlockEntry> new_block, String block_filter_binary_data) {
+    BlockID block_id = new_block->block_id();
+    if (block_id >= block_entries_.size() || block_entries_[block_id].get() == nullptr) {
+        UnrecoverableError(fmt::format("BlockEntry {} does not exist in SegmentEntry {}", block_id, segment_id_));
+    }
+    block_entries_[block_id]->UpdateBlockReplay(new_block, std::move(block_filter_binary_data));
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {

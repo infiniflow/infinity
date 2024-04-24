@@ -715,7 +715,7 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
             auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_idx, last_off, commit_ts);
             block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
         }
-        segment_entry->AddBlockReplay(std::move(block_entry), block_id); // reuse function from delta catalog.
+        segment_entry->AddBlockReplay(std::move(block_entry)); // reuse function from delta catalog.
     }
     return segment_entry;
 }
