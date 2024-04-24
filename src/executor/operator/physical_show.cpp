@@ -2655,7 +2655,7 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
             }
         }
         case SysVar::kWALLogSize: {
-            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize();
+            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize() - query_context->storage()->wal_manager()->GetLastCkpWalSize();
             Value value = Value::MakeVarchar(std::to_string(wal_log_size));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
