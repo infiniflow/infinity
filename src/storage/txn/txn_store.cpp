@@ -328,7 +328,7 @@ void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {
 void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry) {
     auto iter = txn_segments_store_.find(segment_entry->segment_id());
     if (iter == txn_segments_store_.end()) {
-        iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry)).first;
+        iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
     }
     iter->second.block_entries_.emplace_back(block_entry);
 }

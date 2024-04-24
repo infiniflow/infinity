@@ -999,17 +999,16 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
     {
-        for (auto &[_, delta_op] : delta_ops_) {
+        auto delta_ops = std::exchange(delta_ops_, {});
+        auto txn_ids = std::exchange(txn_ids_, {});
+        for (auto &[_, delta_op] : delta_ops) {
             if (delta_op->commit_ts_ <= full_ckp_ts) { // skip the delta op that is before full checkpoint
                 continue;
             }
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
 
-        flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids_.begin(), txn_ids_.end()));
-
-        txn_ids_.clear();
-        delta_ops_.clear();
+        flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
     }
     flush_delta_entry->set_commit_ts(max_commit_ts);
 
