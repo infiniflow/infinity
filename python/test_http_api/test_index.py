@@ -225,8 +225,7 @@ class TestIndex(HttpTest):
                               {"type": "float"},
                               {"type": "double"}, {"type": "varchar"}, {"type": "boolean"},
                               {"type": "vector", "dimension": 3, "element_type": "float", }])
-    def test_http_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type,
-                                               　　　　　　　　　　　　　params, types):
+    def test_http_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type, params, types):
         db_name = "default_db"
         table_name = "test_create_drop_different_fulltext_index_invalid_options"
         idxname = "my_index"
