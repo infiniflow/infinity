@@ -152,7 +152,7 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool free) {
         clean_list_.push_back(buffer_obj);
     }
     if (free) {
-        std::unique_lock lock(w_locker_);
+        std::unique_lock lock(gc_locker_);
         current_memory_size_ -= buffer_obj->GetBufferSize();
     }
 }
