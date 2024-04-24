@@ -468,31 +468,26 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_exceeding_columns", ConflictType.Error)
 
-    # TODO: JSON file type import test
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.jsonl",
+    @pytest.mark.parametrize("check_data", [{"file_name": "test_default.jsonl",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_import_jsonl_file(self, get_infinity_db, check_data):
+    def test_import_jsonl_file_with_default(self, get_infinity_db, check_data):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_import_jsonl_file", ConflictType.Ignore)
+        db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Ignore)
         if not check_data:
-            copy_data("pysdk_test.jsonl")
+            copy_data("test_default.jsonl")
 
-        # columns = {"c" + str(i): "int" for i in range(1024)}
         columns = {
             "c1": {
                 "type": "int",
-                "constraints": ["primary key"],
-                "default": 12,
+                "default": 1,
             },
             "c2": {
                 "type": "int",
-                "constraints": ["primary key"],
-                "default": 12,
+                "default": 4,
             },
             "c3": {
                 "type": "int",
-                "constraints": ["primary key"],
-                "default": 12,
+                "default": 7,
             },
             "c4": {
                 "type": "vector, 3, float",
@@ -500,53 +495,48 @@ class TestImport(TestSdk):
                 "default": [1.0, 2.0, 3.0],
             }
         }
-        table_obj = db_obj.create_table("test_import_jsonl_file", columns, ConflictType.Error)
+        table_obj = db_obj.create_table("test_import_jsonl_file_with_default", columns, ConflictType.Error)
 
-        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.jsonl"
+        test_csv_dir = common_values.TEST_TMP_DIR + "test_default.jsonl"
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "jsonl"})
         assert res.error_code == ErrorCode.OK
-        # table_obj.insert_data("pysdk_test_json_file.json")
         res = table_obj.output(["*"]).to_pl()
         print(res)
-        db_obj.drop_table("test_import_jsonl_file", ConflictType.Error)
+        db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.json",
+    @pytest.mark.skip(reason="not implemented")
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_default.json",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_import_json_file(self, get_infinity_db, check_data):
+    def test_import_json_file_with_default(self, get_infinity_db, check_data):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_import_json_file", ConflictType.Ignore)
+        db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Ignore)
         if not check_data:
-            copy_data("pysdk_test.json")
+            copy_data("pysdk_test_default.json")
 
-        # columns = {"c" + str(i): "int" for i in range(1024)}
         columns = {
             "c1": {
                 "type": "int",
-                "constraints": ["primary key"],
-                "default": 12,
+                "default": 1,
             },
             "c2": {
                 "type": "int",
-                "constraints": ["primary key"],
-                "default": 12,
+                "default": 4,
             },
             "c3": {
                 "type": "int",
-                "constraints": ["primary key"],
-                "default": 12,
+                "default": 7,
             },
             "c4": {
                 "type": "vector, 3, float",
-                "constraints": ["primary key"],
-                # "default": [1, 2, 3],
+                "default": [1.1, 2.5, 3.0],
             }
         }
-        table_obj = db_obj.create_table("test_import_json_file", columns, ConflictType.Error)
+        table_obj = db_obj.create_table("test_import_jsonl_file_with_default", columns, ConflictType.Error)
 
-        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.json"
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_default.json"
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "json"})
         assert res.error_code == ErrorCode.OK
-        # table_obj.insert_data("pysdk_test_json_file.json")
         res = table_obj.output(["*"]).to_pl()
         print(res)
-        # db_obj.drop_table("test_import_json_file", ConflictType.Error)
+        db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Error)
+

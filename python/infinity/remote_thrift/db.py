@@ -25,14 +25,14 @@ from infinity.common import ConflictType
 
 def get_ordinary_info(column_info, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
-    datatype = column_info["type"]
-    constraints = column_info["constraints"]
-
     # process column definition
-    proto_column_def = ttypes.ColumnDef()
+
+    proto_column_def = ttypes.ColumnDef(None, None, None, [], None)
     proto_column_def.id = index
     proto_column_def.name = column_name
+
     proto_column_type = ttypes.DataType()
+    datatype = column_info["type"]
     if datatype == "int8":
         proto_column_type.logic_type = ttypes.LogicType.TinyInt
     elif datatype == "int16":
@@ -55,19 +55,21 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     else:
         raise Exception(f"unknown datatype: {datatype}")
 
-    proto_column_def.data_type = proto_column_type
     # process constraints
-    for constraint in constraints:
-        if constraint == "null":
-            proto_column_def.constraints.append(ttypes.Constraint.Null)
-        elif constraint == "not null":
-            proto_column_def.constraints.append(ttypes.Constraint.NotNull)
-        elif constraint == "primary key":
-            proto_column_def.constraints.append(ttypes.Constraint.PrimaryKey)
-        elif constraint == "unique":
-            proto_column_def.constraints.append(ttypes.Constraint.Unique)
-        else:
-            raise Exception(f"unknown constraint: {constraint}")
+    proto_column_def.data_type = proto_column_type
+    if "constraints" in column_info:
+        constraints = column_info["constraints"]
+        for constraint in constraints:
+            if constraint == "null":
+                proto_column_def.constraints.append(ttypes.Constraint.Null)
+            elif constraint == "not null":
+                proto_column_def.constraints.append(ttypes.Constraint.NotNull)
+            elif constraint == "primary key":
+                proto_column_def.constraints.append(ttypes.Constraint.PrimaryKey)
+            elif constraint == "unique":
+                proto_column_def.constraints.append(ttypes.Constraint.Unique)
+            else:
+                raise Exception(f"unknown constraint: {constraint}")
 
     # process constant expression
     default = None
@@ -181,7 +183,6 @@ class RemoteDatabase(Database, ABC):
         self._db_name = name
 
     @name_validity_check("table_name", "Table")
-    # : dict[str, dict[str, (str, list)]]
     def create_table(self, table_name: str, columns_definition,
                      conflict_type: ConflictType = ConflictType.Error):
         # process column definitions
@@ -201,11 +202,8 @@ class RemoteDatabase(Database, ABC):
         # to column_defs
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
-            print(column_name, column_info)
             check_valid_name(column_name, "Column")
-            # column_big_info = [item.strip() for item in column_info.split(",")]
             column_big_info = [item.strip() for item in column_info["type"].split(",")]
-            print(column_big_info)
             if column_big_info[0] == "vector":
                 get_embedding_info(column_info, column_defs, column_name, index)
 
@@ -222,7 +220,6 @@ class RemoteDatabase(Database, ABC):
         else:
             raise Exception(f"ERROR:3066, Invalid conflict type")
 
-        # print(column_defs)
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       conflict_type=create_table_conflict)
