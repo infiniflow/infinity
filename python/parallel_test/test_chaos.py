@@ -27,7 +27,7 @@ class TestIndexParallel:
         data = read_out_data()
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         res = db_obj.drop_table("chaos_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -56,7 +56,7 @@ class TestIndexParallel:
             threads[i].join()
         
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("chaos_test", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         connection_pool.release_conn(infinity_obj)
@@ -117,7 +117,7 @@ def updata(table_obj:Table):
 
 def random_exec(connection_pool:ConnectionPool, data, end_time, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     table_obj = db_obj.get_table("chaos_test")
     while time.time() < end_time:
         rand_v = random.randint(0, 4)

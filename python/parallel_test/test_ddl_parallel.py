@@ -40,11 +40,11 @@ class TestDDLParallel:
             threads[i].join()
         
         infinity_obj = connection_pool.get_conn()
-        infinity_obj.get_database("default")
+        infinity_obj.get_database("default_db")
         databases = infinity_obj.list_databases().db_names
         print(databases)
         for db_name in databases:
-            if db_name != "default":
+            if db_name != "default_db":
                 infinity_obj.drop_database(db_name, conflict_type = ConflictType.Ignore)
         print(infinity_obj.list_databases().db_names)
 

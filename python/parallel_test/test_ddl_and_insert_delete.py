@@ -90,7 +90,7 @@ def update(db_obj : Database):
 
 def random_exec(connection_pool: ConnectionPool, end_time, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     while time.time() < end_time:
         rand_v = random.randint(0, 99)
         if rand_v == 0:
