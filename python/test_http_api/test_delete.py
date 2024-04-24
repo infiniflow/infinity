@@ -202,7 +202,7 @@ class TestDelete(HttpTest):
         for i in range(1024):
             values = [{"c1": i} for _ in range(5)]
             self.insert(db_name, table_name, values)
-        time.sleep(5)
+        time.sleep(10)
         self.delete(db_name, table_name, "c1 = 1")
         self.drop_table(db_name, table_name)
         return

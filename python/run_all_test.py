@@ -15,20 +15,14 @@
 import os
 import pytest 
 
-#import delete table insert update show knn index database
-
-
-def run_sdk():
+def run_sdk(): 
     os.system("cd test")
-    os.system("python3 -m pytest -m 'not complex and not slow' test")
+    os.system("python3 -m pytest -m 'not complex and not slow' test/test_database.py")
 
 def run_http():
     os.system("cd test_http_api")
-    os.system("python3 -m pytest -m 'not complex and not slow' test_http_api/test_index.py")   
-
-
-# def run_all():
-#     test_base.test_table(HttpTest)
+    os.system("python3 -m pytest -m 'not complex and not slow' test_http_api/test_update.py")   
 
 if __name__ == '__main__':
     run_http()
+    #run_http()

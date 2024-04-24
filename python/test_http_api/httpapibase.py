@@ -20,7 +20,6 @@ class HttpTest:
             for item in dict.items():
                 header[item[0]] = item[1]
 
-        # print(header)
         return header
 
     def set_up_data(self, param=[], tp={}):
@@ -74,18 +73,18 @@ class HttpTest:
 
     def create_database(self, db_name, expect={
         "error_code": 0
-    }):
+    },opt="kIgnore"):
         url = f"databases/{db_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['create_option'])
+        d = self.set_up_data(['create_option'],{'create_option': baseCreateOptions[opt]})
         r = self.request(url, "post", h, d)
         self.tear_down(r, expect)
         return
 
-    def create_db_without_check(self, db_name):
+    def create_db_without_check(self, db_name,opt="kIgnore"):
         url = f"databases/{db_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['create_option'])
+        d = self.set_up_data(['create_option'],{'create_option': baseCreateOptions[opt]})
         r = self.request(url, "post", h, d)
         return r
 
@@ -93,7 +92,6 @@ class HttpTest:
         "error_code": 0,
         "table_count": 0,
     }):
-
         expect["database_name"] = db_name
         url = f"databases/{db_name}"
         h = self.set_up_header(['accept'])
@@ -103,10 +101,10 @@ class HttpTest:
 
     def drop_database(self, db_name, expect={
         "error_code": 0
-    }):
+    },opt="kIgnore"):
         url = f"databases/{db_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['drop_option'])
+        d = self.set_up_data(['drop_option'],{'drop_option': baseDropOptions[opt]})
         r = self.request(url, "delete", h, d)
         self.tear_down(r, expect)
         return
