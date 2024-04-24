@@ -1522,7 +1522,7 @@ public:
         nlohmann::json json_response;
         HTTPStatus http_status;
 
-        CreateIndexOptions options;
+        CreateIndexOptions options;ListTableIndexesHandler
         if(body_info_json.contains("create_option")) {
             auto create_option = body_info_json["create_option"];
             if(create_option.is_string()) {
