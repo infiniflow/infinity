@@ -94,12 +94,9 @@ class TestIndex(HttpTest):
             }
         )
         self.create_index(db_name, table_name, idxname,
-                          [
-                              "body",
-                          ],
-                          {
-                              "type": "FULLTEXT",
-                          })
+        ["body",],{
+            "type": "FULLTEXT",
+        })
 
         self.drop_index(db_name, table_name, idxname)
         self.drop_table(db_name, table_name)
