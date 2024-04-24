@@ -2654,6 +2654,55 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
                 }
             }
         }
+        case SysVar::kWALLogSize: {
+            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize() - query_context->storage()->wal_manager()->GetLastCkpWalSize();
+            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kDeltaLogCount: {
+            SizeT delta_log_count = query_context->storage()->catalog()->GetDeltaLogCount();
+            Value value = Value::MakeVarchar(std::to_string(delta_log_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kNextTxnID: {
+            TransactionID next_transaction_id = query_context->storage()->catalog()->next_txn_id();
+            Value value = Value::MakeVarchar(std::to_string(next_transaction_id));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kBufferedObjectCount: {
+            SizeT wal_log_size = query_context->storage()->buffer_manager()->BufferedObjectCount();
+            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kGCListSizeOfBufferPool: {
+            SizeT waiting_gc_object_count = query_context->storage()->buffer_manager()->WaitingGCObjectCount();
+            Value value = Value::MakeVarchar(std::to_string(waiting_gc_object_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kActiveTxnCount: {
+            SizeT active_txn_count = query_context->storage()->txn_manager()->ActiveTxnCount();
+            Value value = Value::MakeVarchar(std::to_string(active_txn_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kCurrentTs: {
+            SizeT current_ts = query_context->storage()->txn_manager()->CurrentTS();
+            Value value = Value::MakeVarchar(std::to_string(current_ts));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
         default: {
             RecoverableError(Status::NoSysVar(object_name_));
         }

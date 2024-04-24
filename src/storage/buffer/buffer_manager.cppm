@@ -49,6 +49,13 @@ public:
         return current_memory_size_;
     }
 
+    SizeT WaitingGCObjectCount() {
+        std::unique_lock lock(gc_locker_);
+        return gc_map_.size();
+    }
+
+    SizeT BufferedObjectCount();
+
     void RemoveClean();
 
 private:
