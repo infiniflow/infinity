@@ -19,6 +19,7 @@
 #include "type/data_type.h"
 #include "type/datetime/interval_type.h"
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -46,6 +47,8 @@ public:
     ~ConstantExpr() override;
 
     [[nodiscard]] std::string ToString() const override;
+
+    int32_t GetSizeInBytes() const;
 
     void WriteAdv(char *&ptr) const;
 

@@ -114,6 +114,53 @@ std::string ConstantExpr::ToString() const {
     ParserError("Unexpected branch");
 }
 
+int32_t ConstantExpr::GetSizeInBytes() const {
+    int32_t size = sizeof(LiteralType);
+    switch (literal_type_) {
+        case LiteralType::kBoolean: {
+            size += sizeof(bool);
+            break;
+        }
+        case LiteralType::kDouble: {
+            size += sizeof(double);
+            break;
+        }
+        case LiteralType::kString: {
+            size += sizeof(int32_t) + (std::string(str_value_)).length();
+            break;
+        }
+        case LiteralType::kInteger: {
+            size += sizeof(int64_t);
+            break;
+        }
+        case LiteralType::kNull: {
+            break;
+        }
+        case LiteralType::kDate:
+        case LiteralType::kTime:
+        case LiteralType::kDateTime:
+        case LiteralType::kTimestamp: {
+            size += sizeof(int32_t) + (std::string(date_value_)).length();
+            break;
+        }
+        case LiteralType::kIntegerArray: {
+            size += sizeof(int64_t);
+            size += sizeof(int64_t) * long_array_.size();
+            break;
+        }
+        case LiteralType::kDoubleArray: {
+            size += sizeof(int64_t);
+            size += sizeof(double) * double_array_.size();
+            break;
+        }
+        case LiteralType::kInterval: {
+            size += sizeof(int32_t);
+            size += sizeof(int64_t);
+            break;
+        }
+    
+}
+
 void ConstantExpr::WriteAdv(char *&ptr) const {
     WriteBufAdv<LiteralType>(ptr, literal_type_);
     switch (literal_type_) {

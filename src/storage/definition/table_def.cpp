@@ -87,6 +87,7 @@ i32 TableDef::GetSizeInBytes() const {
         size += sizeof(i32) + cd.name_.length();
         size += sizeof(i32);
         size += cd.constraints_.size() * sizeof(ConstraintType);
+        size += (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->GetSizeInBytes();
         size += sizeof(u8); // build_bloom_filter_
     }
     return size;
