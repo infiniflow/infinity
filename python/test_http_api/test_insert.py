@@ -12,7 +12,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_basic(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "table_2"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -37,7 +37,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_varchar(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_varchar"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -54,7 +54,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_big_varchar(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_big_varchar"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -70,7 +70,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_embedding(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_big_embedding"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -90,7 +90,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_big_embedding(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_big_embedding"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -110,7 +110,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_big_embedding_float(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_big_embedding_float"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -134,7 +134,7 @@ class TestInsert(HttpTest):
         self.test_http_insert_big_embedding_float()
 
     def test_http_insert_exceed_block_size(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_exceed_block_size"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -153,7 +153,7 @@ class TestInsert(HttpTest):
 
     @pytest.mark.parametrize("examples", list(zip(types, types_example)))
     def test_http_insert_data_not_aligned_with_table_definition(self, examples):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_data_not_aligned_with_table_definition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -172,7 +172,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_data_into_non_existent_table(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_data_into_non_existent_table"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, {
@@ -187,7 +187,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_empty_into_table(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_empty_into_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -210,7 +210,7 @@ class TestInsert(HttpTest):
 
     # IVFFlat realtime index is not supported yet
     def test_http_insert_data_into_index_created_table(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_data_into_index_created_table"
 
         self.show_database(db_name)
@@ -245,7 +245,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_table_with_10000_columns(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_table_with_10000_columns"
 
         self.show_database(db_name)
@@ -263,7 +263,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_read_after_shutdown(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_table_with_10000_columns"
         self.show_database(db_name)
         self.show_table(db_name, table_name, expect={
@@ -280,7 +280,7 @@ class TestInsert(HttpTest):
 
     def test_http_insert_with_not_matched_columns(self):
         values = [[{"c1": 1}], [{"c1": 1, "c2": 1, "c3": 1}]]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_with_not_matched_columns"
         self.create_table(db_name, table_name, {
             "c1": {"type": "integer", },
@@ -296,7 +296,7 @@ class TestInsert(HttpTest):
     # @pytest.mark.parametrize("values", [[{"c1": pow(2, 63) - 1, "c2": pow(2, 63) - 1}]])
     def test_http_insert_with_exceeding_invalid_value_range(self):
         values = [[{"c1": pow(2, 63) - 1, "c2": pow(2, 63) - 1}]]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_with_exceeding_invalid_value_range"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -316,7 +316,7 @@ class TestInsert(HttpTest):
     # @pytest.mark.parametrize("batch", [10, 1024, 2048])
     def test_http_batch_insert_within_limit(self):
         batch = [10, 1024, 2048]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_batch_insert_within_limit"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -332,7 +332,7 @@ class TestInsert(HttpTest):
         # PASS
 
     def test_http_batch_insert(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_batch_insert"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -350,7 +350,7 @@ class TestInsert(HttpTest):
     @pytest.mark.parametrize("batch", [10, 1024])
     @pytest.mark.parametrize("types", [(1, False), (1.1, False), ("1#$@!adf", False), ([1, 2, 3], True)])
     def test_http_insert_with_invalid_data_type(self, batch, types):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_with_invalid_data_type"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -378,7 +378,7 @@ class TestInsert(HttpTest):
     def test_http_batch_insert_with_invalid_column_count(self):
         batch = [10, 1024]
         for batch in batch:
-            db_name = "default"
+            db_name = "default_db"
             table_name = "test_batch_insert_with_invalid_column_count"
             self.show_database(db_name)
             self.drop_table(db_name, table_name)
@@ -396,7 +396,7 @@ class TestInsert(HttpTest):
 
     # @pytest.mark.parametrize('column_types_example', [[1, 2, 3], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
     def test_http_various_insert_types(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_various_insert_types"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -419,7 +419,7 @@ class TestInsert(HttpTest):
     @pytest.mark.skip(reason="TODO")
     def test_http_insert_and_shutdown_output(self):
         os.system("rm -fr /var/infinity")
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_and_shutdown_output"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -441,7 +441,7 @@ class TestInsert(HttpTest):
         return
 
     def test_http_insert_zero_column(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_zero_colum"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -457,7 +457,7 @@ class TestInsert(HttpTest):
 
     def test_http_insert_no_match_column(self):
         column_name = ["c2", "$%#$sadf", ]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_insert_no_match_column"
         for name in column_name:
             self.show_database(db_name)

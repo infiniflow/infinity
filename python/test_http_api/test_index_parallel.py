@@ -16,7 +16,7 @@ class TestIndexParallel(HttpTest):
     @pytest.mark.skip(reason="segfault")
     def test_http_fulltext_index_rw_parallel(self):
         def write_worker(data, file_path, end_time, thread_id):
-            db_name = "default"
+            db_name = "default_db"
             table_name = "test_fulltext_index_parallel"
             self.show_database(db_name)
 
@@ -35,7 +35,7 @@ class TestIndexParallel(HttpTest):
                     print(f"thread {thread_id}: import complete")
 
         def read_worker(end_time):
-            db_name = "default"
+            db_name = "default_db"
             table_name = "test_fulltext_index_parallel"
             while time.time() < end_time:
                 self.select(db_name, table_name, ["doctitle", "docdate", "_row_id", "_score"], "", {

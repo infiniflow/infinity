@@ -42,7 +42,7 @@ class InfinityClient(BaseClient):
         """
         Upload data and build indexes (parameters are parsed by __init__).
         """
-        db_obj = self.client.get_database("default")
+        db_obj = self.client.get_database("default_db")
         db_obj.drop_table(self.collection_name)
         db_obj.create_table(self.collection_name, self.data["schema"])
         table_obj = db_obj.get_table(self.collection_name)
@@ -97,7 +97,7 @@ class InfinityClient(BaseClient):
         Execute the corresponding query tasks (vector search, full-text search, hybrid search) based on the parsed parameters.
         The function returns id list.
         """
-        db_obj = self.client.get_database("default")
+        db_obj = self.client.get_database("default_db")
         table_obj = db_obj.get_table(self.collection_name)
         query_path = os.path.join(self.path_prefix, self.data["query_path"])
         _, ext = os.path.splitext(query_path)

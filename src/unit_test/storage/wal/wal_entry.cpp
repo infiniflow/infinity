@@ -70,7 +70,7 @@ SharedPtr<TableDef> MockTableDesc2() {
         }
     }
 
-    return MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
+    return MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
 }
 
 WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT column_count) {
@@ -101,9 +101,9 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
 
         auto entry = MakeShared<WalEntry>();
         entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("default2", "AAA_default2"));
-        entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default", "BBB_default", MockTableDesc2()));
+        entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default_db", "BBB_default", MockTableDesc2()));
         WalSegmentInfo segment_info = MakeSegmentInfo(row_count, commit_ts, 2);
-        entry->cmds_.push_back(MakeShared<WalCmdImport>("default", "tbl1", std::move(segment_info)));
+        entry->cmds_.push_back(MakeShared<WalCmdImport>("default_db", "tbl1", std::move(segment_info)));
 
         auto data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;

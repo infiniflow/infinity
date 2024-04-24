@@ -50,7 +50,7 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(data_block->row_count(), 1u);
         Value value = data_block->GetValue(0, 0);
         const String &s2 = value.GetVarchar();
-        EXPECT_STREQ(s2.c_str(), "default");
+        EXPECT_STREQ(s2.c_str(), "default_db");
     }
 
     {
@@ -65,7 +65,7 @@ TEST_F(InfinityTest, test1) {
 
         value = data_block->GetValue(0, 1);
         const String &s3 = value.GetVarchar();
-        EXPECT_STREQ(s3.c_str(), "default");
+        EXPECT_STREQ(s3.c_str(), "default_db");
 
         result = infinity->GetDatabase("db1");
         EXPECT_TRUE(result.IsOk());
@@ -77,7 +77,7 @@ TEST_F(InfinityTest, test1) {
         result = infinity->DropDatabase("db1", drop_db_opts);
         EXPECT_FALSE(result.IsOk());
 
-        result = infinity->GetDatabase("default");
+        result = infinity->GetDatabase("default_db");
         EXPECT_TRUE(result.IsOk());
 
         result = infinity->DropDatabase("db1", drop_db_opts);
@@ -88,13 +88,13 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
         const String &s4 = value.GetVarchar();
-        EXPECT_STREQ(s4.c_str(), "default");
-        result = infinity->GetDatabase("default");
+        EXPECT_STREQ(s4.c_str(), "default_db");
+        result = infinity->GetDatabase("default_db");
         EXPECT_TRUE(result.IsOk());
     }
 
     {
-        QueryResult result = infinity->GetDatabase("default");
+        QueryResult result = infinity->GetDatabase("default_db");
         EXPECT_TRUE(result.IsOk());
 
         CreateTableOptions create_table_opts;
@@ -114,32 +114,32 @@ TEST_F(InfinityTest, test1) {
         col_def = new ColumnDef(1, col_type, col_name, HashSet<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        result = infinity->CreateTable("default", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
+        result = infinity->CreateTable("default_db", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
-        result = infinity->ListTables("default");
+        result = infinity->ListTables("default_db");
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(1, 0);
         const String &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "table1");
 
-        result = infinity->GetTable("default", "table1");
+        result = infinity->GetTable("default_db", "table1");
         EXPECT_TRUE(result.IsOk());
 
         DropTableOptions drop_table_opts;
-        result = infinity->DropTable("default", "table1", drop_table_opts);
+        result = infinity->DropTable("default_db", "table1", drop_table_opts);
         EXPECT_TRUE(result.IsOk());
-        result = infinity->ListTables("default");
+        result = infinity->ListTables("default_db");
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 0);
 
-        result = infinity->GetTable("default", "table1");
+        result = infinity->GetTable("default_db", "table1");
         EXPECT_FALSE(result.IsOk());
     }
 
     {
-        QueryResult result = infinity->GetDatabase("default");
+        QueryResult result = infinity->GetDatabase("default_db");
         EXPECT_TRUE(result.IsOk());
 
         CreateTableOptions create_table_opts;
@@ -158,10 +158,10 @@ TEST_F(InfinityTest, test1) {
         col_def = new ColumnDef(1, col_type, col2_name, HashSet<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        result = infinity->CreateTable("default", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
+        result = infinity->CreateTable("default_db", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
-        result = infinity->GetTable("default", "table1");
+        result = infinity->GetTable("default_db", "table1");
         EXPECT_TRUE(result.IsOk());
 
         //        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
@@ -180,7 +180,7 @@ TEST_F(InfinityTest, test1) {
         ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
         value2->integer_value_ = 22;
         values->at(0)->emplace_back(value2);
-        infinity->Insert("default", "table1", columns, values);
+        infinity->Insert("default_db", "table1", columns, values);
 
         //        QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
         //                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,
@@ -200,7 +200,7 @@ TEST_F(InfinityTest, test1) {
 
         SearchExpr * search_expr = nullptr;
 
-        result = infinity->Search("default", "table1", search_expr, nullptr, output_columns);
+        result = infinity->Search("default_db", "table1", search_expr, nullptr, output_columns);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);
@@ -212,7 +212,7 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(value.value_.big_int, 22);
 
         DropTableOptions drop_table_opts;
-        result = infinity->DropTable("default", "table1", drop_table_opts);
+        result = infinity->DropTable("default_db", "table1", drop_table_opts);
         EXPECT_TRUE(result.IsOk());
     }
 
@@ -227,7 +227,7 @@ TEST_F(InfinityTest, test1) {
 
         value = data_block->GetValue(0, 1);
         const String &s3 = value.GetVarchar();
-        EXPECT_STREQ(s3.c_str(), "default");
+        EXPECT_STREQ(s3.c_str(), "default_db");
 
         result = infinity->Query("drop database db1");
         EXPECT_TRUE(result.IsOk());
@@ -237,8 +237,8 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
         const String &s4 = value.GetVarchar();
-        EXPECT_STREQ(s4.c_str(), "default");
-        result = infinity->GetDatabase("default");
+        EXPECT_STREQ(s4.c_str(), "default_db");
+        result = infinity->GetDatabase("default_db");
         EXPECT_TRUE(result.IsOk());
     }
     infinity->LocalDisconnect();

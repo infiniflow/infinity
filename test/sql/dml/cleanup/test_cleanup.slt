@@ -29,7 +29,7 @@ statement ok
 DROP TABLE test_secondary_index;
 
 statement ok
-USE default;
+USE default_db;
 
 statement ok
 DROP DATABASE db1;
@@ -64,7 +64,7 @@ statement ok
 DROP TABLE test_secondary_index;
 
 statement ok
-USE default;
+USE default_db;
 
 statement ok
 DROP DATABASE db1;
@@ -99,7 +99,7 @@ statement ok
 DROP TABLE test_secondary_index;
 
 statement ok
-USE default;
+USE default_db;
 
 statement ok
 DROP DATABASE db1;

@@ -87,7 +87,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         ++ idx;
     }
 
-    SharedPtr<TableDef> groupby_tabledef = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("groupby"), groupby_columns);
+    SharedPtr<TableDef> groupby_tabledef = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("groupby"), groupby_columns);
     SharedPtr<DataTable> groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
 
     groupby_executor.Execute(input_table_, groupby_table);
@@ -120,7 +120,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
             columns.emplace_back(col_def);
         }
 
-        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("grouped_input"), columns);
+        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("grouped_input"), columns);
 
         grouped_input_table = DataTable::Make(table_def, TableType::kGroupBy);
     }
@@ -162,7 +162,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         }
 
         // output aggregate table definition
-        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make(MakeShared<String>("default"),
+        SharedPtr<TableDef> aggregate_tabledef = TableDef::Make(MakeShared<String>("default_db"),
                                                                 MakeShared<String>("aggregate"),
                                                                 aggregate_columns);
         output_aggregate_table = DataTable::Make(aggregate_tabledef, TableType::kAggregate);
