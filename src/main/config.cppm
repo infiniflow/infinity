@@ -151,6 +151,13 @@ export enum class SysVar {
     kDataURL,
     kTimezone,
     kLogFlushPolicy,
+    kWALLogSize,
+    kDeltaLogCount,
+    kNextTxnID,
+    kBufferedObjectCount,
+    kGCListSizeOfBufferPool,
+    kActiveTxnCount,
+    kCurrentTs,
     kInvalid,
 };
 

@@ -101,6 +101,11 @@ void BufferManager::RemoveClean() {
     }
 }
 
+SizeT BufferManager::BufferedObjectCount() {
+    std::unique_lock lock(w_locker_);
+    return buffer_map_.size();
+}
+
 void BufferManager::RequestSpace(SizeT need_size) {
     std::unique_lock lock(gc_locker_);
     while (current_memory_size_ + need_size > memory_limit_ && !gc_list_.empty()) {
