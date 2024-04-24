@@ -207,10 +207,16 @@ class HttpTest:
     # part index
     def create_index(self, db_name, table_name, index_name, fields=[], index={}, expect={
         "error_code": 0
-    }, opt="ignore_if_exists"):
+    }, opt="kIgnore"):
+        
+        copt = opt 
+        exists = baseCreateOptions.get(opt, None)
+        if exists is not None:
+             copt = baseCreateOptions[opt]
+        
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
         h = self.set_up_header(['accept', 'content-type'], )
-        d = self.set_up_data([], {"fields": fields, "index": index, "create_option": opt})
+        d = self.set_up_data(["create_option"], {"fields": fields, "index": index, "create_option": copt})
         r = self.request(url, "post", h, d)
         self.tear_down(r, expect)
         return
@@ -218,12 +224,18 @@ class HttpTest:
     def drop_index(self, db_name, table_name, index_name, expect={
         "error_code": 0,
     }, opt="kIgnore"):
+        
+        copt = opt 
+        exists = baseDropOptions.get(opt, None)
+        if exists is not None:
+             copt = baseDropOptions[opt]
+        
+        print("copt:"+copt)
+
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
-        ignore = False
-        if opt == "kIgnore":
-            ignore = True
+
         h = self.set_up_header(['accept'])
-        d = self.set_up_data([], {"drop_option": {"ignore_if_not_exists": ignore}})
+        d = self.set_up_data([], {"drop_option": copt})
         r = self.request(url, "delete", h, d)
         self.tear_down(r, expect)
         return
