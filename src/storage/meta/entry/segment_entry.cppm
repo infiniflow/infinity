@@ -78,12 +78,16 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
 
+    void UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data);
+
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    void AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id);
+    void AddBlockReplay(SharedPtr<BlockEntry> block_entry);
+
+    void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
     bool SetSealed();
 

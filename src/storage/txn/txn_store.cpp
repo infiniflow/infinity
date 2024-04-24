@@ -365,11 +365,11 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *t
         // now have minmax filter and optional bloom filter
         // serialize filter
         local_delta_ops->AddOperation(
-            MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, sealed_segment->GetFastRoughFilter()->SerializeToString(), commit_ts));
+            MakeUnique<AddSegmentEntryOp>(sealed_segment, commit_ts, sealed_segment->GetFastRoughFilter()->SerializeToString()));
         // FIXME: hack here
         for (auto &block_entry : sealed_segment->block_entries()) {
             local_delta_ops->AddOperation(
-                MakeUnique<SetBlockStatusSealedOp>(block_entry.get(), block_entry->GetFastRoughFilter()->SerializeToString(), commit_ts));
+                MakeUnique<AddBlockEntryOp>(block_entry.get(), commit_ts, block_entry->GetFastRoughFilter()->SerializeToString()));
         }
     }
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {

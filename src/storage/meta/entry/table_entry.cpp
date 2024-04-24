@@ -255,15 +255,29 @@ void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
     next_segment_id_++;
 }
 
-void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
-    SharedPtr<SegmentEntry> new_segment = init_segment();
-    segment_map_[segment_id] = new_segment;
+void TableEntry::AddSegmentReplay(SharedPtr<SegmentEntry> new_segment) {
+    SegmentID segment_id = new_segment->segment_id();
+
+    auto [iter, insert_ok] = segment_map_.emplace(segment_id, new_segment);
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("Segment {} already exists.", segment_id));
+    }
     if (compaction_alg_.get() != nullptr) {
         compaction_alg_->AddSegment(new_segment.get());
     }
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
     }
+}
+
+void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String segment_filter_binary_data) {
+    SegmentID segment_id = new_segment->segment_id();
+
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
+        UnrecoverableError(fmt::format("Segment {} not found.", segment_id));
+    }
+    iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
 }
 
 void TableEntry::GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer) {

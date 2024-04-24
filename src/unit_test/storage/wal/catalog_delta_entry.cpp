@@ -143,7 +143,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<SetSegmentStatusSealedOp>();
+            auto op = MakeUnique<AddSegmentEntryOp>();
             op->db_name_ = db_name;
             op->table_name_ = table_name;
             op->segment_id_ = segment_id;
@@ -151,7 +151,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
-            auto op = MakeUnique<SetBlockStatusSealedOp>();
+            auto op = MakeUnique<AddBlockEntryOp>();
             op->db_name_ = db_name;
             op->table_name_ = table_name;
             op->segment_id_ = segment_id;
@@ -362,19 +362,19 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
     }
     {
-        auto op1 = MakeUnique<SetSegmentStatusSealedOp>();
+        auto op1 = MakeUnique<AddSegmentEntryOp>();
 
         op1->db_name_ = db_name;
         op1->table_name_ = table_name;
         op1->segment_id_ = segment_id;
         op1->segment_filter_binary_data_ = "abcde";
 
-        op1->merge_flag_ = MergeFlag::kNew;
+        op1->merge_flag_ = MergeFlag::kUpdate;
 
         local_catalog_delta_entry->operations().push_back(std::move(op1));
     }
     {
-        auto op1 = MakeUnique<SetBlockStatusSealedOp>();
+        auto op1 = MakeUnique<AddBlockEntryOp>();
 
         op1->db_name_ = db_name;
         op1->table_name_ = table_name;
@@ -382,7 +382,7 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         op1->block_id_ = block_id;
         op1->block_filter_binary_data_ = "abcde";
 
-        op1->merge_flag_ = MergeFlag::kNew;
+        op1->merge_flag_ = MergeFlag::kUpdate;
 
         local_catalog_delta_entry->operations().push_back(std::move(op1));
     }

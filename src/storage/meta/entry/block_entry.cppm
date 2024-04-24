@@ -68,6 +68,8 @@ public:
                                                      u16 checkpoint_row_count,
                                                      BufferManager *buffer_mgr);
 
+    void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
+
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 

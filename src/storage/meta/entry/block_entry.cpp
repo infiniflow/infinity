@@ -96,6 +96,17 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     return block_entry;
 }
 
+void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data) {
+    row_count_ = block_entry->row_count_;
+    min_row_ts_ = block_entry->min_row_ts_;
+    max_row_ts_ = block_entry->max_row_ts_;
+    checkpoint_ts_ = block_entry->checkpoint_ts_;
+    checkpoint_row_count_ = block_entry->checkpoint_row_count_;
+    if (!block_filter_binary_data.empty()) {
+        LoadFilterBinaryData(block_filter_binary_data);
+    }
+}
+
 Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
     std::shared_lock lock(rw_locker_);
     begin_ts = std::min(begin_ts, this->max_row_ts_);

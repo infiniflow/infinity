@@ -225,14 +225,14 @@ public:
 
     AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY){};
 
-    explicit AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts)
+    explicit AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data = "")
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry, commit_ts),
           db_name_(segment_entry->GetTableEntry()->GetDBName()), table_name_(segment_entry->GetTableEntry()->GetTableName()),
           segment_id_(segment_entry->segment_id()), status_(segment_entry->status()), column_count_(segment_entry->column_count()),
           row_count_(segment_entry->row_count()),               // FIXME: use append_state
           actual_row_count_(segment_entry->actual_row_count()), // FIXME: use append_state
           row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()),
-          deprecate_ts_(segment_entry->deprecate_ts()) {}
+          deprecate_ts_(segment_entry->deprecate_ts()), segment_filter_binary_data_(std::move(segment_filter_binary_data)) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_ENTRY; }
     String GetTypeStr() const final { return "ADD_SEGMENT_ENTRY"; }
@@ -248,6 +248,7 @@ public:
         total_size += sizeof(actual_row_count_);
         total_size += sizeof(SizeT);
         total_size += sizeof(TxnTimeStamp) * 3;
+        total_size += sizeof(i32) + segment_filter_binary_data_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -272,6 +273,7 @@ public:
     TxnTimeStamp min_row_ts_{0};
     TxnTimeStamp max_row_ts_{0};
     TxnTimeStamp deprecate_ts_{0};
+    String segment_filter_binary_data_{};
 };
 
 /// class AddBlockEntryOp
@@ -281,13 +283,13 @@ public:
 
     AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY){};
 
-    explicit AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts)
+    explicit AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts, String block_filter_binary_data = "")
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry, commit_ts), block_entry_(block_entry),
           db_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetDBName()),
           table_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetTableName()), segment_id_(block_entry->GetSegmentEntry()->segment_id()),
           block_id_(block_entry->block_id()), row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()),
           min_row_ts_(block_entry->min_row_ts()), max_row_ts_(block_entry->max_row_ts()), checkpoint_ts_(block_entry->checkpoint_ts()),
-          checkpoint_row_count_(block_entry->checkpoint_row_count()) {}
+          checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_BLOCK_ENTRY; }
     String GetTypeStr() const final { return "ADD_BLOCK_ENTRY"; }
@@ -298,6 +300,7 @@ public:
         total_size += sizeof(SegmentID) + sizeof(BlockID);
         total_size += sizeof(u16) + sizeof(u16) + sizeof(TxnTimeStamp) * 2;
         total_size += sizeof(TxnTimeStamp) + sizeof(u16);
+        total_size += sizeof(i32) + this->block_filter_binary_data_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -327,6 +330,7 @@ public:
     TxnTimeStamp max_row_ts_{0};
     TxnTimeStamp checkpoint_ts_{0};
     u16 checkpoint_row_count_{0};
+    String block_filter_binary_data_{};
 };
 
 /// class AddColumnEntryOp
@@ -506,87 +510,6 @@ public:
     String base_name_{};
     RowID base_rowid_;
     u32 row_count_{0};
-};
-
-// used when a segment is sealed (import, append, compact)
-// should always contain minmax filter data
-// maybe also contain bloom filter data for selected columns
-export class SetSegmentStatusSealedOp : public CatalogDeltaOperation {
-public:
-    static UniquePtr<SetSegmentStatusSealedOp> ReadAdv(char *&ptr);
-
-    explicit SetSegmentStatusSealedOp() : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED) {}
-
-    explicit SetSegmentStatusSealedOp(SegmentEntry *segment_entry, String &&segment_filter_binary_data, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, segment_entry, commit_ts),
-          db_name_(segment_entry->GetTableEntry()->GetDBName()), table_name_(segment_entry->GetTableEntry()->GetTableName()),
-          segment_id_(segment_entry->segment_id()), segment_filter_binary_data_(std::move(segment_filter_binary_data)) {}
-
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED; }
-    String GetTypeStr() const final { return "SET_SEGMENT_STATUS_SEALED"; }
-    [[nodiscard]] SizeT GetSizeInBytes() const final {
-        SizeT total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-        total_size += sizeof(i32) + this->db_name_->size();
-        total_size += sizeof(i32) + this->table_name_->size();
-        total_size += sizeof(this->segment_id_);
-        total_size += sizeof(i32) + this->segment_filter_binary_data_.size();
-        return total_size;
-    }
-    void WriteAdv(char *&ptr) const final;
-    const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, (u8)(type_))); }
-    bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
-
-public:
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> table_name_{};
-    SegmentID segment_id_{};
-    // following data include: 1. minmax filter for all valid columns 2. bloom filter for selected columns
-    String segment_filter_binary_data_{};
-};
-
-// used when a segment is sealed (import, append, compact)
-// should always contain minmax filter data
-// maybe also contain bloom filter data for selected columns
-export class SetBlockStatusSealedOp : public CatalogDeltaOperation {
-public:
-    static UniquePtr<SetBlockStatusSealedOp> ReadAdv(char *&ptr);
-
-    explicit SetBlockStatusSealedOp() : CatalogDeltaOperation(CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED) {}
-
-    explicit SetBlockStatusSealedOp(BlockEntry *block_entry, String &&block_filter_binary_data, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED, block_entry, commit_ts),
-          db_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetDBName()),
-          table_name_(block_entry->GetSegmentEntry()->GetTableEntry()->GetTableName()), segment_id_(block_entry->GetSegmentEntry()->segment_id()),
-          block_id_(block_entry->block_id()), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
-
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED; }
-    String GetTypeStr() const final { return "SET_BLOCK_STATUS_SEALED"; }
-    [[nodiscard]] SizeT GetSizeInBytes() const final {
-        SizeT total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-        total_size += sizeof(i32) + this->db_name_->size();
-        total_size += sizeof(i32) + this->table_name_->size();
-        total_size += sizeof(this->segment_id_);
-        total_size += sizeof(this->block_id_);
-        total_size += sizeof(i32) + this->block_filter_binary_data_.size();
-        return total_size;
-    }
-    void WriteAdv(char *&ptr) const final;
-    const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, block_id_, (u8)(type_)));
-    }
-    bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
-
-public:
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> table_name_{};
-    SegmentID segment_id_{};
-    BlockID block_id_{};
-    // following data include: 1. minmax filter for all valid columns 2. bloom filter for selected columns
-    String block_filter_binary_data_{};
 };
 
 // size of payload, including the header, round to multi
