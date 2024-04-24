@@ -77,7 +77,7 @@ public:
 
     [[nodiscard]] inline u32 GetIndexPartNum() { return vector_buffer_.size() - 1; }
 
-    nlohmann::json Serialize();
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     void SaveIndexFile();
 

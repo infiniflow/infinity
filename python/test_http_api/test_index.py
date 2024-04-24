@@ -613,6 +613,7 @@ class TestIndex(HttpTest):
     # ERROR update error
     @pytest.mark.skip
     #@pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
+    #@pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
     def test_http_create_index_on_update_table(self):
         db_name = "default_db"
         table_name = "test_create_index_on_update_table"
@@ -634,6 +635,7 @@ class TestIndex(HttpTest):
             self.insert(db_name, table_name, [{"c1": embedding_data, "c2": i}])
 
         embedding_data = [(float(i) + 0.1) for i in range(4)]
+    
     
         for i in range(10):
             self.update(db_name, table_name, {"c1": embedding_data}, "c2 = " + str(i))
@@ -739,6 +741,7 @@ class TestIndex(HttpTest):
         return
 
     # PASS
+    # PASS
     def test_http_create_duplicated_index_with_valid_error_options(self):
         db_name = "default_db"
         table_name = "test_create_duplicated_index_with_valid_error_options"
@@ -773,7 +776,7 @@ class TestIndex(HttpTest):
             "status_code": 500,
             "error_code": 3018
         }, "kReplace")
-
+          
         self.drop_index(db_name, table_name, idxname)
         self.drop_table(db_name, table_name)
         return
@@ -868,6 +871,7 @@ class TestIndex(HttpTest):
         self.drop_table(db_name, table_name)
         return
     # PASS
+    # PASS
     def test_http_list_index(self):
         db_name = "default_db"
         table_name = "test_list_index"
@@ -960,6 +964,7 @@ class TestIndex(HttpTest):
         self.drop_table(db_name,table_name)
         return
 
+    # PASS
     # PASS
     def test_http_supported_vector_index(self):
         db_name = "default_db"
