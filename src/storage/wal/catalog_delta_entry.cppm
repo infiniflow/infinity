@@ -93,19 +93,25 @@ public:
     [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
     virtual void WriteAdv(char *&ptr) const = 0;
     static UniquePtr<CatalogDeltaOperation> ReadAdv(char *&ptr, i32 max_bytes);
-    SizeT GetBaseSizeInBytes() const { return sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp); }
+    SizeT GetBaseSizeInBytes() const {
+        SizeT size = sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp);
+        size += sizeof(i32) + encode_.size();
+        return size;
+    }
     void WriteAdvBase(char *&buf) const {
         WriteBufAdv(buf, this->type_);
         WriteBufAdv(buf, this->begin_ts_);
         WriteBufAdv(buf, this->merge_flag_);
         WriteBufAdv(buf, this->txn_id_);
         WriteBufAdv(buf, this->commit_ts_);
+        WriteBufAdv(buf, this->encode_);
     }
     void ReadAdvBase(char *&ptr) {
         begin_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
         merge_flag_ = ReadBufAdv<MergeFlag>(ptr);
         txn_id_ = ReadBufAdv<TransactionID>(ptr);
         commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+        encode_ = ReadBufAdv<String>(ptr);
     }
 
     virtual const String ToString() const {
@@ -116,7 +122,6 @@ public:
                            commit_ts_,
                            (u8)merge_flag_);
     }
-    virtual const String EncodeIndex() const = 0;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
     virtual void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) = 0;
 
@@ -129,9 +134,9 @@ public:
     TransactionID txn_id_{0};
     TxnTimeStamp commit_ts_{0};
     MergeFlag merge_flag_{MergeFlag::kInvalid};
+    String encode_{};
 
 public:
-    bool is_saved_sate_{false};
     CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};
 };
 
@@ -156,7 +161,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("#{}@{}", *db_name_, (u8)(type_))); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
 
@@ -203,7 +207,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("#{}#{}@{}", *db_name_, *table_name_, (u8)(type_))); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
 
@@ -253,9 +256,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}@{}", *this->db_name_, *this->table_name_, this->segment_id_, (u8)(type_)));
-    }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
 
@@ -305,9 +305,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, block_id_, (u8)(type_)));
-    }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
 
@@ -359,9 +356,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, block_id_, column_id_, (u8)(type_)));
-    }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
 
@@ -404,7 +398,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}@{}", *db_name_, *table_name_, *index_name_, (u8)(type_))); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
 
@@ -444,9 +437,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}#{}@{}", *db_name_, *table_name_, *index_name_, segment_id_, (u8)(type_)));
-    }
     void FlushDataToDisk(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
@@ -494,9 +484,6 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}#{}#{}@{}", *db_name_, *table_name_, *index_name_, segment_id_, chunk_id_, (u8)(type_)));
-    }
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
@@ -583,14 +570,14 @@ public:
 private:
     void AddDeltaEntryInner(CatalogDeltaEntry *delta_entry);
 
-    void PruneOpWithSamePrefix(const String &prefix);
+    void PruneOpWithSamePrefix(std::string_view prefix);
 
 private:
     u64 last_sequence_{0};
     std::priority_queue<u64, Vector<u64>, std::greater<u64>> sequence_heap_;
     Map<u64, UniquePtr<CatalogDeltaEntry>> delta_entry_map_;
 
-    Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
+    Map<std::string_view, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
     // update by add delta entry, read by bg_process::checkpoint
     TxnTimeStamp max_commit_ts_{0};

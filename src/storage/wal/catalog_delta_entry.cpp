@@ -35,7 +35,7 @@ import logger;
 namespace infinity {
 
 CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts)
-    : begin_ts_(base_entry->begin_ts_), txn_id_(base_entry->txn_id_), commit_ts_(base_entry->commit_ts_), type_(type) {
+    : begin_ts_(base_entry->begin_ts_), txn_id_(base_entry->txn_id_), commit_ts_(base_entry->commit_ts_), encode_(base_entry->encode()), type_(type) {
     if (base_entry->deleted_) {
         merge_flag_ = MergeFlag::kDelete;
     } else if (commit_ts == base_entry->commit_ts_) {
@@ -974,7 +974,10 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
                 add_segment_op->merge_flag_ = MergeFlag::kDelete;
             }
         }
-        String encode = new_op->EncodeIndex();
+        std::string_view encode = new_op->encode_;
+        if (encode.empty()) {
+            UnrecoverableError("encode is empty");
+        }
         auto iter = delta_ops_.find(encode);
         if (iter != delta_ops_.end()) {
             auto *op = iter->second.get();
@@ -998,34 +1001,23 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
     txn_ids_.insert(delta_entry->txn_ids().begin(), delta_entry->txn_ids().end());
 }
 
-void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
-    SizeT end_i = encode1.rfind('@');
-    if (end_i == String::npos) {
-        UnrecoverableError(fmt::format("encode1 {} not found '@'", encode1));
-    }
-    auto end1 = encode1.begin() + end_i;
-    auto encode1_prefix = encode1.substr(0, end_i);
-
-    auto iter = delta_ops_.lower_bound(encode1_prefix);
+void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(std::string_view encode1) {
+    auto iter = delta_ops_.lower_bound(encode1);
     while (iter != delta_ops_.end()) {
         const auto &[encode2, delta_op2] = *iter;
-        auto [iter1, iter2] = std::mismatch(encode1.begin(), end1, encode2.begin());
-        if (iter1 != end1) {
-            break;
+        auto [iter1, iter2] = std::mismatch(encode1.begin(), encode1.end(), encode2.begin());
+        if (iter1 != encode1.end()) {
+            break; // encode1 is not prefix of encode2
         }
-        if (*iter2 != '#' && *iter2 != '@') {
+        if (iter2 == encode2.end()) {
             ++iter;
-            continue;
+            continue; // same
         }
-        if (*iter2 == '@') {
-            auto type1 = static_cast<CatalogDeltaOpType>(std::stoi(encode1.substr(end_i + 1)));
-            auto type2 = static_cast<CatalogDeltaOpType>(std::stoi(encode2.substr(iter2 - encode2.begin() + 1)));
-            if (type1 == type2) { // same
-                ++iter;
-                continue;
-            }
+        if (*iter2 != '#') {
+            ++iter;
+            continue; // not prefix
         }
-        iter = delta_ops_.erase(iter);
+        iter = delta_ops_.erase(iter); // is prefix
     }
 }
 
