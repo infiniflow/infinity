@@ -40,6 +40,8 @@ protected:
         : index_type_(index_type), index_name_(index_name), file_name_(file_name), column_names_(std::move(column_names)){};
 
 public:
+    explicit IndexBase(SharedPtr<String> index_name) : index_name_(index_name){};
+
     virtual ~IndexBase() = default;
 
     bool operator==(const IndexBase &other) const;
@@ -57,7 +59,7 @@ public:
     static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
 
     virtual String ToString() const;
-    virtual String BuildOtherParamsString() const = 0;
+    virtual String BuildOtherParamsString() const { return ""; }
     virtual nlohmann::json Serialize() const;
 
     static SharedPtr<IndexBase> Deserialize(const nlohmann::json &index_def_json);

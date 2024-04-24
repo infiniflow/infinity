@@ -55,6 +55,13 @@ import column_index_merger;
 
 namespace infinity {
 
+String TableEntry::EncodeIndex(const String &table_name, TableMeta *table_meta) {
+    if (table_meta == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", table_meta->db_entry()->encode(), table_name);
+}
+
 TableEntry::TableEntry(bool is_delete,
                        const SharedPtr<String> &table_entry_dir,
                        SharedPtr<String> table_name,
@@ -65,9 +72,9 @@ TableEntry::TableEntry(bool is_delete,
                        TxnTimeStamp begin_ts,
                        SegmentID unsealed_id,
                        SegmentID next_segment_id)
-    : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)),
-      table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id),
-      next_segment_id_(next_segment_id) {
+    : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
+      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type),
+      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -157,7 +164,8 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
     if (!status.ok()) {
         return {nullptr, status};
     }
-    return index_meta->DropTableIndexEntry(std::move(r_lock), conflict_type, txn_id, begin_ts, txn_mgr);
+    SharedPtr<String> index_name_ptr = index_meta->index_name();
+    return index_meta->DropTableIndexEntry(std::move(r_lock), conflict_type, index_name_ptr, txn_id, begin_ts, txn_mgr);
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -765,8 +773,11 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         // chunk_index_entry->deleted_ = true;
                         txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                     }
-                    SharedPtr<ChunkIndexEntry> chunk_index_entry =
-                        ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count, txn->buffer_mgr());
+                    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
+                                                                                                         dst_base_name,
+                                                                                                         base_rowid,
+                                                                                                         total_row_count,
+                                                                                                         txn->buffer_mgr());
                     txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                     segment_index_entry->ReplaceFtChunkIndexEntries(chunk_index_entry);
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.

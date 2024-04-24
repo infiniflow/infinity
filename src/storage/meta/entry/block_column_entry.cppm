@@ -37,6 +37,8 @@ struct SegmentEntry;
 export struct BlockColumnEntry : public BaseEntry {
     friend struct BlockEntry;
 
+    static String EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry);
+
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref);
 

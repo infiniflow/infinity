@@ -38,13 +38,15 @@ import cleanup_scanner;
 
 namespace infinity {
 
+String DBEntry::EncodeIndex(const String &db_name) { return fmt::format("#{}", db_name); }
+
 DBEntry::DBEntry(DBMeta *db_meta,
                  bool is_delete,
                  const SharedPtr<String> &db_entry_dir,
                  const SharedPtr<String> &db_name,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
+    : BaseEntry(EntryType::kDatabase, is_delete, DBEntry::EncodeIndex(*db_name)), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
     begin_ts_ = begin_ts;
     txn_id_.store(txn_id);
 }

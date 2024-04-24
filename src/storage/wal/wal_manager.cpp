@@ -52,6 +52,7 @@ import table_index_entry;
 import log_file;
 import default_values;
 import defer_op;
+import index_base;
 
 module wal_manager;
 
@@ -666,7 +667,8 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
     table_entry->DropIndexReplay(
         cmd.index_name_,
         [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            auto index_entry = TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, index_meta, txn_id, begin_ts);
+            auto index_base = MakeShared<IndexBase>(index_meta->index_name());
+            auto index_entry = TableIndexEntry::NewTableIndexEntry(index_base, true, nullptr, index_meta, txn_id, begin_ts);
             index_entry->commit_ts_.store(commit_ts);
             return index_entry;
         },

@@ -49,6 +49,8 @@ class AddTableIndexEntryOp;
 export struct TableIndexEntry : public BaseEntry, public EntryInterface {
     friend struct TableEntry;
 
+    static String EncodeIndex(const String &index_name, TableIndexMeta *table_index_meta);
+
 public:
     using EntryOp = AddTableIndexEntryOp;
 

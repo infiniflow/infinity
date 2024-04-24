@@ -24,7 +24,6 @@ namespace infinity {
 class Catalog;
 
 export enum class EntryType : i8 {
-    kDummy,
     kDatabase,
     kTable,
     kTableIndex,
@@ -38,11 +37,8 @@ export enum class EntryType : i8 {
 };
 
 export struct BaseEntry {
-    explicit BaseEntry(EntryType entry_type, bool is_delete) : deleted_(is_delete), entry_type_(entry_type) {
-        if (entry_type == EntryType::kDummy) {
-            commit_ts_ = 0;
-        }
-    }
+    explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
+        : deleted_(is_delete), entry_type_(entry_type), encode_(std::move(encode)) {}
 
     virtual ~BaseEntry() = default;
 
@@ -58,13 +54,18 @@ public:
 
     bool Deleted() const { return deleted_; }
 
+    const String &encode() const { return encode_; }
+
 public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
     const bool deleted_;
 
-    const EntryType entry_type_{EntryType::kDummy};
+    const EntryType entry_type_;
+
+private:
+    const String encode_;
 };
 
 } // namespace infinity
