@@ -8,7 +8,7 @@ import httputils
 
 class TestKnn(HttpTest):
     # PASS
-    #@pytest.mark.skip(reason="can not import tmp_20240116.csv")
+    @pytest.mark.skip(reason="can not import tmp_20240116.csv")
     def test_http_knn(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
