@@ -34,7 +34,7 @@ export class BaseSession {
 
 public:
     BaseSession(u64 session_id, SessionType session_type)
-        : current_database_("default"), session_type_(session_type), session_id_(session_id) {}
+        : current_database_("default_db"), session_type_(session_type), session_id_(session_id) {}
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
@@ -99,7 +99,7 @@ private:
 
 // export class Session {
 // public:
-//     explicit Session() : current_database_("default") {}
+//     explicit Session() : current_database_("default_db") {}
 //
 //     [[nodiscard]] inline String &current_database() { return current_database_; }
 //

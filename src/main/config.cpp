@@ -386,7 +386,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
             system_option_.log_file_rotate_count = log_config["log_file_rotate_count"].value_or(default_log_file_rotate_count);
 
-            String log_level = log_config["log_level"].value_or("default");
+            String log_level = log_config["log_level"].value_or("default_db");
             if (IsEqual(log_level, "trace")) {
                 system_option_.log_level = LogLevel::kTrace;
             } else if (IsEqual(log_level, "info")) {
@@ -397,7 +397,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 system_option_.log_level = LogLevel::kError;
             } else if (IsEqual(log_level, "critical")) {
                 system_option_.log_level = LogLevel::kFatal;
-            } else if (IsEqual(log_level, "default")) {
+            } else if (IsEqual(log_level, "default_db")) {
                 system_option_.log_level = default_log_level;
             } else {
                 return Status::InvalidLogLevel(log_level);

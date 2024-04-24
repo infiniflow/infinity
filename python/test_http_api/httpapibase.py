@@ -143,7 +143,7 @@ class HttpTest:
     def clear_database(self):
         dbs = self.get_database()
         for db_name in dbs:
-            if db_name == "default":
+            if db_name == "default_db":
                 continue
             self.drop_database(db_name)
 

@@ -27,7 +27,7 @@ class TestInfinity(TestSdk):
 
     def test_get_database(self):
         infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
-        database_res = infinity_obj.get_database("default")
+        database_res = infinity_obj.get_database("default_db")
         assert database_res.error_code == ErrorCode.OK
         # disconnect
         res = infinity_obj.disconnect()
@@ -36,7 +36,7 @@ class TestInfinity(TestSdk):
     def test_list_database(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         database_res = infinity_obj.list_databases()
-        assert database_res.db_names[0] == "default"
+        assert database_res.db_names[0] == "default_db"
 
     def test_show_variable(self):
         # QUERY_COUNT = "query_count"
@@ -101,7 +101,7 @@ class TestInfinity(TestSdk):
     def test_timeout_infinity(self):
         infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         time.sleep(3600)
-        database_res = infinity_obj.get_database("default")
+        database_res = infinity_obj.get_database("default_db")
         print(database_res)
         res = infinity_obj.show_variable(ShowVariable.QUERY_COUNT)
         print(res)

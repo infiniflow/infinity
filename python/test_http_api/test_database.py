@@ -38,7 +38,7 @@ class TestDataBase(HttpTest):
             "error_code": 0,
             "databases": [
                 "my_database",
-                "default",
+                "default_db",
             ]
         })
 
@@ -49,7 +49,7 @@ class TestDataBase(HttpTest):
         self.list_database({
             "error_code": 0,
             "databases": [
-                "default",
+                "default_db",
             ]
         })
         self.clear_database()
@@ -75,7 +75,7 @@ class TestDataBase(HttpTest):
         dbs = self.get_database()
         # list all databases
         for db_name in dbs:
-            if db_name == "default":
+            if db_name == "default_db":
                 continue
             self.drop_database(db_name)
 
@@ -108,7 +108,7 @@ class TestDataBase(HttpTest):
         dbs = self.get_database()
         # list all databases
         for db_name in dbs:
-            if db_name == "default":
+            if db_name == "default_db":
                 continue
             self.drop_database(db_name)
 
@@ -143,7 +143,7 @@ class TestDataBase(HttpTest):
             # show database
             dbs = self.get_database()
             for db_name in dbs:
-                assert db_name in ['test_repeatedly_create_drop_show_databases', "default"]
+                assert db_name in ['test_repeatedly_create_drop_show_databases', "default_db"]
             assert len(dbs) == 2
             # drop databses
             self.drop_database('test_repeatedly_create_drop_show_databases')
@@ -183,11 +183,11 @@ class TestDataBase(HttpTest):
         # show database
         self.show_database("my_database", {
             "error_code": 0,
-            "database_name": "default",
+            "database_name": "default_db",
             "table_count": 0,
         })
         # show default database
-        self.show_database("default")
+        self.show_database("default_db")
         # drop database
         self.drop_database("my_database")
         # drop database with invalid name

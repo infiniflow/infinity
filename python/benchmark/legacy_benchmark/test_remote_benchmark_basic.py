@@ -137,7 +137,7 @@ class TestBenchmark:
 
         @trace_unhandled_exceptions
         def get_database(infinity_obj, port, process_id, thread_id, num_iteration):
-            db_obj = infinity_obj.get_database(f"default")
+            db_obj = infinity_obj.get_database(f"default_db")
             if db_obj is None:
                 raise Exception(f"get_database failed")
 
@@ -156,7 +156,7 @@ class TestBenchmark:
 
         @trace_unhandled_exceptions
         def create_table(infinity_obj, port, process_id, thread_id, num_iteration):
-            res = infinity_obj.get_database(f"default").create_table(
+            res = infinity_obj.get_database(f"default_db").create_table(
                 f"table_{port}_{process_id}_{thread_id}_{num_iteration}",
                 {"c1": "int, primary key", "c2": "float"})
             if res.error_code != ErrorCode.OK:
@@ -165,7 +165,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def insert_table(infinity_obj, port, process_id, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default")
+                   .get_database(f"default_db")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]))
             if res.error_code != ErrorCode.OK:
@@ -174,13 +174,13 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def list_tables(infinity_obj, port, process_id, thread_id, num_iteration):
             (infinity_obj
-             .get_database(f"default")
+             .get_database(f"default_db")
              .list_tables())
 
         @trace_unhandled_exceptions
         def select_table(infinity_obj, port, process_id, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default")
+                   .get_database(f"default_db")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .query_builder()
                    .output(["*"])
@@ -191,7 +191,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def drop_table(infinity_obj, port, process_id, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default")
+                   .get_database(f"default_db")
                    .drop_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}"))
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_table failed: {res.error_msg}")
@@ -199,7 +199,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def create_index(infinity_obj, port, process_id, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default")
+                   .get_database(f"default_db")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .create_index("my_index", ["c1"], "IVF_FLAT", None))
             if res.error_code != ErrorCode.OK:
@@ -208,7 +208,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def drop_index(infinity_obj, port, process_id, thread_id, num_iteration):
             res = (infinity_obj
-                   .get_database(f"default")
+                   .get_database(f"default_db")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .drop_index("my_index"))
             if res.error_code != ErrorCode.OK:

@@ -98,7 +98,7 @@ export {
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
 
     constexpr std::string_view SYSTEM_DB_NAME = "system";
-    constexpr std::string_view DEFAULT_DB_NAME = "default";
+    constexpr std::string_view DEFAULT_DB_NAME = "default_db";
     constexpr std::string_view SYSTEM_CONFIG_TABLE_NAME = "config";
     constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 

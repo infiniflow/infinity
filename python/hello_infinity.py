@@ -22,7 +22,7 @@ import pandas as pds
 
 def main():
     infinity_obj = infinity.connect(REMOTE_HOST)
-    db = infinity_obj.get_database("default")
+    db = infinity_obj.get_database("default_db")
     # Drop my_table if it already exists
     db.drop_table("my_table", ConflictType.Ignore)
     # Create a table named "my_table"
@@ -42,7 +42,7 @@ def main():
 def test():
     try:
         infinity_obj = infinity.connect(REMOTE_HOST)
-        db = infinity_obj.get_database("default")
+        db = infinity_obj.get_database("default_db")
         # Drop my_table if it already exists
         db.drop_table("my_table", ConflictType.Ignore)
         # Create a table named "my_table"

@@ -45,7 +45,7 @@ class TestImport(TestSdk):
 
         # infinity
 
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         assert db_obj
 
         # import
@@ -77,7 +77,7 @@ class TestImport(TestSdk):
     def test_import_different_file_format_data(self, file_format, check_data):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_import_different_file_format_data", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_different_file_format_data",
@@ -112,7 +112,7 @@ class TestImport(TestSdk):
     def test_import_empty_file_fvecs(self, file_format):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_fvecs", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_empty_file_fvecs",
                                         {"c1": "vector,128,float"}, ConflictType.Error)
@@ -131,7 +131,7 @@ class TestImport(TestSdk):
     def test_import_empty_file_csv(self, file_format):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_csv", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_empty_file_csv",
                                         {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
@@ -150,7 +150,7 @@ class TestImport(TestSdk):
     def test_import_empty_file_jsonl(self, file_format):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_jsonl", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_empty_file_jsonl",
                                         {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
