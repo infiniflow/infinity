@@ -579,7 +579,7 @@ class TestImport(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    @pytest.mark.skip(reason="cost too much time")
+    #@pytest.mark.skip(reason="cost too much time")
     def test_http_import_exceeding_rows(self):
         httputils.check_data(TEST_TMP_DIR)
         httputils.generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")

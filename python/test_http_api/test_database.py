@@ -272,22 +272,24 @@ class TestDataBase(HttpTest):
         db_name = "test_create_option"
         # create with option: key ignore
         self.create_database(db_name)
-        # drop with option: key error
-        url = f"databases/{db_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        r = self.request(url, "post", h)
-        assert r.status_code == 500
+        #create with option: key error
+        self.create_database(db_name,{
+            "status_code":500,
+            "error_code":3016,
+        },"kError")
+        #create with option: key replace
+        # self.create_database(db_name,{
+        #     "error_code":0
+        # },"kReplace")
         self.clear_database()
 
     def test_http_drop_option(self):
         db_name = "test_drop_option"
-
         # drop with option: key ignore
         self.drop_database(db_name)
-
         # drop with option: key error
-        url = f"databases/{db_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        r = self.request(url, "delete", h)
-        assert r.status_code == 500
+        self.drop_database(db_name,{
+            "status_code":500,
+            "error_code":3021,
+        },"kError")
         self.clear_database()

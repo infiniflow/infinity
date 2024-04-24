@@ -78,6 +78,7 @@ export namespace std {
 
     using std::bit_cast;
     using std::memcpy;
+    using std::strcmp;
     using std::memset;
     using std::memcmp;
     using std::strlen;
