@@ -961,6 +961,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     //         LOG_INFO(fmt::format("Add delta entry: {}", delta_entry->ToString()));
     //     }
     // }
+    std::lock_guard<std::mutex> lock(catalog_delta_locker_);
     if (delta_entry->sequence() != last_sequence_ + 1) {
         // Discontinuous
         u64 entry_sequence = delta_entry->sequence();
@@ -992,12 +993,16 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     }
 }
 
-void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { this->AddDeltaEntryInner(delta_entry.get()); }
+void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
+    std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+    this->AddDeltaEntryInner(delta_entry.get());
+}
 
 // background process Checkpoint call this.
 UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
+    std::lock_guard<std::mutex> lock(catalog_delta_locker_);
     {
         for (auto &[_, delta_op] : delta_ops_) {
             if (delta_op->commit_ts_ <= full_ckp_ts) { // skip the delta op that is before full checkpoint
@@ -1022,6 +1027,11 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     //     }
     // }
     return flush_delta_entry;
+}
+
+SizeT GlobalCatalogDeltaEntry::OpSize() const {
+    std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+    return delta_ops_.size();
 }
 
 // background process AddDeltaOp call this.

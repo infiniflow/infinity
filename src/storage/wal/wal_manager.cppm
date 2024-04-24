@@ -66,7 +66,7 @@ public:
     void RecycleWalFile(TxnTimeStamp full_ckp_ts);
 
     // Should only call in `Flush` thread
-    i64 WalSize() const { return wal_size_; }
+    i64 WalSize() const;
 
 private:
     // Checkpoint Helper
@@ -118,7 +118,7 @@ private:
     FlushOption flush_option_{FlushOption::kOnlyWrite};
 
     // Flush and Checkpoint threads access following members
-    std::mutex mutex2_{};
+    mutable std::mutex mutex2_{};
     i64 last_ckp_wal_size_{};
     Atomic<bool> checkpoint_in_progress_{false};
 

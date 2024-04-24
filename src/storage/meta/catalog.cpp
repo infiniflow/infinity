@@ -1017,4 +1017,8 @@ Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_cat
 
 void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }
 
+SizeT Catalog::GetDeltaLogCount() const {
+    return global_catalog_delta_entry_->OpSize();
+}
+
 } // namespace infinity

@@ -567,6 +567,8 @@ void SystemVariables::InitVariablesMap() {
     map_["data_url"] = SysVar::kDataURL;
     map_["time_zone"] = SysVar::kTimezone;
     map_["flush_at_commit"] = SysVar::kLogFlushPolicy;
+    map_["wal_log_size"] = SysVar::kWALLogSize;
+    map_["delta_log_count"] = SysVar::kDeltaLogCount;
 }
 
 HashMap<String, SysVar> SystemVariables::map_;

@@ -247,6 +247,8 @@ public:
     static UniquePtr<Catalog>
     LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr);
 
+    SizeT GetDeltaLogCount() const;
+
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 

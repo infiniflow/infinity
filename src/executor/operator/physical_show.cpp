@@ -2654,6 +2654,20 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
                 }
             }
         }
+        case SysVar::kWALLogSize: {
+            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize();
+            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kDeltaLogCount: {
+            SizeT delta_log_count = query_context->storage()->catalog()->GetDeltaLogCount();
+            Value value = Value::MakeVarchar(std::to_string(delta_log_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
         default: {
             RecoverableError(Status::NoSysVar(object_name_));
         }
