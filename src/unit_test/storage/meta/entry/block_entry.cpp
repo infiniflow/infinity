@@ -43,16 +43,13 @@ TEST_F(BlockVersionTest, SaveAndLoad) {
     LocalFileSystem fs;
 
     {
-        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        auto file_handler = fs.OpenFile(version_path, file_flags, FileLockType::kNoLock);
+        auto file_handler = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
         block_version.SpillToFile(*file_handler);
     }
 
     {
-        u8 file_flags = FileFlags::READ_FLAG;
-        auto file_handler = fs.OpenFile(version_path, file_flags, FileLockType::kNoLock);
-        BlockVersion block_verson2(8192);
-        block_verson2.LoadFromFile(*file_handler);
-        ASSERT_EQ(block_version, block_verson2);
+        auto file_handler = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto block_version2 = BlockVersion::LoadFromFile(*file_handler);
+        ASSERT_EQ(block_version, *block_version2);
     }
 }
