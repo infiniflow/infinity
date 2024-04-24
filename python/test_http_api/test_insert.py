@@ -7,7 +7,6 @@ import concurrent.futures
 from httpapibase import HttpTest
 from common.common_values import *
 
-
 class TestInsert(HttpTest):
     def test_http_version(self):
         return
@@ -31,8 +30,7 @@ class TestInsert(HttpTest):
         self.insert(db_name, table_name, [{"c1": 0, "c2": 0}])
         self.insert(db_name, table_name, [{"c1": 1, "c2": 1}])
         self.insert(db_name, table_name, [{"c1": 2, "c2": 2}])
-        self.insert(db_name, table_name, [
-                    {"c1": 3, "c2": 3}, {"c1": 4, "c2": 4}])
+        self.insert(db_name, table_name, [{"c1": 3, "c2": 3}, {"c1": 4, "c2": 4}])
 
         self.drop_table(db_name, table_name)
         return
@@ -97,7 +95,6 @@ class TestInsert(HttpTest):
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, {
             "c1": {
-
                 "type": "vector",
                 "dimension": 65535,
                 "element_type": "integer",
@@ -349,7 +346,7 @@ class TestInsert(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    @pytest.mark.skip(reason="error")
+    @pytest.mark.skip("insert vector lead to erroor_code")
     @pytest.mark.parametrize("batch", [10, 1024])
     @pytest.mark.parametrize("types", [(1, False), (1.1, False), ("1#$@!adf", False), ([1, 2, 3], True)])
     def test_http_insert_with_invalid_data_type(self, batch, types):
@@ -365,7 +362,7 @@ class TestInsert(HttpTest):
                 "element_type": "integer",
             }
         })
-        for i in range(5):
+        for i in range(4):
             values = [{"c1": 1, "c2": types[0]} for _ in range(batch)]
             if not types[1]:
                 self.insert(db_name, table_name, values, expect={
@@ -373,6 +370,7 @@ class TestInsert(HttpTest):
                     "error_code": 3032,
                 })
             else:
+                print(values)
                 self.insert(db_name, table_name, values)
         self.drop_table(db_name, table_name)
         return

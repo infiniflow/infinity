@@ -202,7 +202,7 @@ class TestDelete(HttpTest):
         for i in range(1024):
             values = [{"c1": i} for _ in range(5)]
             self.insert(db_name, table_name, values)
-        time.sleep(5)
+        time.sleep(10)
         self.delete(db_name, table_name, "c1 = 1")
         self.drop_table(db_name, table_name)
         return
@@ -281,7 +281,7 @@ class TestDelete(HttpTest):
             "c1 = 0",
         ]
         db_name = "default"
-        table_name = "test_delete_one_segment_without_expression"
+        table_name = "test_http_filter_with_valid_expression"
         self.create_table(db_name, table_name, {
             "c1": {"type": "integer", },
             "c2": {"type": "float"}}

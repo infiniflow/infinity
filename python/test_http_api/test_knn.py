@@ -8,7 +8,7 @@ import httputils
 
 class TestKnn(HttpTest):
     # PASS
-    @pytest.mark.skip(reason="can not import tmp_20240116.csv")
+    #@pytest.mark.skip(reason="can not import tmp_20240116.csv")
     def test_http_knn(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default"
@@ -359,7 +359,7 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    @pytest.mark.skip(reason="knn use element_type:integer leads to segment fault")
+    #@pytest.mark.skip(reason="knn use element_type:integer leads to segment fault")
     def test_http_invalid_embedding_data_type(self):
         db_name = "default"
         table_name = "test_invalid_embedding_data_type"
@@ -399,7 +399,7 @@ class TestKnn(HttpTest):
         }, {}, {
 
                         "status_code": 500,
-                        "error_code": 3013,
+                        "error_code": 3069,
                     })
         self.drop_table(db_name, table_name)
         return

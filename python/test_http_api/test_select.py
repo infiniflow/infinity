@@ -380,14 +380,14 @@ class TestSelect(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, {
-            "c1": {
-                "type": "integer",
-            },
-            "c2": {
-                "type": "float",
+                "c1": {
+                    "type": "integer",
+                },
+                "c2": {
+                    "type": "float",
+                }
             }
-        }
-                          )
+        )
         self.insert(db_name, table_name, [{"c1": 1, "c2": 2.0},
                                           {"c1": 10, "c2": 2.0},
                                           {"c1": 100, "c2": 2.0},
