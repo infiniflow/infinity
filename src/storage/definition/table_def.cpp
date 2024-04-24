@@ -23,6 +23,8 @@ import data_type;
 import serialize;
 import internal_types;
 import infinity_exception;
+import parsed_expr;
+import constant_expr;
 
 namespace infinity {
 
@@ -104,6 +106,7 @@ void TableDef::WriteAdv(char *&ptr) const {
         for (const auto &cons : cd.constraints_) {
             WriteBufAdv(ptr, cons);
         }
+        (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->WriteAdv(ptr);
         u8 bf = cd.build_bloom_filter_ ? 1 : 0;
         WriteBufAdv(ptr, bf);
     }
@@ -133,7 +136,8 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
             ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
             constraints.insert(ct);
         }
-        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints);
+        SharedPtr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, maxbytes);
+        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, default_expr);
         u8 bf = ReadBufAdv<u8>(ptr);
         cd->build_bloom_filter_ = bf;
         columns.push_back(cd);

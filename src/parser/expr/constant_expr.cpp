@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "constant_expr.h"
+#include "expr/parsed_expr.h"
 #include "parser_assert.h"
 #include "spdlog/fmt/fmt.h"
 #include "type/datetime/interval_type.h"
@@ -226,6 +227,96 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) 
     }
     maxbytes = ptr_end - ptr;
     ParserAssert(maxbytes >= 0, "ptr goes out of range when reading constant expression");
+    return std::shared_ptr<ParsedExpr>(const_expr);
+}
+
+nlohmann::json ConstantExpr::Serialize() const {
+    nlohmann::json j;
+    j["type"] = static_cast<int32_t>(literal_type_);
+    switch (literal_type_) {
+        case LiteralType::kBoolean: {
+            j["value"] = bool_value_;
+            break;
+        }
+        case LiteralType::kDouble: {
+            j["value"] = double_value_;
+            break;
+        }
+        case LiteralType::kString: {
+            j["value"] = str_value_;
+            break;
+        }
+        case LiteralType::kInteger: {
+            j["value"] = integer_value_;
+            break;
+        }
+        case LiteralType::kNull: {
+            break;
+        }
+        case LiteralType::kDate:
+        case LiteralType::kTime:
+        case LiteralType::kDateTime:
+        case LiteralType::kTimestamp: {
+            j["value"] = date_value_;
+            break;
+        }
+        case LiteralType::kIntegerArray: {
+            j["value"] = long_array_;
+            break;
+        }
+        case LiteralType::kDoubleArray: {
+            j["value"] = double_array_;
+            break;
+        }
+        case LiteralType::kInterval: {
+            ParserError("Interval type is not supported in JSON serialization");
+        }
+    }
+    return j;
+}
+
+std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &constant_expr) {
+    LiteralType literal_type = static_cast<LiteralType>(constant_expr["type"].get<int32_t>());
+    auto const_expr = new ConstantExpr(literal_type);
+    switch (literal_type) {
+        case LiteralType::kBoolean: {
+            const_expr->bool_value_ = constant_expr["value"].get<bool>();
+            break;
+        }
+        case LiteralType::kDouble: {
+            const_expr->double_value_ = constant_expr["value"].get<double>();
+            break;
+        }
+        case LiteralType::kString: {
+            const_expr->str_value_ = strdup(constant_expr["value"].get<std::string>().c_str());
+            break;
+        }
+        case LiteralType::kInteger: {
+            const_expr->integer_value_ = constant_expr["value"].get<int64_t>();
+            break;
+        }
+        case LiteralType::kNull: {
+            break;
+        }
+        case LiteralType::kDate:
+        case LiteralType::kTime:
+        case LiteralType::kDateTime:
+        case LiteralType::kTimestamp: {
+            const_expr->date_value_ = strdup(constant_expr["value"].get<std::string>().c_str());
+            break;
+        }
+        case LiteralType::kIntegerArray: {
+            const_expr->long_array_ = constant_expr["value"].get<std::vector<int64_t>>();
+            break;
+        }
+        case LiteralType::kDoubleArray: {
+            const_expr->double_array_ = constant_expr["value"].get<std::vector<double>>();
+            break;
+        }
+        case LiteralType::kInterval: {
+            ParserError("Interval type is not supported in JSON serialization");
+        }
+    }
     return std::shared_ptr<ParsedExpr>(const_expr);
 }
 

@@ -266,7 +266,11 @@ public:
                     ToLower(constraint);
                     constraints.insert(StringToConstraintType(constraint));
                 }
-                ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints);
+                SharedPtr<ParsedExpr> default_expr{nullptr};
+                if (field_element.contains("default")) {
+                    default_expr = ConstantExpr::Deserialize(field_element["default"]);
+                }
+                ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints, default_expr);
                 column_definitions.emplace_back(col_def);
             } else {
                 infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
