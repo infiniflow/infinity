@@ -32,7 +32,7 @@ namespace {
 
 infinity::PGServer pg_server;
 
-#define THRIFT_SERVER_TYPE 0
+#define THRIFT_SERVER_TYPE 1
 
 #if THRIFT_SERVER_TYPE == 0
 
