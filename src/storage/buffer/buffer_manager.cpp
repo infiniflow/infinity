@@ -38,6 +38,8 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, Share
     fs.CleanupDirectory(*temp_dir_);
 }
 
+BufferManager::~BufferManager() { RemoveClean(); }
+
 BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
