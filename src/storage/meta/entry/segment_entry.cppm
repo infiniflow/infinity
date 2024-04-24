@@ -52,6 +52,8 @@ public:
     friend struct TableEntry;
     friend struct WalSegmentInfo;
 
+    static String EncodeIndex(const SegmentID segment_id, const TableEntry *table_entry);
+
 public:
     explicit SegmentEntry(TableEntry *table_entry,
                           SharedPtr<String> segment_dir,

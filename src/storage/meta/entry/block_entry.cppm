@@ -45,9 +45,11 @@ export struct BlockEntry : public BaseEntry {
     friend struct SegmentEntry;
     friend struct WalBlockInfo;
 
+    static String EncodeIndex(const BlockID block_id, const SegmentEntry *segment_entry);
+
 public:
     // for iterator unit test
-    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false){};
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);

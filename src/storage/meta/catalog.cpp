@@ -717,7 +717,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     table_entry->DropIndexReplay(
                         *index_name,
                         [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            auto index_entry = TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, index_meta, txn_id, begin_ts);
+                            auto index_base = MakeShared<IndexBase>(index_meta->index_name());
+                            auto index_entry = TableIndexEntry::NewTableIndexEntry(index_base, true, nullptr, index_meta, txn_id, begin_ts);
                             index_entry->commit_ts_.store(commit_ts);
                             return index_entry;
                         },

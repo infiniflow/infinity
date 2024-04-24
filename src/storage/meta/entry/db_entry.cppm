@@ -41,6 +41,8 @@ class DBMeta;
 export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
+    static String EncodeIndex(const String &db_name);
+
 public:
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,

@@ -51,6 +51,8 @@ export struct PopulateEntireConfig {
 
 export class SegmentIndexEntry : public BaseEntry, public EntryInterface {
 
+    static String EncodeIndex(const SegmentID segment_id, const TableIndexEntry *table_index_entry);
+
 public:
     static SharedPtr<SegmentIndexEntry>
     NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *create_index_param);

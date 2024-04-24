@@ -56,6 +56,8 @@ class AddTableEntryOp;
 export struct TableEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
+    static String EncodeIndex(const String &table_name, TableMeta *table_meta);
+
 public:
     using EntryOp = AddTableEntryOp;
 

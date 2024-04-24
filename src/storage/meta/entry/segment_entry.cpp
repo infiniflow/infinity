@@ -46,14 +46,21 @@ import wal_entry;
 
 namespace infinity {
 
+String SegmentEntry::EncodeIndex(const SegmentID segment_id, const TableEntry *table_entry) {
+    if (table_entry == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", table_entry->encode(), segment_id);
+}
+
 SegmentEntry::SegmentEntry(TableEntry *table_entry,
                            SharedPtr<String> segment_dir,
                            SegmentID segment_id,
                            SizeT row_capacity,
                            SizeT column_count,
                            SegmentStatus status)
-    : BaseEntry(EntryType::kSegment, false), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id),
-      row_capacity_(row_capacity), column_count_(column_count), status_(status) {}
+    : BaseEntry(EntryType::kSegment, false, SegmentEntry::EncodeIndex(segment_id, table_entry)), table_entry_(table_entry), segment_dir_(segment_dir),
+      segment_id_(segment_id), row_capacity_(row_capacity), column_count_(column_count), status_(status) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,

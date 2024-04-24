@@ -594,13 +594,14 @@ const String AddColumnEntryOp::ToString() const {
 }
 
 const String AddTableIndexEntryOp::ToString() const {
+    bool is_delete = merge_flag_ == MergeFlag::kDelete;
     return fmt::format("AddTableIndexEntryOp {} db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",
                        CatalogDeltaOperation::ToString(),
                        *db_name_,
                        *table_name_,
                        *index_name_,
-                       index_dir_.get() != nullptr ? *index_dir_ : "nullptr",
-                       index_base_.get() != nullptr ? index_base_->ToString() : "nullptr");
+                       !is_delete ? *index_dir_ : "nullptr",
+                       !is_delete ? index_base_->ToString() : "nullptr");
 }
 
 const String AddSegmentIndexEntryOp::ToString() const {

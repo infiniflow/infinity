@@ -40,6 +40,8 @@ struct SegmentEntry;
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
 export class ChunkIndexEntry : public BaseEntry, public EntryInterface {
 private:
+    static String EncodeIndex(const ChunkID chunk_id, const SegmentIndexEntry *segment_index_entry);
+
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
     static UniquePtr<IndexFileWorker> CreateFileWorker(const IndexBase *index_base,
