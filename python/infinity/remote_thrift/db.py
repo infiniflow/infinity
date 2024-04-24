@@ -27,7 +27,6 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
     datatype = column_info["type"]
     constraints = column_info["constraints"]
-    default = column_info["default"]
 
     # process column definition
     proto_column_def = ttypes.ColumnDef()
@@ -71,12 +70,11 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
             raise Exception(f"unknown constraint: {constraint}")
 
     # process constant expression
-    if "default" not in column_name:
-        default = None
-    else:
-        default = column_name["default"]
+    default = None
+    if "default" in column_info:
+        default = column_info["default"]
 
-    if not default:
+    if default is None:
         constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Null)
         proto_column_def.constant_expr = constant_exp
     else:
@@ -105,8 +103,9 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     column_defs.append(proto_column_def)
 
 
-def get_embedding_info(column_big_info, column_defs, column_name, index):
+def get_embedding_info(column_info, column_defs, column_name, index):
     # "vector,1024,float32"
+    column_big_info = [item.strip() for item in column_info["type"].split(",")]
     length = column_big_info[1]
     element_type = column_big_info[2]
 
@@ -142,10 +141,9 @@ def get_embedding_info(column_big_info, column_defs, column_name, index):
     proto_column_def.data_type = column_type
 
     # process constant expression
-    if "default" not in column_name:
-        default = None
-    else:
-        default = column_name["default"]
+    default = None
+    if "default" in column_info:
+        default = column_info["default"]
 
     if not default:
         constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Null)
@@ -183,36 +181,36 @@ class RemoteDatabase(Database, ABC):
         self._db_name = name
 
     @name_validity_check("table_name", "Table")
-    def create_table(self, table_name: str, columns_definition: dict[dict[str, str]],
+    # : dict[str, dict[str, (str, list)]]
+    def create_table(self, table_name: str, columns_definition,
                      conflict_type: ConflictType = ConflictType.Error):
         # process column definitions
         """
-        db_obj.create_table("my_table", {
-            "c1": {
-                "type": "int",
-                "constraints":["primary key", ...],
-                "default"(optional): 1/"asdf"/[1,2]/...
-            },
-            "c2": {
-                "type":"vector,1024,float32",
+        db_obj.create_table("my_table",
+            {
+                "c1": {
+                    "type": "int",
+                    "constraints":["primary key", ...],
+                    "default"(optional): 1/"asdf"/[1,2]/...
+                },
+                "c2": {
+                    "type":"vector,1024,float32",
                 }
             }, None)
         """
         # to column_defs
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
-            print(column_info)
+            print(column_name, column_info)
             check_valid_name(column_name, "Column")
             # column_big_info = [item.strip() for item in column_info.split(",")]
             column_big_info = [item.strip() for item in column_info["type"].split(",")]
             print(column_big_info)
             if column_big_info[0] == "vector":
-                get_embedding_info(
-                    column_big_info, column_defs, column_name, index)
+                get_embedding_info(column_info, column_defs, column_name, index)
 
             else:  # numeric or varchar
-                get_ordinary_info(
-                    column_info, column_defs, column_name, index)
+                get_ordinary_info(column_info, column_defs, column_name, index)
 
         create_table_conflict: ttypes.CreateConflict
         if conflict_type == ConflictType.Error:

@@ -494,11 +494,11 @@ class TestImport(TestSdk):
                 "constraints": ["primary key"],
                 "default": 12,
             },
-            # "c2": {
-            #     "type": "vector, 3, float",
-            #     "constraints": ["primary key"],
-            #     # "default": [1, 2, 3],
-            # }
+            "c4": {
+                "type": "vector, 3, float",
+                "constraints": ["primary key"],
+                "default": [1.0, 2.0, 3.0],
+            }
         }
         table_obj = db_obj.create_table("test_import_jsonl_file", columns, ConflictType.Error)
 
@@ -509,3 +509,44 @@ class TestImport(TestSdk):
         res = table_obj.output(["*"]).to_pl()
         print(res)
         db_obj.drop_table("test_import_jsonl_file", ConflictType.Error)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.json",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_json_file(self, get_infinity_db, check_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_json_file", ConflictType.Ignore)
+        if not check_data:
+            copy_data("pysdk_test.json")
+
+        # columns = {"c" + str(i): "int" for i in range(1024)}
+        columns = {
+            "c1": {
+                "type": "int",
+                "constraints": ["primary key"],
+                "default": 12,
+            },
+            "c2": {
+                "type": "int",
+                "constraints": ["primary key"],
+                "default": 12,
+            },
+            "c3": {
+                "type": "int",
+                "constraints": ["primary key"],
+                "default": 12,
+            },
+            "c4": {
+                "type": "vector, 3, float",
+                "constraints": ["primary key"],
+                # "default": [1, 2, 3],
+            }
+        }
+        table_obj = db_obj.create_table("test_import_json_file", columns, ConflictType.Error)
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.json"
+        res = table_obj.import_data(test_csv_dir, import_options={"file_type": "json"})
+        assert res.error_code == ErrorCode.OK
+        # table_obj.insert_data("pysdk_test_json_file.json")
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
+        # db_obj.drop_table("test_import_json_file", ConflictType.Error)
