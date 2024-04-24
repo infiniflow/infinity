@@ -158,7 +158,8 @@ int32_t ConstantExpr::GetSizeInBytes() const {
             size += sizeof(int64_t);
             break;
         }
-    
+    }
+    return size;
 }
 
 void ConstantExpr::WriteAdv(char *&ptr) const {
