@@ -209,17 +209,10 @@ class HttpTest:
     # part index
     def create_index(self, db_name, table_name, index_name, fields=[], index={}, expect={
         "error_code": 0
-    }, opt="kIgnore"):
+    }, opt="ignore_if_exists"):
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
-        ignore = False
-        if opt == "kIgnore":
-            ignore = True
-        elif opt == "kError":
-            ignore = False
-        else:
-            ignore = opt
         h = self.set_up_header(['accept', 'content-type'], )
-        d = self.set_up_data([], {"fields": fields, "index": index, "create_option": {"ignore_if_exists": ignore}})
+        d = self.set_up_data([], {"fields": fields, "index": index, "create_option": opt})
         r = self.request(url, "post", h, d)
         self.tear_down(r, expect)
         return

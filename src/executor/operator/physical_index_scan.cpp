@@ -515,11 +515,11 @@ struct FilterResult {
     }
 };
 
-FilterResult SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
-                                       const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
-                                       const SegmentID segment_id,
-                                       const u32 segment_row_count,
-                                       const u32 segment_row_actual_count) {
+FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &filter_execute_command,
+                                            const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
+                                            const SegmentID segment_id,
+                                            const u32 segment_row_count,
+                                            const u32 segment_row_actual_count) {
     Vector<FilterResult> result_stack;
     // execute filter_execute_command_ (Reverse Polish notation)
     for (auto const &elem : filter_execute_command) {
@@ -531,7 +531,7 @@ FilterResult SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_e
                                             result_stack[v_size - 2].MergeOr(right);
                                             result_stack.pop_back();
                                         } else {
-                                            UnrecoverableError("SolveSecondaryIndexFilter(): filter result stack error.");
+                                            UnrecoverableError("SolveSecondaryIndexFilterInner(): filter result stack error.");
                                         }
                                         break;
                                     }
@@ -541,7 +541,7 @@ FilterResult SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_e
                                             result_stack[v_size - 2].MergeAnd(right);
                                             result_stack.pop_back();
                                         } else {
-                                            UnrecoverableError("SolveSecondaryIndexFilter(): filter result stack error.");
+                                            UnrecoverableError("SolveSecondaryIndexFilterInner(): filter result stack error.");
                                         }
                                         break;
                                     }
@@ -555,37 +555,22 @@ FilterResult SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_e
     }
     // check if result is valid
     if (result_stack.size() != 1) {
-        UnrecoverableError("SolveSecondaryIndexFilter(): filter result stack error.");
+        UnrecoverableError("SolveSecondaryIndexFilterInner(): filter result stack error.");
     }
     return std::move(result_stack[0]);
 }
 
-Map<SegmentID, std::variant<Vector<u32>, Bitmask>> SolveSecondaryIndexFilter(const FastRoughFilterEvaluator *fast_rough_filter_evaluator,
-                                                                             const Vector<FilterExecuteElem> &filter_execute_command,
-                                                                             const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
-                                                                             const BaseTableRef *base_table_ref,
-                                                                             TxnTimeStamp begin_ts) {
-    Map<SegmentID, std::variant<Vector<u32>, Bitmask>> result;
-    const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref->block_index_->segment_index_;
-    for (const auto &[segment_id, segment_entry] : segment_index) {
-        if (!fast_rough_filter_evaluator->Evaluate(begin_ts, *segment_entry->GetFastRoughFilter())) {
-            // skip this segment
-            continue;
-        }
-        auto result_elem = SolveSecondaryIndexFilter(filter_execute_command,
-                                                     column_index_map,
-                                                     segment_id,
-                                                     segment_entry->row_count(),
-                                                     segment_entry->actual_row_count());
-        if (std::visit(Overload{[](const Vector<u32> &selected_rows) -> bool { return selected_rows.empty(); },
-                                [](const Bitmask &) -> bool { return false; }},
-                       result_elem.selected_rows_)) {
-            // empty result
-            continue;
-        }
-        result.emplace(segment_id, std::move(result_elem.selected_rows_));
+std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<FilterExecuteElem> &filter_execute_command,
+                                                             const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
+                                                             const SegmentID segment_id,
+                                                             const u32 segment_row_count,
+                                                             const u32 segment_row_actual_count) {
+    if (filter_execute_command.empty()) {
+        // return all true
+        return std::variant<Vector<u32>, Bitmask>(std::in_place_type<Bitmask>);
     }
-    return result;
+    auto result = SolveSecondaryIndexFilterInner(filter_execute_command, column_index_map, segment_id, segment_row_count, segment_row_actual_count);
+    return std::move(result.selected_rows_);
 }
 
 void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const {
@@ -642,7 +627,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     // prepare filter for deleted rows
     DeleteFilter delete_filter(segment_entry, begin_ts);
     // output
-    auto result = SolveSecondaryIndexFilter(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count);
+    auto result = SolveSecondaryIndexFilterInner(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count);
     result.Output(output_data_blocks, segment_id, delete_filter);
 
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, finished", next_idx, segment_ids.size()));

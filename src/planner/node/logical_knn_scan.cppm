@@ -28,6 +28,7 @@ import table_entry;
 import internal_types;
 import data_type;
 import fast_rough_filter;
+import common_query_filter;
 
 namespace infinity {
 
@@ -57,7 +58,7 @@ public:
 
     SharedPtr<BaseExpression> filter_expression_{};
 
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
+    SharedPtr<CommonQueryFilter> common_query_filter_{};
 
     u64 knn_table_index_{};
 };

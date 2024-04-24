@@ -50,7 +50,9 @@ class SealingTaskTest : public BaseTest {
         tree_cmd += GetHomeDir();
     }
 
-    void TearDown() override { system(tree_cmd.c_str()); }
+    void TearDown() override {
+        // system(tree_cmd.c_str());
+    }
 
     String tree_cmd;
 

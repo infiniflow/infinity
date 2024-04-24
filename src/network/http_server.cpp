@@ -101,17 +101,38 @@ public:
         String body_info = request->readBodyToString();
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
         String option = body_info_json["create_option"];
-        CreateDatabaseOptions create_option;
-
-        if (option == "ignore_if_exists") {
-            create_option.conflict_type_ = ConflictType::kIgnore;
-        }
-
-        // create database
-        auto result = infinity->CreateDatabase(database_name, create_option);
 
         HTTPStatus http_status;
         nlohmann::json json_response;
+
+        CreateDatabaseOptions options;
+        if(body_info_json.contains("create_option")) {
+            auto create_option = body_info_json["create_option"];
+            if(create_option.is_string()) {
+                String option = create_option;
+                if(option == "ignore_if_exists") {
+                    options.conflict_type_ = ConflictType::kIgnore;
+                } else if(option == "error") {
+                    options.conflict_type_ = ConflictType::kError;
+                } else if(option == "replace_if_exists") {
+                    options.conflict_type_ = ConflictType::kReplace;
+                } else {
+                    json_response["error_code"] = 3074;
+                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+            } else {
+                json_response["error_code"] = 3067;
+                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+        }
+
+        // create database
+        auto result = infinity->CreateDatabase(database_name, options);
+
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
@@ -134,19 +155,37 @@ public:
         String database_name = request->getPathVariable("database_name");
 
         // get drop option
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
         String body_info = request->readBodyToString();
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
         String option = body_info_json["drop_option"];
-        DropDatabaseOptions drop_option;
-
-        if (option == "ignore_if_not_exists") {
-            drop_option.conflict_type_ = ConflictType::kIgnore;
+        DropDatabaseOptions options;
+        if(body_info_json.contains("drop_option")) {
+            auto drop_option = body_info_json["drop_option"];
+            if(drop_option.is_string()) {
+                String option = drop_option;
+                if(option == "ignore_if_not_exists") {
+                    options.conflict_type_ = ConflictType::kIgnore;
+                } else if(option == "error") {
+                    options.conflict_type_ = ConflictType::kError;
+                } else {
+                    json_response["error_code"] = 3075;
+                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+            } else {
+                json_response["error_code"] = 3067;
+                json_response["error_message"] = "'DROP OPTION' field value should be string type";
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
         }
 
-        auto result = infinity->DropDatabase(database_name, drop_option);
+        auto result = infinity->DropDatabase(database_name, options);
 
-        nlohmann::json json_response;
-        HTTPStatus http_status;
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
@@ -282,15 +321,31 @@ public:
             }
         }
         Vector<TableConstraint *> table_constraint;
-        String option = body_info_json["create_option"];
-        CreateTableOptions create_table_opts;
-        if (option == "ignore_if_exists") {
-            create_table_opts.conflict_type_ = ConflictType::kIgnore;
-        } else if (option == "replace_if_exists") {
-            create_table_opts.conflict_type_ = ConflictType::kReplace;
+
+        CreateTableOptions options;
+        if(body_info_json.contains("create_option")) {
+            auto create_option = body_info_json["create_option"];
+            if(create_option.is_string()) {
+                String option = create_option;
+                if(option == "ignore_if_exists") {
+                    options.conflict_type_ = ConflictType::kIgnore;
+                } else if(option == "error") {
+                    options.conflict_type_ = ConflictType::kError;
+                } else if(option == "replace_if_exists") {
+                    options.conflict_type_ = ConflictType::kReplace;
+                } else {
+                    json_response["error_code"] = 3074;
+                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    http_status = HTTPStatus::CODE_500;
+                }
+            } else {
+                json_response["error_code"] = 3067;
+                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                http_status = HTTPStatus::CODE_500;
+            }
         }
 
-        auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, create_table_opts);
+        auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
@@ -315,17 +370,34 @@ public:
         String body_info = request->readBodyToString();
 
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
-        String option = body_info_json["drop_option"];
-        DropTableOptions drop_table_opts;
-        if (option == "ignore_if_not_exists") {
-            drop_table_opts.conflict_type_ = ConflictType::kIgnore;
-        }
-
-        auto result = infinity->DropTable(database_name, table_name, drop_table_opts);
 
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
         nlohmann::json json_response;
+
+        DropTableOptions options;
+        if(body_info_json.contains("drop_option")) {
+            auto drop_option = body_info_json["drop_option"];
+            if(drop_option.is_string()) {
+                String option = drop_option;
+                if(option == "ignore_if_not_exists") {
+                    options.conflict_type_ = ConflictType::kIgnore;
+                } else if(option == "error") {
+                    options.conflict_type_ = ConflictType::kError;
+                } else {
+                    json_response["error_code"] = 3075;
+                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    http_status = HTTPStatus::CODE_500;
+                }
+            } else {
+                json_response["error_code"] = 3067;
+                json_response["error_message"] = "'DROP OPTION' field value should be string type";
+                http_status = HTTPStatus::CODE_500;
+            }
+        }
+
+        auto result = infinity->DropTable(database_name, table_name, options);
+
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
@@ -876,11 +948,11 @@ public:
 
                                         switch (value_type) {
                                             case nlohmann::json::value_t::number_integer: {
-                                                const_expr->long_array_.emplace_back(value.template get<i64>());
+                                                const_expr->long_array_.emplace_back(value_ref.template get<i64>());
                                                 break;
                                             }
                                             case nlohmann::json::value_t::number_unsigned: {
-                                                const_expr->long_array_.emplace_back(value.template get<u64>());
+                                                const_expr->long_array_.emplace_back(value_ref.template get<u64>());
                                                 break;
                                             }
                                             default: {
@@ -1397,10 +1469,35 @@ public:
         auto table_name = request->getPathVariable("table_name");
         auto index_name = request->getPathVariable("index_name");
 
-        auto result = infinity->DropIndex(database_name, table_name, index_name, DropIndexOptions());
+        String body_info = request->readBodyToString();
+
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
 
         nlohmann::json json_response;
         HTTPStatus http_status;
+        DropIndexOptions options;
+        if(body_info_json.contains("drop_option")) {
+            auto drop_option = body_info_json["drop_option"];
+            if(drop_option.is_string()) {
+                String option = drop_option;
+                if(option == "ignore_if_not_exists") {
+                    options.conflict_type_ = ConflictType::kIgnore;
+                } else if(option == "error") {
+                    options.conflict_type_ = ConflictType::kError;
+                } else {
+                    json_response["error_code"] = 3074;
+                    json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
+                    http_status = HTTPStatus::CODE_500;
+                }
+            } else {
+                json_response["error_code"] = 3067;
+                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                http_status = HTTPStatus::CODE_500;
+            }
+        }
+
+        auto result = infinity->DropIndex(database_name, table_name, index_name, options);
+
         if (result.IsOk()) {
             json_response["error_code"] = 0;
             http_status = HTTPStatus::CODE_200;
@@ -1426,18 +1523,34 @@ public:
         String body_info_str = request->readBodyToString();
         nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
 
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
         CreateIndexOptions options;
-        auto create_option = body_info_json["create_option"];
-        auto ignore_if_exists = create_option["ignore_if_exists"];
-        if (ignore_if_exists.is_boolean() && ignore_if_exists) {
-            options.conflict_type_ = ConflictType::kIgnore;
+        if(body_info_json.contains("create_option")) {
+            auto create_option = body_info_json["create_option"];
+            if(create_option.is_string()) {
+                String option = create_option;
+                if(option == "ignore_if_exists") {
+                    options.conflict_type_ = ConflictType::kIgnore;
+                } else if(option == "error") {
+                    options.conflict_type_ = ConflictType::kError;
+                } else if(option == "replace_if_exists") {
+                    options.conflict_type_ = ConflictType::kReplace;
+                } else {
+                    json_response["error_code"] = 3075;
+                    json_response["error_message"] = fmt::format("Invalid create option: {}", option);
+                    http_status = HTTPStatus::CODE_500;
+                }
+            } else {
+                json_response["error_code"] = 3067;
+                json_response["error_message"] = "'CREATE OPTION' field value should be string type";
+                http_status = HTTPStatus::CODE_500;
+            }
         }
 
         auto fields = body_info_json["fields"];
         auto index = body_info_json["index"];
-
-        nlohmann::json json_response;
-        HTTPStatus http_status;
 
         auto index_info_list = new Vector<IndexInfo *>();
         {
