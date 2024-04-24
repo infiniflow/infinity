@@ -443,7 +443,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
         AddDBEntry(delta_entry.get(), MergeFlag::kUpdate, commit_ts);
         global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry));
 
-        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
         EXPECT_EQ(merged_entry->operations().size(), 1u);
     }
     {
@@ -462,7 +462,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
         AddDBEntry(delta_entry2.get(), MergeFlag::kNew, commit_ts);
         global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry2));
 
-        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
         EXPECT_EQ(merged_entry->operations().size(), 1u);
     }
     {
@@ -476,7 +476,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             AddDBEntry(delta_entry1.get(), MergeFlag::kUpdate, commit_ts);
             global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
 
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
             merged_entries.push_back(std::move(merged_entry));
         }
@@ -488,7 +488,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             AddDBEntry(delta_entry1.get(), MergeFlag::kDelete, commit_ts);
             AddDBEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
             global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
             merged_entries.push_back(std::move(merged_entry));
         }
@@ -497,7 +497,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             for (auto &entry : merged_entries) {
                 global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
             }
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(0 /*full_ckp_ts*/, 5);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(5);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
         }
     }
@@ -513,7 +513,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             AddTableEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
             AddTableEntry(delta_entry1.get(), MergeFlag::kUpdate, commit_ts);
             global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
             EXPECT_EQ(merged_entry->operations().size(), 2u);
             merged_entries.push_back(std::move(merged_entry));
         }
@@ -526,7 +526,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             AddDBEntry(delta_entry1.get(), MergeFlag::kDelete, commit_ts);
             AddDBEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
             global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts - 1 /*full_ckp_ts*/, commit_ts);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
             merged_entries.push_back(std::move(merged_entry));
         }
@@ -535,7 +535,7 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             for (auto &entry : merged_entries) {
                 global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
             }
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(0 /*full_ckp_ts*/, 7);
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(7);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
         }
     }
