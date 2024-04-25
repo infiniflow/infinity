@@ -1,0 +1,30 @@
+{
+    "name": "infinity_enwiki",
+    "app": "infinity",
+    "host": "127.0.0.1:23817",
+    "data_path": "datasets/enwiki/enwiki-1kw.csv",
+    "data_link": "http://192.168.200.183:8000/enwiki-20120502-lines-10.csv",
+    "insert_batch_size": 8192,
+    "query_path": "datasets/enwiki/operations.json",
+    "query_link": "to_be_set",
+    "mode": "fulltext",
+    "topK": 10,
+    "use_import": false,
+    "schema": {
+        "doctitle": "varchar",
+        "docdate": "varchar",
+        "body": "varchar"
+    },
+    "index": {
+        "doctitle": {
+            "type": "text"
+        },
+        "docdate": {
+            "type": "text"
+        },
+        "body": {
+            "type": "text"
+        }
+    },
+    "ground_truth_path": "datasets/enwiki/ground_truth.json"
+}
