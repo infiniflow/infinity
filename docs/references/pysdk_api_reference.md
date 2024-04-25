@@ -209,8 +209,31 @@ emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 ### Examples
 
 ```python
-db_obj.create_table("test_create_varchar_table",
-	            {"c1": {"type": "varchar"}, "c2": {"type": "float"}})
+table = db_obj.create_table("table_example", {
+            "c1": {
+                "type": "int",
+                "constraints": ["primary key",],
+                "default": 1
+            },
+            "c2": {
+                "type": "vector,3,float32",
+                "default": [2.0, 1.2, 3.1],
+            }
+        }, None)
+# CREATE TABLE table_example(
+#   c1 INT PRIMARY KEY DEFAULT 1
+#   c2 EMBEDDING(FLOAT, 3) DEFAULT [2.0,1.2,3.1]
+# );
+
+db_obj.create_table("test_create_varchar_table", {
+            "c1": {
+                "type": "varchar", 
+                "constraints": ["primary key"]
+            },
+            "c2": {
+                "type": "float"
+            }
+        })
 # CREATE TABLE test_create_varchar_table(
 #   c1 VARCHAR PRIMARY KEY,
 #   c2 FLOAT
