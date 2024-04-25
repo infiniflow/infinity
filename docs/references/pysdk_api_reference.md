@@ -176,7 +176,7 @@ Create a table using given name, and specify defination of each column.
 - **table_name : str(not empty)** 
 name of the table to be created
 - **columns_definition : dict[str, str]**
-A dict object whose key value pair indicates name of the column and its datatype. Espcially, a vector column should be declared as *"vector, \<dimision>\, \<datatype>\"*
+A dict object whose key value pair indicates name of the column and its datatype. Especially, a vector column should be declared as *"vector, \<dimision>\, \<datatype>\"*
 `note: ordinary datatype can be int8/int16/int32/int64/int128/`
 - **confilict_type : ConflictType**
 emun type which could be *Error* or *Ignore*, defined in *infinity.common*
