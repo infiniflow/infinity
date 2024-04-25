@@ -52,6 +52,7 @@ import base_entry;
 import block_entry;
 import block_column_entry;
 import segment_index_entry;
+import chunk_index_entry;
 import log_file;
 
 namespace infinity {
@@ -501,6 +502,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
         auto commit_ts = op->commit_ts_;
         auto txn_id = op->txn_id_;
         auto begin_ts = op->begin_ts_;
+        std::string_view encode = op->encode_;
         MergeFlag merge_flag = op->merge_flag_;
         if (op->commit_ts_ < full_ckp_commit_ts_) {
             // Ignore the old txn
@@ -513,7 +515,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             // -----------------------------
             case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
                 auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
-                const auto &db_name = add_db_entry_op->db_name_;
+                auto decodes = DBEntry::DecodeIndex(encode);
+                auto db_name = MakeShared<String>(decodes[0]);
                 const auto &db_entry_dir = add_db_entry_op->db_entry_dir_;
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
                     this->DropDatabaseReplay(
@@ -539,8 +542,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             }
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
-                const auto &db_name = add_table_entry_op->db_name_;
-                const auto &table_name = add_table_entry_op->table_name_;
+                auto decodes = TableEntry::DecodeIndex(encode);
+                auto db_name = String(decodes[0]);
+                auto table_name = MakeShared<String>(decodes[1]);
                 const auto &table_entry_dir = add_table_entry_op->table_entry_dir_;
                 auto column_defs = add_table_entry_op->column_defs_;
                 auto entry_type = add_table_entry_op->table_entry_type_;
@@ -548,7 +552,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 SegmentID unsealed_id = add_table_entry_op->unsealed_id_;
                 SegmentID next_segment_id = add_table_entry_op->next_segment_id_;
 
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
                     // Actually the table entry replayed doesn't have full information cause index entry are lacked, but that is ok for now.
                     db_entry->DropTableReplay(
@@ -593,9 +597,11 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             }
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
                 auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
-                const auto &db_name = add_segment_entry_op->db_name_;
-                const auto &table_name = add_segment_entry_op->table_name_;
-                auto segment_id = add_segment_entry_op->segment_id_;
+                auto decodes = SegmentEntry::DecodeIndex(encode);
+                auto db_name = String(decodes[0]);
+                auto table_name = String(decodes[1]);
+                SegmentID segment_id = 0;
+                std::from_chars(decodes[2].begin(), decodes[2].end(), segment_id);
                 auto segment_status = add_segment_entry_op->status_;
                 auto column_count = add_segment_entry_op->column_count_;
                 auto row_count = add_segment_entry_op->row_count_;
@@ -606,8 +612,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto deprecate_ts = add_segment_entry_op->deprecate_ts_;
                 auto segment_filter_binary_data = add_segment_entry_op->segment_filter_binary_data_;
 
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
 
                 auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry,
                                                                          segment_id,
@@ -637,10 +643,13 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             }
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
                 auto add_block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
-                const auto &db_name = add_block_entry_op->db_name_;
-                const auto &table_name = add_block_entry_op->table_name_;
-                auto segment_id = add_block_entry_op->segment_id_;
-                auto block_id = add_block_entry_op->block_id_;
+                auto decodes = BlockEntry::DecodeIndex(encode);
+                auto db_name = String(decodes[0]);
+                auto table_name = String(decodes[1]);
+                SegmentID segment_id = 0;
+                std::from_chars(decodes[2].begin(), decodes[2].end(), segment_id);
+                BlockID block_id = 0;
+                std::from_chars(decodes[3].begin(), decodes[3].end(), block_id);
                 auto row_count = add_block_entry_op->row_count_;
                 auto row_capacity = add_block_entry_op->row_capacity_;
                 auto min_row_ts = add_block_entry_op->min_row_ts_;
@@ -649,8 +658,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto check_point_row_count = add_block_entry_op->checkpoint_row_count_;
                 auto block_filter_binary_data = add_block_entry_op->block_filter_binary_data_;
 
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
 
                 auto new_block = BlockEntry::NewReplayBlockEntry(segment_entry,
@@ -678,16 +687,20 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             }
             case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
                 auto add_column_entry_op = static_cast<AddColumnEntryOp *>(op.get());
-                const auto &db_name = add_column_entry_op->db_name_;
-                const auto &table_name = add_column_entry_op->table_name_;
-                auto segment_id = add_column_entry_op->segment_id_;
-                auto block_id = add_column_entry_op->block_id_;
-                auto column_id = add_column_entry_op->column_id_;
+                auto decodes = BlockColumnEntry::DecodeIndex(encode);
+                auto db_name = String(decodes[0]);
+                auto table_name = String(decodes[1]);
+                SegmentID segment_id = 0;
+                std::from_chars(decodes[2].begin(), decodes[2].end(), segment_id);
+                BlockID block_id = 0;
+                std::from_chars(decodes[3].begin(), decodes[3].end(), block_id);
+                ColumnID column_id = 0;
+                std::from_chars(decodes[4].begin(), decodes[4].end(), column_id);
                 i32 next_outline_idx = add_column_entry_op->next_outline_idx_;
                 u64 last_chunk_offset = add_column_entry_op->last_chunk_offset_;
 
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
                 block_entry->AddColumnReplay(
@@ -701,14 +714,15 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             // -----------------------------
             case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
                 auto add_table_index_entry_op = static_cast<AddTableIndexEntryOp *>(op.get());
-                const auto &db_name = add_table_index_entry_op->db_name_;
-                const auto &table_name = add_table_index_entry_op->table_name_;
-                const auto &index_name = add_table_index_entry_op->index_name_;
+                auto decodes = TableIndexEntry::DecodeIndex(encode);
+                auto db_name = String(decodes[0]);
+                auto table_name = String(decodes[1]);
+                auto index_name = MakeShared<String>(decodes[2]);
                 const auto &index_dir = add_table_index_entry_op->index_dir_;
                 auto index_base = add_table_index_entry_op->index_base_;
 
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
                     table_entry->DropIndexReplay(
                         *index_name,
@@ -736,19 +750,21 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             }
             case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
                 auto add_segment_index_entry_op = static_cast<AddSegmentIndexEntryOp *>(op.get());
-                const auto &db_name = add_segment_index_entry_op->db_name_;
-                const auto &table_name = add_segment_index_entry_op->table_name_;
-                const auto &index_name = add_segment_index_entry_op->index_name_;
-                auto segment_id = add_segment_index_entry_op->segment_id_;
+                auto decodes = SegmentIndexEntry::DecodeIndex(encode);
+                auto db_name = String(decodes[0]);
+                auto table_name = String(decodes[1]);
+                auto index_name = String(decodes[2]);
+                SegmentID segment_id = 0;
+                std::from_chars(decodes[3].begin(), decodes[3].end(), segment_id);
                 auto min_ts = add_segment_index_entry_op->min_ts_;
                 auto max_ts = add_segment_index_entry_op->max_ts_;
                 auto next_chunk_id = add_segment_index_entry_op->next_chunk_id_;
 
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
 
                 if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
-                    auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
+                    auto *table_index_entry = table_entry->GetIndexReplay(index_name, txn_id, begin_ts);
                     auto *segment_entry = iter->second.get();
                     if (segment_entry->status() == SegmentStatus::kDeprecated) {
                         UnrecoverableError(fmt::format("Segment {} is deprecated", segment_id));
@@ -772,20 +788,23 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
             }
             case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
                 auto add_chunk_index_entry_op = static_cast<AddChunkIndexEntryOp *>(op.get());
-                const auto &db_name = add_chunk_index_entry_op->db_name_;
-                const auto &table_name = add_chunk_index_entry_op->table_name_;
-                const auto &index_name = add_chunk_index_entry_op->index_name_;
-                auto segment_id = add_chunk_index_entry_op->segment_id_;
-                auto chunk_id = add_chunk_index_entry_op->chunk_id_;
+                auto decodes = ChunkIndexEntry::DecodeIndex(encode);
+                auto db_name = String(decodes[0]);
+                auto table_name = String(decodes[1]);
+                auto index_name = String(decodes[2]);
+                SegmentID segment_id = 0;
+                std::from_chars(decodes[3].begin(), decodes[3].end(), segment_id);
+                ChunkID chunk_id = 0;
+                std::from_chars(decodes[4].begin(), decodes[4].end(), chunk_id);
                 const auto &base_name = add_chunk_index_entry_op->base_name_;
                 auto base_rowid = add_chunk_index_entry_op->base_rowid_;
                 auto row_count = add_chunk_index_entry_op->row_count_;
 
-                auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
 
                 if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
-                    auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
+                    auto *table_index_entry = table_entry->GetIndexReplay(index_name, txn_id, begin_ts);
                     auto *segment_entry = iter->second.get();
                     if (segment_entry->status() == SegmentStatus::kDeprecated) {
                         UnrecoverableError(fmt::format("Segment {} is deprecated", segment_id));
@@ -985,8 +1004,6 @@ Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_cat
 
 void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }
 
-SizeT Catalog::GetDeltaLogCount() const {
-    return global_catalog_delta_entry_->OpSize();
-}
+SizeT Catalog::GetDeltaLogCount() const { return global_catalog_delta_entry_->OpSize(); }
 
 } // namespace infinity
