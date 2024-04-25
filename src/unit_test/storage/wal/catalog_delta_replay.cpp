@@ -326,8 +326,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
             }
 
-            TxnTimeStamp flush_ts = txn->BeginTS();
-            segment_entry->FlushNewData(flush_ts);
+            segment_entry->FlushNewData();
             txn->Import(*db_name, *table_name, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
@@ -850,8 +849,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
             }
 
-            TxnTimeStamp flush_ts = txn->BeginTS();
-            segment_entry->FlushNewData(flush_ts);
+            segment_entry->FlushNewData();
             txn->Import(*db_name, *table_name, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
@@ -1017,8 +1015,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
             }
 
-            TxnTimeStamp flush_ts = txn->BeginTS();
-            segment_entry->FlushNewData(flush_ts);
+            segment_entry->FlushNewData();
             txn->Import(*db_name, *table_name, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
@@ -1168,8 +1165,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
             }
 
-            TxnTimeStamp flush_ts = txn->BeginTS();
-            segment_entry->FlushNewData(flush_ts);
+            segment_entry->FlushNewData();
             txn->Import(*db_name, *table_name, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
