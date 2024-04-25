@@ -60,7 +60,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
 
     auto *buffer_mgr = txn->buffer_mgr();
-    block_column_entry->buffer_ = buffer_mgr->Allocate(std::move(file_worker));
+    block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
 
     return block_column_entry;
 }
@@ -81,12 +81,12 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     SizeT total_data_size = (column_type->type() == kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
     auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->file_name_, total_data_size);
 
-    column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
+    column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
 
     for (i32 outline_idx = 0; outline_idx < next_outline_idx; ++outline_idx) {
         // FIXME: not use default value
         auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(outline_idx), DEFAULT_FIXLEN_CHUNK_SIZE);
-        auto *buffer_obj = buffer_manager->Get(std::move(file_worker));
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(file_worker));
         column_entry->outline_buffers_.emplace_back(buffer_obj);
     }
     column_entry->last_chunk_offset_ = last_chunk_offset;
@@ -98,7 +98,7 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
-        this->buffer_ = buffer_mgr->Get(std::move(file_worker));
+        this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
 
     ColumnVector column_vector(column_type_);
@@ -183,11 +183,11 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 
 void BlockColumnEntry::Cleanup() {
     if (buffer_ != nullptr) {
-        buffer_->Cleanup();
+        buffer_->PickForCleanup();
     }
     for (auto *outline_buffer : outline_buffers_) {
         if (outline_buffer) {
-            outline_buffer->Cleanup();
+            outline_buffer->PickForCleanup();
         }
     }
 }

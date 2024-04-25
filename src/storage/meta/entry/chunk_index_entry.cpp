@@ -76,7 +76,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewChunkIndexEntry(ChunkID chunk_id,
     SegmentID segment_id = segment_index_entry->segment_id();
 
     auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, chunk_id);
-    chunk_index_entry->buffer_obj_ = buffer_mgr->Allocate(std::move(file_worker));
+    chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
     return chunk_index_entry;
 }
 
@@ -91,7 +91,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEnt
     if (buffer_mgr != nullptr) {
         auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
         auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name);
-        chunk_index_entry->buffer_obj_ = buffer_mgr->Get(std::move(file_worker));
+        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;
 }
@@ -108,14 +108,14 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
         const auto &index_dir = segment_index_entry->index_dir();
         auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
         auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name);
-        chunk_index_entry->buffer_obj_ = buffer_mgr->Get(std::move(file_worker));
+        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     } else {
         const auto &index_dir = segment_index_entry->index_dir();
         const auto &index_base = param->index_base_;
         SegmentID segment_id = segment_index_entry->segment_id();
 
         auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, chunk_id);
-        chunk_index_entry->buffer_obj_ = buffer_mgr->Get(std::move(file_worker));
+        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;
 }
@@ -147,7 +147,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
 
 void ChunkIndexEntry::Cleanup() {
     if (buffer_obj_) {
-        buffer_obj_->Cleanup();
+        buffer_obj_->PickForCleanup();
     }
 }
 

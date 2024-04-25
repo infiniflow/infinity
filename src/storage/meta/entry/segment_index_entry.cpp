@@ -83,7 +83,7 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
-        vector_buffer[i] = buffer_mgr->Allocate(std::move(vector_file_worker[i]));
+        vector_buffer[i] = buffer_mgr->AllocateBufferObject(std::move(vector_file_worker[i]));
     };
     auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
     auto begin_ts = txn->BeginTS();
@@ -115,7 +115,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
-        vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
+        vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
     };
     auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
     if (segment_index_entry.get() == nullptr) {
@@ -210,7 +210,7 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
     auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
-        vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
+        vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
     }
     return UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
 }
@@ -659,7 +659,7 @@ void SegmentIndexEntry::Cleanup() {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");
         }
-        buffer_obj->Cleanup();
+        buffer_obj->PickForCleanup();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->Cleanup();

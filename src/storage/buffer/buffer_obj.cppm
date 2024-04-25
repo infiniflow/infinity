@@ -74,7 +74,7 @@ public:
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();
 
-    void Cleanup();
+    void PickForCleanup();
 
     void CleanupFile();
 
@@ -96,8 +96,8 @@ private:
 
 public:
     // interface for unit test
-    BufferStatus status() {
-        std::shared_lock<std::shared_mutex> w_locker(rw_locker_);
+    BufferStatus status() const {
+        std::unique_lock<std::mutex> locker(w_locker_);
         return status_;
     }
     BufferType type() const { return type_; }
@@ -107,7 +107,7 @@ public:
     void CheckState() const;
 
 protected:
-    std::shared_mutex rw_locker_{};
+    mutable std::mutex w_locker_{};
 
     BufferManager *buffer_mgr_;
 
