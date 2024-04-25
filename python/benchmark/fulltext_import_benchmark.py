@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
 
     start_time = time.time()

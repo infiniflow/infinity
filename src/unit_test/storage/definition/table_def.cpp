@@ -50,7 +50,7 @@ TEST_F(TableDefTest, test1) {
         columns.emplace_back(column_def_ptr);
     }
 
-    TableDef table_def(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
+    TableDef table_def(MakeShared<String>("default_db"), MakeShared<String>("t1"), columns);
 
     EXPECT_EQ(*table_def.table_name(), "t1");
     EXPECT_EQ(table_def.column_count(), 2u);
@@ -79,7 +79,7 @@ TEST_F(TableDefTest, ReadWrite) {
         columns.emplace_back(column_def_ptr);
     }
 
-    TableDef table_def(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
+    TableDef table_def(MakeShared<String>("default_db"), MakeShared<String>("t1"), columns);
 
     int32_t exp_size = table_def.GetSizeInBytes();
     Vector<char> buf(exp_size, char(0));

@@ -139,6 +139,11 @@ i64 WalManager::GetLastCkpWalSize() {
     return last_ckp_wal_size_;
 }
 
+i64 WalManager::WalSize() const {
+    std::lock_guard guard(mutex2_);
+    return wal_size_;
+}
+
 // Flush is scheduled regularly. It collects a batch of transactions, sync
 // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
 // ~10s. So it's necessary to sync for a batch of transactions, and to

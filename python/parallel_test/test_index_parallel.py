@@ -13,18 +13,18 @@ from infinity.errors import ErrorCode
 from test_sdkbase import TestSdk
 
 TEST_DATA_DIR = "/test/data/"
-
+kInsertThreadNum = 4
+kRuningTime = 10
 
 class TestIndexParallel(TestSdk):
 
     @pytest.mark.parametrize("file_format", ["csv"])
 
-    @pytest.mark.skip(reason="deadlock caused by compaction")
     def test_fulltext_index_rw_parallel(self, get_infinity_connection_pool, file_format):
 
         def write_worker(connection_pool: ConnectionPool, data, file_path, end_time, thread_id):
             infinity_obj = connection_pool.get_conn()
-            db_obj = infinity_obj.get_database("default")
+            db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_fulltext_index_parallel")
 
             while time.time() < end_time:
@@ -45,7 +45,7 @@ class TestIndexParallel(TestSdk):
 
         def read_worker(connection_pool: ConnectionPool, end_time):
             infinity_obj = connection_pool.get_conn()
-            db_obj = infinity_obj.get_database("default")
+            db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_fulltext_index_parallel")
 
             while time.time() < end_time:
@@ -70,7 +70,7 @@ class TestIndexParallel(TestSdk):
         # create index
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_fulltext_index_parallel", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -84,8 +84,6 @@ class TestIndexParallel(TestSdk):
                                                       [])])
         assert res.error_code == ErrorCode.OK
 
-        kInsertThreadNum = 4
-        kRuningTime = 60
         threads = []
         end_time = time.time()+kRuningTime
         for i in range(kInsertThreadNum):
@@ -116,7 +114,7 @@ class TestIndexParallel(TestSdk):
 
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_vector_index_parallel", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -186,7 +184,7 @@ class TestIndexParallel(TestSdk):
 
         def write_worker(connection_pool: ConnectionPool, file_path, end_time, thread_id):
             infinity_obj = connection_pool.get_conn()
-            db_obj = infinity_obj.get_database("default")
+            db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_vector_index_parallel")
 
             while time.time() < end_time:
@@ -198,7 +196,7 @@ class TestIndexParallel(TestSdk):
 
         def read_worker(connection_pool: ConnectionPool, end_time, knn_column_name, knn_distance_type):
             infinity_obj = connection_pool.get_conn()
-            db_obj = infinity_obj.get_database("default")
+            db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_vector_index_parallel")
 
             while time.time() < end_time:
@@ -215,7 +213,7 @@ class TestIndexParallel(TestSdk):
         # create index
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_vector_index_parallel", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK

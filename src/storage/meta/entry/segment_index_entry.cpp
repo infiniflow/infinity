@@ -606,6 +606,10 @@ void SegmentIndexEntry::CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp co
         txn_id_ = txn_id;
         checkpoint_ts_ = commit_ts;
         this->Commit(commit_ts);
+
+        for (auto &chunk_index_entry : chunk_index_entries_) {
+            chunk_index_entry->Commit(commit_ts);
+        }
     }
 }
 
@@ -849,7 +853,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
     return chunk_index_entry;
 }
 
-nlohmann::json SegmentIndexEntry::Serialize() {
+nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     if (this->deleted_) {
         UnrecoverableError("Segment Column index entry can't be deleted.");
     }
@@ -858,13 +862,16 @@ nlohmann::json SegmentIndexEntry::Serialize() {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         index_entry_json["segment_id"] = this->segment_id_;
+        index_entry_json["commit_ts"] = this->commit_ts_.load();
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
         index_entry_json["next_chunk_id"] = this->next_chunk_id_;
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
 
         for (auto &chunk_index_entry : chunk_index_entries_) {
-            index_entry_json["chunk_index_entries"].push_back(chunk_index_entry->Serialize());
+            if (chunk_index_entry->commit_ts_ <= max_commit_ts) {
+                index_entry_json["chunk_index_entries"].push_back(chunk_index_entry->Serialize());
+            }
         }
         index_entry_json["ft_column_len_sum"] = this->ft_column_len_sum_;
         index_entry_json["ft_column_len_cnt"] = this->ft_column_len_cnt_;
@@ -895,6 +902,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     }
     segment_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_index_entry->max_ts_ = index_entry_json["max_ts"];
+    segment_index_entry->commit_ts_.store(index_entry_json["commit_ts"]);
     segment_index_entry->next_chunk_id_ = index_entry_json["next_chunk_id"];
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
     if (index_entry_json.contains("chunk_index_entries")) {

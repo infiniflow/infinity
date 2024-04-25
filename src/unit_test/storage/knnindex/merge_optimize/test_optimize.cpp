@@ -16,6 +16,8 @@
 
 import compilation_config;
 import stl;
+import logger;
+import third_party;
 import global_resource_usage;
 import storage;
 import infinity_context;
@@ -61,15 +63,17 @@ protected:
     }
 
     void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
+            time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
+                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
                 break;
             }
             // wait for at most 10s
-            time_t end = time(nullptr);
             if (end - start > 10) {
                 UnrecoverableException("WaitCleanup timeout");
             }
@@ -87,7 +91,7 @@ TEST_F(OptimizeKnnTest, test1) {
     Catalog *catalog = storage->catalog();
     TxnManager *txn_mgr = storage->txn_manager();
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -200,7 +204,7 @@ TEST_F(OptimizeKnnTest, test1) {
         auto &segment_index_entries = table_index_entry->index_by_segment();
         ASSERT_EQ(segment_index_entries.size(), 1ul);
         auto &segment_index_entry = segment_index_entries.begin()->second;
-        
+
         auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetHnswIndexSnapshot();
         ASSERT_EQ(chunk_index_entries.size(), 1ul);
         auto &chunk_index_entry = chunk_index_entries[0];

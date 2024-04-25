@@ -12,7 +12,7 @@ class TestSelect(HttpTest):
         return
 
     def test_http_select(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -72,7 +72,7 @@ class TestSelect(HttpTest):
 
     # PASS
     def test_http_select_aggregate(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -103,7 +103,7 @@ class TestSelect(HttpTest):
         return
 
     def test_http_select_varchar(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select_varchar"
         self.show_database(db_name)
         self.create_table(db_name, table_name, {
@@ -136,7 +136,7 @@ class TestSelect(HttpTest):
         return
 
     def test_http_select_big(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select_big"
         self.show_database(db_name)
         self.create_table(db_name, table_name, {
@@ -159,7 +159,7 @@ class TestSelect(HttpTest):
 
     def test_http_select_embedding_int32(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select_embedding_int32"
         filename = "embedding_int_dim3.csv"
         self.show_database(db_name)
@@ -196,7 +196,7 @@ class TestSelect(HttpTest):
 
     def test_http_select_embedding_float(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select_embedding_int32"
         filename = "embedding_float_dim4.csv"
         self.show_database(db_name)
@@ -238,7 +238,7 @@ class TestSelect(HttpTest):
 
     def test_http_select_big_embedding(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select_embedding_int32"
         filename = "embedding_int_dim3.csv"
         self.show_database(db_name)
@@ -274,7 +274,7 @@ class TestSelect(HttpTest):
         return
 
     def test_http_select_same_output(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_select_same_output"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -313,7 +313,7 @@ class TestSelect(HttpTest):
         return
 
     def test_http_empty_table(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_empty_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -341,7 +341,7 @@ class TestSelect(HttpTest):
             "c1 < 0.1 and c1 > 1.0",
             "c1 = 0",
         ]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_valid_filter_expression"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -375,19 +375,19 @@ class TestSelect(HttpTest):
         "c3 > 0",
     ])
     def test_http_invalid_filter_expression(self, invalid_filter_list):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_valid_filter_expression"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, {
-            "c1": {
-                "type": "integer",
-            },
-            "c2": {
-                "type": "float",
+                "c1": {
+                    "type": "integer",
+                },
+                "c2": {
+                    "type": "float",
+                }
             }
-        }
-                          )
+        )
         self.insert(db_name, table_name, [{"c1": 1, "c2": 2.0},
                                           {"c1": 10, "c2": 2.0},
                                           {"c1": 100, "c2": 2.0},

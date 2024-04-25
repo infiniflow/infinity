@@ -128,6 +128,7 @@ nlohmann::json ChunkIndexEntry::Serialize() {
     index_entry_json["base_name"] = this->base_name_;
     index_entry_json["base_rowid"] = this->base_rowid_.ToUint64();
     index_entry_json["row_count"] = this->row_count_;
+    index_entry_json["commit_ts"] = this->commit_ts_.load();
     return index_entry_json;
 }
 
@@ -139,7 +140,9 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
     String base_name = index_entry_json["base_name"];
     RowID base_rowid = RowID::FromUint64(index_entry_json["base_rowid"]);
     u32 row_count = index_entry_json["row_count"];
-    return NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
+    auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
+    ret->commit_ts_.store(index_entry_json["commit_ts"]);
+    return ret;
 }
 
 void ChunkIndexEntry::Cleanup() {

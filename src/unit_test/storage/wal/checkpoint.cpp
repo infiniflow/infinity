@@ -66,15 +66,17 @@ protected:
     void TearDown() override { RemoveDbDirs(); }
 
     void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        LOG_INFO("Waiting flush delta op");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
+            time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
+                LOG_INFO(fmt::format("Flush delta op finished after {}", end - start));
                 break;
             }
             // wait for at most 10s
-            time_t end = time(nullptr);
             if (end - start > 10) {
                 UnrecoverableException("WaitFlushDeltaOp timeout");
             }
@@ -82,15 +84,17 @@ protected:
     }
 
     void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
+            time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
+                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
                 break;
             }
             // wait for at most 10s
-            time_t end = time(nullptr);
             if (end - start > 10) {
                 UnrecoverableException("WaitCleanup timeout");
             }
@@ -106,7 +110,7 @@ protected:
         for (SizeT segment_size : segment_sizes) {
             auto *txn = txn_mgr->BeginTxn();
 
-            auto [table_entry, status] = txn->GetTableByName("default", table_name);
+            auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
@@ -138,7 +142,7 @@ protected:
 };
 
 TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("test_cleanup_and_checkpoint");
     auto column_name = MakeShared<String>("col1");
 
@@ -227,7 +231,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
 #endif
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto table_name = std::make_shared<std::string>("test_index_replay_with_full_and_delta_checkpoint1");
     auto column_name = std::make_shared<std::string>("col1");
     auto index_name = std::make_shared<std::string>("idx1");
@@ -337,7 +341,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
 #endif
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto table_name = std::make_shared<std::string>("test_index_replay_with_full_and_delta_checkpoint2");
     auto column_name = std::make_shared<std::string>("col1");
     auto index_name = std::make_shared<std::string>("idx1");

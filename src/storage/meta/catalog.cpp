@@ -415,7 +415,8 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["data_dir"] = *this->data_dir_;
-        json_res["next_txn_id"] = this->next_txn_id_;
+        TransactionID next_txn_id = this->next_txn_id_;
+        json_res["next_txn_id"] = next_txn_id;
         json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
         databases.reserve(this->db_meta_map().size());
         for (auto &db_meta : this->db_meta_map()) {
@@ -433,13 +434,13 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_d
     auto catalog = MakeUnique<Catalog>(data_dir);
     if (create_default_db) {
         // db current dir is same level as catalog
-        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
+        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default_db"));
         SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
         db_meta->db_entry_list().emplace_front(std::move(db_entry));
 
-        catalog->db_meta_map()["default"] = std::move(db_meta);
+        catalog->db_meta_map()["default_db"] = std::move(db_meta);
     }
     return catalog;
 }
@@ -1016,5 +1017,9 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
 Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_catalog_delta_entry_->GetCheckpointState(); }
 
 void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }
+
+SizeT Catalog::GetDeltaLogCount() const {
+    return global_catalog_delta_entry_->OpSize();
+}
 
 } // namespace infinity

@@ -27,12 +27,12 @@ from test_sdkbase import TestSdk
 class TestQuery(TestSdk):
     def test_query(self):
         conn = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
-        db = RemoteDatabase(conn, "default")
+        db = RemoteDatabase(conn, "default_db")
         db.drop_table("my_table", conflict_type=ConflictType.Ignore)
         db.create_table(
             "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
 
-        table = RemoteTable(conn, "default", "my_table")
+        table = RemoteTable(conn, "default_db", "my_table")
         res = table.insert(
             [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
         assert res.error_code == ErrorCode.OK
@@ -72,7 +72,7 @@ class TestQuery(TestSdk):
     def test_query_builder(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_query_builder",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table(

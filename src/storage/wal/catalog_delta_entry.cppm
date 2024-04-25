@@ -655,7 +655,7 @@ public:
 
     Tuple<TxnTimeStamp, i64> GetCheckpointState() const { return {max_commit_ts_, wal_size_}; }
 
-    SizeT OpSize() const { return delta_ops_.size(); }
+    SizeT OpSize() const;
 
 private:
     void AddDeltaEntryInner(CatalogDeltaEntry *delta_entry);
@@ -664,7 +664,7 @@ private:
 
 private:
     u64 last_sequence_{0};
-    std::priority_queue<u64> sequence_heap_;
+    std::priority_queue<u64, Vector<u64>, std::greater<u64>> sequence_heap_;
     Map<u64, UniquePtr<CatalogDeltaEntry>> delta_entry_map_;
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
@@ -673,6 +673,8 @@ private:
     TxnTimeStamp max_commit_ts_{0};
     TxnTimeStamp last_full_ckp_ts_{0};
     i64 wal_size_{};
+
+    mutable std::mutex catalog_delta_locker_{};
 };
 
 } // namespace infinity

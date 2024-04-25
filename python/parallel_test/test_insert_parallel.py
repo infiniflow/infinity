@@ -15,7 +15,7 @@ class TestInsertParallel:
         insert_thread_count = 8
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("parallel_insert_test", {
@@ -45,7 +45,7 @@ class TestInsertParallel:
         print(f"test_insert_parallel: cost {time.time() - start_ts} s")
 
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("parallel_insert_test")
 
         res = table_obj.output(['*']).to_df()
@@ -60,7 +60,7 @@ class TestInsertParallel:
         total_row_count = 500 * 40
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("parallel_insert_test", {
@@ -76,7 +76,7 @@ class TestInsertParallel:
         table_obj.create_index("text_index", [index.IndexInfo("text",
                                                               index.IndexType.FullText, [])])
 
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("parallel_insert_test")
 
         start_ts = time.time()
@@ -110,7 +110,7 @@ class TestInsertParallel:
         count_star_thread_count = 4
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("parallel_insert_test", {
@@ -142,7 +142,7 @@ class TestInsertParallel:
             threads[i].join()
 
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("parallel_insert_test")
 
         res = table_obj.output(['*']).to_df()
@@ -155,7 +155,7 @@ class TestInsertParallel:
 
 def insert_thread(connection_pool: ConnectionPool, count_num, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     table_obj = db_obj.get_table("parallel_insert_test")
 
     value = []
@@ -176,7 +176,7 @@ def insert_thread(connection_pool: ConnectionPool, count_num, thread_id):
 
 def count_star_thread(connection_pool: ConnectionPool, loop_count, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     table_obj = db_obj.get_table("parallel_insert_test")
 
     for i in range(loop_count):

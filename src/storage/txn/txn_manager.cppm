@@ -79,6 +79,10 @@ public:
 
     void RollBackTxn(Txn *txn);
 
+    SizeT ActiveTxnCount();
+
+    TxnTimeStamp CurrentTS() const;
+
 private:
     void AddWaitFlushTxn(const Vector<TransactionID> &txn_ids);
 
@@ -92,9 +96,6 @@ public:
     u64 NextSequence() { return ++sequence_; }
 
 private:
-    TransactionID GetNewTxnID();
-
-private:
     Catalog *catalog_{};
     std::shared_mutex rw_locker_{};
     BufferManager *buffer_mgr_{};
@@ -102,7 +103,6 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    TransactionID start_txn_id_{};
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     //    std::mutex mutex_;
     Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts

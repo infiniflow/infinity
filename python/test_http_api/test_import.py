@@ -14,7 +14,7 @@ class TestImport(HttpTest):
         httputils.check_data(TEST_TMP_DIR)
 
         file_name = "csv/embedding_int_dim3.csv"
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import"
 
         self.show_database(db_name)
@@ -70,7 +70,7 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_different_file_format_data(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_different_file_format_data"
 
         self.show_database(db_name)
@@ -123,7 +123,7 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_empty_file_fvecs(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_different_file_format_data"
 
         self.show_database(db_name)
@@ -149,7 +149,7 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_empty_file_csv(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_different_file_format_data"
 
         self.show_database(db_name)
@@ -176,7 +176,7 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_empty_file_jsonl(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_different_file_format_data"
 
         self.show_database(db_name)
@@ -202,7 +202,7 @@ class TestImport(HttpTest):
 
     def test_http_import_empty_file_json(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_different_file_format_data"
 
         self.show_database(db_name)
@@ -230,7 +230,7 @@ class TestImport(HttpTest):
     def test_http_import_format_unrecognized_data(self):
         httputils.check_data(TEST_TMP_DIR)
         file_format = ["txt"]
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_format_unrecognized_data"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -261,7 +261,7 @@ class TestImport(HttpTest):
     def test_http_csv_with_different_delimiter(self):
         httputils.check_data(TEST_TMP_DIR)
 
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_csv_with_different_delimiter"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -285,7 +285,7 @@ class TestImport(HttpTest):
     # PASS
     def test_http_csv_with_different_delimiter_more_than_one_character(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_csv_with_different_delimiter_more_than_one_character"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -309,7 +309,7 @@ class TestImport(HttpTest):
     def test_http_import_csv_with_headers(self):
         httputils.check_data(TEST_TMP_DIR)
         file_name = "csv/embedding_int_dim3.csv"
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import"
 
         self.show_database(db_name)
@@ -346,7 +346,7 @@ class TestImport(HttpTest):
         file_name = "http_test.fvecs"
         httputils.generate_fvecs(100, 128, file_name)
         httputils.copy_data(file_name)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_fvecs_table_with_more_columns"
 
         self.show_database(db_name)
@@ -389,7 +389,7 @@ class TestImport(HttpTest):
                                   }]
         file_name = "embedding_int_dim3.csv"
         httputils.copy_data(file_name)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_embedding_with_not_match_definition"
 
         self.show_database(db_name)
@@ -422,7 +422,7 @@ class TestImport(HttpTest):
         httputils.check_data(TEST_TMP_DIR)
         file_name = "embedding_int_dim3.csv"
         httputils.copy_data(file_name)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_embedding_with_dimension_unmatch"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -451,7 +451,7 @@ class TestImport(HttpTest):
                   }, {"type": "vector", "dimension": 128, "element_type": "varchar", }]
         file_name = "embedding_int_dim3.csv"
         httputils.copy_data(file_name)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_embedding_with_unmatched_elem_type"
 
         self.show_database(db_name)
@@ -484,7 +484,7 @@ class TestImport(HttpTest):
         httputils.check_data(TEST_TMP_DIR)
         file_name = "pysdk_test_varchar.csv"
         httputils.copy_data(file_name)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_varchar_with_not_match_definition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -507,7 +507,7 @@ class TestImport(HttpTest):
         httputils.check_data(TEST_TMP_DIR)
         httputils.generate_big_int_csv(10000, "pysdk_test_big_int.csv")
         httputils.copy_data("pysdk_test_big_int.csv")
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_10000_columns"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -530,7 +530,7 @@ class TestImport(HttpTest):
     def test_http_table_with_not_matched_columns(self):
         httputils.check_data(TEST_TMP_DIR)
         httputils.copy_data("pysdk_test_commas.csv")
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_table_with_not_matched_columns"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -556,7 +556,7 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_with_different_size(self):
         httputils.check_data(TEST_TMP_DIR)
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_with_different_size"
         filename = "pysdk_test_import_with_different_size.csv"
         self.show_database(db_name)
@@ -579,12 +579,12 @@ class TestImport(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    @pytest.mark.skip(reason="cost too much time")
+    #@pytest.mark.skip(reason="cost too much time")
     def test_http_import_exceeding_rows(self):
         httputils.check_data(TEST_TMP_DIR)
         httputils.generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")
         httputils.copy_data("pysdk_test_big_varchar_rows.csv")
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_exceeding_rows"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -607,7 +607,7 @@ class TestImport(HttpTest):
         httputils.check_data(TEST_TMP_DIR)
         httputils.generate_big_columns_csv(1024, "pysdk_test_big_columns.csv")
         httputils.copy_data("pysdk_test_big_columns.csv")
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_import_exceeding_rows"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)

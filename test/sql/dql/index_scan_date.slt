@@ -36,7 +36,7 @@ EXPLAIN SELECT * FROM date_index_scan WHERE d1 >= DATE '1970-1-1';
   - table index: #4
   - expressions: [i (#0), d1 (#1), d2 (#2)]
  -> INDEX SCAN (6)
-    - table name: date_index_scan(default.date_index_scan)
+    - table name: date_index_scan(default_db.date_index_scan)
     - table index: #1
     - filter: d1 (#1.1) >= 1970-01-01
     - output_columns: [__rowid]
