@@ -452,7 +452,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     UniquePtr<BlockEntry> block_entry = std::move(parser_context->block_entry_);
 
     // if column count is larger than columns defined from schema, extra columns are abandoned
-    if (column_count != table_entry->ColumnCount()) {
+    if (column_count > table_entry->ColumnCount()) {
         UniquePtr<String> err_msg = MakeUnique<String>(
             fmt::format("CSV file row count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.",
                         parser_context->row_count_,
@@ -467,17 +467,28 @@ void PhysicalImport::CSVRowHandler(void *context) {
         ZsvCell cell = parser_context->parser_.GetCell(column_idx);
         std::string_view str_view{};
         auto column_def = table_entry->GetColumnDefByID(column_idx);
-        auto &column_vector = parser_context->column_vectors_[column_idx];
         if (cell.len) {
             str_view = std::string_view((char *)cell.str, cell.len);
+            auto &column_vector = parser_context->column_vectors_[column_idx];
             column_vector.AppendByStringView(str_view, parser_context->delimiter_);
         } else {
             if (column_def->has_default_value()) {
                 auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
+                auto &column_vector = parser_context->column_vectors_[column_idx];
                 column_vector.AppendByConstantExpr(const_expr);
             } else {
                 RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_)));
             }
+        }
+    }
+    for (SizeT column_idx = column_count; column_idx < table_entry->ColumnCount(); ++column_idx) {
+        auto column_def = table_entry->GetColumnDefByID(column_idx);
+        auto &column_vector = parser_context->column_vectors_[column_idx];
+        if (column_def->has_default_value()) {
+            auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
+            column_vector.AppendByConstantExpr(const_expr);
+        } else {
+            RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_)));
         }
     }
     block_entry->IncreaseRowCount(1);
