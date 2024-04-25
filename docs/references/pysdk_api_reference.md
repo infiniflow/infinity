@@ -209,7 +209,7 @@ emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 ### Examples
 
 ```python
-table = db_obj.create_table("table_example", {
+db_obj.create_table("table_example", {
             "c1": {
                 "type": "int",
                 "constraints": ["primary key",],

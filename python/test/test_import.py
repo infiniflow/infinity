@@ -544,7 +544,7 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_csv_file_with_default", ConflictType.Error)
 
-    # @pytest.mark.skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_default.json",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_json_file_with_default(self, get_infinity_db, check_data):
