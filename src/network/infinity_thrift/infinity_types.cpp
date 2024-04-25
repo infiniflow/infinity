@@ -7139,6 +7139,10 @@ void ShowIndexResponse::__set_store_dir(const std::string& val) {
   this->store_dir = val;
 }
 
+void ShowIndexResponse::__set_store_size(const std::string& val) {
+  this->store_size = val;
+}
+
 void ShowIndexResponse::__set_segment_index_count(const std::string& val) {
   this->segment_index_count = val;
 }
@@ -7252,6 +7256,14 @@ uint32_t ShowIndexResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 11:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->store_size);
+          this->__isset.store_size = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 12:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->segment_index_count);
           this->__isset.segment_index_count = true;
         } else {
@@ -7315,7 +7327,11 @@ uint32_t ShowIndexResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
   xfer += oprot->writeString(this->store_dir);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("segment_index_count", ::apache::thrift::protocol::T_STRING, 11);
+  xfer += oprot->writeFieldBegin("store_size", ::apache::thrift::protocol::T_STRING, 11);
+  xfer += oprot->writeString(this->store_size);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("segment_index_count", ::apache::thrift::protocol::T_STRING, 12);
   xfer += oprot->writeString(this->segment_index_count);
   xfer += oprot->writeFieldEnd();
 
@@ -7336,6 +7352,7 @@ void swap(ShowIndexResponse &a, ShowIndexResponse &b) {
   swap(a.index_column_ids, b.index_column_ids);
   swap(a.other_parameters, b.other_parameters);
   swap(a.store_dir, b.store_dir);
+  swap(a.store_size, b.store_size);
   swap(a.segment_index_count, b.segment_index_count);
   swap(a.__isset, b.__isset);
 }
@@ -7351,6 +7368,7 @@ ShowIndexResponse::ShowIndexResponse(const ShowIndexResponse& other239) {
   index_column_ids = other239.index_column_ids;
   other_parameters = other239.other_parameters;
   store_dir = other239.store_dir;
+  store_size = other239.store_size;
   segment_index_count = other239.segment_index_count;
   __isset = other239.__isset;
 }
@@ -7365,6 +7383,7 @@ ShowIndexResponse& ShowIndexResponse::operator=(const ShowIndexResponse& other24
   index_column_ids = other240.index_column_ids;
   other_parameters = other240.other_parameters;
   store_dir = other240.store_dir;
+  store_size = other240.store_size;
   segment_index_count = other240.segment_index_count;
   __isset = other240.__isset;
   return *this;
@@ -7382,6 +7401,7 @@ void ShowIndexResponse::printTo(std::ostream& out) const {
   out << ", " << "index_column_ids=" << to_string(index_column_ids);
   out << ", " << "other_parameters=" << to_string(other_parameters);
   out << ", " << "store_dir=" << to_string(store_dir);
+  out << ", " << "store_size=" << to_string(store_size);
   out << ", " << "segment_index_count=" << to_string(segment_index_count);
   out << ")";
 }
