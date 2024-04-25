@@ -605,8 +605,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 }
 
 void PhysicalImport::SaveSegmentData(TableEntry *table_entry, Txn *txn, SharedPtr<SegmentEntry> segment_entry) {
-    TxnTimeStamp flush_ts = txn->BeginTS();
-    segment_entry->FlushNewData(flush_ts);
+    segment_entry->FlushNewData();
 
     const String &db_name = *table_entry->GetDBName();
     const String &table_name = *table_entry->GetTableName();

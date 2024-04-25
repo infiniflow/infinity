@@ -93,7 +93,7 @@ public:
 
     void RollbackCompact();
 
-    void FlushNewData(TxnTimeStamp flush_ts);
+    void FlushNewData();
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
@@ -163,6 +163,8 @@ public:
     u64 AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
+
+    void CommitFlushed(TxnTimeStamp commit_ts);
 
     void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts);
 

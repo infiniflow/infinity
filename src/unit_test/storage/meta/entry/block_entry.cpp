@@ -21,25 +21,112 @@ import infinity_exception;
 import stl;
 import global_resource_usage;
 import third_party;
-import logger;
-import value;
-import default_values;
-import block_entry;
+import infinity_context;
 import block_version;
+import file_system;
+import local_file_system;
+import file_system_type;
+import buffer_manager;
+import version_file_worker;
 
-class BlockVersionTest : public BaseTest {};
+using namespace infinity;
+
+class BlockVersionTest : public BaseTest {
+protected:
+    void SetUp() override { InfinityContext::instance().Init(nullptr); }
+
+    void TearDown() override { InfinityContext::instance().UnInit(); }
+};
 
 TEST_F(BlockVersionTest, SaveAndLoad) {
-    using namespace infinity;
     BlockVersion block_version(8192);
     block_version.created_.emplace_back(10, 3);
     block_version.created_.emplace_back(20, 6);
     block_version.deleted_[2] = 30;
     block_version.deleted_[5] = 40;
     String version_path = String(GetTmpDir()) + "/block_version_test";
-    block_version.SaveToFile(version_path);
+    LocalFileSystem fs;
 
-    BlockVersion block_verson2(8192);
-    block_verson2.LoadFromFile(version_path);
-    ASSERT_EQ(block_version, block_verson2);
+    {
+        auto file_handler = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+        block_version.SpillToFile(*file_handler);
+    }
+
+    {
+        auto file_handler = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto block_version2 = BlockVersion::LoadFromFile(*file_handler);
+        ASSERT_EQ(block_version, *block_version2);
+    }
+}
+
+TEST_F(BlockVersionTest, SaveAndLoad2) {
+    auto data_dir = MakeShared<String>(String(GetTmpDir()) + "/block_version_test");
+    auto temp_dir = MakeShared<String>(String(GetTmpDir()) + "/temp/block_version_test");
+    auto block_dir = MakeShared<String>(*data_dir + "/block");
+    auto version_file_name = MakeShared<String>("block_version_test");
+
+    {
+        BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
+
+        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
+
+        {
+            auto block_version_handle = buffer_obj->Load();
+            auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
+
+            block_version->created_.emplace_back(10, 3);
+            block_version->created_.emplace_back(20, 6);
+            block_version->deleted_[2] = 30;
+            block_version->deleted_[5] = 40;
+        }
+        {
+            auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
+            file_worker->SetCheckpointTS(15);
+            buffer_obj->Save();
+        }
+    }
+    {
+        BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
+
+        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
+
+        {
+            BlockVersion block_version1(8192);
+            block_version1.created_.emplace_back(10, 3);
+
+            auto block_version_handle = buffer_obj->Load();
+            {
+                const auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());
+                ASSERT_EQ(block_version1, *block_version);
+            }
+            auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
+            block_version->created_.emplace_back(20, 6);
+            block_version->deleted_[2] = 30;
+            block_version->deleted_[5] = 40;
+        }
+        {
+            auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
+            file_worker->SetCheckpointTS(35);
+            buffer_obj->Save();
+        }
+    }
+    {
+        BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
+
+        auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
+        auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
+
+        {
+            BlockVersion block_version1(8192);
+            block_version1.created_.emplace_back(10, 3);
+            block_version1.created_.emplace_back(20, 6);
+            block_version1.deleted_[2] = 30;
+
+            auto block_version_handle = buffer_obj->Load();
+            const auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());
+            ASSERT_EQ(block_version1, *block_version);
+        }
+    }
 }

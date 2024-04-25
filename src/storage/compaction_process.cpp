@@ -91,8 +91,11 @@ void CompactionProcessor::ScanAndOptimize() {
             table_entry->OptimizeIndex(opt_txn);
         }
     }
-
-    txn_mgr_->CommitTxn(opt_txn);
+    try {
+        txn_mgr_->CommitTxn(opt_txn);
+    } catch (const RecoverableException &e) {
+        txn_mgr_->RollBackTxn(opt_txn);
+    }
 }
 
 void CompactionProcessor::Process() {
