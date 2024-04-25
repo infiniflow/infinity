@@ -134,7 +134,9 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("column_name");
             output_names_->emplace_back("column_type");
             output_names_->emplace_back("constraint");
+            output_names_->emplace_back("default");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -1168,6 +1170,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
         varchar_type,
         varchar_type,
         varchar_type,
