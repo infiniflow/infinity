@@ -1098,7 +1098,7 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 9) {
+        if (row_count != 10) {
             UnrecoverableError("ShowIndex: query result is invalid.");
         }
 
@@ -1144,6 +1144,11 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
 
         {
             Value value = data_block->GetValue(1, 8);
+            response.store_size = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 9);
             response.segment_index_count = value.GetVarchar();
         }
 
