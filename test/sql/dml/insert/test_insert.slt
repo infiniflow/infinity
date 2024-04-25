@@ -1,4 +1,4 @@
-# name: test/sql/dml/insert.slt
+# name: test/sql/dml/insert/test_insert.slt
 # description: Test insert
 # group: [dml, insert]
 

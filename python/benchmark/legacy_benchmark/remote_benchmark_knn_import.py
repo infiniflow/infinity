@@ -26,7 +26,7 @@ def import_sift_1m(path):
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("sift_benchmark")
-    db_obj.create_table("sift_benchmark", {"col1": "vector,128,float"})
+    db_obj.create_table("sift_benchmark", {"col1": {"type": "vector,128,float"}})
     table_obj = db_obj.get_table("sift_benchmark")
     assert table_obj
 
@@ -54,7 +54,7 @@ def import_gist_1m(path):
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("gist_benchmark")
-    db_obj.create_table("gist_benchmark", {"col1": "vector,960,float"})
+    db_obj.create_table("gist_benchmark", {"col1": {"type": "vector,960,float"}})
     table_obj = db_obj.get_table("gist_benchmark")
     assert table_obj
 

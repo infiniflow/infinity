@@ -369,7 +369,7 @@ struct SQL_LTYPE {
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
-%token PRIMARY KEY UNIQUE NULLABLE IS
+%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
@@ -420,7 +420,7 @@ struct SQL_LTYPE {
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
 %type <expr_t>                  match_expr query_expr fusion_expr search_clause
-%type <const_expr_t>            constant_expr interval_expr
+%type <const_expr_t>            constant_expr interval_expr default_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
 %type <expr_array_list_t>       expr_array_list
@@ -661,7 +661,7 @@ table_element : table_column {
 
 
 table_column :
-IDENTIFIER column_type {
+IDENTIFIER column_type default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
         case infinity::LogicalType::kDecimal: {
@@ -685,7 +685,9 @@ IDENTIFIER column_type {
             break;
         }
     }
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr);
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($3);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, std::move(default_expr));
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -696,7 +698,7 @@ IDENTIFIER column_type {
     }
     */
 };
-| IDENTIFIER column_type column_constraints {
+| IDENTIFIER column_type column_constraints default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
         case infinity::LogicalType::kDecimal: {
@@ -715,7 +717,9 @@ IDENTIFIER column_type {
             break;
         }
     }
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr);
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, default_expr);
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -819,6 +823,14 @@ column_constraint : PRIMARY KEY {
 | NOT NULLABLE {
     $$ = infinity::ConstraintType::kNotNull;
 };
+
+default_expr : DEFAULT constant_expr {
+    $$ = $2;
+}
+| /* empty default value */ {
+    $$ = nullptr;
+};
+
 
 table_constraint : PRIMARY KEY '(' identifier_array ')' {
     $$ = new infinity::TableConstraint();
@@ -1829,7 +1841,7 @@ expr : operand
 | conjunction_expr;
 
 operand: '(' expr ')' {
-   $$ = $2;
+    $$ = $2;
 }
 | '(' select_without_paren ')' {
     infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
