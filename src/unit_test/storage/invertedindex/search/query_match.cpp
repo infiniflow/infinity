@@ -36,10 +36,11 @@ import internal_types;
 import search_options;
 import phrase_doc_iterator;
 import global_resource_usage;
+import term_doc_iterator;
 
 using namespace infinity;
 
-class QueryPhraseTest : public BaseTest {
+class QueryMatchTest : public BaseTest {
 protected:
     void SetUp() override {
         BaseTest::SetUp();
@@ -72,7 +73,8 @@ protected:
                     const String& fields,
                     const String& phrase,
                     const u32& expected_doc_freq,
-                    const u64& expected_phrase_freq);
+                    const u64& expected_matched_freq,
+                    const DocIteratorType& query_type);
 
     void InitData();
 
@@ -85,18 +87,17 @@ public:
     const String config_path_ = data_path_ + "/config/test_catalog_delta.toml";
     TxnTimeStamp last_commit_ts_ = 0;
     Vector<Vector<String>> datas_;
-
 };
 
-void QueryPhraseTest::InitData() {
+void QueryMatchTest::InitData() {
     datas_ = {
-        {"1", "Animalia (book)", "Animalia is an illustrated children's book by Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold.   A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket."},
+        {"1", "Animalia (book)", "Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold.   A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket."},
         {"2", "Academy Award for Best Production Design", "harmful chemical The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch."},
-        {"3", "Animation", "The American Football Conference (AFC) harm chemical add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots."},
+        {"3", "Animation", "The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots."},
     };
 }
 
-TEST_F(QueryPhraseTest, basic) {
+TEST_F(QueryMatchTest, basic_phrase) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);
@@ -110,7 +111,28 @@ TEST_F(QueryPhraseTest, basic) {
         auto phrase = phrases[i];
         auto doc_freq = expected_doc_freq[i];
         auto phrase_freq = expected_phrase_freq[i];
-        QueryMatch(db_name_, table_name_, index_name_, fields, phrase, doc_freq, phrase_freq);
+        QueryMatch(db_name_, table_name_, index_name_, fields, phrase, doc_freq, phrase_freq, DocIteratorType::kPhraseIterator);
+    }
+}
+
+TEST_F(QueryMatchTest, basic_term) {
+    CreateDBAndTable(db_name_, table_name_);
+    CreateIndex(db_name_, table_name_, index_name_);
+    InsertData(db_name_, table_name_);
+    String fields = "text";
+//    Vector<String> terms = {"harmful", "chemical", "the", "anarchism"};
+//    Vector<u32> expected_doc_freq = {2, 2, 2, 2};
+//    Vector<u64> expected_term_freq = {3, 3, 16, 2};
+    Vector<String> terms = {"the", "harmful", "chemical", "anarchism"};
+    Vector<u32> expected_doc_freq = {2, 2, 2, 2};
+    Vector<u64> expected_term_freq = {16, 3, 3, 2};
+    EXPECT_EQ(terms.size(), expected_doc_freq.size());
+    EXPECT_EQ(terms.size(), expected_term_freq.size());
+    for (SizeT i = 0; i < terms.size(); ++i) {
+        auto term = terms[i];
+        auto doc_freq = expected_doc_freq[i];
+        auto term_freq = expected_term_freq[i];
+        QueryMatch(db_name_, table_name_, index_name_, fields, term, doc_freq, term_freq, DocIteratorType::kTermIterator);
     }
 }
 
@@ -130,6 +152,9 @@ void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_te
         Term last_term;
         last_term.word_offset_ = INVALID_TERM_OFFSET;
         for (const Term &term : temp_output_terms) {
+            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+                assert(term.word_offset_ >= last_term.word_offset_);
+            }
             if (last_term.word_offset_ != term.word_offset_) {
                 if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
                     output_terms.emplace_back(last_term);
@@ -147,10 +172,17 @@ void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_te
         if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
             output_terms.emplace_back(last_term);
         }
+        fmt::print("\n");
+        fmt::print("output terms: ");
+        for (auto& term: output_terms) {
+            fmt::print("{} ", term.text_);
+        }
+        fmt::print("\n");
     }
 }
 
-void QueryPhraseTest::CreateDBAndTable(const String& db_name, const String& table_name) {
+
+void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table_name) {
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
         String col1_name = "id";
@@ -185,7 +217,7 @@ void QueryPhraseTest::CreateDBAndTable(const String& db_name, const String& tabl
 
 }
 
-void QueryPhraseTest::CreateIndex(const String& db_name, const String& table_name, const String& index_name) {
+void QueryMatchTest::CreateIndex(const String& db_name, const String& table_name, const String& index_name) {
     Storage *storage = InfinityContext::instance().storage();
 
     TxnManager *txn_mgr = storage->txn_manager();
@@ -253,7 +285,7 @@ void QueryPhraseTest::CreateIndex(const String& db_name, const String& table_nam
     }
 }
 
-void QueryPhraseTest::InsertData(const String& db_name, const String& table_name) {
+void QueryMatchTest::InsertData(const String& db_name, const String& table_name) {
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
@@ -292,13 +324,14 @@ void QueryPhraseTest::InsertData(const String& db_name, const String& table_name
     last_commit_ts_ = txn_mgr->CommitTxn(txn);
 }
 
-void QueryPhraseTest::QueryMatch(const String& db_name,
-                                 const String& table_name,
-                                 const String& index_name,
-                                 const String& fields,
-                                 const String& phrase,
-                                 const u32& expected_doc_freq,
-                                 const u64& expected_phrase_freq) {
+void QueryMatchTest::QueryMatch(const String& db_name,
+                                const String& table_name,
+                                const String& index_name,
+                                const String& fields,
+                                const String& match_text,
+                                const u32& expected_doc_freq,
+                                const u64& expected_matched_freq,
+                                const DocIteratorType& query_type) {
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
@@ -318,11 +351,8 @@ void QueryPhraseTest::QueryMatch(const String& db_name,
     QueryBuilder query_builder(txn_id, begin_ts, fake_table_ref);
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
 
-    String query_fields = fields;
-    String match_text = phrase;
-
     auto match_expr = MakeShared<MatchExpr>();
-    match_expr->fields_ = query_fields;
+    match_expr->fields_ = fields;
     match_expr->matching_text_ = match_text;
 
     SearchOptions search_ops(match_expr->options_text_);
@@ -347,12 +377,22 @@ void QueryPhraseTest::QueryMatch(const String& db_name,
             query_builder.Score(iter_row_id);
             iter_row_id = doc_iterator->Next();
         } while (iter_row_id != INVALID_ROWID);
-        EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kPhraseIterator);
-        auto phrase_iterator = dynamic_cast<PhraseDocIterator *>(doc_iterator.get());
-        auto res_df = phrase_iterator->GetDF();
-        auto res_phrase_freq = phrase_iterator->GetPhraseFreq();
-        EXPECT_EQ(res_df, expected_doc_freq);
-        EXPECT_EQ(res_phrase_freq, expected_phrase_freq);
+        if (query_type == DocIteratorType::kPhraseIterator) {
+            EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kPhraseIterator);
+            auto phrase_iterator = dynamic_cast<PhraseDocIterator *>(doc_iterator.get());
+            auto res_df = phrase_iterator->GetDF();
+            auto res_phrase_freq = phrase_iterator->GetPhraseFreq();
+            EXPECT_EQ(res_df, expected_doc_freq);
+            EXPECT_EQ(res_phrase_freq, expected_matched_freq);
+        } else {
+            EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kTermIterator);
+            auto term_iterator = dynamic_cast<TermDocIterator *>(doc_iterator.get());
+            auto res_df = term_iterator->GetDF();
+            auto res_term_freq = term_iterator->GetTermFreq();
+            EXPECT_EQ(res_df, expected_doc_freq);
+            EXPECT_EQ(res_term_freq, expected_matched_freq);
+        }
+
     }
     last_commit_ts_ = txn_mgr->CommitTxn(txn);
 }

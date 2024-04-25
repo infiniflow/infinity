@@ -90,10 +90,6 @@ public:
             match_data.doc_payload_ = doc_payload_buffer_[GetDocOffsetInBuffer()];
         }
 
-        pos_t position = 0;
-        while (position != INVALID_POSITION) {
-            SeekPosition(position, position);
-        }
     }
 
 private:
