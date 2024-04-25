@@ -68,7 +68,6 @@ public:
     BufferHandle Load();
 
     // called by BufferMgr in GC process.
-    // return true if is freed.
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
