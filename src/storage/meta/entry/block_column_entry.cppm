@@ -35,7 +35,10 @@ struct TableEntry;
 struct SegmentEntry;
 
 export struct BlockColumnEntry : public BaseEntry {
+public:
     friend struct BlockEntry;
+
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
     static String EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry);
 

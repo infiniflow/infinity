@@ -44,8 +44,21 @@ import table_entry;
 
 namespace infinity {
 
-String TableIndexEntry::EncodeIndex(const String &index_name, TableIndexMeta *table_index_meta) {
-    return fmt::format("{}#{}", table_index_meta->GetTableEntry()->encode(), index_name);
+Vector<std::string_view> TableIndexEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid table index entry encode: {}", encode));
+    }
+    auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String TableIndexEntry::EncodeIndex(const String &index_name, TableIndexMeta *index_meta) {
+    if (index_meta == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", index_meta->GetTableEntry()->encode(), index_name);
 }
 
 TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,

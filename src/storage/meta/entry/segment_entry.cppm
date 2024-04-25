@@ -52,6 +52,8 @@ public:
     friend struct TableEntry;
     friend struct WalSegmentInfo;
 
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
     static String EncodeIndex(const SegmentID segment_id, const TableEntry *table_entry);
 
 public:

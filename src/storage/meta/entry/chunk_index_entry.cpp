@@ -40,6 +40,16 @@ import index_defines;
 
 namespace infinity {
 
+Vector<std::string_view> ChunkIndexEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid chunk index entry encode: {}", encode));
+    }
+    auto decodes = SegmentIndexEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
 String ChunkIndexEntry::EncodeIndex(const ChunkID chunk_id, const SegmentIndexEntry *segment_index_entry) {
     return fmt::format("{}#{}", segment_index_entry->encode(), chunk_id);
 }

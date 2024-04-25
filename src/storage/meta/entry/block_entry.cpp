@@ -40,6 +40,16 @@ import buffer_obj;
 
 namespace infinity {
 
+Vector<std::string_view> BlockEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid block entry encode: {}", encode));
+    }
+    auto decodes = SegmentEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
 String BlockEntry::EncodeIndex(const BlockID block_id, const SegmentEntry *segment_entry) {
     return fmt::format("{}#{}", segment_entry->encode(), block_id);
 }

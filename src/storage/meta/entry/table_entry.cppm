@@ -47,6 +47,7 @@ import column_index_reader;
 namespace infinity {
 
 class IndexBase;
+struct DBEntry;
 struct TableIndexEntry;
 class TableMeta;
 class Txn;
@@ -55,6 +56,9 @@ class AddTableEntryOp;
 
 export struct TableEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
+
+public:
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
     static String EncodeIndex(const String &table_name, TableMeta *table_meta);
 

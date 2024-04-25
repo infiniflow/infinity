@@ -57,6 +57,16 @@ import constant_expr;
 
 namespace infinity {
 
+Vector<std::string_view> TableEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid table entry encode: {}", encode));
+    }
+    auto decodes = DBEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
 String TableEntry::EncodeIndex(const String &table_name, TableMeta *table_meta) {
     if (table_meta == nullptr) {
         return ""; // unit test

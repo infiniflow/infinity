@@ -38,6 +38,16 @@ import data_type;
 
 namespace infinity {
 
+Vector<std::string_view> BlockColumnEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid block column entry encode: {}", encode));
+    }
+    auto decodes = BlockEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
 String BlockColumnEntry::EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry) {
     return fmt::format("{}#{}", block_entry->encode(), column_id);
 }

@@ -38,6 +38,13 @@ import cleanup_scanner;
 
 namespace infinity {
 
+Vector<std::string_view> DBEntry::DecodeIndex(std::string_view encode) {
+    if (encode.empty() || encode[0] != '#') {
+        UnrecoverableError(fmt::format("Invalid db entry encode: {}", encode));
+    }
+    return {encode.substr(1)};
+}
+
 String DBEntry::EncodeIndex(const String &db_name) { return fmt::format("#{}", db_name); }
 
 DBEntry::DBEntry(DBMeta *db_meta,

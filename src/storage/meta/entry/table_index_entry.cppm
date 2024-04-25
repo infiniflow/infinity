@@ -49,7 +49,10 @@ class AddTableIndexEntryOp;
 export struct TableIndexEntry : public BaseEntry, public EntryInterface {
     friend struct TableEntry;
 
-    static String EncodeIndex(const String &index_name, TableIndexMeta *table_index_meta);
+public:
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const String &index_name, TableIndexMeta *index_meta);
 
 public:
     using EntryOp = AddTableIndexEntryOp;

@@ -46,6 +46,16 @@ import wal_entry;
 
 namespace infinity {
 
+Vector<std::string_view> SegmentEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid segment entry encode: {}", encode));
+    }
+    auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
 String SegmentEntry::EncodeIndex(const SegmentID segment_id, const TableEntry *table_entry) {
     if (table_entry == nullptr) {
         return ""; // unit test
