@@ -2,9 +2,9 @@
 #define yyHEADER_H 1
 #define yyIN_HEADER 1
 
-#line 6 "search_lexer.h"
+#line 5 "search_lexer.h"
 
-#line 8 "search_lexer.h"
+#line 7 "search_lexer.h"
 
 #define  YY_INT_ALIGNED short int
 
@@ -528,9 +528,9 @@ static int yy_flex_strlen ( const char * );
 #undef yyTABLES_NAME
 #endif
 
-#line 84 "search_lexer.l"
+#line 94 "search_lexer.l"
 
 
-#line 535 "search_lexer.h"
+#line 534 "search_lexer.h"
 #undef yyIN_HEADER
 #endif /* yyHEADER_H */

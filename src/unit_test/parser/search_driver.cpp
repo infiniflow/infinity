@@ -17,6 +17,9 @@
 import stl;
 import search_driver;
 import query_node;
+import term;
+import analyzer;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -98,4 +101,63 @@ _exists_:"author" AND page_count:zzz^1.3 AND (name:star^0.1 OR name:duna^1.2)^1.
     IStringStream iss(row_quires);
     int rc = ParseStream(driver, iss);
     EXPECT_EQ(rc, 0);
+}
+
+TEST_F(SearchDriverTest, good_test2) {
+    using namespace infinity;
+
+    std::string row_quires = R"##(
+#basic_filter with implicit field
+芯片
+
+#basic_filter with explicit field
+name:芯片
+
+#basic_filter_boost with implicit field
+芯片^1.2
+
+#basic_filter_boost with explicit field
+name:芯片^1.2
+
+#term
+NOT name:microsoft^1.2
+-name:芯片^1.2
+!name:微软^1.2
+(name:星空 OR name:邓肯)
+(邓肯 上帝)
+(邓肯 上帝)^1.3
+!(邓肯 上帝)^1.3
+
+#clause
+foo AND name:邓肯^1.2
+foo +bar
+邓肯^2 AND foo
+邓肯 AND foo
+(邓肯 上帝) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#query
+邓肯 上帝
+邓肯 OR 上帝
+name:星空 OR name:邓肯
+_exists_:"author" AND page_count:yyy AND (name:星空 OR name:邓肯)
+_exists_:"author" AND page_count:zzz^1.3 AND (name:星空^0.1 OR name:邓肯^1.2)^1.2
+
+#test
+(邓肯^1.2 AND NOT name:上帝^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
+(邓肯^1.2 AND NOT (name:上帝^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
+(邓肯^1.2 AND (NOT name:上帝^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+    )##";
+
+    Map<String, String> column2analyzer;
+    column2analyzer["body"] = "chinese";
+    String default_field("body");
+    SearchDriver driver(column2analyzer, default_field);
+    IStringStream iss(row_quires);
+    try {
+        int rc = ParseStream(driver, iss);
+        EXPECT_EQ(rc, 0);
+    } catch (RecoverableException &e) {
+        std::cerr << long(e.ErrorCode()) << " " << e.what() << std::endl;
+    }
 }

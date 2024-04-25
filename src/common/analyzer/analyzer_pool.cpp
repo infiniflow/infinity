@@ -40,7 +40,14 @@ UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
         case Str2Int(CHINESE.data()): {
             Analyzer *prototype = cache_[CHINESE].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->resource_dict_path();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->resource_dict_path();
+                }
                 UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
                 if (!analyzer->Load()) {
                     return nullptr;

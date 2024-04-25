@@ -43,7 +43,7 @@ def main():
     print(res)
 
 
-def test():
+def test_english():
     try:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db = infinity_obj.get_database("default_db")
@@ -105,6 +105,64 @@ def test():
     # print(qb_result)
 
 
+def test_chinese():
+    """
+    Checkout https://github.com/infiniflow/resource.git under /var/infinity. The jieba dict is
+    /var/infinity/resource/jieba/dict/jieba.dict.utf8
+    """
+    try:
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj.create_database("default_db", ConflictType.Ignore)
+        db = infinity_obj.get_database("default_db")
+        # Drop my_table if it already exists
+        db.drop_table("my_table", ConflictType.Ignore)
+        # Create a table named "my_table"
+        table = db.create_table(
+            "my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+        table.insert(
+            [{"num": 1, "body": "据Wccftech报道，苹果正在开发一种定制芯片，旨在为人工智能（AI）服务器提供动力。暂时还不清楚这款芯片的具体规格，以及具体的实现目标。传闻苹果已选择台积电（TSMC）的3nm制程节点来制造这款芯片，预计2025年下半年量产。如果按照量产时间和台积电的半导体工艺进度，那么对应的很可能是N3E工艺。", "vec": [1.0, 1.2, 0.8, 0.9]}])
+        table.insert(
+            [{"num": 2, "body": "两个月前有报道称，苹果已正式放弃了努力超过十年、投下海量资金的“泰坦计划（Project Titan）”电动车项目。苹果随后解散了大约2000人的开发团队，各人会被分配到其他地方，其中一个很重要的去处就是人工智能部门。有传言称，苹果已经将注意力转向生成式AI，希望能够为业务找到新的增长动力。", "vec": [4.0, 4.2, 4.3, 4.5]}])
+
+        # `create_index()` is required before match() or fusion()
+        res = table.create_index("my_index",
+                                 [index.IndexInfo("body",
+                                                  index.IndexType.FullText,
+                                                  [index.InitParameter("ANALYZER", "chinese")]),
+                                  ], ConflictType.Error)
+        # assert res.success
+
+        res = table.output(["num", "body"]).knn(
+            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+
+        pds_df = pds.DataFrame(res)
+        json_data = pds_df.to_json()
+        print("------json-------")
+        print(json_data)
+
+        table_obj = db.get_table("my_table")
+        qb_result = table_obj.output(["num", "body"]).knn(
+            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).to_pl()
+        print("------tabular -------")
+        print("------knn-------")
+        print(qb_result)
+
+        qb_result1 = table_obj.match(
+            "body", "芯片", "topn=1").output(["num", "body"]).to_pl()
+        print("------match-------")
+        print(qb_result1)
+
+        qb_result2 = table_obj.output(["num", "body"]).knn(
+            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match(
+            "body", "芯片", "topn=1").fusion('rrf').to_pl()
+        print("------knn+match-------")
+        print(qb_result2)
+
+    except Exception as e:
+        print(str(e))
+
+
 if __name__ == '__main__':
     main()
-    test()
+    test_english()
+    test_chinese()

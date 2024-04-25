@@ -120,9 +120,6 @@ TEST_F(QueryMatchTest, basic_term) {
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);
     String fields = "text";
-//    Vector<String> terms = {"harmful", "chemical", "the", "anarchism"};
-//    Vector<u32> expected_doc_freq = {2, 2, 2, 2};
-//    Vector<u64> expected_term_freq = {3, 3, 16, 2};
     Vector<String> terms = {"the", "harmful", "chemical", "anarchism"};
     Vector<u32> expected_doc_freq = {2, 2, 2, 2};
     Vector<u64> expected_term_freq = {16, 3, 3, 2};
@@ -359,7 +356,7 @@ void QueryMatchTest::QueryMatch(const String& db_name,
     const String &default_field = search_ops.options_["default_field"];
 
     SearchDriver driver(column2analyzer, default_field);
-    driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
+    // driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
 
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr->fields_, match_expr->matching_text_);
     if (!query_tree) {

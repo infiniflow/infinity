@@ -53,7 +53,6 @@ import query_node;
 import query_builder;
 import doc_iterator;
 import logger;
-import analyzer_pool;
 import analyzer;
 import term;
 import early_terminate_iterator;
@@ -102,7 +101,6 @@ public:
     }
 
     // DocIterator
-
     void DoSeek(RowID doc_id) override {
         for (RowID next_skip = std::max(doc_id, DocIterator::doc_id_ + 1);;) {
             if (!BlockSkipTo(next_skip, 0)) [[unlikely]] {
@@ -450,7 +448,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
-    driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
@@ -553,8 +550,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         if (et_iter) {
             while (true) {
                 ++blockmax_loop_cnt;
-                auto score_threshold = result_heap.GetScoreThreshold();
-                auto [id, et_score] = et_iter->BlockNextWithThreshold(score_threshold);
+                auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
                 if (id == INVALID_ROWID) [[unlikely]] {
                     break;
                 }
