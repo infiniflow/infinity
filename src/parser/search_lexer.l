@@ -32,6 +32,16 @@ static thread_local std::stringstream string_buffer;
 %option warn
 %option never-interactive
 
+ASC     [\x00-\x7f]
+ASCN    [\x00-\t\v-\x7f]
+U       [\x80-\xbf]
+U2      [\xc2-\xdf]
+U3      [\xe0-\xef]
+U4      [\xf0-\xf4]
+UANY    {ASC}|{U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
+UANYN   {ASCN}|{U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
+UONLY   {U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
+
 %x SINGLE_QUOTED_STRING
 %x DOUBLE_QUOTED_STRING
 
@@ -66,7 +76,7 @@ NOT |
 
 -?[0-9]+("."[0-9]*)? |
 -?"."[0-9]+ |
-[a-zA-Z0-9_]+        { yylval->build<std::string>(yytext); return token::STRING; }
+([a-zA-Z0-9_]|{UONLY})+        { yylval->build<std::string>(yytext); return token::STRING; }  // https://stackoverflow.com/questions/9611682/flexlexer-support-for-unicode
 
 \'                            { BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 <SINGLE_QUOTED_STRING>\'\'    { string_buffer << '\''; }
