@@ -66,3 +66,6 @@ SELECT c1 FROM test_delete_with_hnsw SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float
 6
 4
 4
+
+statement ok
+DROP TABLE test_delete_with_hnsw;

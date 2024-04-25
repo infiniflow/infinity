@@ -78,6 +78,10 @@ def generate(generate_if_exist: bool, copy_dir: str):
             slt_file.write("{}\n".format(row_id))
             slt_file.write("\n")
 
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate mem hnsw data for test")
