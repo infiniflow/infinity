@@ -145,6 +145,8 @@ export enum class ErrorCode : long {
     kDataIOError = 7010,
     kUnexpectedError = 7011,
     kParserError = 7012,
+    kMmapFileError = 7013,
+    kMunmapFileError = 7014,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -275,6 +277,8 @@ public:
     static Status DataIOError(const String &detailed_info);
     static Status UnexpectedError(const String &detailed_info);
     static Status ParserError(const String &detailed_info);
+    static Status MmapFileError(const String &detailed_info);
+    static Status MunmapFileError(const String &detailed_info);
 
     // meta
     static Status InvalidEntry();

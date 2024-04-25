@@ -133,52 +133,6 @@ TEST_F(QueryMatchTest, basic_term) {
     }
 }
 
-void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_terms) {
-    UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
-    // (dynamic_cast<CommonLanguageAnalyzer*>(analyzer.get()))->SetExtractEngStem(false);
-    if (analyzer.get() == nullptr) {
-        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name)));
-    }
-    Term input_term;
-    input_term.text_ = std::move(text);
-    TermList temp_output_terms;
-    analyzer->Analyze(input_term, temp_output_terms);
-    if (analyzer_name == AnalyzerPool::STANDARD) {
-        // remove duplicates and only keep the root words for query
-        const u32 INVALID_TERM_OFFSET = -1;
-        Term last_term;
-        last_term.word_offset_ = INVALID_TERM_OFFSET;
-        for (const Term &term : temp_output_terms) {
-            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                assert(term.word_offset_ >= last_term.word_offset_);
-            }
-            if (last_term.word_offset_ != term.word_offset_) {
-                if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                    output_terms.emplace_back(last_term);
-                }
-                last_term.text_ = term.text_;
-                last_term.word_offset_ = term.word_offset_;
-                last_term.stats_ = term.stats_;
-            } else {
-                if (term.text_.size() < last_term.text_.size()) {
-                    last_term.text_ = term.text_;
-                    last_term.stats_ = term.stats_;
-                }
-            }
-        }
-        if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-            output_terms.emplace_back(last_term);
-        }
-        fmt::print("\n");
-        fmt::print("output terms: ");
-        for (auto& term: output_terms) {
-            fmt::print("{} ", term.text_);
-        }
-        fmt::print("\n");
-    }
-}
-
-
 void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table_name) {
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -354,7 +308,6 @@ void QueryMatchTest::QueryMatch(const String& db_name,
     const String &default_field = search_ops.options_["default_field"];
 
     SearchDriver driver(column2analyzer, default_field);
-    // driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
 
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr->fields_, match_expr->matching_text_);
     if (!query_tree) {

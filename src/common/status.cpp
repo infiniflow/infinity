@@ -454,6 +454,14 @@ Status Status::ParserError(const String &detailed_info) {
     return Status(ErrorCode::kParserError, MakeUnique<String>(fmt::format("Parser error: {}", detailed_info)));
 }
 
+Status Status::MmapFileError(const String &detailed_info) {
+    return Status(ErrorCode::kMmapFileError, MakeUnique<String>(fmt::format("mmap error: {}", detailed_info)));
+}
+
+Status Status::MunmapFileError(const String &detailed_info) {
+    return Status(ErrorCode::kMunmapFileError, MakeUnique<String>(fmt::format("munmap error: {}", detailed_info)));
+}
+
 Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }
