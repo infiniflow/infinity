@@ -52,7 +52,8 @@ void DataFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void DataFileWorker::WriteToFileImpl(bool &prepare_success) {
+// FIXME: to_spill
+void DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     LocalFileSystem fs;
     // File structure:
     // - header: magic number

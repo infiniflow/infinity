@@ -59,7 +59,7 @@ public:
     void FreeInMemory() final;
 
 protected:
-    void WriteToFileImpl(bool &prepare_success) final;
+    void WriteToFileImpl(bool to_spill, bool &prepare_success) final;
 
     void ReadFromFileImpl() final;
 

@@ -39,7 +39,7 @@ public:
     SizeT GetMemoryCost() const override { return buffer_size_; }
 
 protected:
-    void WriteToFileImpl(bool &prepare_success) override;
+    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
     void ReadFromFileImpl() override;
 

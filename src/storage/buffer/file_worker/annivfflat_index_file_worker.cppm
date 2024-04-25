@@ -60,7 +60,7 @@ public:
     void FreeInMemory() override;
 
 protected:
-    void WriteToFileImpl(bool &prepare_success) override;
+    void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
     void ReadFromFileImpl() override;
 
@@ -119,7 +119,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
 }
 
 template <typename DataType>
-void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool &prepare_success) {
+void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     index->SaveIndexInner(*file_handler_);
     prepare_success = true;
