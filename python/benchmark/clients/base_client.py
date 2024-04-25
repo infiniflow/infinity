@@ -6,6 +6,8 @@ import subprocess
 import sys
 import os
 from urllib.parse import urlparse
+import time
+
 class BaseClient:
     """
     Base class for all clients(Qdrant, ES, infinity).
@@ -24,7 +26,7 @@ class BaseClient:
         pass
 
     @abstractmethod
-    def upload(self) :
+    def upload(self):
         """
         Upload data and build indexes (parameters are parsed by __init__).
         """
@@ -60,10 +62,15 @@ class BaseClient:
         """
         pass
 
-    def run_experiment(self):
+    def run_experiment(self, args):
         """
         run experiment and save results.
         """
-        self.upload()
-        results = self.search()
-        self.check_and_save_results(results)
+        if args.import_data:
+            start_time = time.time()
+            self.upload()
+            finish_time = time.time()
+            print(f"upload finish, cost time = {finish_time - start_time}")
+        if args.query:
+            results = self.search()
+            self.check_and_save_results(results)
