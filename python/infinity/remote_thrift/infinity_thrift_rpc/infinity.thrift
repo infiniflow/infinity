@@ -377,7 +377,8 @@ struct ShowIndexResponse {
 8: string index_column_ids,
 9: string other_parameters,
 10: string store_dir,
-11: string segment_index_count,
+11: string store_size,
+12: string segment_index_count,
 }
 
 struct GetDatabaseRequest {

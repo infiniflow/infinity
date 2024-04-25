@@ -3003,7 +3003,7 @@ void swap(ShowIndexRequest &a, ShowIndexRequest &b);
 std::ostream& operator<<(std::ostream& out, const ShowIndexRequest& obj);
 
 typedef struct _ShowIndexResponse__isset {
-  _ShowIndexResponse__isset() : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), index_type(false), index_column_names(false), index_column_ids(false), other_parameters(false), store_dir(false), segment_index_count(false) {}
+  _ShowIndexResponse__isset() : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), index_type(false), index_column_names(false), index_column_ids(false), other_parameters(false), store_dir(false), store_size(false), segment_index_count(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool db_name :1;
@@ -3014,6 +3014,7 @@ typedef struct _ShowIndexResponse__isset {
   bool index_column_ids :1;
   bool other_parameters :1;
   bool store_dir :1;
+  bool store_size :1;
   bool segment_index_count :1;
 } _ShowIndexResponse__isset;
 
@@ -3033,6 +3034,7 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
                       index_column_ids(),
                       other_parameters(),
                       store_dir(),
+                      store_size(),
                       segment_index_count() {
   }
 
@@ -3047,6 +3049,7 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
   std::string index_column_ids;
   std::string other_parameters;
   std::string store_dir;
+  std::string store_size;
   std::string segment_index_count;
 
   _ShowIndexResponse__isset __isset;
@@ -3071,6 +3074,8 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
 
   void __set_store_dir(const std::string& val);
 
+  void __set_store_size(const std::string& val);
+
   void __set_segment_index_count(const std::string& val);
 
   bool operator == (const ShowIndexResponse & rhs) const
@@ -3094,6 +3099,8 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
     if (!(other_parameters == rhs.other_parameters))
       return false;
     if (!(store_dir == rhs.store_dir))
+      return false;
+    if (!(store_size == rhs.store_size))
       return false;
     if (!(segment_index_count == rhs.segment_index_count))
       return false;
