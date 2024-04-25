@@ -43,16 +43,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("fix_tmp_20240116",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("fix_tmp_20240116", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
 
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
@@ -97,16 +97,16 @@ class TestKnn(TestSdk):
             db_obj.drop_table("test_insert_multi_column",
                               conflict_type=ConflictType.Ignore)
             table = db_obj.create_table("test_insert_multi_column", {
-                "variant_id": "varchar",
-                "gender_vector": "vector,4,float",
-                "color_vector": "vector,4,float",
-                "category_vector": "vector,4,float",
-                "tag_vector": "vector,4,float",
-                "other_vector": "vector,4,float",
-                "query_is_recommend": "varchar",
-                "query_gender": "varchar",
-                "query_color": "varchar",
-                "query_price": "float"
+                "variant_id": {"type": "varchar"},
+                "gender_vector": {"type": "vector,4,float"},
+                "color_vector": {"type": "vector,4,float"},
+                "category_vector": {"type": "vector,4,float"},
+                "tag_vector": {"type": "vector,4,float"},
+                "other_vector": {"type": "vector,4,float"},
+                "query_is_recommend": {"type": "varchar"},
+                "query_gender": {"type": "varchar"},
+                "query_color": {"type": "varchar"},
+                "query_price": {"type": "float"}
             }, ConflictType.Error)
             table.insert([{"variant_id": "123",
                            "gender_vector": [1.0] * 4,
@@ -136,16 +136,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_knn_on_vector_column",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_knn_on_vector_column", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -172,16 +172,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_knn_on_non_vector_column",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_knn_on_non_vector_column", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -207,16 +207,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_valid_embedding_data",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_embedding_data", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -246,16 +246,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_invalid_embedding_data",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_embedding_data", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -284,16 +284,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_valid_embedding_data_type",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_embedding_data_type", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -330,16 +330,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_invalid_embedding_data_type",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_embedding_data_type", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -381,16 +381,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_various_distance_type",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_distance_type", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -428,16 +428,16 @@ class TestKnn(TestSdk):
         db_obj.drop_table("test_various_topn",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_topn", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
@@ -473,16 +473,16 @@ class TestKnn(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("pysdk_test_knn.csv")
@@ -534,16 +534,16 @@ class TestKnn(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_index_after", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index_after", {
-            "variant_id": "varchar",
-            "gender_vector": "vector,4,float",
-            "color_vector": "vector,4,float",
-            "category_vector": "vector,4,float",
-            "tag_vector": "vector,4,float",
-            "other_vector": "vector,4,float",
-            "query_is_recommend": "varchar",
-            "query_gender": "varchar",
-            "query_color": "varchar",
-            "query_price": "float"
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
         }, ConflictType.Error)
         if not check_data:
             copy_data("pysdk_test_knn.csv")
@@ -582,11 +582,11 @@ class TestKnn(TestSdk):
         db_obj.drop_table(
             "test_with_fulltext_match_with_valid_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_valid_columns",
-                                        {"doctitle": "varchar",
-                                         "docdate": "varchar",
-                                         "body": "varchar",
-                                         "num": "int",
-                                         "vec": "vector, 4, float"})
+                                        {"doctitle": {"type": "varchar"},
+                                         "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "vec": {"type": "vector, 4, float"}})
         table_obj.create_index("my_index",
                                [index.IndexInfo("body",
                                                 index.IndexType.FullText,
@@ -628,11 +628,11 @@ class TestKnn(TestSdk):
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_columns",
-                                        {"doctitle": "varchar",
-                                         "docdate": "varchar",
-                                         "body": "varchar",
-                                         "num": "int",
-                                         "vec": "vector, 4, float"})
+                                        {"doctitle": {"type": "varchar"},
+                                         "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "vec": {"type": "vector, 4, float"}})
         table_obj.create_index("my_index",
                                [index.IndexInfo("body",
                                                 index.IndexType.FullText,
@@ -671,11 +671,11 @@ class TestKnn(TestSdk):
         db_obj.drop_table(
             "test_with_fulltext_match_with_valid_words", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_valid_words",
-                                        {"doctitle": "varchar",
-                                         "docdate": "varchar",
-                                         "body": "varchar",
-                                         "num": "int",
-                                         "vec": "vector, 4, float"})
+                                        {"doctitle": {"type": "varchar"},
+                                         "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "vec": {"type": "vector, 4, float"}})
         table_obj.create_index("my_index",
                                [index.IndexInfo("body",
                                                 index.IndexType.FullText,
@@ -717,11 +717,11 @@ class TestKnn(TestSdk):
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_words", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_words",
-                                        {"doctitle": "varchar",
-                                         "docdate": "varchar",
-                                         "body": "varchar",
-                                         "num": "int",
-                                         "vec": "vector, 4, float"})
+                                        {"doctitle": {"type": "varchar"},
+                                         "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "vec": {"type": "vector, 4, float"}})
         table_obj.create_index("my_index",
                                [index.IndexInfo("body",
                                                 index.IndexType.FullText,
@@ -762,11 +762,11 @@ class TestKnn(TestSdk):
         db_obj.drop_table(
             "test_with_fulltext_match_with_options", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_options",
-                                        {"doctitle": "varchar",
-                                         "docdate": "varchar",
-                                         "body": "varchar",
-                                         "num": "int",
-                                         "vec": "vector, 4, float"})
+                                        {"doctitle": {"type": "varchar"},
+                                         "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "vec": {"type": "vector, 4, float"}})
         table_obj.create_index("my_index",
                                [index.IndexInfo("body",
                                                 index.IndexType.FullText,
@@ -799,7 +799,7 @@ class TestKnn(TestSdk):
                                                pytest.param(1.1),
                                                pytest.param([]),
                                                pytest.param({}),
-                                               pytest.param(()),])
+                                               pytest.param(()), ])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
@@ -807,11 +807,11 @@ class TestKnn(TestSdk):
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_options",
-                                        {"doctitle": "varchar",
-                                         "docdate": "varchar",
-                                         "body": "varchar",
-                                         "num": "int",
-                                         "vec": "vector, 4, float"})
+                                        {"doctitle": {"type": "varchar"},
+                                         "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "vec": {"type": "vector, 4, float"}})
         table_obj.create_index("my_index",
                                [index.IndexInfo("body",
                                                 index.IndexType.FullText,

@@ -52,6 +52,8 @@ import segment_index_entry;
 import chunk_index_entry;
 import cleanup_scanner;
 import column_index_merger;
+import parsed_expr;
+import constant_expr;
 
 namespace infinity {
 
@@ -884,6 +886,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
                     column_def_json["constraints"].emplace_back(column_constraint);
                 }
 
+                if (column_def->has_default_value()) {
+                    auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
+                    column_def_json["default"] = default_expr->Serialize();
+                }
+
                 json_res["column_definition"].emplace_back(column_def_json);
             }
         }
@@ -945,7 +952,12 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
                 }
             }
 
-            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
+            SharedPtr<ParsedExpr> default_expr = nullptr;
+            if (column_def_json.contains("default")) {
+                default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+            }
+
+            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, default_expr);
             columns.emplace_back(column_def);
         }
         row_count = table_entry_json["row_count"];

@@ -539,7 +539,8 @@ class TestDatabase(TestSdk):
     def test_show_valid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         res = db_obj.show_table(table_name)
         db_obj.drop_table("test_show_table", ConflictType.Error)
@@ -556,7 +557,8 @@ class TestDatabase(TestSdk):
     def test_show_invalid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj.show_table(table_name)
@@ -567,7 +569,8 @@ class TestDatabase(TestSdk):
     def test_show_not_exist_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         with pytest.raises(Exception, match=f"ERROR:3022, Table {table_name} doesn't exist"):
             db_obj.show_table(table_name)
@@ -579,7 +582,8 @@ class TestDatabase(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
-        db_obj.create_table("test_show_table_columns", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table_columns", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         res = db_obj.show_columns(column_name)
         db_obj.drop_table("test_show_table_columns", ConflictType.Error)
@@ -598,9 +602,8 @@ class TestDatabase(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
-        db_obj.create_table("test_show_table_columns", {"c1": "int", "c2": "vector,3,int"})
+        db_obj.create_table("test_show_table_columns", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}})
 
         with pytest.raises(Exception):
             db_obj.show_columns(column_name)
         db_obj.drop_table("test_show_table_columns", ConflictType.Error)
-

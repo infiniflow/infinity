@@ -15,6 +15,8 @@
 #pragma once
 
 // #include "type/data_type.h"
+#include "expr/constant_expr.h"
+#include "expr/parsed_expr.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
 
@@ -75,9 +77,13 @@ public:
 
 class ColumnDef : public TableElement {
 public:
-    ColumnDef(int64_t id, std::shared_ptr<DataType> column_type, std::string column_name, std::unordered_set<ConstraintType> constraints);
+    ColumnDef(int64_t id,
+              std::shared_ptr<DataType> column_type,
+              std::string column_name,
+              std::unordered_set<ConstraintType> constraints,
+              std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
-    ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr);
+    ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr, std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
     inline ~ColumnDef() override = default;
 
@@ -91,11 +97,17 @@ public:
 
     inline const std::shared_ptr<DataType> &type() const { return column_type_; }
 
+    inline bool has_default_value() const {
+        auto const_expr = std::dynamic_pointer_cast<ConstantExpr>(default_expr_);
+        return const_expr != nullptr && const_expr->literal_type_ != LiteralType::kNull;
+    }
+
 public:
     int64_t id_{-1};
     const std::shared_ptr<DataType> column_type_{};
     std::string name_{};
     std::unordered_set<ConstraintType> constraints_{};
+    std::shared_ptr<ParsedExpr> default_expr_{nullptr};
     bool build_bloom_filter_{};
 };
 } // namespace infinity

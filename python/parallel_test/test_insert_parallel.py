@@ -19,14 +19,14 @@ class TestInsertParallel:
         res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("parallel_insert_test", {
-            "id": "int64",
-            "text": "varchar",
-            "c_tiny_int": "int8",
-            "c_small_int": "int16",
-            "c_int": "int32",
-            "c_float": "float32",
-            "c_double": "float64",
-            "c_vector": "vector, 4, float"
+            "id": {"type": "int64"},
+            "text": {"type": "varchar"},
+            "c_tiny_int": {"type": "int8"},
+            "c_small_int": {"type": "int16"},
+            "c_int": {"type": "int32"},
+            "c_float": {"type": "float32"},
+            "c_double": {"type": "float64"},
+            "c_vector": {"type": "vector, 4, float"}
         }, ConflictType.Error)
         table_obj.create_index("text_index", [index.IndexInfo("text",
                                                               index.IndexType.FullText, [])])
@@ -64,14 +64,14 @@ class TestInsertParallel:
         res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("parallel_insert_test", {
-            "id": "int64",
-            "text": "varchar",
-            "c_tiny_int": "int8",
-            "c_small_int": "int16",
-            "c_int": "int32",
-            "c_float": "float32",
-            "c_double": "float64",
-            "c_vector": "vector, 4, float"
+            "id": {"type": "int64"},
+            "text": {"type": "varchar"},
+            "c_tiny_int": {"type": "int8"},
+            "c_small_int": {"type": "int16"},
+            "c_int": {"type": "int32"},
+            "c_float": {"type": "float32"},
+            "c_double": {"type": "float64"},
+            "c_vector": {"type": "vector, 4, float"}
         }, ConflictType.Error)
         table_obj.create_index("text_index", [index.IndexInfo("text",
                                                               index.IndexType.FullText, [])])
@@ -102,7 +102,6 @@ class TestInsertParallel:
 
         connection_pool.release_conn(infinity_obj)
 
-
     def test_insert_and_count_star_parallel(self, get_infinity_connection_pool):
         total_row_count = 500 * 40
         count_star_count = 100
@@ -114,14 +113,14 @@ class TestInsertParallel:
         res = db_obj.drop_table("parallel_insert_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("parallel_insert_test", {
-            "id": "int64",
-            "text": "varchar",
-            "c_tiny_int": "int8",
-            "c_small_int": "int16",
-            "c_int": "int32",
-            "c_float": "float32",
-            "c_double": "float64",
-            "c_vector": "vector, 4, float"
+            "id": {"type": "int64"},
+            "text": {"type": "varchar"},
+            "c_tiny_int": {"type": "int8"},
+            "c_small_int": {"type": "int16"},
+            "c_int": {"type": "int32"},
+            "c_float": {"type": "float32"},
+            "c_double": {"type": "float64"},
+            "c_vector": {"type": "vector, 4, float"}
         }, ConflictType.Error)
         table_obj.create_index("text_index", [index.IndexInfo("text",
                                                               index.IndexType.FullText, [])])
@@ -183,4 +182,3 @@ def count_star_thread(connection_pool: ConnectionPool, loop_count, thread_id):
         table_obj.filter().output(["count(*)"]).to_pl()
 
     connection_pool.release_conn(infinity_obj)
-

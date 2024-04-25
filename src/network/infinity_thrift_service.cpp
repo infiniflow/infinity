@@ -1398,8 +1398,14 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         constraints.insert(type);
     }
 
+    Status status;
+    auto const_expr = SharedPtr<ParsedExpr>(GetConstantFromProto(status, column_def.constant_expr));
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
     const auto &column_def_name = column_def.name;
-    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints);
+    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints, const_expr);
     return {col_def, Status::OK()};
 }
 

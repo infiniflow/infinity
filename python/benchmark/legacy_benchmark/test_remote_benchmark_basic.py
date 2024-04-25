@@ -158,7 +158,7 @@ class TestBenchmark:
         def create_table(infinity_obj, port, process_id, thread_id, num_iteration):
             res = infinity_obj.get_database(f"default_db").create_table(
                 f"table_{port}_{process_id}_{thread_id}_{num_iteration}",
-                {"c1": "int, primary key", "c2": "float"})
+                {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}})
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_table failed: {res.error_msg}")
 

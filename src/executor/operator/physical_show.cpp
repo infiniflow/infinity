@@ -134,7 +134,9 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("column_name");
             output_names_->emplace_back("column_type");
             output_names_->emplace_back("constraint");
+            output_names_->emplace_back("default");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -1160,6 +1162,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "default", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
@@ -1167,6 +1170,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
         varchar_type,
         varchar_type,
         varchar_type,
@@ -1217,6 +1221,15 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             }
 
             Value value = Value::MakeVarchar(column_constraint);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+        }
+
+        ++output_column_idx;
+        {
+            // Append column default value to the fourth column
+            String column_default = column->default_expr_->ToString();
+            Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }

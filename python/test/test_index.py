@@ -33,7 +33,7 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_ivfflat", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("test_index_ivfflat", {
-            "c1": "vector,1024,float"}, ConflictType.Error)
+            "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -54,7 +54,7 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_hnsw", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
-            "test_index_hnsw", {"c1": "vector,1024,float"}, ConflictType.Error)
+            "test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -84,7 +84,9 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_fulltext", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
-            "test_index_fulltext", {"doctitle": "varchar", "docdate": "varchar", "body": "varchar"}, ConflictType.Error)
+            "test_index_fulltext", {
+                "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}
+            }, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -100,7 +102,8 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_fulltext", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    # drop non-existent index
+        # drop non-existent index
+
     def test_drop_non_existent_index(self, get_infinity_db):
         # connect
         db_obj = get_infinity_db
@@ -109,7 +112,7 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_drop_non_existent_index", {
-            "c1": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "vector,3,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         # drop none existent index
@@ -128,7 +131,7 @@ class TestIndex(TestSdk):
             "test_create_created_index", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("test_create_created_index", {
-            "c1": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "vector,3,float"}}, ConflictType.Error)
 
         # create index
         res = table_obj.create_index("my_index",
@@ -165,7 +168,7 @@ class TestIndex(TestSdk):
     ])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
-            1, 2), False), ({"1": 2}, False),
+                                                                                1, 2), False), ({"1": 2}, False),
         ([index.InitParameter("centroids_count", "128"),
           index.InitParameter("metric", "l2")], True)
     ])
@@ -176,7 +179,7 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table(
             "test_create_drop_vector_index_invalid_options", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
-        table_obj = db_obj.create_table("test_create_drop_vector_index_invalid_options", {"c1": types},
+        table_obj = db_obj.create_table("test_create_drop_vector_index_invalid_options", {"c1": {"type": types}},
                                         ConflictType.Error)
 
         index_info = [index.IndexInfo(
@@ -217,7 +220,7 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_create_drop_different_fulltext_index_invalid_options", {
-            "c1": types}, ConflictType.Error)
+            "c1": {"type": types}}, ConflictType.Error)
 
         index_info = [index.IndexInfo(
             column_name[0], index_type[0], params[0])]
@@ -241,7 +244,7 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_create_drop_index_invalid_options", {
-            "c1": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "vector,3,float"}}, ConflictType.Error)
         db_obj.drop_table(
             "test_create_drop_index_invalid_options")
 
@@ -262,7 +265,7 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_create_index_show_index", {
-            "c1": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "vector,3,float"}}, ConflictType.Error)
         # create created index
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c1",
@@ -285,7 +288,7 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_create_index_show_index", {
-            "c1": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "vector,3,float"}}, ConflictType.Error)
         # create created index
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c1",
@@ -322,7 +325,7 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_create_index_on_different_type_of_column", {
-            "c1": types}, ConflictType.Error)
+            "c1": {"type": types}}, ConflictType.Error)
         # create created index
         if not index_type[1]:
             with pytest.raises(Exception, match=index_type[2]):
@@ -352,7 +355,7 @@ class TestIndex(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_insert_data_create_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_data_create_index", {
-            "c1": "vector,1024,float"}, ConflictType.Error)
+            "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         values = [{"c1": [1.1 for _ in range(1024)]}]
         table_obj.insert(values)
 
@@ -380,8 +383,8 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_import_data_create_index", {
-            "c1": "int",
-            "c2": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "int"},
+            "c2": {"type": "vector,3,float"}}, ConflictType.Error)
 
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
                               file_format + "/pysdk_test." + file_format)
@@ -415,8 +418,8 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_create_vector_index_import_data", {
-            "c1": "int",
-            "c2": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "int"},
+            "c2": {"type": "vector,3,float"}}, ConflictType.Error)
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c2",
                                                       index_type,
@@ -441,8 +444,8 @@ class TestIndex(TestSdk):
             "test_create_index_import_data", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("test_create_index_import_data", {
-            "c1": "int",
-            "c2": "vector,3,float"}, ConflictType.Error)
+            "c1": {"type": "int"},
+            "c2": {"type": "vector,3,float"}}, ConflictType.Error)
 
         with pytest.raises(Exception,
                            match="ERROR:3009, Attempt to create full-text index on column: c2, data type: Embedding*"):
@@ -476,8 +479,8 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         table_obj = db_obj.create_table("test_insert_data_fulltext_index_search", {
-            "doctitle": "varchar",
-            "docdate": "varchar", "body": "varchar"}, ConflictType.Error)
+            "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}
+        }, ConflictType.Error)
         res = table_obj.create_index("body_index",
                                      [index.IndexInfo("body",
                                                       index.IndexType.FullText,
@@ -508,10 +511,8 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_fulltext_match_with_invalid_analyzer", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
-        table_obj = db_obj.create_table("test_fulltext_match_with_invalid_analyzer",
-                                        {"doctitle": "varchar",
-                                         "docdate": "varchar",
-                                         "body": "varchar", })
+        table_obj = db_obj.create_table("test_fulltext_match_with_invalid_analyzer", {
+            "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}})
         assert res.error_code == ErrorCode.OK
 
         with pytest.raises(Exception, match="ERROR:3009*"):
@@ -529,7 +530,7 @@ class TestIndex(TestSdk):
         db_obj.drop_table(
             "test_create_index_on_deleted_table", ConflictType.Ignore)
 
-        table_obj = db_obj.create_table("test_create_index_on_deleted_table", {"c1": "vector,128,float"},
+        table_obj = db_obj.create_table("test_create_index_on_deleted_table", {"c1": {"type": "vector,128,float"}},
                                         ConflictType.Error)
         # insert data
         embedding_data = [i for i in range(128)]
@@ -564,8 +565,10 @@ class TestIndex(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_create_index_on_update_table",
                           ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_create_index_on_update_table", {"c1": "vector,128,float", "c2": "int"},
-                                        ConflictType.Error)
+        table_obj = db_obj.create_table("test_create_index_on_update_table", {
+            "c1": {"type": "vector,128,float"},
+            "c2": {"type": "int"}
+        }, ConflictType.Error)
         # insert data
         embedding_data = [i for i in range(128)]
         value = [{"c1": embedding_data, "c2": i} for i in range(10)]
@@ -598,7 +601,7 @@ class TestIndex(TestSdk):
             "test_create_index_with_valid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_create_index_with_valid_options",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -635,7 +638,7 @@ class TestIndex(TestSdk):
             "test_create_index_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_create_index_with_invalid_options",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         with pytest.raises(Exception, match="ERROR:3066, Invalid conflict type"):
@@ -666,7 +669,7 @@ class TestIndex(TestSdk):
             "test_create_duplicated_index_with_valid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_create_duplicated_index_with_valid_options",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
         for i in range(10):
             res = table_obj.create_index("my_index",
@@ -704,7 +707,7 @@ class TestIndex(TestSdk):
             "test_create_duplicated_index_with_valid_error_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_create_duplicated_index_with_valid_error_options",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -758,7 +761,7 @@ class TestIndex(TestSdk):
             "test_create_duplicated_index_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_create_duplicated_index_with_invalid_options",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         table_obj.drop_index("my_index", ConflictType.Ignore)
@@ -806,7 +809,7 @@ class TestIndex(TestSdk):
         db_obj.drop_table("test_show_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_show_index",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
         for i in range(10):
             res = table_obj.create_index("my_index_" + str(i),
@@ -840,7 +843,7 @@ class TestIndex(TestSdk):
         db_obj.drop_table("test_show_various_name_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_show_various_name_index",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c1",
@@ -880,7 +883,7 @@ class TestIndex(TestSdk):
         db_obj.drop_table("test_show_invalid_name_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_show_invalid_name_index",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         with pytest.raises(Exception):
@@ -910,7 +913,7 @@ class TestIndex(TestSdk):
         db_obj.drop_table("test_list_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_list_index",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
         for i in range(10):
             res = table_obj.create_index("my_index_" + str(i),
@@ -949,7 +952,7 @@ class TestIndex(TestSdk):
             "test_drop_index_with_valid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_drop_index_with_valid_options",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -987,7 +990,7 @@ class TestIndex(TestSdk):
             "test_drop_index_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_drop_index_with_invalid_options",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -1023,7 +1026,7 @@ class TestIndex(TestSdk):
             "test_supported_vector_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_supported_vector_index",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.create_index("my_index",
@@ -1057,7 +1060,7 @@ class TestIndex(TestSdk):
             "test_unsupported_vector_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_unsupported_vector_index",
-            {"c1": "vector,1024,float"}, ConflictType.Error)
+            {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
         assert table_obj is not None
 
         with pytest.raises(Exception, match="ERROR:3061, Invalid index parameter type: Metric type*"):
