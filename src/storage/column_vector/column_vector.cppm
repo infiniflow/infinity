@@ -32,6 +32,7 @@ import infinity_exception;
 import fix_heap;
 import internal_types;
 import data_type;
+import constant_expr;
 
 namespace infinity {
 
@@ -189,6 +190,8 @@ public:
     void AppendByPtr(const_ptr_t value_ptr);
 
     void AppendByStringView(std::string_view sv, char delimiter);
+
+    void AppendByConstantExpr(const ConstantExpr *const_expr);
 
     void AppendWith(const ColumnVector &other, SizeT start_row, SizeT count);
 

@@ -1302,6 +1302,118 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
     }
 }
 
+void ColumnVector::AppendByConstantExpr(const ConstantExpr *const_expr) {
+    switch (data_type_->type()) {
+        case kBoolean: {
+            bool v = const_expr->bool_value_;
+            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+            break;
+        }
+        case kTinyInt: {
+            i8 v = static_cast<i8>(const_expr->integer_value_);
+            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+            break;
+        }
+        case kSmallInt: {
+            i16 v = static_cast<i16>(const_expr->integer_value_);
+            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+            break;
+        }
+        case kInteger: {
+            i32 v = static_cast<i32>(const_expr->integer_value_);
+            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+            break;
+        }
+        case kBigInt: {
+            i64 v = const_expr->integer_value_;
+            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+            break;
+        }
+        case kFloat: {
+            float v = static_cast<float>(const_expr->double_value_);
+            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+            break;
+        }
+        case kDouble: {
+            double v = const_expr->double_value_;
+            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+            break;
+        }
+        case kVarchar: {
+            std::string_view str_view = const_expr->str_value_;
+            AppendByStringView(str_view, ',');
+            break;
+        }
+        case kEmbedding: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            // SizeT dim = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    Vector<i8> embedding;
+                    embedding.reserve(const_expr->long_array_.size());
+                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
+                        return static_cast<i8>(v);
+                    });
+                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemInt16: {
+                    Vector<i16> embedding;
+                    embedding.reserve(const_expr->long_array_.size());
+                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
+                        return static_cast<i16>(v);
+                    });
+                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemInt32: {
+                    Vector<i32> embedding;
+                    embedding.reserve(const_expr->long_array_.size());
+                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
+                        return static_cast<i32>(v);
+                    });
+                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemInt64: {
+                    Vector<i64> embedding;
+                    embedding.reserve(const_expr->long_array_.size());
+                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
+                        return v;
+                    });
+                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemFloat: {
+                    Vector<float> embedding;
+                    embedding.reserve(const_expr->double_array_.size());
+                    std::transform(const_expr->double_array_.begin(), const_expr->double_array_.end(), std::back_inserter(embedding), [](auto &v) {
+                        return static_cast<float>(v);
+                    });
+                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemDouble: {
+                    Vector<i8> embedding;
+                    embedding.reserve(const_expr->double_array_.size());
+                    std::transform(const_expr->double_array_.begin(), const_expr->double_array_.end(), std::back_inserter(embedding), [](auto &v) {
+                        return v;
+                    });
+                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implement: Embedding type.");
+                }
+            }
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implement: Invalid data type.");
+        }
+    }
+}
+
 void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
     if (count == 0) {
         return;
@@ -1611,7 +1723,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         UnrecoverableError(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
 
-    if(data_type_->type() == LogicalType::kHugeInt) {
+    if (data_type_->type() == LogicalType::kHugeInt) {
         UnrecoverableError(fmt::format("Attempt to serialize huge integer type"));
     }
     this->data_type_->WriteAdv(ptr);
