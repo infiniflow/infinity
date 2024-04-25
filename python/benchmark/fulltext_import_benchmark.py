@@ -22,10 +22,12 @@ def import_data(path):
     print("import data complete")
     return data[:10000]
 
+
 def insert_data(db_obj, data):
     db_obj.drop_table("insert_benchmark")
-    table_obj = db_obj.create_table("insert_benchmark", 
-                                    {"id": "varchar", "title": "varchar", "text": "varchar"}, ConflictType.Error)
+    table_obj = db_obj.create_table("insert_benchmark",
+                                    {"id": {"type": "varchar"}, "title": {"type": "varchar"},
+                                     "text": {"type": "varchar"}}, ConflictType.Error)
     res = table_obj.create_index("text_index", [index.IndexInfo("text", index.IndexType.FullText, [])])
     assert res.error_code == ErrorCode.OK
     inserted_records_num = 0
@@ -33,22 +35,25 @@ def insert_data(db_obj, data):
         value = []
         insert_num_this_round = 0
         while insert_num_this_round < 500 and insert_num_this_round + inserted_records_num < len(data):
-            value.append(data[inserted_records_num+insert_num_this_round])
+            value.append(data[inserted_records_num + insert_num_this_round])
             insert_num_this_round += 1
         inserted_records_num += insert_num_this_round
         begin_time = time.time()
         table_obj.insert(value)
-        print(f"insert {inserted_records_num} has been blocked {time.time()-begin_time} s")
+        print(f"insert {inserted_records_num} has been blocked {time.time() - begin_time} s")
     print(inserted_records_num)
+
 
 def import_file(db_obj, path):
     db_obj.drop_table("import_file_benchmark")
-    table_obj = db_obj.create_table("import_file_benchmark", 
-                                    {"id": "varchar", "title": "varchar", "text": "varchar"}, ConflictType.Error)
+    table_obj = db_obj.create_table("import_file_benchmark",
+                                    {"id": {"type": "varchar"}, "title": {"type": "varchar"},
+                                     "text": {"type": "varchar"}}, ConflictType.Error)
     assert table_obj
     res = table_obj.create_index("text_index", [index.IndexInfo("text", index.IndexType.FullText, [])])
     assert res.error_code == ErrorCode.OK
     table_obj.import_data(path, {'file_type': 'jsonl'})
+
 
 if __name__ == '__main__':
     current_path = os.getcwd()
@@ -79,5 +84,3 @@ if __name__ == '__main__':
     start_time = time.time()
     insert_data(db_obj, data)
     print("insert time cost: %.2f " % (time.time() - start_time))
-
-    

@@ -118,7 +118,12 @@ db = infinity_obj.get_database("default_db")
 # Drop my_table if it already exists
 db.drop_table("my_table", ConflictType.Ignore)
 # Create a table named "my_table"
-table = db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+table = db.create_table(
+          "my_table", {
+            "num": {"type": "integer"}, 
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"}
+          })
 ```
 
 

@@ -27,11 +27,13 @@ from test_sdkbase import TestSdk
 
 test_csv_file = "embedding_int_dim3.csv"
 
+
 class TestCase(TestSdk):
     def test_version(self):
         print(infinity.__version__)
+
     def test_connection(self):
-        
+
         """
         target: test connect and disconnect server ok
         method: connect server
@@ -42,8 +44,7 @@ class TestCase(TestSdk):
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
             assert infinity_obj.disconnect()
-    
-    
+
     def test_create_db_with_invalid_name(self):
         """
         target: test db name limitation
@@ -58,8 +59,7 @@ class TestCase(TestSdk):
                            match=f"DB name '{db_name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"):
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
-    
-   
+
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_basic(self, check_data):
@@ -107,7 +107,7 @@ class TestCase(TestSdk):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table("my_table1", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table1", {"c1": "int, primary key"}, ConflictType.Error)
+                "my_table1", {"c1": {"type": "int", "constraints": ["primary key"]}}, ConflictType.Error)
             assert table_obj is not None
 
             res = db_obj.list_tables()
@@ -119,7 +119,7 @@ class TestCase(TestSdk):
             # index
             db_obj.drop_table("my_table2", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table2", {"c1": "vector,1024,float"}, ConflictType.Error)
+                "my_table2", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table2")
@@ -141,7 +141,8 @@ class TestCase(TestSdk):
             # insert
             db_obj.drop_table("my_table3", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table3", {"c1": "int, primary key", "c2": "float"}, ConflictType.Error)
+                "my_table3", {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
+                ConflictType.Error)
             assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table3")
@@ -168,7 +169,7 @@ class TestCase(TestSdk):
             # import
             db_obj.drop_table("my_table4", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table4", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+                "my_table4", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
             assert table_obj is not None
             table_obj = db_obj.get_table("my_table4")
             assert table_obj

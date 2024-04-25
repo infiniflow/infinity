@@ -210,14 +210,14 @@ emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ```python
 db_obj.create_table("test_create_varchar_table",
-	            {"c1": "varchar", "c2": "float"})
+	            {"c1": {"type": "varchar"}, "c2": {"type": "float"}})
 # CREATE TABLE test_create_varchar_table(
 #   c1 VARCHAR PRIMARY KEY,
 #   c2 FLOAT
 # );
 
 db_obj.create_table("test_create_embedding_table", 
-                    {"c1": "vector,128,float"}, ConflictType.Replace)
+                    {"c1": {"type": "vector,128,float"}}, ConflictType.Replace)
 # a 128-dimensional float vector
 ```
 
@@ -360,7 +360,7 @@ emun type which could be `Error` , `Replace`, or `Ignore`, defined in *infinity.
 
 ```python
 db_obj.create_table("test_index_ivfflat", {
-            "c1": "vector,1024,float"}, None)
+            "c1": {"type": "vector,1024,float"}}, None)
 db_obj.get_table("test_index_ivfflat")
 table_obj.create_index("my_index",
                         [index.IndexInfo("c1",index.IndexType.IVFFlat,
@@ -371,7 +371,7 @@ table_obj.create_index("my_index",
 
 ```python
 db_obj.create_table(
-            "test_index_hnsw", {"c1": "vector,1024,float"}, None)
+            "test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 
 db_obj.get_table("test_index_hnsw")
 table_obj.create_index("my_index",
@@ -386,7 +386,11 @@ table_obj.create_index("my_index",
 
 ```python
 db_obj.create_table(
-            "test_index_fulltext", {"doctitle": "varchar", "docdate": "varchar", "body": "varchar"}, None)
+            "test_index_fulltext", {
+                "doctitle": {"type": "varchar"},
+                "docdate": {"type": "varchar"},
+                "body": {"type": "varchar"}
+            }, None)
 
 db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",

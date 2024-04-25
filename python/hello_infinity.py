@@ -27,7 +27,11 @@ def main():
     db.drop_table("my_table", ConflictType.Ignore)
     # Create a table named "my_table"
     table = db.create_table(
-        "my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+        "my_table", {
+            "num": {"type": "integer"}, 
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"}
+        })
     table.insert(
         [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
     table.insert(
@@ -47,7 +51,11 @@ def test():
         db.drop_table("my_table", ConflictType.Ignore)
         # Create a table named "my_table"
         table = db.create_table(
-            "my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+            "my_table", {
+                "num": {"type": "integer"}, 
+                "body": {"type": "varchar"},
+                "vec": {"type": "vector, 4, float"}
+            })
         table.insert(
             [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
         table.insert(

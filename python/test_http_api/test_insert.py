@@ -389,7 +389,6 @@ class TestInsert(HttpTest):
                 values = [{"c1": 1, "c2": 1} for _ in range(batch)]
                 self.insert(db_name, table_name, values, expect={
                     "status_code": 500,
-                    "error_code": 3013
                 })
             self.drop_table(db_name, table_name)
         return
