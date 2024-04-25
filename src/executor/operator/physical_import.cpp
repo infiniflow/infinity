@@ -471,11 +471,13 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             str_view = std::string_view((char *)cell.str, cell.len);
             column_vector.AppendByStringView(str_view, parser_context->delimiter_);
-        } else if (column_def->has_default_value()) {
-            auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
-            column_vector.AppendByConstantExpr(const_expr);
         } else {
-            RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_)));
+            if (column_def->has_default_value()) {
+                auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
+                column_vector.AppendByConstantExpr(const_expr);
+            } else {
+                RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_)));
+            }
         }
     }
     block_entry->IncreaseRowCount(1);
