@@ -61,7 +61,7 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
 
     auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir_, BlockVersion::FileName(), block_entry->row_capacity_);
     auto *buffer_mgr = txn->buffer_mgr();
-    block_entry->block_version_ = buffer_mgr->Allocate(std::move(version_file_worker));
+    block_entry->block_version_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
     return block_entry;
 }
 
@@ -85,7 +85,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
 
     auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir_, BlockVersion::FileName(), row_capacity);
-    block_entry->block_version_ = buffer_mgr->Get(std::move(version_file_worker));
+    block_entry->block_version_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
 
     block_entry->checkpoint_ts_ = check_point_ts;
     block_entry->checkpoint_row_count_ = checkpoint_row_count;
@@ -296,7 +296,7 @@ void BlockEntry::Cleanup() {
     for (auto &block_column_entry : columns_) {
         block_column_entry->Cleanup();
     }
-    block_version_->Cleanup();
+    block_version_->PickForCleanup();
 
     CleanupScanner::CleanupDir(*block_dir_);
 }

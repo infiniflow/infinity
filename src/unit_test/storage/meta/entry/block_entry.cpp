@@ -69,7 +69,7 @@ TEST_F(BlockVersionTest, SaveAndLoad2) {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
         auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
-        auto *buffer_obj = buffer_mgr.Allocate(std::move(file_worker));
+        auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
 
         {
             auto block_version_handle = buffer_obj->Load();
@@ -90,7 +90,7 @@ TEST_F(BlockVersionTest, SaveAndLoad2) {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
         auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
-        auto *buffer_obj = buffer_mgr.Get(std::move(file_worker));
+        auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {
             BlockVersion block_version1(8192);
@@ -116,7 +116,7 @@ TEST_F(BlockVersionTest, SaveAndLoad2) {
         BufferManager buffer_mgr(1 << 20 /*memory limit*/, data_dir, temp_dir);
 
         auto file_worker = MakeUnique<VersionFileWorker>(block_dir, version_file_name, 8192);
-        auto *buffer_obj = buffer_mgr.Get(std::move(file_worker));
+        auto *buffer_obj = buffer_mgr.GetBufferObject(std::move(file_worker));
 
         {
             BlockVersion block_version1(8192);
