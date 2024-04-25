@@ -453,7 +453,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // if column count is larger than columns defined from schema, extra columns are abandoned
     if (column_count != table_entry->ColumnCount()) {
         UniquePtr<String> err_msg =
-            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
+            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.", parser_context->row_count_, column_count, table_entry->ColumnCount()));
         LOG_ERROR(*err_msg);
         RecoverableError(Status::ColumnCountMismatch(*err_msg));
     }

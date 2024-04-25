@@ -8,6 +8,7 @@ import os
 import h5py
 import uuid
 import numpy as np
+import csv
 
 from .base_client import BaseClient
 
@@ -26,7 +27,7 @@ class ElasticsearchClient(BaseClient):
         self.collection_name = self.data['name']
         self.path_prefix = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    def upload_bach(self, actions:List):
+    def upload_batch(self, actions: List):
         helpers.bulk(self.client, actions)
 
     def upload(self):
@@ -46,30 +47,52 @@ class ElasticsearchClient(BaseClient):
                 actions = []
                 for i, line in enumerate(f):
                     if i % batch_size == 0 and i != 0:
-                        self.upload_bach(actions)
+                        self.upload_batch(actions)
                         actions = []
                     record = json.loads(line)
                     actions.append({"_index": self.collection_name, "_id": uuid.UUID(int=i).hex, "_source": record})
                 if actions:
-                    self.upload_bach(actions)
+                    self.upload_batch(actions)
         elif ext == '.hdf5' and self.data['mode'] == 'vector':
             with h5py.File(dataset_path, 'r') as f:
                 actions = []
                 for i, line in enumerate(f['train']):
                     if i % batch_size == 0 and i != 0:
-                        self.upload_bach(actions)
+                        self.upload_batch(actions)
                         actions = []
                     record = {self.data['vector_name']: line}
                     actions.append({"_index": self.collection_name, "_id": uuid.UUID(int=i).hex, "_source": record})
                 if actions:
-                    self.upload_bach(actions)
+                    self.upload_batch(actions)
+        elif ext == '.csv':
+            custom_headers = []
+            headers = self.data["index"]["mappings"]["properties"]
+            for key, value in headers.items():
+                custom_headers.append(key)
+            with open(dataset_path, 'r', encoding='utf-8', errors='replace') as data_file:
+                current_batch = []
+                for i, line in enumerate(data_file):
+                    row = line.strip().split('\t')
+                    if len(row) != len(headers):
+                        print(f"row = {i}, row_len = {len(row)}, not equal headers len, skip")
+                        continue
+                    row_dict = {header: value for header, value in zip(headers, row)}
+                    current_batch.append({"_index": self.collection_name, "_id": uuid.UUID(int=i).hex, "_source": row_dict})
+                    if len(current_batch) >= batch_size:
+                        self.upload_batch(current_batch)
+                        current_batch = []
+
+                if current_batch:
+                    self.upload_batch(current_batch)
         else:
             raise TypeError("Unsupported file type")
         
         self.client.indices.forcemerge(index=self.collection_name, wait_for_completion=True)
 
     def parse_fulltext_query(self, query: dict) -> Any:
-        key, value = list(query.items())[0]
+        condition = query["body"]["query"]
+        key, value = list(condition.items())[0]
+        ret = {}
         if key == 'and':
             ret = {
                 "query": {
@@ -85,7 +108,15 @@ class ElasticsearchClient(BaseClient):
                         "should": [{"match": item} for item in value]
                     }
                 }
-            } 
+            }
+        elif key == 'match':
+            ret = {
+                "query": {
+                    "match": {
+                        list(value.keys())[0]: list(value.values())[0]
+                    }
+                }
+            }
         return ret
 
     def search(self) -> list[list[Any]]:
@@ -94,7 +125,7 @@ class ElasticsearchClient(BaseClient):
         The function returns id list.
         """
         query_path = os.path.join(self.path_prefix, self.data["query_path"])
-
+        print(query_path)
         results = []
         _, ext = os.path.splitext(query_path)
         if ext == '.json':
@@ -109,7 +140,7 @@ class ElasticsearchClient(BaseClient):
                                                     body=body,
                                                     size=self.data['topK'])
                         end = time.time()
-                        latency = (end-start)*1000
+                        latency = (end - start) * 1000
                         result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
                         result.append(latency)
                         results.append(result)
@@ -126,9 +157,9 @@ class ElasticsearchClient(BaseClient):
                     result = self.client.search(index=self.collection_name,
                                                 source=["_id", "_score"],
                                                 knn=knn,
-                                                size = self.data["topK"])
+                                                size=self.data["topK"])
                     end = time.time()
-                    latency = (end - start)*1000
+                    latency = (end - start) * 1000
                     result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
                     result.append(latency)
                     results.append(result)
@@ -137,25 +168,34 @@ class ElasticsearchClient(BaseClient):
         return results
     
     def check_and_save_results(self, results: List[List[Any]]):
-        ground_truth_path = self.data['ground_truth_path']
-        _, ext = os.path.splitext(ground_truth_path)
-        precisions = []
-        latencies = []
-        if ext == '.hdf5':
-            with h5py.File(ground_truth_path, 'r') as f:
-                expected_result = f['neighbors']
-                for i, result in enumerate(results):
-                    ids = set(x[0] for x in result[:-1])
-                    precision = len(ids.intersection(expected_result[i][:self.data['topK']])) / self.data['topK']
-                    precisions.append(precision)
-                    latencies.append(result[-1])
-        elif ext == '.json':
-            with open(ground_truth_path, 'r') as f:
-                expected_results = json.load(f)
-                for i, result in enumerate(results):
-                    ids = set(x[0] for x in result[:-1])
-                    precision = len(ids.intersection(expected_results[i]['expected_results'][:self.data['topK']])) / self.data['topK']
-                    precisions.append(precision)
-                    latencies.append(result[-1])
-        
-        print(f"mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)}, std_time: {np.std(latencies)}, min_time: {np.min(latencies)}, max_time: {np.max(latencies)}")
+        # print(results)
+        for i, result in enumerate(results):
+            print(f"result {i} = {result}")
+            if len(result) == 1:
+                print(f"not found term, cost time = {results[0]}")
+            elif len(result) > 1:
+                for row, score in result[:-1]:
+                    print(f"row = {row}, score = {score}")
+                print(f"query cost time: {result[-1]}ms")
+        # ground_truth_path = self.data['ground_truth_path']
+        # _, ext = os.path.splitext(ground_truth_path)
+        # precisions = []
+        # latencies = []
+        # if ext == '.hdf5':
+        #     with h5py.File(ground_truth_path, 'r') as f:
+        #         expected_result = f['neighbors']
+        #         for i, result in enumerate(results):
+        #             ids = set(x[0] for x in result[:-1])
+        #             precision = len(ids.intersection(expected_result[i][:self.data['topK']])) / self.data['topK']
+        #             precisions.append(precision)
+        #             latencies.append(result[-1])
+        # elif ext == '.json':
+        #     with open(ground_truth_path, 'r') as f:
+        #         expected_results = json.load(f)
+        #         for i, result in enumerate(results):
+        #             ids = set(x[0] for x in result[:-1])
+        #             precision = len(ids.intersection(expected_results[i]['expected_results'][:self.data['topK']])) / self.data['topK']
+        #             precisions.append(precision)
+        #             latencies.append(result[-1])
+        #
+        # print(f"mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)}, std_time: {np.std(latencies)}, min_time: {np.min(latencies)}, max_time: {np.max(latencies)}")
