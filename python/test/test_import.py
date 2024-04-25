@@ -407,7 +407,7 @@ class TestImport(TestSdk):
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_commas.csv"
         with pytest.raises(Exception,
-                           match="ERROR:3039, Column count mismatch: CSV file row count isn't match with table schema*"):
+                           match="ERROR:3037, Column count mismatch: CSV file row count isn't match with table schema*"):
             res = table_obj.import_data(test_csv_dir)
             assert res.error_code == ErrorCode.OK
 
