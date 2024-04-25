@@ -53,3 +53,6 @@ SELECT * FROM test_limit order by c1 desc limit 2 offset 2;
 query II
 SELECT * FROM test_limit limit 2 offset 4;
 ----
+
+statement ok
+DROP TABLE test_limit;

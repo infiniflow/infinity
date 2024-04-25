@@ -30,3 +30,5 @@ CREATE INDEX idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
 statement ok
 CREATE INDEX IF NOT EXISTS idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
 
+statement ok
+DROP TABLE test_hnsw;

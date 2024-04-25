@@ -60,3 +60,5 @@ SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l
 8
 8
 
+statement ok
+DROP TABLE test_knn_hnsw_l2;

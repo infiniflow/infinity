@@ -57,3 +57,5 @@ SELECT c1 FROM test_knn_annivfflat_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'floa
 8
 8
 
+statement ok
+DROP TABLE test_knn_annivfflat_ip;
