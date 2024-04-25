@@ -39,6 +39,7 @@ import index_base;
 import column_def;
 import base_entry;
 import default_values;
+import constant_expr;
 
 namespace infinity {
 
@@ -195,6 +196,51 @@ public:
             total_size += sizeof(i32) + cd.name_.length();
             total_size += sizeof(i32);
             total_size += cd.constraints_.size() * sizeof(ConstraintType);
+            total_size += sizeof(i32);
+            auto const_expr = dynamic_cast<ConstantExpr *>(cd.default_expr_.get());
+            switch (const_expr->literal_type_) {
+                case LiteralType::kBoolean: {
+                    total_size += sizeof(bool);
+                    break;
+                }
+                case LiteralType::kDouble: {
+                    total_size += sizeof(double);
+                    break;
+                }
+                case LiteralType::kString: {
+                    total_size += sizeof(i32) + (std::string(const_expr->str_value_)).length();
+                    break;
+                }
+                case LiteralType::kInteger: {
+                    total_size += sizeof(i64);
+                    break;
+                }
+                case LiteralType::kNull: {
+                    break;
+                }
+                case LiteralType::kDate:
+                case LiteralType::kTime:
+                case LiteralType::kDateTime:
+                case LiteralType::kTimestamp: {
+                    total_size += sizeof(i32) + (std::string(const_expr->date_value_)).length();
+                    break;
+                }
+                case LiteralType::kIntegerArray: {
+                    total_size += sizeof(i64);
+                    total_size += sizeof(i64) * const_expr->long_array_.size();
+                    break;
+                }
+                case LiteralType::kDoubleArray: {
+                    total_size += sizeof(i64);
+                    total_size += sizeof(double) * const_expr->double_array_.size();
+                    break;
+                }
+                case LiteralType::kInterval: {
+                    total_size += sizeof(i32);
+                    total_size += sizeof(i64);
+                    break;
+                }
+            }
         }
 
         total_size += sizeof(SizeT);
@@ -425,7 +471,7 @@ public:
           db_name_(segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(segment_index_entry->table_index_entry()->table_index_meta()->index_name()), segment_id_(segment_index_entry->segment_id()),
-          min_ts_(segment_index_entry->min_ts()), max_ts_(segment_index_entry->max_ts()) {}
+          min_ts_(segment_index_entry->min_ts()), max_ts_(segment_index_entry->max_ts()), next_chunk_id_(segment_index_entry->next_chunk_id()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY; }
     String GetTypeStr() const final { return "ADD_SEGMENT_INDEX_ENTRY"; }
@@ -435,6 +481,7 @@ public:
         total_size += sizeof(i32) + this->table_name_->size();
         total_size += sizeof(i32) + this->index_name_->size();
         total_size += sizeof(SegmentID) + sizeof(TxnTimeStamp) + sizeof(TxnTimeStamp);
+        total_size += sizeof(ChunkID);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -455,6 +502,7 @@ public:
     SegmentID segment_id_{0};
     TxnTimeStamp min_ts_{0};
     TxnTimeStamp max_ts_{0};
+    ChunkID next_chunk_id_{0};
 };
 
 /// class AddSegmentColumnEntryOperation
@@ -469,8 +517,8 @@ public:
           db_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(chunk_index_entry->segment_index_entry_->table_index_entry()->table_index_meta()->index_name()),
-          segment_id_(chunk_index_entry->segment_index_entry_->segment_id()), base_name_(chunk_index_entry->base_name_),
-          base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_) {}
+          segment_id_(chunk_index_entry->segment_index_entry_->segment_id()), chunk_id_(chunk_index_entry->chunk_id_),
+          base_name_(chunk_index_entry->base_name_), base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY; }
     String GetTypeStr() const final { return "ADD_CHUNK_INDEX_ENTRY"; }
@@ -480,6 +528,7 @@ public:
         total_size += sizeof(i32) + this->table_name_->size();
         total_size += sizeof(i32) + this->index_name_->size();
         total_size += sizeof(SegmentID);
+        total_size += sizeof(ChunkID);
         total_size += sizeof(i32) + this->base_name_.size();
         total_size += sizeof(RowID);
         total_size += sizeof(u32);
@@ -488,15 +537,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("#{}#{}#{}#{}#{}#{}#{}@{}",
-                                  *db_name_,
-                                  *table_name_,
-                                  *index_name_,
-                                  segment_id_,
-                                  base_name_,
-                                  base_rowid_.ToUint64(),
-                                  row_count_,
-                                  (u8)(type_)));
+        return String(fmt::format("#{}#{}#{}#{}#{}@{}", *db_name_, *table_name_, *index_name_, segment_id_, chunk_id_, (u8)(type_)));
     }
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
@@ -507,6 +548,7 @@ public:
     SharedPtr<String> table_name_{};
     SharedPtr<String> index_name_{};
     SegmentID segment_id_{0};
+    ChunkID chunk_id_{};
     String base_name_{};
     RowID base_rowid_;
     u32 row_count_{0};
@@ -659,7 +701,7 @@ public:
 
     Tuple<TxnTimeStamp, i64> GetCheckpointState() const { return {max_commit_ts_, wal_size_}; }
 
-    SizeT OpSize() const { return delta_ops_.size(); }
+    SizeT OpSize() const;
 
 private:
     void AddDeltaEntryInner(CatalogDeltaEntry *delta_entry);
@@ -668,7 +710,7 @@ private:
 
 private:
     u64 last_sequence_{0};
-    std::priority_queue<u64> sequence_heap_;
+    std::priority_queue<u64, Vector<u64>, std::greater<u64>> sequence_heap_;
     Map<u64, UniquePtr<CatalogDeltaEntry>> delta_entry_map_;
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
@@ -677,6 +719,8 @@ private:
     TxnTimeStamp max_commit_ts_{0};
     TxnTimeStamp last_full_ckp_ts_{0};
     i64 wal_size_{};
+
+    mutable std::mutex catalog_delta_locker_{};
 };
 
 } // namespace infinity

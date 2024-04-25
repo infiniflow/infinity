@@ -15,6 +15,7 @@
 #include "unit_test/base_test.h"
 
 import stl;
+import logger;
 import infinity_context;
 import storage;
 import column_def;
@@ -45,15 +46,17 @@ using namespace infinity;
 class CleanupTaskTest : public BaseTest {
 protected:
     void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
             visible_ts = txn_mgr->GetMinUnflushedTS();
+            time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
+                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
                 break;
             }
             // wait for at most 10s
-            time_t end = time(nullptr);
             if (end - start > 10) {
                 UnrecoverableException("WaitCleanup timeout");
             }
@@ -171,7 +174,7 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     {
 
@@ -221,7 +224,7 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     {
 
@@ -296,7 +299,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     {
 
@@ -381,7 +384,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
-    auto db_name = MakeShared<String>("default");
+    auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("table1");
     auto index_name = MakeShared<String>("idx1");
     auto column_name = MakeShared<String>("col1");

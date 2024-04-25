@@ -18,11 +18,13 @@ module;
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <cassert>
 #include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <experimental/source_location>
@@ -39,6 +41,7 @@ module;
 #include <set>
 #include <shared_mutex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -75,6 +78,7 @@ export namespace std {
 
     using std::bit_cast;
     using std::memcpy;
+    using std::strcmp;
     using std::memset;
     using std::memcmp;
     using std::strlen;
@@ -191,9 +195,10 @@ export namespace std {
     using std::filesystem::remove_all;
     }
 
-    using std::mt19937;
-    using std::uniform_real_distribution;
     using std::iota;
+    using std::mt19937;
+    using std::random_device;
+    using std::uniform_real_distribution;
 
     using std::exception;
     using std::unordered_set;
@@ -352,6 +357,7 @@ namespace infinity {
     using const_ptr_t = const char *;
     using char_t = char;
     using SizeT = u64;
+    using uintptr_t = std::uintptr_t;
 
     // Transactions
     using TxnTimeStamp = uint64_t;
@@ -359,6 +365,7 @@ namespace infinity {
 
     // Entry
     using SegmentID = uint32_t;
+    using ChunkID = uint32_t;
     using BlockID = uint16_t;
     using ColumnID = uint64_t;
 
@@ -386,8 +393,10 @@ namespace infinity {
     template<typename T>
     using Atomic = std::atomic<T>;
 
-    // Smart ptr
+    using std::atomic_compare_exchange_strong;
+    using std::atomic_store;
 
+    // Smart ptr
     template<typename T>
     using SharedPtr = std::shared_ptr<T>;
 

@@ -90,7 +90,7 @@ protected:
         for (SizeT segment_size : segment_sizes) {
             auto *txn = txn_mgr->BeginTxn();
 
-            auto [table_entry, status] = txn->GetTableByName("default", table_name);
+            auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
@@ -192,7 +192,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
     RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -269,7 +269,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
     RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -376,7 +376,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
     RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -466,7 +466,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
     RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -540,7 +540,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     RemoveDbDirs();
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -735,10 +735,10 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     }
     {
         // create table
-        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
+        auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
         auto *txn = txn_mgr->BeginTxn();
 
-        Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+        Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
 
         txn_mgr->CommitTxn(txn);
@@ -750,7 +750,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
         // add compact
         auto txn4 = txn_mgr->BeginTxn();
 
-        auto [table_entry, status] = txn4->GetTableByName("default", table_name);
+        auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
         EXPECT_NE(table_entry, nullptr);
 
         {
@@ -766,7 +766,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
 
         TxnTimeStamp begin_ts = txn5->BeginTS();
 
-        auto [table_entry, status] = txn5->GetTableByName("default", table_name);
+        auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
         EXPECT_NE(table_entry, nullptr);
 
         size_t test_segment_n = segment_sizes.size();
@@ -790,7 +790,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
     // this test is for single index,not for joint index
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
 
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
         std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
@@ -1112,7 +1112,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
     // this test is for single index,not for joint index
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
     std::shared_ptr<std::string> db_entry_dir;
-    auto db_name = std::make_shared<std::string>("default");
+    auto db_name = std::make_shared<std::string>("default_db");
 
     auto table_name = std::make_shared<std::string>("db1");
     // auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});

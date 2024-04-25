@@ -30,10 +30,10 @@ public:
 
 public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
-    BufferObj *Allocate(UniquePtr<FileWorker> file_worker);
+    BufferObj *AllocateBufferObject(UniquePtr<FileWorker> file_worker);
 
     // Get an existing BufferHandle from memory or disk.
-    BufferObj *Get(UniquePtr<FileWorker> file_worker);
+    BufferObj *GetBufferObject(UniquePtr<FileWorker> file_worker);
 
     SharedPtr<String> GetDataDir() const { return data_dir_; }
 
@@ -45,9 +45,15 @@ public:
     }
 
     u64 memory_usage() {
-        std::unique_lock<std::mutex> lock(gc_locker_);
         return current_memory_size_;
     }
+
+    SizeT WaitingGCObjectCount() {
+        std::unique_lock lock(gc_locker_);
+        return gc_map_.size();
+    }
+
+    SizeT BufferedObjectCount();
 
     void RemoveClean();
 
@@ -65,16 +71,17 @@ private:
     void AddToCleanList(BufferObj *buffer_obj, bool free);
 
 private:
-    std::mutex w_locker_{};
-    using GCListIter = List<BufferObj *>::iterator;
-
     SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
-    u64 current_memory_size_{};
+
+    Atomic<u64> current_memory_size_{};
+
+    std::mutex w_locker_{};
     HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
 
     std::mutex gc_locker_{};
+    using GCListIter = List<BufferObj *>::iterator;
     HashMap<BufferObj *, GCListIter> gc_map_{};
     List<BufferObj *> gc_list_{};
 

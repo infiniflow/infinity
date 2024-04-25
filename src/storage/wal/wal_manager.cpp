@@ -139,6 +139,11 @@ i64 WalManager::GetLastCkpWalSize() {
     return last_ckp_wal_size_;
 }
 
+i64 WalManager::WalSize() const {
+    std::lock_guard guard(mutex2_);
+    return wal_size_;
+}
+
 // Flush is scheduled regularly. It collects a batch of transactions, sync
 // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
 // ~10s. So it's necessary to sync for a batch of transactions, and to
@@ -164,10 +169,6 @@ void WalManager::Flush() {
                 running_ = false;
                 break;
             }
-            if (entry->cmds_.empty()) {
-                UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
-            }
-
             SharedPtr<Txn> txn = txn_mgr->GetTxnPtr(entry->txn_id_);
             // Commit sequentially so they get visible in the same order with wal.
             bool conflict = txn->CheckConflict();
@@ -175,6 +176,11 @@ void WalManager::Flush() {
             if (conflict) {
                 txn->SetTxnToRollback();
                 continue;
+            }
+
+            if (entry->cmds_.empty()) {
+                continue;
+                // UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
 
             i32 exp_size = entry->GetSizeInBytes();

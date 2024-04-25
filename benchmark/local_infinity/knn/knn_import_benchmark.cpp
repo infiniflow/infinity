@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
         auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::unordered_set<ConstraintType>());
         column_defs.emplace_back(col1_def.release());
 
-        std::string db_name = "default";
+        std::string db_name = "default_db";
         std::string index_name = "hnsw_index";
 
         std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();

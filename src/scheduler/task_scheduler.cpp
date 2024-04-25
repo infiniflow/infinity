@@ -275,6 +275,8 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         }
         if (finish) {
             fragment_ctx->notifier()->FinishTask(error, fragment_ctx);
+        } else {
+            fragment_ctx->notifier()->UnstartTask();
         }
     }
 }

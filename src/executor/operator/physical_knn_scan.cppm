@@ -34,7 +34,7 @@ import knn_expression;
 import infinity_exception;
 import internal_types;
 import data_type;
-import fast_rough_filter;
+import common_query_filter;
 
 namespace infinity {
 
@@ -43,15 +43,13 @@ public:
     explicit PhysicalKnnScan(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<KnnExpression> knn_expression,
-                             SharedPtr<BaseExpression> filter_expression,
-                             UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                             const SharedPtr<CommonQueryFilter> &common_query_filter,
                              SharedPtr<Vector<String>> output_names,
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
-          knn_expression_(std::move(knn_expression)), filter_expression_(std::move(filter_expression)),
-          fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), output_names_(std::move(output_names)),
+          knn_expression_(std::move(knn_expression)), common_query_filter_(common_query_filter), output_names_(std::move(output_names)),
           output_types_(std::move(output_types)), knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
@@ -89,9 +87,7 @@ public:
 
     SharedPtr<KnnExpression> knn_expression_{};
 
-    SharedPtr<BaseExpression> filter_expression_{};
-
-    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
+    SharedPtr<CommonQueryFilter> common_query_filter_;
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

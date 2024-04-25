@@ -23,10 +23,10 @@ def import_sift_1m(path):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("sift_benchmark")
-    db_obj.create_table("sift_benchmark", {"col1": "vector,128,float"})
+    db_obj.create_table("sift_benchmark", {"col1": {"type": "vector,128,float"}})
     table_obj = db_obj.get_table("sift_benchmark")
     assert table_obj
 
@@ -51,10 +51,10 @@ def import_gist_1m(path):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("gist_benchmark")
-    db_obj.create_table("gist_benchmark", {"col1": "vector,960,float"})
+    db_obj.create_table("gist_benchmark", {"col1": {"type": "vector,960,float"}})
     table_obj = db_obj.get_table("gist_benchmark")
     assert table_obj
 
@@ -77,7 +77,7 @@ def import_gist_1m(path):
 
 def create_index(table_name):
     conn = ThriftInfinityClient(REMOTE_HOST)
-    table = RemoteTable(conn, "default", table_name)
+    table = RemoteTable(conn, "default_db", table_name)
     res = table.create_index("hnsw_index",
                              [index.IndexInfo("col1",
                                               index.IndexType.Hnsw,

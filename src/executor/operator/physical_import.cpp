@@ -54,6 +54,7 @@ import column_vector;
 import default_values;
 import embedding_info;
 import column_def;
+import constant_expr;
 import wal_entry;
 
 import catalog;
@@ -273,6 +274,12 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
     }
 
+    if (read_n == 0) {
+        auto result_msg = MakeUnique<String>(fmt::format("Empty JSONL file, IMPORT 0 Rows"));
+        import_op_state->result_msg_ = std::move(result_msg);
+        return;
+    }
+
     Txn *txn = query_context->GetTxn();
     u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
@@ -285,16 +292,24 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
     }
     while (true) {
+        if (start_pos >= file_size) {
+            if (block_entry->row_count() == 0) {
+                std::move(*block_entry).Cleanup();
+            } else {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+            }
+            if (segment_entry->row_count() == 0) {
+                std::move(*segment_entry).Cleanup();
+            } else {
+                SaveSegmentData(table_entry_, txn, segment_entry);
+            }
+            break;
+        }
         SizeT end_pos = jsonl_str.find('\n', start_pos);
         if (end_pos == String::npos) {
             end_pos = file_size;
         }
         std::string_view json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
-        if (end_pos == file_size) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
-            break;
-        }
         start_pos = end_pos + 1;
 
         nlohmann::json line_json = nlohmann::json::parse(json_sv);
@@ -325,8 +340,74 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) {
-    RecoverableError(Status::NotSupport("Import JSON is not implemented yet."));
+void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    nlohmann::json json_arr;
+    {
+        LocalFileSystem fs;
+        UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+        DeferFn file_defer([&]() { fs.Close(*file_handler); });
+
+        SizeT file_size = fs.GetFileSize(*file_handler);
+        String json_str(file_size, 0);
+        SizeT read_n = file_handler->Read(json_str.data(), file_size);
+        if (read_n != file_size) {
+            UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        }
+
+        if (read_n == 0) {
+            auto result_msg = MakeUnique<String>(fmt::format("Empty JSON file, IMPORT 0 Rows"));
+            import_op_state->result_msg_ = std::move(result_msg);
+            return;
+        }
+
+        json_arr = nlohmann::json::parse(json_str);
+    }
+
+    Txn *txn = query_context->GetTxn();
+    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+
+    Vector<ColumnVector> column_vectors;
+    for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+    }
+
+    if (!json_arr.is_array()) {
+        auto result_msg = MakeUnique<String>(fmt::format("Invalid json format, IMPORT 0 rows"));
+        import_op_state->result_msg_ = std::move(result_msg);
+        return;
+    }
+
+    for (const auto &json_entry : json_arr) {
+        if (block_entry->GetAvailableCapacity() <= 0) {
+            LOG_INFO(fmt::format("Block {} saved", block_entry->block_id()));
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            if (segment_entry->Room() <= 0) {
+                LOG_INFO(fmt::format("Segment {} saved", segment_entry->segment_id()));
+                SaveSegmentData(table_entry_, txn, segment_entry);
+                u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+            }
+
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+            column_vectors.clear();
+            for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+                auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+            }
+        }
+
+        JSONLRowHandler(json_entry, column_vectors);
+        block_entry->IncreaseRowCount(1);
+    }
+
+    segment_entry->AppendBlockEntry(std::move(block_entry));
+    SaveSegmentData(table_entry_, txn, segment_entry);
+
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
@@ -373,7 +454,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // if column count is larger than columns defined from schema, extra columns are abandoned
     if (column_count != table_entry->ColumnCount()) {
         UniquePtr<String> err_msg =
-            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
+            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.", parser_context->row_count_, column_count, table_entry->ColumnCount()));
         LOG_ERROR(*err_msg);
         RecoverableError(Status::ColumnCountMismatch(*err_msg));
     }
@@ -417,90 +498,211 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
     for (SizeT i = 0; auto &column_vector : column_vectors) {
         const ColumnDef *column_def = table_entry_->GetColumnDefByID(i++);
 
-        switch (column_vector.data_type()->type()) {
-            case kBoolean: {
-                bool v = line_json[column_def->name_];
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-                break;
-            }
-            case kTinyInt: {
-                i8 v = line_json[column_def->name_];
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-                break;
-            }
-            case kSmallInt: {
-                i16 v = line_json[column_def->name_];
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-                break;
-            }
-            case kInteger: {
-                i32 v = line_json[column_def->name_];
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-                break;
-            }
-            case kBigInt: {
-                i64 v = line_json[column_def->name_];
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-                break;
-            }
-            case kFloat: {
-                float v = line_json[column_def->name_];
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-                break;
-            }
-            case kDouble: {
-                double v = line_json[column_def->name_];
-                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-                break;
-            }
-            case kVarchar: {
-                std::string_view str_view = line_json[column_def->name_].get<std::string_view>();
-                column_vector.AppendByStringView(str_view, ',');
-                break;
-            }
-            case kEmbedding: {
-                auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-                // SizeT dim = embedding_info->Dimension();
-                switch (embedding_info->Type()) {
-                    case kElemInt8: {
-                        Vector<i8> &&embedding = line_json[column_def->name_].get<Vector<i8>>();
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemInt16: {
-                        Vector<i16> &&embedding = line_json[column_def->name_].get<Vector<i16>>();
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemInt32: {
-                        Vector<i32> &&embedding = line_json[column_def->name_].get<Vector<i32>>();
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemInt64: {
-                        Vector<i64> &&embedding = line_json[column_def->name_].get<Vector<i64>>();
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemFloat: {
-                        Vector<float> &&embedding = line_json[column_def->name_].get<Vector<float>>();
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemDouble: {
-                        Vector<double> &&embedding = line_json[column_def->name_].get<Vector<double>>();
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError("Not implement: Embedding type.");
-                    }
+        if (line_json.contains(column_def->name_)) {
+            switch (column_vector.data_type()->type()) {
+                case kBoolean: {
+                    bool v = line_json[column_def->name_];
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
                 }
-                break;
+                case kTinyInt: {
+                    i8 v = line_json[column_def->name_];
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kSmallInt: {
+                    i16 v = line_json[column_def->name_];
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kInteger: {
+                    i32 v = line_json[column_def->name_];
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kBigInt: {
+                    i64 v = line_json[column_def->name_];
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kFloat: {
+                    float v = line_json[column_def->name_];
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kDouble: {
+                    double v = line_json[column_def->name_];
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kVarchar: {
+                    std::string_view str_view = line_json[column_def->name_].get<std::string_view>();
+                    column_vector.AppendByStringView(str_view, ',');
+                    break;
+                }
+                case kEmbedding: {
+                    auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
+                    // SizeT dim = embedding_info->Dimension();
+                    switch (embedding_info->Type()) {
+                        case kElemInt8: {
+                            Vector<i8> &&embedding = line_json[column_def->name_].get<Vector<i8>>();
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemInt16: {
+                            Vector<i16> &&embedding = line_json[column_def->name_].get<Vector<i16>>();
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemInt32: {
+                            Vector<i32> &&embedding = line_json[column_def->name_].get<Vector<i32>>();
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemInt64: {
+                            Vector<i64> &&embedding = line_json[column_def->name_].get<Vector<i64>>();
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemFloat: {
+                            Vector<float> &&embedding = line_json[column_def->name_].get<Vector<float>>();
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemDouble: {
+                            Vector<double> &&embedding = line_json[column_def->name_].get<Vector<double>>();
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Not implement: Embedding type.");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implement: Invalid data type.");
+                }
             }
-            default: {
-                UnrecoverableError("Not implement: Invalid data type.");
+        } else if (column_def->has_default_value()) {
+            auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
+            switch (column_vector.data_type()->type()) {
+                case kBoolean: {
+                    bool v = const_expr->bool_value_;
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kTinyInt: {
+                    i8 v = static_cast<i8>(const_expr->integer_value_);
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kSmallInt: {
+                    i16 v = static_cast<i16>(const_expr->integer_value_);
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kInteger: {
+                    i32 v = static_cast<i32>(const_expr->integer_value_);
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kBigInt: {
+                    i64 v = const_expr->integer_value_;
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kFloat: {
+                    float v = static_cast<float>(const_expr->double_value_);
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kDouble: {
+                    double v = const_expr->double_value_;
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
+                    break;
+                }
+                case kVarchar: {
+                    std::string_view str_view = const_expr->str_value_;
+                    column_vector.AppendByStringView(str_view, ',');
+                    break;
+                }
+                case kEmbedding: {
+                    auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
+                    // SizeT dim = embedding_info->Dimension();
+                    switch (embedding_info->Type()) {
+                        case kElemInt8: {
+                            Vector<i8> embedding;
+                            embedding.reserve(const_expr->long_array_.size());
+                            std::transform(const_expr->long_array_.begin(),
+                                           const_expr->long_array_.end(),
+                                           std::back_inserter(embedding),
+                                           [](auto &v) { return static_cast<i8>(v); });
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemInt16: {
+                            Vector<i16> embedding;
+                            embedding.reserve(const_expr->long_array_.size());
+                            std::transform(const_expr->long_array_.begin(),
+                                           const_expr->long_array_.end(),
+                                           std::back_inserter(embedding),
+                                           [](auto &v) { return static_cast<i16>(v); });
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemInt32: {
+                            Vector<i32> embedding;
+                            embedding.reserve(const_expr->long_array_.size());
+                            std::transform(const_expr->long_array_.begin(),
+                                           const_expr->long_array_.end(),
+                                           std::back_inserter(embedding),
+                                           [](auto &v) { return static_cast<i32>(v); });
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemInt64: {
+                            Vector<i64> embedding;
+                            embedding.reserve(const_expr->long_array_.size());
+                            std::transform(const_expr->long_array_.begin(),
+                                           const_expr->long_array_.end(),
+                                           std::back_inserter(embedding),
+                                           [](auto &v) { return v; });
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemFloat: {
+                            Vector<float> embedding;
+                            embedding.reserve(const_expr->double_array_.size());
+                            std::transform(const_expr->double_array_.begin(),
+                                           const_expr->double_array_.end(),
+                                           std::back_inserter(embedding),
+                                           [](auto &v) { return static_cast<float>(v); });
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        case kElemDouble: {
+                            Vector<i8> embedding;
+                            embedding.reserve(const_expr->double_array_.size());
+                            std::transform(const_expr->double_array_.begin(),
+                                           const_expr->double_array_.end(),
+                                           std::back_inserter(embedding),
+                                           [](auto &v) { return v; });
+                            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Not implement: Embedding type.");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implement: Invalid data type.");
+                }
             }
+        } else {
+            RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} not found in JSON.", column_def->name_)));
         }
     }
 }

@@ -23,7 +23,7 @@ class TestConnectionPool(TestSdk):
         assert res is not None
 
         res.db_names.sort()
-        assert res.db_names[0] == 'default'
+        assert res.db_names[0] == "default_db"
         assert res.db_names[1] == 'my_database'
 
         connction_pool.release_conn(infinity_obj)

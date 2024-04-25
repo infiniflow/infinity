@@ -52,7 +52,7 @@ TEST_F(StatementParsingTest, good_test1) {
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
     {
-        String input_sql = "SHOW DATABASE default";
+        String input_sql = "SHOW DATABASE default_db";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -63,7 +63,7 @@ TEST_F(StatementParsingTest, good_test1) {
         auto *show_statement = (ShowStatement *)(statement);
         EXPECT_EQ(show_statement->show_type_, ShowStmtType::kDatabase);
         EXPECT_EQ(show_statement->table_name_, "");
-        EXPECT_EQ(show_statement->schema_name_, "default");
+        EXPECT_EQ(show_statement->schema_name_, "default_db");
         EXPECT_EQ(show_statement->index_name_.has_value(), false);
 
         result->Reset();
@@ -273,7 +273,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "SHOW TABLE default.t1 SEGMENT 3 BLOCKS";
+        String input_sql = "SHOW TABLE default_db.t1 SEGMENT 3 BLOCKS";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -284,7 +284,7 @@ TEST_F(StatementParsingTest, good_test1) {
         auto *show_statement = (ShowStatement *)(statement);
         EXPECT_EQ(show_statement->show_type_, ShowStmtType::kBlocks);
         EXPECT_EQ(show_statement->table_name_, "t1");
-        EXPECT_EQ(show_statement->schema_name_, "default");
+        EXPECT_EQ(show_statement->schema_name_, "default_db");
         EXPECT_EQ(show_statement->index_name_.has_value(), false);
         EXPECT_EQ(show_statement->segment_id_.value(), 3);
 

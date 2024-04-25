@@ -45,7 +45,7 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
 BufferObj::~BufferObj() = default;
 
 BufferHandle BufferObj::Load() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             break;
@@ -82,7 +82,7 @@ BufferHandle BufferObj::Load() {
 }
 
 bool BufferObj::Free() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     // no lock is needed because already in gc_queue
     if (status_ == BufferStatus::kClean) {
         return false;
@@ -108,7 +108,7 @@ bool BufferObj::Free() {
 
 bool BufferObj::Save() {
     bool write = false;
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ != BufferType::kPersistent) {
         switch (status_) {
             case BufferStatus::kLoaded:
@@ -134,8 +134,8 @@ bool BufferObj::Save() {
     return write;
 }
 
-void BufferObj::Cleanup() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+void BufferObj::PickForCleanup() {
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         // when insert data into table with index, the index buffer_obj
         // will remain BufferStatus::kNew, so we should allow this situation
@@ -171,7 +171,7 @@ void BufferObj::CleanupFile() {
 }
 
 void BufferObj::LoadInner() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     if (status_ != BufferStatus::kLoaded) {
         UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
     }
@@ -179,12 +179,12 @@ void BufferObj::LoadInner() {
 }
 
 void BufferObj::GetMutPointer() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     type_ = BufferType::kEphemeral;
 }
 
 void BufferObj::UnloadInner() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             --rc_;
@@ -202,6 +202,7 @@ void BufferObj::UnloadInner() {
 }
 
 void BufferObj::CheckState() const {
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             if (rc_ == 0) {

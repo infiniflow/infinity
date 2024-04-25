@@ -7,13 +7,14 @@ from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.common import ConflictType
 from test_sdkbase import TestSdk
 
+
 class TestConvert(TestSdk):
     def test_to_pl(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_pl", ConflictType.Ignore)
         db_obj.create_table("test_to_pl", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_to_pl")
         table_obj.insert([{"c1": 1, "c2": 2}])
@@ -28,10 +29,10 @@ class TestConvert(TestSdk):
 
     def test_to_pa(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_pa", ConflictType.Ignore)
         db_obj.create_table("test_to_pa", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_to_pa")
         table_obj.insert([{"c1": 1, "c2": 2.0}])
@@ -46,10 +47,10 @@ class TestConvert(TestSdk):
 
     def test_to_df(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_df", ConflictType.Ignore)
         db_obj.create_table("test_to_df", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_to_df")
         table_obj.insert([{"c1": 1, "c2": 2.0}])
@@ -65,10 +66,10 @@ class TestConvert(TestSdk):
     def test_without_output_select_list(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_without_output_select_list", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_without_output_select_list", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
         table_obj.insert([{"c1": 1, "c2": 2.0}])
         with pytest.raises(Exception, match="ERROR:3050*"):
@@ -92,10 +93,10 @@ class TestConvert(TestSdk):
     def test_with_valid_select_list_output(self, condition_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_valid_select_list_output", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_valid_select_list_output", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
                           {"c1": 100, "c2": 2.0},
@@ -110,17 +111,17 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("condition_list", [pytest.param("c1 + 0.1 and c2 - 1.0",),
-                                                pytest.param("c1 * 0.1 and c2 / 1.0",),
-                                                pytest.param("c1 > 0.1 %@#$sf c2 < 1.0",),
+    @pytest.mark.parametrize("condition_list", [pytest.param("c1 + 0.1 and c2 - 1.0", ),
+                                                pytest.param("c1 * 0.1 and c2 / 1.0", ),
+                                                pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", ),
                                                 ])
     def test_with_invalid_select_list_output(self, condition_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_invalid_select_list_output", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_invalid_select_list_output", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
                           {"c1": 100, "c2": 2.0},
@@ -148,10 +149,10 @@ class TestConvert(TestSdk):
     def test_output_with_valid_filter_function(self, filter_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_output_with_valid_filter_function", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_output_with_valid_filter_function", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
                           {"c1": 100, "c2": 2.0},
@@ -166,7 +167,6 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-
     @pytest.mark.parametrize("filter_list", [
         pytest.param("c1"),
         pytest.param("_row_id"),
@@ -179,10 +179,10 @@ class TestConvert(TestSdk):
     def test_output_with_invalid_filter_function(self, filter_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_output_with_invalid_filter_function", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_output_with_invalid_filter_function", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
                           {"c1": 100, "c2": 2.0},

@@ -55,6 +55,8 @@ BufferHandle::~BufferHandle() {
     if (buffer_obj_) {
         buffer_obj_->UnloadInner();
     }
+    buffer_obj_ = nullptr;
+    data_ = nullptr;
 }
 
 const void *BufferHandle::GetData() const { return data_; }

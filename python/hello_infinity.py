@@ -22,12 +22,16 @@ import pandas as pds
 
 def main():
     infinity_obj = infinity.connect(REMOTE_HOST)
-    db = infinity_obj.get_database("default")
+    db = infinity_obj.get_database("default_db")
     # Drop my_table if it already exists
     db.drop_table("my_table", ConflictType.Ignore)
     # Create a table named "my_table"
     table = db.create_table(
-        "my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+        "my_table", {
+            "num": {"type": "integer"}, 
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"}
+        })
     table.insert(
         [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
     table.insert(
@@ -42,12 +46,16 @@ def main():
 def test():
     try:
         infinity_obj = infinity.connect(REMOTE_HOST)
-        db = infinity_obj.get_database("default")
+        db = infinity_obj.get_database("default_db")
         # Drop my_table if it already exists
         db.drop_table("my_table", ConflictType.Ignore)
         # Create a table named "my_table"
         table = db.create_table(
-            "my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+            "my_table", {
+                "num": {"type": "integer"}, 
+                "body": {"type": "varchar"},
+                "vec": {"type": "vector, 4, float"}
+            })
         table.insert(
             [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
         table.insert(

@@ -327,7 +327,7 @@ int main(int argc, char *argn[]) {
     }
     RegisterSignal();
 
-    String db_name = "default";
+    String db_name = "default_db";
     String table_name = "ft_dbpedia_benchmark";
     String index_name = "ft_dbpedia_index";
     String srcfile = test_data_path();

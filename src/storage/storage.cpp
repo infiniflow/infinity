@@ -75,7 +75,7 @@ void Storage::Init() {
                                       buffer_mgr_.get(),
                                       bg_processor_.get(),
                                       wal_mgr_.get(),
-                                      new_catalog_->next_txn_id_,
+                                      new_catalog_->next_txn_id(),
                                       system_start_ts,
                                       enable_compaction);
 

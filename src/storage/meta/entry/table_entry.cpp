@@ -52,6 +52,8 @@ import segment_index_entry;
 import chunk_index_entry;
 import cleanup_scanner;
 import column_index_merger;
+import parsed_expr;
+import constant_expr;
 
 namespace infinity {
 
@@ -644,7 +646,8 @@ void TableEntry::MemIndexDump(Txn *txn, bool spill) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
         if (!status.ok())
             continue;
-        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(spill);
+        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
+        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn_index_store, spill);
         if (chunk_index_entry.get() != nullptr) {
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
@@ -765,9 +768,9 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                     }
                     SharedPtr<ChunkIndexEntry> chunk_index_entry =
-                        ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count);
+                        ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(), dst_base_name, base_rowid, total_row_count, txn->buffer_mgr());
                     txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-                    segment_index_entry->ReplaceChunkIndexEntries(chunk_index_entry);
+                    segment_index_entry->ReplaceFtChunkIndexEntries(chunk_index_entry);
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
@@ -776,10 +779,16 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 break;
             }
             case IndexType::kHnsw: {
-                // TODO
-                UniquePtr<String> err_msg =
-                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
-                LOG_WARN(*err_msg);
+                TxnTimeStamp begin_ts = txn->BeginTS();
+                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                    SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
+                    if (segment_entry != nullptr) {
+                        auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);
+                        if (merged_chunk_entry != nullptr) {
+                            merged_chunk_entry->SaveIndexFile();
+                        }
+                    }
+                }
                 break;
             }
             default: {
@@ -877,6 +886,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
                     column_def_json["constraints"].emplace_back(column_constraint);
                 }
 
+                if (column_def->has_default_value()) {
+                    auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
+                    column_def_json["default"] = default_expr->Serialize();
+                }
+
                 json_res["column_definition"].emplace_back(column_def_json);
             }
         }
@@ -938,7 +952,12 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
                 }
             }
 
-            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
+            SharedPtr<ParsedExpr> default_expr = nullptr;
+            if (column_def_json.contains("default")) {
+                default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+            }
+
+            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, default_expr);
             columns.emplace_back(column_def);
         }
         row_count = table_entry_json["row_count"];

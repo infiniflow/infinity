@@ -44,10 +44,10 @@ def insert_sift_1m(path):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("sift_benchmark")
-    db_obj.create_table("sift_benchmark", {"col1": "vector,128,float"})
+    db_obj.create_table("sift_benchmark", {"col1": {"type": "vector,128,float"}})
     table_obj = db_obj.get_table("sift_benchmark")
     assert table_obj
 
@@ -83,10 +83,10 @@ def insert_gist_1m(path):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table("gist_benchmark")
-    db_obj.create_table("gist_benchmark", {"col1": "vector,960,float"})
+    db_obj.create_table("gist_benchmark", {"col1": {"type": "vector,960,float"}})
     table_obj = db_obj.get_table("gist_benchmark")
     assert table_obj
 
@@ -121,7 +121,7 @@ def insert_gist_1m(path):
 
 def create_index(table_name):
     conn = ThriftInfinityClient(REMOTE_HOST)
-    table = RemoteTable(conn, "default", table_name)
+    table = RemoteTable(conn, "default_db", table_name)
     res = table.create_index("hnsw_index",
                              [index.IndexInfo("col1",
                                               index.IndexType.Hnsw,
@@ -139,7 +139,7 @@ def create_index(table_name):
 def work(vectors, table_name, column_name):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     table_obj = db_obj.get_table(table_name)
     assert table_obj
@@ -156,18 +156,17 @@ def process_pool(threads, path, table_name):
     infinity_obj = infinity.connect(REMOTE_HOST)
     assert infinity_obj
 
-    db_obj = infinity_obj.get_database("default")
+    db_obj = infinity_obj.get_database("default_db")
     assert db_obj
     db_obj.drop_table(table_name)
-    db_obj.create_table(table_name, {"col1": "vector,128,float"})
+    db_obj.create_table(table_name, {"col1": {"type": "vector,128,float"}})
     infinity_obj.disconnect()
-
 
     results = []
     total_vectors = fvecs_read_all(path)
     total_count = len(total_vectors)
     print(f"Total Data Count: {total_count}")
-    
+
     total_time = 0
     for i in range(10):
         batch = total_count / 10
@@ -218,7 +217,7 @@ def insert_data(threads, data_set, path):
             process_pool(threads, data_path, "gist_benchmark")
         else:
             print(f"Single-thread")
-            insert_gist_1m(data_path) 
+            insert_gist_1m(data_path)
 
 
 if __name__ == '__main__':

@@ -172,7 +172,7 @@ private:
             }
         }
 
-        Position begin = reinterpret_cast<Position>(new char[next_chunk_size]{});
+        Position begin = reinterpret_cast<Position>(new char[next_chunk_size]);
         chunk_tail_ = chunk_list_.emplace_after(chunk_tail_, begin, begin + next_chunk_size);
         total_chunks_size_ += next_chunk_size;
 

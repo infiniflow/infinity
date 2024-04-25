@@ -39,11 +39,11 @@ class TestDatabase(TestSdk):
             - ''                    ❌
         2. list databases
             - 'my_database'
-            - 'default'
+            - "default_db"
         3. drop databases
             - 'my_database'
         4. list tables:
-            - 'default'
+            - "default_db"
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -71,20 +71,20 @@ class TestDatabase(TestSdk):
 
         res.db_names.sort()
 
-        assert res.db_names[0] == 'default'
+        assert res.db_names[0] == "default_db"
         assert res.db_names[1] == 'my_database'
 
         res = infinity_obj.drop_database("my_database")
         assert res.error_code == ErrorCode.OK
 
-        # res = infinity_obj.drop_database("default")
+        # res = infinity_obj.drop_database("default_db")
         # assert not res.success
 
         res = infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
 
         for db in res.db_names:
-            assert db == 'default'
+            assert db == "default_db"
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -237,7 +237,7 @@ class TestDatabase(TestSdk):
             # 2.2 show database
             dbs = infinity_obj.list_databases()
             for db_name in dbs.db_names:
-                assert db_name in ['test_repeatedly_create_drop_show_databases', 'default']
+                assert db_name in ['test_repeatedly_create_drop_show_databases', "default_db"]
             assert len(dbs.db_names) == 2
 
             # 2.3 drop database
@@ -300,8 +300,8 @@ class TestDatabase(TestSdk):
         db = infinity_obj.get_database("my_database")
         print(db._db_name)
 
-        # 3. get 'default' db(using default), if not switch to default, my_database can't be dropped.
-        db = infinity_obj.get_database("default")
+        # 3. get "default_db" db(using default), if not switch to default, my_database can't be dropped.
+        db = infinity_obj.get_database("default_db")
         print(db._db_name)
 
         # 4.
@@ -465,6 +465,9 @@ class TestDatabase(TestSdk):
         infinity_obj.drop_database("test_create_option", ConflictType.Ignore)
         infinity_obj.create_database("test_create_option", conflict_type)
 
+        # infinity_obj.create_database("test_create_option", ConflictType.Ignore)
+        # infinity_obj.create_database("test_create_option", ConflictType.Replace)
+
         infinity_obj.drop_database("test_create_option")
 
         # disconnect
@@ -536,7 +539,8 @@ class TestDatabase(TestSdk):
     def test_show_valid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         res = db_obj.show_table(table_name)
         db_obj.drop_table("test_show_table", ConflictType.Error)
@@ -553,7 +557,8 @@ class TestDatabase(TestSdk):
     def test_show_invalid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         with pytest.raises(Exception):
             db_obj.show_table(table_name)
@@ -564,7 +569,8 @@ class TestDatabase(TestSdk):
     def test_show_not_exist_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
-        db_obj.create_table("test_show_table", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         with pytest.raises(Exception, match=f"ERROR:3022, Table {table_name} doesn't exist"):
             db_obj.show_table(table_name)
@@ -576,7 +582,8 @@ class TestDatabase(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
-        db_obj.create_table("test_show_table_columns", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+        db_obj.create_table("test_show_table_columns", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                            ConflictType.Error)
 
         res = db_obj.show_columns(column_name)
         db_obj.drop_table("test_show_table_columns", ConflictType.Error)
@@ -595,9 +602,8 @@ class TestDatabase(TestSdk):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
-        db_obj.create_table("test_show_table_columns", {"c1": "int", "c2": "vector,3,int"})
+        db_obj.create_table("test_show_table_columns", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}})
 
         with pytest.raises(Exception):
             db_obj.show_columns(column_name)
         db_obj.drop_table("test_show_table_columns", ConflictType.Error)
-

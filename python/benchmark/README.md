@@ -43,25 +43,29 @@ Today there are many open-source vector databases and search engines, each offer
 Usage: run_benchmark.py [OPTIONS]
 
 Options:
-	-- engines
-		all(default), qdrant, elasticSearch, infinity
-  -- hardware
-		8c_16g(default)
-		4c_32g
-	-- mode
-		test mode:  all(default)
-                gist,
-                sift,
-                cohere_1M,
-                cohere_10M,
-                geonames,
-                pmc
-  -- limit_ram
-    25Gb(default)
-  -- limit_cpus
-    8(default), 1~your cpu core
-  -- help
-    show this message.
+    --engines
+        all(default), qdrant, elasticSearch, infinity
+    --hardware
+        8c_16g(default)
+        4c_32g
+    --mode
+        test mode:  all(default)
+        gist,
+        sift,
+        cohere_1M,
+        cohere_10M,
+        geonames,
+        pmc
+    --limit_ram
+        25Gb(default)
+    --limit_cpus
+        8(default), 1~your cpu core
+    --import
+        perform import data operation
+    --query
+        perform query operation
+    --help
+        show this message.
 ```
 
-The hardware and mode configurations are saved as JSON files in the "configs" folder. The hardware configuration is for setting up the database server's hardware parameters, while the mode configuration is for setting up the benchmark being used, which includes the dataset, index parameters, queries, and query parameters. Users can customize these configurations, saving them as JSON files, for example, "elasticsearch_sift.json". To run a test, simply use `-- engines elasticsesarch --mode sift`.
+The hardware and mode configurations are saved as JSON files in the "configs" folder. The hardware configuration is for setting up the database server's hardware parameters, while the mode configuration is for setting up the benchmark being used, which includes the dataset, index parameters, queries, and query parameters. Users can customize these configurations, saving them as JSON files, for example, "elasticsearch_sift.json". To run a test, simply use `--engines elasticsesarch --mode sift`.

@@ -223,8 +223,6 @@ class PhysicalType;
 
 class DataType;
 
-class ColumnDef;
-
 class ParsedExprType;
 
 class ParsedExpr;
@@ -252,6 +250,8 @@ class BetweenExpr;
 class UpdateExpr;
 
 class OrderByExpr;
+
+class ColumnDef;
 
 class Field;
 
@@ -726,69 +726,6 @@ class DataType : public virtual ::apache::thrift::TBase {
 void swap(DataType &a, DataType &b);
 
 std::ostream& operator<<(std::ostream& out, const DataType& obj);
-
-typedef struct _ColumnDef__isset {
-  _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true) {}
-  bool id :1;
-  bool name :1;
-  bool data_type :1;
-  bool constraints :1;
-} _ColumnDef__isset;
-
-class ColumnDef : public virtual ::apache::thrift::TBase {
- public:
-
-  ColumnDef(const ColumnDef&);
-  ColumnDef& operator=(const ColumnDef&);
-  ColumnDef() noexcept
-            : id(0),
-              name() {
-
-  }
-
-  virtual ~ColumnDef() noexcept;
-  int32_t id;
-  std::string name;
-  DataType data_type;
-  std::vector<Constraint::type>  constraints;
-
-  _ColumnDef__isset __isset;
-
-  void __set_id(const int32_t val);
-
-  void __set_name(const std::string& val);
-
-  void __set_data_type(const DataType& val);
-
-  void __set_constraints(const std::vector<Constraint::type> & val);
-
-  bool operator == (const ColumnDef & rhs) const
-  {
-    if (!(id == rhs.id))
-      return false;
-    if (!(name == rhs.name))
-      return false;
-    if (!(data_type == rhs.data_type))
-      return false;
-    if (!(constraints == rhs.constraints))
-      return false;
-    return true;
-  }
-  bool operator != (const ColumnDef &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const ColumnDef & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(ColumnDef &a, ColumnDef &b);
-
-std::ostream& operator<<(std::ostream& out, const ColumnDef& obj);
 
 typedef struct _ParsedExprType__isset {
   _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_expr(false), fusion_expr(false), search_expr(false) {}
@@ -1689,6 +1626,75 @@ class OrderByExpr : public virtual ::apache::thrift::TBase {
 void swap(OrderByExpr &a, OrderByExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const OrderByExpr& obj);
+
+typedef struct _ColumnDef__isset {
+  _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true), constant_expr(false) {}
+  bool id :1;
+  bool name :1;
+  bool data_type :1;
+  bool constraints :1;
+  bool constant_expr :1;
+} _ColumnDef__isset;
+
+class ColumnDef : public virtual ::apache::thrift::TBase {
+ public:
+
+  ColumnDef(const ColumnDef&);
+  ColumnDef& operator=(const ColumnDef&);
+  ColumnDef() noexcept
+            : id(0),
+              name() {
+
+  }
+
+  virtual ~ColumnDef() noexcept;
+  int32_t id;
+  std::string name;
+  DataType data_type;
+  std::vector<Constraint::type>  constraints;
+  ConstantExpr constant_expr;
+
+  _ColumnDef__isset __isset;
+
+  void __set_id(const int32_t val);
+
+  void __set_name(const std::string& val);
+
+  void __set_data_type(const DataType& val);
+
+  void __set_constraints(const std::vector<Constraint::type> & val);
+
+  void __set_constant_expr(const ConstantExpr& val);
+
+  bool operator == (const ColumnDef & rhs) const
+  {
+    if (!(id == rhs.id))
+      return false;
+    if (!(name == rhs.name))
+      return false;
+    if (!(data_type == rhs.data_type))
+      return false;
+    if (!(constraints == rhs.constraints))
+      return false;
+    if (!(constant_expr == rhs.constant_expr))
+      return false;
+    return true;
+  }
+  bool operator != (const ColumnDef &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ColumnDef & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ColumnDef &a, ColumnDef &b);
+
+std::ostream& operator<<(std::ostream& out, const ColumnDef& obj);
 
 typedef struct _Field__isset {
   _Field__isset() : parse_exprs(true) {}

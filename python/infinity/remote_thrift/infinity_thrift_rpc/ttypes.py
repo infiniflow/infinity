@@ -822,12 +822,13 @@ class ColumnDef(object):
      - name
      - data_type
      - constraints
+     - constant_expr
 
     """
 
 
     def __init__(self, id=None, name=None, data_type=None, constraints=[
-    ],):
+    ], constant_expr=None,):
         self.id = id
         self.name = name
         self.data_type = data_type
@@ -835,6 +836,7 @@ class ColumnDef(object):
             constraints = [
             ]
         self.constraints = constraints
+        self.constant_expr = constant_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -871,6 +873,12 @@ class ColumnDef(object):
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRUCT:
+                    self.constant_expr = ConstantExpr()
+                    self.constant_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -899,6 +907,10 @@ class ColumnDef(object):
             for iter13 in self.constraints:
                 oprot.writeI32(iter13)
             oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.constant_expr is not None:
+            oprot.writeFieldBegin('constant_expr', TType.STRUCT, 5)
+            self.constant_expr.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -7094,6 +7106,7 @@ ColumnDef.thrift_spec = (
     (3, TType.STRUCT, 'data_type', [DataType, None], None, ),  # 3
     (4, TType.LIST, 'constraints', (TType.I32, None, False), [
     ], ),  # 4
+    (5, TType.STRUCT, 'constant_expr', [ConstantExpr, None], None, ),  # 5
 )
 all_structs.append(ParsedExprType)
 ParsedExprType.thrift_spec = (

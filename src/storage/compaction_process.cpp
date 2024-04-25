@@ -120,7 +120,9 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
+                    LOG_INFO("Optimize start.");
                     ScanAndOptimize();
+                    LOG_INFO("Optimize done.");
                     break;
                 }
                 default: {

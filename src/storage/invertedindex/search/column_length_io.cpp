@@ -30,6 +30,8 @@ import file_system;
 import local_file_system;
 import chunk_index_entry;
 import memory_indexer;
+import buffer_obj;
+import buffer_handle;
 
 namespace infinity {
 
@@ -41,9 +43,10 @@ FullTextColumnLengthReader::FullTextColumnLengthReader(UniquePtr<FileSystem> fil
 
 u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     // determine the ChunkIndexEntry which contains row_id
+    current_chunk_buffer_handle_.~BufferHandle();
     SizeT left = 0;
     SizeT right = chunk_index_entries_.size();
-    current_chunk_ = std::numeric_limits<u32>::max();
+    SizeT current_chunk = std::numeric_limits<SizeT>::max();
     while (left < right) {
         SizeT mid = left + (right - left) / 2;
         if (chunk_index_entries_[mid]->base_rowid_ > row_id) {
@@ -51,30 +54,20 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
         } else if (chunk_index_entries_[mid]->base_rowid_ + chunk_index_entries_[mid]->row_count_ <= row_id) {
             left = mid + 1;
         } else {
-            current_chunk_ = mid;
+            current_chunk = mid;
             break;
         }
     }
-    if (current_chunk_ == std::numeric_limits<u32>::max()) {
+    if (current_chunk == std::numeric_limits<SizeT>::max()) {
         return 0;
     }
-    // load the column length file of the ChunkIndexEntry
-    Path column_length_file_path = Path(index_dir_) / (chunk_index_entries_[current_chunk_]->base_name_ + LENGTH_SUFFIX);
-    UniquePtr<FileHandler> file_handler = file_system_->OpenFile(column_length_file_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
-    SizeT file_size = file_system_->GetFileSize(*file_handler);
-    assert(file_size % sizeof(u32) == 0);
-    u32 new_size = file_size / sizeof(u32);
-    if (new_size > column_lengths_capacity_) {
-        column_lengths_capacity_ = 2 * new_size;
-        column_lengths_ = MakeUniqueForOverwrite<u32[]>(column_lengths_capacity_);
-    }
-    column_lengths_size_ = new_size;
-    i64 read_count = file_system_->Read(*file_handler, column_lengths_.get(), file_size);
-    file_handler->Close();
-    if (read_count != i64(file_size)) {
-        UnrecoverableError("SeekFile: read_count != file_size");
-    }
-    return column_lengths_[row_id - chunk_index_entries_[current_chunk_]->base_rowid_];
+
+    // Load the column-length file of the ChunkIndexEntry
+    current_chunk_buffer_handle_ = chunk_index_entries_[current_chunk]->GetBufferObj()->Load();
+    column_lengths_ = (const u32 *)current_chunk_buffer_handle_.GetData();
+    current_chunk_base_rowid_ = chunk_index_entries_[current_chunk]->base_rowid_;
+    current_chunk_row_count_ = chunk_index_entries_[current_chunk]->row_count_;
+    return column_lengths_[row_id - current_chunk_base_rowid_];
 }
 
 void ColumnLengthReader::AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length) {

@@ -169,7 +169,7 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 
-    Vector<SegmentIndexEntry *> segment_index_entry_candidates;
+    Vector<SharedPtr<SegmentIndexEntry>> segment_index_entry_candidates;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json["txn_id"] = this->txn_id_.load();
@@ -185,12 +185,14 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
         std::shared_lock r_lock(rw_locker_);
         for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
-            segment_index_entry_candidates.emplace_back((SegmentIndexEntry *)index_entry.get());
+            if (index_entry->commit_ts_ <= max_commit_ts) {
+                segment_index_entry_candidates.push_back(index_entry);
+            }
         }
     }
 
     for (const auto &segment_index_entry : segment_index_entry_candidates) {
-        json["segment_indexes"].emplace_back(segment_index_entry->Serialize());
+        json["segment_indexes"].emplace_back(segment_index_entry->Serialize(max_commit_ts));
     }
 
     return json;
@@ -235,10 +237,11 @@ void TableIndexEntry::MemIndexCommit() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(bool spill) {
+SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_index_store, bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     if (last_segment_.get() != nullptr) {
         chunk_index_entry = last_segment_->MemIndexDump();
+        txn_index_store->chunk_index_entries_.push_back(chunk_index_entry.get());
     }
     return chunk_index_entry;
 }
@@ -313,7 +316,12 @@ void TableIndexEntry::Cleanup() {
     LOG_TRACE(fmt::format("Cleaned dir: {}", *index_dir_));
 }
 
-void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
+void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
+    std::shared_lock r_lock(rw_locker_);
+    for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        segment_index_entry->PickCleanup(scanner);
+    }
+}
 
 void TableIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
     std::unique_lock w_lock(rw_locker_);

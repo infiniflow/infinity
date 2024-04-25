@@ -7,7 +7,7 @@ from common.common_values import *
 
 class TestShow(HttpTest):
     def test_http_show_table(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_show_table"
         self.drop_table(db_name, table_name)
         self.show_table(db_name, table_name, {
@@ -39,7 +39,7 @@ class TestShow(HttpTest):
         return
 
     def test_http_show_columns(self):
-        db_name = "default"
+        db_name = "default_db"
         table_name = "test_show_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -59,9 +59,9 @@ class TestShow(HttpTest):
         self.show_table_columns(db_name, table_name, {
             "error_code": 0,
             "columns": [
-                {'column_name': 'body', 'column_type': 'Varchar', 'constraint': ''},
-                {'column_name': 'num', 'column_type': 'Integer', 'constraint': ''},
-                {'column_name': 'vec', 'column_type': 'Embedding(float,5)', 'constraint': ''}
+                {'column_name': 'body', 'column_type': 'Varchar', 'constraint': '', 'default': 'Null'},
+                {'column_name': 'num', 'column_type': 'Integer', 'constraint': '', 'default': 'Null'},
+                {'column_name': 'vec', 'column_type': 'Embedding(float,5)', 'constraint': '', 'default': 'Null'}
             ]
         })
         self.drop_table(db_name, table_name)

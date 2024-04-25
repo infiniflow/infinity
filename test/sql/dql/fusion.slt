@@ -27,6 +27,39 @@ Anarchism 30-APR-2012 03:25:17.000  http://web.archive.org/web/20061214085638/ht
 Algae 02-MAY-2012 02:41:42.000  |title=Harmful Algae|year=2007|publisher=US National Office for Harmful Algal Blooms|url=http://www.whoi.edu/redtide/page.do?pid=14779|accessdate=2008-12-19}} * {{cite web|title=Australian Freshwater Algae (AFA)|publisher=Department of Environment and Climate Change NSW Botanic Gardens Trust|url=http://www.rbgsyd.nsw.gov.au/science/hot_science_topics/australian_freshwater_algae2|accessdate=2008-12-19}} * {{cite web|title=Freshwater Algae Research|publisher=Phycology Section, Patrick Center for Environmental Research|year=2011|url=http://diatom.ansp.org/|accessdate=2011-12-17}} * {{cite web|title=Monterey Bay Flora|publisher=Monterey Bay Aquarium Research Institute (MBARI)|date=1996–2008|accessdate=2008-12-20|url=http://www.mbari.org/staff/conn/botany/flora/mflora.htm}} * {{cite web|url=http://ucjeps.berkeley.edu/INA.html|title= Index Nominum Algarum (INA)|first=Paul|last=Silva|date=1997–2004|publisher=University Herbarium, University of California|location=Berkeley|accessdate=2008-12-19}} * 2123 2123,2123,2123,2123
 Anarchism 30-APR-2012 03:25:17.000  [[hierarchical organization]] in the conduct of human relations.<ref name="iaf-ifa.org">"The [[International of Anarchist Federations|IAF - IFA]] fights for : the abolition of all forms of authority whether economical, political, social, religious, cultural or sexual."[http://www.iaf-ifa.org/principles/english.html "Principles of The [[International of Anarchist Federations]]"]</ref><ref>"Anarchism, then, really stands for the liberation of the human mind from the dominion of religion; the liberation of the human body from the dominion of property; liberation from the shackles and restraint of government. Anarchism stands for a social order based on the free grouping of individuals for the purpose of producing real social wealth; an order that will guarantee to every human being free access to the earth and full enjoyment of the necessities of life, according to individual desires, tastes, and inclinations." [[Emma Goldman]]. "What it Really Stands for Anarchy" in ''[[Anarchism and Other 2 2,2,2,2
 
+query TTT
+SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 10 > num;
+----
+Anarchism 30-APR-2012 03:25:17.000 0 0,0,0,0
+Anarchism 30-APR-2012 03:25:17.000 1 1,1,1,1
+Anarchism 30-APR-2012 03:25:17.000 2 2,2,2,2
+
+statement ok
+CREATE INDEX sec_idx ON enwiki_embedding(num);
+
+query TTT
+SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 10 > num;
+----
+Anarchism 30-APR-2012 03:25:17.000 0 0,0,0,0
+Anarchism 30-APR-2012 03:25:17.000 1 1,1,1,1
+Anarchism 30-APR-2012 03:25:17.000 2 2,2,2,2
+
+query TTT
+SELECT doctitle, docdate, num, vec FROM enwiki_embedding SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf') where 2000 < num and num < 3000;
+----
+Algae 02-MAY-2012 02:41:42.000 2123 2123,2123,2123,2123
+Agriculture 28-APR-2012 20:16:08.000 2001 2001,2001,2001,2001
+Alkali metal 30-APR-2012 05:35:44.000 2681 2681,2681,2681,2681
+Agriculture 28-APR-2012 20:16:08.000 2002 2002,2002,2002,2002
+Atomic number 25-APR-2012 22:03:10.000 2774 2774,2774,2774,2774
+Agriculture 28-APR-2012 20:16:08.000 2003 2003,2003,2003,2003
+
+# Algae 02-MAY-2012 02:41:42.000 2123 2123,2123,2123,2123
+# Agriculture 28-APR-2012 20:16:08.000 2001 2001,2001,2001,2001
+# Alkali metal 30-APR-2012 05:35:44.000 2681 2681,2681,2681,2681
+# Agriculture 28-APR-2012 20:16:08.000 2002 2002,2002,2002,2002
+# Alkane 27-APR-2012 21:26:31.000 2200 2200,2200,2200,2200
+# Agriculture 28-APR-2012 20:16:08.000 2003 2003,2003,2003,2003
 
 query I
 SELECT num FROM enwiki_embedding SEARCH MATCH('body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');

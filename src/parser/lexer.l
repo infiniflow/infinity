@@ -67,6 +67,7 @@ DAYS            { return DAYS; }
 DISTINCT        { return DISTINCT; }
 DOUBLE          { return DOUBLE; }
 DECIMAL         { return DECIMAL; }
+DEFAULT         { return DEFAULT; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
 DESC            { return DESC; }

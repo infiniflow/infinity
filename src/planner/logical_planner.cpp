@@ -244,31 +244,20 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     for (SizeT idx = 0; idx < value_list_count; ++idx) {
         auto &value_list = value_list_array[idx];
         if (statement->columns_ != nullptr) {
-            SizeT statement_column_count = statement->columns_->size();
-            if (statement_column_count != value_list.size()) {
+            SizeT column_count = statement->columns_->size();
+            if (column_count != value_list.size()) {
                 RecoverableError(Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
                                                                  "input value count mismatch ({})",
-                                                                 statement_column_count,
+                                                                 column_count,
                                                                  value_list.size())));
             }
-
-            //        Value null_value = Value::MakeNullData();
-            //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
 
             SizeT table_column_count = table_entry->ColumnCount();
 
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
-            SizeT column_count = statement->columns_->size();
-
-            if (column_count != table_column_count) {
-                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                 "input value count mismatch ({})",
-                                                                 table_column_count,
-                                                                 column_count)));
-            }
-
+            Map<SizeT, bool> map;
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = statement->columns_->at(column_idx);
                 SizeT table_column_id = table_entry->GetColumnIdByName(column_name);
@@ -289,11 +278,55 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                         rewrite_value_list[column_idx] = value_list[column_idx];
                     }
                 }
+                map[table_column_id] = true;
+            }
+
+            for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
+                if (map.find(column_idx) != map.end()) {
+                    continue;
+                }
+
+                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                if (column_def->has_default_value()) {
+                    SharedPtr<BaseExpression> value_expr =
+                        bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
+                    value_list.emplace_back(value_expr);
+                } else {
+                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                     "input value count mismatch ({})",
+                                                                     table_column_count,
+                                                                     column_count)));
+                }
+
+                const SharedPtr<DataType> &table_column_type = column_def->column_type_;
+                auto &value = value_list.back();
+                DataType value_type = value->Type();
+                if (*table_column_type == value_type) {
+                    rewrite_value_list[column_idx] = value;
+                } else {
+                    if (LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
+                        BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
+                        SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, value, *table_column_type);
+                        rewrite_value_list[column_idx] = cast_expr;
+                    } else {
+                        // LogicalType are same and type info is also OK.
+                        rewrite_value_list[column_idx] = value;
+                    }
+                }
             }
 
             value_list = rewrite_value_list;
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
+            for (SizeT column_idx = value_list.size(); column_idx < table_column_count; ++column_idx) {
+                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                if (column_def->has_default_value()) {
+                    SharedPtr<BaseExpression> value_expr =
+                        bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
+                    value_list.emplace_back(value_expr);
+                }
+            }
+
             if (value_list.size() != table_column_count) {
                 RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
                                                                  "input value count mismatch ({})",
@@ -405,7 +438,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             }
         }
 
-        switch(create_table_info->column_defs_[idx]->type()->type()) {
+        switch (create_table_info->column_defs_[idx]->type()->type()) {
             case LogicalType::kBoolean:
             case LogicalType::kTinyInt:
             case LogicalType::kSmallInt:
@@ -426,11 +459,11 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             }
         }
 
-
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 create_table_info->column_defs_[idx]->name(),
-                                                                create_table_info->column_defs_[idx]->constraints_);
+                                                                create_table_info->column_defs_[idx]->constraints_,
+                                                                std::move(create_table_info->column_defs_[idx]->default_expr_));
         columns.emplace_back(column_def);
     }
 
@@ -448,7 +481,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
         }
     }
 
-    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
+    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>(create_table_info->table_name_), columns);
     for (HashSet<String> visited_param_names; auto *property_ptr : create_table_info->properties_) {
         auto &[param_name, param_value] = *property_ptr;
         if (auto [_, success] = visited_param_names.insert(param_name); !success) {
@@ -687,7 +720,7 @@ Status LogicalPlanner::BuildDropTable(const DropStatement *statement, SharedPtr<
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if (drop_table_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("default");
+        schema_name_ptr = MakeShared<String>("default_db");
     } else {
         schema_name_ptr = MakeShared<String>(drop_table_info->schema_name_);
     }
@@ -707,7 +740,7 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if (drop_collection_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("default");
+        schema_name_ptr = MakeShared<String>("default_db");
     } else {
         schema_name_ptr = MakeShared<String>(drop_collection_info->schema_name_);
     }

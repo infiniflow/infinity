@@ -81,7 +81,7 @@ protected:
 
 public:
     const String data_path_ = "/var/infinity";
-    const String db_name_ = "default";
+    const String db_name_ = "default_db";
     const String table_name_ = "test_table";
     const String index_name_ = "test_fulltext_index";
     const String config_path_ = data_path_ + "/config/test_catalog_delta.toml";

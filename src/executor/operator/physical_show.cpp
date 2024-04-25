@@ -134,7 +134,9 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("column_name");
             output_names_->emplace_back("column_type");
             output_names_->emplace_back("constraint");
+            output_names_->emplace_back("default");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -1078,7 +1080,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     };
 
     auto catalog = txn->GetCatalog();
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("profiles"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("profiles"), column_defs);
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -1160,13 +1162,15 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "default", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
         varchar_type,
         varchar_type,
         varchar_type,
@@ -1217,6 +1221,15 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             }
 
             Value value = Value::MakeVarchar(column_constraint);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+        }
+
+        ++output_column_idx;
+        {
+            // Append column default value to the fourth column
+            String column_default = column->default_expr_->ToString();
+            Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
@@ -1733,7 +1746,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     const Config *global_config = query_context->global_config();
     const SessionOptions *session_options = query_context->current_session()->options();
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("configs"), column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("configs"), column_defs);
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2275,7 +2288,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                                                 MakeShared<ColumnDef>(5, varchar_type, "index_segment", HashSet<ConstraintType>()),
                                                 MakeShared<ColumnDef>(6, varchar_type, "other_parameters", HashSet<ConstraintType>())};
 
-    auto table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+    auto table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
@@ -2386,7 +2399,7 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
         MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), output_column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), output_column_defs);
     output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -2428,7 +2441,7 @@ void PhysicalShow::ExecuteShowSessionStatus(QueryContext *query_context, ShowOpe
         MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("session status"), output_column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("session status"), output_column_defs);
     output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2466,7 +2479,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
         MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("global status"), output_column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("global status"), output_column_defs);
     output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2522,7 +2535,7 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
         MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
     };
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("variables"), output_column_defs);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
     output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2653,6 +2666,55 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
                     UnrecoverableError("Invalid log flush policy: {}");
                 }
             }
+        }
+        case SysVar::kWALLogSize: {
+            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize() - query_context->storage()->wal_manager()->GetLastCkpWalSize();
+            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kDeltaLogCount: {
+            SizeT delta_log_count = query_context->storage()->catalog()->GetDeltaLogCount();
+            Value value = Value::MakeVarchar(std::to_string(delta_log_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kNextTxnID: {
+            TransactionID next_transaction_id = query_context->storage()->catalog()->next_txn_id();
+            Value value = Value::MakeVarchar(std::to_string(next_transaction_id));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kBufferedObjectCount: {
+            SizeT wal_log_size = query_context->storage()->buffer_manager()->BufferedObjectCount();
+            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kGCListSizeOfBufferPool: {
+            SizeT waiting_gc_object_count = query_context->storage()->buffer_manager()->WaitingGCObjectCount();
+            Value value = Value::MakeVarchar(std::to_string(waiting_gc_object_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kActiveTxnCount: {
+            SizeT active_txn_count = query_context->storage()->txn_manager()->ActiveTxnCount();
+            Value value = Value::MakeVarchar(std::to_string(active_txn_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kCurrentTs: {
+            SizeT current_ts = query_context->storage()->txn_manager()->CurrentTS();
+            Value value = Value::MakeVarchar(std::to_string(current_ts));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
         }
         default: {
             RecoverableError(Status::NoSysVar(object_name_));

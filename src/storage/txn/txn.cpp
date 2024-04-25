@@ -408,7 +408,7 @@ TxnTimeStamp Txn::Commit() {
     //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     //    txn_context_.SetTxnCommitting(commit_ts);
 
-    if (wal_entry_->cmds_.empty()) {
+    if (wal_entry_->cmds_.empty() && txn_store_.Empty()) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp();
         this->SetTxnCommitting(commit_ts);
@@ -427,8 +427,10 @@ TxnTimeStamp Txn::Commit() {
 
     if (txn_context_.GetTxnState() == TxnState::kToRollback) {
         // abort because of conflict
-        RecoverableError(Status::TxnRollback(txn_id_));
+        LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, this->CommitTS()));
+        return this->CommitTS();
     }
+
     if (txn_context_.GetTxnState() != TxnState::kCommitted) {
         UnrecoverableError("Transaction isn't in COMMITTED status.");
     }

@@ -23,13 +23,13 @@ baseResponse = {
 }
 
 baseCreateOptions = {
-    "kError": '',
+    "kError": 'error',
     "kIgnore": "ignore_if_exists",
     "kReplace": "replace_if_exists"
 }
 
 baseDropOptions = {
-    "kError": "",
+    "kError": "error",
     "kIgnore": "ignore_if_not_exists",
 }
 

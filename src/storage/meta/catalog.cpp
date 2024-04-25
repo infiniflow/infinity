@@ -415,7 +415,8 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["data_dir"] = *this->data_dir_;
-        json_res["next_txn_id"] = this->next_txn_id_;
+        TransactionID next_txn_id = this->next_txn_id_;
+        json_res["next_txn_id"] = next_txn_id;
         json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
         databases.reserve(this->db_meta_map().size());
         for (auto &db_meta : this->db_meta_map()) {
@@ -433,13 +434,13 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_d
     auto catalog = MakeUnique<Catalog>(data_dir);
     if (create_default_db) {
         // db current dir is same level as catalog
-        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
+        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default_db"));
         SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
         db_meta->db_entry_list().emplace_front(std::move(db_entry));
 
-        catalog->db_meta_map()["default"] = std::move(db_meta);
+        catalog->db_meta_map()["default_db"] = std::move(db_meta);
     }
     return catalog;
 }
@@ -745,6 +746,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto segment_id = add_segment_index_entry_op->segment_id_;
                 auto min_ts = add_segment_index_entry_op->min_ts_;
                 auto max_ts = add_segment_index_entry_op->max_ts_;
+                auto next_chunk_id = add_segment_index_entry_op->next_chunk_id_;
 
                 auto *db_entry = this->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
@@ -761,6 +763,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                                              buffer_mgr,
                                                                                              min_ts,
                                                                                              max_ts,
+                                                                                             next_chunk_id,
                                                                                              txn_id,
                                                                                              begin_ts,
                                                                                              commit_ts);
@@ -777,6 +780,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 const auto &table_name = add_chunk_index_entry_op->table_name_;
                 const auto &index_name = add_chunk_index_entry_op->index_name_;
                 auto segment_id = add_chunk_index_entry_op->segment_id_;
+                auto chunk_id = add_chunk_index_entry_op->chunk_id_;
                 const auto &base_name = add_chunk_index_entry_op->base_name_;
                 auto base_rowid = add_chunk_index_entry_op->base_rowid_;
                 auto row_count = add_chunk_index_entry_op->row_count_;
@@ -795,7 +799,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
                     }
                     auto *segment_index_entry = iter2->second.get();
-                    segment_index_entry->AddChunkIndexEntryReplay(table_entry, base_name, base_rowid, row_count, buffer_mgr);
+                    segment_index_entry->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, buffer_mgr);
                 }
                 break;
             }
@@ -1013,5 +1017,9 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
 Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_catalog_delta_entry_->GetCheckpointState(); }
 
 void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }
+
+SizeT Catalog::GetDeltaLogCount() const {
+    return global_catalog_delta_entry_->OpSize();
+}
 
 } // namespace infinity
