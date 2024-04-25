@@ -110,17 +110,19 @@ SizeT BufferManager::BufferedObjectCount() {
 
 void BufferManager::RequestSpace(SizeT need_size) {
     std::unique_lock lock(gc_locker_);
-    while (current_memory_size_ + need_size > memory_limit_ && !gc_list_.empty()) {
-        auto *buffer_obj = gc_list_.front();
+    auto iter = gc_list_.begin();
+    while (current_memory_size_ + need_size > memory_limit_ && iter != gc_list_.end()) {
+        auto *buffer_obj = *iter;
 
         // Free return false when the buffer is freed by cleanup
-        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or kClean state
+        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or state
         if (buffer_obj->Free()) {
             current_memory_size_ -= buffer_obj->GetBufferSize();
+            iter = gc_list_.erase(iter);
+            gc_map_.erase(buffer_obj);
+        } else {
+            ++iter;
         }
-
-        gc_list_.pop_front();
-        gc_map_.erase(buffer_obj);
     }
     if (current_memory_size_ + need_size > memory_limit_) {
         UnrecoverableError("Out of memory.");
@@ -140,12 +142,7 @@ void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
 
 bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
     std::unique_lock lock(gc_locker_);
-    if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
-        gc_list_.erase(iter->second);
-        gc_map_.erase(iter);
-        return true;
-    }
-    return false;
+    return RemoveFromGCQueueInner(buffer_obj);
 }
 
 void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool free) {
@@ -154,8 +151,21 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool free) {
         clean_list_.push_back(buffer_obj);
     }
     if (free) {
+        std::unique_lock lock(gc_locker_);
         current_memory_size_ -= buffer_obj->GetBufferSize();
+        if (!RemoveFromGCQueueInner(buffer_obj)) {
+            UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename()));
+        }
     }
+}
+
+bool BufferManager::RemoveFromGCQueueInner(BufferObj *buffer_obj) {
+    if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
+        gc_list_.erase(iter->second);
+        gc_map_.erase(iter);
+        return true;
+    }
+    return false;
 }
 
 } // namespace infinity
