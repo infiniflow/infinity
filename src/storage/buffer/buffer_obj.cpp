@@ -82,9 +82,8 @@ BufferHandle BufferObj::Load() {
 }
 
 bool BufferObj::Free() {
-    std::unique_lock<std::mutex> locker(w_locker_);
-    // no lock is needed because already in gc_queue
-    if (status_ == BufferStatus::kClean) {
+    std::unique_lock<std::mutex> locker(w_locker_, std::defer_lock);
+    if (!locker.try_lock()) {
         return false;
     }
     if (status_ != BufferStatus::kUnloaded) {

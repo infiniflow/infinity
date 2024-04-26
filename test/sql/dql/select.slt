@@ -98,3 +98,5 @@ SELECT 'abccccccccccccccccccccccccccccccccccccccccc';
 ----
 abccccccccccccccccccccccccccccccccccccccccc
 
+statement ok
+DROP TABLE select3;

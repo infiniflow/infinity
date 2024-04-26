@@ -119,7 +119,7 @@ public:
     }
     virtual const String EncodeIndex() const = 0;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
-    virtual void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) = 0;
+    virtual void Merge(UniquePtr<CatalogDeltaOperation> other) = 0;
 
     static PruneFlag ToPrune(Optional<MergeFlag> old_merge_flag, MergeFlag new_merge_flag);
 
@@ -159,7 +159,7 @@ public:
     const String ToString() const final;
     const String EncodeIndex() const final { return String(fmt::format("#{}@{}", *db_name_, (u8)(type_))); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -251,7 +251,7 @@ public:
     const String ToString() const final;
     const String EncodeIndex() const final { return String(fmt::format("#{}#{}@{}", *db_name_, *table_name_, (u8)(type_))); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -302,7 +302,7 @@ public:
         return String(fmt::format("#{}#{}#{}@{}", *this->db_name_, *this->table_name_, this->segment_id_, (u8)(type_)));
     }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -352,7 +352,7 @@ public:
         return String(fmt::format("#{}#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, block_id_, (u8)(type_)));
     }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts);
 
@@ -405,7 +405,7 @@ public:
         return String(fmt::format("#{}#{}#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, block_id_, column_id_, (u8)(type_)));
     }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -448,7 +448,7 @@ public:
     const String ToString() const final;
     const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}@{}", *db_name_, *table_name_, *index_name_, (u8)(type_))); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -491,7 +491,7 @@ public:
     }
     void FlushDataToDisk(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SegmentIndexEntry *segment_index_entry_{};
@@ -541,7 +541,7 @@ public:
     }
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -582,7 +582,7 @@ public:
     const String ToString() const final;
     const String EncodeIndex() const final { return String(fmt::format("#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, (u8)(type_))); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -624,7 +624,7 @@ public:
         return String(fmt::format("#{}#{}#{}#{}@{}", *db_name_, *table_name_, segment_id_, block_id_, (u8)(type_)));
     }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other, TxnTimeStamp last_full_checkpoint_ts) override;
+    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
 
 public:
     SharedPtr<String> db_name_{};
@@ -690,14 +690,14 @@ public:
     // Must be called before any checkpoint.
     void InitMaxCommitTS(TxnTimeStamp max_commit_ts) { max_commit_ts_ = max_commit_ts; }
 
-    void InitFullCheckpointTs(TxnTimeStamp last_full_ckp_ts) { last_full_ckp_ts_ = last_full_ckp_ts; }
+    void InitFullCheckpointTs(TxnTimeStamp last_full_ckp_ts);
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
-    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp full_ckp_ts, TxnTimeStamp max_commit_ts);
+    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
 
     Tuple<TxnTimeStamp, i64> GetCheckpointState() const { return {max_commit_ts_, wal_size_}; }
 

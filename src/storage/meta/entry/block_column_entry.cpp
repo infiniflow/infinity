@@ -114,7 +114,7 @@ void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input
     column_vector.AppendWith(*input_column_vector, input_column_vector_offset, append_rows);
 }
 
-void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpoint_row_count) {
+void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count) {
     // TODO: Opt, Flush certain row_count content
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {
@@ -157,7 +157,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 
             std::shared_lock lock(block_column_entry->mutex_);
             for (auto *outline_buffer : block_column_entry->outline_buffers_) {
-                if(outline_buffer != nullptr) {
+                if (outline_buffer != nullptr) {
                     outline_buffer->Save();
                 }
             }
@@ -223,10 +223,11 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 }
 
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
-    if (!this->Committed()) {
-        this->txn_id_ = txn_id;
-        this->Commit(commit_ts);
+    if (this->Committed()) {
+        UnrecoverableError("Column already committed");
     }
+    this->txn_id_ = txn_id;
+    this->Commit(commit_ts);
 }
 
 Vector<String> BlockColumnEntry::OutlinePaths() const {

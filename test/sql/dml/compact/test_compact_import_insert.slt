@@ -51,3 +51,6 @@ SELECT * FROM test_compact_import_delete;
 5 6,7,8
 9 10,11,12
 9 10,11,12
+
+statement ok
+DROP TABLE test_compact_import_delete;

@@ -70,3 +70,6 @@ CREATE TABLE T2 (c1 boolean, c2 boolean);
 
 statement error
 UPDATE t2 SET c1 = 1 WHERE c2 = true;
+
+statement ok
+DROP TABLE T2;

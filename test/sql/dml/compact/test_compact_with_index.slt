@@ -54,3 +54,6 @@ SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'flo
 8
 8
 8
+
+statement ok
+DROP TABLE test_compact_with_index;
