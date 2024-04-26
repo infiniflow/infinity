@@ -234,13 +234,15 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     { // add the last segment entry
         auto segment_entry = parser_context->segment_entry_;
         auto &block_entry = parser_context->block_entry_;
-        if (block_entry->row_count() > 0) {
+        if (!block_entry) {
+        } else if (block_entry->row_count() > 0) {
             segment_entry->AppendBlockEntry(std::move(block_entry));
         } else {
             parser_context->column_vectors_.clear();
             std::move(*block_entry).Cleanup();
         }
-        if (segment_entry->row_count() == 0) {
+        if (!segment_entry) {
+        } else if (segment_entry->row_count() == 0) {
             parser_context->column_vectors_.clear();
             std::move(*segment_entry).Cleanup();
         } else {

@@ -221,46 +221,78 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job end for column: {}", arg.column_id_));
 }
 
+// FIXME: Local threads are used here, which is not a properly solution for multi-threads implementation.
 template <CanBuildMinMaxFilter ValueType, bool CheckTS>
 void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &arg) {
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job begin for column: {}", arg.column_id_));
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
     // step 0. prepare min and max value
-    MinMaxInnerValueType segment_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
-    MinMaxInnerValueType segment_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
+    SizeT thread_size = 4;
+    Vector<BlockEntry *> block_entries[thread_size];
+    for (SizeT i = 0; i < thread_size; ++i) {
+        block_entries[i].reserve(arg.segment_entry_->block_entries().size() / thread_size);
+    }
+    SizeT block_count = 0;
     auto iter = BlockEntryIter(arg.segment_entry_);
     for (auto *block_entry = iter.Next(); block_entry != nullptr; block_entry = iter.Next()) {
-        // check row count
-        u32 block_row_cnt = block_entry->row_count();
-        if (block_row_cnt == 0) {
-            // skip empty block
-            continue;
-        }
-        // step 1. update min and max value for block
-        MinMaxInnerValueType block_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
-        MinMaxInnerValueType block_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
-        BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(arg.column_id_);
-        BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_);
-        for (auto next_pair = column_iter.Next(); next_pair; next_pair = column_iter.Next()) {
-            Advance(arg.total_row_count_handler_);
-            auto &[ptr, offset] = next_pair.value();
-            if constexpr (std::is_same_v<ValueType, VarcharT>) {
-                Value val = column_iter.column_vector()->GetValue(offset);
-                const String &str = val.GetVarchar();
-                UpdateMin(block_min_value, str);
-                UpdateMax(block_max_value, str);
-            } else {
-                const auto &val = *static_cast<const ValueType *>(ptr);
-                UpdateMin(block_min_value, val);
-                UpdateMax(block_max_value, val);
+        block_entries[block_count++ % thread_size].push_back(block_entry);
+    }
+
+    MinMaxInnerValueType segment_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
+    MinMaxInnerValueType segment_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
+    Vector<infinity::Thread> threads;
+    std::mutex mutex;
+    for (SizeT i = 0; i < thread_size; ++i) {
+        infinity::Thread thread([&, i]() {
+            MinMaxInnerValueType chunk_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
+            MinMaxInnerValueType chunk_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
+            SizeT chunk_row_count = 0;
+            for (auto *block_entry : block_entries[i]) {
+                u32 block_row_cnt = block_entry->row_count();
+                if (block_row_cnt == 0) {
+                    // skip empty block
+                    continue;
+                }
+                // step 1. update min and max value for block
+                MinMaxInnerValueType block_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
+                MinMaxInnerValueType block_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(arg.column_id_);
+                BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_);
+                for (auto next_pair = column_iter.Next(); next_pair; next_pair = column_iter.Next()) {
+                    auto &[ptr, offset] = next_pair.value();
+                    if constexpr (std::is_same_v<ValueType, VarcharT>) {
+                        Value val = column_iter.column_vector()->GetValue(offset);
+                        const String &str = val.GetVarchar();
+                        UpdateMin(block_min_value, str);
+                        UpdateMax(block_max_value, str);
+                    } else {
+                        const auto &val = *static_cast<const ValueType *>(ptr);
+                        UpdateMin(block_min_value, val);
+                        UpdateMax(block_max_value, val);
+                    }
+                }
+                // step 2. merge min, max for segment
+                UpdateMin(chunk_min_value, block_min_value);
+                UpdateMax(chunk_max_value, block_max_value);
+                // step 3. build min_max_data_filter for block
+                block_entry->GetFastRoughFilter()->BuildMinMaxDataFilter<ValueType>(arg.column_id_,
+                                                                                    std::move(block_min_value),
+                                                                                    std::move(block_max_value));
+                chunk_row_count += block_row_cnt;
             }
-        }
-        // step 2. merge min, max for segment
-        UpdateMin(segment_min_value, block_min_value);
-        UpdateMax(segment_max_value, block_max_value);
-        // step 3. build min_max_data_filter for block
-        block_entry->GetFastRoughFilter()->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(block_min_value), std::move(block_max_value));
+            // merge chunk_min_value, chunk_max_value
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                UpdateMin(segment_min_value, chunk_min_value);
+                UpdateMax(segment_max_value, chunk_max_value);
+                arg.total_row_count_handler_.total_row_count_read_ += chunk_row_count;
+            }
+        });
+        threads.push_back(std::move(thread));
+    }
+    for (auto &thread : threads) {
+        thread.join();
     }
     // finally, build min_max_data_filter for segment
     arg.segment_entry_->GetFastRoughFilter()->BuildMinMaxDataFilter<ValueType>(arg.column_id_,
