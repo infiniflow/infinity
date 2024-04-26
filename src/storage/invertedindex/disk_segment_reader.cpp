@@ -46,12 +46,15 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
 
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {}
 
-bool DiskIndexSegmentReader::GetSegmentPostingBack(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
+bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
     }
-    u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
+    u64 file_length = term_meta.pos_start_ - term_meta.doc_start_;
+    if (fetch_position) {
+        file_length = term_meta.pos_end_ - term_meta.doc_start_;
+    }
     ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -60,19 +63,18 @@ bool DiskIndexSegmentReader::GetSegmentPostingBack(const String &term, SegmentPo
 
         ByteSliceReader byte_slice_reader;
         byte_slice_reader.Open(slice);
-
     }
     SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
     seg_posting.Init(std::move(byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
     return true;
 }
 
-bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
+bool DiskIndexSegmentReader::GetSegmentPostingBack(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
     }
-    // sometimes the result of pos_end_ is 0 ??? bug?
+
     u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
     u64 doc_header_length = sizeof(u32) * 2;
     u64 pos_header_length = sizeof(u32) * 2;
@@ -134,6 +136,5 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
                      session_pool);
     return true;
 }
-
 
 } // namespace infinity
