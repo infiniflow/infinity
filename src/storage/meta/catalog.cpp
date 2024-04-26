@@ -498,11 +498,11 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
     auto &delta_ops = delta_entry->operations();
     for (auto &op : delta_ops) {
         auto type = op->GetType();
-        LOG_TRACE(fmt::format("Catalog Delta Op is {}", op->ToString()));
+        LOG_INFO(fmt::format("Load delta op {}", op->ToString()));
         auto commit_ts = op->commit_ts_;
         auto txn_id = op->txn_id_;
         auto begin_ts = op->begin_ts_;
-        std::string_view encode = op->encode_;
+        std::string_view encode = *op->encode_;
         MergeFlag merge_flag = op->merge_flag_;
         if (op->commit_ts_ < full_ckp_commit_ts_) {
             // Ignore the old txn

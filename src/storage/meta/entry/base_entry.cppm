@@ -38,7 +38,7 @@ export enum class EntryType : i8 {
 
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
-        : deleted_(is_delete), entry_type_(entry_type), encode_(std::move(encode)) {}
+        : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {}
 
     virtual ~BaseEntry() = default;
 
@@ -54,7 +54,9 @@ public:
 
     bool Deleted() const { return deleted_; }
 
-    const String &encode() const { return encode_; }
+    const String &encode() const { return *encode_; }
+
+    SharedPtr<String> encode_ptr() const { return encode_; }
 
 public:
     atomic_u64 txn_id_{0};
@@ -65,7 +67,7 @@ public:
     const EntryType entry_type_;
 
 private:
-    const String encode_;
+    SharedPtr<String> encode_;
 };
 
 } // namespace infinity

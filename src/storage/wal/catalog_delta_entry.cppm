@@ -100,7 +100,7 @@ public:
 
     virtual const String ToString() const;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
-    virtual void Merge(UniquePtr<CatalogDeltaOperation> other) = 0;
+    virtual void Merge(CatalogDeltaOperation &other) = 0;
 
     static PruneFlag ToPrune(Optional<MergeFlag> old_merge_flag, MergeFlag new_merge_flag);
 
@@ -111,10 +111,7 @@ public:
     TransactionID txn_id_{0};
     TxnTimeStamp commit_ts_{0};
     MergeFlag merge_flag_{MergeFlag::kInvalid};
-    std::string_view encode_{};
-
-private:
-    String encode_inner_{};
+    SharedPtr<String> encode_;
 
 public:
     CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};
@@ -135,7 +132,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
 public:
     SharedPtr<String> db_entry_dir_{};
@@ -158,7 +155,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
 public:
     SharedPtr<String> table_entry_dir_{};
@@ -188,7 +185,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
 public:
     SegmentStatus status_{};
@@ -220,7 +217,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts);
 
@@ -254,7 +251,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
 public:
     i32 next_outline_idx_{0};
@@ -277,7 +274,7 @@ public:
     void WriteAdv(char *&buf) const final;
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
 public:
     SharedPtr<String> index_dir_{};
@@ -302,7 +299,7 @@ public:
     const String ToString() const final;
     void FlushDataToDisk(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
 public:
     SegmentIndexEntry *segment_index_entry_{};
@@ -329,7 +326,7 @@ public:
     const String ToString() const final;
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
+    void Merge(CatalogDeltaOperation &other) override;
 
 public:
     String base_name_{};
@@ -408,14 +405,14 @@ public:
 private:
     void AddDeltaEntryInner(CatalogDeltaEntry *delta_entry);
 
-    void PruneOpWithSamePrefix(std::string_view prefix);
+    void PruneOpWithSamePrefix(const String &prefix);
 
 private:
     u64 last_sequence_{0};
     std::priority_queue<u64, Vector<u64>, std::greater<u64>> sequence_heap_;
     Map<u64, UniquePtr<CatalogDeltaEntry>> delta_entry_map_;
 
-    Map<std::string_view, UniquePtr<CatalogDeltaOperation>> delta_ops_;
+    Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
     // update by add delta entry, read by bg_process::checkpoint
     TxnTimeStamp max_commit_ts_{0};

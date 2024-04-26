@@ -38,7 +38,7 @@ namespace infinity {
 
 SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     SizeT size = sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp);
-    size += sizeof(i32) + encode_.size();
+    size += sizeof(i32) + encode_->size();
     return size;
 }
 
@@ -47,7 +47,7 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     WriteBufAdv(buf, this->merge_flag_);
     WriteBufAdv(buf, this->txn_id_);
     WriteBufAdv(buf, this->commit_ts_);
-    WriteBufAdv(buf, String(this->encode_));
+    WriteBufAdv(buf, *(this->encode_));
 }
 
 void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
@@ -55,22 +55,21 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     merge_flag_ = ReadBufAdv<MergeFlag>(ptr);
     txn_id_ = ReadBufAdv<TransactionID>(ptr);
     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
-    encode_inner_ = ReadBufAdv<String>(ptr);
-    encode_ = encode_inner_;
+    encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
 }
 
 const String CatalogDeltaOperation::ToString() const {
-    return fmt::format("type: {}, begin_ts: {}, txn_id: {}, commit_ts: {}, merge_flag: {}, encode: {}",
-                       GetTypeStr(),
+    return fmt::format("begin_ts: {}, txn_id: {}, commit_ts: {}, merge_flag: {}, encode: {}",
                        begin_ts_,
                        txn_id_,
                        commit_ts_,
                        (u8)merge_flag_,
-                       String(encode_));
+                       *encode_);
 }
 
 CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts)
-    : begin_ts_(base_entry->begin_ts_), txn_id_(base_entry->txn_id_), commit_ts_(base_entry->commit_ts_), encode_(base_entry->encode()), type_(type) {
+    : begin_ts_(base_entry->begin_ts_), txn_id_(base_entry->txn_id_), commit_ts_(base_entry->commit_ts_), encode_(base_entry->encode_ptr()),
+      type_(type) {
     if (base_entry->deleted_) {
         merge_flag_ = MergeFlag::kDelete;
     } else if (commit_ts == base_entry->commit_ts_) {
@@ -138,7 +137,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
 
 bool CatalogDeltaOperation::operator==(const CatalogDeltaOperation &rhs) const {
     return this->begin_ts_ == rhs.begin_ts_ && this->txn_id_ == rhs.txn_id_ && this->commit_ts_ == rhs.commit_ts_ &&
-           this->merge_flag_ == rhs.merge_flag_ && this->type_ == rhs.type_ && this->encode_ == rhs.encode_;
+           this->merge_flag_ == rhs.merge_flag_ && this->type_ == rhs.type_ && *this->encode_ == *rhs.encode_;
 }
 
 PruneFlag CatalogDeltaOperation::ToPrune(Optional<MergeFlag> old_merge_flag_opt, MergeFlag new_merge_flag) {
@@ -218,7 +217,6 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
                     UnrecoverableError("Should prune before reach this.");
                     break;
                 }
-                case MergeFlag::kNew:
                 case MergeFlag::kUpdate:
                 case MergeFlag::kDeleteAndNew: {
                     return MergeFlag::kNew;
@@ -721,33 +719,33 @@ bool AddChunkIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
            row_count_ == rhs_op->row_count_;
 }
 
-void AddDBEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_DATABASE_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddDBEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_DATABASE_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    MergeFlag flag = this->NextDeleteFlag(other->merge_flag_);
-    *this = std::move(*static_cast<AddDBEntryOp *>(other.get()));
+    MergeFlag flag = this->NextDeleteFlag(other.merge_flag_);
+    *this = std::move(static_cast<AddDBEntryOp &>(other));
     this->merge_flag_ = flag;
 }
 
-void AddTableEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_TABLE_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddTableEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_TABLE_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    auto *add_table_op = static_cast<AddTableEntryOp *>(other.get());
-    MergeFlag flag = this->NextDeleteFlag(add_table_op->merge_flag_);
-    *this = std::move(*add_table_op);
+    auto &add_table_op = static_cast<AddTableEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_table_op.merge_flag_);
+    *this = std::move(add_table_op);
     this->merge_flag_ = flag;
 }
 
-void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddSegmentEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    auto *add_segment_op = static_cast<AddSegmentEntryOp *>(other.get());
-    MergeFlag flag = this->NextDeleteFlag(add_segment_op->merge_flag_);
+    auto &add_segment_op = static_cast<AddSegmentEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_segment_op.merge_flag_);
     auto segment_filter_binary_data = std::move(segment_filter_binary_data_);
-    *this = std::move(*add_segment_op);
+    *this = std::move(add_segment_op);
     this->merge_flag_ = flag;
     if (!segment_filter_binary_data.empty()) {
         if (!segment_filter_binary_data_.empty()) {
@@ -757,13 +755,15 @@ void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     }
 }
 
-void AddBlockEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_BLOCK_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddBlockEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_BLOCK_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    auto *add_block_op = static_cast<AddBlockEntryOp *>(other.get());
+    auto &add_block_op = static_cast<AddBlockEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_block_op.merge_flag_);
     auto block_filter_binary_data = std::move(block_filter_binary_data_);
-    *this = std::move(*add_block_op);
+    *this = std::move(add_block_op);
+    this->merge_flag_ = flag;
     if (!block_filter_binary_data.empty()) {
         if (!block_filter_binary_data_.empty()) {
             UnrecoverableError("Serialize block filter binary twice");
@@ -772,35 +772,35 @@ void AddBlockEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     }
 }
 
-void AddColumnEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_COLUMN_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddColumnEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_COLUMN_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    *this = std::move(*static_cast<AddColumnEntryOp *>(other.get()));
+    *this = std::move(static_cast<AddColumnEntryOp &>(other));
 }
 
-void AddTableIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddTableIndexEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    auto *add_table_index_op = static_cast<AddTableIndexEntryOp *>(other.get());
-    MergeFlag flag = this->NextDeleteFlag(add_table_index_op->merge_flag_);
-    *this = std::move(*add_table_index_op);
+    auto &add_table_index_op = static_cast<AddTableIndexEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_table_index_op.merge_flag_);
+    *this = std::move(add_table_index_op);
     this->merge_flag_ = flag;
 }
 
-void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddSegmentIndexEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    *this = std::move(*static_cast<AddSegmentIndexEntryOp *>(other.get()));
+    *this = std::move(static_cast<AddSegmentIndexEntryOp &>(other));
 }
 
-void AddChunkIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
+    if (other.type_ != CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other.GetTypeStr()));
     }
-    *this = std::move(*static_cast<AddChunkIndexEntryOp *>(other.get()));
+    *this = std::move(static_cast<AddChunkIndexEntryOp &>(other));
 }
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
@@ -1041,7 +1041,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
                 add_segment_op->merge_flag_ = MergeFlag::kDelete;
             }
         }
-        std::string_view encode = new_op->encode_;
+        const String &encode = *new_op->encode_;
         if (encode.empty()) {
             UnrecoverableError("encode is empty");
         }
@@ -1064,7 +1064,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             } else if (prune_flag == PruneFlag::kPruneSub) {
                 PruneOpWithSamePrefix(encode);
             }
-            op->Merge(std::move(new_op));
+            op->Merge(*new_op);
         } else {
             PruneFlag prune_flag = CatalogDeltaOperation::ToPrune(None, new_op->merge_flag_);
             delta_ops_[encode] = std::move(new_op);
@@ -1076,7 +1076,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
     txn_ids_.insert(delta_entry->txn_ids().begin(), delta_entry->txn_ids().end());
 }
 
-void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(std::string_view encode1) {
+void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
     auto iter = delta_ops_.lower_bound(encode1);
     while (iter != delta_ops_.end()) {
         const auto &[encode2, delta_op2] = *iter;
