@@ -20,29 +20,6 @@ from infinity.common import ConflictType
 import pandas as pds
 
 
-def main():
-    infinity_obj = infinity.connect(REMOTE_HOST)
-    db = infinity_obj.get_database("default_db")
-    # Drop my_table if it already exists
-    db.drop_table("my_table", ConflictType.Ignore)
-    # Create a table named "my_table"
-    table = db.create_table(
-        "my_table", {
-            "num": {"type": "integer"}, 
-            "body": {"type": "varchar"},
-            "vec": {"type": "vector, 4, float"}
-        })
-    table.insert(
-        [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-    table.insert(
-        [{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-
-    res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7,
-                                          3.1], "float", "ip", 2).to_pl()
-    print("------all rows-------")
-    print(res)
-
-
 def test_english():
     try:
         infinity_obj = infinity.connect(REMOTE_HOST)
@@ -52,7 +29,7 @@ def test_english():
         # Create a table named "my_table"
         table = db.create_table(
             "my_table", {
-                "num": {"type": "integer"}, 
+                "num": {"type": "integer"},
                 "body": {"type": "varchar"},
                 "vec": {"type": "vector, 4, float"}
             })
@@ -118,7 +95,11 @@ def test_chinese():
         db.drop_table("my_table", ConflictType.Ignore)
         # Create a table named "my_table"
         table = db.create_table(
-            "my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
+            "my_table", {
+                "num": {"type": "integer"},
+                "body": {"type": "varchar"},
+                "vec": {"type": "vector, 4, float"}
+            })
         table.insert(
             [{"num": 1, "body": "据Wccftech报道，苹果正在开发一种定制芯片，旨在为人工智能（AI）服务器提供动力。暂时还不清楚这款芯片的具体规格，以及具体的实现目标。传闻苹果已选择台积电（TSMC）的3nm制程节点来制造这款芯片，预计2025年下半年量产。如果按照量产时间和台积电的半导体工艺进度，那么对应的很可能是N3E工艺。", "vec": [1.0, 1.2, 0.8, 0.9]}])
         table.insert(
@@ -163,6 +144,5 @@ def test_chinese():
 
 
 if __name__ == '__main__':
-    main()
     test_english()
     test_chinese()

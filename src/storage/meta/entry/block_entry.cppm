@@ -41,13 +41,18 @@ class DataBlock;
 
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {
+public:
     friend struct TableEntry;
     friend struct SegmentEntry;
     friend struct WalBlockInfo;
 
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const BlockID block_id, const SegmentEntry *segment_entry);
+
 public:
     // for iterator unit test
-    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false){};
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
@@ -65,6 +70,8 @@ public:
                                                      TxnTimeStamp check_point_ts,
                                                      u16 checkpoint_row_count,
                                                      BufferManager *buffer_mgr);
+
+    void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);

@@ -50,11 +50,11 @@ public:
 
     TxnSegmentStore() = default;
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, TxnTimeStamp commit_ts) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, Txn *txn, bool set_sealed) const;
 
 public:
     SegmentEntry *const segment_entry_ = nullptr;
-    Vector<BlockEntry *> block_entries_;
+    HashMap<BlockID, BlockEntry *> block_entries_;
 };
 
 export struct TxnIndexStore {
@@ -84,8 +84,6 @@ export struct TxnCompactStore {
 
     TxnCompactStore();
     TxnCompactStore(CompactSegmentsTaskType type);
-
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const;
 };
 
 export class TxnTableStore {
@@ -139,7 +137,7 @@ public: // Getter
 private:
     HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
     Vector<SegmentEntry *> flushed_segments_{};
-    Vector<SegmentEntry *> set_sealed_segments_{};
+    HashSet<SegmentEntry *> set_sealed_segments_{};
 
     int ptr_seq_n_;
     HashMap<TableIndexEntry *, int> txn_indexes_{};

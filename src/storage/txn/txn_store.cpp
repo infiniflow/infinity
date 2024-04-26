@@ -43,18 +43,33 @@ namespace infinity {
 TxnSegmentStore TxnSegmentStore::AddSegmentStore(SegmentEntry *segment_entry) {
     TxnSegmentStore txn_segment_store(segment_entry);
     for (auto &block_entry : segment_entry->block_entries()) {
-        txn_segment_store.block_entries_.emplace_back(block_entry.get());
+        txn_segment_store.block_entries_.emplace(block_entry->block_id(), block_entry.get());
     }
     return txn_segment_store;
 }
 
 TxnSegmentStore::TxnSegmentStore(SegmentEntry *segment_entry) : segment_entry_(segment_entry) {}
 
-void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, TxnTimeStamp commit_ts) const {
-    // FIXME: use append_state
-    local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(segment_entry_, commit_ts));
-    for (auto *block_entry : block_entries_) {
-        local_delta_ops->AddOperation(MakeUnique<AddBlockEntryOp>(block_entry, commit_ts));
+void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, Txn *txn, bool set_sealed) const {
+    TxnTimeStamp commit_ts = txn->CommitTS();
+
+    if (set_sealed) {
+        // build minmax filter
+        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(segment_entry_, txn->buffer_mgr(), commit_ts);
+        // now have minmax filter and optional bloom filter
+        // serialize filter
+        local_delta_ops->AddOperation(
+            MakeUnique<AddSegmentEntryOp>(segment_entry_, commit_ts, segment_entry_->GetFastRoughFilter()->SerializeToString()));
+    } else {
+        local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(segment_entry_, commit_ts));
+    }
+    for (auto [block_id, block_entry] : block_entries_) {
+        if (set_sealed) {
+            local_delta_ops->AddOperation(
+                MakeUnique<AddBlockEntryOp>(block_entry, commit_ts, block_entry->GetFastRoughFilter()->SerializeToString()));
+        } else {
+            local_delta_ops->AddOperation(MakeUnique<AddBlockEntryOp>(block_entry, commit_ts));
+        }
         for (const auto &column_entry : block_entry->columns()) {
             local_delta_ops->AddOperation(MakeUnique<AddColumnEntryOp>(column_entry.get(), commit_ts));
         }
@@ -94,16 +109,6 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
 TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvalid) {}
 
 TxnCompactStore::TxnCompactStore(CompactSegmentsTaskType type) : task_type_(type) {}
-
-void TxnCompactStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const {
-    if (task_type_ != CompactSegmentsTaskType::kInvalid) {
-        for (const auto &[new_segment, old_segments] : compact_data_) {
-            for (auto *old_segment : old_segments) {
-                local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(old_segment, commit_ts));
-            }
-        }
-    }
-}
 
 ///-----------------------------------------------------------------------------
 
@@ -337,12 +342,12 @@ void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {
 void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry) {
     auto iter = txn_segments_store_.find(segment_entry->segment_id());
     if (iter == txn_segments_store_.end()) {
-        iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry)).first;
+        iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
     }
-    iter->second.block_entries_.emplace_back(block_entry);
+    iter->second.block_entries_.emplace(block_entry->block_id(), block_entry);
 }
 
-void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace_back(segment_entry); }
+void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace(segment_entry); }
 
 void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts) const {
     local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
@@ -356,24 +361,8 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *t
         index_store->AddDeltaOp(local_delta_ops, commit_ts);
     }
     for (const auto &[segment_id, segment_store] : txn_segments_store_) {
-        segment_store.AddDeltaOp(local_delta_ops, append_state_.get(), commit_ts);
-    }
-
-    for (auto *sealed_segment : set_sealed_segments_) {
-        // build minmax filter
-        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(sealed_segment, txn_->buffer_mgr(), commit_ts);
-        // now have minmax filter and optional bloom filter
-        // serialize filter
-        local_delta_ops->AddOperation(
-            MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, sealed_segment->GetFastRoughFilter()->SerializeToString(), commit_ts));
-        // FIXME: hack here
-        for (auto &block_entry : sealed_segment->block_entries()) {
-            local_delta_ops->AddOperation(
-                MakeUnique<SetBlockStatusSealedOp>(block_entry.get(), block_entry->GetFastRoughFilter()->SerializeToString(), commit_ts));
-        }
-    }
-    if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
-        compact_state_.AddDeltaOp(local_delta_ops, commit_ts);
+        bool set_sealed = set_sealed_segments_.contains(segment_store.segment_entry_);
+        segment_store.AddDeltaOp(local_delta_ops, append_state_.get(), txn_, set_sealed);
     }
 }
 

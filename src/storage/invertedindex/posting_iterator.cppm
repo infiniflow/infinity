@@ -12,6 +12,7 @@ import segment_posting;
 import index_defines;
 import match_data;
 import internal_types;
+import third_party;
 
 export module posting_iterator;
 
@@ -88,6 +89,7 @@ public:
         if (posting_option_.HasDocPayload()) {
             match_data.doc_payload_ = doc_payload_buffer_[GetDocOffsetInBuffer()];
         }
+
     }
 
 private:

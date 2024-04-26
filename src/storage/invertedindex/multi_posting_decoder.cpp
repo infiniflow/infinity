@@ -30,8 +30,9 @@ MultiPostingDecoder::~MultiPostingDecoder() {
         if (session_pool_) {
             index_decoder_->~IndexDecoder();
             session_pool_->Deallocate((void *)index_decoder_, sizeof(index_decoder_));
-        } else
+        } else {
             delete index_decoder_;
+        }
     }
 }
 
@@ -131,7 +132,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     if (posting_writer) {
         return MemSegMoveToSegment(posting_writer);
     } else {
-        return SplitDiskSegMoveToSegment(cur_segment_posting);
+        return DiskSegMoveToSegment(cur_segment_posting);
     }
 }
 
@@ -231,61 +232,6 @@ IndexDecoder* MultiPostingDecoder::CreateDocIndexDecoder(u32 doc_list_begin_pos)
                                                                          &doc_reader_,
                                                                          doc_list_begin_pos,
                                                                          format_option_.GetDocListFormatOption());
-}
-
-bool MultiPostingDecoder::SplitDiskSegMoveToSegment(SegmentPosting &cur_segment_posting) {
-    ByteSliceReader doc_reader;
-
-    ByteSliceList *doc_slice_list = cur_segment_posting.GetDocSliceListPtr().get();
-
-    doc_reader.Open(doc_slice_list);
-    doc_reader_.Open(doc_slice_list);
-
-    const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
-    u32 doc_skiplist_size = doc_reader.ReadVUInt32();
-    doc_reader.ReadVUInt32();
-
-    u32 doc_list_begin_pos = doc_reader.Tell() + doc_skiplist_size;
-
-    if (index_decoder_) {
-        if (session_pool_) {
-            index_decoder_->~IndexDecoder();
-            session_pool_->Deallocate((void *)index_decoder_, sizeof(index_decoder_));
-        } else {
-            delete index_decoder_;
-        }
-        index_decoder_ = nullptr;
-    }
-    index_decoder_ = CreateDocIndexDecoder(doc_list_begin_pos);
-    u32 doc_skiplist_start = doc_reader.Tell();
-    u32 doc_skiplist_end = doc_skiplist_start + doc_skiplist_size;
-
-    index_decoder_->InitSkipList(doc_skiplist_start, doc_skiplist_end, doc_slice_list, term_meta.GetDocFreq());
-    if (format_option_.HasPositionList()) {
-        ByteSliceList *pos_slice_list = cur_segment_posting.GetPosSliceListPtr().get();
-        assert(nullptr != pos_slice_list);
-        pos_reader_.Open(pos_slice_list);
-
-        u32 pos_list_begin = pos_reader_.Tell();
-
-        in_doc_state_keeper_.MoveToSegment(pos_slice_list, term_meta.GetTotalTermFreq(), pos_list_begin, format_option_);
-
-        if (in_doc_pos_iterator_) {
-            if (session_pool_) {
-                in_doc_pos_iterator_->~InDocPositionIterator();
-                session_pool_->Deallocate((void *)in_doc_pos_iterator_, sizeof(in_doc_pos_iterator_));
-            } else {
-                delete in_doc_pos_iterator_;
-            }
-            in_doc_pos_iterator_ = nullptr;
-        }
-        in_doc_pos_iterator_ = session_pool_ ? (new ((session_pool_)->Allocate(sizeof(InDocPositionIterator)))
-                                                    InDocPositionIterator(format_option_.GetPosListFormatOption()))
-                                             : new InDocPositionIterator(format_option_.GetPosListFormatOption());
-    }
-
-    ++segment_cursor_;
-    return true;
 }
 
 } // namespace infinity

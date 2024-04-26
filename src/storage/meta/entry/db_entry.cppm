@@ -42,6 +42,11 @@ export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const String &db_name);
+
+public:
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
                      const SharedPtr<String> &db_entry_dir,
