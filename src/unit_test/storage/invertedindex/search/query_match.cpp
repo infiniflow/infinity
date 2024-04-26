@@ -313,9 +313,7 @@ void QueryMatchTest::InsertData(const String& db_name, const String& table_name)
         }
 
     }
-
-    TxnTimeStamp flush_ts = txn->BeginTS();
-    segment_entry->FlushNewData(flush_ts);
+    segment_entry->FlushNewData();
     txn->Import(db_name, table_name, segment_entry);
 
     last_commit_ts_ = txn_mgr->CommitTxn(txn);
