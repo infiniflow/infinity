@@ -7,7 +7,7 @@
     "topK": 100,
     "mode": "vector", 
     "schema": {
-        "embeddings": "vector, 960, float"
+        "embeddings": {"type": "vector, 960, float"}
     }, 
     "metric_type": "l2",
     "vector_size": 960,
