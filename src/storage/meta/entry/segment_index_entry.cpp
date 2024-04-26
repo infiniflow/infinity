@@ -61,9 +61,26 @@ import txn_store;
 
 namespace infinity {
 
+Vector<std::string_view> SegmentIndexEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid segment index entry encode: {}", encode));
+    }
+    auto decodes = TableIndexEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String SegmentIndexEntry::EncodeIndex(const SegmentID segment_id, const TableIndexEntry *table_index_entry) {
+    if (table_index_entry == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", table_index_entry->encode(), segment_id);
+}
+
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
-    : BaseEntry(EntryType::kSegmentIndex, false), table_index_entry_(table_index_entry), segment_id_(segment_id),
-      vector_buffer_(std::move(vector_buffer)) {
+    : BaseEntry(EntryType::kSegmentIndex, false, SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
+      table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)) {
     if (table_index_entry != nullptr)
         index_dir_ = table_index_entry->index_dir();
 };

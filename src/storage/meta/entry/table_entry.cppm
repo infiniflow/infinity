@@ -47,6 +47,7 @@ import column_index_reader;
 namespace infinity {
 
 class IndexBase;
+struct DBEntry;
 struct TableIndexEntry;
 class TableMeta;
 class Txn;
@@ -55,6 +56,11 @@ class AddTableEntryOp;
 
 export struct TableEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
+
+public:
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const String &table_name, TableMeta *table_meta);
 
 public:
     using EntryOp = AddTableEntryOp;
@@ -133,7 +139,9 @@ private:
     void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);
 
 public:
-    void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id);
+    void AddSegmentReplay(SharedPtr<SegmentEntry> segment_entry);
+
+    void UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data);
 
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }

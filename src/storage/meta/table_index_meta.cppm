@@ -59,6 +59,7 @@ public:
 
     Tuple<SharedPtr<TableIndexEntry>, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                                   ConflictType conflict_type,
+                                                                  SharedPtr<String> index_name,
                                                                   TransactionID txn_id,
                                                                   TxnTimeStamp begin_ts,
                                                                   TxnManager *txn_mgr);
