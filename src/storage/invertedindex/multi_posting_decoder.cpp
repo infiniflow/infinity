@@ -30,8 +30,9 @@ MultiPostingDecoder::~MultiPostingDecoder() {
         if (session_pool_) {
             index_decoder_->~IndexDecoder();
             session_pool_->Deallocate((void *)index_decoder_, sizeof(index_decoder_));
-        } else
+        } else {
             delete index_decoder_;
+        }
     }
 }
 
@@ -131,7 +132,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     if (posting_writer) {
         return MemSegMoveToSegment(posting_writer);
     } else {
-        return SplitDiskSegMoveToSegment(cur_segment_posting);
+        return DiskSegMoveToSegment(cur_segment_posting);
     }
 }
 
