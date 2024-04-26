@@ -39,7 +39,9 @@ public:
 
     float BlockMaxBM25Score() override { return common_block_max_bm25_score_; }
 
+    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
+    float BM25Score() override;
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 
@@ -50,15 +52,32 @@ public:
     }
 
 private:
+    // won't change after initialization
+    Vector<UniquePtr<EarlyTerminateIterator>> sorted_iterators_; // sort by BM25ScoreUpperBound, in descending order
+    Vector<float> leftover_scores_upper_bound_;                  // value at i: upper bound of sum of BM25 scores for iter i + 1, i + 2, ..., n - 1
     // block max info
-    u32 pivot = 0;                                           // seperate the iterators into two parts: [0, pivot) and [pivot, n)
-    RowID common_block_min_possible_doc_id_ = INVALID_ROWID; // not always exist
+    RowID common_block_min_possible_doc_id_ = INVALID_ROWID;
     RowID common_block_last_doc_id_ = INVALID_ROWID;
     float common_block_max_bm25_score_ = 0.0f;
-    Vector<float> common_block_max_bm25_score_until_; // value at i: blockmax of sum of BM25 scores for iter 0, 1, ..., i
-    // won't change after initialization
-    Vector<float> bm25_scores_upper_bound_until_;                // value at i: upper bound of sum of BM25 scores for iter 0, 1, ..., i
-    Vector<UniquePtr<EarlyTerminateIterator>> sorted_iterators_; // sort by BM25ScoreUpperBound, in ascending order
+    Vector<float> common_block_max_bm25_score_parts_; // value at i: blockmax of sum of BM25 scores for iter i + 1, i + 2, ..., n - 1
+    // pivot and must_have info
+    // seperate the iterators into two parts:
+    // 1. [0, pivot) : cannot add into part 2
+    // 2. [pivot, n) : sum < threshold
+    u32 pivot_ = sorted_iterators_.size();
+    // there is an "AND" requirement for the iterators 0, 1, ..., must_have_before_ - 1
+    // we have must_have_before_ > 0 <=> pivot_ <= 1.
+    // so: case 1: must_have_before_ = 0, pivot_ > 1.
+    //     case 2: must_have_before_ > 0, pivot_ = 1.
+    u32 must_have_before_ = 0;
+    float must_have_total_upper_bound_score_ = 0.0f;
+    Vector<int> bool_need_score_;
+    // bm25 score cache
+    bool bm25_score_cached_ = false;
+    bool need_seek_after_must_ = false;
+    bool need_seek_after_pivot_ = false;
+    float bm25_score_cache_ = 0.0F;
+    RowID prev_next_candidate_ = INVALID_ROWID;
 };
 
 } // namespace infinity

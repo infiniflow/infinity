@@ -166,6 +166,13 @@ public:
 
     float BlockMaxBM25Score() override { return 0.0f; }
 
+    float BM25Score() override { return 0.0f; }
+
+    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
+        const auto [success, _, id] = SeekInBlockRange(doc_id, doc_id_no_beyond, 0.0f);
+        return {success, id};
+    }
+
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override {
         assert(doc_id.segment_id_ == current_segment_id_);
         assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
