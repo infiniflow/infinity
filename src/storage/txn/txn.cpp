@@ -405,6 +405,8 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 // }
 
 TxnTimeStamp Txn::Commit() {
+    txn_store_.PrepareCommit1();
+
     //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     //    txn_context_.SetTxnCommitting(commit_ts);
 

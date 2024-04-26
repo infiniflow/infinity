@@ -71,6 +71,10 @@ def generate(generate_if_exists: bool, copy_dir: str):
                 slt_file.write("{}\n".format(x1))
         slt_file.write("\n")
 
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
+
     pass
 
 

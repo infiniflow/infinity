@@ -56,7 +56,7 @@ public:
     void CleanupFile();
 
 protected:
-    virtual void WriteToFileImpl(bool &prepare_success) = 0;
+    virtual void WriteToFileImpl(bool to_spill, bool &prepare_success) = 0;
 
     virtual void ReadFromFileImpl() = 0;
 

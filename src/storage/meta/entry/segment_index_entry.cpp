@@ -226,7 +226,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        BufferManager *buffer_manager) {
     u32 seg_id = block_entry->segment_id();
     u16 block_id = block_entry->block_id();
-    RowID begin_row_id(seg_id, row_offset + u32(block_id) * block_entry->row_capacity());
+    SegmentOffset block_offset = u32(block_id) * block_entry->row_capacity();
+    RowID begin_row_id(seg_id, row_offset + block_offset);
 
     const SharedPtr<IndexBase> &index_base = table_index_entry_->table_index_def();
     const SharedPtr<ColumnDef> &column_def = table_index_entry_->column_def();
@@ -277,7 +278,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             switch (embedding_info->Type()) {
                 case kElemFloat: {
                     AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
-                    MemIndexInserterIter<f32> iter(0, block_column_entry, buffer_manager, row_offset, row_count);
+                    MemIndexInserterIter<f32> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
                     auto [start_i, end_i] = abstract_hnsw.InsertVecs(std::move(iter));
                     row_cnt = end_i;
                     break;

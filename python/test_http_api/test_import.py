@@ -547,7 +547,7 @@ class TestImport(HttpTest):
             "delimiter": ","
         }, {
                              "status_code": 500,
-                             "error_code": 3039,
+                             "error_code": 3037,
                          })
 
         self.drop_table(db_name, table_name)

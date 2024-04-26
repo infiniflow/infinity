@@ -100,3 +100,6 @@ SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 
 2
 2
 2
+
+statement ok
+DROP TABLE test_knn_ip_filter;

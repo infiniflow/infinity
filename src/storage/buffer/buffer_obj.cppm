@@ -68,7 +68,6 @@ public:
     BufferHandle Load();
 
     // called by BufferMgr in GC process.
-    // return true if is freed.
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
@@ -81,6 +80,8 @@ public:
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
+
+    FileWorker *file_worker() { return file_worker_.get(); }
 
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.

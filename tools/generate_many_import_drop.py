@@ -59,6 +59,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
                 )
                 slt_file.write("\n")
 
+            slt_file.write("statement ok\n")
+            slt_file.write("DROP TABLE {};\n".format(table_name))
+            slt_file.write("\n")
         # # The delete will throw exception when compacting, so add this to wait for sometime
         # slt_file.write("statement ok\n")
         # slt_file.write("SELECT * FROM {};\n".format(table_name))

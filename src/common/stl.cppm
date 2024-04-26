@@ -106,6 +106,10 @@ export namespace std {
     using std::unique_lock;
     using std::scoped_lock;
 
+    using std::defer_lock;
+    using std::adopt_lock;
+    using std::try_to_lock;
+
     using std::binary_search;
     using std::fabs;
     using std::fill_n;

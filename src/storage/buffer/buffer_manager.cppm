@@ -28,6 +28,8 @@ export class BufferManager {
 public:
     explicit BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir);
 
+    ~BufferManager();
+
 public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
     BufferObj *AllocateBufferObject(UniquePtr<FileWorker> file_worker);
@@ -44,9 +46,7 @@ public:
         return memory_limit_;
     }
 
-    u64 memory_usage() {
-        return current_memory_size_;
-    }
+    u64 memory_usage() { return current_memory_size_; }
 
     SizeT WaitingGCObjectCount() {
         std::unique_lock lock(gc_locker_);
@@ -69,6 +69,9 @@ private:
     bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
     void AddToCleanList(BufferObj *buffer_obj, bool free);
+
+private:
+    bool RemoveFromGCQueueInner(BufferObj *buffer_obj);
 
 private:
     SharedPtr<String> data_dir_;
