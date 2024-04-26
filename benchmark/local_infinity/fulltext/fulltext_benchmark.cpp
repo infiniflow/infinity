@@ -222,7 +222,8 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
 
 void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
-    std::vector<std::string> query_vec = {"Animalia", "Algorithms", "Animalia Algorithms", "network space", "harmful chemical anarchism"};
+    //std::vector<std::string> query_vec = {"one of", "is", "a", "\"is a\"", "\"one of\""};// {"Animalia", "Algorithms", "Animalia Algorithms", "network space", "harmful chemical anarchism"};
+    std::vector<std::string> query_vec = {"harmful chemical anarchism", "\"harmful chemical\"", "\"one of\"", "harmful chemical"};
     for (auto match_text : query_vec) {
         BaseProfiler profiler;
         profiler.Begin();
@@ -300,7 +301,9 @@ void BenchmarkMoreQuery(SharedPtr<Infinity> infinity, const String &db_name, con
     profiler.End();
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argn[]) {
+    argc = 3;
+    const char* argv[] = {"fulltext", "--mode", "query"};
     CLI::App app{"fulltext_benchmark"};
     // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
     // Using enumerations in an option
@@ -328,7 +331,7 @@ int main(int argc, char *argv[]) {
     String table_name = "ft_dbpedia_benchmark";
     String index_name = "ft_dbpedia_index";
     String srcfile = test_data_path();
-    srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
+    srcfile += "/benchmark/dbpedia-entity/corpus10.jsonl";
 
 // #define DEL_LOCAL_DATA
 #ifdef DEL_LOCAL_DATA
@@ -357,7 +360,8 @@ int main(int argc, char *argv[]) {
         case Mode::kQuery: {
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
-            BenchmarkOptimize(infinity, db_name, table_name);
+            // BenchmarkOptimize(infinity, db_name, table_name);
+            sleep(10);
             BenchmarkMoreQuery(infinity, db_name, table_name, 1);
             break;
         }

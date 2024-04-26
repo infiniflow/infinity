@@ -21,6 +21,8 @@ import blockmax_and_not_iterator;
 import blockmax_maxscore_iterator;
 import index_defines;
 import third_party;
+import phrase_doc_iterator;
+import blockmax_phrase_doc_iterator;
 
 namespace infinity {
 
@@ -46,6 +48,11 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     // optimize the query tree
     switch (root->GetType()) {
         case QueryNodeType::TERM: {
+            // no need to optimize
+            optimized_root = std::move(root);
+            break;
+        }
+        case QueryNodeType::PHRASE: {
             // no need to optimize
             optimized_root = std::move(root);
             break;
@@ -92,9 +99,13 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
 std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
     for (auto &child : children_) {
         switch (child->GetType()) {
-            case QueryNodeType::TERM:
+            case QueryNodeType::TERM: {
                 // no need to optimize
                 break;
+            }
+            case QueryNodeType::PHRASE: {
+                break;
+            }
             case QueryNodeType::AND_NOT: {
                 UnrecoverableError("GetNewOptimizedQueryTree: Unexpected case! AndNotQueryNode should not exist in parser output");
                 break;
@@ -142,6 +153,7 @@ std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
                 break;
             }
             case QueryNodeType::TERM:
+            case QueryNodeType::PHRASE:
             case QueryNodeType::AND:
             case QueryNodeType::AND_NOT: {
                 new_not_list.emplace_back(std::move(child));
@@ -193,6 +205,7 @@ std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
                 break;
             }
             case QueryNodeType::TERM:
+            case QueryNodeType::PHRASE:
             case QueryNodeType::OR: {
                 and_list.emplace_back(std::move(child));
                 break;
@@ -281,6 +294,7 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
                 break;
             }
             case QueryNodeType::TERM:
+            case QueryNodeType::PHRASE:
             case QueryNodeType::AND:
             case QueryNodeType::AND_NOT: {
                 or_list.emplace_back(std::move(child));
@@ -389,6 +403,71 @@ TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRe
     if (scorer) {
         // nodes under "not" will not be added to scorer
         scorer->AddBlockMaxDocIterator(search.get(), column_id);
+    }
+    return search;
+}
+
+std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+    ColumnID column_id = table_entry->GetColumnIdByName(column_);
+    ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
+    if (!column_index_reader) {
+        return nullptr;
+    }
+    bool fetch_position = false;
+    auto option_flag = column_index_reader->GetOptionFlag();
+    if (option_flag & OptionFlag::of_position_list) {
+        fetch_position = true;
+    }
+    Vector<std::unique_ptr<PostingIterator>> posting_iterators;
+    for (auto& term : terms_) {
+        auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
+        if (nullptr == posting_iterator) {
+            return nullptr;
+        }
+        posting_iterators.emplace_back(std::move(posting_iterator));
+    }
+    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), column_id, GetWeight());
+
+    search->terms_ptr_ = &terms_;
+    search->column_name_ptr_ = &column_;
+
+    if (scorer) {
+        scorer->AddDocIterator(search.get(), column_id);
+    }
+    return search;
+}
+
+std::unique_ptr<EarlyTerminateIterator>
+PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+    ColumnID column_id = table_entry->GetColumnIdByName(column_);
+    ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
+    if (!column_index_reader) {
+        return nullptr;
+    }
+    bool fetch_position = false;
+    auto option_flag = column_index_reader->GetOptionFlag();
+    if (option_flag & OptionFlag::of_position_list) {
+        fetch_position = true;
+    }
+
+    Vector<std::unique_ptr<BlockMaxTermDocIterator>> term_doc_iterators;
+    for (auto& term : terms_) {
+        auto term_doc_iterator = column_index_reader->LookupBlockMax(term, index_reader.session_pool_.get(), GetWeight(), fetch_position);
+        if (nullptr == term_doc_iterator) {
+            return nullptr;
+        }
+        term_doc_iterators.emplace_back(std::move(term_doc_iterator));
+    }
+
+    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(term_doc_iterators), column_id);
+    if (!search) {
+        return nullptr;
+    }
+    search->terms_ptr_ = &terms_;
+    search->column_name_ptr_ = &column_;
+    if (scorer) {
+        // nodes under "not" will not be added to scorer
+        scorer->AddBlockMaxPhraseDocIterator(search.get(), column_id);
     }
     return search;
 }
@@ -563,6 +642,20 @@ void TermQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool 
     os << " (weight: " << weight_ << ")";
     os << " (column: " << column_ << ")";
     os << " (term: " << term_ << ")";
+    os << '\n';
+}
+
+void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << QueryNodeTypeToString(type_);
+    os << " (weight: " << weight_ << ")";
+    os << " (column: " << column_ << ")";
+    os << " (phrase: ";
+    for (auto term : terms_) {
+        os << term << " ";
+    }
+    os << ")";
     os << '\n';
 }
 

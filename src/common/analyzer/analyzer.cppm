@@ -37,10 +37,12 @@ public:
 
     int Analyze(const Term &input, TermList &output) {
         void *array[2] = {&output, this};
-        if (IsJiebaSpecialize())
+        if (IsJiebaSpecialize()) {
             return AnalyzeImpl(input, &array, &Analyzer::AppendTermListForJieba);
-        else
+        }
+        else {
             return AnalyzeImpl(input, &array, &Analyzer::AppendTermList);
+        }
     }
 
 protected:

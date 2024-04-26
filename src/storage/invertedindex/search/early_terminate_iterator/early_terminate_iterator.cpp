@@ -22,6 +22,7 @@ import internal_types;
 import stl;
 import index_defines;
 import infinity_exception;
+import third_party;
 
 namespace infinity {
 

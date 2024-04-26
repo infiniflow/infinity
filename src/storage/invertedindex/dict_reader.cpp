@@ -54,8 +54,9 @@ DictionaryReader::~DictionaryReader() {
 bool DictionaryReader::Lookup(const String &key, TermMeta &term_meta) {
     u64 val;
     bool found = fst_->Get((u8 *)key.c_str(), key.length(), val);
-    if (!found)
+    if (!found) {
         return false;
+    }
     u8 *data_cursor = data_ptr_ + val;
     SizeT left_size = data_len_ - val;
     meta_loader_.Load(data_cursor, left_size, term_meta);

@@ -14,7 +14,6 @@
 
 module;
 
-#include <vector>
 module match_data;
 
 import stl;
@@ -24,6 +23,9 @@ import bm25_ranker;
 import internal_types;
 import column_index_reader;
 import blockmax_term_doc_iterator;
+import doc_iterator;
+import phrase_doc_iterator;
+import blockmax_phrase_doc_iterator;
 
 namespace infinity {
 
@@ -43,7 +45,7 @@ u32 Scorer::GetOrSetColumnIndex(u64 column_id) {
     }
 }
 
-void Scorer::AddDocIterator(TermDocIterator *iter, u64 column_id) {
+void Scorer::AddDocIterator(DocIterator *iter, u64 column_id) {
     u32 column_index = GetOrSetColumnIndex(column_id);
     iterators_.resize(std::max<u32>(column_index + 1, iterators_.size()));
     iterators_[column_index].push_back(iter);
@@ -51,8 +53,15 @@ void Scorer::AddDocIterator(TermDocIterator *iter, u64 column_id) {
 
 void Scorer::AddBlockMaxDocIterator(BlockMaxTermDocIterator *iter, u64 column_id) {
     u32 column_index = GetOrSetColumnIndex(column_id);
-    block_max_iterators_.resize(std::max<u32>(column_index + 1, block_max_iterators_.size()));
-    block_max_iterators_[column_index].push_back(iter);
+    block_max_term_iterators_.resize(std::max<u32>(column_index + 1, block_max_term_iterators_.size()));
+    block_max_term_iterators_[column_index].push_back(iter);
+    iter->InitBM25Info(total_df_, avg_column_length_[column_index], column_length_reader_.GetColumnLengthReader(column_index));
+}
+
+void Scorer::AddBlockMaxPhraseDocIterator(BlockMaxPhraseDocIterator *iter, u64 column_id) {
+    u32 column_index = GetOrSetColumnIndex(column_id);
+    block_max_phrase_iterators_.resize(std::max<u32>(column_index + 1, block_max_phrase_iterators_.size()));
+    block_max_phrase_iterators_[column_index].push_back(iter);
     iter->InitBM25Info(total_df_, avg_column_length_[column_index], column_length_reader_.GetColumnLengthReader(column_index));
 }
 
@@ -62,11 +71,30 @@ float Scorer::Score(RowID doc_id) {
         BM25Ranker ranker(total_df_);
         float avg_column_length = avg_column_length_[i];
         u32 column_len = column_length_reader_.GetColumnLength(i, doc_id);
-        Vector<TermDocIterator *> &column_iters = iterators_[i];
-        TermColumnMatchData column_match_data;
-        for (u32 j = 0; j < column_iters.size(); j++) {
-            if (column_iters[j]->GetTermMatchData(column_match_data, doc_id)) {
-                ranker.AddTermParam(column_match_data.tf_, column_iters[j]->GetDF(), avg_column_length, column_len, column_iters[j]->GetWeight());
+        Vector<DocIterator *> &column_iters = iterators_[i];
+        if (column_iters.empty()) {
+            continue;
+        }
+        if (column_iters[0]->GetType() == DocIteratorType::kTermIterator) {
+            TermColumnMatchData column_match_data;
+            for (u32 j = 0; j < column_iters.size(); j++) {
+                TermDocIterator* term_iter = dynamic_cast<TermDocIterator*>(column_iters[j]);
+                if (term_iter->GetTermMatchData(column_match_data, doc_id)) {
+                    ranker.AddTermParam(column_match_data.tf_, term_iter->GetDF(), avg_column_length, column_len, term_iter->GetWeight());
+                }
+            }
+        } else if (column_iters[0]->GetType() == DocIteratorType::kPhraseIterator) {
+            for (u32 j = 0; j < column_iters.size(); j++) {
+                PhraseColumnMatchData column_match_data;
+                PhraseDocIterator* phrase_iter = dynamic_cast<PhraseDocIterator*>(column_iters[j]);
+                if (phrase_iter->GetPhraseMatchData(column_match_data, doc_id)) {
+                    ranker.AddPhraseParam(column_match_data.all_tf_,
+                                          phrase_iter->GetAllDF(),
+                                          avg_column_length,
+                                          column_len,
+                                          phrase_iter->GetWeight(),
+                                          column_iters.size());
+                }
             }
         }
         score += ranker.GetScore();

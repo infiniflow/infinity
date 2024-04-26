@@ -22,6 +22,14 @@ import index_defines;
 import internal_types;
 
 namespace infinity {
+
+export enum class DocIteratorType : u8 {
+    kInvalidIterator,
+    kTermIterator,
+    kPhraseIterator,
+    kMultiQueryIterator
+};
+
 export class DocIterator {
 public:
     DocIterator() = default;
@@ -36,8 +44,9 @@ public:
     // than the give doc id. If there is no such a doc id,
     // INVALID_DOCID will be returned
     bool Seek(RowID doc_id) {
-        if (doc_id > doc_id_)
+        if (doc_id > doc_id_) {
             DoSeek(doc_id);
+        }
         return doc_id == doc_id_;
     }
 
@@ -56,6 +65,7 @@ public:
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const String &prefix = "", bool is_final = true) const = 0;
 
+    virtual DocIteratorType GetType() const { return DocIteratorType::kInvalidIterator; }
 protected:
     RowID doc_id_{INVALID_ROWID};
 };
