@@ -2,7 +2,7 @@
     "name": "infinity_enwiki",
     "app": "infinity",
     "host": "127.0.0.1:23817",
-    "data_path": "datasets/enwiki/enwiki-1kw.csv",
+    "data_path": "/home/zhichyu/benchmark/enwiki-20120502-lines-10m.csv",
     "data_link": "http://192.168.200.183:8000/enwiki-20120502-lines-10.csv",
     "insert_batch_size": 8192,
     "query_path": "datasets/enwiki/operations.json",
@@ -11,9 +11,9 @@
     "topK": 10,
     "use_import": false,
     "schema": {
-        "doctitle": "varchar",
-        "docdate": "varchar",
-        "body": "varchar"
+        "doctitle": {"type": "varchar"},
+        "docdate": {"type": "varchar"},
+        "body": {"type": "varchar"}
     },
     "index": {
         "doctitle": {
