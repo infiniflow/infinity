@@ -869,11 +869,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     // FIXME: Temp implementation, will be replaced by async task.
     LocalFileSystem fs;
 
-    u8 fileflags = FileFlags::WRITE_FLAG;
-
-    if (!fs.Exists(catalog_tmp_path)) {
-        fileflags |= FileFlags::CREATE_FLAG;
-    }
+    u8 fileflags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
 
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
 
