@@ -176,7 +176,7 @@ public:
 
     void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry);
+    void RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries);
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);

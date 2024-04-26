@@ -43,7 +43,7 @@ namespace infinity {
 TxnSegmentStore TxnSegmentStore::AddSegmentStore(SegmentEntry *segment_entry) {
     TxnSegmentStore txn_segment_store(segment_entry);
     for (auto &block_entry : segment_entry->block_entries()) {
-        txn_segment_store.block_entries_.emplace_back(block_entry.get());
+        txn_segment_store.block_entries_.emplace(block_entry->block_id(), block_entry.get());
     }
     return txn_segment_store;
 }
@@ -63,7 +63,7 @@ void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState
     } else {
         local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(segment_entry_, commit_ts));
     }
-    for (auto *block_entry : block_entries_) {
+    for (auto [block_id, block_entry] : block_entries_) {
         if (set_sealed) {
             local_delta_ops->AddOperation(
                 MakeUnique<AddBlockEntryOp>(block_entry, commit_ts, block_entry->GetFastRoughFilter()->SerializeToString()));
@@ -344,7 +344,7 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
     if (iter == txn_segments_store_.end()) {
         iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
     }
-    iter->second.block_entries_.emplace_back(block_entry);
+    iter->second.block_entries_.emplace(block_entry->block_id(), block_entry);
 }
 
 void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace(segment_entry); }

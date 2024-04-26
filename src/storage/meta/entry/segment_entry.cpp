@@ -382,12 +382,13 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
 }
 
-void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry) {
+void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries) {
     std::unique_lock w_lock(rw_locker_);
-    for (auto iter = block_entry.rbegin(); iter != block_entry.rend(); ++iter) {
-        BlockEntry *block = *iter;
-        if (!block->Committed()) {
-            if (block_entries_.empty() || block_entries_.back()->block_id() != block->block_id()) {
+    Vector<Pair<BlockID, BlockEntry *>> rollback_blocks(block_entries.begin(), block_entries.end());
+    std::sort(rollback_blocks.begin(), rollback_blocks.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+    for (auto [block_id, block_entry] : rollback_blocks) {
+        if (!block_entry->Committed()) {
+            if (block_entries_.empty() || block_entries_.back()->block_id() != block_entry->block_id()) {
                 UnrecoverableError("BlockEntry rollback order is not correct");
             }
             auto &rollback_block = block_entries_.back();

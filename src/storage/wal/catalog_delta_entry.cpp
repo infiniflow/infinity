@@ -82,6 +82,7 @@ CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry 
         }
         merge_flag_ = MergeFlag::kUpdate;
     }
+    // LOG_TRACE(fmt::format("Create delta op: {} ", this->ToString()));
 }
 
 UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 max_bytes) {

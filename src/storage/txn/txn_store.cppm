@@ -54,7 +54,7 @@ public:
 
 public:
     SegmentEntry *const segment_entry_ = nullptr;
-    Vector<BlockEntry *> block_entries_;
+    HashMap<BlockID, BlockEntry *> block_entries_;
 };
 
 export struct TxnIndexStore {
