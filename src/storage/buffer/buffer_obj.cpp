@@ -114,6 +114,7 @@ bool BufferObj::Save() {
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
                 file_worker_->WriteToFile(false);
+                buffer_mgr_->AddToCleanTempList(this);
                 write = true;
                 break;
             }
@@ -138,28 +139,37 @@ void BufferObj::PickForCleanup() {
     switch (status_) {
         // when insert data into table with index, the index buffer_obj
         // will remain BufferStatus::kNew, so we should allow this situation
-        case BufferStatus::kNew:
+        case BufferStatus::kNew: {
+            buffer_mgr_->AddToCleanList(this, false /*do_free*/);
+            break;
+        }
         case BufferStatus::kFreed: {
-            status_ = BufferStatus::kClean;
-            if (file_worker_->GetData() != nullptr) {
-                UnrecoverableError("Buffer is not freed.");
-            }
-            buffer_mgr_->AddToCleanList(this, false /*free*/);
+            buffer_mgr_->AddToCleanList(this, false /*do_free*/);
             break;
         }
         case BufferStatus::kUnloaded: {
             file_worker_->FreeInMemory();
-            status_ = BufferStatus::kClean;
-            buffer_mgr_->AddToCleanList(this, true /*free*/);
+            buffer_mgr_->AddToCleanList(this, true /*do_free*/);
             break;
         }
         default: {
             UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
         }
     }
+    status_ = BufferStatus::kClean;
+    switch (type_) {
+        case BufferType::kPersistent:
+        case BufferType::kTemp: {
+            buffer_mgr_->AddToCleanTempList(this);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
 }
 
-void BufferObj::CleanupFile() {
+void BufferObj::CleanupFile() const {
     if (status_ != BufferStatus::kClean) {
         UnrecoverableError("Invalid status.");
     }
@@ -168,6 +178,8 @@ void BufferObj::CleanupFile() {
     }
     file_worker_->CleanupFile();
 }
+
+void BufferObj::CleanupTempFile() const { file_worker_->CleanupTempFile(); }
 
 void BufferObj::LoadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
