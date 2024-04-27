@@ -53,7 +53,9 @@ public:
     // Get file path. As key of buffer handle.
     String GetFilePath() const { return fmt::format("{}/{}", *file_dir_, *file_name_); }
 
-    void CleanupFile();
+    void CleanupFile() const;
+
+    void CleanupTempFile() const;
 
 protected:
     virtual void WriteToFileImpl(bool to_spill, bool &prepare_success) = 0;

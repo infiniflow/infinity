@@ -75,13 +75,18 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker) {
 
 void BufferManager::RemoveClean() {
     Vector<BufferObj *> clean_list;
+    Vector<BufferObj *> clean_temp_list;
     {
         std::unique_lock lock(clean_locker_);
         clean_list.swap(clean_list_);
+        clean_temp_list.swap(clean_temp_list_);
     }
 
     for (auto *buffer_obj : clean_list) {
         buffer_obj->CleanupFile();
+    }
+    for (auto *buffer_obj : clean_temp_list) {
+        buffer_obj->CleanupTempFile();
     }
 
     {
@@ -147,18 +152,23 @@ bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
     return RemoveFromGCQueueInner(buffer_obj);
 }
 
-void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool free) {
+void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
     {
         std::unique_lock lock(clean_locker_);
-        clean_list_.push_back(buffer_obj);
+        clean_list_.emplace_back(buffer_obj);
     }
-    if (free) {
+    if (do_free) {
         std::unique_lock lock(gc_locker_);
         current_memory_size_ -= buffer_obj->GetBufferSize();
         if (!RemoveFromGCQueueInner(buffer_obj)) {
             UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename()));
         }
     }
+}
+
+void BufferManager::AddToCleanTempList(BufferObj *buffer_obj) {
+    std::unique_lock lock(clean_locker_);
+    clean_temp_list_.push_back(buffer_obj);
 }
 
 bool BufferManager::RemoveFromGCQueueInner(BufferObj *buffer_obj) {

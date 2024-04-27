@@ -501,11 +501,11 @@ i64 WalManager::ReplayWalFile() {
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
+        LOG_INFO(replay_entries[replay_count]->ToString());
         ReplayWalEntry(*replay_entries[replay_count]);
-        LOG_TRACE(replay_entries[replay_count]->ToString());
     }
 
-    LOG_TRACE(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
+    LOG_INFO(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
     storage_->catalog()->next_txn_id_ = last_txn_id;
     this->max_commit_ts_ = system_start_ts;
 
