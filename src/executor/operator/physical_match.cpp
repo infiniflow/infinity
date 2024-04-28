@@ -19,7 +19,6 @@ module;
 #include <iostream>
 #include <memory>
 #include <string>
-#include <valgrind/callgrind.h>
 
 module physical_match;
 
@@ -534,28 +533,21 @@ void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_te
 }
 
 void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
-    u32 update_threshold_cnt = 0;
     if (et_iter) {
-        CALLGRIND_START_INSTRUMENTATION;
         while (true) {
-            ++blockmax_loop_cnt;
             auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
             if (id == INVALID_ROWID) [[unlikely]] {
                 break;
             }
+            ++blockmax_loop_cnt;
             if (result_heap.AddResult(et_score, id)) {
                 // update threshold
-                ++update_threshold_cnt;
                 if (const float new_threshold = result_heap.GetScoreThreshold(); new_threshold > 0.0f) {
                     et_iter->UpdateScoreThreshold(new_threshold);
                 }
             }
         }
-        CALLGRIND_STOP_INSTRUMENTATION;
     }
-    OStringStream oss;
-    oss << "Update threshold count: " << update_threshold_cnt << std::endl;
-    std::cerr << std::move(oss).str();
 }
 
 bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {

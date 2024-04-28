@@ -23,23 +23,24 @@ import stl;
 import index_defines;
 import early_terminate_iterator;
 import internal_types;
+import logger;
 
 namespace infinity {
 
 BlockMaxMaxscoreIterator::~BlockMaxMaxscoreIterator() {
     OStringStream oss;
-    oss << "BlockMaxMaxscoreIterator: inner_pivot_loop_cnt: " << inner_pivot_loop_cnt << " inner_must_have_loop_cnt: " << inner_must_have_loop_cnt_
-        << " use_prev_candidate_cnt: " << use_prev_candidate_cnt_ << " not_use_prev_candidate_cnt: " << not_use_prev_candidate_cnt_ << "\n\n";
-    oss << "pivot_history:\n";
+    oss << "BlockMaxMaxscoreIterator: Debug Info:\n    inner_pivot_loop_cnt: " << inner_pivot_loop_cnt
+        << " inner_must_have_loop_cnt: " << inner_must_have_loop_cnt_ << " use_prev_candidate_cnt: " << use_prev_candidate_cnt_
+        << " not_use_prev_candidate_cnt: " << not_use_prev_candidate_cnt_ << "\n";
+    oss << "    pivot_history:\n";
     for (const auto &p : pivot_history_) {
-        oss << "pivit value: " << p.first << " at doc_id: " << p.second << '\n';
+        oss << "    pivit value: " << p.first << " at doc_id: " << p.second << '\n';
     }
-    oss << "\nmust_have_history:\n";
+    oss << "    must_have_history:\n";
     for (const auto &p : must_have_history_) {
-        oss << "must_have value: " << p.first << " at doc_id: " << p.second << '\n';
+        oss << "    must_have value: " << p.first << " at doc_id: " << p.second << '\n';
     }
-    oss << "\n\n";
-    std::cerr << std::move(oss).str();
+    LOG_INFO(std::move(oss).str());
 }
 
 BlockMaxMaxscoreIterator::BlockMaxMaxscoreIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators) : sorted_iterators_(std::move(iterators)) {

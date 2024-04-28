@@ -28,18 +28,20 @@ import segment_posting;
 import posting_iterator;
 import column_length_io;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
 BlockMaxTermDocIterator::~BlockMaxTermDocIterator() {
     OStringStream oss;
-    oss << "BlockMaxTermDocIterator: " << *column_name_ptr_ << " " << *term_ptr_ << "\n    access_bm_score_cnt: " << access_bm_score_cnt_
-        << " calc_bm_score_cnt: " << calc_bm_score_cnt_ << " calc_score_cnt: " << calc_score_cnt_ << " seek_cnt: " << seek_cnt_
-        << " peek_cnt: " << peek_cnt_ << " block_skip_cnt: " << block_skip_cnt_ << " block_skip_cnt_inner: " << block_skip_cnt_inner_ << "\n\n";
+    oss << "BlockMaxTermDocIterator Debug Info:\n    column name: " << *column_name_ptr_ << " term: " << *term_ptr_
+        << "\n    access_bm_score_cnt: " << access_bm_score_cnt_ << " calc_bm_score_cnt: " << calc_bm_score_cnt_
+        << " calc_score_cnt: " << calc_score_cnt_ << " seek_cnt: " << seek_cnt_ << " peek_cnt: " << peek_cnt_
+        << " block_skip_cnt: " << block_skip_cnt_ << " block_skip_cnt_inner: " << block_skip_cnt_inner_ << "\n";
     if (duplicate_calc_score_cnt_) {
         oss << "!!! duplicate_calc_score_cnt: " << duplicate_calc_score_cnt_ << '\n';
     }
-    std::cerr << std::move(oss).str();
+    LOG_INFO(std::move(oss).str());
 }
 
 BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool) : iter_(flag, session_pool) {}
