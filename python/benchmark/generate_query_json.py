@@ -37,7 +37,11 @@ def generate_query_txt(terms_path, query_cnt = 1, terms_count = 4, operation_pat
     for i in range(query_cnt):
         new_value = ""
         terms = load_terms(terms_path)
-        query_terms = random_select(terms, terms_count)
+        if terms_count > 0:
+            query_terms = random_select(terms, terms_count)
+        else:
+            terms_count = random.randint(1, -terms_count + 1)
+            query_terms = random_select(terms, terms_count)
         new_value = " ".join(query_terms)
         querys.append(new_value)
         # print(f"generate terms = {new_value}")

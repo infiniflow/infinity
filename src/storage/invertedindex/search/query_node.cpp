@@ -34,8 +34,12 @@ namespace infinity {
 // 3. children of "or" can only be term, "and" or "and_not", because "or" will be optimized, and "not" is either optimized or not allowed
 // 4. "and_not" does not exist in parser output, it is generated during optimization
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
-
+void QueryNode::FilterOptimizeQueryTree() { UnrecoverableError("Should not reach here!"); }
 std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
+    if (root->GetType() == QueryNodeType::FILTER) {
+        root->FilterOptimizeQueryTree();
+        return root;
+    }
 #ifdef INFINITY_DEBUG
     auto start_time = std::chrono::high_resolution_clock::now();
 #endif
@@ -419,7 +423,7 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
         fetch_position = true;
     }
     Vector<std::unique_ptr<PostingIterator>> posting_iterators;
-    for (auto& term : terms_) {
+    for (auto &term : terms_) {
         auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
         if (nullptr == posting_iterator) {
             return nullptr;
@@ -451,7 +455,7 @@ PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, Index
     }
 
     Vector<std::unique_ptr<BlockMaxTermDocIterator>> term_doc_iterators;
-    for (auto& term : terms_) {
+    for (auto &term : terms_) {
         auto term_doc_iterator = column_index_reader->LookupBlockMax(term, index_reader.session_pool_.get(), GetWeight(), fetch_position);
         if (nullptr == term_doc_iterator) {
             return nullptr;
@@ -612,6 +616,8 @@ std::string QueryNodeTypeToString(QueryNodeType type) {
     switch (type) {
         case QueryNodeType::INVALID:
             return "INVALID";
+        case QueryNodeType::FILTER:
+            return "FILTER";
         case QueryNodeType::TERM:
             return "TERM";
         case QueryNodeType::AND:
