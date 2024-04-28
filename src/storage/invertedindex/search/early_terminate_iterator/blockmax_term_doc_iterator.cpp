@@ -18,6 +18,7 @@ module;
 #include <cmath>
 #include <iostream>
 #include <tuple>
+#include <string>
 module blockmax_term_doc_iterator;
 
 import stl;
@@ -89,7 +90,7 @@ void BlockMaxTermDocIterator::InitBM25Info(u64 total_df, float avg_column_len, F
     OStringStream oss;
     oss << "BlockMaxTermDocIterator: " << *column_name_ptr_ << " " << *term_ptr_ << " bm25_common_score: " << bm25_common_score_
         << " bm25_score_upper_bound: " << bm25_score_upper_bound_ << " avg_column_len: " << avg_column_len_ << " f1: " << f1 << " f2: " << f2 << '\n';
-    std::cerr << std::move(oss).str();
+    LOG_INFO(std::move(oss).str());
 }
 
 // weight included

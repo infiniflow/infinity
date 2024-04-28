@@ -596,6 +596,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 
     // 2 build query iterator
     // result
+    FullTextQueryContext full_text_query_context;
     u32 result_count = 0;
     const float *score_result = nullptr;
     const RowID *row_id_result = nullptr;
@@ -621,7 +622,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     TimeDurationType blockmax_duration = {};
     TimeDurationType blockmax_duration_2 = {};
     TimeDurationType blockmax_duration_3 = {};
-    FullTextQueryContext full_text_query_context;
     assert(common_query_filter_);
     full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree));
 
