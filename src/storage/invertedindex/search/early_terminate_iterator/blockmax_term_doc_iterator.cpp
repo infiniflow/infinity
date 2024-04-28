@@ -30,6 +30,18 @@ import column_length_io;
 import infinity_exception;
 
 namespace infinity {
+
+BlockMaxTermDocIterator::~BlockMaxTermDocIterator() {
+    OStringStream oss;
+    oss << "BlockMaxTermDocIterator: " << *column_name_ptr_ << " " << *term_ptr_ << "\n    access_bm_score_cnt: " << access_bm_score_cnt_
+        << " calc_bm_score_cnt: " << calc_bm_score_cnt_ << " calc_score_cnt: " << calc_score_cnt_ << " seek_cnt: " << seek_cnt_
+        << " peek_cnt: " << peek_cnt_ << " block_skip_cnt: " << block_skip_cnt_ << " block_skip_cnt_inner: " << block_skip_cnt_inner_ << "\n\n";
+    if (duplicate_calc_score_cnt_) {
+        oss << "!!! duplicate_calc_score_cnt: " << duplicate_calc_score_cnt_ << '\n';
+    }
+    std::cerr << std::move(oss).str();
+}
+
 BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool) : iter_(flag, session_pool) {}
 
 bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size) {
@@ -42,10 +54,12 @@ bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPostin
 }
 
 bool BlockMaxTermDocIterator::BlockSkipTo(RowID doc_id, float threshold) {
+    ++block_skip_cnt_;
     if (threshold > BM25ScoreUpperBound()) [[unlikely]] {
         return false;
     }
     while (true) {
+        ++block_skip_cnt_inner_;
         if (!iter_.SkipTo(doc_id)) {
             doc_id_ = INVALID_ROWID;
             return false;
@@ -70,13 +84,19 @@ void BlockMaxTermDocIterator::InitBM25Info(u64 total_df, float avg_column_len, F
     f1 = k1 * (1.0F - b);
     f2 = k1 * b / avg_column_len_;
     f3 = f2 * std::numeric_limits<u16>::max();
+    OStringStream oss;
+    oss << "BlockMaxTermDocIterator: " << *column_name_ptr_ << " " << *term_ptr_ << " bm25_common_score: " << bm25_common_score_
+        << " bm25_score_upper_bound: " << bm25_score_upper_bound_ << " avg_column_len: " << avg_column_len_ << " f1: " << f1 << " f2: " << f2 << '\n';
+    std::cerr << std::move(oss).str();
 }
 
 // weight included
 float BlockMaxTermDocIterator::BlockMaxBM25Score() {
+    ++access_bm_score_cnt_;
     if (const auto last_doc_id = BlockLastDocID(); last_doc_id == block_max_bm25_score_cache_end_id_) {
         return block_max_bm25_score_cache_;
     } else {
+        ++calc_bm_score_cnt_;
         block_max_bm25_score_cache_end_id_ = last_doc_id;
         // bm25_common_score_ / (1.0F + k1 * ((1.0F - b) / block_max_tf + b / block_max_percentage / avg_column_len));
         const auto [block_max_tf, block_max_percentage_u16] = GetBlockMaxInfo();
@@ -88,6 +108,12 @@ Pair<tf_t, u32> BlockMaxTermDocIterator::GetScoreData() { return {iter_.GetCurre
 
 // weight included
 float BlockMaxTermDocIterator::BM25Score() {
+    if (doc_id_ == prev_calc_score_doc_id_) {
+        ++duplicate_calc_score_cnt_;
+    } else {
+        prev_calc_score_doc_id_ = doc_id_;
+    }
+    ++calc_score_cnt_;
     // bm25_common_score_ * tf / (tf + k1 * (1.0F - b + b * column_len / avg_column_len));
     const auto [tf, doc_len] = GetScoreData();
     const float p = f1 + f2 * doc_len;
@@ -100,6 +126,7 @@ Pair<bool, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id, RowID 
     if (doc_id > seek_end) {
         return {false, INVALID_ROWID};
     }
+    ++seek_cnt_;
     doc_id = iter_.SeekDoc(doc_id);
     // always update inner doc_id_
     doc_id_ = doc_id;
@@ -117,6 +144,7 @@ Tuple<bool, float, RowID> BlockMaxTermDocIterator::SeekInBlockRange(RowID doc_id
     const RowID block_last = BlockLastDocID();
     const RowID seek_end = std::min(doc_id_no_beyond, block_last);
     while (doc_id <= seek_end) {
+        ++seek_cnt_;
         doc_id = iter_.SeekDoc(doc_id);
         // always update inner doc_id_
         doc_id_ = doc_id;
@@ -149,6 +177,7 @@ Pair<bool, RowID> BlockMaxTermDocIterator::PeekInBlockRange(RowID doc_id, RowID 
         }
     }
     // need to decode
+    ++peek_cnt_;
     Pair<bool, RowID> result = iter_.PeekInBlockRange(doc_id, seek_end);
     // update cache
     peek_doc_id_range_start_ = doc_id;

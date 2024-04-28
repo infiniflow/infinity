@@ -27,6 +27,8 @@ export class BlockMaxMaxscoreIterator final : public EarlyTerminateIterator {
 public:
     explicit BlockMaxMaxscoreIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators);
 
+    ~BlockMaxMaxscoreIterator() override;
+
     void UpdateScoreThreshold(float threshold) override;
 
     bool BlockSkipTo(RowID doc_id, float threshold) override;
@@ -78,6 +80,14 @@ private:
     bool need_seek_after_pivot_ = false;
     float bm25_score_cache_ = 0.0F;
     RowID prev_next_candidate_ = INVALID_ROWID;
+
+    // debug info
+    u32 inner_pivot_loop_cnt = 0;
+    u32 inner_must_have_loop_cnt_ = 0;
+    u32 use_prev_candidate_cnt_ = 0;
+    u32 not_use_prev_candidate_cnt_ = 0;
+    Vector<Pair<u32, u64>> pivot_history_;
+    Vector<Pair<u32, u64>> must_have_history_;
 };
 
 } // namespace infinity

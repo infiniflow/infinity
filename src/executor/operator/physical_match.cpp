@@ -19,6 +19,7 @@ module;
 #include <iostream>
 #include <memory>
 #include <string>
+#include <valgrind/callgrind.h>
 
 module physical_match;
 
@@ -425,6 +426,35 @@ void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_te
     }
 }
 
+void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
+    u32 update_threshold_cnt = 0;
+    if (et_iter) {
+        CALLGRIND_START_INSTRUMENTATION;
+        while (true) {
+            ++blockmax_loop_cnt;
+            auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
+            if (id == INVALID_ROWID) [[unlikely]] {
+                break;
+            }
+            if (result_heap.AddResult(et_score, id)) {
+                // update threshold
+                ++update_threshold_cnt;
+                /*
+                auto new_threshold = result_heap.GetScoreThreshold();
+                OStringStream oss;
+                oss << "Update threshold: " << new_threshold << std::endl;
+                std::cerr << std::move(oss).str();
+                */
+                et_iter->UpdateScoreThreshold(result_heap.GetScoreThreshold());
+            }
+        }
+        CALLGRIND_STOP_INSTRUMENTATION;
+    }
+    OStringStream oss;
+    oss << "Update threshold count: " << update_threshold_cnt << std::endl;
+    std::cerr << std::move(oss).str();
+}
+
 bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
     using TimeDurationType = std::chrono::duration<float, std::milli>;
     auto execute_start_time = std::chrono::high_resolution_clock::now();
@@ -492,7 +522,9 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     TimeDurationType blockmax_duration_3 = {};
     FullTextQueryContext full_text_query_context;
     assert(common_query_filter_);
-    {
+    if (true) {
+        full_text_query_context.query_tree_ = std::move(query_tree);
+    } else {
         auto and_root = MakeUnique<AndQueryNode>();
         and_root->Add(std::move(query_tree));
         and_root->Add(MakeUnique<FilterQueryNode>(common_query_filter_.get()));
@@ -554,19 +586,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        if (et_iter) {
-            while (true) {
-                ++blockmax_loop_cnt;
-                auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
-                if (id == INVALID_ROWID) [[unlikely]] {
-                    break;
-                }
-                if (result_heap.AddResult(et_score, id)) {
-                    // update threshold
-                    et_iter->UpdateScoreThreshold(result_heap.GetScoreThreshold());
-                }
-            }
-        }
+        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt);
         result_heap.Sort();
         blockmax_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -606,19 +626,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        if (et_iter_2) {
-            while (true) {
-                ++blockmax_loop_cnt_2;
-                auto [id, et_score] = et_iter_2->BlockNextWithThreshold(result_heap.GetScoreThreshold());
-                if (id == INVALID_ROWID) [[unlikely]] {
-                    break;
-                }
-                if (result_heap.AddResult(et_score, id)) {
-                    // update threshold
-                    et_iter_2->UpdateScoreThreshold(result_heap.GetScoreThreshold());
-                }
-            }
-        }
+        ExecuteFTSearch(et_iter_2, result_heap, blockmax_loop_cnt_2);
         result_heap.Sort();
         blockmax_result_count_2 = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -630,19 +638,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             FullTextScoreResultHeap result_heap_3(top_n, blockmax_score_result_3.get(), blockmax_row_id_result_3.get());
             auto blockmax_begin_ts_3 = std::chrono::high_resolution_clock::now();
             u32 blockmax_loop_cnt_3 = 0;
-            if (et_iter_3) {
-                while (true) {
-                    ++blockmax_loop_cnt_3;
-                    auto [id, et_score] = et_iter_3->BlockNextWithThreshold(result_heap_3.GetScoreThreshold());
-                    if (id == INVALID_ROWID) [[unlikely]] {
-                        break;
-                    }
-                    if (result_heap_3.AddResult(et_score, id)) {
-                        // update threshold
-                        et_iter_3->UpdateScoreThreshold(result_heap_3.GetScoreThreshold());
-                    }
-                }
-            }
+            ExecuteFTSearch(et_iter_3, result_heap_3, blockmax_loop_cnt_3);
             result_heap_3.Sort();
             if (blockmax_loop_cnt_3 != blockmax_loop_cnt_2) {
                 assert(false);

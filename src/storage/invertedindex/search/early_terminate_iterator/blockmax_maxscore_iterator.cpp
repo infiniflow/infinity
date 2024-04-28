@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <iostream>
 #include <tuple>
 #include <vector>
 module blockmax_maxscore_iterator;
@@ -24,6 +25,22 @@ import early_terminate_iterator;
 import internal_types;
 
 namespace infinity {
+
+BlockMaxMaxscoreIterator::~BlockMaxMaxscoreIterator() {
+    OStringStream oss;
+    oss << "BlockMaxMaxscoreIterator: inner_pivot_loop_cnt: " << inner_pivot_loop_cnt << " inner_must_have_loop_cnt: " << inner_must_have_loop_cnt_
+        << " use_prev_candidate_cnt: " << use_prev_candidate_cnt_ << " not_use_prev_candidate_cnt: " << not_use_prev_candidate_cnt_ << "\n\n";
+    oss << "pivot_history:\n";
+    for (const auto &p : pivot_history_) {
+        oss << "pivit value: " << p.first << " at doc_id: " << p.second << '\n';
+    }
+    oss << "\nmust_have_history:\n";
+    for (const auto &p : must_have_history_) {
+        oss << "must_have value: " << p.first << " at doc_id: " << p.second << '\n';
+    }
+    oss << "\n\n";
+    std::cerr << std::move(oss).str();
+}
 
 BlockMaxMaxscoreIterator::BlockMaxMaxscoreIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators) : sorted_iterators_(std::move(iterators)) {
     std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto &a, const auto &b) {
@@ -169,13 +186,17 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
     const RowID block_end = std::min(doc_id_no_beyond, BlockLastDocID());
     assert((doc_id >= BlockMinPossibleDocID()));
     if (const RowID prev_next_candidate = prev_next_candidate_; prev_next_candidate != INVALID_ROWID and doc_id < prev_next_candidate) {
+        ++use_prev_candidate_cnt_;
         doc_id = prev_next_candidate;
         prev_next_candidate_ = INVALID_ROWID;
+    } else {
+        ++not_use_prev_candidate_cnt_;
     }
     if (must_have_before_) {
         // use must_have_before_
         while (true) {
             while (true) {
+                ++inner_must_have_loop_cnt_;
                 if (doc_id > block_end) [[unlikely]] {
                     return {false, 0.0F, INVALID_ROWID};
                 }
@@ -236,6 +257,7 @@ Tuple<bool, float, RowID> BlockMaxMaxscoreIterator::SeekInBlockRange(RowID doc_i
     // now must_have_before_ == 0, pivot > 1. use pivot.
     assert(pivot_ > 1);
     while (true) {
+        ++inner_pivot_loop_cnt;
         if (doc_id > block_end) [[unlikely]] {
             return {false, 0.0F, INVALID_ROWID};
         }
@@ -303,11 +325,13 @@ void BlockMaxMaxscoreIterator::UpdateScoreThreshold(const float threshold) {
     // update pivot
     while (pivot_ > 0 and threshold > (pivot_ > 1 ? leftover_scores_upper_bound_[pivot_ - 2] : BlockMaxBM25Score())) {
         --pivot_;
+        pivot_history_.emplace_back(pivot_, doc_id_.ToUint64());
     }
     // update must have
     while (must_have_before_ < sorted_iterators_.size() and
            threshold > must_have_total_upper_bound_score_ + leftover_scores_upper_bound_[must_have_before_]) {
         must_have_total_upper_bound_score_ += sorted_iterators_[must_have_before_++]->BM25ScoreUpperBound();
+        must_have_history_.emplace_back(must_have_before_, doc_id_.ToUint64());
     }
 }
 

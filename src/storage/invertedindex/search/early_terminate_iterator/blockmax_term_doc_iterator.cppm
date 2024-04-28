@@ -32,6 +32,8 @@ export class BlockMaxTermDocIterator final : public EarlyTerminateIterator {
 public:
     BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool);
 
+    ~BlockMaxTermDocIterator() override;
+
     bool InitPostingIterator(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size);
 
     void MultiplyWeight(float factor) { weight_ *= factor; }
@@ -88,6 +90,16 @@ private:
     RowID peek_doc_id_range_start_ = INVALID_ROWID;
     RowID peek_doc_id_range_end_ = INVALID_ROWID;
     RowID peek_doc_id_val_ = INVALID_ROWID;
+    // debug info
+    u32 calc_score_cnt_ = 0;
+    u32 calc_bm_score_cnt_ = 0;
+    u32 access_bm_score_cnt_ = 0;
+    RowID prev_calc_score_doc_id_ = INVALID_ROWID;
+    u32 duplicate_calc_score_cnt_ = 0;
+    u32 seek_cnt_ = 0;
+    u32 peek_cnt_ = 0;
+    u32 block_skip_cnt_ = 0;
+    u32 block_skip_cnt_inner_ = 0;
 };
 
 } // namespace infinity
