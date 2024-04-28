@@ -94,7 +94,7 @@ public:
     bool CheckVisible(TxnTimeStamp ts) {
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();
         TxnTimeStamp commit_ts = commit_ts_.load();
-        return ts >= commit_ts && ts < deprecate_ts;
+        return ts >= commit_ts && ts <= deprecate_ts;
     }
 
     bool CheckDeprecate(TxnTimeStamp ts) {

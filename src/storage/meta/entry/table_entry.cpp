@@ -658,7 +658,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
         segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
-        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= 8192) {
+        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= 1000000) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
@@ -777,17 +777,22 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         continue;
                     }
 
+                    String msg("merging");
                     Vector<String> base_names;
                     Vector<RowID> base_rowids;
                     RowID base_rowid = chunk_index_entries[0]->base_rowid_;
                     u32 total_row_count = 0;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
+                        assert(chunk_index_entry->base_rowid_ == chunk_index_entries[0]->base_rowid_ + total_row_count);
+                        msg += " " + chunk_index_entry->base_name_;
                         base_names.push_back(chunk_index_entry->base_name_);
                         base_rowids.push_back(chunk_index_entry->base_rowid_);
                         total_row_count += chunk_index_entry->row_count_;
                     }
                     String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
+                    msg += " -> " + dst_base_name;
+                    LOG_INFO(msg);
                     ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
                                                           index_fulltext->flag_,
                                                           &table_index_entry->GetFulltextByteSlicePool(),
@@ -808,7 +813,6 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     segment_index_entry->ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
-                    assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
                     table_index_entry->UpdateFulltextSegmentTs(ts);
                 }
                 break;

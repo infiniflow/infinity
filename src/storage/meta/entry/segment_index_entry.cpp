@@ -823,7 +823,7 @@ void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_inde
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
-    assert(chunk_index_entries_.empty() || base_rowid == chunk_index_entries_.back()->base_rowid_ + chunk_index_entries_.back()->row_count_);
+    // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
     SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
