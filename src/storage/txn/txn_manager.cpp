@@ -95,6 +95,14 @@ TxnTimeStamp TxnManager::GetTimestamp() {
     return ts;
 }
 
+TxnTimeStamp TxnManager::GetCommitTimeStamp(Txn *txn) {
+    std::unique_lock w_locker(mutex_);
+    TxnTimeStamp commit_ts = ++start_ts_;
+    wait_conflict_ck_.emplace(commit_ts, nullptr);
+    txn->SetTxnCommitting(commit_ts);
+    return commit_ts;
+}
+
 void TxnManager::SendToWAL(Txn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
@@ -104,7 +112,32 @@ void TxnManager::SendToWAL(Txn *txn) {
         UnrecoverableError("TxnManager is null");
     }
 
-    wal_mgr_->PutEntry(txn->GetWALEntry(), txn);
+    TxnTimeStamp commit_ts = txn->CommitTS();
+    WalEntry *wal_entry = txn->GetWALEntry();
+
+    std::unique_lock w_locker(mutex_);
+    if (wait_conflict_ck_.empty()) {
+        UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS()));
+    }
+    if (wait_conflict_ck_.begin()->first > commit_ts) {
+        UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
+                                       wait_conflict_ck_.begin()->first,
+                                       txn->CommitTS()));
+    }
+    if (wait_conflict_ck_.begin()->first < commit_ts) {
+        wait_conflict_ck_.at(commit_ts) = wal_entry;
+    } else {
+        Vector<WalEntry *> wal_entries{wal_entry};
+        wait_conflict_ck_.erase(wait_conflict_ck_.begin());
+        {
+            std::unique_lock w_locker1(mutex_, std::adopt_lock);
+            while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
+                wal_entries.push_back(wait_conflict_ck_.begin()->second);
+                wait_conflict_ck_.erase(wait_conflict_ck_.begin());
+            }
+        }
+        wal_mgr_->PutEntries(wal_entries);
+    }
 }
 
 void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
@@ -150,18 +183,20 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp txn_ts = txn->Commit();
-    rw_locker_.lock();
-    txn_map_.erase(txn->TxnID());
-    rw_locker_.unlock();
+    {
+        std::lock_guard guard(rw_locker_);
+        txn_map_.erase(txn->TxnID());
+    }
     return txn_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
     TransactionID txn_id = txn->TxnID();
     txn->Rollback();
-    rw_locker_.lock();
-    txn_map_.erase(txn_id);
-    rw_locker_.unlock();
+    {
+        std::lock_guard guard(rw_locker_);
+        txn_map_.erase(txn_id);
+    }
 }
 
 SizeT TxnManager::ActiveTxnCount() {

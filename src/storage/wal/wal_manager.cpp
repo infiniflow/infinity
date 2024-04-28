@@ -108,7 +108,7 @@ void WalManager::Stop() {
     txn_mgr->Stop();
 
     // pop all the entries in the queue. and notify the condition variable.
-    blocking_queue_.Enqueue(nullptr, nullptr);
+    wait_flush_.Enqueue(nullptr);
 
     // Wait for flush thread to stop
     LOG_TRACE("WalManager::Stop flush thread join");
@@ -120,14 +120,11 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-void WalManager::PutEntry(WalEntry *entry, Txn *txn) {
+void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
     if (!running_.load()) {
         return;
     }
-
-    blocking_queue_.Enqueue(entry, txn);
-
-    return;
+    wait_flush_.EnqueueBulk(wal_entries);
 }
 
 void WalManager::SetLastCkpWalSize(i64 wal_size) {
@@ -154,7 +151,7 @@ void WalManager::Flush() {
 
     Deque<WalEntry *> log_batch{};
     while (running_.load()) {
-        blocking_queue_.DequeueBulk(log_batch);
+        wait_flush_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
             LOG_WARN("WalManager::Dequeue empty batch logs");
             continue;

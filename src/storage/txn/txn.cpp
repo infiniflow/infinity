@@ -418,6 +418,12 @@ TxnTimeStamp Txn::Commit() {
         LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
         return commit_ts;
     }
+
+    // register commit ts in wal manager here, define the commit sequence
+    txn_mgr_->GetCommitTimeStamp(this);
+
+    // should check conflict here
+
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_id_;
     txn_mgr_->SendToWAL(this);

@@ -61,7 +61,7 @@ public:
 
     TxnTimeStamp GetTimestamp();
 
-    TxnTimeStamp GetBeginTimestamp(TransactionID txn_id);
+    TxnTimeStamp GetCommitTimeStamp(Txn *txn);
 
     void Invalidate(TxnTimeStamp commit_ts);
 
@@ -104,7 +104,9 @@ private:
     WalManager *wal_mgr_;
 
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
-    //    std::mutex mutex_;
+    std::mutex mutex_{};
+    Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{};
+
     Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
     // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
     Map<TxnTimeStamp, TransactionID> ts_map_{};
