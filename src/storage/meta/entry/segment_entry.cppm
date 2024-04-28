@@ -52,6 +52,10 @@ public:
     friend struct TableEntry;
     friend struct WalSegmentInfo;
 
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const SegmentID segment_id, const TableEntry *table_entry);
+
 public:
     explicit SegmentEntry(TableEntry *table_entry,
                           SharedPtr<String> segment_dir,
@@ -76,12 +80,16 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
 
+    void UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data);
+
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    void AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id);
+    void AddBlockReplay(SharedPtr<BlockEntry> block_entry);
+
+    void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
     bool SetSealed();
 
@@ -93,7 +101,7 @@ public:
 
     void RollbackCompact();
 
-    void FlushNewData(TxnTimeStamp flush_ts);
+    void FlushNewData();
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
@@ -164,9 +172,11 @@ public:
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
+    void CommitFlushed(TxnTimeStamp commit_ts);
+
     void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry);
+    void RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries);
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);

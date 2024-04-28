@@ -27,9 +27,6 @@ module analyzer_pool;
 
 namespace infinity {
 
-constexpr std::string_view CHINESE = "chinese";
-constexpr std::string_view STANDARD = "standard";
-constexpr std::string_view NGRAM = "ngram";
 
 constexpr u64 basis = 0xCBF29CE484222325ull;
 constexpr u64 prime = 0x100000001B3ull;
@@ -43,7 +40,14 @@ UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
         case Str2Int(CHINESE.data()): {
             Analyzer *prototype = cache_[CHINESE].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->resource_dict_path();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->resource_dict_path();
+                }
                 UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
                 if (!analyzer->Load()) {
                     return nullptr;

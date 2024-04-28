@@ -56,7 +56,7 @@ void FileWorker::WriteToFile(bool to_spill) {
         file_handler_ = nullptr;
     });
 
-    WriteToFileImpl(prepare_success);
+    WriteToFileImpl(to_spill, prepare_success);
     if (prepare_success) {
         if (to_spill) {
             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
@@ -96,17 +96,27 @@ void FileWorker::MoveFile() {
     fs.Rename(src_path, dest_path);
 }
 
-void FileWorker::CleanupFile() {
+void FileWorker::CleanupFile() const {
     LocalFileSystem fs;
+
     String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
     if (fs.Exists(path)) {
-        LOG_TRACE(fmt::format("Cleaning up file: {}", path));
         fs.DeleteFile(path);
-        LOG_TRACE(fmt::format("Cleaned file: {}", path));
+        LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
-        // this may happen the same reason as in "CleanupScanner::CleanupDir"
-        // It may also happen when cleanup a table not been flushed (need a checkpoint txn),
-        // at that time there is not data file under dir.
+        // Now, we cannot check whether a buffer obj has been flushed to disk.
+        LOG_TRACE(fmt::format("Cleanup: File {} not found for deletion", path));
+    }
+}
+
+void FileWorker::CleanupTempFile() const {
+    LocalFileSystem fs;
+    String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
+    if (fs.Exists(path)) {
+        fs.DeleteFile(path);
+        LOG_INFO(fmt::format("Cleaned file: {}", path));
+    } else {
+        // Now, we cannot check whether a temp file is moved to data
         LOG_TRACE(fmt::format("Cleanup: File {} not found for deletion", path));
     }
 }

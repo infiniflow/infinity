@@ -22,3 +22,5 @@ DROP INDEX idx1 ON test_annivfflat;
 statement ok
 CREATE INDEX idx2 ON test_annivfflat (col1) USING IVFFlat WITH (metric = l2);
 
+statement ok
+DROP TABLE test_annivfflat;

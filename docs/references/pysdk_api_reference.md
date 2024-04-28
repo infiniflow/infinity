@@ -59,7 +59,7 @@ Create a database using given name. Different approaches will be adopted dependi
 
 - **db_name : str(ont empty)** 
 name of the database
-- **confilict_type : ConflictType**
+- **conflict_type : ConflictType**
 emun type which could be *Error*, *Ignore* or *Replace*, defined in *infinity.common*
 
 ### Returns
@@ -82,7 +82,7 @@ Drop a database by name.
 
 - **db_name : str** 
 name of the database
-- **confilict_type : ConflictType**
+- **conflict_type : ConflictType**
 emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### Returns
@@ -176,9 +176,9 @@ Create a table using given name, and specify defination of each column.
 - **table_name : str(not empty)** 
 name of the table to be created
 - **columns_definition : dict[str, str]**
-A dict object whose key value pair indicates name of the column and its datatype. Espcially, a vector column should be declared as *"vector, \<dimision>\, \<datatype>\"*
+A dict object whose key value pair indicates name of the column and its datatype. Especially, a vector column should be declared as *"vector, \<dimision>\, \<datatype>\"*
 `note: ordinary datatype can be int8/int16/int32/int64/int128/`
-- **confilict_type : ConflictType**
+- **conflict_type : ConflictType**
 emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### note
@@ -209,15 +209,38 @@ emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 ### Examples
 
 ```python
-db_obj.create_table("test_create_varchar_table",
-	            {"c1": "varchar", "c2": "float"})
+db_obj.create_table("table_example", {
+            "c1": {
+                "type": "int",
+                "constraints": ["primary key",],
+                "default": 1
+            },
+            "c2": {
+                "type": "vector,3,float32",
+                "default": [2.0, 1.2, 3.1],
+            }
+        }, None)
+# CREATE TABLE table_example(
+#   c1 INT PRIMARY KEY DEFAULT 1
+#   c2 EMBEDDING(FLOAT, 3) DEFAULT [2.0,1.2,3.1]
+# );
+
+db_obj.create_table("test_create_varchar_table", {
+            "c1": {
+                "type": "varchar", 
+                "constraints": ["primary key"]
+            },
+            "c2": {
+                "type": "float"
+            }
+        })
 # CREATE TABLE test_create_varchar_table(
 #   c1 VARCHAR PRIMARY KEY,
 #   c2 FLOAT
 # );
 
 db_obj.create_table("test_create_embedding_table", 
-                    {"c1": "vector,128,float"}, ConflictType.Replace)
+                    {"c1": {"type": "vector,128,float"}}, ConflictType.Replace)
 # a 128-dimensional float vector
 ```
 
@@ -231,7 +254,7 @@ Drops a table by name.
 
 - **table_name : str(not empty)** 
 name of the table
-- **confilict_type : ConflictType**
+- **conflict_type : ConflictType**
 emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### Returns
@@ -348,7 +371,7 @@ A IndexInfo struct contains three fields, which are column_name, index_type, ind
         - FullText : `'ANALYZER'`(default:`'standard'`)
 
         the metric field supports `ip`(inner product) and `l2`(Euclidean distance)
-- **confilict_type : ConflictType**
+- **conflict_type : ConflictType**
 emun type which could be `Error` , `Replace`, or `Ignore`, defined in *infinity.common*
 
 ### Returns
@@ -360,7 +383,7 @@ emun type which could be `Error` , `Replace`, or `Ignore`, defined in *infinity.
 
 ```python
 db_obj.create_table("test_index_ivfflat", {
-            "c1": "vector,1024,float"}, None)
+            "c1": {"type": "vector,1024,float"}}, None)
 db_obj.get_table("test_index_ivfflat")
 table_obj.create_index("my_index",
                         [index.IndexInfo("c1",index.IndexType.IVFFlat,
@@ -371,7 +394,7 @@ table_obj.create_index("my_index",
 
 ```python
 db_obj.create_table(
-            "test_index_hnsw", {"c1": "vector,1024,float"}, None)
+            "test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 
 db_obj.get_table("test_index_hnsw")
 table_obj.create_index("my_index",
@@ -386,7 +409,11 @@ table_obj.create_index("my_index",
 
 ```python
 db_obj.create_table(
-            "test_index_fulltext", {"doctitle": "varchar", "docdate": "varchar", "body": "varchar"}, None)
+            "test_index_fulltext", {
+                "doctitle": {"type": "varchar"},
+                "docdate": {"type": "varchar"},
+                "body": {"type": "varchar"}
+            }, None)
 
 db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",
@@ -406,7 +433,7 @@ Drops an index by name.
 
 - **index_name : str** 
 The name of the index to drop.
-- **confilict_type : ConflictType**
+- **conflict_type : ConflictType**
 emun type which could be *Error* or *Ignore*, defined in *infinity.common*
 
 ### Returns

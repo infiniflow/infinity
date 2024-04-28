@@ -1098,7 +1098,7 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 9) {
+        if (row_count != 10) {
             UnrecoverableError("ShowIndex: query result is invalid.");
         }
 
@@ -1144,6 +1144,11 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
 
         {
             Value value = data_block->GetValue(1, 8);
+            response.store_size = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 9);
             response.segment_index_count = value.GetVarchar();
         }
 
@@ -1398,8 +1403,14 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         constraints.insert(type);
     }
 
+    Status status;
+    auto const_expr = SharedPtr<ParsedExpr>(GetConstantFromProto(status, column_def.constant_expr));
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
     const auto &column_def_name = column_def.name;
-    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints);
+    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints, const_expr);
     return {col_def, Status::OK()};
 }
 

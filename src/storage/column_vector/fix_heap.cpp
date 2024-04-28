@@ -66,7 +66,7 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
         auto file_worker = MakeUnique<DataFileWorker>(block_column_entry_->base_dir(),
                                                       block_column_entry_->OutlineFilename(current_chunk_idx_),
                                                       current_chunk_size_);
-        auto *buffer_obj = buffer_mgr_->Allocate(std::move(file_worker));
+        auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
         block_column_entry_->AppendOutlineBuffer(buffer_obj);
         return VectorHeapChunk(buffer_obj);
     }
@@ -116,7 +116,7 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
         auto filename = block_column_entry_->OutlineFilename(chunk_id);
         auto base_dir = block_column_entry_->base_dir();
         auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, current_chunk_size_);
-        outline_buffer = buffer_mgr_->Get(std::move(file_worker));
+        outline_buffer = buffer_mgr_->GetBufferObject(std::move(file_worker));
 
         if (outline_buffer == nullptr) {
             UnrecoverableError("No such chunk in heap");

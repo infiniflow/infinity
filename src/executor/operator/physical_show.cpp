@@ -134,7 +134,9 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("column_name");
             output_names_->emplace_back("column_type");
             output_names_->emplace_back("constraint");
+            output_names_->emplace_back("default");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -762,6 +764,23 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage_size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            const String *table_dir = table_index_info->index_entry_dir_.get();
+            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*table_dir));
+            Value value = Value::MakeVarchar(index_size);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
 
     {
         SizeT column_id = 0;
@@ -1160,6 +1179,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "default", HashSet<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
@@ -1167,6 +1187,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
         varchar_type,
         varchar_type,
         varchar_type,
@@ -1217,6 +1238,15 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             }
 
             Value value = Value::MakeVarchar(column_constraint);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
+        }
+
+        ++output_column_idx;
+        {
+            // Append column default value to the fourth column
+            String column_default = column->default_expr_->ToString();
+            Value value = Value::MakeVarchar(column_default);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
@@ -2653,6 +2683,55 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
                     UnrecoverableError("Invalid log flush policy: {}");
                 }
             }
+        }
+        case SysVar::kWALLogSize: {
+            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize() - query_context->storage()->wal_manager()->GetLastCkpWalSize();
+            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kDeltaLogCount: {
+            SizeT delta_log_count = query_context->storage()->catalog()->GetDeltaLogCount();
+            Value value = Value::MakeVarchar(std::to_string(delta_log_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kNextTxnID: {
+            TransactionID next_transaction_id = query_context->storage()->catalog()->next_txn_id();
+            Value value = Value::MakeVarchar(std::to_string(next_transaction_id));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kBufferedObjectCount: {
+            SizeT wal_log_size = query_context->storage()->buffer_manager()->BufferedObjectCount();
+            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kGCListSizeOfBufferPool: {
+            SizeT waiting_gc_object_count = query_context->storage()->buffer_manager()->WaitingGCObjectCount();
+            Value value = Value::MakeVarchar(std::to_string(waiting_gc_object_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kActiveTxnCount: {
+            SizeT active_txn_count = query_context->storage()->txn_manager()->ActiveTxnCount();
+            Value value = Value::MakeVarchar(std::to_string(active_txn_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kCurrentTs: {
+            SizeT current_ts = query_context->storage()->txn_manager()->CurrentTS();
+            Value value = Value::MakeVarchar(std::to_string(current_ts));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
         }
         default: {
             RecoverableError(Status::NoSysVar(object_name_));

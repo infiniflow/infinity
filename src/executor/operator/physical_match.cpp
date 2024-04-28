@@ -53,7 +53,6 @@ import query_node;
 import query_builder;
 import doc_iterator;
 import logger;
-import analyzer_pool;
 import analyzer;
 import term;
 import early_terminate_iterator;
@@ -63,6 +62,8 @@ import explain_logical_plan;
 import column_index_reader;
 import match_data;
 import filter_value_type_classification;
+import common_analyzer;
+import analyzer_pool;
 import bitmask;
 import segment_entry;
 import knn_filter;
@@ -100,7 +101,6 @@ public:
     }
 
     // DocIterator
-
     void DoSeek(RowID doc_id) override {
         for (RowID next_skip = std::max(doc_id, DocIterator::doc_id_ + 1);;) {
             if (!BlockSkipTo(next_skip, 0)) [[unlikely]] {
@@ -381,12 +381,41 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
 
 void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_terms) {
     UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
+    // (dynamic_cast<CommonLanguageAnalyzer*>(analyzer.get()))->SetExtractEngStem(false);
     if (analyzer.get() == nullptr) {
         RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name)));
     }
     Term input_term;
     input_term.text_ = std::move(text);
-    analyzer->Analyze(input_term, output_terms);
+    TermList temp_output_terms;
+    analyzer->Analyze(input_term, temp_output_terms);
+    if (analyzer_name == AnalyzerPool::STANDARD) {
+        // remove duplicates and only keep the root words for query
+        const u32 INVALID_TERM_OFFSET = -1;
+        Term last_term;
+        last_term.word_offset_ = INVALID_TERM_OFFSET;
+        for (const Term &term : temp_output_terms) {
+            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+                assert(term.word_offset_ >= last_term.word_offset_);
+            }
+            if (last_term.word_offset_ != term.word_offset_) {
+                if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+                    output_terms.emplace_back(last_term);
+                }
+                last_term.text_ = term.text_;
+                last_term.word_offset_ = term.word_offset_;
+                last_term.stats_ = term.stats_;
+            } else {
+                if (term.text_.size() < last_term.text_.size()) {
+                    last_term.text_ = term.text_;
+                    last_term.stats_ = term.stats_;
+                }
+            }
+        }
+        if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+            output_terms.emplace_back(last_term);
+        }
+    }
 }
 
 bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
@@ -419,7 +448,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
-    driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
@@ -463,6 +491,14 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         and_root->Add(MakeUnique<FilterQueryNode>(common_query_filter_.get()));
         full_text_query_context.query_tree_ = std::move(and_root);
     }
+
+    if (full_text_query_context.query_tree_->type_ == QueryNodeType::PHRASE) {
+        // TODO: make sure there is no problem with block max phrase and delete this code
+        // LOG_INFO(fmt::format("Block max phrase not supported, use ordinary iterator, query: {}", match_expr_->matching_text_));
+        use_block_max_iter = false;
+        use_ordinary_iter = true;
+    }
+
     if (use_block_max_iter) {
         et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
         if (et_iter and dynamic_cast<FilterIterator *>(et_iter.get())) {
@@ -767,8 +803,9 @@ SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {
 SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatch::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
     result_types->reserve(base_table_ref_->column_types_->size() + 2);
-    for (auto &type : *base_table_ref_->column_types_)
+    for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
+    }
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;

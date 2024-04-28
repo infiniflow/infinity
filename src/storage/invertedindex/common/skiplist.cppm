@@ -37,9 +37,7 @@ Pair<u32, u32> DecodeVal(u64 value) {
 
 export class KeyComparator {
 public:
-    i32 operator()(const Pair<const char *, u16> &lhs, const Pair<const char *, u16> &rhs) const {
-        return std::memcmp(lhs.first, rhs.first, std::min(lhs.second, rhs.second));
-    }
+    i32 operator()(const char *lhs, const char *rhs) const { return std::strcmp(lhs, rhs); }
 };
 
 export template <typename KeyType, typename ValueType>
@@ -57,7 +55,8 @@ public:
 
     void SetValue(u64 valueoffset) { atomic_store(&value_, valueoffset); }
 
-    Pair<const char *, u16> Key(Arena<KeyType, ValueType> *arena) { return {arena->GetKey(key_offset_, key_size_), key_size_}; }
+    const char *KeyForString(Arena<KeyType, ValueType> *arena) { return arena->GetKeyForString(key_offset_, key_size_); }
+    KeyType Key(Arena<KeyType, ValueType> *arena) { return arena->GetKey(key_offset_, key_size_); }
 
     u32 GetNextOffset(i32 h) { return next_[h].load(std::memory_order_relaxed); }
 
@@ -71,12 +70,12 @@ public:
     Atomic<u32> next_[MAX_LEVEL];
 };
 
-export template <typename KeyType, typename ValueType, typename Comparator = KeyComparator>
+export template <typename KeyType, typename ValueType, typename Comparator>
 class SkipList {
     typedef SkipListNode<KeyType, ValueType> Node;
 
 public:
-    SkipList(Comparator cmp = KeyComparator(), MemoryPool *arena = nullptr, u32 sz = 1 << 30) : comparator_(cmp), height_(1), ref_(1), buf_size_(sz) {
+    SkipList(Comparator cmp, MemoryPool *arena = nullptr, u32 sz = 1 << 30) : comparator_(cmp), height_(1), buf_size_(sz) {
         arena_ = new Arena<KeyType, ValueType>(buf_size_);
         auto head = NewNode(KeyType(), ValueType(), MAX_LEVEL);
         head_offset_ = arena_->GetNodeOffset(head);
@@ -158,11 +157,15 @@ public:
             return false;
         }
 
-        auto nextKey = arena_->GetKey(n->key_offset_, n->key_size_);
-        const char* mk = nullptr;
-        i32 l = 0;
-        ParseKey(key,mk,l);
-        if (0 != comparator_({mk,l}, {nextKey, n->key_size_})) {
+        i32 cmp = 0;
+        if constexpr (std::is_same_v<KeyType, String>) {
+            auto nextkey = arena_->GetKeyForString(n->key_offset_, n->key_size_);
+            cmp = comparator_(key.data(), nextkey);
+        } else {
+            auto nextkey = arena_->GetKey(n->key_offset_, n->key_size_);
+            cmp = comparator_(key, nextkey);
+        }
+        if (0 != cmp) {
             return false;
         }
 
@@ -180,9 +183,25 @@ public:
     public:
         Iterator(SkipListNode<KeyType, ValueType> *node, SkipList<KeyType, ValueType, Comparator> *s) : s_(s), current_(node) {}
 
-        Pair<KeyType, ValueType> operator*() { return {current_->Key(s_->arena_), current_->GetValue(s_->arena_)}; }
+        Pair<KeyType, ValueType> operator*() {
+            KeyType k{};
+            if constexpr (std::is_same_v<ValueType, String>) {
+                auto ret = current_->KeyForString(s_->arena_);
+                k = String(ret, current_->key_size_);
+            } else {
+                k = current_->Key(s_->arena_);
+            }
+            return {k, current_->GetValue(s_->arena_)};
+        }
 
-        const KeyType Key() { return current_->Key(s_->arena_); }
+        const KeyType Key() {
+            if constexpr (std::is_same_v<ValueType, String>) {
+                auto ret = current_->KeyForString(s_->arena_);
+                return String(ret, current_->key_size_);
+            } else {
+                return current_->Key(s_->arena_);
+            }
+        }
 
         const ValueType Value() { return current_->GetValue(s_->arena_); }
 
@@ -255,16 +274,6 @@ private:
         }
     }
 
-    void ParseKey(const KeyType &key, const char *&mk, i32 &l) {
-        if constexpr (std::is_same_v<KeyType, String>) {
-            mk = key.data();
-            l = key.size();
-        } else {
-            mk = reinterpret_cast<const char *>(&key);
-            l = sizeof(key);
-        }
-    }
-
     Node *GetNext(Node *node, i32 h) { return arena_->GetNode(node->GetNextOffset(h)); }
 
     Node *GetHead() { return arena_->GetNode(head_offset_); }
@@ -292,11 +301,14 @@ private:
                 return {x, false};
             }
 
-            auto nextkey = next->Key(arena_);
-            const char* mk = nullptr;
-            i32 l = 0;
-            ParseKey(k,mk,l);
-            i32 cmp = comparator_({mk, l}, nextkey);
+            i32 cmp = 0;
+            if constexpr (std::is_same_v<KeyType, String>) {
+                auto nextkey = next->KeyForString(arena_);
+                cmp = comparator_(k.data(), nextkey);
+            } else {
+                auto nextkey = next->Key(arena_);
+                cmp = comparator_(k, nextkey);
+            }
 
             if (cmp > 0) {
                 x = next;
@@ -344,17 +356,14 @@ private:
                 return {before, nextOffset};
             }
 
-            auto nextKey = nextNode->Key(arena_);
-            const char *mk = nullptr;
-            i32 l = 0;
+            i32 cmp = 0;
             if constexpr (std::is_same_v<KeyType, String>) {
-                mk = k.data();
-                l = k.size();
+                auto nextkey = nextNode->KeyForString(arena_);
+                cmp = comparator_(k.data(), nextkey);
             } else {
-                mk = reinterpret_cast<const char *>(&k);
-                l = sizeof(k);
+                auto nextkey = nextNode->Key(arena_);
+                cmp = comparator_(k, nextkey);
             }
-            i32 cmp = comparator_({mk, l}, nextKey);
 
             if (cmp == 0) {
                 return {nextOffset, nextOffset};
@@ -384,15 +393,6 @@ private:
         }
     }
 
-    void IncrRef() { ref_.fetch_add(1); }
-
-    // TODO
-    void DecRef() {
-        ref_.fetch_sub(1);
-        if (ref_ > 0)
-            return;
-    }
-
 protected:
     Arena<KeyType, ValueType> *arena_;
 
@@ -402,7 +402,6 @@ private:
     // cur_height
     Atomic<i32> height_;
     Atomic<u32> head_offset_;
-    Atomic<i32> ref_;
 
     u32 buf_size_;
 };
@@ -426,7 +425,7 @@ public:
             u32 grow = buf_.size();
             if (grow > (1 << 30)) {
                 grow = 1 << 30;
-            } else if (grow < sz) {
+            } else if (grow < MAX_NODE_SIZE) {
                 grow = sz;
             }
             buf_.resize(buf_.size() + grow);
@@ -445,14 +444,13 @@ public:
         u32 offset = 0;
         if constexpr (std::is_same_v<ValueType, String>) {
             auto l = v.size();
-            offset = Allocate(l);
+            offset = Allocate(l + 1);
             std::memcpy(&buf_[offset], v.data(), l);
-            // buf_[offset + l + 1] = '\0';
+            buf_[offset + l + 1] = '\0';
         } else {
             auto l = sizeof(v);
             offset = Allocate(l);
             std::memcpy(&buf_[offset], &v, l);
-            // buf_[offset + l + 1] = '\0';
         }
         return offset;
     }
@@ -463,12 +461,11 @@ public:
             auto l = key.size();
             offset = Allocate(l + 1);
             std::memcpy(&buf_[offset], key.data(), l);
-            // buf_[offset + key.size() + 1] = '\0';
+            buf_[offset + l + 1] = '\0';
         } else {
             auto l = sizeof(key);
-            offset = Allocate(l + 1);
+            offset = Allocate(l);
             std::memcpy(&buf_[offset], &key, l);
-            // buf_[offset + l + 1] = '\0';
         }
         return offset;
     }
@@ -489,11 +486,18 @@ public:
 
     i64 ArenaSize() const { return static_cast<i64>(n_.load()); }
 
-    const char *GetKey(u32 offset, u16 size) {
+    const char *GetKeyForString(u32 offset, u16 size) {
         if (offset + size > ArenaSize()) {
             return nullptr;
         }
         return reinterpret_cast<const char *>(&buf_[offset]);
+    }
+
+    KeyType GetKey(u32 offset, u16 size) {
+        if (offset + size > ArenaSize()) {
+            return KeyType{};
+        }
+        return *reinterpret_cast<KeyType *>(&buf_[offset]);
     }
 
     ValueType GetVal(u32 offset, u32 size) {
@@ -503,9 +507,7 @@ public:
         if constexpr (std::is_same_v<ValueType, String>) {
             return String(&buf_[offset], size);
         } else {
-            ValueType val;
-            std::memcpy(&val, &buf_[offset], size);
-            return val;
+            return *reinterpret_cast<ValueType *>(&buf_[offset]);
         }
     }
 

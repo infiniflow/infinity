@@ -78,6 +78,7 @@ export namespace std {
 
     using std::bit_cast;
     using std::memcpy;
+    using std::strcmp;
     using std::memset;
     using std::memcmp;
     using std::strlen;
@@ -104,6 +105,10 @@ export namespace std {
     using std::shared_mutex;
     using std::unique_lock;
     using std::scoped_lock;
+
+    using std::defer_lock;
+    using std::adopt_lock;
+    using std::try_to_lock;
 
     using std::binary_search;
     using std::fabs;

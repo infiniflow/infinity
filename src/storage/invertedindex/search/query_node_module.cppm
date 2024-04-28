@@ -30,10 +30,10 @@ export using infinity::AndQueryNode;
 export using infinity::AndNotQueryNode;
 export using infinity::OrQueryNode;
 export using infinity::NotQueryNode;
+export using infinity::PhraseQueryNode;
 
 // unimplemented
 // export using infinity::WandQueryNode;
-// export using infinity::PhraseQueryNode;
 // export using infinity::PrefixTermQueryNode;
 // export using infinity::SuffixTermQueryNode;
 // export using infinity::SubstringTermQueryNode;

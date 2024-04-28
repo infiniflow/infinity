@@ -28,12 +28,14 @@ export class BufferManager {
 public:
     explicit BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir);
 
+    ~BufferManager();
+
 public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
-    BufferObj *Allocate(UniquePtr<FileWorker> file_worker);
+    BufferObj *AllocateBufferObject(UniquePtr<FileWorker> file_worker);
 
     // Get an existing BufferHandle from memory or disk.
-    BufferObj *Get(UniquePtr<FileWorker> file_worker);
+    BufferObj *GetBufferObject(UniquePtr<FileWorker> file_worker);
 
     SharedPtr<String> GetDataDir() const { return data_dir_; }
 
@@ -44,10 +46,14 @@ public:
         return memory_limit_;
     }
 
-    u64 memory_usage() {
-        std::unique_lock<std::mutex> lock(gc_locker_);
-        return current_memory_size_;
+    u64 memory_usage() { return current_memory_size_; }
+
+    SizeT WaitingGCObjectCount() {
+        std::unique_lock lock(gc_locker_);
+        return gc_map_.size();
     }
+
+    SizeT BufferedObjectCount();
 
     void RemoveClean();
 
@@ -62,24 +68,31 @@ private:
 
     bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
-    void AddToCleanList(BufferObj *buffer_obj, bool free);
+    void AddToCleanList(BufferObj *buffer_obj, bool do_free);
+
+    void AddToCleanTempList(BufferObj *buffer_obj);
 
 private:
-    std::mutex w_locker_{};
-    using GCListIter = List<BufferObj *>::iterator;
+    bool RemoveFromGCQueueInner(BufferObj *buffer_obj);
 
+private:
     SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
-    u64 current_memory_size_{};
+
+    Atomic<u64> current_memory_size_{};
+
+    std::mutex w_locker_{};
     HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
 
     std::mutex gc_locker_{};
+    using GCListIter = List<BufferObj *>::iterator;
     HashMap<BufferObj *, GCListIter> gc_map_{};
     List<BufferObj *> gc_list_{};
 
     std::mutex clean_locker_{};
     Vector<BufferObj *> clean_list_{};
+    Vector<BufferObj *> clean_temp_list_{};
 };
 
 } // namespace infinity

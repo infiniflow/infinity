@@ -52,6 +52,7 @@ import table_index_entry;
 import log_file;
 import default_values;
 import defer_op;
+import index_base;
 
 module wal_manager;
 
@@ -137,6 +138,11 @@ void WalManager::SetLastCkpWalSize(i64 wal_size) {
 i64 WalManager::GetLastCkpWalSize() {
     std::lock_guard guard(mutex2_);
     return last_ckp_wal_size_;
+}
+
+i64 WalManager::WalSize() const {
+    std::lock_guard guard(mutex2_);
+    return wal_size_;
 }
 
 // Flush is scheduled regularly. It collects a batch of transactions, sync
@@ -495,11 +501,11 @@ i64 WalManager::ReplayWalFile() {
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
+        LOG_INFO(replay_entries[replay_count]->ToString());
         ReplayWalEntry(*replay_entries[replay_count]);
-        LOG_TRACE(replay_entries[replay_count]->ToString());
     }
 
-    LOG_TRACE(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
+    LOG_INFO(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
     storage_->catalog()->next_txn_id_ = last_txn_id;
     this->max_commit_ts_ = system_start_ts;
 
@@ -666,7 +672,8 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
     table_entry->DropIndexReplay(
         cmd.index_name_,
         [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            auto index_entry = TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, index_meta, txn_id, begin_ts);
+            auto index_base = MakeShared<IndexBase>(index_meta->index_name());
+            auto index_entry = TableIndexEntry::NewTableIndexEntry(index_base, true, nullptr, index_meta, txn_id, begin_ts);
             index_entry->commit_ts_.store(commit_ts);
             return index_entry;
         },
@@ -708,7 +715,7 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
             auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_idx, last_off, commit_ts);
             block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
         }
-        segment_entry->AddBlockReplay(std::move(block_entry), block_id); // reuse function from delta catalog.
+        segment_entry->AddBlockReplay(std::move(block_entry)); // reuse function from delta catalog.
     }
     return segment_entry;
 }

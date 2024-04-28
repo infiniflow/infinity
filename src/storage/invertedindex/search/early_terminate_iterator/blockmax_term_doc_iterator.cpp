@@ -28,6 +28,7 @@ import segment_posting;
 import posting_iterator;
 import column_length_io;
 import infinity_exception;
+import third_party;
 
 namespace infinity {
 BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool) : iter_(flag, session_pool) {}

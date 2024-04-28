@@ -30,7 +30,9 @@ class TestQuery(TestSdk):
         db = RemoteDatabase(conn, "default_db")
         db.drop_table("my_table", conflict_type=ConflictType.Ignore)
         db.create_table(
-            "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
+            "my_table", {
+                "num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}},
+            ConflictType.Error)
 
         table = RemoteTable(conn, "default_db", "my_table")
         res = table.insert(
@@ -76,7 +78,7 @@ class TestQuery(TestSdk):
         db_obj.drop_table("test_query_builder",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_query_builder", {"c1": "int"}, ConflictType.Error)
+            "test_query_builder", {"c1": {"type": "int"}}, ConflictType.Error)
         query_builder = table_obj.query_builder
         query_builder.output(["*"]).to_df()
 

@@ -32,8 +32,16 @@ from infinity.common import ConflictType
 infinity_obj = infinity.connect(REMOTE_HOST)
 db = infinity_obj.get_database("default_db")
 db.drop_table("my_table", ConflictType.Ignore)
-table = db.create_table(
-    "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
+table = db_obj.create_table("my_table", {
+            "c1": {
+                "type": "int",
+                "constraints"(optional): ["primary key", ...],
+                "default"(optional): 1/"asdf"/[1,2]/...
+            },
+            "c2": {
+                "type":"vector,1024,float32",
+            }
+        }, None)
 table.insert(
     [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
 table.insert(

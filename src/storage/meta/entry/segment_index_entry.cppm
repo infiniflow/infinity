@@ -50,6 +50,10 @@ export struct PopulateEntireConfig {
 };
 
 export class SegmentIndexEntry : public BaseEntry, public EntryInterface {
+public:
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const SegmentID segment_id, const TableIndexEntry *table_index_entry);
 
 public:
     static SharedPtr<SegmentIndexEntry>
@@ -77,7 +81,7 @@ public:
 
     [[nodiscard]] inline u32 GetIndexPartNum() { return vector_buffer_.size() - 1; }
 
-    nlohmann::json Serialize();
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     void SaveIndexFile();
 

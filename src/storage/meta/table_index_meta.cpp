@@ -61,11 +61,13 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shar
 
 Tuple<SharedPtr<TableIndexEntry>, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                                               ConflictType conflict_type,
+                                                                              SharedPtr<String> index_name,
                                                                               TransactionID txn_id,
                                                                               TxnTimeStamp begin_ts,
                                                                               TxnManager *txn_mgr) {
+    auto index_base = MakeShared<IndexBase>(index_name);
     auto init_drop_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, this, txn_id, begin_ts);
+        return TableIndexEntry::NewTableIndexEntry(index_base, true, nullptr, this, txn_id, begin_ts);
     };
     return index_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -165,9 +167,6 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
 
         table_index_entry_candidates.reserve(this->index_entry_list().size());
         for (const auto &base_entry : this->index_entry_list()) {
-            if (base_entry->entry_type_ == EntryType::kDummy) {
-                continue;
-            }
             if (base_entry->entry_type_ != EntryType::kTableIndex) {
                 UnrecoverableError("Unexpected entry type during serialize table index meta");
             }

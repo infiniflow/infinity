@@ -22,7 +22,7 @@ class TestInsertDeleteParallelSimple:
         res = db_obj.drop_table("insert_delete_test", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
-            "insert_delete_test", {"id": "int64"}, ConflictType.Error
+            "insert_delete_test", {"id": {"type": "int64"}}, ConflictType.Error
         )
         connection_pool.release_conn(infinity_obj)
 

@@ -80,14 +80,6 @@ Null,
 Unique,
 }
 
-struct ColumnDef {
-1:  i32 id,
-2:  string name,
-3:  DataType data_type,
-4:  list<Constraint> constraints = [],
-}
-
-
 enum LiteralType {
 Boolean,
 Double,
@@ -197,6 +189,14 @@ struct UpdateExpr {
 struct OrderByExpr {
 1: ParsedExpr expr,
 2: bool asc,
+}
+
+struct ColumnDef {
+1:  i32 id,
+2:  string name,
+3:  DataType data_type,
+4:  list<Constraint> constraints = [],
+5:  ConstantExpr constant_expr,
 }
 
 
@@ -377,7 +377,8 @@ struct ShowIndexResponse {
 8: string index_column_ids,
 9: string other_parameters,
 10: string store_dir,
-11: string segment_index_count,
+11: string store_size,
+12: string segment_index_count,
 }
 
 struct GetDatabaseRequest {

@@ -15,12 +15,17 @@
 #pragma once
 
 #include "parsed_expr.h"
+#include "json.hpp"
+#include "type/data_type.h"
 #include "type/datetime/interval_type.h"
+
+#include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace infinity {
 
-enum class LiteralType {
+enum class LiteralType : int32_t {
     kBoolean,
     kDouble,
     kString,
@@ -42,6 +47,16 @@ public:
     ~ConstantExpr() override;
 
     [[nodiscard]] std::string ToString() const override;
+
+    int32_t GetSizeInBytes() const;
+
+    void WriteAdv(char *&ptr) const;
+
+    static std::shared_ptr<ParsedExpr> ReadAdv(char *&ptr, int32_t maxbytes);
+
+    nlohmann::json Serialize() const;
+
+    static std::shared_ptr<ParsedExpr> Deserialize(const nlohmann::json &constant_expr);
 
 public:
     LiteralType literal_type_;

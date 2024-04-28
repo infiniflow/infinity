@@ -30,18 +30,34 @@ import internal_types;
 import infinity_exception;
 import data_type;
 import segment_entry;
-
+import version_file_worker;
 import column_vector;
 import bitmask;
 import block_version;
 import cleanup_scanner;
+import buffer_manager;
+import buffer_obj;
 
 namespace infinity {
 
+Vector<std::string_view> BlockEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid block entry encode: {}", encode));
+    }
+    auto decodes = SegmentEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String BlockEntry::EncodeIndex(const BlockID block_id, const SegmentEntry *segment_entry) {
+    return fmt::format("{}#{}", segment_entry->encode(), block_id);
+}
+
 /// class BlockEntry
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts)
-    : BaseEntry(EntryType::kBlock, false), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
-      checkpoint_ts_(checkpoint_ts) {}
+    : BaseEntry(EntryType::kBlock, false, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry), block_id_(block_id),
+      row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
 
 UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
@@ -56,7 +72,10 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
         auto column_entry = BlockColumnEntry::NewBlockColumnEntry(block_entry.get(), column_id, txn);
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
-    block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
+
+    auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir_, BlockVersion::FileName(), block_entry->row_capacity_);
+    auto *buffer_mgr = txn->buffer_mgr();
+    block_entry->block_version_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
     return block_entry;
 }
 
@@ -78,17 +97,33 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->max_row_ts_ = max_row_ts;
     block_entry->commit_ts_ = commit_ts;
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
-    block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
-    block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
+
+    auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir_, BlockVersion::FileName(), row_capacity);
+    block_entry->block_version_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+
     block_entry->checkpoint_ts_ = check_point_ts;
     block_entry->checkpoint_row_count_ = checkpoint_row_count;
     return block_entry;
 }
 
+void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data) {
+    row_count_ = block_entry->row_count_;
+    min_row_ts_ = block_entry->min_row_ts_;
+    max_row_ts_ = block_entry->max_row_ts_;
+    checkpoint_ts_ = block_entry->checkpoint_ts_;
+    checkpoint_row_count_ = block_entry->checkpoint_row_count_;
+    if (!block_filter_binary_data.empty()) {
+        LoadFilterBinaryData(block_filter_binary_data);
+    }
+}
+
 Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
     std::shared_lock lock(rw_locker_);
     begin_ts = std::min(begin_ts, this->max_row_ts_);
-    auto &block_version = this->block_version_;
+
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+
     auto &deleted = block_version->deleted_;
     BlockOffset block_offset_end = block_version->GetRowCount(begin_ts);
     while (block_offset_begin < block_offset_end && deleted[block_offset_begin] != 0 && deleted[block_offset_begin] <= begin_ts) {
@@ -105,7 +140,10 @@ Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts
 
 bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    auto &block_version = this->block_version_;
+
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+
     auto &deleted = block_version->deleted_;
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
 }
@@ -162,6 +200,10 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
 
     this->row_count_ += actual_copied;
 
+    auto block_version_handle = block_version_->Load();
+    auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
+    block_version->created_.emplace_back(commit_ts, this->row_count_);
+
     return actual_copied;
 }
 
@@ -177,12 +219,25 @@ void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const 
     u32 segment_id = this->segment_entry_->segment_id();
     u16 block_id = this->block_id_;
 
-    auto &block_version = this->block_version_;
+    auto block_version_handle = block_version_->Load();
+    auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
+
     for (BlockOffset block_offset : rows) {
         block_version->deleted_[block_offset] = commit_ts;
     }
 
     LOG_TRACE(fmt::format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));
+}
+
+void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+    auto block_version_handle = block_version_->Load();
+    auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
+    if (!block_version->created_.empty()) {
+        UnrecoverableError("BlockEntry::CommitFlushed: block_version->created_ is not empty");
+    }
+    block_version->created_.emplace_back(commit_ts, this->row_count_);
+
+    FlushVersion(commit_ts);
 }
 
 void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -202,87 +257,63 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (!this->Committed()) {
         txn_id_ = txn_id;
         this->Commit(commit_ts);
-    }
-
-    auto &block_version = this->block_version_;
-    if (block_version->created_.empty() || block_version->created_.back().create_ts_ != commit_ts) {
-        block_version->created_.emplace_back(commit_ts, i32(this->row_count_));
-    }
-    for (auto &column : columns_) {
-        column->CommitColumn(txn_id, commit_ts);
+        for (auto &column : columns_) {
+            column->CommitColumn(txn_id, commit_ts);
+        }
     }
 }
 
-void BlockEntry::FlushData(int64_t checkpoint_row_count) {
+void BlockEntry::FlushData(SizeT start_row_count, SizeT checkpoint_row_count) {
     SizeT column_count = this->columns_.size();
     SizeT column_idx = 0;
     while (column_idx < column_count) {
         BlockColumnEntry *block_column_entry = this->columns_[column_idx].get();
-        BlockColumnEntry::Flush(block_column_entry, checkpoint_row_count);
+        BlockColumnEntry::Flush(block_column_entry, start_row_count, checkpoint_row_count);
         LOG_TRACE(fmt::format("ColumnData {} is flushed", block_column_entry->column_id()));
         ++column_idx;
     }
 }
 
-void BlockEntry::FlushVersion(BlockVersion &checkpoint_version) { checkpoint_version.SaveToFile(this->VersionFilePath()); }
+bool BlockEntry::FlushVersion(TxnTimeStamp checkpoint_ts) {
+    std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
+    // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
+    if (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts) {
+        return false;
+    }
 
-void BlockEntry::Flush(TxnTimeStamp checkpoint_ts, bool check_commit) {
+    auto *version_file_worker = static_cast<VersionFileWorker *>(block_version_->file_worker());
+    version_file_worker->SetCheckpointTS(checkpoint_ts);
+    block_version_->Save();
+
+    return true;
+}
+
+void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     LOG_TRACE(fmt::format("Segment: {}, Block: {} is flushing", this->segment_entry_->segment_id(), this->block_id_));
     if (checkpoint_ts < this->checkpoint_ts_) {
         UnrecoverableError(
             fmt::format("BlockEntry checkpoint_ts skew! checkpoint_ts: {}, this->checkpoint_ts_: {}", checkpoint_ts, this->checkpoint_ts_));
     }
-    int checkpoint_row_count = 0;
 
-    BlockVersion checkpoint_version(this->block_version_->deleted_.size());
-    {
-        std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
-
-        if (check_commit) {
-            // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
-            if (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)
-                return;
-            checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
-        } else {
-            checkpoint_row_count = this->row_count_;
-        }
-        if (checkpoint_row_count == 0) {
-            LOG_TRACE(fmt::format("Block entry {} is empty at checkpoint_ts {}", this->block_id_, checkpoint_ts));
-            return;
-        }
-        const Vector<TxnTimeStamp> &deleted = this->block_version_->deleted_;
-        if (checkpoint_row_count <= this->checkpoint_row_count_) {
-            // BlockEntry doesn't append rows between the previous checkpoint and checkpoint_ts.
-            bool deleted_between = false;
-            for (int i = 0; i < checkpoint_row_count; i++) {
-                if (deleted[i] > this->checkpoint_ts_ && deleted[i] <= checkpoint_ts) {
-                    deleted_between = true;
-                    break;
-                }
-            }
-            if (!deleted_between) // BlockEntry doesn't change between the previous checkpoint and checkpoint_ts.
-                return;
-        }
-        checkpoint_version.created_ = this->block_version_->created_;
-        checkpoint_version.deleted_ = deleted;
-    }
-    for (int i = 0; i < checkpoint_row_count; i++) {
-        if (checkpoint_version.deleted_[i] > checkpoint_ts) {
-            checkpoint_version.deleted_[i] = 0;
-        }
-    }
     LOG_TRACE("Block entry flush before flush version");
-    FlushVersion(checkpoint_version);
-    LOG_TRACE("Block entry flush before flush data");
-    FlushData(checkpoint_row_count);
-    this->checkpoint_ts_ = checkpoint_ts;
-    this->checkpoint_row_count_ = checkpoint_row_count;
-    LOG_TRACE(
-        fmt::format("Segment: {}, Block {} is flushed {} rows", this->segment_entry_->segment_id(), this->block_id_, this->checkpoint_row_count_));
-    return;
+    bool flush = FlushVersion(checkpoint_ts);
+    if (flush) {
+        auto block_version_handle = block_version_->Load();
+        auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());
+        SizeT checkpoint_row_count = block_version->GetRowCount(checkpoint_ts);
+
+        LOG_TRACE("Block entry flush before flush data");
+        FlushData(this->checkpoint_row_count_, checkpoint_row_count);
+        this->checkpoint_ts_ = checkpoint_ts;
+        this->checkpoint_row_count_ = checkpoint_row_count;
+        LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed {} rows",
+                              this->segment_entry_->segment_id(),
+                              this->block_id_,
+                              this->checkpoint_row_count_));
+    }
 }
 
-void BlockEntry::FlushForImport(TxnTimeStamp checkpoint_ts) { this->Flush(checkpoint_ts, false); }
+void BlockEntry::FlushForImport() { FlushData(0, this->row_count_); }
 
 void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_.DeserializeFromString(block_filter_data); }
 
@@ -290,7 +321,7 @@ void BlockEntry::Cleanup() {
     for (auto &block_column_entry : columns_) {
         block_column_entry->Cleanup();
     }
-    block_version_->Cleanup(this->VersionFilePath());
+    block_version_->PickForCleanup();
 
     CleanupScanner::CleanupDir(*block_dir_);
 }
@@ -347,11 +378,6 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
 
     block_entry->begin_ts_ = block_entry_json["begin_ts"];
     block_entry->txn_id_ = block_entry_json["txn_id"];
-
-    block_entry->block_version_->LoadFromFile(block_entry->VersionFilePath());
-    if (block_entry->block_version_->created_.empty()) {
-        block_entry->block_version_->created_.emplace_back(block_entry->max_row_ts_, block_entry->row_count_);
-    }
 
     for (const auto &block_column_json : block_entry_json["columns"]) {
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));

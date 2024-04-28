@@ -567,6 +567,12 @@ void SystemVariables::InitVariablesMap() {
     map_["data_url"] = SysVar::kDataURL;
     map_["time_zone"] = SysVar::kTimezone;
     map_["flush_at_commit"] = SysVar::kLogFlushPolicy;
+    map_["wal_log_size"] = SysVar::kWALLogSize;
+    map_["next_transaction_id"] = SysVar::kNextTxnID;
+    map_["buffered_object_count"] = SysVar::kBufferedObjectCount;
+    map_["object_count_for_gc"] = SysVar::kGCListSizeOfBufferPool;
+    map_["active_transaction_count"] = SysVar::kActiveTxnCount;
+    map_["current_ts"] = SysVar::kCurrentTs;
 }
 
 HashMap<String, SysVar> SystemVariables::map_;

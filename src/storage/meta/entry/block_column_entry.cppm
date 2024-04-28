@@ -35,7 +35,12 @@ struct TableEntry;
 struct SegmentEntry;
 
 export struct BlockColumnEntry : public BaseEntry {
+public:
     friend struct BlockEntry;
+
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry);
 
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref);
@@ -93,7 +98,7 @@ public:
 public:
     void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
 
-    static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
+    static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
     void Cleanup();
 

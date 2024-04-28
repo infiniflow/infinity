@@ -115,13 +115,13 @@ TEST_F(BufferObjTest, test1) {
     auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
     auto test_fname1 = MakeShared<String>("test1");
     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-    auto buf1 = buffer_manager.Allocate(std::move(file_worker1));
+    auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     SizeT test_size2 = 1024;
     auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
     auto test_fname2 = MakeShared<String>("test2");
     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
-    auto buf2 = buffer_manager.Allocate(std::move(file_worker2));
+    auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     /// kEphemeral
     // kNew, kEphemeral
@@ -297,13 +297,13 @@ TEST_F(BufferObjTest, test1) {
 //     auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
 //     auto test_fname1 = MakeShared<String>("test1");
 //     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-//     auto *buf1 = buffer_manager.Allocate(std::move(file_worker1));
+//     auto *buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
 //     SizeT test_size2 = 1024;
 //     auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
 //     auto test_fname2 = MakeShared<String>("test2");
 //     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
-//     auto *buf2 = buffer_manager.Allocate(std::move(file_worker2));
+//     auto *buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
 //     /// kEphemeral
 //     // kNew, kEphemeral
@@ -333,7 +333,7 @@ TEST_F(BufferObjTest, test1) {
 //     { auto handle2 = buf2->Load(); }
 //     {
 //         auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-//         buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
+//         buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1_new1));
 //         auto handle1 = buf1->Load();
 //         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
 //         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
@@ -355,7 +355,7 @@ TEST_F(BufferObjTest, test1) {
 //     buf1 = nullptr;
 
 //     auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-//     buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
+//     buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1_new1));
 //     EXPECT_EQ(buf1->status(), BufferStatus::kNew);
 //     buf1->CheckState();
 
@@ -397,7 +397,7 @@ TEST_F(BufferObjTest, test1) {
 //     { auto handle2 = buf2->Load(); }
 //     {
 //         auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-//         buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
+//         buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1_new1));
 //         auto handle1 = buf1->Load();
 //         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
 //         buf1->CheckState();
@@ -423,7 +423,7 @@ TEST_F(BufferObjTest, test1) {
 //     // kFreed, kTemp -> kNew, kTemp
 //     buf1->Cleanup();
 //     auto file_worker1_new2 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-//     buf1 = buffer_manager.Allocate(std::move(file_worker1_new2));
+//     buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1_new2));
 //     EXPECT_EQ(buf1->status(), BufferStatus::kNew);
 //     buf1->CheckState();
 //     buffer_manager.RemoveClean();
@@ -460,7 +460,7 @@ TEST_F(BufferObjTest, test1) {
 //     { auto handle2 = buf2->Load(); }
 //     {
 //         auto file_worker1_new1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-//         buf1 = buffer_manager.Allocate(std::move(file_worker1_new1));
+//         buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1_new1));
 //         auto handle1 = buf1->Load();
 //         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
 //         buf1->CheckState();
@@ -486,7 +486,7 @@ TEST_F(BufferObjTest, test1) {
 //     buf1->Cleanup();
 //     buffer_manager.RemoveClean();
 //     auto file_worker1_new3 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-//     buf1 = buffer_manager.Allocate(std::move(file_worker1_new3));
+//     buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1_new3));
 //     EXPECT_EQ(buf1->status(), BufferStatus::kNew);
 //     buf1->CheckState();
 // }

@@ -73,7 +73,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
     }
 }
 
-void SecondaryIndexFileWorker::WriteToFileImpl(bool &prepare_success) {
+void SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     if (data_) [[likely]] {
         if (worker_id_ == 0) {
             auto index = static_cast<SecondaryIndexDataHead *>(data_);

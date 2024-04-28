@@ -45,7 +45,7 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
 BufferObj::~BufferObj() = default;
 
 BufferHandle BufferObj::Load() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             break;
@@ -82,9 +82,8 @@ BufferHandle BufferObj::Load() {
 }
 
 bool BufferObj::Free() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-    // no lock is needed because already in gc_queue
-    if (status_ == BufferStatus::kClean) {
+    std::unique_lock<std::mutex> locker(w_locker_, std::defer_lock);
+    if (!locker.try_lock()) {
         return false;
     }
     if (status_ != BufferStatus::kUnloaded) {
@@ -108,13 +107,14 @@ bool BufferObj::Free() {
 
 bool BufferObj::Save() {
     bool write = false;
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ != BufferType::kPersistent) {
         switch (status_) {
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
                 file_worker_->WriteToFile(false);
+                buffer_mgr_->AddToCleanTempList(this);
                 write = true;
                 break;
             }
@@ -134,33 +134,42 @@ bool BufferObj::Save() {
     return write;
 }
 
-void BufferObj::Cleanup() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+void BufferObj::PickForCleanup() {
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         // when insert data into table with index, the index buffer_obj
         // will remain BufferStatus::kNew, so we should allow this situation
-        case BufferStatus::kNew:
+        case BufferStatus::kNew: {
+            buffer_mgr_->AddToCleanList(this, false /*do_free*/);
+            break;
+        }
         case BufferStatus::kFreed: {
-            status_ = BufferStatus::kClean;
-            if (file_worker_->GetData() != nullptr) {
-                UnrecoverableError("Buffer is not freed.");
-            }
-            buffer_mgr_->AddToCleanList(this, false /*free*/);
+            buffer_mgr_->AddToCleanList(this, false /*do_free*/);
             break;
         }
         case BufferStatus::kUnloaded: {
             file_worker_->FreeInMemory();
-            status_ = BufferStatus::kClean;
-            buffer_mgr_->AddToCleanList(this, true /*free*/);
+            buffer_mgr_->AddToCleanList(this, true /*do_free*/);
             break;
         }
         default: {
             UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
         }
     }
+    status_ = BufferStatus::kClean;
+    switch (type_) {
+        case BufferType::kPersistent:
+        case BufferType::kTemp: {
+            buffer_mgr_->AddToCleanTempList(this);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
 }
 
-void BufferObj::CleanupFile() {
+void BufferObj::CleanupFile() const {
     if (status_ != BufferStatus::kClean) {
         UnrecoverableError("Invalid status.");
     }
@@ -170,8 +179,10 @@ void BufferObj::CleanupFile() {
     file_worker_->CleanupFile();
 }
 
+void BufferObj::CleanupTempFile() const { file_worker_->CleanupTempFile(); }
+
 void BufferObj::LoadInner() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     if (status_ != BufferStatus::kLoaded) {
         UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
     }
@@ -179,12 +190,12 @@ void BufferObj::LoadInner() {
 }
 
 void BufferObj::GetMutPointer() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     type_ = BufferType::kEphemeral;
 }
 
 void BufferObj::UnloadInner() {
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             --rc_;
@@ -202,6 +213,7 @@ void BufferObj::UnloadInner() {
 }
 
 void BufferObj::CheckState() const {
+    std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             if (rc_ == 0) {

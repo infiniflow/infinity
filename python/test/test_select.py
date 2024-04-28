@@ -87,7 +87,9 @@ class TestSelect(TestSdk):
         # infinity
         db_obj.drop_table("test_select", ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_select", {"c1": "int, primary key, not null", "c2": "int, not null"}, ConflictType.Error)
+            "test_select", {
+                "c1": {"type": "int", "constraints": ["primary key", "not null"]},
+                "c2": {"type": "int", "constraints": ["not null"]}}, ConflictType.Error)
 
         assert table_obj is not None
 
@@ -200,7 +202,9 @@ class TestSelect(TestSdk):
         # infinity
         db_obj.drop_table("test_select_aggregate", ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_select_aggregate", {"c1": "int, primary key, not null", "c2": "float, not null"}, ConflictType.Error)
+            "test_select_aggregate", {
+                "c1": {"type": "int", "constraints": ["primary key", "not null"]},
+                "c2": {"type": "float", "constraints": ["not null"]}}, ConflictType.Error)
 
         assert table_obj is not None
 
@@ -287,8 +291,9 @@ class TestSelect(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_varchar", ConflictType.Ignore)
-        db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
-                            ConflictType.Error)
+        db_obj.create_table("test_select_varchar",
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_varchar")
         table_obj.insert(
             [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
@@ -323,8 +328,9 @@ class TestSelect(TestSdk):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_select_big", ConflictType.Ignore)
-        db_obj.create_table("test_select_big", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
-                            ConflictType.Error)
+        db_obj.create_table("test_select_big", {
+            "c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+            "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_big")
 
@@ -363,7 +369,7 @@ class TestSelect(TestSdk):
         db_obj.drop_table("test_select_embedding", ConflictType.Ignore)
 
         res = db_obj.create_table("test_select_embedding", {
-            "c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_embedding")
 
@@ -416,7 +422,7 @@ class TestSelect(TestSdk):
         db_obj.drop_table("test_select_embedding_float", ConflictType.Ignore)
 
         res = db_obj.create_table("test_select_embedding_float", {
-            "c1": "float", "c2": "vector,4,float"}, ConflictType.Error)
+            "c1": {"type": "float"}, "c2": {"type": "vector,4,float"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_embedding_float")
 
@@ -479,7 +485,7 @@ class TestSelect(TestSdk):
         db_obj.drop_table("test_select_big_embedding", ConflictType.Ignore)
 
         db_obj.create_table("test_select_big_embedding", {
-            "c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_big_embedding")
 
@@ -506,7 +512,7 @@ class TestSelect(TestSdk):
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_same_output", ConflictType.Ignore)
         db_obj.create_table("test_select_same_output", {
-            "c1": "int", "c2": "int"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_same_output")
         table_obj.insert([{"c1": 1, "c2": 2}])
@@ -530,7 +536,7 @@ class TestSelect(TestSdk):
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_empty_table", ConflictType.Ignore)
         db_obj.create_table("test_empty_table", {
-            "c1": "int", "c2": "int"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_empty_table")
         print()
@@ -566,7 +572,7 @@ class TestSelect(TestSdk):
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_valid_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_filter_expression", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
                           {"c1": 100, "c2": 2.0},
@@ -600,7 +606,7 @@ class TestSelect(TestSdk):
         db_obj.drop_table("test_invalid_filter_expression",
                           ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_filter_expression", {
-            "c1": "int", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
                           {"c1": 100, "c2": 2.0},

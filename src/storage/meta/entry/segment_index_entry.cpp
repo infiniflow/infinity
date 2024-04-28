@@ -61,9 +61,26 @@ import txn_store;
 
 namespace infinity {
 
+Vector<std::string_view> SegmentIndexEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid segment index entry encode: {}", encode));
+    }
+    auto decodes = TableIndexEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String SegmentIndexEntry::EncodeIndex(const SegmentID segment_id, const TableIndexEntry *table_index_entry) {
+    if (table_index_entry == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", table_index_entry->encode(), segment_id);
+}
+
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
-    : BaseEntry(EntryType::kSegmentIndex, false), table_index_entry_(table_index_entry), segment_id_(segment_id),
-      vector_buffer_(std::move(vector_buffer)) {
+    : BaseEntry(EntryType::kSegmentIndex, false, SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
+      table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)) {
     if (table_index_entry != nullptr)
         index_dir_ = table_index_entry->index_dir();
 };
@@ -83,7 +100,7 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
-        vector_buffer[i] = buffer_mgr->Allocate(std::move(vector_file_worker[i]));
+        vector_buffer[i] = buffer_mgr->AllocateBufferObject(std::move(vector_file_worker[i]));
     };
     auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
     auto begin_ts = txn->BeginTS();
@@ -115,7 +132,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
-        vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
+        vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
     };
     auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
     if (segment_index_entry.get() == nullptr) {
@@ -210,7 +227,7 @@ SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segmen
     auto vector_file_worker = SegmentIndexEntry::CreateFileWorkers(table_index_entry->index_dir(), param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
-        vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
+        vector_buffer[i] = buffer_manager->GetBufferObject(std::move(vector_file_worker[i]));
     }
     return UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
 }
@@ -226,7 +243,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        BufferManager *buffer_manager) {
     u32 seg_id = block_entry->segment_id();
     u16 block_id = block_entry->block_id();
-    RowID begin_row_id(seg_id, row_offset + u32(block_id) * block_entry->row_capacity());
+    SegmentOffset block_offset = u32(block_id) * block_entry->row_capacity();
+    RowID begin_row_id(seg_id, row_offset + block_offset);
 
     const SharedPtr<IndexBase> &index_base = table_index_entry_->table_index_def();
     const SharedPtr<ColumnDef> &column_def = table_index_entry_->column_def();
@@ -277,7 +295,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             switch (embedding_info->Type()) {
                 case kElemFloat: {
                     AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
-                    MemIndexInserterIter<f32> iter(0, block_column_entry, buffer_manager, row_offset, row_count);
+                    MemIndexInserterIter<f32> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
                     auto [start_i, end_i] = abstract_hnsw.InsertVecs(std::move(iter));
                     row_cnt = end_i;
                     break;
@@ -659,7 +677,7 @@ void SegmentIndexEntry::Cleanup() {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");
         }
-        buffer_obj->Cleanup();
+        buffer_obj->PickForCleanup();
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->Cleanup();
@@ -853,7 +871,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
     return chunk_index_entry;
 }
 
-nlohmann::json SegmentIndexEntry::Serialize() {
+nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     if (this->deleted_) {
         UnrecoverableError("Segment Column index entry can't be deleted.");
     }
@@ -869,7 +887,9 @@ nlohmann::json SegmentIndexEntry::Serialize() {
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
 
         for (auto &chunk_index_entry : chunk_index_entries_) {
-            index_entry_json["chunk_index_entries"].push_back(chunk_index_entry->Serialize());
+            if (chunk_index_entry->commit_ts_ <= max_commit_ts) {
+                index_entry_json["chunk_index_entries"].push_back(chunk_index_entry->Serialize());
+            }
         }
         index_entry_json["ft_column_len_sum"] = this->ft_column_len_sum_;
         index_entry_json["ft_column_len_cnt"] = this->ft_column_len_cnt_;

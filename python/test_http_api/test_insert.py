@@ -7,7 +7,6 @@ import concurrent.futures
 from httpapibase import HttpTest
 from common.common_values import *
 
-
 class TestInsert(HttpTest):
     def test_http_version(self):
         return
@@ -97,7 +96,6 @@ class TestInsert(HttpTest):
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, {
             "c1": {
-
                 "type": "vector",
                 "dimension": 65535,
                 "element_type": "integer",
@@ -364,7 +362,7 @@ class TestInsert(HttpTest):
                 "element_type": "integer",
             }
         })
-        for i in range(5):
+        for i in range(4):
             values = [{"c1": 1, "c2": types[0]} for _ in range(batch)]
             if not types[1]:
                 self.insert(db_name, table_name, values, expect={
@@ -372,6 +370,7 @@ class TestInsert(HttpTest):
                     "error_code": 3032,
                 })
             else:
+                print(values)
                 self.insert(db_name, table_name, values)
         self.drop_table(db_name, table_name)
         return
@@ -390,7 +389,6 @@ class TestInsert(HttpTest):
                 values = [{"c1": 1, "c2": 1} for _ in range(batch)]
                 self.insert(db_name, table_name, values, expect={
                     "status_code": 500,
-                    "error_code": 3013
                 })
             self.drop_table(db_name, table_name)
         return

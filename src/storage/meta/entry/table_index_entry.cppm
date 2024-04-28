@@ -50,6 +50,11 @@ export struct TableIndexEntry : public BaseEntry, public EntryInterface {
     friend struct TableEntry;
 
 public:
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const String &index_name, TableIndexMeta *index_meta);
+
+public:
     using EntryOp = AddTableIndexEntryOp;
 
 public:

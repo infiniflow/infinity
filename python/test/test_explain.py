@@ -21,6 +21,7 @@ from infinity.table import ExplainType
 from infinity.common import ConflictType
 from test_sdkbase import TestSdk
 
+
 class TestExplain(TestSdk):
 
     def test_explain_default(self):
@@ -37,7 +38,7 @@ class TestExplain(TestSdk):
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_explain_default", ConflictType.Ignore)
         table = db_obj.create_table("test_explain_default", {
-            "c1": "varchar, primary key", "c2": "float"}, ConflictType.Error)
+            "c1": {"type": "varchar", "constraints": ["primary key"]}, "c2": {"type": "float"}}, ConflictType.Error)
         assert table
 
         table.insert({"c1": "hello", "c2": 1.0})

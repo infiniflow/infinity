@@ -68,19 +68,22 @@ public:
     BufferHandle Load();
 
     // called by BufferMgr in GC process.
-    // return true if is freed.
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();
 
-    void Cleanup();
+    void PickForCleanup();
 
-    void CleanupFile();
+    void CleanupFile() const;
+
+    void CleanupTempFile() const ;
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
+
+    FileWorker *file_worker() { return file_worker_.get(); }
 
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.
@@ -96,8 +99,8 @@ private:
 
 public:
     // interface for unit test
-    BufferStatus status() {
-        std::shared_lock<std::shared_mutex> w_locker(rw_locker_);
+    BufferStatus status() const {
+        std::unique_lock<std::mutex> locker(w_locker_);
         return status_;
     }
     BufferType type() const { return type_; }
@@ -107,7 +110,7 @@ public:
     void CheckState() const;
 
 protected:
-    std::shared_mutex rw_locker_{};
+    mutable std::mutex w_locker_{};
 
     BufferManager *buffer_mgr_;
 

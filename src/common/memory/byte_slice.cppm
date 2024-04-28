@@ -20,6 +20,8 @@ export struct ByteSlice {
 
     static ByteSlice *CreateSlice(SizeT data_size, MemoryPool *pool = nullptr);
 
+    static ByteSlice *NewSlice(u8 *data, SizeT data_size);
+
     static void DestroySlice(ByteSlice *slice, MemoryPool *pool = nullptr);
 
     static ByteSlice *GetEmptySlice() {
@@ -30,6 +32,7 @@ export struct ByteSlice {
     u8 *volatile data_ = nullptr;
     SizeT volatile size_ = 0;
     SizeT volatile offset_ = 0;
+    bool volatile owned_ = true;
     ByteSlice *volatile next_ = nullptr;
 };
 

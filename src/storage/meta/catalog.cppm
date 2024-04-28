@@ -247,6 +247,8 @@ public:
     static UniquePtr<Catalog>
     LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr);
 
+    SizeT GetDeltaLogCount() const;
+
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
@@ -270,13 +272,15 @@ public:
 
     const SharedPtr<String> &CatalogDir() const { return catalog_dir_; }
 
+    TransactionID next_txn_id() const { return next_txn_id_; }
+
 public:
     SharedPtr<String> data_dir_{};
     SharedPtr<String> catalog_dir_{};
 
     MetaMap<DBMeta> db_meta_map_{};
 
-    TransactionID next_txn_id_{};
+    Atomic<TransactionID> next_txn_id_{};
 
 private:
     TxnTimeStamp full_ckp_commit_ts_{};

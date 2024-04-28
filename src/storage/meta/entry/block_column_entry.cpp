@@ -38,8 +38,23 @@ import data_type;
 
 namespace infinity {
 
+Vector<std::string_view> BlockColumnEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid block column entry encode: {}", encode));
+    }
+    auto decodes = BlockEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String BlockColumnEntry::EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry) {
+    return fmt::format("{}#{}", block_entry->encode(), column_id);
+}
+
 BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref)
-    : BaseEntry(EntryType::kBlockColumn, false), block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
+    : BaseEntry(EntryType::kBlockColumn, false, BlockColumnEntry::EncodeIndex(column_id, block_entry)), block_entry_(block_entry),
+      column_id_(column_id), base_dir_(base_dir_ref) {}
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
@@ -60,7 +75,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
 
     auto *buffer_mgr = txn->buffer_mgr();
-    block_column_entry->buffer_ = buffer_mgr->Allocate(std::move(file_worker));
+    block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
 
     return block_column_entry;
 }
@@ -81,12 +96,12 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     SizeT total_data_size = (column_type->type() == kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
     auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->file_name_, total_data_size);
 
-    column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
+    column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
 
     for (i32 outline_idx = 0; outline_idx < next_outline_idx; ++outline_idx) {
         // FIXME: not use default value
         auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(outline_idx), DEFAULT_FIXLEN_CHUNK_SIZE);
-        auto *buffer_obj = buffer_manager->Get(std::move(file_worker));
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(file_worker));
         column_entry->outline_buffers_.emplace_back(buffer_obj);
     }
     column_entry->last_chunk_offset_ = last_chunk_offset;
@@ -98,7 +113,7 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
-        this->buffer_ = buffer_mgr->Get(std::move(file_worker));
+        this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
 
     ColumnVector column_vector(column_type_);
@@ -114,7 +129,7 @@ void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input
     column_vector.AppendWith(*input_column_vector, input_column_vector_offset, append_rows);
 }
 
-void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpoint_row_count) {
+void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count) {
     // TODO: Opt, Flush certain row_count content
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {
@@ -157,7 +172,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 
             std::shared_lock lock(block_column_entry->mutex_);
             for (auto *outline_buffer : block_column_entry->outline_buffers_) {
-                if(outline_buffer != nullptr) {
+                if (outline_buffer != nullptr) {
                     outline_buffer->Save();
                 }
             }
@@ -183,11 +198,11 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 
 void BlockColumnEntry::Cleanup() {
     if (buffer_ != nullptr) {
-        buffer_->Cleanup();
+        buffer_->PickForCleanup();
     }
     for (auto *outline_buffer : outline_buffers_) {
         if (outline_buffer) {
-            outline_buffer->Cleanup();
+            outline_buffer->PickForCleanup();
         }
     }
 }
@@ -223,10 +238,11 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 }
 
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
-    if (!this->Committed()) {
-        this->txn_id_ = txn_id;
-        this->Commit(commit_ts);
+    if (this->Committed()) {
+        UnrecoverableError("Column already committed");
     }
+    this->txn_id_ = txn_id;
+    this->Commit(commit_ts);
 }
 
 Vector<String> BlockColumnEntry::OutlinePaths() const {

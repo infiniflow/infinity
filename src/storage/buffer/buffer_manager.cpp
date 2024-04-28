@@ -38,21 +38,25 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, Share
     fs.CleanupDirectory(*temp_dir_);
 }
 
-BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
+BufferManager::~BufferManager() { RemoveClean(); }
+
+BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
 
     BufferObj *res = buffer_obj.get();
-    std::unique_lock lock(w_locker_);
-    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-        UnrecoverableError(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
+    {
+        std::unique_lock lock(w_locker_);
+        if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+            UnrecoverableError(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
+        }
+        buffer_map_.emplace(file_path, std::move(buffer_obj));
     }
-    buffer_map_.emplace(file_path, std::move(buffer_obj));
 
     return res;
 }
 
-BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
+BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     // LOG_TRACE(fmt::format("Get buffer object: {}", file_path));
 
@@ -63,21 +67,26 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
 
     auto buffer_obj = MakeUnique<BufferObj>(this, false, std::move(file_worker));
 
-    auto [iter2, _] = buffer_map_.emplace(std::move(file_path), std::move(buffer_obj));
-    BufferObj *res = iter2->second.get();
+    BufferObj *res = buffer_obj.get();
+    buffer_map_.emplace(std::move(file_path), std::move(buffer_obj));
 
     return res;
 }
 
 void BufferManager::RemoveClean() {
     Vector<BufferObj *> clean_list;
+    Vector<BufferObj *> clean_temp_list;
     {
         std::unique_lock lock(clean_locker_);
         clean_list.swap(clean_list_);
+        clean_temp_list.swap(clean_temp_list_);
     }
 
     for (auto *buffer_obj : clean_list) {
         buffer_obj->CleanupFile();
+    }
+    for (auto *buffer_obj : clean_temp_list) {
+        buffer_obj->CleanupTempFile();
     }
 
     {
@@ -101,19 +110,26 @@ void BufferManager::RemoveClean() {
     }
 }
 
+SizeT BufferManager::BufferedObjectCount() {
+    std::unique_lock lock(w_locker_);
+    return buffer_map_.size();
+}
+
 void BufferManager::RequestSpace(SizeT need_size) {
     std::unique_lock lock(gc_locker_);
-    while (current_memory_size_ + need_size > memory_limit_ && !gc_list_.empty()) {
-        auto *buffer_obj = gc_list_.front();
+    auto iter = gc_list_.begin();
+    while (current_memory_size_ + need_size > memory_limit_ && iter != gc_list_.end()) {
+        auto *buffer_obj = *iter;
 
         // Free return false when the buffer is freed by cleanup
-        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or kClean state
+        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or state
         if (buffer_obj->Free()) {
             current_memory_size_ -= buffer_obj->GetBufferSize();
+            iter = gc_list_.erase(iter);
+            gc_map_.erase(buffer_obj);
+        } else {
+            ++iter;
         }
-
-        gc_list_.pop_front();
-        gc_map_.erase(buffer_obj);
     }
     if (current_memory_size_ + need_size > memory_limit_) {
         UnrecoverableError("Out of memory.");
@@ -133,23 +149,35 @@ void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
 
 bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
     std::unique_lock lock(gc_locker_);
+    return RemoveFromGCQueueInner(buffer_obj);
+}
+
+void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
+    {
+        std::unique_lock lock(clean_locker_);
+        clean_list_.emplace_back(buffer_obj);
+    }
+    if (do_free) {
+        std::unique_lock lock(gc_locker_);
+        current_memory_size_ -= buffer_obj->GetBufferSize();
+        if (!RemoveFromGCQueueInner(buffer_obj)) {
+            UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename()));
+        }
+    }
+}
+
+void BufferManager::AddToCleanTempList(BufferObj *buffer_obj) {
+    std::unique_lock lock(clean_locker_);
+    clean_temp_list_.push_back(buffer_obj);
+}
+
+bool BufferManager::RemoveFromGCQueueInner(BufferObj *buffer_obj) {
     if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
         gc_list_.erase(iter->second);
         gc_map_.erase(iter);
         return true;
     }
     return false;
-}
-
-void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool free) {
-    {
-        std::unique_lock lock(clean_locker_);
-        clean_list_.push_back(buffer_obj);
-    }
-    if (free) {
-        std::unique_lock lock(w_locker_);
-        current_memory_size_ -= buffer_obj->GetBufferSize();
-    }
 }
 
 } // namespace infinity

@@ -44,14 +44,32 @@ import table_entry;
 
 namespace infinity {
 
+Vector<std::string_view> TableIndexEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid table index entry encode: {}", encode));
+    }
+    auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String TableIndexEntry::EncodeIndex(const String &index_name, TableIndexMeta *index_meta) {
+    if (index_meta == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", index_meta->GetTableEntry()->encode(), index_name);
+}
+
 TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  bool is_delete,
                                  TableIndexMeta *table_index_meta,
                                  const SharedPtr<String> &index_entry_dir,
                                  TransactionID txn_id,
                                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTableIndex, is_delete), byte_slice_pool_(), buffer_pool_(), inverting_thread_pool_(4), commiting_thread_pool_(2),
-      table_index_meta_(table_index_meta), index_base_(std::move(index_base)), index_dir_(index_entry_dir) {
+    : BaseEntry(EntryType::kTableIndex, is_delete, TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)), byte_slice_pool_(),
+      buffer_pool_(), inverting_thread_pool_(4), commiting_thread_pool_(2), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
+      index_dir_(index_entry_dir) {
     if (!is_delete) {
         assert(index_base.get() != nullptr);
         const String &column_name = index_base->column_name();
@@ -169,7 +187,7 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 
-    Vector<SegmentIndexEntry *> segment_index_entry_candidates;
+    Vector<SharedPtr<SegmentIndexEntry>> segment_index_entry_candidates;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json["txn_id"] = this->txn_id_.load();
@@ -185,12 +203,14 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
         std::shared_lock r_lock(rw_locker_);
         for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
-            segment_index_entry_candidates.emplace_back((SegmentIndexEntry *)index_entry.get());
+            if (index_entry->commit_ts_ <= max_commit_ts) {
+                segment_index_entry_candidates.push_back(index_entry);
+            }
         }
     }
 
     for (const auto &segment_index_entry : segment_index_entry_candidates) {
-        json["segment_indexes"].emplace_back(segment_index_entry->Serialize());
+        json["segment_indexes"].emplace_back(segment_index_entry->Serialize(max_commit_ts));
     }
 
     return json;
@@ -206,7 +226,9 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        auto table_index_entry = ReplayTableIndexEntry(table_index_meta, true, nullptr, nullptr, txn_id, begin_ts, commit_ts);
+        auto index_name = table_index_meta->index_name();
+        auto table_index_entry =
+            ReplayTableIndexEntry(table_index_meta, true, MakeShared<IndexBase>(index_name), nullptr, txn_id, begin_ts, commit_ts);
         table_index_entry->commit_ts_.store(commit_ts);
         table_index_entry->begin_ts_ = begin_ts;
         return table_index_entry;

@@ -29,6 +29,7 @@ import block_column_entry;
 import block_version;
 import fast_rough_filter;
 import value;
+import buffer_obj;
 
 namespace infinity {
 
@@ -40,13 +41,18 @@ class DataBlock;
 
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {
+public:
     friend struct TableEntry;
     friend struct SegmentEntry;
     friend struct WalBlockInfo;
 
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const BlockID block_id, const SegmentEntry *segment_entry);
+
 public:
     // for iterator unit test
-    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false){};
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
@@ -65,6 +71,8 @@ public:
                                                      u16 checkpoint_row_count,
                                                      BufferManager *buffer_mgr);
 
+    void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
+
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
@@ -76,9 +84,9 @@ public:
 
     void Cleanup();
 
-    void Flush(TxnTimeStamp checkpoint_ts, bool check_commit = true);
+    void Flush(TxnTimeStamp checkpoint_ts);
 
-    void FlushForImport(TxnTimeStamp checkpoint_ts);
+    void FlushForImport();
 
     void LoadFilterBinaryData(const String &block_filter_data);
 
@@ -87,6 +95,8 @@ protected:
     AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
+
+    void CommitFlushed(TxnTimeStamp commit_ts);
 
     void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 
@@ -142,9 +152,9 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 private:
-    void FlushData(i64 checkpoint_row_count);
+    void FlushData(SizeT start_row_count, SizeT checkpoint_row_count);
 
-    void FlushVersion(BlockVersion &checkpoint_version);
+    bool FlushVersion(TxnTimeStamp checkpoint_ts);
 
 protected:
     mutable std::shared_mutex rw_locker_{};
@@ -156,7 +166,8 @@ protected:
     u16 row_count_{};
     u16 row_capacity_{};
 
-    UniquePtr<BlockVersion> block_version_{};
+    // UniquePtr<BlockVersion> block_version_{};
+    BufferObj *block_version_{};
 
     // check if a value must not exist in the block
     FastRoughFilter fast_rough_filter_;

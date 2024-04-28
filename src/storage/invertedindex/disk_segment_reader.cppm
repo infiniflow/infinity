@@ -25,20 +25,23 @@ import file_reader;
 import posting_list_format;
 import local_file_system;
 import internal_types;
+import term_meta;
 
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {
 public:
     DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
+
     virtual ~DiskIndexSegmentReader();
 
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const override;
-    bool GetSegmentPostingBack(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const;
+
 private:
     RowID base_row_id_{INVALID_ROWID};
     SharedPtr<DictionaryReader> dict_reader_;
-    mutable std::mutex mutex_;
-    SharedPtr<FileReader> posting_reader_;
+    String posting_file_{};
+    u8 *data_ptr_{};
+    SizeT data_len_{};
     LocalFileSystem fs_{};
 };
 

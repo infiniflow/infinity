@@ -160,6 +160,10 @@ def generate(generate_if_exists: bool, copy: bool):
                 slt_file.write("{}\n".format(to_result_embedding(v_x)))
             slt_file.write("\n")
 
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate top data for test")

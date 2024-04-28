@@ -28,7 +28,9 @@ class TestDescribe(TestSdk):
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table(
-            "test_show_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
+            "test_show_table",
+            {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}},
+            ConflictType.Error)
         with pl.Config(fmt_str_lengths=1000):
             res = db_obj.show_table("test_show_table")
             print(res)
@@ -46,12 +48,14 @@ class TestDescribe(TestSdk):
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_columns", ConflictType.Ignore)
         db_obj.create_table(
-            "test_show_columns", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
+            "test_show_columns",
+            {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}},
+            ConflictType.Error)
         with pl.Config(fmt_str_lengths=1000):
             res = db_obj.show_columns("test_show_columns")
             print(res)
             # check the polars dataframe
-            assert res.columns == ["column_name", "column_type", "constraint"]
+            assert res.columns == ["column_name", "column_type", "constraint", "default"]
 
         res = db_obj.drop_table("test_show_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

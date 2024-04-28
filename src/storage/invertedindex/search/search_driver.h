@@ -40,9 +40,6 @@ public:
     // used in SearchParser in ParseSingle
     [[nodiscard]] std::unique_ptr<QueryNode> AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const;
 
-    // will be set in PhysicalMatch
-    void (*analyze_func_)() = nullptr;
-
     /**
      * parsing options
      */

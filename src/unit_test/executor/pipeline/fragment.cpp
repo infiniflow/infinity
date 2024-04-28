@@ -75,4 +75,10 @@ TEST_F(FragmentTest, test_build_fragment) {
     EXPECT_EQ(result7->definition_ptr_->column_count(), 8u);
     auto result8 = SQLRunner::Run("show table t2", true);
     EXPECT_EQ(result8->definition_ptr_->column_count(), 2u);
+
+    /// DDL
+    auto result9 = SQLRunner::Run("drop table t3", true);
+    EXPECT_EQ(result9->definition_ptr_.get()->columns()[0]->name_, "OK");
+    auto result10 = SQLRunner::Run("drop table t2", true);
+    EXPECT_EQ(result9->definition_ptr_.get()->columns()[0]->name_, "OK");
 }
