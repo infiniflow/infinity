@@ -119,6 +119,14 @@ class ElasticsearchClient(BaseClient):
             }
         return ret
 
+    def parse_fulltext_query_content(self, query_content: dict) -> Any:
+        ret = {
+            "query": {
+                "match": query_content
+            }
+        }
+        return ret
+
     def search(self) -> list[list[Any]]:
         """
         Execute the corresponding query tasks (vector search, full-text search, hybrid search) based on the parsed parameters.
@@ -128,17 +136,19 @@ class ElasticsearchClient(BaseClient):
         print(query_path)
         results = []
         _, ext = os.path.splitext(query_path)
-        if ext == '.json':
+        if ext == '.json' or ext == '.jsonl':
             with open(query_path, 'r') as f:
                 queries = json.load(f)
                 if self.data['mode'] == 'fulltext':
                     for query in queries:
-                        start = time.time()
                         body = self.parse_fulltext_query(query)
+                        topk = self.data['topK']
+                        print(f"body = {body}, index = {self.collection_name}, size = {topk}")
+                        start = time.time()
                         result = self.client.search(index=self.collection_name,
-                                                    source=["_id", "_score"],
-                                                    body=body,
-                                                    size=self.data['topK'])
+                                                    # source=["_id", "_score"],
+                                                    body=body)
+                                                    # size=self.data['topK'])
                         end = time.time()
                         latency = (end - start) * 1000
                         result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
@@ -163,20 +173,77 @@ class ElasticsearchClient(BaseClient):
                     result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
                     result.append(latency)
                     results.append(result)
+        elif ext == '.txt':
+            with open(query_path, 'r') as f:
+                if self.data['mode'] == 'fulltext':
+                    for line in f:
+                        query = {"body" : line[:-1]}
+                        print("query = ", query)
+                        body = self.parse_fulltext_query_content(query)
+                        topk = self.data['topK']
+                        print(f"body = {body}, index = {self.collection_name}, size = {topk}")
+                        start = time.time()
+                        result = self.client.search(index=self.collection_name,
+                                                    # source=["_id", "_score"],
+                                                    body=body)
+                        # size=self.data['topK'])
+                        end = time.time()
+                        latency = (end - start) * 1000
+                        result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
+                        result.append(latency)
+                        results.append(result)
         else:
             raise TypeError("Unsupported file type")
         return results
     
     def check_and_save_results(self, results: List[List[Any]]):
         # print(results)
-        for i, result in enumerate(results):
-            print(f"result {i} = {result}")
-            if len(result) == 1:
-                print(f"not found term, cost time = {results[0]}")
-            elif len(result) > 1:
-                for row, score in result[:-1]:
-                    print(f"row = {row}, score = {score}")
-                print(f"query cost time: {result[-1]}ms")
+        # for i, result in enumerate(results):
+        #     print(f"result {i} = {result}")
+        #     if len(result) == 1:
+        #         print(f"not found term, cost time = {results[0]}")
+        #     elif len(result) > 1:
+        #         for row, score in result[:-1]:
+        #             print(f"row = {row}, score = {score}")
+        #         print(f"query cost time: {result[-1]}ms")
+
+        if 'ground_truth_path' in self.data:
+            ground_truth_path = self.data['ground_truth_path']
+            _, ext = os.path.splitext(ground_truth_path)
+            precisions = []
+            latencies = []
+            if ext == '.hdf5':
+                with h5py.File(ground_truth_path, 'r') as f:
+                    expected_result = f['neighbors']
+                    for i, result in enumerate(results):
+                        ids = set(x[0] for x in result[:-1])
+                        precision = len(ids.intersection(expected_result[i][:self.data['topK']])) / self.data['topK']
+                        precisions.append(precision)
+                        latencies.append(result[-1])
+            elif ext == '.json' or ext == '.jsonl':
+                with open(ground_truth_path, 'r') as f:
+                    for i, line in enumerate(f):
+                        expected_result = json.loads(line)
+                        result = results[i]
+                        ids = set(x[0] for x in result[:-1])
+                        precision = len(ids.intersection(expected_result['expected_results'][:self.data['topK']])) / self.data['topK']
+                        precisions.append(precision)
+                        latencies.append(result[-1])
+
+            print(
+                f'''mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)},
+                    std_time: {np.std(latencies)}, min_time: {np.min(latencies)}, \n
+                    max_time: {np.max(latencies)}, p95_time: {np.percentile(latencies, 95)},
+                    p99_time: {np.percentile(latencies, 99)}''')
+        else:
+            latencies = []
+            for result in results:
+                latencies.append(result[-1])
+            print(
+                f'''mean_time: {np.mean(latencies)}, std_time: {np.std(latencies)},
+                    max_time: {np.max(latencies)}, min_time: {np.min(latencies)}, 
+                    p95_time: {np.percentile(latencies, 95)}, p99_time: {np.percentile(latencies, 99)}''')
+
         # ground_truth_path = self.data['ground_truth_path']
         # _, ext = os.path.splitext(ground_truth_path)
         # precisions = []

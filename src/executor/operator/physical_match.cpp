@@ -485,11 +485,13 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     TimeDurationType blockmax_duration_3 = {};
     FullTextQueryContext full_text_query_context;
     assert(common_query_filter_);
-    {
+    if (false) {
         auto and_root = MakeUnique<AndQueryNode>();
         and_root->Add(std::move(query_tree));
         and_root->Add(MakeUnique<FilterQueryNode>(common_query_filter_.get()));
         full_text_query_context.query_tree_ = std::move(and_root);
+    } else {
+        full_text_query_context.query_tree_ = std::move(query_tree);
     }
 
     if (full_text_query_context.query_tree_->type_ == QueryNodeType::PHRASE) {

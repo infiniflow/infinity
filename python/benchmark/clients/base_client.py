@@ -8,6 +8,7 @@ import os
 from urllib.parse import urlparse
 import time
 
+
 class BaseClient:
     """
     Base class for all clients(Qdrant, ES, infinity).

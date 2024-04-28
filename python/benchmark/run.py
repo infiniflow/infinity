@@ -5,6 +5,7 @@ from clients.elasticsearch_client import ElasticsearchClient
 from clients.infinity_client import InfinityClient
 from clients.qdrant_client import QdrantClient
 from generate_query_json import generate_query_json
+from generate_query_json import generate_query_txt
 
 ENGINES = ['infinity', 'qdrant', 'elasticsearch']
 DATA_SETS = ['gist', 'sift', 'geonames', 'enwiki']
@@ -18,6 +19,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--hardware', type=str, default='8c_16g', dest='hardware')
     parser.add_argument('--limit-ram', type=str, default='16g', dest='limit_ram')
     parser.add_argument('--limit-cpu', type=int, default=8, dest='limit_cpu')
+    parser.add_argument('--query-num', type=int, default=1, dest='query_num')
+    parser.add_argument('--term-num', type=int, default=4, dest='term_num')
     parser.add_argument('--query', action='store_true', dest='query')
     parser.add_argument('--import', action='store_true', dest='import_data')
     parser.add_argument('--generate', action='store_true', dest='generate_terms')
@@ -52,9 +55,14 @@ def get_client(engine: str, config: str, options: argparse.Namespace):
 if __name__ == '__main__':
     args = parse_args()
     config_paths = generate_config_paths(args)
+
     if args.generate_terms:
         # TODO: Write a fixed path for the fulltext benchmark, expand or delete it for the general benchmark
-        generate_query_json("datasets/enwiki/enwiki-10.csv", 4, "datasets/enwiki/operations.json")
+        # generate_query_json("datasets/enwiki/enwiki-top-terms.txt", 4, "datasets/enwiki/operations.json")
+        generate_query_txt("datasets/enwiki/enwiki-top-terms.txt",
+                           query_cnt=args.query_num,
+                           terms_count=args.term_num,
+                           operation_path="datasets/enwiki/operations.txt")
 
     for path, engine in config_paths:
         if not os.path.exists(path):
