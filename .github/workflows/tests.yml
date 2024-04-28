@@ -82,7 +82,12 @@ jobs:
 
       - name: Stop infinity pysdk & http_api debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-debug/src/infinity) && sleep 5s
+        run: |
+          sh ./timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 10
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
 
       - name: Start infinity sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -96,7 +101,12 @@ jobs:
 
       - name: Stop infinity sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-debug/src/infinity) && sleep 5s
+          run: |
+            sh ./timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 10
+            if [ $? -ne 0 ]; then
+              echo "Failed to kill infinity debug version"
+              exit 1
+            fi
 
       - name: Collect infinity debug output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
@@ -167,7 +177,12 @@ jobs:
 
       - name: Stop infinity pysdk & http_api release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
+        run: |
+          sh ./timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
 
       - name: Start infinity sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
@@ -180,7 +195,12 @@ jobs:
 
       - name: Stop infinity sqllogictest release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
+        run: |
+          sh ./timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
 
       - name: Collect infinity release output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
