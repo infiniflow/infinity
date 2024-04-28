@@ -34,7 +34,7 @@ class InfinityClient(BaseClient):
                 indexs.append(index.IndexInfo(key, index.IndexType.FullText, []))
             elif value['type'] == 'HNSW':
                 params = []
-                for param, v in value['params'].items():
+                for param, v in value['params'].items():uplo
                     params.append(index.InitParameter(param, str(v)))
                 indexs.append(index.IndexInfo(key, index.IndexType.Hnsw, params))
         return indexs

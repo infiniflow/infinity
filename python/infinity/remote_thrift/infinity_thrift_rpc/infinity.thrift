@@ -238,12 +238,6 @@ struct ImportOption {
 4:  CopyFileType copy_file_type,
 }
 
-struct UploadResponse {
-1:  i64 error_code,
-2:  string error_msg,
-3:  bool can_skip,
-}
-
 struct CommonRequest {
 1:  i64 session_id,
 }
@@ -430,17 +424,6 @@ struct ImportRequest{
 6:  i64 session_id,
 }
 
-struct FileChunk {
-1:  string db_name,
-2:  string table_name,
-3:  string file_name,
-4:  binary data,
-5:  i32 index,
-6:  bool is_last
-7:  i64 session_id,
-8:  i64 total_size,
-}
-
 enum ExplainType {
 Analyze,
 Ast,
@@ -607,7 +590,6 @@ SelectResponse Select(1:SelectRequest request),
 SelectResponse Explain(1:ExplainRequest request),
 CommonResponse Delete(1:DeleteRequest request),
 CommonResponse Update(1:UpdateRequest request),
-UploadResponse UploadFileChunk(1:FileChunk request),
 
 ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),

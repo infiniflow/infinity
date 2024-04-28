@@ -259,8 +259,6 @@ class ColumnField;
 
 class ImportOption;
 
-class UploadResponse;
-
 class CommonRequest;
 
 class CommonResponse;
@@ -312,8 +310,6 @@ class DropTableRequest;
 class InsertRequest;
 
 class ImportRequest;
-
-class FileChunk;
 
 class ExplainRequest;
 
@@ -1867,63 +1863,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 void swap(ImportOption &a, ImportOption &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
-
-typedef struct _UploadResponse__isset {
-  _UploadResponse__isset() : error_code(false), error_msg(false), can_skip(false) {}
-  bool error_code :1;
-  bool error_msg :1;
-  bool can_skip :1;
-} _UploadResponse__isset;
-
-class UploadResponse : public virtual ::apache::thrift::TBase {
- public:
-
-  UploadResponse(const UploadResponse&);
-  UploadResponse& operator=(const UploadResponse&);
-  UploadResponse() noexcept
-                 : error_code(0),
-                   error_msg(),
-                   can_skip(0) {
-  }
-
-  virtual ~UploadResponse() noexcept;
-  int64_t error_code;
-  std::string error_msg;
-  bool can_skip;
-
-  _UploadResponse__isset __isset;
-
-  void __set_error_code(const int64_t val);
-
-  void __set_error_msg(const std::string& val);
-
-  void __set_can_skip(const bool val);
-
-  bool operator == (const UploadResponse & rhs) const
-  {
-    if (!(error_code == rhs.error_code))
-      return false;
-    if (!(error_msg == rhs.error_msg))
-      return false;
-    if (!(can_skip == rhs.can_skip))
-      return false;
-    return true;
-  }
-  bool operator != (const UploadResponse &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const UploadResponse & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(UploadResponse &a, UploadResponse &b);
-
-std::ostream& operator<<(std::ostream& out, const UploadResponse& obj);
 
 typedef struct _CommonRequest__isset {
   _CommonRequest__isset() : session_id(false) {}
@@ -3564,98 +3503,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
 void swap(ImportRequest &a, ImportRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportRequest& obj);
-
-typedef struct _FileChunk__isset {
-  _FileChunk__isset() : db_name(false), table_name(false), file_name(false), data(false), index(false), is_last(false), session_id(false), total_size(false) {}
-  bool db_name :1;
-  bool table_name :1;
-  bool file_name :1;
-  bool data :1;
-  bool index :1;
-  bool is_last :1;
-  bool session_id :1;
-  bool total_size :1;
-} _FileChunk__isset;
-
-class FileChunk : public virtual ::apache::thrift::TBase {
- public:
-
-  FileChunk(const FileChunk&);
-  FileChunk& operator=(const FileChunk&);
-  FileChunk() noexcept
-            : db_name(),
-              table_name(),
-              file_name(),
-              data(),
-              index(0),
-              is_last(0),
-              session_id(0),
-              total_size(0) {
-  }
-
-  virtual ~FileChunk() noexcept;
-  std::string db_name;
-  std::string table_name;
-  std::string file_name;
-  std::string data;
-  int32_t index;
-  bool is_last;
-  int64_t session_id;
-  int64_t total_size;
-
-  _FileChunk__isset __isset;
-
-  void __set_db_name(const std::string& val);
-
-  void __set_table_name(const std::string& val);
-
-  void __set_file_name(const std::string& val);
-
-  void __set_data(const std::string& val);
-
-  void __set_index(const int32_t val);
-
-  void __set_is_last(const bool val);
-
-  void __set_session_id(const int64_t val);
-
-  void __set_total_size(const int64_t val);
-
-  bool operator == (const FileChunk & rhs) const
-  {
-    if (!(db_name == rhs.db_name))
-      return false;
-    if (!(table_name == rhs.table_name))
-      return false;
-    if (!(file_name == rhs.file_name))
-      return false;
-    if (!(data == rhs.data))
-      return false;
-    if (!(index == rhs.index))
-      return false;
-    if (!(is_last == rhs.is_last))
-      return false;
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(total_size == rhs.total_size))
-      return false;
-    return true;
-  }
-  bool operator != (const FileChunk &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const FileChunk & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(FileChunk &a, FileChunk &b);
-
-std::ostream& operator<<(std::ostream& out, const FileChunk& obj);
 
 typedef struct _ExplainRequest__isset {
   _ExplainRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}
