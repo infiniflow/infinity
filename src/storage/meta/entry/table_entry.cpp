@@ -658,7 +658,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
         segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
-        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= 1000000) {
+        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= 8192) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
@@ -771,7 +771,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
                 for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
                     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+                    Vector<ChunkIndexEntry *> old_chunks;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn->BeginTS());
                     if (chunk_index_entries.size() <= 1) {
                         continue;
                     }
@@ -795,17 +796,16 @@ void TableEntry::OptimizeIndex(Txn *txn) {
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
-                        // TODO yzc: txn_store.cpp:87
-                        // chunk_index_entry->deleted_ = true;
                         txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                        old_chunks.push_back(chunk_index_entry.get());
                     }
-                    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
-                                                                                                         dst_base_name,
-                                                                                                         base_rowid,
-                                                                                                         total_row_count,
-                                                                                                         txn->buffer_mgr());
-                    txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-                    segment_index_entry->ReplaceFtChunkIndexEntries(chunk_index_entry);
+                    SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
+                                                                                                                dst_base_name,
+                                                                                                                base_rowid,
+                                                                                                                total_row_count,
+                                                                                                                txn->buffer_mgr());
+                    txn_table_store->AddChunkIndexStore(table_index_entry, merged_chunk_index_entry.get());
+                    segment_index_entry->ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
                     assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());

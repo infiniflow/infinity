@@ -230,6 +230,9 @@ export namespace std {
 
     using std::is_same_v;
     using std::priority_queue;
+
+    using std::begin;
+    using std::end;
 } // namespace std
 
 namespace infinity {
