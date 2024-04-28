@@ -726,31 +726,6 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
     return nullptr;
 }
 
-void SegmentIndexEntry::ReplaceFtChunkIndexEntries(SharedPtr<ChunkIndexEntry> merged_chunk_index_entry) {
-    std::shared_lock lock(rw_locker_);
-    SizeT num_entries = chunk_index_entries_.size();
-    SizeT idx_first = num_entries;
-    for (SizeT i = 0; i < num_entries; i++) {
-        if (chunk_index_entries_[i]->base_rowid_ == merged_chunk_index_entry->base_rowid_) {
-            idx_first = i;
-            break;
-        }
-    }
-    assert(idx_first < num_entries);
-    SizeT idx_last = num_entries;
-    u32 total_row_count = 0;
-    for (SizeT i = idx_first; i < num_entries; i++) {
-        total_row_count += chunk_index_entries_[i]->row_count_;
-        if (total_row_count == merged_chunk_index_entry->row_count_) {
-            idx_last = i;
-            break;
-        }
-    }
-    assert(idx_last < num_entries);
-    chunk_index_entries_[idx_first] = merged_chunk_index_entry;
-    chunk_index_entries_.erase(chunk_index_entries_.begin() + idx_first + 1, chunk_index_entries_.begin() + idx_last + 1);
-}
-
 void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                                  SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
                                                  Vector<ChunkIndexEntry *> &&old_chunks) {
@@ -848,7 +823,7 @@ void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_inde
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
-    assert(chunk_index_entries_.empty() || base_rowid == chunk_index_entries_.back()->base_rowid_ + chunk_index_entries_.back()->row_count_);
+    // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
     SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;

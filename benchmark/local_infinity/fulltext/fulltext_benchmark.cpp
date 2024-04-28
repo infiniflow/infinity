@@ -331,7 +331,7 @@ int main(int argc, char *argn[]) {
     String table_name = "ft_dbpedia_benchmark";
     String index_name = "ft_dbpedia_index";
     String srcfile = test_data_path();
-    srcfile += "/benchmark/dbpedia-entity/corpus10.jsonl";
+    srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
 // #define DEL_LOCAL_DATA
 #ifdef DEL_LOCAL_DATA
