@@ -69,15 +69,20 @@ import segment_entry;
 import knn_filter;
 
 namespace infinity {
-class FilterIterator final : public DocIterator, public EarlyTerminateIterator {
-private:
+
+template <typename QueryIteratorT>
+class FilterIteratorBase : public QueryIteratorT {
+protected:
+    // real search iterator
+    UniquePtr<QueryIteratorT> query_iterator_;
+
+    // filter info
     const CommonQueryFilter *common_query_filter_;
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
     const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
     const HashMap<SegmentID, SegmentEntry *> *segment_index_ = &common_query_filter_->base_table_ref_->block_index_->segment_index_;
 
-private:
     const TxnTimeStamp begin_ts_ = common_query_filter_->begin_ts_;
     SegmentID current_segment_id_ = filter_result_ptr_->size() ? filter_result_ptr_->begin()->first : INVALID_SEGMENT_ID;
     mutable SegmentID cache_segment_id_ = INVALID_SEGMENT_ID;
@@ -94,37 +99,18 @@ private:
     const Bitmask *doc_id_bitmask_ = nullptr;
     u32 pos_ = 0;
 
-public:
-    explicit FilterIterator(const CommonQueryFilter *common_query_filter) : common_query_filter_(common_query_filter) {
-        doc_freq_ = std::numeric_limits<u32>::max();
-        DoSeek(0);
-    }
+    RowID SelfBlockMinPossibleDocID() const { return RowID(current_segment_id_, 0); }
 
-    // DocIterator
-    void DoSeek(RowID doc_id) override {
-        for (RowID next_skip = std::max(doc_id, DocIterator::doc_id_ + 1);;) {
-            if (!BlockSkipTo(next_skip, 0)) [[unlikely]] {
-                DocIterator::doc_id_ = INVALID_ROWID;
-                return;
-            }
-            next_skip = std::max(next_skip, BlockMinPossibleDocID());
-            assert((next_skip <= BlockLastDocID()));
-            auto [success, score, id] = SeekInBlockRange(next_skip, BlockLastDocID(), 0);
-            if (success) {
-                DocIterator::doc_id_ = id;
-                return;
-            }
-            next_skip = BlockLastDocID() + 1;
+    RowID SelfBlockLastDocID() const {
+        if (current_segment_id_ != cache_segment_id_) {
+            cache_segment_id_ = current_segment_id_;
+            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
+            cache_segment_offset_ = cache_segment_entry_->row_count();
+            cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }
+        return RowID(current_segment_id_, cache_segment_offset_);
     }
-
-    u32 GetDF() const override { return doc_freq_; }
-
-    // EarlyTerminateIterator
-
-    void UpdateScoreThreshold(float threshold) override {} // do nothing
-
-    bool BlockSkipTo(RowID doc_id, float threshold) override {
+    bool SelfBlockSkipTo(RowID doc_id) {
         if (current_segment_id_ == INVALID_SEGMENT_ID) {
             return false;
         }
@@ -141,32 +127,13 @@ public:
                     pos_ = 0;
                 }
             }
-            if (doc_id <= BlockLastDocID()) {
+            if (doc_id <= SelfBlockLastDocID()) {
                 return true;
             }
             doc_id = RowID(current_segment_id_ + 1, 0);
         }
     }
-
-    // u32: block max tf
-    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    Pair<u32, u16> GetBlockMaxInfo() const { return {}; }
-
-    RowID BlockMinPossibleDocID() const override { return RowID(current_segment_id_, 0); }
-
-    RowID BlockLastDocID() const override {
-        if (current_segment_id_ != cache_segment_id_) {
-            cache_segment_id_ = current_segment_id_;
-            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
-            cache_segment_offset_ = cache_segment_entry_->row_count();
-            cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
-        }
-        return RowID(current_segment_id_, cache_segment_offset_);
-    }
-
-    float BlockMaxBM25Score() override { return 0.0f; }
-
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override {
+    Tuple<bool, RowID> SelfSeekInBlockRange(RowID doc_id, const RowID doc_id_no_beyond) {
         assert(doc_id.segment_id_ == current_segment_id_);
         assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
         if (current_segment_id_ != cache_segment_id_) {
@@ -175,29 +142,29 @@ public:
             cache_segment_offset_ = cache_segment_entry_->row_count();
             cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }
-        const RowID seek_end = std::min(doc_id_no_beyond, BlockLastDocID());
+        const RowID seek_end = std::min(doc_id_no_beyond, SelfBlockLastDocID());
         while (true) {
             if (doc_id > seek_end) {
-                return {false, 0.0f, INVALID_ROWID};
+                return {false, INVALID_ROWID};
             }
             const auto [success, id] = SeekInBlockRangeInner(doc_id, seek_end);
             if (!success) {
-                return {false, 0.0f, INVALID_ROWID};
+                return {false, INVALID_ROWID};
             }
             if (cache_need_check_delete_) [[unlikely]] {
                 DeleteFilter delete_filter(cache_segment_entry_, common_query_filter_->begin_ts_);
                 if (delete_filter(id.segment_offset_)) {
-                    return {true, 0.0f, id};
+                    return {true, id};
                 }
             } else [[likely]] {
-                return {true, 0.0f, id};
+                return {true, id};
             }
             doc_id = id + 1;
         }
     }
 
-    Pair<bool, RowID> SeekInBlockRangeInner(RowID doc_id, RowID doc_id_no_beyond) {
-        assert(doc_id_no_beyond <= BlockLastDocID());
+    Pair<bool, RowID> SeekInBlockRangeInner(RowID doc_id, const RowID doc_id_no_beyond) {
+        assert(doc_id_no_beyond <= SelfBlockLastDocID());
         assert(doc_id.segment_id_ == current_segment_id_);
         assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
         assert(doc_id.segment_offset_ <= doc_id_no_beyond.segment_offset_);
@@ -309,17 +276,9 @@ public:
         return {false, INVALID_ROWID};
     }
 
-    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
-        // will not be called
-        UnrecoverableError("Should not be called!");
-        return {false, INVALID_ROWID};
-    }
-
-    bool NotPartCheckExist(RowID doc_id) override {
-        // will not be called
-        UnrecoverableError("Should not be called!");
-        return false;
-    }
+public:
+    FilterIteratorBase(const CommonQueryFilter *common_query_filter, UniquePtr<QueryIteratorT> &&query_iterator)
+        : query_iterator_(std::move(query_iterator)), common_query_filter_(common_query_filter) {}
 
     // common
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
@@ -333,28 +292,183 @@ public:
             filter_str = "None";
         }
         os << filter_str << ")\n";
+        const String next_prefix = prefix + (is_final ? "    " : "│   ");
+        query_iterator_->PrintTree(os, next_prefix, true);
     }
 };
 
-// use QueryNodeType::TERM
-// treat it as TERM in optimization
-// total_df: total rows after filter
-// score: always 0.0f
+template <typename QueryIteratorT>
+class FilterIterator;
+
+template <>
+class FilterIterator<DocIterator> final : public FilterIteratorBase<DocIterator> {
+public:
+    explicit FilterIterator(const CommonQueryFilter *common_query_filter, UniquePtr<DocIterator> &&query_iterator)
+        : FilterIteratorBase(common_query_filter, std::move(query_iterator)) {
+        query_iterator_->DoSeek(0);
+        SelfDoSeek(0);
+        DoSeek(0);
+    }
+
+    // DocIterator
+    void DoSeek(RowID doc_id) override {
+        while (true) {
+            query_iterator_->Seek(doc_id);
+            doc_id = query_iterator_->Doc();
+            if (doc_id == INVALID_ROWID) {
+                doc_id_ = INVALID_ROWID;
+                return;
+            }
+            if (doc_id_ < doc_id) {
+                SelfDoSeek(doc_id);
+            }
+            if (doc_id_ == doc_id || doc_id_ == INVALID_ROWID) {
+                return;
+            }
+            doc_id = doc_id_;
+        }
+    }
+
+    void SelfDoSeek(RowID doc_id) {
+        for (RowID next_skip = std::max(doc_id, doc_id_ + 1);;) {
+            if (!SelfBlockSkipTo(next_skip)) [[unlikely]] {
+                doc_id_ = INVALID_ROWID;
+                return;
+            }
+            next_skip = std::max(next_skip, SelfBlockMinPossibleDocID());
+            assert((next_skip <= SelfBlockLastDocID()));
+            const auto [success, id] = SelfSeekInBlockRange(next_skip, SelfBlockLastDocID());
+            if (success) {
+                doc_id_ = id;
+                return;
+            }
+            next_skip = SelfBlockLastDocID() + 1;
+        }
+    }
+
+    u32 GetDF() const override {
+        UnrecoverableError("Unreachable code!");
+        return 0;
+    }
+};
+
+template <>
+class FilterIterator<EarlyTerminateIterator> final : public FilterIteratorBase<EarlyTerminateIterator> {
+    // block max info
+    RowID common_block_min_possible_doc_id_{}; // not always exist
+    RowID common_block_last_doc_id_{};
+
+public:
+    explicit FilterIterator(const CommonQueryFilter *common_query_filter, UniquePtr<EarlyTerminateIterator> &&query_iterator)
+        : FilterIteratorBase(common_query_filter, std::move(query_iterator)) {
+        doc_freq_ = std::numeric_limits<u32>::max();
+    }
+    void UpdateScoreThreshold(float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
+    RowID BlockMinPossibleDocID() const override { return common_block_min_possible_doc_id_; }
+    RowID BlockLastDocID() const override { return common_block_last_doc_id_; }
+    bool BlockSkipTo(RowID doc_id, float threshold) override {
+        while (true) {
+            if (!query_iterator_->BlockSkipTo(doc_id, threshold)) {
+                return false;
+            }
+            if (const RowID lowest_possible = query_iterator_->BlockMinPossibleDocID(); lowest_possible > doc_id) {
+                doc_id = lowest_possible;
+            }
+            RowID common_block_last_doc_id = query_iterator_->BlockLastDocID();
+            if (!SelfBlockSkipTo(doc_id)) {
+                return false;
+            }
+            if (const RowID lowest_possible = SelfBlockMinPossibleDocID(); lowest_possible > common_block_last_doc_id) {
+                // continue loop
+                doc_id = common_block_last_doc_id + 1;
+                continue;
+            } else if (lowest_possible > doc_id) {
+                doc_id = lowest_possible;
+            }
+            common_block_last_doc_id = std::min(common_block_last_doc_id, SelfBlockLastDocID());
+            common_block_min_possible_doc_id_ = doc_id;
+            common_block_last_doc_id_ = common_block_last_doc_id;
+            return true;
+        }
+    }
+    float BlockMaxBM25Score() override {
+        UnrecoverableError("Unreachable code!");
+        return 0.0f;
+    }
+    float BM25Score() override {
+        UnrecoverableError("Unreachable code!");
+        return 0.0f;
+    }
+    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
+        UnrecoverableError("Unreachable code!");
+        return {false, INVALID_ROWID};
+    }
+    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, const RowID doc_id_no_beyond, const float threshold) override {
+        const RowID block_end = std::min(doc_id_no_beyond, BlockLastDocID());
+        while (true) {
+            if (doc_id > block_end) [[unlikely]] {
+                return {false, 0.0F, INVALID_ROWID};
+            }
+            // real query
+            const auto result = query_iterator_->SeekInBlockRange(doc_id, block_end, threshold);
+            const auto &[success1, score, id1] = result;
+            if (!success1) {
+                return {false, 0.0F, INVALID_ROWID};
+            }
+            doc_id = id1;
+            // check filter
+            const auto [success2, id2] = SelfSeekInBlockRange(doc_id, block_end);
+            if (id2 == doc_id) {
+                doc_id_ = doc_id;
+                return result;
+            }
+            // need to update doc_id, restart from the first iterator
+            doc_id = id2;
+        }
+    }
+    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
+        UnrecoverableError("Unreachable code!");
+        return {false, INVALID_ROWID};
+    }
+    bool NotPartCheckExist(RowID doc_id) override {
+        UnrecoverableError("Unreachable code!");
+        return false;
+    }
+};
+
+// use QueryNodeType::FILTER
 struct FilterQueryNode final : public QueryNode {
+    // search iterator
+    UniquePtr<QueryNode> query_tree_;
+    // filter info
     const CommonQueryFilter *common_query_filter_;
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
     const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
 
-    explicit FilterQueryNode(const CommonQueryFilter *common_query_filter)
-        : QueryNode(QueryNodeType::TERM), common_query_filter_(common_query_filter) {}
+    explicit FilterQueryNode(const CommonQueryFilter *common_query_filter, UniquePtr<QueryNode> &&query_tree)
+        : QueryNode(QueryNodeType::FILTER), query_tree_(std::move(query_tree)), common_query_filter_(common_query_filter) {}
+
+    void FilterOptimizeQueryTree() override {
+        auto new_query_tree = GetOptimizedQueryTree(std::move(query_tree_));
+        query_tree_ = std::move(new_query_tree);
+    }
 
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, Scorer *) const override {
-        return MakeUnique<FilterIterator>(common_query_filter_);
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override {
+        auto search_iter = query_tree_->CreateSearch(table_entry, index_reader, scorer);
+        if (!search_iter) {
+            return nullptr;
+        }
+        return MakeUnique<FilterIterator<DocIterator>>(common_query_filter_, std::move(search_iter));
     }
-    std::unique_ptr<EarlyTerminateIterator> CreateEarlyTerminateSearch(const TableEntry *, IndexReader &, Scorer *) const override {
-        return MakeUnique<FilterIterator>(common_query_filter_);
+    std::unique_ptr<EarlyTerminateIterator>
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override {
+        auto search_iter = query_tree_->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+        if (!search_iter) {
+            return nullptr;
+        }
+        return MakeUnique<FilterIterator<EarlyTerminateIterator>>(common_query_filter_, std::move(search_iter));
     }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override {
         os << prefix;
@@ -418,6 +532,24 @@ void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_te
     }
 }
 
+void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
+    if (et_iter) {
+        while (true) {
+            auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
+            if (id == INVALID_ROWID) [[unlikely]] {
+                break;
+            }
+            ++blockmax_loop_cnt;
+            if (result_heap.AddResult(et_score, id)) {
+                // update threshold
+                if (const float new_threshold = result_heap.GetScoreThreshold(); new_threshold > 0.0f) {
+                    et_iter->UpdateScoreThreshold(new_threshold);
+                }
+            }
+        }
+    }
+}
+
 bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
     using TimeDurationType = std::chrono::duration<float, std::milli>;
     auto execute_start_time = std::chrono::high_resolution_clock::now();
@@ -452,12 +584,19 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
     }
+    if (query_tree->type_ == QueryNodeType::PHRASE) {
+        // TODO: make sure there is no problem with block max phrase and delete this code
+        // LOG_INFO(fmt::format("Block max phrase not supported, use ordinary iterator, query: {}", match_expr_->matching_text_));
+        use_block_max_iter = false;
+        use_ordinary_iter = true;
+    }
     auto finish_parse_query_tree_time = std::chrono::high_resolution_clock::now();
     TimeDurationType parse_query_tree_duration = finish_parse_query_tree_time - finish_init_query_builder_time;
     LOG_INFO(fmt::format("PhysicalMatch Part 0.2: Parse QueryNode tree time: {} ms", parse_query_tree_duration.count()));
 
     // 2 build query iterator
     // result
+    FullTextQueryContext full_text_query_context;
     u32 result_count = 0;
     const float *score_result = nullptr;
     const RowID *row_id_result = nullptr;
@@ -483,47 +622,18 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     TimeDurationType blockmax_duration = {};
     TimeDurationType blockmax_duration_2 = {};
     TimeDurationType blockmax_duration_3 = {};
-    FullTextQueryContext full_text_query_context;
     assert(common_query_filter_);
-    {
-        auto and_root = MakeUnique<AndQueryNode>();
-        and_root->Add(std::move(query_tree));
-        and_root->Add(MakeUnique<FilterQueryNode>(common_query_filter_.get()));
-        full_text_query_context.query_tree_ = std::move(and_root);
-    }
-
-    if (full_text_query_context.query_tree_->type_ == QueryNodeType::PHRASE) {
-        // TODO: make sure there is no problem with block max phrase and delete this code
-        // LOG_INFO(fmt::format("Block max phrase not supported, use ordinary iterator, query: {}", match_expr_->matching_text_));
-        use_block_max_iter = false;
-        use_ordinary_iter = true;
-    }
+    full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree));
 
     if (use_block_max_iter) {
         et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
-        if (et_iter and dynamic_cast<FilterIterator *>(et_iter.get())) {
-            // no valid query iterator
-            et_iter.reset();
-        }
     }
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context);
-        if (doc_iterator and dynamic_cast<FilterIterator *>(doc_iterator.get())) {
-            // no valid query iterator
-            doc_iterator.reset();
-        }
     }
     if (use_block_max_iter and use_ordinary_iter) {
         et_iter_2 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
-        if (et_iter_2 and dynamic_cast<FilterIterator *>(et_iter_2.get())) {
-            // no valid query iterator
-            et_iter_2.reset();
-        }
         et_iter_3 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
-        if (et_iter_3 and dynamic_cast<FilterIterator *>(et_iter_3.get())) {
-            // no valid query iterator
-            et_iter_3.reset();
-        }
     }
 
     // 3 full text search
@@ -547,19 +657,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        if (et_iter) {
-            while (true) {
-                ++blockmax_loop_cnt;
-                auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
-                if (id == INVALID_ROWID) [[unlikely]] {
-                    break;
-                }
-                if (result_heap.AddResult(et_score, id)) {
-                    // update threshold
-                    et_iter->UpdateScoreThreshold(result_heap.GetScoreThreshold());
-                }
-            }
-        }
+        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt);
         result_heap.Sort();
         blockmax_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -599,19 +697,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        if (et_iter_2) {
-            while (true) {
-                ++blockmax_loop_cnt_2;
-                auto [id, et_score] = et_iter_2->BlockNextWithThreshold(result_heap.GetScoreThreshold());
-                if (id == INVALID_ROWID) [[unlikely]] {
-                    break;
-                }
-                if (result_heap.AddResult(et_score, id)) {
-                    // update threshold
-                    et_iter_2->UpdateScoreThreshold(result_heap.GetScoreThreshold());
-                }
-            }
-        }
+        ExecuteFTSearch(et_iter_2, result_heap, blockmax_loop_cnt_2);
         result_heap.Sort();
         blockmax_result_count_2 = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -623,20 +709,9 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             FullTextScoreResultHeap result_heap_3(top_n, blockmax_score_result_3.get(), blockmax_row_id_result_3.get());
             auto blockmax_begin_ts_3 = std::chrono::high_resolution_clock::now();
             u32 blockmax_loop_cnt_3 = 0;
-            if (et_iter_3) {
-                while (true) {
-                    ++blockmax_loop_cnt_3;
-                    auto [id, et_score] = et_iter_3->BlockNextWithThreshold(result_heap_3.GetScoreThreshold());
-                    if (id == INVALID_ROWID) [[unlikely]] {
-                        break;
-                    }
-                    if (result_heap_3.AddResult(et_score, id)) {
-                        // update threshold
-                        et_iter_3->UpdateScoreThreshold(result_heap_3.GetScoreThreshold());
-                    }
-                }
-            }
+            ExecuteFTSearch(et_iter_3, result_heap_3, blockmax_loop_cnt_3);
             result_heap_3.Sort();
+            auto blockmax_end_ts_3 = std::chrono::high_resolution_clock::now();
             if (blockmax_loop_cnt_3 != blockmax_loop_cnt_2) {
                 assert(false);
             }
@@ -645,7 +720,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
                 assert(blockmax_score_result_2[i] == blockmax_score_result_3[i]);
                 assert(blockmax_row_id_result_2[i] == blockmax_row_id_result_3[i]);
             }
-            auto blockmax_end_ts_3 = std::chrono::high_resolution_clock::now();
             blockmax_duration_3 = blockmax_end_ts_3 - blockmax_begin_ts_3;
         }
 #endif
