@@ -313,12 +313,10 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     {
         std::unique_lock lock(this->rw_locker_);
         SegmentID segment_id = segment_entry->segment_id();
-        SizeT row_count = segment_entry->row_count();
         auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
         if (!insert_ok) {
             UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
         }
-        this->row_count_ += row_count;
     }
     // Populate index entirely for the segment
     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
@@ -369,6 +367,12 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Txn *txn = txn_store_ptr->txn_;
     if (append_state_ptr->Finished()) {
+        // Import update row count
+        if (append_state_ptr->blocks_.empty()) {
+            for (auto &segment : txn_store_ptr->flushed_segments()) {
+                this->row_count_ += segment->row_count();
+            }
+        }
         LOG_TRACE("No append is done.");
         return;
     }
@@ -904,11 +908,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<SegmentEntry *> segment_candidates;
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
+    SizeT checkpoint_row_count = 0;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;
-        json_res["row_count"] = this->row_count_.load();
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
         json_res["txn_id"] = this->txn_id_.load();
@@ -952,7 +956,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
+        checkpoint_row_count += segment_entry->checkpoint_row_count();
     }
+    json_res["row_count"] = checkpoint_row_count;
     json_res["unsealed_id"] = unsealed_id_;
 
     // Serialize indexes

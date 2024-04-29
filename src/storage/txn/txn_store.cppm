@@ -134,6 +134,8 @@ public: // Getter
 
     const HashMap<SegmentID, TxnSegmentStore> &txn_segments() const { return txn_segments_store_; }
 
+    const Vector<SegmentEntry *> &flushed_segments() const { return flushed_segments_; }
+
 private:
     HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
     Vector<SegmentEntry *> flushed_segments_{};

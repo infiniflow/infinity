@@ -151,6 +151,11 @@ public:
         return actual_row_count_;
     }
 
+    // only used in Serialize(), FullCheckpoint, and no concurrency
+    SizeT checkpoint_row_count() const {
+        return checkpoint_row_count_;
+    }
+
     int Room() const { return this->row_capacity_ - this->row_count(); }
 
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
@@ -207,6 +212,7 @@ private:
 
     SizeT row_count_{};
     SizeT actual_row_count_{}; // not deleted row count
+    SizeT checkpoint_row_count_{};
 
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{0};

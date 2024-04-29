@@ -409,6 +409,8 @@ SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
+    this->checkpoint_row_count_ = 0;
+
     // const field
     json_res["segment_dir"] = *this->segment_dir_;
     json_res["row_capacity"] = this->row_capacity_;
@@ -420,7 +422,6 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["min_row_ts"] = this->min_row_ts_;
         json_res["max_row_ts"] = std::min(this->max_row_ts_, max_commit_ts);
         json_res["deleted"] = this->deleted_;
-        json_res["row_count"] = this->row_count_;
         json_res["actual_row_count"] = this->actual_row_count_;
 
         json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
@@ -436,8 +437,11 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
             if (block_entry->commit_ts_ <= max_commit_ts) {
                 block_entry->Flush(max_commit_ts);
                 json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
+                this->checkpoint_row_count_ += block_entry->checkpoint_row_count();
             }
         }
+
+        json_res["row_count"] = this->checkpoint_row_count_;
     }
     return json_res;
 }
@@ -455,6 +459,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->row_count_ = segment_entry_json["row_count"];
     segment_entry->actual_row_count_ = segment_entry_json["actual_row_count"];
+    segment_entry->checkpoint_row_count_ = 0;
 
     segment_entry->commit_ts_ = segment_entry_json["commit_ts"];
     segment_entry->begin_ts_ = segment_entry_json["begin_ts"];
