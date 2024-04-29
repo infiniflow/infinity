@@ -313,12 +313,10 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     {
         std::unique_lock lock(this->rw_locker_);
         SegmentID segment_id = segment_entry->segment_id();
-        SizeT row_count = segment_entry->row_count();
         auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
         if (!insert_ok) {
             UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
         }
-        this->row_count_ += row_count;
     }
     // Populate index entirely for the segment
     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
@@ -369,6 +367,12 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Txn *txn = txn_store_ptr->txn_;
     if (append_state_ptr->Finished()) {
+        // Import update row count
+        if (append_state_ptr->blocks_.empty()) {
+            for (auto &segment : txn_store_ptr->flushed_segments()) {
+                this->row_count_ += segment->row_count();
+            }
+        }
         LOG_TRACE("No append is done.");
         return;
     }
