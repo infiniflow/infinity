@@ -75,17 +75,20 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker) {
 
 void BufferManager::RemoveClean() {
     Vector<BufferObj *> clean_list;
-    Vector<BufferObj *> clean_temp_list;
     {
         std::unique_lock lock(clean_locker_);
         clean_list.swap(clean_list_);
-        clean_temp_list.swap(clean_temp_list_);
     }
 
     for (auto *buffer_obj : clean_list) {
         buffer_obj->CleanupFile();
     }
-    for (auto *buffer_obj : clean_temp_list) {
+    HashSet<BufferObj *> clean_temp_set;
+    {
+        std::unique_lock lock(temp_locker_);
+        clean_temp_set.swap(clean_temp_set_);
+    }
+    for (auto *buffer_obj : clean_temp_set) {
         buffer_obj->CleanupTempFile();
     }
 
@@ -166,9 +169,33 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
     }
 }
 
-void BufferManager::AddToCleanTempList(BufferObj *buffer_obj) {
-    std::unique_lock lock(clean_locker_);
-    clean_temp_list_.push_back(buffer_obj);
+void BufferManager::AddTemp(BufferObj *buffer_obj) {
+    std::unique_lock lock(temp_locker_);
+    auto [iter, insert_ok] = temp_set_.emplace(buffer_obj);
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("BufferManager::AddTemp: file {} already exists.", buffer_obj->GetFilename()));
+    }
+    clean_temp_set_.erase(buffer_obj);
+}
+
+void BufferManager::RemoveTemp(BufferObj *buffer_obj) {
+    std::unique_lock lock(temp_locker_);
+    auto remove_n = temp_set_.erase(buffer_obj);
+    if (remove_n != 1) {
+        UnrecoverableError(fmt::format("BufferManager::RemoveTemp: file {} not found.", buffer_obj->GetFilename()));
+    }
+    auto [iter, insert_ok] = clean_temp_set_.emplace(buffer_obj);
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("BufferManager::RemoveTemp: file {} already exists in clean temp set.", buffer_obj->GetFilename()));
+    }
+}
+
+void BufferManager::MoveTemp(BufferObj *buffer_obj) {
+    std::unique_lock lock(temp_locker_);
+    auto remove_n = temp_set_.erase(buffer_obj);
+    if (remove_n != 1) {
+        UnrecoverableError(fmt::format("BufferManager::RemoveTemp: file {} not found.", buffer_obj->GetFilename()));
+    }
 }
 
 bool BufferManager::RemoveFromGCQueueInner(BufferObj *buffer_obj) {
