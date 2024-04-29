@@ -58,10 +58,10 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kFreed: {
             buffer_mgr_->RequestSpace(GetBufferSize());
-            file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
             if (type_ == BufferType::kEphemeral) {
-                type_ = BufferType::kTemp;
+                UnrecoverableError("Invalid state.");
             }
+            file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
             break;
         }
         case BufferStatus::kNew: {
@@ -96,7 +96,9 @@ bool BufferObj::Free() {
             break;
         }
         case BufferType::kEphemeral: {
+            type_ = BufferType::kTemp;
             file_worker_->WriteToFile(true);
+            buffer_mgr_->AddTemp(this);
             break;
         }
     }
@@ -108,13 +110,12 @@ bool BufferObj::Free() {
 bool BufferObj::Save() {
     bool write = false;
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (type_ != BufferType::kPersistent) {
+    if (type_ == BufferType::kEphemeral) {
         switch (status_) {
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
                 file_worker_->WriteToFile(false);
-                buffer_mgr_->AddToCleanTempList(this);
                 write = true;
                 break;
             }
@@ -129,8 +130,12 @@ bool BufferObj::Save() {
                 UnrecoverableError(*err_msg);
             }
         }
-        type_ = BufferType::kPersistent;
+    } else if (type_ == BufferType::kTemp) {
+        LOG_TRACE(fmt::format("BufferObj::Move file: {}", GetFilename()));
+        buffer_mgr_->MoveTemp(this);
+        file_worker_->MoveFile();
     }
+    type_ = BufferType::kPersistent;
     return write;
 }
 
@@ -157,15 +162,8 @@ void BufferObj::PickForCleanup() {
         }
     }
     status_ = BufferStatus::kClean;
-    switch (type_) {
-        case BufferType::kPersistent:
-        case BufferType::kTemp: {
-            buffer_mgr_->AddToCleanTempList(this);
-            break;
-        }
-        default: {
-            break;
-        }
+    if (type_ == BufferType::kTemp) {
+        buffer_mgr_->RemoveTemp(this);
     }
 }
 
@@ -179,7 +177,13 @@ void BufferObj::CleanupFile() const {
     file_worker_->CleanupFile();
 }
 
-void BufferObj::CleanupTempFile() const { file_worker_->CleanupTempFile(); }
+void BufferObj::CleanupTempFile() const {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    if (type_ == BufferType::kTemp) {
+        return;
+    }
+    file_worker_->CleanupTempFile();
+}
 
 void BufferObj::LoadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
@@ -191,6 +195,9 @@ void BufferObj::LoadInner() {
 
 void BufferObj::GetMutPointer() {
     std::unique_lock<std::mutex> locker(w_locker_);
+    if (type_ == BufferType::kTemp) {
+        buffer_mgr_->RemoveTemp(this);
+    }
     type_ = BufferType::kEphemeral;
 }
 
