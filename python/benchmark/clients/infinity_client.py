@@ -166,22 +166,13 @@ class InfinityClient(BaseClient):
                         latency = (time.time() - start) * 1000
                         result = [(row_id[0], score) for row_id, score in zip(res['ROW_ID'], res['SCORE'])]
                         result.append(latency)
-                        # print(f"{query}, {latency}")
+                        print(f"{query}, {latency}")
                         results.append(result)
         else:
             raise TypeError("Unsupported file type")
         return results
 
     def check_and_save_results(self, results: List[List[Any]]):
-        # for i, result in enumerate(results):
-        #     print(f"result {i} = {result}")
-        #
-        #     if len(result) == 1:
-        #         print(f"not found term, cost time = {results[0]}")
-        #     elif len(result) > 1:
-        #         for row, score in result[:-1]:
-        #             print(f"row = {row}, score = {score}")
-        #         print(f"query cost time: {result[-1]}ms")
         if 'ground_truth_path' in self.data:
             ground_truth_path = self.data['ground_truth_path']
             _, ext = os.path.splitext(ground_truth_path)
@@ -219,29 +210,3 @@ class InfinityClient(BaseClient):
                 f'''mean_time: {np.mean(latencies)}, std_time: {np.std(latencies)},
                     max_time: {np.max(latencies)}, min_time: {np.min(latencies)},
                     p95_time: {np.percentile(latencies, 95)}, p99_time: {np.percentile(latencies, 99)}''')
-        # ground_truth_path = self.data['ground_truth_path']
-        # _, ext = os.path.splitext(ground_truth_path)
-        # precisions = []
-        # latencies = []
-        # if ext == '.hdf5':
-        #     with h5py.File(ground_truth_path, 'r') as f:
-        #         expected_result = f['neighbors']
-        #         assert len(expected_result) == len(results)
-        #         for i, result in enumerate(results):
-        #             ids = set(result[0])
-        #             precision = len(ids.intersection(expected_result[i][:self.data['topK']])) / self.data['topK']
-        #             precisions.append(precision)
-        #             latencies.append(result[-1])
-        # elif ext == '.json':
-        #     with open(ground_truth_path, 'r') as f:
-        #         expected_results = json.load(f)
-        #         for i, result in enumerate(results):
-        #             ids = set(x[0] for x in result[:-1])
-        #             precision = len(ids.intersection(expected_results[i]['expected_results'][:self.data['topK']])) / self.data['topK']
-        #             precisions.append(precision)
-        #             latencies.append(result[-1])
-        #
-        # print(f"mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)}, \
-        #       std_time: {np.std(latencies)}, min_time: {np.min(latencies)}, \
-        #       max_time: {np.max(latencies)}, p95_time: {np.percentile(latencies, 95)}, \
-        #       p99_time: {np.percentile(latencies, 99)}")
