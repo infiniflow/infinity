@@ -115,7 +115,7 @@ class InfinityClient(BaseClient):
         condition = query["body"]["query"]
 
         key, value = list(condition.items())[0]
-        ret = f'{list(value.keys())[0]}:{list(value.values())[0]}'
+        ret = f'{list(value.keys())[0]}:"{list(value.values())[0]}"'
         if key == 'and':
             ret = '&&'.join(f'{list(value.keys())[0]}:"{list(value.values())[0]}"')
         elif key == 'or':

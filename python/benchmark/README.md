@@ -56,18 +56,18 @@ Options:
         cohere_10M,
         geonames,
         pmc
-    --limit-cpu
+    --limit-ram
         25Gb(default)
-    --limit_cpus
+    --limit-cpu
         8(default), 1~your cpu core
     --import
         perform import data operation
     --generate
         whether to generate a query
-    --query-num
-        number of queries generated
-    --term-num
-        number of terms generated
+    --generate-query-num
+        1(default)
+    --generate-term-num
+        4(default)
     --query
         perform query operation
     --help

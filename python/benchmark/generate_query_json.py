@@ -44,8 +44,6 @@ def generate_query_txt(terms_path, query_cnt = 1, terms_count = 4, operation_pat
             query_terms = random_select(terms, terms_count)
         new_value = " ".join(query_terms)
         querys.append(new_value)
-        # print(f"generate terms = {new_value}")
-        # write new value to file operation_path
     with open(operation_path, 'w') as file:
         for query in querys:
             file.write(query + '\n')
@@ -65,7 +63,6 @@ def generate_query_json(terms_path, terms_count = 10, operation_path="datasets/e
         }
     ]
 
-    # new_value = "Chicago culture"
     new_value = ""
     terms = load_terms(terms_path)
     query_terms = random_select(terms, terms_count)
@@ -75,5 +72,3 @@ def generate_query_json(terms_path, terms_count = 10, operation_path="datasets/e
 
     with open(operation_path, "w") as json_file:
         json.dump(data, json_file, indent=2)
-# if __name__ == "__main__":
-#     generate_query_json("datasets/enwiki/enwiki-10.csv", 10, "datasets/enwiki/operations1.json")
