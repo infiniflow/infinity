@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module block_entry;
 
 import stl;
@@ -123,6 +125,10 @@ public:
     inline u16 block_id() const { return block_id_; }
 
     u32 segment_id() const;
+
+    u32 segment_offset() const { return u32(block_id() * row_capacity()); }
+
+    RowID base_row_id() const { return RowID(segment_id(), segment_offset()); }
 
     const SharedPtr<String> &base_dir() const { return block_dir_; }
 

@@ -15,6 +15,7 @@
 module;
 
 #include "type/complex/row_id.h"
+#include <cassert>
 
 export module chunk_index_entry;
 
@@ -89,11 +90,15 @@ public:
 
     BufferObj *GetBufferObj() { return buffer_obj_; }
 
-    void DeprecateChunk(TxnTimeStamp commit_ts) { deprecate_ts_.store(commit_ts); }
+    void DeprecateChunk(TxnTimeStamp commit_ts) {
+        assert(commit_ts_.load() < commit_ts);
+        deprecate_ts_.store(commit_ts);
+    }
 
     bool CheckVisible(TxnTimeStamp ts) {
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();
         TxnTimeStamp commit_ts = commit_ts_.load();
+        assert(commit_ts == UNCOMMIT_TS || commit_ts < deprecate_ts);
         return ts >= commit_ts && ts <= deprecate_ts;
     }
 

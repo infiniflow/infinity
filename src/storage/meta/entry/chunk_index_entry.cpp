@@ -106,7 +106,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEnt
     assert(index_dir.get() != nullptr);
     if (buffer_mgr != nullptr) {
         auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name);
+        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name, row_count * sizeof(u32));
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;
@@ -123,7 +123,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
     if (param->index_base_->index_type_ == IndexType::kFullText) {
         const auto &index_dir = segment_index_entry->index_dir();
         auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name);
+        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name, row_count * sizeof(u32));
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     } else {
         const auto &index_dir = segment_index_entry->index_dir();
@@ -145,6 +145,7 @@ nlohmann::json ChunkIndexEntry::Serialize() {
     index_entry_json["base_rowid"] = this->base_rowid_.ToUint64();
     index_entry_json["row_count"] = this->row_count_;
     index_entry_json["commit_ts"] = this->commit_ts_.load();
+    index_entry_json["deprecate_ts_"] = this->deprecate_ts_.load();
     return index_entry_json;
 }
 
@@ -158,6 +159,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
     u32 row_count = index_entry_json["row_count"];
     auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
     ret->commit_ts_.store(index_entry_json["commit_ts"]);
+    ret->deprecate_ts_.store(index_entry_json["deprecate_ts_"]);
     return ret;
 }
 

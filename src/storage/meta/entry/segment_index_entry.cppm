@@ -145,7 +145,7 @@ public:
         std::sort(std::begin(chunk_index_entries),
                   std::end(chunk_index_entries),
                   [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) noexcept {
-                      return lhs->base_rowid_ < rhs->base_rowid_;
+                      return (lhs->base_rowid_ < rhs->base_rowid_ || (lhs->base_rowid_ == rhs->base_rowid_ && lhs->row_count_ < rhs->row_count_));
                   });
     }
 

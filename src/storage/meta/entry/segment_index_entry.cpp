@@ -241,10 +241,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_count,
                                        TxnTimeStamp commit_ts,
                                        BufferManager *buffer_manager) {
-    u32 seg_id = block_entry->segment_id();
-    u16 block_id = block_entry->block_id();
-    SegmentOffset block_offset = u32(block_id) * block_entry->row_capacity();
-    RowID begin_row_id(seg_id, row_offset + block_offset);
+    SegmentOffset block_offset = block_entry->segment_offset();
+    RowID begin_row_id = block_entry->base_row_id() + row_offset;
 
     const SharedPtr<IndexBase> &index_base = table_index_entry_->table_index_def();
     const SharedPtr<ColumnDef> &column_def = table_index_entry_->column_def();
@@ -267,7 +265,15 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                                             table_index_entry_->GetFulltextCommitingThreadPool());
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
-                assert(begin_row_id == memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount());
+                RowID exp_begin_row_id = memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount();
+                assert(begin_row_id >= exp_begin_row_id);
+                if (begin_row_id > exp_begin_row_id) {
+                    LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
+                                         begin_row_id.ToUint64(),
+                                         exp_begin_row_id.ToUint64(),
+                                         begin_row_id - exp_begin_row_id));
+                    memory_indexer_->InsertGap(begin_row_id - exp_begin_row_id);
+                }
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_manager));
@@ -408,6 +414,17 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                RowID begin_row_id = block_entry->base_row_id();
+                RowID exp_begin_row_id = memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount();
+                assert(begin_row_id >= exp_begin_row_id);
+                if (begin_row_id > exp_begin_row_id) {
+                    LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
+                                         begin_row_id.ToUint64(),
+                                         exp_begin_row_id.ToUint64(),
+                                         begin_row_id - exp_begin_row_id));
+                    memory_indexer_->InsertGap(begin_row_id - exp_begin_row_id);
+                }
+
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
                 memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), true);
                 memory_indexer_->Commit(true);

@@ -60,6 +60,9 @@ tf_t PostingWriter::GetCurrentTF() const { return doc_list_encoder_->GetCurrentT
 void PostingWriter::SetCurrentTF(tf_t tf) { doc_list_encoder_->SetCurrentTF(tf); }
 
 void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta, bool spill) {
+    term_meta.doc_freq_ = GetDF();
+    term_meta.total_tf_ = GetTotalTF();
+    term_meta.payload_ = 0;
     term_meta.doc_start_ = file_writer->TotalWrittenBytes();
     doc_list_encoder_->Dump(file_writer, spill);
     if (position_list_encoder_) {
