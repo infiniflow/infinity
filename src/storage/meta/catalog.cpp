@@ -873,7 +873,6 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
 
-    // TODO: Save as a temp filename, then rename it to the real filename.
     SizeT n_bytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (n_bytes != catalog_str.size()) {
         LOG_ERROR(fmt::format("Saving catalog file failed: {}", catalog_tmp_path));

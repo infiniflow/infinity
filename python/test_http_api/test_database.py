@@ -104,7 +104,7 @@ class TestDataBase(HttpTest):
     @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Cost too much times")
     def test_http_create_drop_show_100K_databases(self):
         """
-        create 1M dbs, show these dbs, drop these dbs
+        create 100K dbs, show these dbs, drop these dbs
         """
         dbs = self.get_database()
         # list all databases

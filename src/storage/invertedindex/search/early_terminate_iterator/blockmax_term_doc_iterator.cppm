@@ -32,6 +32,8 @@ export class BlockMaxTermDocIterator final : public EarlyTerminateIterator {
 public:
     BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool);
 
+    ~BlockMaxTermDocIterator() override;
+
     bool InitPostingIterator(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size);
 
     void MultiplyWeight(float factor) { weight_ *= factor; }
@@ -53,6 +55,7 @@ public:
     // weight included
     float BlockMaxBM25Score() override;
 
+    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
@@ -60,7 +63,7 @@ public:
     bool NotPartCheckExist(RowID doc_id) override;
 
     // weight included
-    float BM25Score();
+    float BM25Score() override;
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 
@@ -69,10 +72,15 @@ public:
     const String *column_name_ptr_ = nullptr;
 
 private:
+    Pair<tf_t, u32> GetScoreData();
+
     // similar to TermDocIterator
     PostingIterator iter_; // initialized in constructor and InitPostingIterator() function
     float weight_ = 1.0f;  // changed in MultiplyWeight()
     // for BM25 Score
+    float f1 = 0.0f;
+    float f2 = 0.0f;
+    float f3 = 0.0f;
     float avg_column_len_ = 0;
     FullTextColumnLengthReader *column_length_reader_ = nullptr;
     float bm25_common_score_ = 0; // include: weight * smooth_idf * (k1 + 1.0F)
@@ -82,6 +90,16 @@ private:
     RowID peek_doc_id_range_start_ = INVALID_ROWID;
     RowID peek_doc_id_range_end_ = INVALID_ROWID;
     RowID peek_doc_id_val_ = INVALID_ROWID;
+    // debug info
+    u32 calc_score_cnt_ = 0;
+    u32 calc_bm_score_cnt_ = 0;
+    u32 access_bm_score_cnt_ = 0;
+    RowID prev_calc_score_doc_id_ = INVALID_ROWID;
+    u32 duplicate_calc_score_cnt_ = 0;
+    u32 seek_cnt_ = 0;
+    u32 peek_cnt_ = 0;
+    u32 block_skip_cnt_ = 0;
+    u32 block_skip_cnt_inner_ = 0;
 };
 
 } // namespace infinity

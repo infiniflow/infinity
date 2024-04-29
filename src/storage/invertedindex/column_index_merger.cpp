@@ -86,6 +86,12 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
             }
         }
+
+        String column_length_file = index_prefix + LENGTH_SUFFIX;
+        UniquePtr<FileHandler> file_handler =
+            fs_.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+        fs_.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
+        fs_.Close(*file_handler);
     }
 
     while (!term_posting_queue.Empty()) {

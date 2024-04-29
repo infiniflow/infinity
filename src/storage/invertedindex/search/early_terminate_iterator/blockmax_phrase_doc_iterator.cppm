@@ -27,7 +27,9 @@ public:
 
     float BlockMaxBM25Score() override;
 
+    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override { return {}; }
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
+    float BM25Score() override { return 0.0f; }
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 
