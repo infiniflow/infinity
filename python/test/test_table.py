@@ -454,7 +454,7 @@ class TestTable(TestSdk):
 
     # create/drop/show/get 1000 tables with 10000 columns with various column types.
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
+    @pytest.mark.skip(reason="Cost too much times")
     def test_various_tables_with_various_columns(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)

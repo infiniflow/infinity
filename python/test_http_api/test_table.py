@@ -380,28 +380,24 @@ class TestTable(HttpTest):
         # create tables
         url = f"databases/{db_name}/tables/{table_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        idx = 0
-        for name in invalid_name_array:
+        for idx, name in enumerate(invalid_name_array):
             if idx == 0:
-                d = self.set_up_data([], {'fields': {"c1": {"type": "integer", }, }, 'properties': {},
+                d = self.set_up_data([], {'fields': {"c1": {"type": "integer", "id": 0}, }, 'properties': {},
                                           'create_option': str(name)})
                 r = self.request(url, "post", h, d)
-                # print(r)
                 expect = {"status_code": 200, "error_code": 0}
                 self.tear_down(r, expect)
             else:
-                d = self.set_up_data([], {'fields': {"c1": {"type": "integer", }, }, 'properties': {},
+                d = self.set_up_data([], {'fields': {"c1": {"type": "integer", "id": 0}, }, 'properties': {},
                                           'create_option': str(name)})
                 r = self.request(url, "post", h, d)
-                # print(r)
                 expect = {"status_code": 500, "error_code": 3017}
                 self.tear_down(r, expect)
-            idx += 1
         self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
+    @pytest.mark.skip(reason="Cost too much times")
     def test_http_various_tables_with_various_columns(self):
         db_name = "default_db"
         table_name = "my_table"
@@ -574,25 +570,10 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, None, None, expect={
             "status_code": 500,
-            "error_code": 3048,
+            "error_code": 3007,
         })
         self.drop_table(db_name, table_name)
         return
-
-        # @pytest.mark.parametrize("types", [
-
-    #     "int", "int8", "int16", "int32", "int64", "integer",
-    #     "float", "float32", "double", "float64",
-    #     "varchar",
-    #     "bool",
-    #     "vector, 3, float"])
-    # def test_http_create_valid_option(self, types):
-    #     db_name = "default_db"
-    #     table_name = "test_valid_option"
-    #     self.showdb(db_name)
-    #     self.dropTable(db_name,table_name)
-    #     self.createTable(db_name,table_name,{"c1":types})
-    #     return
 
     def test_http_drop_option(self):
         db_name = "default_db"
@@ -645,13 +626,16 @@ class TestTable(HttpTest):
         table_name = "test_same_column_name"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        # self.createTable(db_name,table_name,{"c1": {'type':"integer"},"c1": {"type":"integer"}})
         url = f"databases/{db_name}/tables/{table_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = {'create_option': 'ignore_if_exists', 'fields': {'c1': {'type': 'integer'}, 'c1': {'type': 'integer'}},
+        d = {'create_option': 'ignore_if_exists',
+             'fields': {'c1': {'type': 'integer', 'id': 0}, 'c1': {'type': 'integer', 'id': 1}},
              'properties': []}
         r = self.request(url, "post", h, d)
-        self.tear_down(r, {})
+        self.tear_down(r, {
+            "status_code": 500,
+            "error_code": 3007,
+        })
         return
 
     def test_http_column_numbers(self):
@@ -679,8 +663,9 @@ class TestTable(HttpTest):
         for i in create_valid_option:
             url = f"databases/{db_name}/tables/{table_name}"
             h = self.set_up_header(['accept', 'content-type'])
-            d = self.set_up_data(['create_option'],
-                                 {'fields': {"c1": {"type": "integer"}}, 'properties': {}, 'create_option': str(i)})
+            d = self.set_up_data([],
+                                 {'fields': {"c1": {"type": "integer", "id": 0}}, 'properties': {},
+                                  'create_option': str(i)})
             r = self.request(url, "post", h, d)
             print(r)
             self.tear_down(r, {
@@ -699,7 +684,8 @@ class TestTable(HttpTest):
             url = f"databases/{db_name}/tables/{table_name}"
             h = self.set_up_header(['accept', 'content-type'])
             d = self.set_up_data(['create_option'],
-                                 {'fields': {"c1": {"type": "integer"}}, 'properties': {}, 'create_option': str(i)})
+                                 {'fields': {"c1": {"type": "integer", "id": 0}}, 'properties': {},
+                                  'create_option': str(i)})
             r = self.request(url, "post", h, d)
             print(r)
             self.tear_down(r, {

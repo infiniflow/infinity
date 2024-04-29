@@ -262,12 +262,26 @@ public:
         nlohmann::json json_response;
         HTTPStatus http_status;
 
-        Vector<ColumnDef *> column_definitions;
-        i64 id = 0;
+        Vector<ColumnDef *> column_definitions(fields.size(), nullptr);
+        SizeT id = 0;
 
         for (auto &field : fields.items()) {
             String column_name = field.key();
             auto field_element = field.value();
+
+            id = field_element["id"];
+            if (id < 0 || id >= fields.size()) {
+                for (auto &column_def : column_definitions) {
+                    if (column_def) {
+                        delete column_def;
+                    }
+                }
+                json_response["error_code"] = 3007;
+                json_response["error_message"] = fmt::format("Invalid field id: {}", id);
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
             String value_type = field_element["type"];
             ToLower(value_type);
 
@@ -309,9 +323,14 @@ public:
                 if (field_element.contains("default")) {
                     default_expr = ConstantExpr::Deserialize(field_element["default"]);
                 }
-                ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints, default_expr);
-                column_definitions.emplace_back(col_def);
+                ColumnDef *col_def = new ColumnDef(id, column_type, column_name, constraints, default_expr);
+                column_definitions[id] = col_def;
             } else {
+                for (auto &column_def : column_definitions) {
+                    if (column_def) {
+                        delete column_def;
+                    }
+                }
                 infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
                 json_response["error_code"] = status.code();
                 json_response["error_message"] = status.message();
@@ -320,8 +339,22 @@ public:
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
         }
-        Vector<TableConstraint *> table_constraint;
 
+        for (auto &column_def : column_definitions) {
+            if (!column_def) {
+                for (auto &column_def : column_definitions) {
+                    if (column_def) {
+                        delete column_def;
+                    }
+                }
+                json_response["error_code"] = 3007;
+                json_response["error_message"] = "Invalid column definition";
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+        }
+
+        Vector<TableConstraint *> table_constraint;
         CreateTableOptions options;
         if(body_info_json.contains("create_option")) {
             auto create_option = body_info_json["create_option"];
@@ -1250,7 +1283,7 @@ public:
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
 
-                                const_expr->double_array_.emplace_back(value.template get<double>());
+                                const_expr->double_array_.emplace_back(value_ref.get<double>());
                             }
 
                             update_expr->value = const_expr;

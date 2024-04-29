@@ -495,9 +495,11 @@ void PhysicalImport::CSVRowHandler(void *context) {
     ++parser_context->row_count_;
 
     if (block_entry->GetAvailableCapacity() <= 0) {
+        LOG_INFO(fmt::format("Block {} saved", block_entry->block_id()));
         segment_entry->AppendBlockEntry(std::move(block_entry));
         // we have already used all space of the segment
         if (segment_entry->Room() <= 0) {
+            LOG_INFO(fmt::format("Segment {} saved", segment_entry->segment_id()));
             SaveSegmentData(table_entry, txn, segment_entry);
             u64 segment_id = Catalog::GetNextSegmentID(parser_context->table_entry_);
             segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);

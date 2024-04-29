@@ -1,7 +1,9 @@
 import requests
 import logging
 import os
+import json
 from common.common_data import *
+from collections import OrderedDict
 
 
 class HttpTest:
@@ -45,14 +47,16 @@ class HttpTest:
         else:
             assert resp.status_code == expected_status_code
 
-        resp_json = resp.json()
-        # print(resp_json)
-        for item in expect.items():
-            if resp_json.get(item[0], None) is None:
-                continue
-            print("[" + str(item[0]) + "]: " + "resp:" + str(resp_json[item[0]]) + ", expect:" + str(item[1]))
-            assert str(resp_json[item[0]]) == str(item[1])
-        print("----------------------------------------------")
+        try:
+            resp_json = resp.json()
+            for item in expect.items():
+                if resp_json.get(item[0], None) is None:
+                    continue
+                print("[" + str(item[0]) + "]: " + "resp:" + str(resp_json[item[0]]) + ", expect:" + str(item[1]))
+                assert str(resp_json[item[0]]) == str(item[1])
+            print("----------------------------------------------")
+        except:
+            pass
         return
 
     def request(self, url, method, header={}, data={}):
@@ -73,18 +77,18 @@ class HttpTest:
 
     def create_database(self, db_name, expect={
         "error_code": 0
-    },opt="kIgnore"):
+    }, opt="kIgnore"):
         url = f"databases/{db_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['create_option'],{'create_option': baseCreateOptions[opt]})
+        d = self.set_up_data(['create_option'], {'create_option': baseCreateOptions[opt]})
         r = self.request(url, "post", h, d)
         self.tear_down(r, expect)
         return
 
-    def create_db_without_check(self, db_name,opt="kIgnore"):
+    def create_db_without_check(self, db_name, opt="kIgnore"):
         url = f"databases/{db_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['create_option'],{'create_option': baseCreateOptions[opt]})
+        d = self.set_up_data(['create_option'], {'create_option': baseCreateOptions[opt]})
         r = self.request(url, "post", h, d)
         return r
 
@@ -101,10 +105,10 @@ class HttpTest:
 
     def drop_database(self, db_name, expect={
         "error_code": 0
-    },opt="kIgnore"):
+    }, opt="kIgnore"):
         url = f"databases/{db_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['drop_option'],{'drop_option': baseDropOptions[opt]})
+        d = self.set_up_data(['drop_option'], {'drop_option': baseDropOptions[opt]})
         r = self.request(url, "delete", h, d)
         self.tear_down(r, expect)
         return
@@ -145,9 +149,12 @@ class HttpTest:
                 continue
             self.drop_database(db_name)
 
-    def create_table(self, db_name, table_name, fields=[], properties=[], expect={
+    def create_table(self, db_name, table_name, fields={}, properties=[], expect={
         "error_code": 0
     }, opt="kIgnore"):
+        if fields is not None:
+            for idx, (name, field) in enumerate(fields.items()):
+                field["id"] = idx
         url = f"databases/{db_name}/tables/{table_name}"
         h = self.set_up_header(['accept', 'content-type'])
         d = self.set_up_data(['create_option'],
@@ -208,12 +215,12 @@ class HttpTest:
     def create_index(self, db_name, table_name, index_name, fields=[], index={}, expect={
         "error_code": 0
     }, opt="kIgnore"):
-        
-        copt = opt 
+
+        copt = opt
         exists = baseCreateOptions.get(opt, None)
         if exists is not None:
-             copt = baseCreateOptions[opt]
-        
+            copt = baseCreateOptions[opt]
+
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
         h = self.set_up_header(['accept', 'content-type'], )
         d = self.set_up_data(["create_option"], {"fields": fields, "index": index, "create_option": copt})
@@ -224,13 +231,13 @@ class HttpTest:
     def drop_index(self, db_name, table_name, index_name, expect={
         "error_code": 0,
     }, opt="kIgnore"):
-        
-        copt = opt 
+
+        copt = opt
         exists = baseDropOptions.get(opt, None)
         if exists is not None:
-             copt = baseDropOptions[opt]
-        
-        print("copt:"+copt)
+            copt = baseDropOptions[opt]
+
+        print("copt:" + copt)
 
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
 

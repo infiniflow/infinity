@@ -607,8 +607,7 @@ class TestIndex(HttpTest):
 
     # ERROR update error
     @pytest.mark.skip
-    #@pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
-    #@pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
+    # @pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
     def test_http_create_index_on_update_table(self):
         db_name = "default_db"
         table_name = "test_create_index_on_update_table"
