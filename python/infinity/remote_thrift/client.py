@@ -202,16 +202,6 @@ class ThriftInfinityClient:
         self.transport.close()
         return res
 
-    def upload(self, db_name: str, table_name: str, file_name: str, data, index: int, is_last: bool, total_size: int):
-        return self.client.UploadFileChunk(FileChunk(session_id=self.session_id,
-                                                     db_name=db_name,
-                                                     table_name=table_name,
-                                                     file_name=file_name,
-                                                     index=index,
-                                                     data=data,
-                                                     is_last=is_last,
-                                                     total_size=total_size))
-
     def show_variable(self, variable: ShowVariable):
         return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,
                                                             variable_name=str(variable.value)))

@@ -26,22 +26,6 @@ import third_party;
 
 namespace infinity {
 
-Pair<RowID, float> EarlyTerminateIterator::NextWithThreshold(float threshold) {
-    /*
-    while (true) {
-        RowID next_doc = Next();
-        if (next_doc == INVALID_ROWID) [[unlikely]] {
-            return {INVALID_ROWID, 0.0F};
-        }
-        if (float score = BM25Score(); score >= threshold) {
-            return {next_doc, score};
-        }
-    }
-    */
-    UnrecoverableError("Not implemented");
-    return {};
-}
-
 Pair<RowID, float> EarlyTerminateIterator::BlockNextWithThreshold(float threshold) {
     for (RowID next_skip = doc_id_ + 1;;) {
         if (!BlockSkipTo(next_skip, threshold)) [[unlikely]] {

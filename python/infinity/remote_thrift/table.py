@@ -246,40 +246,9 @@ class RemoteTable(Table, ABC):
                 else:
                     raise Exception("Unknown import parameter")
 
-        total_size = os.path.getsize(file_path)
-        chunk_size = 1024 * 1024 * 10  # 10MB
-        file_name = os.path.basename(file_path)
-
-        with open(file_path, 'rb') as f:
-            file_data = f.read()
-            num_chunks = len(file_data) // chunk_size + 1
-
-            for index in range(num_chunks):
-                start = index * chunk_size
-                end = min((index + 1) * chunk_size, len(file_data))
-                chunk_data = file_data[start:end]
-                is_last = (index == num_chunks - 1)
-                res = self._conn.upload(db_name=self._db_name,
-                                        table_name=self._table_name,
-                                        file_name=file_name,
-                                        data=chunk_data,
-                                        index=index,
-                                        is_last=is_last,
-                                        total_size=total_size)
-                match res:
-                    case None:
-                        raise Exception("upload failed")
-                    case _:
-                        if res.error_code != ErrorCode.OK:
-                            raise Exception(f"ERROR:{res.error_code} upload failed: {res.error_msg}")
-                        if res.error_msg:
-                            raise Exception(f"upload failed: {res.error_msg}")
-                        if res.can_skip:
-                            break
-
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
-                                     file_name=file_name,
+                                     file_name=file_path,
                                      import_options=options)
         if res.error_code == ErrorCode.OK:
             return res

@@ -32,6 +32,7 @@ import meta_entry_interface;
 import cleanup_scanner;
 import chunk_index_entry;
 import memory_indexer;
+import default_values;
 
 namespace infinity {
 
@@ -131,10 +132,21 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
 
-    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries) {
+    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, TxnTimeStamp begin_ts = MAX_TIMESTAMP) {
         std::shared_lock lock(rw_locker_);
         chunk_index_entries.clear();
-        chunk_index_entries.insert(chunk_index_entries.end(), chunk_index_entries_.begin(), chunk_index_entries_.end());
+        SizeT num = chunk_index_entries_.size();
+        for (SizeT i = 0; i < num; i++) {
+            auto &chunk_index_entry = chunk_index_entries_[i];
+            if (chunk_index_entry->CheckVisible(begin_ts)) {
+                chunk_index_entries.push_back(chunk_index_entry);
+            }
+        }
+        std::sort(std::begin(chunk_index_entries),
+                  std::end(chunk_index_entries),
+                  [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) noexcept {
+                      return lhs->base_rowid_ < rhs->base_rowid_;
+                  });
     }
 
     void RemoveChunkIndexEntry(ChunkIndexEntry *chunk_index_entry) {
@@ -145,8 +157,6 @@ public:
                                                   [base_rowid](const SharedPtr<ChunkIndexEntry> &entry) { return entry->base_rowid_ == base_rowid; }),
                                    chunk_index_entries_.end());
     }
-
-    void ReplaceFtChunkIndexEntries(SharedPtr<ChunkIndexEntry> merged_chunk_index_entry);
 
     void ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                   SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
