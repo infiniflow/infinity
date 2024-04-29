@@ -8,25 +8,24 @@ import httputils
 
 class TestKnn(HttpTest):
     # PASS
-    @pytest.mark.skip(reason="can not import tmp_20240116.csv")
     def test_http_knn(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
         table_name = "test_knn"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "varchar"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "varchar"},
-            "query_gender": {"type": "varchar"},
-            "query_color": {"type": "varchar"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
 
         httputils.copy_data("tmp_20240116.csv")
         test_csv_dir = TEST_TMP_DIR + "tmp_20240116.csv"
@@ -44,18 +43,18 @@ class TestKnn(HttpTest):
         table_name = "test_knn"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "varchar"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "varchar"},
-            "query_gender": {"type": "varchar"},
-            "query_color": {"type": "varchar"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": "123",
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -76,18 +75,18 @@ class TestKnn(HttpTest):
         table_name = "test_knn_on_vector_column"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -129,18 +128,18 @@ class TestKnn(HttpTest):
         table_name = "test_knn_on_vector_column"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -183,18 +182,18 @@ class TestKnn(HttpTest):
         table_name = "test_valid_embedding_data"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -245,18 +244,18 @@ class TestKnn(HttpTest):
         table_name = "test_invalid_embedding_data"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -298,18 +297,18 @@ class TestKnn(HttpTest):
         table_name = "test_valid_embedding_data_type"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -359,24 +358,24 @@ class TestKnn(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    #@pytest.mark.skip(reason="knn use element_type:integer leads to segment fault")
+    # @pytest.mark.skip(reason="knn use element_type:integer leads to segment fault")
     def test_http_invalid_embedding_data_type(self):
         db_name = "default_db"
         table_name = "test_invalid_embedding_data_type"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -413,18 +412,18 @@ class TestKnn(HttpTest):
         table_name = "test_various_distance_type"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -471,18 +470,18 @@ class TestKnn(HttpTest):
         table_name = "test_various_topn"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
                                            "color_vector": [2.0] * 4,
@@ -512,18 +511,18 @@ class TestKnn(HttpTest):
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
 
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
@@ -574,18 +573,18 @@ class TestKnn(HttpTest):
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "variant_id": {"type": "integer"},
-            "gender_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "color_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "category_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "tag_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "other_vector": {"type": "vector", "dimension": 4, "element_type": "float"},
-            "query_is_recommend": {"type": "integer"},
-            "query_gender": {"type": "integer"},
-            "query_color": {"type": "integer"},
-            "query_price": {"type": "float"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "variant_id", "type": "varchar"},
+            {"name": "gender_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "color_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "category_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "tag_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "other_vector", "type": "vector", "dimension": 4, "element_type": "float"},
+            {"name": "query_is_recommend", "type": "varchar"},
+            {"name": "query_gender", "type": "varchar"},
+            {"name": "query_color", "type": "varchar"},
+            {"name": "query_price", "type": "float"}
+        ])
 
         self.insert(db_name, table_name, [{"variant_id": 123,
                                            "gender_vector": [1.0] * 4,
@@ -638,15 +637,13 @@ class TestKnn(HttpTest):
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "doctitle": {"type": "varchar"},
-            "docdate": {"type": "varchar"},
-            "body": {"type": "varchar"},
-            "num": {"type": "integer"},
-            "vec": {
-                "type": "vector", "dimension": 4, "element_type": "integer"
-            }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "doctitle", "type": "varchar"},
+            {"name": "docdate", "type": "varchar"},
+            {"name": "body", "type": "varchar"},
+            {"name": "num", "type": "integer"},
+            {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
+        ])
         httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
         httputils.copy_data("enwiki_embedding_99_commas.csv")
 
@@ -685,15 +682,13 @@ class TestKnn(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "doctitle": {"type": "varchar"},
-            "docdate": {"type": "varchar"},
-            "body": {"type": "varchar"},
-            "num": {"type": "integer"},
-            "vec": {
-                "type": "vector", "dimension": 4, "element_type": "integer"
-            }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "doctitle", "type": "varchar"},
+            {"name": "docdate", "type": "varchar"},
+            {"name": "body", "type": "varchar"},
+            {"name": "num", "type": "integer"},
+            {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
+        ])
         httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
         httputils.copy_data("enwiki_embedding_99_commas.csv")
 
@@ -734,15 +729,13 @@ class TestKnn(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "doctitle": {"type": "varchar"},
-            "docdate": {"type": "varchar"},
-            "body": {"type": "varchar"},
-            "num": {"type": "integer"},
-            "vec": {
-                "type": "vector", "dimension": 4, "element_type": "integer"
-            }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "doctitle", "type": "varchar"},
+            {"name": "docdate", "type": "varchar"},
+            {"name": "body", "type": "varchar"},
+            {"name": "num", "type": "integer"},
+            {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
+        ])
         httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
         httputils.copy_data("enwiki_embedding_99_commas.csv")
 
@@ -783,15 +776,13 @@ class TestKnn(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "doctitle": {"type": "varchar"},
-            "docdate": {"type": "varchar"},
-            "body": {"type": "varchar"},
-            "num": {"type": "integer"},
-            "vec": {
-                "type": "vector", "dimension": 4, "element_type": "integer"
-            }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "doctitle", "type": "varchar"},
+            {"name": "docdate", "type": "varchar"},
+            {"name": "body", "type": "varchar"},
+            {"name": "num", "type": "integer"},
+            {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
+        ])
         httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
         httputils.copy_data("enwiki_embedding_99_commas.csv")
 
@@ -832,15 +823,13 @@ class TestKnn(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "doctitle": {"type": "varchar"},
-            "docdate": {"type": "varchar"},
-            "body": {"type": "varchar"},
-            "num": {"type": "integer"},
-            "vec": {
-                "type": "vector", "dimension": 4, "element_type": "integer"
-            }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "doctitle", "type": "varchar"},
+            {"name": "docdate", "type": "varchar"},
+            {"name": "body", "type": "varchar"},
+            {"name": "num", "type": "integer"},
+            {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
+        ])
         httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
         httputils.copy_data("enwiki_embedding_99_commas.csv")
 
@@ -881,15 +870,13 @@ class TestKnn(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "doctitle": {"type": "varchar"},
-            "docdate": {"type": "varchar"},
-            "body": {"type": "varchar"},
-            "num": {"type": "integer"},
-            "vec": {
-                "type": "vector", "dimension": 4, "element_type": "integer"
-            }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "doctitle", "type": "varchar"},
+            {"name": "docdate", "type": "varchar"},
+            {"name": "body", "type": "varchar"},
+            {"name": "num", "type": "integer"},
+            {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
+        ])
         httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
         httputils.copy_data("enwiki_embedding_99_commas.csv")
 

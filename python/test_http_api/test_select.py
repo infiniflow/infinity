@@ -16,17 +16,18 @@ class TestSelect(HttpTest):
         table_name = "test_select"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "integer",
                 "constraints": ["not null"]
             }
-        }
-                          )
+        ])
         self.insert(db_name, table_name,
                     [{"c1": -3, "c2": -3}, {"c1": -2, "c2": -2}, {"c1": -1, "c2": -1}, {"c1": 0, "c2": 0},
                      {"c1": 1, "c2": 1},
@@ -76,16 +77,18 @@ class TestSelect(HttpTest):
         table_name = "test_select"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "float",
                 "constraints": ["not null"]
             }
-        })
+        ])
         self.insert(db_name, table_name,
                     [{"c1": -30, "c2": -1.43}, {"c1": -2, "c2": -2.5}, {"c1": 42, "c2": -5.1}, {"c1": 0, "c2": 0.0},
                      {"c1": 1, "c2": 1.0}, {"c1": 2, "c2": 2.0}, {"c1": 3, "c2": 3.0}])
@@ -106,17 +109,18 @@ class TestSelect(HttpTest):
         db_name = "default_db"
         table_name = "test_select_varchar"
         self.show_database(db_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "varchar",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "varchar",
                 "constraints": ["not null"]
             }
-        }
-                          )
+        ])
         self.show_table(db_name, table_name, {
             "error_code": 0,
             "database_name": db_name,
@@ -139,23 +143,28 @@ class TestSelect(HttpTest):
         db_name = "default_db"
         table_name = "test_select_big"
         self.show_database(db_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "varchar",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "varchar",
                 "constraints": ["not null"]
             }
-        }
+        ]
                           )
         for i in range(1000):
             self.insert(db_name, table_name, [
                 {"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}
+
             ])
+
         self.drop_table(db_name, table_name)
         return
+
 
     def test_http_select_embedding_int32(self):
         httputils.check_data(TEST_TMP_DIR)
@@ -164,18 +173,18 @@ class TestSelect(HttpTest):
         filename = "embedding_int_dim3.csv"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
-                "type": "varchar",
-                "constraints": ["primary key", "not null"]
-            },
-            "c2": {
-                "type": "varchar",
-                "dimension": 3,
-                "element_type": "integer",
-            }
-        }
-                          )
+        self.create_table(db_name, table_name, [
+            {"name": "c1",
+             "type": "varchar",
+             "constraints": ["primary key", "not null"]
+             },
+            {"name": "c2",
+             "type": "varchar",
+             "dimension": 3,
+             "element_type": "integer",
+             }
+        ])
+
         httputils.copy_data("embedding_int_dim3.csv")
         test_csv_dir = TEST_TMP_DIR + filename
         assert os.path.exists(test_csv_dir)
@@ -194,6 +203,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
+
     def test_http_select_embedding_float(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
@@ -201,17 +211,19 @@ class TestSelect(HttpTest):
         filename = "embedding_float_dim4.csv"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "varchar",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "varchar",
                 "dimension": 4,
                 "element_type": "float",
             }
-        }
+        ]
                           )
         httputils.copy_data(filename)
         test_csv_dir = TEST_TMP_DIR + filename
@@ -222,6 +234,7 @@ class TestSelect(HttpTest):
             "file_type": "csv",
             "header": False,
             "delimiter": ","
+
         })
 
         self.select(db_name, table_name, ["c2"], "", {}, {}, {
@@ -236,6 +249,7 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
+
     def test_http_select_big_embedding(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
@@ -243,17 +257,19 @@ class TestSelect(HttpTest):
         filename = "embedding_int_dim3.csv"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "varchar",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "varchar",
                 "dimension": 3,
                 "element_type": "integer",
             }
-        }
+        ]
                           )
         httputils.copy_data(filename)
         csv_test_dir = TEST_TMP_DIR + filename
@@ -265,7 +281,9 @@ class TestSelect(HttpTest):
                 "file_type": "csv",
                 "header": False,
                 "delimiter": ","
+
             })
+
         self.select(db_name, table_name, ["c1"], "", {
         }, {}, {
                         "error_code": 0,
@@ -273,20 +291,23 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
+
     def test_http_select_same_output(self):
         db_name = "default_db"
         table_name = "test_select_same_output"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "integer",
             }
-        }
+        ]
                           )
 
         self.insert(db_name, table_name, [{"c1": 1, "c2": 2}])
@@ -295,6 +316,7 @@ class TestSelect(HttpTest):
             "output": [{"c1": '1', "c2": '2'}]
 
         })
+
         self.select(db_name, table_name, ["c1", "c1"], "", {
             "match":
                 {
@@ -312,24 +334,27 @@ class TestSelect(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
+
     def test_http_empty_table(self):
         db_name = "default_db"
         table_name = "test_empty_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "integer",
             }
-        }
-                          )
+        ])
 
         self.select(db_name, table_name, ["c1", "c2"])
         self.drop_table(db_name, table_name)
         return
+
 
     def test_http_valid_filter_expression(self):
         filter_list = [
@@ -345,14 +370,16 @@ class TestSelect(HttpTest):
         table_name = "test_valid_filter_expression"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "float",
             }
-        }
+        ]
                           )
         self.insert(db_name, table_name, [{"c1": 1, "c2": 2.0},
                                           {"c1": 10, "c2": 2.0},
@@ -362,7 +389,9 @@ class TestSelect(HttpTest):
         for f in filter_list:
             self.select(db_name, table_name, ["c1", "c2"])
         self.drop_table(db_name, table_name)
+
         return
+
 
     @pytest.mark.parametrize("invalid_filter_list", [
         "c1",
@@ -379,15 +408,17 @@ class TestSelect(HttpTest):
         table_name = "test_valid_filter_expression"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-                "c1": {
-                    "type": "integer",
-                },
-                "c2": {
-                    "type": "float",
-                }
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
+                "type": "integer",
+            },
+            {
+                "name": "c2",
+                "type": "float",
             }
-        )
+        ]
+                          )
         self.insert(db_name, table_name, [{"c1": 1, "c2": 2.0},
                                           {"c1": 10, "c2": 2.0},
                                           {"c1": 100, "c2": 2.0},
@@ -396,5 +427,6 @@ class TestSelect(HttpTest):
         self.select(db_name, table_name, ["*"], invalid_filter_list, {}, {}, {
             "status_code": 500,
         })
+
         self.drop_table(db_name, table_name)
         return
