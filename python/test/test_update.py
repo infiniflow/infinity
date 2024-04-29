@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 import time
 
 import pandas as pd
@@ -369,7 +370,7 @@ class TestUpdate(TestSdk):
 
     # update inserted long before and select to check
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Taking too much time.")
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
     def test_update_inserted_long_before(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -385,7 +386,7 @@ class TestUpdate(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        time.sleep(3600)
+        time.sleep(60)
 
         # update
         table_obj.update("c1 = 1", [{"c2": 21}])
