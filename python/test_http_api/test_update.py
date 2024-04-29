@@ -221,7 +221,7 @@ class TestUpdate(HttpTest):
         return
 
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Taking too much time.")
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
     def test_http_update_inserted_long_before(self):
         db_name = "default_db"
         table_name = "test_update_before_delete"
@@ -234,7 +234,7 @@ class TestUpdate(HttpTest):
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         self.insert(db_name, table_name, values)
 
-        time.sleep(30)
+        time.sleep(60)
 
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
         self.drop_table(db_name, table_name)
