@@ -900,11 +900,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<SegmentEntry *> segment_candidates;
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
+    SizeT checkpoint_row_count = 0;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;
-        json_res["row_count"] = this->row_count_.load();
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
         json_res["txn_id"] = this->txn_id_.load();
@@ -948,7 +948,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
+        checkpoint_row_count += segment_entry->checkpoint_row_count();
     }
+    json_res["row_count"] = checkpoint_row_count;
     json_res["unsealed_id"] = unsealed_id_;
 
     // Serialize indexes
