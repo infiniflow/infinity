@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import infinity
 import infinity.index as index
 from infinity.common import REMOTE_HOST
@@ -74,12 +73,6 @@ def test_english():
 
     except Exception as e:
         print(str(e))
-
-    # Print the JSON data
-    # print("------json-------")
-    # print(json_data)
-    # print("------tabular - querybuilder-------")
-    # print(qb_result)
 
 
 def test_chinese():

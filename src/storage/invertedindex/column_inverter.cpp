@@ -108,7 +108,7 @@ void ColumnInverter::MergePrepare() {
 }
 
 void ColumnInverter::Merge(ColumnInverter &rhs) {
-    assert(begin_doc_id_ + doc_count_ == rhs.begin_doc_id_);
+    assert(begin_doc_id_ + doc_count_ <= rhs.begin_doc_id_);
     MergePrepare();
     for (auto &doc_terms : rhs.terms_per_doc_) {
         u32 doc_id = doc_terms.first;

@@ -100,7 +100,11 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
         segment_index_entry->CommitSegmentIndex(txn_id, commit_ts);
     }
     for (auto *chunk_index_entry : chunk_index_entries_) {
-        chunk_index_entry->Commit(commit_ts);
+        // uncommitted: insert or import, create index
+        // committed: create index, insert or import
+        if (!chunk_index_entry->Committed()) {
+            chunk_index_entry->Commit(commit_ts);
+        }
     }
 }
 

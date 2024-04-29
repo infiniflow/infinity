@@ -355,7 +355,7 @@ void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
     }
 }
 
-void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr, bool is_replay) {
     SizeT row_count = 0;
 
     // Read-only no lock needed.
@@ -402,8 +402,11 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
         row_count += actual_appended;
     }
 
-    // Realtime index insertion
-    MemIndexInsert(txn, append_state_ptr->append_ranges_);
+    // Needn't inserting into MemIndex since MemIndexRecover is responsible for recovering MemIndex
+    if (!is_replay) {
+        // Realtime index insertion.
+        MemIndexInsert(txn, append_state_ptr->append_ranges_);
+    }
 
     this->row_count_ += row_count;
 }
@@ -665,6 +668,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= 1000000) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
+                chunk_index_entry->Commit(txn->CommitTS());
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
 
                 if (index_base->index_type_ == IndexType::kFullText) {
@@ -685,6 +689,7 @@ void TableEntry::MemIndexDump(Txn *txn, bool spill) {
         TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
         SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn_index_store, spill);
         if (chunk_index_entry.get() != nullptr) {
+            chunk_index_entry->Commit(txn->CommitTS());
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
         }
@@ -737,7 +742,12 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
                 append_ranges.emplace_back(segment_id, block_id, start_offset, row_count);
                 for (SizeT i = block_id + 1; i < block_entries.size(); i++) {
                     assert(block_entries[i - 1]->row_capacity() == block_capacity);
-                    assert(block_entries[i - 1]->GetAvailableCapacity() <= 0);
+                    if (block_entries[i - 1]->GetAvailableCapacity() > 0) {
+                        LOG_ERROR(fmt::format("MemIndexRecover got a non-full BlockEntry. block_id {}, row_count {}, block_entries {}",
+                                              block_entries[i - 1]->block_id(),
+                                              block_entries[i - 1]->row_count(),
+                                              block_entries.size()));
+                    }
                     append_ranges.emplace_back(segment_id, i, 0, block_entries[i]->row_count());
                 }
             }
