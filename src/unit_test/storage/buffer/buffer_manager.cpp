@@ -85,12 +85,19 @@ protected:
 };
 
 TEST_F(BufferManagerTest, cleanup_test) {
-
     const SizeT k = 2;
     const SizeT file_size = 100;
     const SizeT buffer_size = k * file_size;
     const SizeT file_num = 100;
-    EXPECT_GT(file_num, k);
+    const SizeT file_num1 = file_num / 2;
+    EXPECT_GT(file_num, k + file_num1);
+
+    auto CheckFileNum = [&](SizeT data_num, SizeT temp_num) {
+        auto datas = ListAllData();
+        auto temps = ListAllTemp();
+        EXPECT_EQ(datas.size(), data_num);
+        EXPECT_EQ(temps.size(), temp_num);
+    };
 
     {
         BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_);
@@ -105,18 +112,11 @@ TEST_F(BufferManagerTest, cleanup_test) {
                 auto buffer_handle = buffer_obj->Load();
                 auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
                 for (SizeT j = 0; j < file_size; ++j) {
-                    data[j] = 'a' + i % 26;
+                    data[j] = 'a' + (i + j) % 26;
                 }
             }
         }
-
-        {
-            auto datas = ListAllData();
-            auto temps = ListAllTemp();
-            EXPECT_EQ(datas.size(), 0ull);
-            EXPECT_EQ(temps.size(), file_num - k);
-        }
-
+        CheckFileNum(0, file_num - k);
         {
             SizeT write_n = 0;
             for (auto *buffer_obj : buffer_objs) {
@@ -126,42 +126,57 @@ TEST_F(BufferManagerTest, cleanup_test) {
             }
             EXPECT_EQ(write_n, k);
         }
-        {
-            auto datas = ListAllData();
-            auto temps = ListAllTemp();
-            EXPECT_EQ(datas.size(), file_num);
-            EXPECT_EQ(temps.size(), 0ull);
-        }
-
+        CheckFileNum(file_num, 0);
         for (SizeT i = 0; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
             auto buffer_handle = buffer_obj->Load();
             const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
             for (SizeT j = 0; j < file_size; ++j) {
-                EXPECT_EQ(data[j], char('a' + i % 26));
+                EXPECT_EQ(data[j], char('a' + (i + j) % 26));
             }
         }
-        {
-            auto datas = ListAllData();
-            auto temps = ListAllTemp();
-            EXPECT_EQ(datas.size(), file_num);
-            EXPECT_EQ(temps.size(), 0ull);
-        }
-
+        CheckFileNum(file_num, 0);
         for (SizeT i = 0; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
             auto buffer_handle = buffer_obj->Load();
             auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
             for (SizeT j = 0; j < file_size; ++j) {
-                data[j] = 'a' + (i + i) % 26;
+                data[j] = 'a' + (i + j) % 26;
             }
         }
         {
-            auto datas = ListAllData();
-            auto temps = ListAllTemp();
-            EXPECT_EQ(datas.size(), file_num);
-            EXPECT_EQ(temps.size(), file_num - k);
+            SizeT write_n = 0;
+            for (SizeT i = 0; i < file_num1; ++i) {
+                auto *buffer_obj = buffer_objs[i];
+                bool write = buffer_obj->Save();
+                if (write) {
+                    ++write_n;
+                }
+            }
+            EXPECT_EQ(write_n, 0ull);
         }
+        buffer_mgr.RemoveClean();
+        CheckFileNum(file_num, file_num - k - file_num1);
+        for (SizeT i = file_num1; i < file_num; ++i) {
+            auto *buffer_obj = buffer_objs[i];
+            {
+                auto buffer_handle = buffer_obj->Load();
+                auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
+                for (SizeT j = 0; j < file_size; ++j) {
+                    data[j] = 'A' + (i + j) % 26;
+                }
+            }
+            buffer_obj->Save();
+        }
+        CheckFileNum(file_num, file_num - file_num1);
+        buffer_mgr.RemoveClean();
+        CheckFileNum(file_num, 0);
+
+        for (auto *buffer_obj : buffer_objs) {
+            buffer_obj->PickForCleanup();
+        }
+        buffer_mgr.RemoveClean();
+        CheckFileNum(0, 0);
     }
 }
 

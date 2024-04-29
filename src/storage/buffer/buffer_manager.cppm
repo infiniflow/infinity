@@ -70,7 +70,11 @@ private:
 
     void AddToCleanList(BufferObj *buffer_obj, bool do_free);
 
-    void AddToCleanTempList(BufferObj *buffer_obj);
+    void AddTemp(BufferObj *buffer_obj);
+
+    void RemoveTemp(BufferObj *buffer_obj);
+
+    void MoveTemp(BufferObj *buffer_obj);
 
 private:
     bool RemoveFromGCQueueInner(BufferObj *buffer_obj);
@@ -92,7 +96,10 @@ private:
 
     std::mutex clean_locker_{};
     Vector<BufferObj *> clean_list_{};
-    Vector<BufferObj *> clean_temp_list_{};
+
+    std::mutex temp_locker_{};
+    HashSet<BufferObj *> temp_set_;
+    HashSet<BufferObj *> clean_temp_set_;
 };
 
 } // namespace infinity
