@@ -313,12 +313,10 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     {
         std::unique_lock lock(this->rw_locker_);
         SegmentID segment_id = segment_entry->segment_id();
-        SizeT row_count = segment_entry->row_count();
         auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
         if (!insert_ok) {
             UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
         }
-        this->row_count_ += row_count;
     }
     // Populate index entirely for the segment
     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
@@ -369,6 +367,12 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Txn *txn = txn_store_ptr->txn_;
     if (append_state_ptr->Finished()) {
+        // Import update row count
+        if (append_state_ptr->blocks_.empty()) {
+            for (auto &segment : txn_store_ptr->flushed_segments()) {
+                this->row_count_ += segment->row_count();
+            }
+        }
         LOG_TRACE("No append is done.");
         return;
     }
@@ -771,22 +775,28 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
                 for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
                     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+                    Vector<ChunkIndexEntry *> old_chunks;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn->BeginTS());
                     if (chunk_index_entries.size() <= 1) {
                         continue;
                     }
 
+                    String msg("merging");
                     Vector<String> base_names;
                     Vector<RowID> base_rowids;
                     RowID base_rowid = chunk_index_entries[0]->base_rowid_;
                     u32 total_row_count = 0;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
+                        assert(chunk_index_entry->base_rowid_ == chunk_index_entries[0]->base_rowid_ + total_row_count);
+                        msg += " " + chunk_index_entry->base_name_;
                         base_names.push_back(chunk_index_entry->base_name_);
                         base_rowids.push_back(chunk_index_entry->base_rowid_);
                         total_row_count += chunk_index_entry->row_count_;
                     }
                     String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
+                    msg += " -> " + dst_base_name;
+                    LOG_INFO(msg);
                     ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
                                                           index_fulltext->flag_,
                                                           &table_index_entry->GetFulltextByteSlicePool(),
@@ -795,20 +805,18 @@ void TableEntry::OptimizeIndex(Txn *txn) {
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
-                        // TODO yzc: txn_store.cpp:87
-                        // chunk_index_entry->deleted_ = true;
                         txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                        old_chunks.push_back(chunk_index_entry.get());
                     }
-                    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
-                                                                                                         dst_base_name,
-                                                                                                         base_rowid,
-                                                                                                         total_row_count,
-                                                                                                         txn->buffer_mgr());
-                    txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-                    segment_index_entry->ReplaceFtChunkIndexEntries(chunk_index_entry);
+                    SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
+                                                                                                                dst_base_name,
+                                                                                                                base_rowid,
+                                                                                                                total_row_count,
+                                                                                                                txn->buffer_mgr());
+                    txn_table_store->AddChunkIndexStore(table_index_entry, merged_chunk_index_entry.get());
+                    segment_index_entry->ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
-                    assert(ts >= table_index_entry->GetFulltexSegmentUpdateTs());
                     table_index_entry->UpdateFulltextSegmentTs(ts);
                 }
                 break;
@@ -900,11 +908,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<SegmentEntry *> segment_candidates;
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
+    SizeT checkpoint_row_count = 0;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;
-        json_res["row_count"] = this->row_count_.load();
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
         json_res["txn_id"] = this->txn_id_.load();
@@ -948,7 +956,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
+        checkpoint_row_count += segment_entry->checkpoint_row_count();
     }
+    json_res["row_count"] = checkpoint_row_count;
     json_res["unsealed_id"] = unsealed_id_;
 
     // Serialize indexes

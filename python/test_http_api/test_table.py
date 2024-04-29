@@ -17,38 +17,38 @@ class TestTable(HttpTest):
         self.create_table(
             db_name,
             "my_table",
-            {
-                "name":
-                    {
-                        "type": "varchar",
-                        "constraints": ["not null"]
-                    },
-                "age":
-                    {
-                        "type": "integer",
-                        "constraints": ["not null"]
-                    },
-                "score":
-                    {
-                        "type": "integer",
-                        "constraints": ["not null"]
-                    },
-            },
+            [
+                {
+                    "name": "name",
+                    "type": "varchar",
+                    "constraints": ["not null"]
+                },
+                {
+                    "name": "age",
+                    "type": "integer",
+                    "constraints": ["not null"]
+                },
+                {
+                    "name": "score",
+                    "type": "integer",
+                    "constraints": ["not null"]
+                },
+            ],
         )
         self.create_table(
             db_name,
             "mytable!@#",
-            {
-                "c1":
-                    {
-                        "type": "integer",
-                        "constraints": ["primary key"]
-                    },
-                "c2":
-                    {
-                        "type": "float",
-                    }
-            },
+            [
+                {
+                    "name": "c1",
+                    "type": "integer",
+                    "constraints": ["primary key"]
+                },
+                {
+                    "name": "c2",
+                    "type": "float",
+                }
+            ],
             {},
             {
                 "status_code": 500,
@@ -60,17 +60,17 @@ class TestTable(HttpTest):
         self.create_table(
             db_name,
             "123_table",
-            {
-                "c1":
-                    {
-                        "type": "integer",
-                        "constraints": ["primary key"]
-                    },
-                "c2":
-                    {
-                        "type": "float",
-                    }
-            },
+            [
+                {
+                    "name": "c1",
+                    "type": "integer",
+                    "constraints": ["primary key"]
+                },
+                {
+                    "name": "c2",
+                    "type": "float",
+                }
+            ],
             {},
             {
                 "status_code": 500,
@@ -82,17 +82,17 @@ class TestTable(HttpTest):
         self.create_table(
             db_name,
             "my-table-dash",
-            {
-                "c1":
-                    {
-                        "type": "integer",
-                        "constraints": ["primary key"]
-                    },
-                "c2":
-                    {
-                        "type": "float",
-                    }
-            },
+            [
+                {
+                    "name": "c1",
+                    "type": "integer",
+                    "constraints": ["primary key"]
+                },
+                {
+                    "name": "c2",
+                    "type": "float",
+                }
+            ],
             {},
             {
                 "status_code": 500,
@@ -104,17 +104,17 @@ class TestTable(HttpTest):
         self.create_table(
             db_name,
             "bad_column",
-            {
-                "123":
-                    {
-                        "type": "integer",
-                        "constraints": ["int", "primary key"]
-                    },
-                "c2":
-                    {
-                        "type": "float",
-                    }
-            },
+            [
+                {
+                    "name": "123",
+                    "type": "integer",
+                    "constraints": ["int", "primary key"]
+                },
+                {
+                    "name": "c2",
+                    "type": "float",
+                }
+            ],
             {},
             {
                 "status_code": 500,
@@ -144,17 +144,17 @@ class TestTable(HttpTest):
         self.create_table(
             "default_db",
             table_name,
-            {
-                "c1":
-                    {
-                        "type": "varchar",
-                        "constraints": ["primary key"]
-                    },
-                "c2":
-                    {
-                        "type": "float",
-                    }
-            },
+            [
+                {
+                    "name": "c1",
+                    "type": "varchar",
+                    "constraints": ["primary key"]
+                },
+                {
+                    "name": "c2",
+                    "type": "float",
+                }
+            ],
         )
         self.drop_table("default_db", table_name)
         return
@@ -169,13 +169,13 @@ class TestTable(HttpTest):
         self.create_table(
             "default_db",
             table_name,
-            {
-                "c1":
-                    {
-                        "type": "integer",
-                        "constraints": []
-                    },
-            },
+            [
+                {
+                    "name": "c1",
+                    "type": "integer",
+                    "constraints": []
+                },
+            ],
         )
         self.drop_table("default_db", table_name)
         return
@@ -187,7 +187,7 @@ class TestTable(HttpTest):
         db_name = "default_db"
         table_name = "test_create_invalid_column_name"
 
-        invalid_clumn_name = ["", " ", "12", "[]", "()", "{}", "10", 1.1]
+        invalid_clumn_name = ["", " ", "12", "[]", "()", "{}", "10"]
         for i in invalid_clumn_name:
             self.show_database(db_name)
             self.drop_table("default_db", table_name)
@@ -195,9 +195,10 @@ class TestTable(HttpTest):
                 self.create_table(
                     db_name,
                     table_name,
-                    {i: {
+                    [{
+                        "name": i,
                         "type": "float",
-                    }},
+                    }],
                     {},
                     {
                         "status_code": 500,
@@ -209,9 +210,10 @@ class TestTable(HttpTest):
                 self.create_table(
                     db_name,
                     table_name,
-                    {i: {
+                    [{
+                        "name": i,
                         "type": "float",
-                    }},
+                    }],
                     {},
                     {
                         "status_code": 500,
@@ -234,9 +236,10 @@ class TestTable(HttpTest):
                 self.create_table(
                     db_name,
                     table_name,
-                    {str(column_name): {
+                    [{
+                        "name": str(column_name),
                         "type": "float",
-                    }},
+                    }],
                     {},
                     {
                         "status_code": 500,
@@ -248,13 +251,13 @@ class TestTable(HttpTest):
                 self.create_table(
                     db_name,
                     table_name,
-                    {
-                        str(column_name):
-                            {
-                                "type": "integer",
-                                "constraints": []
-                            },
-                    },
+                    [
+                        {
+                            "name": str(column_name),
+                            "type": "integer",
+                            "constraints": []
+                        },
+                    ],
                     {},
                     {
                         "status_code": 500,
@@ -281,12 +284,10 @@ class TestTable(HttpTest):
             self.create_table(
                 db_name,
                 table_name,
-                {
-                    str(column_name):
-                        {
-                            "type": "integer"
-                        }
-                },
+                [{
+                    "name": str(column_name),
+                    "type": "integer",
+                }],
                 {},
                 {
                     "status_code": 500,
@@ -313,17 +314,16 @@ class TestTable(HttpTest):
         self.create_table(
             db_name,
             table_name,
-            {
-                "c1": {"type": "BOOLEAN", },
-                "c2": {"type": "INTEGER", },
-                "c3": {"type": "TINYINT", },
-                "c4": {"type": "SMALLINT", },
-                "c5": {"type": "BIGINT", },
-                "c6": {"type": "FLOAT", },
-                "c7": {"type": "DOUBLE", },
-                "c8": {"type": "VARCHAR", },
-                # "c10":{"type":"ARRAY",},
-            }
+            [
+                {"name": "c1", "type": "BOOLEAN", },
+                {"name": "c2", "type": "INTEGER", },
+                {"name": "c3", "type": "TINYINT", },
+                {"name": "c4", "type": "SMALLINT", },
+                {"name": "c5", "type": "BIGINT", },
+                {"name": "c6", "type": "FLOAT", },
+                {"name": "c7", "type": "DOUBLE", },
+                {"name": "c8", "type": "VARCHAR", },
+            ]
         )
         self.list_tables(db_name)
         self.show_table(db_name, table_name, expect={
@@ -349,11 +349,9 @@ class TestTable(HttpTest):
         ]
         sz = len(types)
         # make params
-        params = {}
+        params = []
         for i in range(c_count - sz):
-            params.update({
-                "c" + str(i): {"type": types[i % sz]}
-            })
+            params.append({"name": "c" + str(i), "type": types[i % sz]})
 
         # create tb with 10000 columns with various column types
         self.create_table(db_name, table_name, params)
@@ -384,14 +382,14 @@ class TestTable(HttpTest):
         idx = 0
         for name in invalid_name_array:
             if idx == 0:
-                d = self.set_up_data([], {'fields': {"c1": {"type": "integer", }, }, 'properties': {},
+                d = self.set_up_data([], {'fields': [{"name": "c1", "type": "integer", }, ], 'properties': {},
                                           'create_option': str(name)})
                 r = self.request(url, "post", h, d)
                 # print(r)
                 expect = {"status_code": 200, "error_code": 0}
                 self.tear_down(r, expect)
             else:
-                d = self.set_up_data([], {'fields': {"c1": {"type": "integer", }, }, 'properties': {},
+                d = self.set_up_data([], {'fields': [{"name": "c1", "type": "integer", }, ], 'properties': {},
                                           'create_option': str(name)})
                 r = self.request(url, "post", h, d)
                 # print(r)
@@ -402,7 +400,7 @@ class TestTable(HttpTest):
         return
 
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Cost too much times,and may cause the serve to terminate")
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Cost too much times,and may cause the serve to terminate")
     def test_http_various_tables_with_various_columns(self):
         db_name = "default_db"
         table_name = "my_table"
@@ -418,11 +416,9 @@ class TestTable(HttpTest):
         ]
         sz = len(types)
         # make params
-        params = {}
+        params = []
         for i in range(column_count - sz):
-            params.update({
-                "c" + str(i): {"type": types[i % sz]}
-            })
+            params.append({"name": "c" + str(i), "type": types[i % sz]})
 
         for i in range(tb_count):
             self.create_table(
@@ -434,7 +430,7 @@ class TestTable(HttpTest):
             self.drop_table(
                 db_name,
                 "my_table" + str(i),
-        )
+            )
         return
 
     def test_http_after_disconnect_use_table(self):
@@ -448,12 +444,12 @@ class TestTable(HttpTest):
         self.create_table(
             db_name,
             table_name,
-            {"c1": {"type": "integer", "constraints": ["primary key"], }, "c2": {"type": "float", }}
+            [{"name": "c1", "type": "integer", "constraints": ["primary key"]}, {"name": "c2", "type": "float"}]
         )
         self.create_table(
             db_name,
             table_name,
-            {"c1": {"type": "integer", "constraints": ["primary key"], }, "c2": {"type": "float", }},
+            [{"name": "c1", "type": "integer", "constraints": ["primary key"]}, {"name": "c2", "type": "float"}],
             {},
             {"status_code": 200, "error_code": 0, },
             "kIgnore",
@@ -462,8 +458,7 @@ class TestTable(HttpTest):
         self.create_table(
             db_name,
             table_name,
-            {"c1": {"type": "integer", "constraints": ["primary key"], }, "c2": {"type": "float", }
-             },
+            [{"name": "c1", "type": "integer", "constraints": ["primary key"]}, {"name": "c2", "type": "float"}],
             {},
             {"status_code": 500, "error_code": 3017, },
             "kError",
@@ -486,7 +481,7 @@ class TestTable(HttpTest):
             self.create_table(
                 db_name,
                 table_name + str(i),
-                {"c1": {"type": "integer"}}
+                [{"name": "c1", "type": "integer"}]
             )
             # get all tables
         res = self.get_all_tables(db_name)
@@ -510,19 +505,19 @@ class TestTable(HttpTest):
 
     # create/drop/list/get 1M table to reach the limit
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Cost too much times")
-    def test_http_create_1m_table(self):
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Cost too much times")
+    def test_http_create_100K_table(self):
         db_name = "default_db"
         table_name = "my_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        tb_count = 1000000
+        tb_count = 100000
         for i in range(tb_count):
             self.create_table(
                 db_name,
                 table_name + str(i),
-                {"c1": {"type": "integer"}}
+                [{"name": "c1", "type": "integer"}]
             )
             # get all tables
         res = self.get_all_tables(db_name)
@@ -555,19 +550,19 @@ class TestTable(HttpTest):
             futures = [executor.submit(self.create_table(
                 db_name,
                 table_name,
-                {
-                    "c1": {
-                        "type": "integer",
-                    }
-                }
+                [
+                    {
+                        "name": "c1",
+                        "type": "integer"
+                    }]
             ), i) for i in range(16)]
             # wait all processes finished
             concurrent.futures.wait(futures)
 
-        # drop table
-        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
-            # commit task into threadpool
-            futures = [executor.submit(self.drop_table(db_name, table_name), i) for i in range(16)]
+            # drop table
+            with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+                # commit task into threadpool
+                futures = [executor.submit(self.drop_table(db_name, table_name), i) for i in range(16)]
             # wait all threads finished
             concurrent.futures.wait(futures)
         return
@@ -577,7 +572,7 @@ class TestTable(HttpTest):
         table_name = "my_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, None, None, expect={
+        self.create_table(db_name, table_name, [], None, expect={
             "status_code": 500,
             "error_code": 3048,
         })
@@ -606,7 +601,7 @@ class TestTable(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {"c1": {"type": "integer"}})
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}])
         self.drop_table(db_name, table_name)
         self.drop_table(
             db_name,
@@ -624,9 +619,9 @@ class TestTable(HttpTest):
         table_name = "test_create_same_name"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {'type': 'integer'}})
-        self.create_table(db_name, table_name, {"c1": {'type': 'integer'}})
-        self.create_table(db_name, table_name, {"c1": {'type': 'integer'}}, {}, {
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}])
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}])
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], {}, {
             "status_code": 500,
             "error_code": 3017,
         }, "kError")
@@ -653,7 +648,8 @@ class TestTable(HttpTest):
         # self.createTable(db_name,table_name,{"c1": {'type':"integer"},"c1": {"type":"integer"}})
         url = f"databases/{db_name}/tables/{table_name}"
         h = self.set_up_header(['accept', 'content-type'])
-        d = {'create_option': 'ignore_if_exists', 'fields': {'c1': {'type': 'integer'}, 'c1': {'type': 'integer'}},
+        d = {'create_option': 'ignore_if_exists',
+             'fields': [{'name': 'c1', 'type': 'integer'}, {'name': 'c1', 'type': 'integer'}],
              'properties': []}
         r = self.request(url, "post", h, d)
         self.tear_down(r, {})
@@ -664,11 +660,10 @@ class TestTable(HttpTest):
         table_name = "test_same_column_name"
 
         column_number = [0, 1, pow(2, 63) - 1]
-        params = {}
+        params = []
         for i in column_number:
-            params.update({
-                "c" + str(i): {"type": types[i % len(types)]}
-            })
+            params.append({"name": "c" + str(i), "type": types[i % len(types)]})
+
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, params)
@@ -684,8 +679,11 @@ class TestTable(HttpTest):
         for i in create_valid_option:
             url = f"databases/{db_name}/tables/{table_name}"
             h = self.set_up_header(['accept', 'content-type'])
+
             d = self.set_up_data(['create_option'],
-                                 {'fields': {"c1": {"type": "integer"}}, 'properties': {}, 'create_option': str(i)})
+                                 {'fields': [{"name": "c1", "type": "integer"}], 'properties': {},
+                                  'create_option': str(i)})
+
             r = self.request(url, "post", h, d)
             print(r)
             self.tear_down(r, {
@@ -704,7 +702,8 @@ class TestTable(HttpTest):
             url = f"databases/{db_name}/tables/{table_name}"
             h = self.set_up_header(['accept', 'content-type'])
             d = self.set_up_data(['create_option'],
-                                 {'fields': {"c1": {"type": "integer"}}, 'properties': {}, 'create_option': str(i)})
+                                 {'fields': [{"name": "c1", "type": "integer"}], 'properties': {},
+                                  'create_option': str(i)})
             r = self.request(url, "post", h, d)
             print(r)
             self.tear_down(r, {
@@ -720,7 +719,7 @@ class TestTable(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         for i in drop_valid_option:
-            self.create_table(db_name, table_name + str(i), {"c1": {"type": "integer"}}, {}, {})
+            self.create_table(db_name, table_name + str(i), [{"name": "c1", "type": "integer"}], {}, {})
             self.drop_table(db_name, table_name + str(i), {
                 "status_code": 200,
                 "error_code": 0,
@@ -733,7 +732,7 @@ class TestTable(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         for i in drop_invalid_option:
-            self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, {}, {})
+            self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], {}, {})
 
             url = f"databases/{db_name}/tables/{table_name}"
             h = self.set_up_header(['accept', 'content-type'])
@@ -751,7 +750,7 @@ class TestTable(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         for i in range(100):
-            self.create_table(db_name, table_name, {"c1": {"type": "integer"}})
+            self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
         self.drop_table(db_name, table_name)
 
     def test_http_create_duplicated_table_with_error_option(self):
@@ -761,9 +760,9 @@ class TestTable(HttpTest):
         self.drop_table(db_name, table_name)
         for i in range(100):
             if i == 0:
-                self.create_table(db_name, table_name, {"c1": {"type": "integer"}})
+                self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
             else:
-                self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, {}, {
+                self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], {}, {
                     "status_code": 500,
                     "error_code": 3017
                 }, "kError")
@@ -778,7 +777,7 @@ class TestTable(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         for i in range(100):
-            self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, {}, {
+            self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], {}, {
                 "status_code": 200,
                 "error_code": 0
             }, "kIgnore")

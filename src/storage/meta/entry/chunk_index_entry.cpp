@@ -25,6 +25,7 @@ import base_entry;
 import meta_entry_interface;
 import cleanup_scanner;
 import segment_index_entry;
+import table_index_entry;
 import index_file_worker;
 import logger;
 import create_index_info;
@@ -37,6 +38,7 @@ import buffer_obj;
 import buffer_handle;
 import infinity_exception;
 import index_defines;
+import local_file_system;
 
 namespace infinity {
 
@@ -162,6 +164,22 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
 void ChunkIndexEntry::Cleanup() {
     if (buffer_obj_) {
         buffer_obj_->PickForCleanup();
+    }
+    TableIndexEntry *table_index_entry = segment_index_entry_->table_index_entry();
+    const auto &index_dir = segment_index_entry_->index_dir();
+    const IndexBase *index_base = table_index_entry->index_base();
+    if (index_base->index_type_ == IndexType::kFullText) {
+        Path path = Path(*index_dir) / base_name_;
+        String index_prefix = path.string();
+        String posting_file = index_prefix + POSTING_SUFFIX;
+        String dict_file = index_prefix + DICT_SUFFIX;
+
+        LocalFileSystem fs;
+        fs.DeleteFile(posting_file);
+        fs.DeleteFile(dict_file);
+        LOG_INFO(fmt::format("cleanuped chunk index entry {}", index_prefix));
+    } else {
+        LOG_INFO(fmt::format("cleanuped chunk index entry {}/{}", *index_dir, chunk_id_));
     }
 }
 

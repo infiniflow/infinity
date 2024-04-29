@@ -526,7 +526,7 @@ QueryResult Infinity::Import(const String &db_name, const String &table_name, co
     import_statement->schema_name_ = db_name;
     import_statement->table_name_ = table_name;
 
-    import_statement->header_ = false;
+    import_statement->header_ = import_options.header_;
     import_statement->copy_file_type_ = import_options.copy_file_type_;
     import_statement->delimiter_ = import_options.delimiter_;
 

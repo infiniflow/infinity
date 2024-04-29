@@ -17,18 +17,21 @@ class TestUpdate(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
                 "constraints": ["primary key", "not null"],
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "integer",
             },
-            "c3": {
+            {
+                "name": "c3",
                 "type": "integer",
             }
-        })
+        ])
         self.insert(db_name, table_name,
                     [{"c1": 1, "c2": 10, "c3": 100}, {"c1": 2, "c2": 20, "c3": 200}, {"c1": 3, "c2": 30, "c3": 300},
                      {"c1": 4, "c2": 40, "c3": 400}]
@@ -54,7 +57,7 @@ class TestUpdate(HttpTest):
         table_name = "test_update_empty_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {}, {}, {
+        self.create_table(db_name, table_name, [], {}, {
             "status_code": 500,
             "error_code": 3048,
         })
@@ -75,11 +78,21 @@ class TestUpdate(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "integer", },
-            "c3": {"type": "integer", }
-        })
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
+                "type": "integer",
+            },
+            {
+                "name": "c2",
+                "type": "integer",
+            },
+            {
+                "name": "c3",
+                "type": "integer",
+            }
+        ])
+
         self.show_table(db_name, table_name, {
             "error_code": 0,
             "database_name": db_name,
@@ -104,10 +117,10 @@ class TestUpdate(HttpTest):
         ]
 
         for i in range(len(types)):
-            self.create_table(db_name, table_name, {
-                "c1": {"type": types[i]},
-                "c2": {"type": types[i]}
-            })
+            self.create_table(db_name, table_name, [
+                {"name": "c1", "type": types[i]},
+                {"name": "c2", "type": types[i]}
+            ])
             self.show_table(db_name, table_name, {
                 "error_code": 0,
                 "database_name": db_name,
@@ -135,10 +148,10 @@ class TestUpdate(HttpTest):
         ]
 
         for i in range(len(types)):
-            self.create_table(db_name, table_name + str(i), {
-                "c1": {"type": types[i]},
-                "c2": {"type": types[i]}
-            })
+            self.create_table(db_name, table_name + str(i), [
+                {"name": "c1", "type": types[i]},
+                {"name": "c2", "type": types[i]}
+            ])
             self.show_table(db_name, table_name + str(i), {
                 "error_code": 0,
                 "database_name": db_name,
@@ -157,10 +170,10 @@ class TestUpdate(HttpTest):
         table_name = "test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer"},
-            "c2": {"type": "integer"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"}
+        ])
         values = [{"c1": 1, "c2": 2} for _ in range(8192)]
         self.insert(db_name, table_name, values)
         self.update(db_name, table_name, {"c2": 20}, "c1 = 1")
@@ -173,10 +186,10 @@ class TestUpdate(HttpTest):
         table_name = "test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer"},
-            "c2": {"type": "integer"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"}
+        ])
         for _ in range(1024):
             values = [{"c1": 1, "c2": 2} for _ in range(8)]
             self.insert(db_name, table_name, values)
@@ -190,10 +203,10 @@ class TestUpdate(HttpTest):
         table_name = "test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "integer", }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"}
+        ])
 
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         self.insert(db_name, table_name, values)
@@ -209,10 +222,10 @@ class TestUpdate(HttpTest):
         table_name = "test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "integer", }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"}
+        ])
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         self.insert(db_name, table_name, values)
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
@@ -221,20 +234,20 @@ class TestUpdate(HttpTest):
         return
 
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Taking too much time.")
+    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST") != "0", reason="Taking too much time.")
     def test_http_update_inserted_long_before(self):
         db_name = "default_db"
         table_name = "test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "integer", }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"}
+        ])
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         self.insert(db_name, table_name, values)
 
-        time.sleep(30)
+        time.sleep(60)
 
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
         self.drop_table(db_name, table_name)
@@ -246,10 +259,10 @@ class TestUpdate(HttpTest):
         table_name = "test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "integer", }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"}
+        ])
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
         self.drop_table(db_name, table_name)
         return
@@ -265,14 +278,16 @@ class TestUpdate(HttpTest):
             [1, 2, 3]
         ]
         for i in range(len(types)):
-            self.create_table(db_name, table_name, {
-                "c1": {
+            self.create_table(db_name, table_name, [
+                {
+                    "name": "c1",
                     "type": "integer",
                 },
-                "c2": {
+                {
+                    "name": "c2",
                     "type": str(types[i]),
                 }
-            })
+            ])
             self.update(db_name, table_name, {"c2": types_example[i]}, "c1 = 1", {
                 "status_code": 500,
                 "error_code": 3067,
@@ -288,14 +303,16 @@ class TestUpdate(HttpTest):
         table_name = "test_update_before_delete"
         self.drop_table(db_name, table_name)
         for i in range(len(types)):
-            self.create_table(db_name, table_name, {
-                "c1": {
+            self.create_table(db_name, table_name, [
+                {
+                    "name": "c1",
                     "type": "integer",
                 },
-                "c2": {
+                {
+                    "name": "c2",
                     "type": str(types[i]),
                 }
-            })
+            ])
             self.update(db_name, table_name, {"c2": types_example[i]}, "c1 = 1")
             self.drop_table(db_name, table_name)
         return
@@ -316,14 +333,16 @@ class TestUpdate(HttpTest):
         db_name = "default_db"
         table_name = "test_valid_filter_expression"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "float",
             }
-        })
+        ])
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             self.insert(db_name, table_name, values)
@@ -346,14 +365,16 @@ class TestUpdate(HttpTest):
         db_name = "default_db"
         table_name = "test_valid_filter_expression"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "float",
             }
-        })
+        ])
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             self.insert(db_name, table_name, values)
