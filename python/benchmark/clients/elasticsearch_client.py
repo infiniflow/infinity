@@ -178,19 +178,18 @@ class ElasticsearchClient(BaseClient):
                 if self.data['mode'] == 'fulltext':
                     for line in f:
                         query = {"body" : line[:-1]}
-                        print("query = ", query)
                         body = self.parse_fulltext_query_content(query)
                         topk = self.data['topK']
-                        print(f"body = {body}, index = {self.collection_name}, size = {topk}")
                         start = time.time()
                         result = self.client.search(index=self.collection_name,
                                                     # source=["_id", "_score"],
+                                                    # size=self.data['topK'],
                                                     body=body)
-                        # size=self.data['topK'])
                         end = time.time()
                         latency = (end - start) * 1000
                         result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
                         result.append(latency)
+                        print(line[:-1], ",", latency)
                         results.append(result)
         else:
             raise TypeError("Unsupported file type")

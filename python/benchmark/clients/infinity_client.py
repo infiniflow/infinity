@@ -161,13 +161,12 @@ class InfinityClient(BaseClient):
                     for query_line in queries:
                         query = query_line[:-1]
                         condition = f"body:'{query}'"
-                        print("query = ", query, ", condition = ", condition)
                         start = time.time()
                         res, _ = table_obj.output(["_row_id", "_score"]).match("", condition, f"topn={self.data['topK']}").to_result()
-                        # res, _ = table_obj.match("", query, f"topn={self.data['topK']}").output(["_row_id", "_score"]).to_result()
                         latency = (time.time() - start) * 1000
                         result = [(row_id[0], score) for row_id, score in zip(res['ROW_ID'], res['SCORE'])]
                         result.append(latency)
+                        # print(f"{query}, {latency}")
                         results.append(result)
         else:
             raise TypeError("Unsupported file type")
