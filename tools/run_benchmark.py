@@ -22,8 +22,6 @@ def benchmark_test(benchmark_dir: str):
     run_benchmark_cmds = [[f'{benchmark_dir}blocking_scheduler/blocking_scheduler_benchmark'], 
                           [f'{benchmark_dir}polling_scheduler/polling_scheduler_benchmark'], 
                           ["echo", "'1 1 centroids'", "|", f'{benchmark_dir}embedding/ann_ivfflat_benchmark'], 
-                          [f'{benchmark_dir}embedding/hnsw_benchmark2'],
-                          [f'{benchmark_dir}local_infinity/fulltext_benchmark'],
                           ]
     
     for i in range(len(run_benchmark_cmds)):

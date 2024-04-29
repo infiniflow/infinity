@@ -20,7 +20,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted", "slow-test"]
+    runs-on: ["self-hosted", "slow-test" ]
     steps:
       # https://github.com/hmarr/debug-action
       #- uses: hmarr/debug-action@v2
@@ -55,7 +55,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "rm -fr /var/infinity && cd /infinity/ && python3 tools/run_benchmark.py" && sleep 1s
 
-      - name: Start infinity pysdk & http_api release version
+      - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
@@ -69,7 +69,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test_continuous.py" && sleep 1s
 
-      - name: Stop infinity pysdk & http_api release
+      - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
 
