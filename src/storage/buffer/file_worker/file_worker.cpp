@@ -116,8 +116,7 @@ void FileWorker::CleanupTempFile() const {
         fs.DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
-        // Now, we cannot check whether a temp file is moved to data
-        LOG_TRACE(fmt::format("Cleanup: File {} not found for deletion", path));
+        UnrecoverableError(fmt::format("Cleanup: File {} not found for deletion", path));
     }
 }
 
