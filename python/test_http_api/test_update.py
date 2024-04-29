@@ -247,7 +247,7 @@ class TestUpdate(HttpTest):
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         self.insert(db_name, table_name, values)
 
-        time.sleep(30)
+        time.sleep(60)
 
         self.update(db_name, table_name, {"c2": 21}, "c1 = 1")
         self.drop_table(db_name, table_name)

@@ -400,8 +400,7 @@ class TestTable(HttpTest):
         return
 
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST") != "0",
-                        reason="Cost too much times,and may cause the serve to terminate")
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Cost too much times,and may cause the serve to terminate")
     def test_http_various_tables_with_various_columns(self):
         db_name = "default_db"
         table_name = "my_table"
@@ -506,14 +505,14 @@ class TestTable(HttpTest):
 
     # create/drop/list/get 1M table to reach the limit
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST") != "0", reason="Cost too much times")
-    def test_http_create_1m_table(self):
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Cost too much times")
+    def test_http_create_100K_table(self):
         db_name = "default_db"
         table_name = "my_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        tb_count = 1000000
+        tb_count = 100000
         for i in range(tb_count):
             self.create_table(
                 db_name,

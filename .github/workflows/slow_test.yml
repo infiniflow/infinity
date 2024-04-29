@@ -1,0 +1,78 @@
+name: slow_tests
+
+on:
+  schedule:
+    - cron: '0 21 * * *'  # This schedule runs every 21:00:00Z(05:00:00+08:00)
+  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
+  create:
+    tags:
+      - "v*.*.*"                  # normal release
+      - "nightly"                 # the only one mutable tag
+
+# https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  slow_tests:
+    name: run slow test
+    runs-on: ["self-hosted", "slow-test" ]
+    steps:
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v3
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
+          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:ubuntu2310
+
+      - name: Build release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
+
+      - name: Prepare dataset
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo mkdir -p test/data/benchmark && sudo ln -s $HOME/benchmark_dataset/dbpedia-entity test/data/benchmark/dbpedia-entity && sudo ln -s $HOME/benchmark_dataset/sift1M test/data/benchmark/sift_1m
+
+      - name: benchmark test
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "rm -fr /var/infinity && cd /infinity/ && python3 tools/run_benchmark.py" && sleep 1s
+
+      - name: Start infinity release version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          # Run a command in the background
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+
+      - name: pysdk test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "export RUNSLOWTEST=1 && cd /infinity/ && python3 tools/run_slow_test.py" && sleep 1s
+
+      - name: parallel test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test_continuous.py" && sleep 1s
+
+      - name: Stop infinity release
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: |
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10s
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
+
+      - name: Collect infinity release output
+        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: cat release.log 2>/dev/null || true
