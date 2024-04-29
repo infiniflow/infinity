@@ -123,7 +123,10 @@ float ColumnIndexReader::GetAvgColumnLength() const {
 void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
     std::scoped_lock lock1(mutex_);
     std::unique_lock lock2(segment_update_ts_mutex);
-    assert(ts >= segment_update_ts);
+    if (ts < segment_update_ts) {
+        // Optimize txn begin ts may be less than Insert txn commit ts
+        return;
+    }
     segment_update_ts = ts;
     first_known_update_ts_ = std::min(first_known_update_ts_, ts);
     last_known_update_ts_ = std::max(last_known_update_ts_, ts);
