@@ -1,3 +1,4 @@
+import os
 import sys
 import pytest
 import concurrent.futures
@@ -397,7 +398,7 @@ class TestTable(HttpTest):
         return
 
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Cost too much times")
+    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Cost too much times")
     def test_http_various_tables_with_various_columns(self):
         db_name = "default_db"
         table_name = "my_table"
@@ -408,7 +409,7 @@ class TestTable(HttpTest):
         column_count = 10000
 
         types = [
-            "integer", "tinyint", "smallint", "bigint", "hugeint", "float",
+            "integer", "tinyint", "smallint", "bigint", "float",
             "double", "varchar", "boolean",
         ]
         sz = len(types)
@@ -425,7 +426,11 @@ class TestTable(HttpTest):
                 "my_table" + str(i),
                 params,
             )
-        self.drop_table(db_name, table_name)
+        for i in range(tb_count):
+            self.drop_table(
+                db_name,
+                "my_table" + str(i),
+        )
         return
 
     def test_http_after_disconnect_use_table(self):
@@ -501,7 +506,7 @@ class TestTable(HttpTest):
 
     # create/drop/list/get 1M table to reach the limit
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Cost too much times")
+    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Cost too much times")
     def test_http_create_1m_table(self):
         db_name = "default_db"
         table_name = "my_table"

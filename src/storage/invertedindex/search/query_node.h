@@ -26,6 +26,8 @@ enum class QueryNodeType : char {
     // may be used in test cases,
     // but should not appear in parser output:
     INVALID,
+    // filter
+    FILTER,
     // may appear in parser output,
     // but should not appear in optimized query tree:
     NOT,
@@ -74,6 +76,7 @@ struct QueryNode {
     // 1. push down the weight to the leaf term node
     // 2. optimize the query tree
     static std::unique_ptr<QueryNode> GetOptimizedQueryTree(std::unique_ptr<QueryNode> root);
+    virtual void FilterOptimizeQueryTree();
 
     // recursively multiply and push down the weight to the leaf term nodes
     virtual void PushDownWeight(float factor = 1.0f) = 0;
@@ -112,7 +115,7 @@ struct PhraseQueryNode final : public QueryNode {
     CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
-    void AddTerm(const std::string& term) { terms_.emplace_back(term); }
+    void AddTerm(const std::string &term) { terms_.emplace_back(term); }
 };
 
 struct MultiQueryNode : public QueryNode {

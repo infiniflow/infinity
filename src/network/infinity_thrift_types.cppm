@@ -30,8 +30,6 @@ export using infinity_thrift_rpc::DropTableRequest;
 export using infinity_thrift_rpc::InsertRequest;
 export using infinity_thrift_rpc::CopyFileType;
 export using infinity_thrift_rpc::ImportRequest;
-export using infinity_thrift_rpc::FileChunk;
-export using infinity_thrift_rpc::UploadResponse;
 export using infinity_thrift_rpc::SelectRequest;
 export using infinity_thrift_rpc::SelectResponse;
 export using infinity_thrift_rpc::ExplainRequest;

@@ -34,7 +34,6 @@ class InfinityServiceIf {
   virtual void Explain(SelectResponse& _return, const ExplainRequest& request) = 0;
   virtual void Delete(CommonResponse& _return, const DeleteRequest& request) = 0;
   virtual void Update(CommonResponse& _return, const UpdateRequest& request) = 0;
-  virtual void UploadFileChunk(UploadResponse& _return, const FileChunk& request) = 0;
   virtual void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) = 0;
   virtual void ListTable(ListTableResponse& _return, const ListTableRequest& request) = 0;
   virtual void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) = 0;
@@ -116,9 +115,6 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void Update(CommonResponse& /* _return */, const UpdateRequest& /* request */) override {
-    return;
-  }
-  void UploadFileChunk(UploadResponse& /* _return */, const FileChunk& /* request */) override {
     return;
   }
   void ListDatabase(ListDatabaseResponse& /* _return */, const ListDatabaseRequest& /* request */) override {
@@ -1408,110 +1404,6 @@ class InfinityService_Update_presult {
   CommonResponse* success;
 
   _InfinityService_Update_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
-};
-
-typedef struct _InfinityService_UploadFileChunk_args__isset {
-  _InfinityService_UploadFileChunk_args__isset() : request(false) {}
-  bool request :1;
-} _InfinityService_UploadFileChunk_args__isset;
-
-class InfinityService_UploadFileChunk_args {
- public:
-
-  InfinityService_UploadFileChunk_args(const InfinityService_UploadFileChunk_args&);
-  InfinityService_UploadFileChunk_args& operator=(const InfinityService_UploadFileChunk_args&);
-  InfinityService_UploadFileChunk_args() noexcept {
-  }
-
-  virtual ~InfinityService_UploadFileChunk_args() noexcept;
-  FileChunk request;
-
-  _InfinityService_UploadFileChunk_args__isset __isset;
-
-  void __set_request(const FileChunk& val);
-
-  bool operator == (const InfinityService_UploadFileChunk_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
-  bool operator != (const InfinityService_UploadFileChunk_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_UploadFileChunk_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class InfinityService_UploadFileChunk_pargs {
- public:
-
-
-  virtual ~InfinityService_UploadFileChunk_pargs() noexcept;
-  const FileChunk* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_UploadFileChunk_result__isset {
-  _InfinityService_UploadFileChunk_result__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_UploadFileChunk_result__isset;
-
-class InfinityService_UploadFileChunk_result {
- public:
-
-  InfinityService_UploadFileChunk_result(const InfinityService_UploadFileChunk_result&);
-  InfinityService_UploadFileChunk_result& operator=(const InfinityService_UploadFileChunk_result&);
-  InfinityService_UploadFileChunk_result() noexcept {
-  }
-
-  virtual ~InfinityService_UploadFileChunk_result() noexcept;
-  UploadResponse success;
-
-  _InfinityService_UploadFileChunk_result__isset __isset;
-
-  void __set_success(const UploadResponse& val);
-
-  bool operator == (const InfinityService_UploadFileChunk_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
-  bool operator != (const InfinityService_UploadFileChunk_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_UploadFileChunk_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_UploadFileChunk_presult__isset {
-  _InfinityService_UploadFileChunk_presult__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_UploadFileChunk_presult__isset;
-
-class InfinityService_UploadFileChunk_presult {
- public:
-
-
-  virtual ~InfinityService_UploadFileChunk_presult() noexcept;
-  UploadResponse* success;
-
-  _InfinityService_UploadFileChunk_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -3450,9 +3342,6 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Update(CommonResponse& _return, const UpdateRequest& request) override;
   void send_Update(const UpdateRequest& request);
   void recv_Update(CommonResponse& _return);
-  void UploadFileChunk(UploadResponse& _return, const FileChunk& request) override;
-  void send_UploadFileChunk(const FileChunk& request);
-  void recv_UploadFileChunk(UploadResponse& _return);
   void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
   void send_ListDatabase(const ListDatabaseRequest& request);
   void recv_ListDatabase(ListDatabaseResponse& _return);
@@ -3534,7 +3423,6 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_Explain(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Delete(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Update(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_UploadFileChunk(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -3568,7 +3456,6 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["Explain"] = &InfinityServiceProcessor::process_Explain;
     processMap_["Delete"] = &InfinityServiceProcessor::process_Delete;
     processMap_["Update"] = &InfinityServiceProcessor::process_Update;
-    processMap_["UploadFileChunk"] = &InfinityServiceProcessor::process_UploadFileChunk;
     processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
     processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
     processMap_["ListIndex"] = &InfinityServiceProcessor::process_ListIndex;
@@ -3732,16 +3619,6 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
       ifaces_[i]->Update(_return, request);
     }
     ifaces_[i]->Update(_return, request);
-    return;
-  }
-
-  void UploadFileChunk(UploadResponse& _return, const FileChunk& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->UploadFileChunk(_return, request);
-    }
-    ifaces_[i]->UploadFileChunk(_return, request);
     return;
   }
 
@@ -3993,9 +3870,6 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Update(CommonResponse& _return, const UpdateRequest& request) override;
   int32_t send_Update(const UpdateRequest& request);
   void recv_Update(CommonResponse& _return, const int32_t seqid);
-  void UploadFileChunk(UploadResponse& _return, const FileChunk& request) override;
-  int32_t send_UploadFileChunk(const FileChunk& request);
-  void recv_UploadFileChunk(UploadResponse& _return, const int32_t seqid);
   void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
   int32_t send_ListDatabase(const ListDatabaseRequest& request);
   void recv_ListDatabase(ListDatabaseResponse& _return, const int32_t seqid);

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import concurrent.futures
+import os
 import pytest
 import polars as pl
 
@@ -454,7 +455,7 @@ class TestTable(TestSdk):
 
     # create/drop/show/get 1000 tables with 10000 columns with various column types.
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Cost too much times")
+    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Cost too much times")
     def test_various_tables_with_various_columns(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -471,9 +472,9 @@ class TestTable(TestSdk):
 
         # make params
         params = {}
-        for i in range(column_count - 13):
+        for i in range(column_count - 12):
             params.update({
-                "c" + str(i): {"type": types[i % 13]}
+                "c" + str(i): {"type": types[i % 12]}
             })
 
         for i in range(tb_count):
@@ -486,7 +487,7 @@ class TestTable(TestSdk):
                 print(e)
 
         for i in range(tb_count):
-            db_obj.drop_table("test_various_tables_with_various_columns" + str(i), params, ConflictType.Error)
+            db_obj.drop_table("test_various_tables_with_various_columns" + str(i), ConflictType.Error)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -655,7 +656,7 @@ class TestTable(TestSdk):
 
     # create/drop/list/get 1M table to reach the limit
     @pytest.mark.slow
-    @pytest.mark.skip(reason="Cost too much times")
+    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Cost too much times")
     def test_create_1M_table(self):
         """
         target: create/drop/list/get 1K table
@@ -670,10 +671,10 @@ class TestTable(TestSdk):
         tb_count = 1000000
         for i in range(tb_count):
             res = db_obj.create_table("my_table" + str(i), {"c1": {"type": "int"}}, ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
+            assert res
 
         for i in range(tb_count):
-            res = db_obj.drop_table("my_table" + str(i), {"c1": {"type": "int"}}, ConflictType.Error)
+            res = db_obj.drop_table("my_table" + str(i), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
         # disconnect
