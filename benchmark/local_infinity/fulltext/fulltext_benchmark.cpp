@@ -301,9 +301,7 @@ void BenchmarkMoreQuery(SharedPtr<Infinity> infinity, const String &db_name, con
     profiler.End();
 }
 
-int main(int argc, char *argn[]) {
-    argc = 3;
-    const char* argv[] = {"fulltext", "--mode", "query"};
+int main(int argc, char *argv[]) {
     CLI::App app{"fulltext_benchmark"};
     // https://github.com/CLIUtils/CLI11/blob/main/examples/enum.cpp
     // Using enumerations in an option
