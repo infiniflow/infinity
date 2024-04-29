@@ -91,6 +91,14 @@ git clone https://github.com/infiniflow/infinity.git
 
 ### Step3 Build the source code
 
+you need first install `simde` if on arm, note we need `v0.7.4+` version for simde
+
+```
+sudo apt install libsimde-dev
+```
+If the installed version is under v0.7.4, you can download the include files directly from github and replace it.
+
+
 ```shell
 git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug

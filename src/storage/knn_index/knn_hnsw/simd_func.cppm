@@ -27,7 +27,7 @@ template <typename T>
 void log_m256(const __m256i &value) {
     const size_t n = sizeof(__m256i) / sizeof(T);
     T buffer[n];
-    _mm256_storeu_si256((__m256i_u *)buffer, value);
+    _mm256_storeu_si256((__m256i *)buffer, value);
     std::cout << "[";
     for (size_t i = 0; i < n; i++) {
         std::cout << (int)buffer[i];
@@ -87,9 +87,9 @@ export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     __m256i sum = _mm256_set1_ps(0);
     const __m256 highest_bit = _mm256_set1_epi8(0x80);
     while (pv1 < pend1) {
-        v1 = _mm256_loadu_si256((__m256i_u *)pv1);
+        v1 = _mm256_loadu_si256((__m256i *)pv1);
         pv1 += 32;
-        v2 = _mm256_loadu_si256((__m256i_u *)pv2);
+        v2 = _mm256_loadu_si256((__m256i *)pv2);
         pv2 += 32;
 
         msb = _mm256_maddubs_epi16(_mm256_and_si256(v1, highest_bit), v2);
@@ -124,9 +124,9 @@ export int32_t I8IPSSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     __m128i sum = _mm_set1_ps(0);
     const __m128 highest_bit = _mm_set1_epi8(0x80);
     while (pv1 < pend1) {
-        v1 = _mm_loadu_si128((__m128i_u *)pv1);
+        v1 = _mm_loadu_si128((__m128i *)pv1);
         pv1 += 16;
-        v2 = _mm_loadu_si128((__m128i_u *)pv2);
+        v2 = _mm_loadu_si128((__m128i *)pv2);
         pv2 += 16;
 
         msb = _mm_maddubs_epi16(_mm_and_si128(v1, highest_bit), v2);

@@ -13,7 +13,11 @@
 // limitations under the License.
 #pragma once
 
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <immintrin.h>
+#elif defined(__GNUC__) && defined(__aarch64__)
+#include <simde/x86/sse4.1.h>
+#endif
 
 #include <cstddef>
 #include <cstdint>
@@ -71,11 +75,13 @@ inline std::string ToLower(std::string const &s) {
     std::string result = s;
     char *begin = result.data();
     char *end = result.data() + s.size();
-    const size_t size = result.size();
+    
+    char *p = begin;
 #if defined(__SSE2__)
+    const size_t size = result.size();
     static constexpr int SSE2_BYTES = sizeof(__m128i);
     const char *sse2_end = begin + (size & ~(SSE2_BYTES - 1));
-    char *p = begin;
+    
     const auto a_minus1 = _mm_set1_epi8('A' - 1);
     const auto z_plus1 = _mm_set1_epi8('Z' + 1);
     const auto delta = _mm_set1_epi8('a' - 'A');

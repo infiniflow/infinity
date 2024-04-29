@@ -6,7 +6,12 @@
 #include "task.h"
 #include "threadutil.h"
 #include <iostream>
+
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <emmintrin.h>
+#elif defined(__GNUC__) && defined(__aarch64__)
+#include <simde/x86/sse2.h>
+#endif
 
 namespace infinity {
 
