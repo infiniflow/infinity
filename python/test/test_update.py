@@ -370,7 +370,7 @@ class TestUpdate(TestSdk):
 
     # update inserted long before and select to check
     @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST")!="0", reason="Taking too much time.")
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
     def test_update_inserted_long_before(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -386,7 +386,7 @@ class TestUpdate(TestSdk):
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        time.sleep(20)
+        time.sleep(60)
 
         # update
         table_obj.update("c1 = 1", [{"c2": 21}])
