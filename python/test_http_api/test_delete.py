@@ -16,18 +16,21 @@ class TestDelete(HttpTest):
         table_name = "test_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
                 "constraints": ["primary key", "not null"]
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "integer",
             },
-            "c3": {
+            {
+                "name": "c3",
                 "type": "integer",
             }
-        })
+        ])
         self.show_table(db_name, table_name, {
             "error_code": 0,
         })
@@ -53,12 +56,13 @@ class TestDelete(HttpTest):
         table_name = "test_delete_empty_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
                 "constraints": ["primary key", "not null"]
             },
-        })
+        ])
         self.show_table(db_name, table_name, {
             "error_code": 0,
         })
@@ -95,10 +99,12 @@ class TestDelete(HttpTest):
         i = 0
         for t in types:
             self.drop_table(db_name, table_name)
-            self.create_table(db_name, table_name, {
-                "c1": {"type": str(t)
-                       }
-            })
+            self.create_table(db_name, table_name, [
+                {
+                    "name": "c1",
+                    "type": str(t)
+                }
+            ])
             self.show_table(db_name, table_name, {
                 "error_code": 0,
             })
@@ -123,10 +129,12 @@ class TestDelete(HttpTest):
         for i in range(len(types)):
             self.drop_table(db_name, table_name + str(i))
         for i in range(len(types)):
-            self.create_table(db_name, table_name + str(i), {
-                "c1": {"type": str(types[i])
-                       }
-            })
+            self.create_table(db_name, table_name + str(i), [
+                {
+                    "name": "c1",
+                    "type": str(types[i])
+                }
+            ])
             self.show_table(db_name, table_name + str(i), {
                 "error_code": 0,
             })
@@ -143,7 +151,7 @@ class TestDelete(HttpTest):
         db_name = "default_db"
         table_name = "test_delete_table_with_one_block"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, )
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
         values = [{"c1": 1} for _ in range(8192)]
         self.insert(db_name, table_name, values)
         self.delete(db_name, table_name, "c1 = 1")
@@ -155,7 +163,7 @@ class TestDelete(HttpTest):
         db_name = "default_db"
         table_name = "test_delete_table_with_one_segment"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, )
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
         for i in range(1024):
             values = [{"c1": i} for _ in range(10)]
             self.insert(db_name, table_name, values)
@@ -169,7 +177,7 @@ class TestDelete(HttpTest):
         db_name = "default_db"
         table_name = "test_select_before_after_delete"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, )
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
 
         for i in range(10):
             values = [{"c1": i} for _ in range(10)]
@@ -183,7 +191,7 @@ class TestDelete(HttpTest):
         db_name = "default_db"
         table_name = "test_delete_insert_data"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, )
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
 
         values = [{"c1": 1} for _ in range(10)]
         self.insert(db_name, table_name, values)
@@ -197,7 +205,7 @@ class TestDelete(HttpTest):
         db_name = "default_db"
         table_name = "test_delete_inserted_long_before_data"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {"type": "integer"}}, )
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
 
         for i in range(1024):
             values = [{"c1": i} for _ in range(5)]
@@ -235,11 +243,12 @@ class TestDelete(HttpTest):
             1, 127, 32767, 10, 10.10, 10.1010,
         ]
         for i in range(len(types)):
-            self.create_table(db_name, table_name, {
-                "c1": {
+            self.create_table(db_name, table_name, [
+                {
+                    "name": "c1",
                     "type": str(types[i]),
                 }
-            })
+            ])
             self.show_table(db_name, table_name, {
                 "error_code": 0,
             })
@@ -253,7 +262,7 @@ class TestDelete(HttpTest):
         db_name = "default_db"
         table_name = "test_delete_one_block_without_expression"
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {"c1": {"type": "integer", }})
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer", }])
         values = [{"c1": 1} for _ in range(8192)]
         self.insert(db_name, table_name, values)
         self.delete(db_name, table_name, "c1 = 1")
@@ -263,7 +272,7 @@ class TestDelete(HttpTest):
     def test_http_delete_one_segment_without_expression(self):
         db_name = "default_db"
         table_name = "test_delete_one_segment_without_expression"
-        self.create_table(db_name, table_name, {"c1": {"type": "integer", }})
+        self.create_table(db_name, table_name, [{"name": "c1", "type": "integer", }])
         for i in range(1024):
             values = [{"c1": i} for _ in range(10)]
             self.insert(db_name, table_name, values)
@@ -282,10 +291,10 @@ class TestDelete(HttpTest):
         ]
         db_name = "default_db"
         table_name = "test_delete_one_segment_without_expression"
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "float"}}
-                          )
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer", },
+            {"name": "c2", "type": "float"}
+        ])
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             self.insert(db_name, table_name, values)
@@ -304,10 +313,10 @@ class TestDelete(HttpTest):
     def test_http_filter_with_invalid_expression(self, filters):
         db_name = "default_db"
         table_name = "test_filter_with_invalid_expression"
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "float"}}
-                          )
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer", },
+            {"name": "c2", "type": "float"}
+        ])
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             self.insert(db_name, table_name, values)

@@ -153,35 +153,37 @@ curl --request POST \
     "create_option": "ignore_if_exists",
     "fields": 
     [
-        "name": 
         {
+            "name": "name",
             "type": "varchar",
-            "constraints": ["not null"]
+            "constraints": ["not null"],
+            "id": 0
         },
-        "age":
         {
+            "name": "age",
             "type": "integer",
-            "constraints": ["not null"]
+            "constraints": ["not null"],
+            "id": 1
         },
-        "score":
         {
+            "name": "score",
             "type": "integer",
-            "constraints": ["not null"]
-        }
-        "my_vector"
+            "constraints": ["not null"],
+            "id": 2
+        },
         {
+            "name": "my_vector",
             "type": "vector",
             "dimension": 1024,
-            "element_type": "float"
+            "element_type": "float",
+            "id": 3
         }
     ],
     "properties": 
     [
-        "bloomfilter_columns": 
-        [
-            "age",
-            "score"
-        ]
+        { 
+            "bloomfilter_columns": [ "age", "score" ]
+        }
     ]
         
 } '
@@ -533,7 +535,6 @@ curl --request GET \
 }
 ```
 
-
 ## Import
 
 Imports data into a specified table.
@@ -822,7 +823,6 @@ curl --request GET \
     ]
 }
 ```
-
 
 ## Show segment
 

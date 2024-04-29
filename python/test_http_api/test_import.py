@@ -20,16 +20,18 @@ class TestImport(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "vector",
                 "dimension": 3,
                 "element_type": "integer",
             }
-        })
+        ])
 
         test_csv_dir = self.get_project_path() + TEST_DATA_DIR + file_name
         print("test_csv_dir: " + test_csv_dir)
@@ -44,16 +46,18 @@ class TestImport(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c1",
                 "type": "vector",
                 "dimension": 4,
                 "element_type": "float",
             }
-        })
+        ])
 
         file_path = self.get_project_path() + TEST_DATA_DIR + "csv/embedding_float_dim4.csv"
         assert os.path.exists(file_path)
@@ -75,16 +79,18 @@ class TestImport(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "vector",
                 "dimension": 3,
                 "element_type": "integer",
             }
-        })
+        ])
 
         file_format = ["csv", "fvecs"]
         for format in file_format:
@@ -92,13 +98,14 @@ class TestImport(HttpTest):
                 httputils.generate_fvecs(100, 128, "pysdk_test.fvecs")
                 httputils.copy_data("pysdk_test.fvecs")
                 self.drop_table(db_name, table_name)
-                self.create_table(db_name, table_name, {
-                    "c1": {
+                self.create_table(db_name, table_name, [
+                    {
+                        "name": "c1",
                         "type": "vector",
                         "dimension": 128,
                         "element_type": "float",
                     }
-                })
+                ])
                 file_path = TEST_TMP_DIR + "pysdk_test.fvecs"
                 assert os.path.exists(file_path)
                 self.import_data(db_name, table_name, {
@@ -128,13 +135,14 @@ class TestImport(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c2": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c2",
                 "type": "vector",
                 "dimension": 1024,
                 "element_type": "float",
             }
-        })
+        ])
         file_path = self.get_project_path() + TEST_DATA_DIR + "fvecs/test_empty.fvecs"
         assert os.path.exists(file_path)
         self.import_data(db_name, table_name, {
@@ -154,14 +162,18 @@ class TestImport(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
-                "type": "vector", "dimension": 3, "element_type": "integer",
+            {
+                "name": "c2",
+                "type": "vector",
+                "dimension": 3,
+                "element_type": "integer",
             }
-        })
+        ])
         file_path = self.get_project_path() + TEST_DATA_DIR + "csv/test_empty.csv"
         assert os.path.exists(file_path)
 
@@ -181,14 +193,18 @@ class TestImport(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
-                "type": "vector", "dimension": 3, "element_type": "integer",
+            {
+                "name": "c2",
+                "type": "vector",
+                "dimension": 3,
+                "element_type": "integer",
             }
-        })
+        ])
 
         file_path = self.get_project_path() + TEST_DATA_DIR + "jsonl/test_empty.jsonl"
         self.import_data(db_name, table_name, {
@@ -207,22 +223,26 @@ class TestImport(HttpTest):
 
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
-                "type": "vector", "dimension": 3, "element_type": "integer",
+            {
+                "name": "c2",
+                "type": "vector",
+                "dimension": 3,
+                "element_type": "integer",
             }
-        })
+        ])
 
         file_path = self.get_project_path() + TEST_DATA_DIR + "json/test_empty.json"
         assert os.path.exists(file_path)
         self.import_data(db_name, table_name, {
             "file_path": file_path, "file_type": "json", "header": False, "delimiter": ","
         }, {
-            "status_code": 200, "error_code": 0,
-        })
+                             "status_code": 200, "error_code": 0,
+                         })
         self.drop_table(db_name, table_name)
         return
 
@@ -234,14 +254,18 @@ class TestImport(HttpTest):
         table_name = "test_import_format_unrecognized_data"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
-                "type": "vector", "dimension": 3, "element_type": "integer",
+            {
+                "name": "c2",
+                "type": "vector",
+                "dimension": 3,
+                "element_type": "integer",
             }
-        })
+        ])
         for format in file_format:
             file_path = self.get_project_path() + TEST_DATA_DIR + format + "/http_test." + format
             assert os.path.exists(file_path)
@@ -267,10 +291,10 @@ class TestImport(HttpTest):
         self.drop_table(db_name, table_name)
 
         for i in range(len(delimiter)):
-            self.create_table(db_name, table_name, {
-                "c1": {"type": "integer", },
-                "c2": {"type": "integer"},
-            })
+            self.create_table(db_name, table_name, [
+                {"name": "c1", "type": "integer"},
+                {"name": "c2", "type": "integer"},
+            ])
             file_path = self.get_project_path() + TEST_DATA_DIR + "/csv/" + check_file_data[i]["file_name"]
             assert os.path.exists(file_path)
             self.import_data(db_name, table_name, {
@@ -290,10 +314,10 @@ class TestImport(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "integer"},
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"},
+        ])
         file_path = self.get_project_path() + TEST_DATA_DIR + "/csv/pysdk_test_blankspace.csv"
         assert os.path.exists(file_path)
         self.import_data(db_name, table_name, {
@@ -315,16 +339,18 @@ class TestImport(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "vector",
                 "dimension": 3,
                 "element_type": "integer",
             }
-        })
+        ])
 
         test_csv_dir = self.get_project_path() + TEST_DATA_DIR + file_name
         print("test_csv_dir: " + test_csv_dir)
@@ -352,16 +378,18 @@ class TestImport(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
                 "type": "integer",
             },
-            "c2": {
+            {
+                "name": "c2",
                 "type": "vector",
                 "dimension": 128,
                 "element_type": "float",
             }
-        })
+        ])
         test_csv_dir = TEST_TMP_DIR + file_name
         print("test_file_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
@@ -381,12 +409,11 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_embedding_with_not_match_definition(self):
         httputils.check_data(TEST_TMP_DIR)
-        types = [{"type": "vector", "dimension": 3, "element_type": "integer",
-                  }, {"type": "vector", "dimension": 128, "element_type": "integer",
-                      }, {"type": "vector", "dimension": 3, "element_type": "float",
-                          }, {"type": "vector", "dimension": 128, "element_type": "float",
-                              }, {"type": "vector", "dimension": 3, "element_type": "double",
-                                  }]
+        types = [{"name": "c2", "type": "vector", "dimension": 3, "element_type": "integer"},
+                 {"name": "c2", "type": "vector", "dimension": 128, "element_type": "integer"},
+                 {"name": "c2", "type": "vector", "dimension": 3, "element_type": "float"},
+                 {"name": "c2", "type": "vector", "dimension": 128, "element_type": "float"},
+                 {"name": "c2", "type": "vector", "dimension": 3, "element_type": "double"}]
         file_name = "embedding_int_dim3.csv"
         httputils.copy_data(file_name)
         db_name = "default_db"
@@ -397,12 +424,10 @@ class TestImport(HttpTest):
 
         for i in range(len(types)):
             self.drop_table(db_name, table_name)
-            self.create_table(db_name, table_name, {
-                "c1": {
-                    "type": "integer",
-                },
-                "c2": types[i]
-            })
+            self.create_table(db_name, table_name, [
+                {"name": "c1", "type": "integer"},
+                types[i]
+            ])
             test_csv_dir = TEST_TMP_DIR + file_name
             self.import_data(db_name, table_name, {
                 "file_path": test_csv_dir,
@@ -427,10 +452,19 @@ class TestImport(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "vector", "dimension": 2, "element_type": "integer"}
-        })
+        self.create_table(db_name, table_name, [
+            {
+                "name": "c1",
+                "type": "integer",
+            },
+            {
+                "name": "c2",
+                "type": "vector",
+                "dimension": 2,
+                "element_type": "integer",
+            }
+        ])
+
         test_csv_dir = TEST_TMP_DIR + file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
@@ -447,8 +481,8 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_embedding_with_unmatched_elem_type(self):
         httputils.check_data(TEST_TMP_DIR)
-        types = [{"type": "vector", "dimension": 3, "element_type": "bool",
-                  }, {"type": "vector", "dimension": 128, "element_type": "varchar", }]
+        types = [{"name": "c2", "type": "vector", "dimension": 3, "element_type": "bool"},
+                 {"name": "c2", "type": "vector", "dimension": 128, "element_type": "varchar", }]
         file_name = "embedding_int_dim3.csv"
         httputils.copy_data(file_name)
         db_name = "default_db"
@@ -459,12 +493,10 @@ class TestImport(HttpTest):
 
         for i in range(len(types)):
             self.drop_table(db_name, table_name)
-            self.create_table(db_name, table_name, {
-                "c1": {
-                    "type": "integer",
-                },
-                "c2": types[i]
-            })
+            self.create_table(db_name, table_name, [
+                {"name": "c1", "type": "integer"},
+                types[i]
+            ])
             test_csv_dir = TEST_TMP_DIR + file_name
             self.import_data(db_name, table_name, {
                 "file_path": test_csv_dir,
@@ -489,10 +521,10 @@ class TestImport(HttpTest):
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer", },
-            "c2": {"type": "varchar", }
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "varchar"}
+        ])
 
         test_csv_dir = TEST_TMP_DIR + file_name
         self.import_data(db_name, table_name, {
@@ -511,10 +543,10 @@ class TestImport(HttpTest):
         table_name = "test_import_10000_columns"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer"},
-            "c2": {"type": "integer"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"}
+        ])
         test_csv_dir = TEST_TMP_DIR + "pysdk_test_big_int.csv"
         assert os.path.exists(test_csv_dir)
         self.import_data(db_name, table_name, {
@@ -534,11 +566,11 @@ class TestImport(HttpTest):
         table_name = "test_table_with_not_matched_columns"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer"},
-            "c2": {"type": "integer"},
-            "c3": {"type": "integer"},
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "integer"},
+            {"name": "c3", "type": "integer"},
+        ])
         test_csv_dir = TEST_TMP_DIR + "pysdk_test_commas.csv"
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
@@ -561,10 +593,10 @@ class TestImport(HttpTest):
         filename = "pysdk_test_import_with_different_size.csv"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer"},
-            "c2": {"type": "varchar"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "varchar"}
+        ])
         data_size = [1, 8191, 8192, 8193, 16 * 8192]
         for sz in data_size:
             httputils.generate_big_rows_csv(sz, filename)
@@ -579,7 +611,7 @@ class TestImport(HttpTest):
         self.drop_table(db_name, table_name)
         return
 
-    #@pytest.mark.skip(reason="cost too much time")
+    # @pytest.mark.skip(reason="cost too much time")
     def test_http_import_exceeding_rows(self):
         httputils.check_data(TEST_TMP_DIR)
         httputils.generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")
@@ -588,10 +620,10 @@ class TestImport(HttpTest):
         table_name = "test_import_exceeding_rows"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        self.create_table(db_name, table_name, {
-            "c1": {"type": "integer"},
-            "c2": {"type": "varchar"}
-        })
+        self.create_table(db_name, table_name, [
+            {"name": "c1", "type": "integer"},
+            {"name": "c2", "type": "varchar"}
+        ])
         test_csv_dir = TEST_TMP_DIR + "pysdk_test_big_varchar_rows.csv"
         res = self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
@@ -611,9 +643,9 @@ class TestImport(HttpTest):
         table_name = "test_import_exceeding_rows"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
-        columns = {}
+        columns = []
         for i in range(1024):
-            columns.update({"c" + str(i): {"type": "integer"}})
+            columns.append({"name": "c" + str(i), "type": "integer"})
         self.create_table(db_name, table_name, columns)
         test_csv_dir = TEST_TMP_DIR + "pysdk_test_big_columns.csv"
         self.import_data(db_name, table_name, {

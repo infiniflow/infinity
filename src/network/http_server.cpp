@@ -106,15 +106,15 @@ public:
         nlohmann::json json_response;
 
         CreateDatabaseOptions options;
-        if(body_info_json.contains("create_option")) {
+        if (body_info_json.contains("create_option")) {
             auto create_option = body_info_json["create_option"];
-            if(create_option.is_string()) {
+            if (create_option.is_string()) {
                 String option = create_option;
-                if(option == "ignore_if_exists") {
+                if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
-                } else if(option == "error") {
+                } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
-                } else if(option == "replace_if_exists") {
+                } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
                     json_response["error_code"] = 3074;
@@ -162,13 +162,13 @@ public:
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
         String option = body_info_json["drop_option"];
         DropDatabaseOptions options;
-        if(body_info_json.contains("drop_option")) {
+        if (body_info_json.contains("drop_option")) {
             auto drop_option = body_info_json["drop_option"];
-            if(drop_option.is_string()) {
+            if (drop_option.is_string()) {
                 String option = drop_option;
-                if(option == "ignore_if_not_exists") {
+                if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
-                } else if(option == "error") {
+                } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
                 } else {
                     json_response["error_code"] = 3075;
@@ -262,12 +262,51 @@ public:
         nlohmann::json json_response;
         HTTPStatus http_status;
 
-        Vector<ColumnDef *> column_definitions;
-        i64 id = 0;
+        if (!fields.is_array()) {
+            infinity::Status status = infinity::Status::InvalidColumnDefinition("Expect json array in column definitions");
+            json_response["error_code"] = status.code();
+            json_response["error_message"] = status.message();
+            HTTPStatus http_status;
+            http_status = HTTPStatus::CODE_500;
+            return ResponseFactory::createResponse(http_status, json_response.dump());
+        }
 
-        for (auto &field : fields.items()) {
-            String column_name = field.key();
-            auto field_element = field.value();
+        SizeT column_count = fields.size();
+
+        Vector<ColumnDef *> column_definitions;
+        Vector<TableConstraint *> table_constraint;
+        DeferFn defer_fn_column_def([&]() {
+            for (auto &column_def : column_definitions) {
+                delete column_def;
+                column_def = nullptr;
+            }
+            for (auto &constraint : table_constraint) {
+                delete constraint;
+                constraint = nullptr;
+            }
+        });
+
+        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+            auto &field_element = fields[column_id];
+
+            if (!field_element.contains("name") && !field_element["name"].is_string()) {
+                infinity::Status status = infinity::Status::InvalidColumnDefinition("Name field is missing or not string");
+                json_response["error_code"] = status.code();
+                json_response["error_message"] = status.message();
+                HTTPStatus http_status;
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+            String column_name = field_element["name"];
+
+            if (!field_element.contains("type") && !field_element["type"].is_string()) {
+                infinity::Status status = infinity::Status::InvalidColumnDefinition("Type field is missing or not string");
+                json_response["error_code"] = status.code();
+                json_response["error_message"] = status.message();
+                HTTPStatus http_status;
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
             String value_type = field_element["type"];
             ToLower(value_type);
 
@@ -309,7 +348,7 @@ public:
                 if (field_element.contains("default")) {
                     default_expr = ConstantExpr::Deserialize(field_element["default"]);
                 }
-                ColumnDef *col_def = new ColumnDef(id++, column_type, column_name, constraints, default_expr);
+                ColumnDef *col_def = new ColumnDef(column_id, column_type, column_name, constraints, default_expr);
                 column_definitions.emplace_back(col_def);
             } else {
                 infinity::Status status = infinity::Status::NotSupport(fmt::format("{} type is not supported yet.", field_element["type"]));
@@ -320,18 +359,17 @@ public:
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
         }
-        Vector<TableConstraint *> table_constraint;
 
         CreateTableOptions options;
-        if(body_info_json.contains("create_option")) {
+        if (body_info_json.contains("create_option")) {
             auto create_option = body_info_json["create_option"];
-            if(create_option.is_string()) {
+            if (create_option.is_string()) {
                 String option = create_option;
-                if(option == "ignore_if_exists") {
+                if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
-                } else if(option == "error") {
+                } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
-                } else if(option == "replace_if_exists") {
+                } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
                     json_response["error_code"] = 3074;
@@ -346,6 +384,9 @@ public:
         }
 
         auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
+
+        column_definitions.clear();
+        table_constraint.clear();
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
@@ -376,13 +417,13 @@ public:
         nlohmann::json json_response;
 
         DropTableOptions options;
-        if(body_info_json.contains("drop_option")) {
+        if (body_info_json.contains("drop_option")) {
             auto drop_option = body_info_json["drop_option"];
-            if(drop_option.is_string()) {
+            if (drop_option.is_string()) {
                 String option = drop_option;
-                if(option == "ignore_if_not_exists") {
+                if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
-                } else if(option == "error") {
+                } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
                 } else {
                     json_response["error_code"] = 3075;
@@ -1476,13 +1517,13 @@ public:
         nlohmann::json json_response;
         HTTPStatus http_status;
         DropIndexOptions options{ConflictType::kInvalid};
-        if(body_info_json.contains("drop_option")) {
+        if (body_info_json.contains("drop_option")) {
             auto drop_option = body_info_json["drop_option"];
-            if(drop_option.is_string()) {
+            if (drop_option.is_string()) {
                 String option = drop_option;
-                if(option == "ignore_if_not_exists") {
+                if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
-                } else if(option == "error") {
+                } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
                 } else {
                     json_response["error_code"] = 3074;
@@ -1527,15 +1568,15 @@ public:
         HTTPStatus http_status;
 
         CreateIndexOptions options;
-        if(body_info_json.contains("create_option")) {
+        if (body_info_json.contains("create_option")) {
             auto create_option = body_info_json["create_option"];
-            if(create_option.is_string()) {
+            if (create_option.is_string()) {
                 String option = create_option;
-                if(option == "ignore_if_exists") {
+                if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
-                } else if(option == "error") {
+                } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
-                } else if(option == "replace_if_exists") {
+                } else if (option == "replace_if_exists") {
                     options.conflict_type_ = ConflictType::kReplace;
                 } else {
                     json_response["error_code"] = 3075;
@@ -1567,7 +1608,28 @@ public:
 
                 if (strcmp(name.c_str(), "type") == 0) {
                     index_info->index_type_ = IndexInfo::StringToIndexType(value);
-                    if(index_info->index_type_ == IndexType::kInvalid) {
+                    if (index_info->index_type_ == IndexType::kInvalid) {
+                        {
+                            delete index_info;
+                            index_info = nullptr;
+                        }
+
+                        {
+                            for (auto &index_info_ptr : *index_info_list) {
+                                delete index_info_ptr;
+                            }
+                            delete index_info_list;
+                            index_info_list = nullptr;
+                        }
+
+                        {
+                            for (auto &index_param_ptr : *index_param_list) {
+                                delete index_param_ptr;
+                            }
+                            delete index_param_list;
+                            index_param_list = nullptr;
+                        }
+
                         json_response["error_code"] = ErrorCode::kInvalidIndexType;
                         json_response["error_message"] = fmt::format("Invalid index type: {}", name);
                         http_status = HTTPStatus::CODE_500;

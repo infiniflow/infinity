@@ -12,19 +12,22 @@ class TestQuery(HttpTest):
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
-            db_name, table_name, {
-                "num": {
+            db_name, table_name, [
+                {
+                    "name": "num",
                     "type": "integer",
                 },
-                "body": {
+                {
+                    "name": "body",
                     "type": "varchar",
                 },
-                "vec": {
+                {
+                    "name": "vec",
                     "type": "varchar",
                     "dimension": 5,
                     "element_type": "float"
                 }
-            }
+            ]
         )
         self.insert(db_name, table_name,
                     [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
@@ -43,11 +46,12 @@ class TestQuery(HttpTest):
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
-            db_name, table_name, {
-                "c1": {
+            db_name, table_name, [
+                {
+                    "name": "c1",
                     "type": "integer",
                 },
-            }
+            ]
         )
         self.select(db_name, table_name,
                     ["*"])
