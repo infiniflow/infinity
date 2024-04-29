@@ -156,23 +156,27 @@ curl --request POST \
         "name": 
         {
             "type": "varchar",
-            "constraints": ["not null"]
+            "constraints": ["not null"],
+            "id": 0,
         },
         "age":
         {
             "type": "integer",
-            "constraints": ["not null"]
+            "constraints": ["not null"],
+            "id": 1,
         },
         "score":
         {
             "type": "integer",
-            "constraints": ["not null"]
+            "constraints": ["not null"],
+            "id": 2,
         }
         "my_vector"
         {
             "type": "vector",
             "dimension": 1024,
-            "element_type": "float"
+            "element_type": "float",
+            "id": 3,
         }
     ],
     "properties": 
