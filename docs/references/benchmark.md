@@ -39,11 +39,11 @@ python run.py
 > - Metric: L2
 > - 10000 queries
 
-|                   | QPS   | Disk   | Mean precision | Time to insert & build index | Time to import & build index | Peak memory |
-| ----------------- | ----- | ------ | -------------- | ---------------------------- | ---------------------------- | ----------- |
-| **Elasticsearch** | 934   | 874 MB | 0.992          | 131 s                        | N/A                          | 1.463 GB    |
-| **Qdrant**        | 1303  | 418 MB | 0.979          | 46 s                         | N/A                          | 1.6 GB      |
-| **Infinity**      | 16320 | 792 MB | 0.973          | 74 s                         | 28 s                         | 0.95 GB     |
+|                   | QPS   | Recall         | Time to insert & build index | Time to import & build index | Disk   | Peak memory |
+| ----------------- | ----- | -------------- | ---------------------------- | ---------------------------- | ------ | ----------- |
+| **Elasticsearch** | 934   | 0.992          | 131 s                        | N/A                          | 874 MB | 1.463 GB    |
+| **Qdrant**        | 1303  | 0.979          | 46 s                         | N/A                          | 418 MB | 1.6 GB      |
+| **Infinity**      | 16320 | 0.973          | 74 s                         | 28 s                         | 792 MB | 0.95 GB     |
 
 
 
@@ -52,11 +52,11 @@ python run.py
 > - Metric: L2
 > - 1000 queries
 
-|                   | QPS  | Disk   | Mean precision | Time to insert & build index | Time to import & build index | Peak memory |
-| ----------------- | ---- | ------ | -------------- | ---------------------------- | ---------------------------- | ----------- |
-| **Elasticsearch** | 305  | 13 GB  | 0.885          | 872 s                        | N/A                          | 6.9 GB      |
-| **Qdrant**        | 339  | 4.4 GB | 0.947          | 366 s                        | N/A                          | 7.3 GB      |
-| **Infinity**      | 2200 | 4.7 GB | 0.946          | 463 s                        | 112 s                        | 6.0 GB      |
+|                   | QPS  |  Recall        | Time to insert & build index | Time to import & build index | Disk   | Peak memory |
+| ----------------- | ---- | -------------- | ---------------------------- | ---------------------------- | ------ | ----------- |
+| **Elasticsearch** | 305  | 0.885          | 872 s                        | N/A                          | 13 GB  | 6.9 GB      |
+| **Qdrant**        | 339  | 0.947          | 366 s                        | N/A                          | 4.4 GB | 7.3 GB      |
+| **Infinity**      | 2200 | 0.946          | 463 s                        | 112 s                        | 4.7 GB | 6.0 GB      |
 
 
 
@@ -65,22 +65,23 @@ python run.py
 > -  4160000 documents
 > - 467 queries
 
-|                   | QPS  | Disk   | Time to insert & build index | Time to import & build index | Peak memory |
-| ----------------- | ---- | ------ | ---------------------------- | ---------------------------- | ----------- |
-| **Elasticsearch** | 777  | 2 GB   | 291 s                        | N/A                          | 1.7 GB      |
-| **Infinity**      | 817  | 3.4 GB | 237 s                        | 123 s                        | 0.49 GB     |
+|                   | QPS  | Time to insert & build index | Time to import & build index | Disk   | Peak memory |
+| ----------------- | ----------- | ---------------------------- | ---------------------------- | ---- | ------ |
+| **Elasticsearch** | 777  | 291 s                        | N/A                          | 2 GB   | 1.7 GB      |
+| **Infinity**      | 817  | 237 s                        | 123 s                        | 3.4 GB | 0.49 GB     |
 
 ### Enwiki
 
 > - 33000000 documents
 > - 100 queries
 
-|                   | QPS  | Disk  | Time to insert & build index | Time to import & build index | Peak memory |
-| ----------------- | ---- | ----- | ---------------------------- | ---------------------------- | ----------- |
-| **Elasticsearch** | 484  | 28 GB | 2289 s                       | N/A                          | 5.3 GB      |
-| **Infinity**      | 484  | 54 GB | 2321 s                       | 944 s                        | 5.1 GB      |
+|                   | QPS  | Time to insert & build index | Time to import & build index | Disk  | Peak memory |
+| ----------------- | ----------- | ---------------------------- | ---------------------------- | ---- | ----- |
+| **Elasticsearch** | 484      | 2289 s                       | N/A                          | 5.3 GB | 28 GB |
+| **Infinity**      | 484      | 2321 s                       | 944 s                        | 5.1 GB  | 54 GB |
 
 
+---
 
 ## Deprecated Benchmark
 
