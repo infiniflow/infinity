@@ -150,6 +150,7 @@ void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
     Deque<WalEntry *> log_batch{};
+    TxnManager *txn_mgr = storage_->txn_manager();
     while (running_.load()) {
         wait_flush_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
@@ -157,23 +158,13 @@ void WalManager::Flush() {
             continue;
         }
         // auto [max_commit_ts, wal_size] = GetWalState();
-        TxnManager *txn_mgr = storage_->txn_manager();
 
-        Vector<SharedPtr<Txn>> txns;
         for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry == nullptr) {
                 // terminate entry
                 running_ = false;
                 break;
-            }
-            SharedPtr<Txn> txn = txn_mgr->GetTxnPtr(entry->txn_id_);
-            // Commit sequentially so they get visible in the same order with wal.
-            bool conflict = txn->CheckConflict();
-            txns.push_back(txn);
-            if (conflict) {
-                txn->SetTxnToRollback();
-                continue;
             }
 
             if (entry->cmds_.empty()) {
@@ -216,11 +207,13 @@ void WalManager::Flush() {
             }
         }
 
-        log_batch.clear();
-
-        for (auto txn : txns) {
-            txn->CommitBottom();
+        for (const auto &entry : log_batch) {
+            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
+            if (txn != nullptr) {
+                txn->CommitBottom();
+            }
         }
+        log_batch.clear();
 
         // Check if the wal file is too large, swap to a new one.
         try {

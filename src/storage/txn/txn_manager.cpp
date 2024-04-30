@@ -62,16 +62,16 @@ Txn *TxnManager::BeginTxn() {
     TxnTimeStamp ts = ++start_ts_;
 
     // Create txn instance
-    UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts);
+    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts));
 
     // Storage txn in txn manager
-    Txn *res = new_txn.get();
-    txn_map_[new_txn_id] = std::move(new_txn);
+    txn_map_[new_txn_id] = new_txn;
     ts_map_.emplace(ts, new_txn_id);
+    beginned_txns_.emplace_back(new_txn);
     rw_locker_.unlock();
 
     LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
-    return res;
+    return new_txn.get();
 }
 
 Txn *TxnManager::GetTxn(TransactionID txn_id) {
@@ -90,17 +90,25 @@ SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
 
 TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
 
-TxnTimeStamp TxnManager::GetTimestamp() {
-    TxnTimeStamp ts = ++start_ts_;
-    return ts;
+TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
+    std::unique_lock w_locker(mutex_);
+    TxnTimeStamp commit_ts = ++start_ts_;
+    txn->SetTxnRead();
+    return commit_ts;
 }
 
-TxnTimeStamp TxnManager::GetCommitTimeStamp(Txn *txn) {
+TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
     std::unique_lock w_locker(mutex_);
     TxnTimeStamp commit_ts = ++start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
-    txn->SetTxnCommitting(commit_ts);
+    finished_txns_.emplace_back(txn);
+    txn->SetTxnWrite();
     return commit_ts;
+}
+
+bool TxnManager::CheckConflict(Txn *txn) {
+    // TEMP
+    return txn->CheckConflict();
 }
 
 void TxnManager::SendToWAL(Txn *txn) {
@@ -124,18 +132,17 @@ void TxnManager::SendToWAL(Txn *txn) {
                                        wait_conflict_ck_.begin()->first,
                                        txn->CommitTS()));
     }
-    if (wait_conflict_ck_.begin()->first < commit_ts) {
+    if (wal_entry) {
         wait_conflict_ck_.at(commit_ts) = wal_entry;
     } else {
-        Vector<WalEntry *> wal_entries{wal_entry};
-        wait_conflict_ck_.erase(wait_conflict_ck_.begin());
-        {
-            std::unique_lock w_locker1(mutex_, std::adopt_lock);
-            while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
-                wal_entries.push_back(wait_conflict_ck_.begin()->second);
-                wait_conflict_ck_.erase(wait_conflict_ck_.begin());
-            }
-        }
+        wait_conflict_ck_.erase(commit_ts); // rollback
+    }
+    if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
+        Vector<WalEntry *> wal_entries;
+        do {
+            wal_entries.push_back(wait_conflict_ck_.begin()->second);
+            wait_conflict_ck_.erase(wait_conflict_ck_.begin());
+        } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
         wal_mgr_->PutEntries(wal_entries);
     }
 }
@@ -182,21 +189,16 @@ void TxnManager::Stop() {
 bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
-    TxnTimeStamp txn_ts = txn->Commit();
-    {
-        std::lock_guard guard(rw_locker_);
-        txn_map_.erase(txn->TxnID());
-    }
-    return txn_ts;
+    TransactionID txn_id = txn->TxnID();
+    TxnTimeStamp commit_ts = txn->Commit();
+    this->FinishTxn(txn_id);
+    return commit_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
     TransactionID txn_id = txn->TxnID();
     txn->Rollback();
-    {
-        std::lock_guard guard(rw_locker_);
-        txn_map_.erase(txn_id);
-    }
+    this->FinishTxn(txn_id);
 }
 
 SizeT TxnManager::ActiveTxnCount() {
@@ -205,6 +207,63 @@ SizeT TxnManager::ActiveTxnCount() {
 }
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
+
+// A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
+// So maintain the least uncommitted begin ts
+void TxnManager::FinishTxn(TransactionID txn_id) {
+    std::lock_guard guard(rw_locker_);
+    auto iter = txn_map_.find(txn_id);
+    if (iter == txn_map_.end()) {
+        return;
+    }
+    auto *txn = iter->second.get();
+    if (txn->GetTxnType() == TxnType::kInvalid) {
+        UnrecoverableError("Txn type is invalid");
+    }
+    if (txn->GetTxnType() == TxnType::kRead) {
+        txn_map_.erase(txn_id);
+        return;
+    }
+
+    TxnTimeStamp least_uncommitted_begin_ts = txn->BeginTS() + 1;
+    while (!beginned_txns_.empty()) {
+        auto first_txn = beginned_txns_.front().lock();
+        if (first_txn.get() == nullptr) {
+            beginned_txns_.pop_front();
+            continue;
+        }
+        auto status = first_txn->GetTxnState();
+        if (status == TxnState::kCommitted || status == TxnState::kRollbacked) {
+            beginned_txns_.pop_front();
+        } else {
+            least_uncommitted_begin_ts = first_txn->BeginTS();
+            break;
+        }
+    }
+
+    while (!finished_txns_.empty()) {
+        auto *finished_txn = finished_txns_.front();
+        auto finished_state = finished_txn->GetTxnState();
+        if (finished_state != TxnState::kCommitted && finished_state != TxnState::kRollbacked) {
+            break;
+        }
+        TxnTimeStamp finished_commit_ts = finished_txn->CommitTS();
+        if (finished_commit_ts > least_uncommitted_begin_ts) {
+            break;
+        }
+        auto finished_txn_id = finished_txn->TxnID();
+        // LOG_INFO(fmt::format("Txn: {} is erased from txn map", finished_txn_id));
+        SizeT remove_n = txn_map_.erase(finished_txn_id);
+        if (remove_n == 0) {
+            UnrecoverableError(fmt::format("Txn: {} not found in txn map", finished_txn_id));
+        }
+        finished_txns_.pop_front();
+    }
+
+    if (txn_map_.size() > 1000) {
+        LOG_WARN(fmt::format("Txn map size: {} is too large. Something error may occurred", txn_map_.size()));
+    }
+}
 
 void TxnManager::AddWaitFlushTxn(const Vector<TransactionID> &txn_ids) {
     // std::stringstream ss;
