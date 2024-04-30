@@ -491,7 +491,7 @@ i64 WalManager::ReplayWalFile() {
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
-        LOG_INFO(replay_entries[replay_count]->ToString());
+        LOG_TRACE(replay_entries[replay_count]->ToString());
         ReplayWalEntry(*replay_entries[replay_count]);
     }
 
