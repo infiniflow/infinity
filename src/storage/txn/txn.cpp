@@ -407,17 +407,26 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 TxnTimeStamp Txn::Commit() {
     txn_store_.PrepareCommit1();
 
-    //    TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
-    //    txn_context_.SetTxnCommitting(commit_ts);
-
     if (wal_entry_->cmds_.empty() && txn_store_.Empty()) {
         // Don't need to write empty WalEntry (read-only transactions).
-        TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp();
+        TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
         LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
         return commit_ts;
     }
+
+    // register commit ts in wal manager here, define the commit sequence
+    TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
+    this->SetTxnCommitting(commit_ts);
+
+    if (txn_mgr_->CheckConflict(this)) {
+        LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, commit_ts));
+        wal_entry_ = nullptr;
+        txn_mgr_->SendToWAL(this);
+        RecoverableError(Status::TxnRollback(txn_id_));
+    }
+
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_id_;
     txn_mgr_->SendToWAL(this);
@@ -425,17 +434,7 @@ TxnTimeStamp Txn::Commit() {
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
-    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, this->CommitTS()));
-
-    if (txn_context_.GetTxnState() == TxnState::kToRollback) {
-        // abort because of conflict
-        LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, this->CommitTS()));
-        return this->CommitTS();
-    }
-
-    if (txn_context_.GetTxnState() != TxnState::kCommitted) {
-        UnrecoverableError("Transaction isn't in COMMITTED status.");
-    }
+    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->enable_compaction()) {
         txn_store_.MaintainCompactionAlg();
@@ -444,7 +443,9 @@ TxnTimeStamp Txn::Commit() {
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }
 
-    return this->CommitTS();
+    this->SetTxnCommitted();
+
+    return commit_ts;
 }
 
 bool Txn::CheckConflict() {
@@ -455,22 +456,18 @@ bool Txn::CheckConflict() {
 
 void Txn::CommitBottom() {
     LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
-    if (txn_context_.GetTxnState() != TxnState::kToRollback) {
-        // prepare to commit txn local data into table
-        TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
+    // prepare to commit txn local data into table
+    TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
-        txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
+    txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
 
-        txn_context_.SetTxnCommitted();
+    txn_store_.CommitBottom(txn_id_, commit_ts);
 
-        txn_store_.CommitBottom(txn_id_, commit_ts);
+    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
 
-        txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
-
-        // Don't need to write empty CatalogDeltaEntry (read-only transactions).
-        if (!local_catalog_delta_ops_entry_->operations().empty()) {
-            local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
-        }
+    // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+    if (!local_catalog_delta_ops_entry_->operations().empty()) {
+        local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
     }
 
     // Notify the top half
@@ -495,12 +492,20 @@ void Txn::FakeCommit(TxnTimeStamp commit_ts) {
 }
 
 void Txn::Rollback() {
-    TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
+    auto state = txn_context_.GetTxnState();
+    TxnTimeStamp abort_ts = 0;
+    if (state == TxnState::kStarted) {
+        abort_ts = txn_mgr_->GetCommitTimeStampR(this);
+    } else if (state == TxnState::kCommitting) {
+        abort_ts = txn_context_.GetCommitTS();
+    } else {
+        UnrecoverableError(fmt::format("Transaction {} state is {}.", txn_id_, ToString(state)));
+    }
     txn_context_.SetTxnRollbacking(abort_ts);
 
     txn_store_.Rollback(txn_id_, abort_ts);
 
-    txn_context_.SetTxnRollbacked();
+    this->SetTxnRollbacked();
 
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }
