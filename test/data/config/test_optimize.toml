@@ -6,4 +6,4 @@ timezone = "utc-8"
 # close auto optimize
 optimize_interval = 0
 # close auto compaction
-compaction_interval = 0
+compact_interval = 0

@@ -4,7 +4,7 @@ timezone = "utc-8"
 
 [storage]
 # close auto compaction
-compaction_interval = 0
+compact_interval = 0
 
 [wal]
 #short checkpoint interval for test
