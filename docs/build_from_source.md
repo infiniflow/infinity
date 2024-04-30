@@ -45,10 +45,10 @@ git clone https://github.com/infiniflow/infinity.git
 ### Step2 Build the source code using Docker
 
 ```shell
-cd infinity && mkdir build
+cd infinity && mkdir cmake-build-debug
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
 docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
-docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
+docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
 ```
 
 ### Step3 Start up the Infinity server
