@@ -425,11 +425,9 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
+        SizeT delete_row_n = segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
 
-        for (const auto &[_, block_row_offsets] : block_row_hashmap) {
-            row_count += block_row_offsets.size();
-        }
+        row_count += delete_row_n;
     }
     this->row_count_ -= row_count;
     return Status::OK();
