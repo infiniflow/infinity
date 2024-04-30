@@ -8,6 +8,7 @@ import os
 from urllib.parse import urlparse
 import time
 
+
 class BaseClient:
     """
     Base class for all clients(Qdrant, ES, infinity).
@@ -26,13 +27,20 @@ class BaseClient:
         pass
 
     @abstractmethod
+    def upload(self):
+        """
+        Upload data and build indexes (parameters are parsed by __init__).
+        """
+        pass
+
+    @abstractmethod
     def search(self) -> list[list[Any]]:
         """
         Execute the corresponding query tasks (vector search, full-text search, hybrid search) based on the parsed parameters. 
         The function returns id list.
         """
         pass
-    
+
     def download_data(self, url, target_path):
         """
         Download dataset and extract it into path.
@@ -59,6 +67,11 @@ class BaseClient:
         """
         run experiment and save results.
         """
+        if args.import_data:
+            start_time = time.time()
+            self.upload()
+            finish_time = time.time()
+            print(f"upload finish, cost time = {finish_time - start_time}")
         if args.query:
             results = self.search()
             self.check_and_save_results(results)
