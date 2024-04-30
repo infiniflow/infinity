@@ -86,6 +86,14 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 delete search_expr;
                 search_expr = nullptr;
             }
+            if (search_exprs != nullptr) {
+                for (auto &expr : *search_exprs) {
+                    delete expr;
+                    expr = nullptr;
+                }
+                delete search_exprs;
+                search_exprs = nullptr;
+            }
         });
 
         search_exprs = new Vector<ParsedExpr *>();
@@ -219,7 +227,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             }
         }
 
-        if (search_expr != nullptr && !search_exprs->empty()) {
+        if (search_exprs != nullptr && !search_exprs->empty()) {
             search_expr->SetExprs(search_exprs);
             search_exprs = nullptr;
         }
