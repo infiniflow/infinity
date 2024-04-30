@@ -16,7 +16,7 @@ module;
 
 import stl;
 import txn_state;
-
+import third_party;
 import infinity_exception;
 
 export module txn_context;
@@ -57,9 +57,9 @@ public:
 
     inline void SetTxnRollbacked() {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kRollbacking) {
-            UnrecoverableError("Transaction isn't in ROLLBACKING status.");
-        }
+        // if (state_ != TxnState::kRollbacking) {
+        //     UnrecoverableError(fmt::format("Transaction isn't in ROLLBACKING status. {}", ToString(state_)));
+        // }
         state_ = TxnState::kRollbacked;
     }
 
