@@ -65,6 +65,9 @@ public:
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
+    // InsertGap insert some empty documents. This is for abnormal case.
+    void InsertGap(u32 row_count);
+
     // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
 

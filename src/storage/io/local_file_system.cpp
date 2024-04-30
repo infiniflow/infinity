@@ -18,6 +18,7 @@ module;
 #include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -37,6 +38,9 @@ namespace infinity {
 namespace fs = std::filesystem;
 
 constexpr std::size_t BUFFER_SIZE = 4096; // Adjust buffer size as needed
+
+std::mutex LocalFileSystem::mtx_{};
+HashMap<String, MmapInfo> LocalFileSystem::mapped_files_{};
 
 LocalFileHandler::~LocalFileHandler() {
     if (fd_ != -1) {
@@ -75,7 +79,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
         }
 #if defined(__linux__)
         if (flags & FileFlags::DIRECT_IO) {
-            file_flags |= O_DIRECT | O_SYNC;
+            file_flags |= O_DIRECT;
         }
 #endif
     }
@@ -132,11 +136,37 @@ i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
 
 i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    i64 write_count = write(fd, data, nbytes);
-    if (write_count == -1) {
-        UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+    i64 written = 0;
+    while (written < (i64)nbytes) {
+        i64 write_count = write(fd, (char *)data + written, nbytes - written);
+        if (write_count == -1) {
+            UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+        }
+        written += write_count;
     }
-    return write_count;
+    return written;
+}
+
+i64 LocalFileSystem::ReadAt(FileHandler &file_handler, i64 file_offset, void *data, u64 nbytes) {
+    i32 fd = ((LocalFileHandler &)file_handler).fd_;
+    i64 read_count = pread(fd, data, nbytes, file_offset);
+    if (read_count == -1) {
+        UnrecoverableError(fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno)));
+    }
+    return read_count;
+}
+
+i64 LocalFileSystem::WriteAt(FileHandler &file_handler, i64 file_offset, const void *data, u64 nbytes) {
+    i32 fd = ((LocalFileHandler &)file_handler).fd_;
+    i64 written = 0;
+    while (written < (i64)nbytes) {
+        i64 write_count = pwrite(fd, (char *)data + written, nbytes - written, file_offset + written);
+        if (write_count == -1) {
+            UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+        }
+        written += write_count;
+    }
+    return written;
 }
 
 void LocalFileSystem::Seek(FileHandler &file_handler, i64 pos) {
@@ -286,6 +316,50 @@ u64 LocalFileSystem::GetFolderSizeByPath(const String &path) {
 String LocalFileSystem::ConcatenateFilePath(const String &dir_path, const String &file_path) {
     std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
+}
+
+int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
+    data_ptr = nullptr;
+    data_len = 0;
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = mapped_files_.find(file_path);
+    if (it != mapped_files_.end()) {
+        auto &mmap_info = it->second;
+        data_ptr = mmap_info.data_ptr_;
+        data_len = mmap_info.data_len_;
+        mmap_info.rc_++;
+        return 0;
+    }
+    long len_f = fs::file_size(file_path);
+    if (len_f == 0)
+        return -1;
+    int f = open(file_path.c_str(), O_RDONLY);
+    void *tmpd = mmap(NULL, len_f, PROT_READ, MAP_SHARED, f, 0);
+    if (tmpd == MAP_FAILED)
+        return -1;
+    close(f);
+    int rc = madvise(tmpd, len_f, MADV_DONTDUMP);
+    if (rc < 0)
+        return -1;
+    data_ptr = (u8 *)tmpd;
+    data_len = len_f;
+    mapped_files_.emplace(file_path, MmapInfo{data_ptr, data_len, 1});
+    return 0;
+}
+
+int LocalFileSystem::MunmapFile(const String &file_path) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = mapped_files_.find(file_path);
+    if (it == mapped_files_.end()) {
+        return -1;
+    }
+    auto &mmap_info = it->second;
+    mmap_info.rc_--;
+    if (mmap_info.rc_ == 0) {
+        munmap(mmap_info.data_ptr_, mmap_info.data_len_);
+        mapped_files_.erase(it);
+    }
+    return 0;
 }
 
 } // namespace infinity

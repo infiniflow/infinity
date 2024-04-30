@@ -34,8 +34,12 @@ namespace infinity {
 // 3. children of "or" can only be term, "and" or "and_not", because "or" will be optimized, and "not" is either optimized or not allowed
 // 4. "and_not" does not exist in parser output, it is generated during optimization
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
-
+void QueryNode::FilterOptimizeQueryTree() { UnrecoverableError("Should not reach here!"); }
 std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
+    if (root->GetType() == QueryNodeType::FILTER) {
+        root->FilterOptimizeQueryTree();
+        return root;
+    }
 #ifdef INFINITY_DEBUG
     auto start_time = std::chrono::high_resolution_clock::now();
 #endif
@@ -368,6 +372,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
     }
+    fmt::print("fetch position = {}\n", fetch_position);
     auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get(), fetch_position);
     if (!posting_iterator) {
         return nullptr;
@@ -419,14 +424,14 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
         fetch_position = true;
     }
     Vector<std::unique_ptr<PostingIterator>> posting_iterators;
-    for (auto& term : terms_) {
+    for (auto &term : terms_) {
         auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
         if (nullptr == posting_iterator) {
             return nullptr;
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), column_id, GetWeight());
+    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight());
 
     search->terms_ptr_ = &terms_;
     search->column_name_ptr_ = &column_;
@@ -450,16 +455,27 @@ PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, Index
         fetch_position = true;
     }
 
-    Vector<std::unique_ptr<BlockMaxTermDocIterator>> term_doc_iterators;
+//    Vector<std::unique_ptr<BlockMaxTermDocIterator>> term_doc_iterators;
+//    for (auto& term : terms_) {
+//        auto term_doc_iterator = column_index_reader->LookupBlockMax(term, index_reader.session_pool_.get(), GetWeight(), fetch_position);
+//        if (nullptr == term_doc_iterator) {
+//            return nullptr;
+//        }
+//        term_doc_iterators.emplace_back(std::move(term_doc_iterator));
+//    }
+    Vector<std::unique_ptr<PostingIterator>> posting_iterators;
     for (auto& term : terms_) {
-        auto term_doc_iterator = column_index_reader->LookupBlockMax(term, index_reader.session_pool_.get(), GetWeight(), fetch_position);
-        if (nullptr == term_doc_iterator) {
+        fmt::print("phrase query term: {}\n", term);
+        auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
+        if (nullptr == posting_iterator) {
+            fmt::print("not found term = {}\n", term);
             return nullptr;
         }
-        term_doc_iterators.emplace_back(std::move(term_doc_iterator));
+        posting_iterators.emplace_back(std::move(posting_iterator));
     }
-
-    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(term_doc_iterators), column_id);
+    fmt::print("posting_iterators size = {}\n", posting_iterators.size());
+    // auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(term_doc_iterators));
+    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(posting_iterators));
     if (!search) {
         return nullptr;
     }
@@ -612,6 +628,8 @@ std::string QueryNodeTypeToString(QueryNodeType type) {
     switch (type) {
         case QueryNodeType::INVALID:
             return "INVALID";
+        case QueryNodeType::FILTER:
+            return "FILTER";
         case QueryNodeType::TERM:
             return "TERM";
         case QueryNodeType::AND:

@@ -58,6 +58,15 @@ public:
         return true;
     }
 
+    void EnqueueBulk(Vector<T> &input_array) {
+        {
+            std::unique_lock <std::mutex> lock(queue_mutex_);
+            full_cv_.wait(lock, [&] { return queue_.size() + input_array.size() < capacity_; });
+            queue_.insert(queue_.end(), input_array.begin(), input_array.end());
+        }
+        empty_cv_.notify_one();
+    }
+
     void EnqueueBulk(List<T> &input_queue) {
         {
             std::unique_lock <std::mutex> lock(queue_mutex_);

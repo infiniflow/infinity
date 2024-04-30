@@ -61,9 +61,26 @@ import txn_store;
 
 namespace infinity {
 
+Vector<std::string_view> SegmentIndexEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid segment index entry encode: {}", encode));
+    }
+    auto decodes = TableIndexEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String SegmentIndexEntry::EncodeIndex(const SegmentID segment_id, const TableIndexEntry *table_index_entry) {
+    if (table_index_entry == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", table_index_entry->encode(), segment_id);
+}
+
 SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
-    : BaseEntry(EntryType::kSegmentIndex, false), table_index_entry_(table_index_entry), segment_id_(segment_id),
-      vector_buffer_(std::move(vector_buffer)) {
+    : BaseEntry(EntryType::kSegmentIndex, false, SegmentIndexEntry::EncodeIndex(segment_id, table_index_entry)),
+      table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)) {
     if (table_index_entry != nullptr)
         index_dir_ = table_index_entry->index_dir();
 };
@@ -224,10 +241,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_count,
                                        TxnTimeStamp commit_ts,
                                        BufferManager *buffer_manager) {
-    u32 seg_id = block_entry->segment_id();
-    u16 block_id = block_entry->block_id();
-    SegmentOffset block_offset = u32(block_id) * block_entry->row_capacity();
-    RowID begin_row_id(seg_id, row_offset + block_offset);
+    SegmentOffset block_offset = block_entry->segment_offset();
+    RowID begin_row_id = block_entry->base_row_id() + row_offset;
 
     const SharedPtr<IndexBase> &index_base = table_index_entry_->table_index_def();
     const SharedPtr<ColumnDef> &column_def = table_index_entry_->column_def();
@@ -250,7 +265,15 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                                             table_index_entry_->GetFulltextCommitingThreadPool());
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
-                assert(begin_row_id == memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount());
+                RowID exp_begin_row_id = memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount();
+                assert(begin_row_id >= exp_begin_row_id);
+                if (begin_row_id > exp_begin_row_id) {
+                    LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
+                                         begin_row_id.ToUint64(),
+                                         exp_begin_row_id.ToUint64(),
+                                         begin_row_id - exp_begin_row_id));
+                    memory_indexer_->InsertGap(begin_row_id - exp_begin_row_id);
+                }
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_manager));
@@ -391,6 +414,17 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                RowID begin_row_id = block_entry->base_row_id();
+                RowID exp_begin_row_id = memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount();
+                assert(begin_row_id >= exp_begin_row_id);
+                if (begin_row_id > exp_begin_row_id) {
+                    LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
+                                         begin_row_id.ToUint64(),
+                                         exp_begin_row_id.ToUint64(),
+                                         begin_row_id - exp_begin_row_id));
+                    memory_indexer_->InsertGap(begin_row_id - exp_begin_row_id);
+                }
+
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
                 memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), true);
                 memory_indexer_->Commit(true);
@@ -709,31 +743,6 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
     return nullptr;
 }
 
-void SegmentIndexEntry::ReplaceFtChunkIndexEntries(SharedPtr<ChunkIndexEntry> merged_chunk_index_entry) {
-    std::shared_lock lock(rw_locker_);
-    SizeT num_entries = chunk_index_entries_.size();
-    SizeT idx_first = num_entries;
-    for (SizeT i = 0; i < num_entries; i++) {
-        if (chunk_index_entries_[i]->base_rowid_ == merged_chunk_index_entry->base_rowid_) {
-            idx_first = i;
-            break;
-        }
-    }
-    assert(idx_first < num_entries);
-    SizeT idx_last = num_entries;
-    u32 total_row_count = 0;
-    for (SizeT i = idx_first; i < num_entries; i++) {
-        total_row_count += chunk_index_entries_[i]->row_count_;
-        if (total_row_count == merged_chunk_index_entry->row_count_) {
-            idx_last = i;
-            break;
-        }
-    }
-    assert(idx_last < num_entries);
-    chunk_index_entries_[idx_first] = merged_chunk_index_entry;
-    chunk_index_entries_.erase(chunk_index_entries_.begin() + idx_first + 1, chunk_index_entries_.begin() + idx_last + 1);
-}
-
 void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                                  SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
                                                  Vector<ChunkIndexEntry *> &&old_chunks) {
@@ -831,7 +840,7 @@ void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_inde
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
-    assert(chunk_index_entries_.empty() || base_rowid == chunk_index_entries_.back()->base_rowid_ + chunk_index_entries_.back()->row_count_);
+    // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
     SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;

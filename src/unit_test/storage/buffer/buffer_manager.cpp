@@ -28,8 +28,31 @@ import config;
 
 using namespace infinity;
 
-class BufferParallelTest : public BaseTest {
+class BufferManagerTest : public BaseTest {
+private:
+    LocalFileSystem fs;
+
+    Vector<SharedPtr<DirEntry>> ListAllFile(const String &path) {
+        Vector<SharedPtr<DirEntry>> res;
+        std::function<void(const String &)> f = [&](const String &path) {
+            auto entries = fs.ListDirectory(path);
+            for (auto &entry : entries) {
+                if (entry->is_directory()) {
+                    f(entry->path());
+                } else {
+                    res.push_back(entry);
+                }
+            }
+        };
+        f(path);
+        return res;
+    }
+
 protected:
+    Vector<SharedPtr<DirEntry>> ListAllData() { return ListAllFile(*data_dir_); }
+
+    Vector<SharedPtr<DirEntry>> ListAllTemp() { return ListAllFile(*temp_dir_); }
+
     SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
 
@@ -40,13 +63,13 @@ protected:
 
         data_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/data");
         temp_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/temp");
-        LocalFileSystem fs;
+        fs.DeleteDirectory(*data_dir_);
+        fs.DeleteDirectory(*temp_dir_);
         fs.CreateDirectory(*data_dir_);
         fs.CreateDirectory(*temp_dir_);
     }
 
     void TearDown() override {
-        LocalFileSystem fs;
         fs.DeleteDirectory(*data_dir_);
         fs.DeleteDirectory(*temp_dir_);
 
@@ -61,7 +84,105 @@ protected:
     };
 };
 
-TEST_F(BufferParallelTest, test1) {
+TEST_F(BufferManagerTest, cleanup_test) {
+    const SizeT k = 2;
+    const SizeT file_size = 100;
+    const SizeT buffer_size = k * file_size;
+    const SizeT file_num = 100;
+    const SizeT file_num1 = file_num / 2;
+    EXPECT_GT(file_num, k + file_num1);
+
+    auto CheckFileNum = [&](SizeT data_num, SizeT temp_num) {
+        auto datas = ListAllData();
+        auto temps = ListAllTemp();
+        EXPECT_EQ(datas.size(), data_num);
+        EXPECT_EQ(temps.size(), temp_num);
+    };
+
+    {
+        BufferManager buffer_mgr(buffer_size, data_dir_, temp_dir_);
+        Vector<BufferObj *> buffer_objs;
+
+        for (SizeT i = 0; i < file_num; ++i) {
+            auto file_name = MakeShared<String>(fmt::format("file_{}", i));
+            auto file_worker = MakeUnique<DataFileWorker>(data_dir_, file_name, file_size);
+            auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
+            buffer_objs.push_back(buffer_obj);
+            {
+                auto buffer_handle = buffer_obj->Load();
+                auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
+                for (SizeT j = 0; j < file_size; ++j) {
+                    data[j] = 'a' + (i + j) % 26;
+                }
+            }
+        }
+        CheckFileNum(0, file_num - k);
+        {
+            SizeT write_n = 0;
+            for (auto *buffer_obj : buffer_objs) {
+                if (buffer_obj->Save()) {
+                    ++write_n;
+                }
+            }
+            EXPECT_EQ(write_n, k);
+        }
+        CheckFileNum(file_num, 0);
+        for (SizeT i = 0; i < file_num; ++i) {
+            auto *buffer_obj = buffer_objs[i];
+            auto buffer_handle = buffer_obj->Load();
+            const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
+            for (SizeT j = 0; j < file_size; ++j) {
+                EXPECT_EQ(data[j], char('a' + (i + j) % 26));
+            }
+        }
+        CheckFileNum(file_num, 0);
+        for (SizeT i = 0; i < file_num; ++i) {
+            auto *buffer_obj = buffer_objs[i];
+            auto buffer_handle = buffer_obj->Load();
+            auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
+            for (SizeT j = 0; j < file_size; ++j) {
+                data[j] = 'a' + (i + j) % 26;
+            }
+        }
+        {
+            SizeT write_n = 0;
+            for (SizeT i = 0; i < file_num1; ++i) {
+                auto *buffer_obj = buffer_objs[i];
+                bool write = buffer_obj->Save();
+                if (write) {
+                    ++write_n;
+                }
+            }
+            EXPECT_EQ(write_n, 0ull);
+        }
+        buffer_mgr.RemoveClean();
+        CheckFileNum(file_num, file_num - k - file_num1);
+        for (SizeT i = file_num1; i < file_num; ++i) {
+            auto *buffer_obj = buffer_objs[i];
+            {
+                auto buffer_handle = buffer_obj->Load();
+                auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
+                for (SizeT j = 0; j < file_size; ++j) {
+                    data[j] = 'A' + (i + j) % 26;
+                }
+            }
+            buffer_obj->Save();
+        }
+        CheckFileNum(file_num, file_num - file_num1);
+        buffer_mgr.RemoveClean();
+        CheckFileNum(file_num, 0);
+
+        for (auto *buffer_obj : buffer_objs) {
+            buffer_obj->PickForCleanup();
+        }
+        buffer_mgr.RemoveClean();
+        CheckFileNum(0, 0);
+    }
+}
+
+TEST_F(BufferManagerTest, parallel_test) {
+    LocalFileSystem fs;
+
     const SizeT thread_n = 4;
     const SizeT file_n = 100;
     const SizeT avg_file_size = 100;
@@ -145,4 +266,5 @@ TEST_F(BufferParallelTest, test1) {
             thread.join();
         }
     }
+    LOG_INFO("Finished parallel test.");
 }

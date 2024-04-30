@@ -43,7 +43,7 @@ public:
     bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) {
         if (doc_id == doc_id_) {
             match_data.doc_id_ = doc_id_;
-            iter_->GetTermMatchData(match_data);
+            iter_->GetTermMatchData(match_data, true);
             term_freq_ += match_data.tf_;
             return true;
         }

@@ -98,6 +98,8 @@ public:
 
     [[nodiscard]] inline std::chrono::seconds optimize_interval() const { return system_option_.optimize_interval_; }
 
+    [[nodiscard]] inline SizeT memindex_capacity() const { return system_option_.memindex_capacity_; }
+
     // Buffer
     [[nodiscard]] inline u64 buffer_pool_size() const { return system_option_.buffer_pool_size; }
 

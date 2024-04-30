@@ -52,6 +52,7 @@ import table_index_entry;
 import log_file;
 import default_values;
 import defer_op;
+import index_base;
 
 module wal_manager;
 
@@ -107,7 +108,7 @@ void WalManager::Stop() {
     txn_mgr->Stop();
 
     // pop all the entries in the queue. and notify the condition variable.
-    blocking_queue_.Enqueue(nullptr, nullptr);
+    wait_flush_.Enqueue(nullptr);
 
     // Wait for flush thread to stop
     LOG_TRACE("WalManager::Stop flush thread join");
@@ -119,14 +120,11 @@ void WalManager::Stop() {
 
 // Session request to persist an entry. Assuming txn_id of the entry has
 // been initialized.
-void WalManager::PutEntry(WalEntry *entry, Txn *txn) {
+void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
     if (!running_.load()) {
         return;
     }
-
-    blocking_queue_.Enqueue(entry, txn);
-
-    return;
+    wait_flush_.EnqueueBulk(wal_entries);
 }
 
 void WalManager::SetLastCkpWalSize(i64 wal_size) {
@@ -152,30 +150,21 @@ void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
     Deque<WalEntry *> log_batch{};
+    TxnManager *txn_mgr = storage_->txn_manager();
     while (running_.load()) {
-        blocking_queue_.DequeueBulk(log_batch);
+        wait_flush_.DequeueBulk(log_batch);
         if (log_batch.empty()) {
             LOG_WARN("WalManager::Dequeue empty batch logs");
             continue;
         }
         // auto [max_commit_ts, wal_size] = GetWalState();
-        TxnManager *txn_mgr = storage_->txn_manager();
 
-        Vector<SharedPtr<Txn>> txns;
         for (const auto &entry : log_batch) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry == nullptr) {
                 // terminate entry
                 running_ = false;
                 break;
-            }
-            SharedPtr<Txn> txn = txn_mgr->GetTxnPtr(entry->txn_id_);
-            // Commit sequentially so they get visible in the same order with wal.
-            bool conflict = txn->CheckConflict();
-            txns.push_back(txn);
-            if (conflict) {
-                txn->SetTxnToRollback();
-                continue;
             }
 
             if (entry->cmds_.empty()) {
@@ -218,11 +207,13 @@ void WalManager::Flush() {
             }
         }
 
-        log_batch.clear();
-
-        for (auto txn : txns) {
-            txn->CommitBottom();
+        for (const auto &entry : log_batch) {
+            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
+            if (txn != nullptr) {
+                txn->CommitBottom();
+            }
         }
+        log_batch.clear();
 
         // Check if the wal file is too large, swap to a new one.
         try {
@@ -500,11 +491,11 @@ i64 WalManager::ReplayWalFile() {
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
+        LOG_INFO(replay_entries[replay_count]->ToString());
         ReplayWalEntry(*replay_entries[replay_count]);
-        LOG_TRACE(replay_entries[replay_count]->ToString());
     }
 
-    LOG_TRACE(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
+    LOG_INFO(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
     storage_->catalog()->next_txn_id_ = last_txn_id;
     this->max_commit_ts_ = system_start_ts;
 
@@ -671,7 +662,8 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
     table_entry->DropIndexReplay(
         cmd.index_name_,
         [&](TableIndexMeta *index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-            auto index_entry = TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, index_meta, txn_id, begin_ts);
+            auto index_base = MakeShared<IndexBase>(index_meta->index_name());
+            auto index_entry = TableIndexEntry::NewTableIndexEntry(index_base, true, nullptr, index_meta, txn_id, begin_ts);
             index_entry->commit_ts_.store(commit_ts);
             return index_entry;
         },
@@ -713,7 +705,7 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
             auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_idx, last_off, commit_ts);
             block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
         }
-        segment_entry->AddBlockReplay(std::move(block_entry), block_id); // reuse function from delta catalog.
+        segment_entry->AddBlockReplay(std::move(block_entry)); // reuse function from delta catalog.
     }
     return segment_entry;
 }
@@ -777,7 +769,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     table_store->append_state_ = std::move(append_state);
 
     fake_txn->FakeCommit(commit_ts);
-    Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager());
+    Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), true);
     Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
 }
 

@@ -15,6 +15,7 @@
 module;
 
 #include "type/complex/row_id.h"
+#include <cassert>
 
 export module chunk_index_entry;
 
@@ -39,7 +40,11 @@ struct SegmentEntry;
 
 // ChunkIndexEntry is an immutable chunk of SegmentIndexEntry. MemIndexer(for fulltext) is the mutable chunk of SegmentIndexEntry.
 export class ChunkIndexEntry : public BaseEntry, public EntryInterface {
-private:
+public:
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const ChunkID chunk_id, const SegmentIndexEntry *segment_index_entry);
+
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
     static UniquePtr<IndexFileWorker> CreateFileWorker(const IndexBase *index_base,
@@ -85,12 +90,16 @@ public:
 
     BufferObj *GetBufferObj() { return buffer_obj_; }
 
-    void DeprecateChunk(TxnTimeStamp commit_ts) { deprecate_ts_.store(commit_ts); }
+    void DeprecateChunk(TxnTimeStamp commit_ts) {
+        assert(commit_ts_.load() < commit_ts);
+        deprecate_ts_.store(commit_ts);
+    }
 
     bool CheckVisible(TxnTimeStamp ts) {
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();
         TxnTimeStamp commit_ts = commit_ts_.load();
-        return ts >= commit_ts && ts < deprecate_ts;
+        assert(commit_ts == UNCOMMIT_TS || commit_ts < deprecate_ts);
+        return ts >= commit_ts && ts <= deprecate_ts;
     }
 
     bool CheckDeprecate(TxnTimeStamp ts) {

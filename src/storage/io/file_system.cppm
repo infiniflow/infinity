@@ -59,6 +59,10 @@ public:
 
     virtual i64 Write(FileHandler &file_handler, const void *data, u64 nbytes) = 0;
 
+    virtual i64 ReadAt(FileHandler &file_handler, i64 file_offset, void *data, u64 nbytes) = 0;
+
+    virtual i64 WriteAt(FileHandler &file_handler, i64 file_offset, const void *data, u64 nbytes) = 0;
+
     virtual void Rename(const String &old_path, const String &new_path) = 0;
 
     virtual void Seek(FileHandler &file_handler, i64 pos) = 0;

@@ -323,38 +323,8 @@ void InfinityThriftService::Import(infinity_thrift_rpc::CommonResponse &response
     }
     import_options.delimiter_ = delimiter_string[0];
 
-    const QueryResult result = infinity->Import(request.db_name, request.table_name, path.c_str(), import_options);
+    const QueryResult result = infinity->Import(request.db_name, request.table_name, request.file_name.c_str(), import_options);
     ProcessQueryResult(response, result);
-}
-
-void InfinityThriftService::UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) {
-    LocalFileSystem fs;
-    Path path(
-        fmt::format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
-    if (request.index != 0) {
-        FileWriter file_writer(fs, path.c_str(), request.data.size(), FileFlags::WRITE_FLAG | FileFlags::APPEND_FLAG);
-        file_writer.Write(request.data.data(), request.data.size());
-        file_writer.Flush();
-    } else {
-        // Check file exist
-        if (fs.Exists(path.c_str())) {
-            auto exist_file_size = LocalFileSystem::GetFileSizeByPath(path.c_str());
-            if ((i64)exist_file_size != request.total_size) {
-                LOG_TRACE(fmt::format("Exist file size: {} , request total size: {}", exist_file_size, request.total_size));
-                fs.DeleteFile(path.c_str());
-            } else {
-                response.__set_error_code((i64)(ErrorCode::kOk));
-                response.__set_can_skip(true);
-                return;
-            }
-        }
-        FileWriter file_writer(fs, path.c_str(), request.data.size());
-        file_writer.Write(request.data.data(), request.data.size());
-        file_writer.Flush();
-    }
-    response.__set_error_code((i64)(ErrorCode::kOk));
-    response.__set_can_skip(false);
-    LOG_TRACE(fmt::format("Upload file name: {} , index: {}", path.c_str(), request.index));
 }
 
 void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) {

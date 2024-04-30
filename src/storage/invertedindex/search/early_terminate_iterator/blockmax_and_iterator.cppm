@@ -38,7 +38,9 @@ public:
 
     float BlockMaxBM25Score() override { return common_block_max_bm25_score_; }
 
+    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
+    float BM25Score() override;
 
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
 
@@ -57,6 +59,9 @@ private:
     // won't change after initialization
     Vector<float> leftover_scores_upper_bound_;                  // value at i: upper bound of sum of BM25 scores for iter i + 1, i + 2, ..., n - 1
     Vector<UniquePtr<EarlyTerminateIterator>> sorted_iterators_; // sort by df, in ascending order
+    // bm25 score cache
+    bool bm25_score_cached_ = false;
+    float bm25_score_cache_ = 0.0F;
 };
 
 } // namespace infinity

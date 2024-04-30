@@ -32,11 +32,11 @@ protected:
 public:
     virtual ~EarlyTerminateIterator() = default;
 
+    inline RowID DocID() const { return doc_id_; }
+
     inline u32 DocFreq() const { return doc_freq_; }
 
     inline float BM25ScoreUpperBound() const { return bm25_score_upper_bound_; }
-
-    Pair<RowID, float> NextWithThreshold(float threshold);
 
     Pair<RowID, float> BlockNextWithThreshold(float threshold);
 
@@ -56,7 +56,11 @@ public:
 
     // if seek failed in current block, return false, doc_id_ may be unchanged or changed
     // if seek succeed in current block, return true, doc_id_ is updated
+    virtual Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) = 0;
+
     virtual Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) = 0;
+
+    virtual float BM25Score() = 0;
 
     virtual Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) = 0;
 

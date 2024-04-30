@@ -209,6 +209,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         }
         return result;
         */
+        // create phrase query node
         auto result = std::make_unique<PhraseQueryNode>();
         for (auto term : terms) {
             result->AddTerm(term.Text());

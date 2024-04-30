@@ -255,6 +255,7 @@ if __name__ == '__main__':
     current_path = os.getcwd()
     parent_path = os.path.dirname(current_path)
     parent_path = os.path.dirname(parent_path)
+    parent_path = os.path.dirname(parent_path)
 
     print(f"Current Path: {current_path}")
     print(f"Parent Path: {parent_path}")

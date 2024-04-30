@@ -61,6 +61,8 @@ public:
     [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
     [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
 
+    DBEntry *db_entry() { return db_entry_; }
+
 private:
     Tuple<TableEntry *, Status> CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TableEntryType table_entry_type,

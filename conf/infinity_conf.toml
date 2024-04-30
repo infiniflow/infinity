@@ -50,6 +50,9 @@ garbage_collection_interval = "60s"
 # 0.1 means, once the storage reach 10% storage capacity, GC is triggered.
 garbage_collection_storage_ratio = 0.1
 
+# dump memory index entry when it reachs the capacity
+memindex_capacity       = 1048576
+
 [buffer]
 buffer_pool_size        = "4GB"
 temp_dir                = "/var/infinity/tmp"

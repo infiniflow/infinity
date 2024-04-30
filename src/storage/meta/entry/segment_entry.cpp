@@ -46,14 +46,31 @@ import wal_entry;
 
 namespace infinity {
 
+Vector<std::string_view> SegmentEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid segment entry encode: {}", encode));
+    }
+    auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String SegmentEntry::EncodeIndex(const SegmentID segment_id, const TableEntry *table_entry) {
+    if (table_entry == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", table_entry->encode(), segment_id);
+}
+
 SegmentEntry::SegmentEntry(TableEntry *table_entry,
                            SharedPtr<String> segment_dir,
                            SegmentID segment_id,
                            SizeT row_capacity,
                            SizeT column_count,
                            SegmentStatus status)
-    : BaseEntry(EntryType::kSegment, false), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id),
-      row_capacity_(row_capacity), column_count_(column_count), status_(status) {}
+    : BaseEntry(EntryType::kSegment, false, SegmentEntry::EncodeIndex(segment_id, table_entry)), table_entry_(table_entry), segment_dir_(segment_dir),
+      segment_id_(segment_id), row_capacity_(row_capacity), column_count_(column_count), status_(status) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
@@ -92,6 +109,18 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
+void SegmentEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data) {
+    status_ = segment_entry->status_;
+    row_count_ = segment_entry->row_count_;
+    actual_row_count_ = segment_entry->actual_row_count_;
+    min_row_ts_ = segment_entry->min_row_ts_;
+    max_row_ts_ = segment_entry->max_row_ts_;
+    deprecate_ts_ = segment_entry->deprecate_ts_;
+    if (!segment_filter_binary_data.empty()) {
+        LoadFilterBinaryData(segment_filter_binary_data);
+    }
+}
+
 bool SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
@@ -101,12 +130,24 @@ bool SegmentEntry::SetSealed() {
     return true;
 }
 
-void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id) {
+void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry) {
+    BlockID block_id = block_entry->block_id();
     BlockID cur_blocks_size = block_entries_.size();
     if (block_id >= cur_blocks_size) {
         block_entries_.resize(block_id + 1);
     }
+    if (block_entries_[block_id].get() != nullptr) {
+        UnrecoverableError(fmt::format("BlockEntry {} already exists in SegmentEntry {}", block_id, segment_id_));
+    }
     block_entries_[block_id] = std::move(block_entry);
+}
+
+void SegmentEntry::UpdateBlockReplay(SharedPtr<BlockEntry> new_block, String block_filter_binary_data) {
+    BlockID block_id = new_block->block_id();
+    if (block_id >= block_entries_.size() || block_entries_[block_id].get() == nullptr) {
+        UnrecoverableError(fmt::format("BlockEntry {} does not exist in SegmentEntry {}", block_id, segment_id_));
+    }
+    block_entries_[block_id]->UpdateBlockReplay(new_block, std::move(block_filter_binary_data));
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
@@ -341,12 +382,13 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
 }
 
-void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry) {
+void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries) {
     std::unique_lock w_lock(rw_locker_);
-    for (auto iter = block_entry.rbegin(); iter != block_entry.rend(); ++iter) {
-        BlockEntry *block = *iter;
-        if (!block->Committed()) {
-            if (block_entries_.empty() || block_entries_.back()->block_id() != block->block_id()) {
+    Vector<Pair<BlockID, BlockEntry *>> rollback_blocks(block_entries.begin(), block_entries.end());
+    std::sort(rollback_blocks.begin(), rollback_blocks.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+    for (auto [block_id, block_entry] : rollback_blocks) {
+        if (!block_entry->Committed()) {
+            if (block_entries_.empty() || block_entries_.back()->block_id() != block_entry->block_id()) {
                 UnrecoverableError("BlockEntry rollback order is not correct");
             }
             auto &rollback_block = block_entries_.back();
@@ -367,6 +409,8 @@ SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
+    this->checkpoint_row_count_ = 0;
+
     // const field
     json_res["segment_dir"] = *this->segment_dir_;
     json_res["row_capacity"] = this->row_capacity_;
@@ -378,7 +422,6 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["min_row_ts"] = this->min_row_ts_;
         json_res["max_row_ts"] = std::min(this->max_row_ts_, max_commit_ts);
         json_res["deleted"] = this->deleted_;
-        json_res["row_count"] = this->row_count_;
         json_res["actual_row_count"] = this->actual_row_count_;
 
         json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
@@ -394,8 +437,11 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
             if (block_entry->commit_ts_ <= max_commit_ts) {
                 block_entry->Flush(max_commit_ts);
                 json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
+                this->checkpoint_row_count_ += block_entry->checkpoint_row_count();
             }
         }
+
+        json_res["row_count"] = this->checkpoint_row_count_;
     }
     return json_res;
 }
@@ -413,6 +459,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->row_count_ = segment_entry_json["row_count"];
     segment_entry->actual_row_count_ = segment_entry_json["actual_row_count"];
+    segment_entry->checkpoint_row_count_ = 0;
 
     segment_entry->commit_ts_ = segment_entry_json["commit_ts"];
     segment_entry->begin_ts_ = segment_entry_json["begin_ts"];

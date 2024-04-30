@@ -8,31 +8,37 @@
 #define USE_AVX512
 #endif
 #endif
+#elif defined(__aarch64__)
+#define USE_SSE
+#define USE_AVX
 #endif
 #endif
 
 #if defined(USE_AVX) || defined(USE_SSE)
-#ifdef _MSC_VER
-#include <intrin.h>
-#include <stdexcept>
-// void cpuid(int32_t out[4], int32_t eax, int32_t ecx) {
-//     __cpuidex(out, eax, ecx);
-// }
-// static __int64 xgetbv(unsigned int x) {
-//     return _xgetbv(x);
-// }
-#else
-#include <x86intrin.h>
-#include <cpuid.h>
-#include <stdint.h>
-// static void cpuid(int32_t cpuInfo[4], int32_t eax, int32_t ecx) {
-    // __cpuid_count(eax, ecx, cpuInfo[0], cpuInfo[1], cpuInfo[2], cpuInfo[3]);
-// }
-// static uint64_t xgetbv(unsigned int index) {
-    // uint32_t eax, edx;
-    // __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
-    // return ((uint64_t)edx << 32) | eax;
-// }
+
+#if defined(_MSC_VER)
+     /* Microsoft C/C++-compatible compiler */
+     #include <intrin.h>
+     #include <stdexcept>
+#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+     /* GCC-compatible compiler, targeting x86/x86-64 */
+     #include <x86intrin.h>
+     #include <cpuid.h>
+     #include <stdint.h>
+#elif defined(__GNUC__) && defined(__aarch64__)
+     /* GCC-compatible compiler, targeting ARM with NEON */
+     #include <simde/x86/avx2.h>
+     #include <simde/x86/avx512.h>
+     #include <stdint.h>
+#elif defined(__GNUC__) && defined(__IWMMXT__)
+     /* GCC-compatible compiler, targeting ARM with WMMX */
+     #include <mmintrin.h>
+#elif (defined(__GNUC__) || defined(__xlC__)) && (defined(__VEC__) || defined(__ALTIVEC__))
+     /* XLC or GCC-compatible compiler, targeting PowerPC with VMX/VSX */
+     #include <altivec.h>
+#elif defined(__GNUC__) && defined(__SPE__)
+     /* GCC-compatible compiler, targeting PowerPC with SPE */
+     #include <spe.h>
 #endif
 
 #if defined(USE_AVX512)

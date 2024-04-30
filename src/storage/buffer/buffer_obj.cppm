@@ -75,7 +75,9 @@ public:
 
     void PickForCleanup();
 
-    void CleanupFile();
+    void CleanupFile() const;
+
+    void CleanupTempFile() const ;
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 

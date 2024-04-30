@@ -20,6 +20,7 @@ module bm25_ranker;
 
 import stl;
 import index_defines;
+import third_party;
 
 namespace infinity {
 
@@ -34,23 +35,22 @@ void BM25Ranker::AddTermParam(u64 tf, u64 df, float avg_column_len, u32 column_l
     score_ += smooth_idf * smooth_tf * weight;
 }
 
-void BM25Ranker::AddPhraseParam(const Vector<tf_t>& all_tf,
-                                const Vector<u32>& all_df,
-                                float avg_column_len,
-                                u32 column_len,
-                                float weight,
-                                SizeT term_num) {
-    for (SizeT i = 0; i < term_num; ++i) {
-        u64 tf = 0;
-        u64 df = 0;
-        if (i < all_tf.size()) {
-            tf = all_tf[i];
-        }
-        if (i < all_df.size()) {
-            df = all_df[i];
-        }
-        AddTermParam(tf, df, avg_column_len, column_len, weight);
-    }
+void BM25Ranker::AddPhraseParam(tf_t tf, u64 df, float avg_column_len, u32 column_len, float weight) {
+    float smooth_idf = std::log(1.0F + (total_df_ - df + 0.5F) / (df + 0.5F));
+    float smooth_tf = (k1 + 1.0F) * tf / (tf + k1 * (1.0F - b + b * column_len / avg_column_len));
+    score_ += smooth_idf * smooth_tf * weight;
+//    fmt::print("tf = {}, df = {}, score: {}\n", tf, df, score_);
+//    for (SizeT i = 0; i < term_num; ++i) {
+//        u64 tf = 0;
+//        u64 df = 0;
+//        if (i < all_tf.size()) {
+//            tf = all_tf[i];
+//        }
+//        if (i < all_df.size()) {
+//            df = all_df[i];
+//        }
+//        AddTermParam(tf, df, avg_column_len, column_len, weight);
+//    }
 }
 
 } // namespace infinity

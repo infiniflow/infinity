@@ -78,6 +78,7 @@ export struct SystemOptions {
     std::chrono::seconds cleanup_interval_{};
     std::chrono::seconds compact_interval_{};
     std::chrono::seconds optimize_interval_{};
+    SizeT memindex_capacity_{};
 
     // Buffer
     u64 buffer_pool_size{};

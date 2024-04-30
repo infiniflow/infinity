@@ -7,7 +7,7 @@
     "topK": 100,
     "mode": "vector", 
     "schema": {
-        "embeddings": "vector, 128, float"
+        "embeddings": {"type": "vector, 128, float"}
     }, 
     "vector_size": 128,
     "vector_name": "embeddings",

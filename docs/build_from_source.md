@@ -14,11 +14,23 @@ Infinity can only be compiled natively on Linux. If your operating system is not
 
 ## Prerequisites
 
-A RAM of 16GB is advised to properly build the project. If your machine does not have that much memory capacity, ensure that there is a minimum of 6GB of RAM and limit the number of ninja parallel compilation jobs to one: 
+Build the whole project, especially the link stage, requires much RAM. The host may become unresponsive due to the very slow kernel oom killer. To lessen the chances of it happening, it is recommended to install [earlyoom](https://github.com/rfjakob/earlyoom). Furthermore, you need to tell cmake to limit the concurrent link process:
 
-```shell
-ninja -j1
-```
+`-DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=2`
+
+The recommended `link_pool` size is:
+
+- 1 for 6GB
+- 2 for 16GB
+- 3 for 32GB
+
+The `CMAKE_BUILD_TYPE` (cmake build type) can be one of:
+
+- `Debug`: no inline, with symbol info, with address sanitize, normally ~10x slower than `RelWithDebInfo` and `Release`. This aims daily development.
+- `RelWithDebInfo`: optimize with `-O2`, with symbol info. This aims performance analysis.
+- `Release`: optimize with `-O3`, without symbol info. The built one executables are much smaller than `RelWithDebInfo`. This aims [project releases](https://github.com/infiniflow/infinity/releases).
+
+Following procedures use `Debug`. Change it as you need.
 
 ## Build from source on Linux using Docker
 
@@ -36,13 +48,14 @@ git clone https://github.com/infiniflow/infinity.git
 cd infinity && mkdir build
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
 docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu2310
-docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && ninja"
+docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
 ```
 
 ### Step3 Start up the Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```
 
@@ -78,19 +91,28 @@ git clone https://github.com/infiniflow/infinity.git
 
 ### Step3 Build the source code
 
+you need first install `simde` if on arm, note we need `v0.7.4+` version for simde
+
+```
+sudo apt install libsimde-dev
+```
+If the installed version is under v0.7.4, you can download the include files directly from github and replace it.
+
+
 ```shell
 git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-17
 export CXX=/usr/bin/clang++-17
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-ninja
+cmake --build .
 ```
 
 ### Step4 Start up the Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```
 
@@ -127,12 +149,13 @@ cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-17
 export CXX=/usr/bin/clang++-17
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
-ninja
+cmake --build .
 ```
 
 ### Step4 Start up Infinity server
 
 ```shell
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+ulimit -n 500000
 ./cmake-build-debug/src/infinity
 ```

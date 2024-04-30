@@ -198,7 +198,8 @@ public:
     // static void RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn);
 
     // Append related functions
-    static void Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+    static void
+    Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr, bool is_replay = false);
 
     static void RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 

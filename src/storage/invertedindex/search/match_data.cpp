@@ -88,12 +88,18 @@ float Scorer::Score(RowID doc_id) {
                 PhraseColumnMatchData column_match_data;
                 PhraseDocIterator* phrase_iter = dynamic_cast<PhraseDocIterator*>(column_iters[j]);
                 if (phrase_iter->GetPhraseMatchData(column_match_data, doc_id)) {
-                    ranker.AddPhraseParam(column_match_data.all_tf_,
-                                          phrase_iter->GetAllDF(),
+                    ranker.AddPhraseParam(column_match_data.tf_,
+                                          phrase_iter->GetEstimateDF(),
                                           avg_column_length,
                                           column_len,
-                                          phrase_iter->GetWeight(),
-                                          column_iters.size());
+                                          phrase_iter->GetWeight());
+                    fmt::print("doc_id = {}, tf = {}, score: {}\n", doc_id.ToUint64(), column_match_data.tf_, ranker.GetScore());
+//                    ranker.AddPhraseParam(column_match_data.all_tf_,
+//                                          phrase_iter->GetAllDF(),
+//                                          avg_column_length,
+//                                          column_len,
+//                                          phrase_iter->GetWeight(),
+//                                          column_iters.size());
                 }
             }
         }

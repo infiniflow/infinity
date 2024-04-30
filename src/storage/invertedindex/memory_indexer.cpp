@@ -144,6 +144,14 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     }
 }
 
+void MemoryIndexer::InsertGap(u32 row_count) {
+    if (is_spilled_)
+        Load();
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    doc_count_ += row_count;
+}
+
 void MemoryIndexer::Commit(bool offline) {
     if (offline) {
         commiting_thread_pool_.push([this](int id) { this->CommitOffline(); });

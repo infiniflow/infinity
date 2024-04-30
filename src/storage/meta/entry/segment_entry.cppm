@@ -52,6 +52,10 @@ public:
     friend struct TableEntry;
     friend struct WalSegmentInfo;
 
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const SegmentID segment_id, const TableEntry *table_entry);
+
 public:
     explicit SegmentEntry(TableEntry *table_entry,
                           SharedPtr<String> segment_dir,
@@ -76,12 +80,16 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
 
+    void UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data);
+
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    void AddBlockReplay(SharedPtr<BlockEntry> block_entry, BlockID block_id);
+    void AddBlockReplay(SharedPtr<BlockEntry> block_entry);
+
+    void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
     bool SetSealed();
 
@@ -143,6 +151,11 @@ public:
         return actual_row_count_;
     }
 
+    // only used in Serialize(), FullCheckpoint, and no concurrency
+    SizeT checkpoint_row_count() const {
+        return checkpoint_row_count_;
+    }
+
     int Room() const { return this->row_capacity_ - this->row_count(); }
 
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
@@ -168,7 +181,7 @@ public:
 
     void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry);
+    void RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries);
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
@@ -199,6 +212,7 @@ private:
 
     SizeT row_count_{};
     SizeT actual_row_count_{}; // not deleted row count
+    SizeT checkpoint_row_count_{};
 
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{0};

@@ -230,6 +230,9 @@ export namespace std {
 
     using std::is_same_v;
     using std::priority_queue;
+
+    using std::begin;
+    using std::end;
 } // namespace std
 
 namespace infinity {
@@ -403,6 +406,9 @@ namespace infinity {
     // Smart ptr
     template<typename T>
     using SharedPtr = std::shared_ptr<T>;
+
+    template<typename T>
+    using WeakPtr = std::weak_ptr<T>;
 
     template<typename T, typename... Args>
     inline SharedPtr<T> MakeShared(Args &&...args) {

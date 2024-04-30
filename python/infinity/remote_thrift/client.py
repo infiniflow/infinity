@@ -21,6 +21,7 @@ from infinity import URI
 from infinity.infinity import ShowVariable
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.errors import ErrorCode
 
 
 class ThriftInfinityClient:
@@ -30,7 +31,8 @@ class ThriftInfinityClient:
 
     def reconnect(self):
         # self.transport = TTransport.TFramedTransport(TSocket.TSocket(self.uri.ip, self.uri.port))  # async
-        self.transport = TTransport.TBufferedTransport(TSocket.TSocket(self.uri.ip, self.uri.port))  # sync
+        self.transport = TTransport.TBufferedTransport(
+            TSocket.TSocket(self.uri.ip, self.uri.port))  # sync
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         # self.protocol = TCompactProtocol.TCompactProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
@@ -124,7 +126,7 @@ class ThriftInfinityClient:
 
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
         retry = 0
-        while retry <= 1:
+        while retry <= 10:
             try:
                 res = self.client.Insert(InsertRequest(session_id=self.session_id,
                                                        db_name=db_name,
@@ -138,8 +140,7 @@ class ThriftInfinityClient:
                     retry += 1
                 else:
                     break
-
-        return
+        return CommonResponse(ErrorCode.TOO_MANY_CONNECTIONS, "retry insert failed")
 
     # Can be used in compact mode
     # def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
@@ -200,16 +201,6 @@ class ThriftInfinityClient:
         res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
         self.transport.close()
         return res
-
-    def upload(self, db_name: str, table_name: str, file_name: str, data, index: int, is_last: bool, total_size: int):
-        return self.client.UploadFileChunk(FileChunk(session_id=self.session_id,
-                                                     db_name=db_name,
-                                                     table_name=table_name,
-                                                     file_name=file_name,
-                                                     index=index,
-                                                     data=data,
-                                                     is_last=is_last,
-                                                     total_size=total_size))
 
     def show_variable(self, variable: ShowVariable):
         return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,

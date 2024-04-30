@@ -40,10 +40,24 @@ import buffer_obj;
 
 namespace infinity {
 
+Vector<std::string_view> BlockEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid block entry encode: {}", encode));
+    }
+    auto decodes = SegmentEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String BlockEntry::EncodeIndex(const BlockID block_id, const SegmentEntry *segment_entry) {
+    return fmt::format("{}#{}", segment_entry->encode(), block_id);
+}
+
 /// class BlockEntry
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts)
-    : BaseEntry(EntryType::kBlock, false), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
-      checkpoint_ts_(checkpoint_ts) {}
+    : BaseEntry(EntryType::kBlock, false, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry), block_id_(block_id),
+      row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
 
 UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
@@ -90,6 +104,17 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->checkpoint_ts_ = check_point_ts;
     block_entry->checkpoint_row_count_ = checkpoint_row_count;
     return block_entry;
+}
+
+void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data) {
+    row_count_ = block_entry->row_count_;
+    min_row_ts_ = block_entry->min_row_ts_;
+    max_row_ts_ = block_entry->max_row_ts_;
+    checkpoint_ts_ = block_entry->checkpoint_ts_;
+    checkpoint_row_count_ = block_entry->checkpoint_row_count_;
+    if (!block_filter_binary_data.empty()) {
+        LoadFilterBinaryData(block_filter_binary_data);
+    }
 }
 
 Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {

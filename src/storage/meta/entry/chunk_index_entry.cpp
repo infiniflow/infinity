@@ -25,6 +25,7 @@ import base_entry;
 import meta_entry_interface;
 import cleanup_scanner;
 import segment_index_entry;
+import table_index_entry;
 import index_file_worker;
 import logger;
 import create_index_info;
@@ -37,12 +38,27 @@ import buffer_obj;
 import buffer_handle;
 import infinity_exception;
 import index_defines;
+import local_file_system;
 
 namespace infinity {
 
+Vector<std::string_view> ChunkIndexEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid chunk index entry encode: {}", encode));
+    }
+    auto decodes = SegmentIndexEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
+
+String ChunkIndexEntry::EncodeIndex(const ChunkID chunk_id, const SegmentIndexEntry *segment_index_entry) {
+    return fmt::format("{}#{}", segment_index_entry->encode(), chunk_id);
+}
+
 ChunkIndexEntry::ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count)
-    : BaseEntry(EntryType::kChunkIndex, false), chunk_id_(chunk_id), segment_index_entry_(segment_index_entry), base_name_(base_name),
-      base_rowid_(base_rowid), row_count_(row_count){};
+    : BaseEntry(EntryType::kChunkIndex, false, ChunkIndexEntry::EncodeIndex(chunk_id, segment_index_entry)), chunk_id_(chunk_id),
+      segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count){};
 
 UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const IndexBase *index_base,
                                                              const SharedPtr<String> &index_dir,
@@ -90,7 +106,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEnt
     assert(index_dir.get() != nullptr);
     if (buffer_mgr != nullptr) {
         auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name);
+        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name, row_count * sizeof(u32));
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;
@@ -107,7 +123,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
     if (param->index_base_->index_type_ == IndexType::kFullText) {
         const auto &index_dir = segment_index_entry->index_dir();
         auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name);
+        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name, row_count * sizeof(u32));
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     } else {
         const auto &index_dir = segment_index_entry->index_dir();
@@ -129,6 +145,7 @@ nlohmann::json ChunkIndexEntry::Serialize() {
     index_entry_json["base_rowid"] = this->base_rowid_.ToUint64();
     index_entry_json["row_count"] = this->row_count_;
     index_entry_json["commit_ts"] = this->commit_ts_.load();
+    index_entry_json["deprecate_ts_"] = this->deprecate_ts_.load();
     return index_entry_json;
 }
 
@@ -142,12 +159,29 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
     u32 row_count = index_entry_json["row_count"];
     auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
     ret->commit_ts_.store(index_entry_json["commit_ts"]);
+    ret->deprecate_ts_.store(index_entry_json["deprecate_ts_"]);
     return ret;
 }
 
 void ChunkIndexEntry::Cleanup() {
     if (buffer_obj_) {
         buffer_obj_->PickForCleanup();
+    }
+    TableIndexEntry *table_index_entry = segment_index_entry_->table_index_entry();
+    const auto &index_dir = segment_index_entry_->index_dir();
+    const IndexBase *index_base = table_index_entry->index_base();
+    if (index_base->index_type_ == IndexType::kFullText) {
+        Path path = Path(*index_dir) / base_name_;
+        String index_prefix = path.string();
+        String posting_file = index_prefix + POSTING_SUFFIX;
+        String dict_file = index_prefix + DICT_SUFFIX;
+
+        LocalFileSystem fs;
+        fs.DeleteFile(posting_file);
+        fs.DeleteFile(dict_file);
+        LOG_INFO(fmt::format("cleanuped chunk index entry {}", index_prefix));
+    } else {
+        LOG_INFO(fmt::format("cleanuped chunk index entry {}/{}", *index_dir, chunk_id_));
     }
 }
 

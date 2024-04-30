@@ -25,12 +25,8 @@ import status;
 
 namespace infinity {
 
-RawFileWorker::RawFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name)
-    : FileWorker(std::move(file_dir), std::move(file_name)), buffer_size_(0) {
-    LocalFileSystem fs;
-    String full_path = fs.ConcatenateFilePath(*file_dir_, *file_name_);
-    buffer_size_ = fs.GetFileSizeByPath(full_path);
-}
+RawFileWorker::RawFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, u32 file_size)
+    : FileWorker(std::move(file_dir), std::move(file_name)), buffer_size_(file_size) {}
 
 RawFileWorker::~RawFileWorker() {
     if (data_ != nullptr) {
