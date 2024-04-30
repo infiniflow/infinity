@@ -77,8 +77,8 @@ python run.py
 
 |                   | QPS  | Time to insert & build index | Time to import & build index | Disk  | Peak memory |
 | ----------------- | ----------- | ---------------------------- | ---------------------------- | ---- | ----- |
-| **Elasticsearch** | 484      | 2289 s                       | N/A                          | 5.3 GB | 28 GB |
-| **Infinity**      | 484      | 2321 s                       | 944 s                        | 5.1 GB  | 54 GB |
+| **Elasticsearch** | 484      | 2289 s                       | N/A                          | 28 GB  | 5.3 GB |
+| **Infinity**      | 484      | 2321 s                       | 944 s                        | 54 GB  | 5.1 GB |
 
 
 ---
