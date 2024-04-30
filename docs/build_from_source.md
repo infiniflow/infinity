@@ -47,7 +47,7 @@ git clone https://github.com/infiniflow/infinity.git
 ```shell
 cd infinity && mkdir build
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu2310
+docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
 docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
 ```
 
