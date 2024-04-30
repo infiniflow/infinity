@@ -75,16 +75,14 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
 }
 
 Txn *TxnManager::GetTxn(TransactionID txn_id) {
-    rw_locker_.lock_shared();
+    std::lock_guard guard(rw_locker_);
     Txn *res = txn_map_.at(txn_id).get();
-    rw_locker_.unlock_shared();
     return res;
 }
 
 SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
-    rw_locker_.lock_shared();
+    std::lock_guard guard(rw_locker_);
     SharedPtr<Txn> res = txn_map_.at(txn_id);
-    rw_locker_.unlock_shared();
     return res;
 }
 
@@ -243,7 +241,7 @@ void TxnManager::FinishTxn(TransactionID txn_id) {
         return;
     }
 
-    TxnTimeStamp least_uncommitted_begin_ts = txn->BeginTS() + 1;
+    TxnTimeStamp least_uncommitted_begin_ts = txn->CommitTS() + 1;
     while (!beginned_txns_.empty()) {
         auto first_txn = beginned_txns_.front().lock();
         if (first_txn.get() == nullptr) {

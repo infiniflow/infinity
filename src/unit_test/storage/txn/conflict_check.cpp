@@ -16,6 +16,7 @@
 #include "unit_test/base_test.h"
 
 import stl;
+import compilation_config;
 import infinity_context;
 import table_def;
 import column_def;
@@ -39,7 +40,7 @@ protected:
     void SetUp() override {
         RemoveDbDirs();
 
-        std::shared_ptr<std::string> config_path = nullptr;
+        auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_all_bgtask.toml");
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -117,11 +118,14 @@ TEST_F(ConflictCheckTest, conflict_check_delete) {
         auto *txn1 = DeleteRow(0);
         auto *txn2 = DeleteRow(0);
         auto *txn3 = DeleteRow(0);
+        Vector<TransactionID> txn_ids{txn1->TxnID(), txn2->TxnID(), txn3->TxnID()};
 
         txn_mgr->CommitTxn(txn1);
         ExpectConflict(txn2);
         ExpectConflict(txn3);
-        // EXPECT_EQ(txn_mgr->SavedTxnNum(), 0ull);
+        for (auto txn_id : txn_ids) {
+            EXPECT_THROW(txn_mgr->GetTxn(txn_id), std::out_of_range);
+        }
     }
     {
         auto *txn1 = DeleteRow(0);
@@ -131,7 +135,6 @@ TEST_F(ConflictCheckTest, conflict_check_delete) {
         txn_mgr->CommitTxn(txn2);
         ExpectConflict(txn1);
         ExpectConflict(txn3);
-        // EXPECT_EQ(txn_mgr->SavedTxnNum(), 0ull);
     }
     {
         auto *txn1 = DeleteRow(0);
@@ -141,6 +144,5 @@ TEST_F(ConflictCheckTest, conflict_check_delete) {
         txn_mgr->CommitTxn(txn3);
         ExpectConflict(txn2);
         ExpectConflict(txn1);
-        // EXPECT_EQ(txn_mgr->SavedTxnNum(), 0ull);
     }
 }

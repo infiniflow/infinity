@@ -1,0 +1,17 @@
+[general]
+version = "0.1.0"
+timezone = "utc-8"
+
+[storage]
+# close auto optimize
+optimize_interval = 0
+# close auto cleanup task
+cleanup_interval = 0
+# close auto compaction
+compact_interval = 0
+
+[wal]
+# close delta checkpoint
+delta_checkpoint_interval_sec = 0
+# close full checkpoint
+checkpoint_interval_sec = 0
