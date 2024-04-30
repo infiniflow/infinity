@@ -454,6 +454,12 @@ bool Txn::CheckConflict() {
     return txn_store_.CheckConflict();
 }
 
+bool Txn::CheckConflict(Txn *txn) {
+    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
+
+    return txn_store_.CheckConflict(txn->txn_store_);
+}
+
 void Txn::CommitBottom() {
     LOG_TRACE(fmt::format("Txn bottom: {} is started.", txn_id_));
     // prepare to commit txn local data into table
