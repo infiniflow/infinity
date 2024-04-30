@@ -88,6 +88,7 @@ export {
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
     constexpr SizeT DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
+    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 128 * 8192; // 128 * 8192 = 1M rows
 
     constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * GB;
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 30;          // 30 seconds
