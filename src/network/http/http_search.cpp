@@ -220,8 +220,10 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             }
         }
 
-        search_expr->SetExprs(search_exprs);
-        search_expr->Validate();
+        if (search_expr != nullptr && !search_exprs->empty()) {
+            search_expr->SetExprs(search_exprs);
+            search_expr->Validate();
+        }
 
         const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
 
