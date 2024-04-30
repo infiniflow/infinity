@@ -113,6 +113,8 @@ public:
 
     bool CheckConflict(Catalog *catalog) const;
 
+    bool CheckConflict(TxnTableStore *txn_table_store) const;
+
     void PrepareCommit1();
 
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
@@ -180,6 +182,8 @@ public:
     void MaintainCompactionAlg() const;
 
     bool CheckConflict() const;
+
+    bool CheckConflict(const TxnStore &txn_store);
 
     void PrepareCommit1();
 

@@ -94,6 +94,8 @@ public:
 
     bool CheckConflict();
 
+    bool CheckConflict(Txn *txn);
+
     void CommitBottom();
 
     void CancelCommitBottom();

@@ -276,6 +276,40 @@ bool TxnTableStore::CheckConflict(Catalog *catalog) const {
     return false;
 }
 
+bool TxnTableStore::CheckConflict(TxnTableStore *txn_table_store) const {
+    const auto &delete_state = delete_state_;
+    const auto &other_delete_state = txn_table_store->delete_state_;
+    if (delete_state.rows_.empty() || other_delete_state.rows_.empty()) {
+        return false;
+    }
+    for (const auto &[segment_id, block_map] : delete_state.rows_) {
+        auto other_iter = other_delete_state.rows_.find(segment_id);
+        if (other_iter == other_delete_state.rows_.end()) {
+            continue;
+        }
+        for (const auto &[block_id, block_offsets] : block_map) {
+            auto other_block_iter = other_iter->second.find(block_id);
+            if (other_block_iter == other_iter->second.end()) {
+                continue;
+            }
+            const auto other_block_offsets = other_block_iter->second;
+            SizeT j = 0;
+            for (const auto &block_offset : block_offsets) {
+                while (j < other_block_offsets.size() && other_block_offsets[j] < block_offset) {
+                    ++j;
+                }
+                if (j == other_block_offsets.size()) {
+                    break;
+                }
+                if (other_block_offsets[j] == block_offset) {
+                    return true;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 void TxnTableStore::PrepareCommit1() {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     for (auto *segment_entry : flushed_segments_) {
@@ -436,6 +470,19 @@ void TxnStore::MaintainCompactionAlg() const {
 bool TxnStore::CheckConflict() const {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         if (table_store->CheckConflict(catalog_)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool TxnStore::CheckConflict(const TxnStore &txn_store) {
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        auto other_iter = txn_store.txn_tables_store_.find(table_name);
+        if (other_iter == txn_store.txn_tables_store_.end()) {
+            continue;
+        }
+        if (table_store->CheckConflict(other_iter->second.get())) {
             return true;
         }
     }
