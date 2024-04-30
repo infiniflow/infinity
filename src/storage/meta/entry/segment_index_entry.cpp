@@ -851,13 +851,15 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
                                                                        const String &base_name,
                                                                        RowID base_rowid,
                                                                        u32 row_count,
+                                                                       TxnTimeStamp commit_ts,
+                                                                       TxnTimeStamp deprecate_ts,
                                                                        BufferManager *buffer_mgr) {
     const auto &index_base = table_index_entry_->table_index_def();
     const auto &column_def = table_entry->GetColumnDefByName(index_base->column_name());
     auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
 
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
-        ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, buffer_mgr);
+        ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
 
     chunk_index_entries_.push_back(chunk_index_entry); // replay not need lock
     return chunk_index_entry;

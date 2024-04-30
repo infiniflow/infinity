@@ -28,7 +28,7 @@ The `CMAKE_BUILD_TYPE` (cmake build type) can be one of:
 
 - `Debug`: no inline, with symbol info, with address sanitize, normally ~10x slower than `RelWithDebInfo` and `Release`. This aims daily development.
 - `RelWithDebInfo`: optimize with `-O2`, with symbol info. This aims performance analysis.
-- `Release`: optimize with `-O3`, without symbol info. The built one executables are much smaller than `RelWithDebInfo`. This aims [project releases](https://github.com/infiniflow/infinity/releases).
+- `Release`: optimize with `-O3`, without symbol info. The executables built out are much smaller than `RelWithDebInfo`. This aims [project releases](https://github.com/infiniflow/infinity/releases).
 
 Following procedures use `Debug`. Change it as you need.
 
