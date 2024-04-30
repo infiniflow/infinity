@@ -59,9 +59,11 @@ public:
 
     BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
 
-    TxnTimeStamp GetTimestamp();
+    TxnTimeStamp GetCommitTimeStampR(Txn *txn);
 
-    TxnTimeStamp GetBeginTimestamp(TransactionID txn_id);
+    TxnTimeStamp GetCommitTimeStampW(Txn *txn);
+
+    bool CheckConflict(Txn *txn);
 
     void Invalidate(TxnTimeStamp commit_ts);
 
@@ -84,6 +86,8 @@ public:
     TxnTimeStamp CurrentTS() const;
 
 private:
+    void FinishTxn(TransactionID txn_id);
+
     void AddWaitFlushTxn(const Vector<TransactionID> &txn_ids);
 
 public:
@@ -103,14 +107,16 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
-    //    std::mutex mutex_;
+    std::mutex mutex_{};
+    Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
+    Deque<Txn *> finished_txns_;        // sorted by commit ts
+    Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{};
+
     Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
     // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
-    Map<TxnTimeStamp, TransactionID> ts_map_{};
+    Map<TxnTimeStamp, TransactionID> ts_map_{}; // optimize the data structure
     HashSet<TransactionID> wait_flush_txns_{};
 
-    //    Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};
     bool enable_compaction_{};

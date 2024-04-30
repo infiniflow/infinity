@@ -54,6 +54,7 @@ import cleanup_scanner;
 import column_index_merger;
 import parsed_expr;
 import constant_expr;
+import infinity_context;
 
 namespace infinity {
 
@@ -665,7 +666,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
         segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
-        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= 1000000) {
+        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->memindex_capacity()) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
                 chunk_index_entry->Commit(txn->CommitTS());

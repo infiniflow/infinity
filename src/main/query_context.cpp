@@ -159,7 +159,14 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StopProfile(QueryPhase::kExecution);
 //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
-        this->CommitTxn();
+        try {
+            this->CommitTxn();
+        } catch (RecoverableException &e) {
+            StopProfile();
+            this->RollbackTxn();
+            query_result.result_table_ = nullptr;
+            query_result.status_.Init(e.ErrorCode(), e.what());
+        }
         StopProfile(QueryPhase::kCommit);
 
     } catch (RecoverableException &e) {

@@ -162,6 +162,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
     u64 default_compact_interval_sec = DEFAULT_COMPACT_INTERVAL_SEC;
     u64 default_optimize_interval_sec = DEFAULT_OPTIMIZE_INTERVAL_SEC;
+    u64 default_memindex_capacity = DEFAULT_MEMINDEX_CAPACITY;
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
@@ -241,6 +242,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
             system_option_.compact_interval_ = std::chrono::seconds(default_compact_interval_sec);
             system_option_.optimize_interval_ = std::chrono::seconds(default_optimize_interval_sec);
+            system_option_.memindex_capacity_ = default_memindex_capacity;
         }
 
         // Buffer
@@ -427,6 +429,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             system_option_.cleanup_interval_ = std::chrono::seconds(storage_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
             system_option_.compact_interval_ = std::chrono::seconds(storage_config["compact_interval"].value_or(default_compact_interval_sec));
             system_option_.optimize_interval_ = std::chrono::seconds(storage_config["optimize_interval"].value_or(default_optimize_interval_sec));
+            system_option_.memindex_capacity_ = storage_config["memindex_capacity"].value_or(default_memindex_capacity);
         }
 
         // Buffer
@@ -517,6 +520,7 @@ void Config::PrintAll() const {
     fmt::print(" - cleanup_interval_sec: {}\n", system_option_.cleanup_interval_.count());
     fmt::print(" - compact_interval_sec: {}\n", system_option_.compact_interval_.count());
     fmt::print(" - optimize_interval_sec: {}\n", system_option_.optimize_interval_.count());
+    fmt::print(" - memindex_capacity: {}\n", system_option_.memindex_capacity_);
 
     // Buffer
     fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));

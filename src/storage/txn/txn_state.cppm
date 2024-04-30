@@ -27,7 +27,6 @@ export enum class TxnState {
     kStarted,
     kCommitting,
     kCommitted,
-    kToRollback,
     kRollbacking,
     kRollbacked,
     kInvalid,
@@ -47,9 +46,6 @@ export inline String ToString(TxnState txn_state) {
         case TxnState::kCommitted: {
             return "Committed";
         }
-        case TxnState::kToRollback: {
-            return "To Rollback";
-        }
         case TxnState::kRollbacking: {
             return "Rollbacking";
         }
@@ -63,5 +59,11 @@ export inline String ToString(TxnState txn_state) {
     UnrecoverableError("Invalid transaction state.");
     return String();
 }
+
+export enum class TxnType : i8 {
+    kRead = 0,
+    kWrite,
+    kInvalid,
+};
 
 } // namespace infinity

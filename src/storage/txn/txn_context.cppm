@@ -16,7 +16,7 @@ module;
 
 import stl;
 import txn_state;
-
+import third_party;
 import infinity_exception;
 
 export module txn_context;
@@ -29,16 +29,7 @@ export class TxnContext {
 public:
     friend class Txn;
 
-    TxnContext(TxnTimeStamp begin_ts): begin_ts_(begin_ts) {}
-
-//    inline void SetTxnBegin(TxnTimeStamp begin_ts) {
-//        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-//        if (state_ != TxnState::kNotStarted) {
-//            UnrecoverableError("Transaction isn't in NOT_STARTED status.");
-//        }
-//        begin_ts_ = begin_ts;
-//        state_ = TxnState::kStarted;
-//    }
+    TxnContext(TxnTimeStamp begin_ts) : begin_ts_(begin_ts) {}
 
     inline TxnTimeStamp GetBeginTS() {
         std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
@@ -55,17 +46,9 @@ public:
         return state_;
     }
 
-    inline void SetTxnToRollback() {
-        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kCommitting) {
-            UnrecoverableError("Transaction isn't in COMMITTING status.");
-        }
-        state_ = TxnState::kToRollback;
-    }
-
     inline void SetTxnRollbacking(TxnTimeStamp rollback_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kToRollback && state_ != TxnState::kStarted) {
+        if (state_ != TxnState::kCommitting && state_ != TxnState::kStarted) {
             UnrecoverableError("Transaction isn't in TO_ROLLBACK status.");
         }
         state_ = TxnState::kRollbacking;
@@ -74,9 +57,9 @@ public:
 
     inline void SetTxnRollbacked() {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kRollbacking && state_!= TxnState::kCommitting) {
-            UnrecoverableError("Transaction isn't in ROLLBACKING status.");
-        }
+        // if (state_ != TxnState::kRollbacking) {
+        //     UnrecoverableError(fmt::format("Transaction isn't in ROLLBACKING status. {}", ToString(state_)));
+        // }
         state_ = TxnState::kRollbacked;
     }
 
@@ -97,11 +80,16 @@ public:
         commit_ts_ = commit_ts;
     }
 
+    void SetTxnType(TxnType type) { type_ = type; }
+
+    TxnType GetTxnType() const { return type_; }
+
 private:
     std::shared_mutex rw_locker_{};
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnState state_{TxnState::kStarted};
+    TxnType type_{TxnType::kInvalid};
 };
 
 } // namespace infinity
