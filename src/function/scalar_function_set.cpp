@@ -59,8 +59,8 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
         // No matched function
         std::stringstream ss;
         String function_str = FunctionSet::ToString(name_, input_arguments);
-        ss << "Can't find matched function for " << function_str << std::endl;
-        ss << "Candidate functions: " << std::endl;
+        ss << "Can't find matched function for " << function_str;
+        ss << " Candidate functions: ";
         for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }

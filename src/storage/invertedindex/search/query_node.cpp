@@ -94,7 +94,7 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
         } else {
             oss << "Empty query tree!\n";
         }
-        LOG_INFO(std::move(oss).str());
+        LOG_TRACE(std::move(oss).str());
     }
 #endif
     return optimized_root;

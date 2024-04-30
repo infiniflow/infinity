@@ -112,20 +112,20 @@ void CompactionProcessor::Process() {
                 case BGTaskType::kNotifyCompact: {
                     Vector<UniquePtr<CompactSegmentsTask>> compact_tasks = this->ScanForCompact();
                     for (auto &compact_task : compact_tasks) {
-                        LOG_INFO(fmt::format("Compact {} start.", compact_task->table_name()));
+                        LOG_TRACE(fmt::format("Compact {} start.", compact_task->table_name()));
                         compact_task->Execute();
                         if (compact_task->TryCommitTxn()) {
-                            LOG_INFO(fmt::format("Compact {} done.", compact_task->table_name()));
+                            LOG_TRACE(fmt::format("Compact {} done.", compact_task->table_name()));
                         } else {
-                            LOG_INFO(fmt::format("Compact {} rollback.", compact_task->table_name()));
+                            LOG_TRACE(fmt::format("Compact {} rollback.", compact_task->table_name()));
                         }
                     }
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
-                    LOG_INFO("Optimize start.");
+                    LOG_TRACE("Optimize start.");
                     ScanAndOptimize();
-                    LOG_INFO("Optimize done.");
+                    LOG_TRACE("Optimize done.");
                     break;
                 }
                 default: {

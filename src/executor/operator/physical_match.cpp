@@ -560,7 +560,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     QueryBuilder query_builder(txn_id, begin_ts, base_table_ref_);
     auto finish_init_query_builder_time = std::chrono::high_resolution_clock::now();
     TimeDurationType query_builder_init_duration = finish_init_query_builder_time - execute_start_time;
-    LOG_INFO(fmt::format("PhysicalMatch Part 0.1: Init QueryBuilder time: {} ms", query_builder_init_duration.count()));
+    LOG_TRACE(fmt::format("PhysicalMatch Part 0.1: Init QueryBuilder time: {} ms", query_builder_init_duration.count()));
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
@@ -592,7 +592,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     auto finish_parse_query_tree_time = std::chrono::high_resolution_clock::now();
     TimeDurationType parse_query_tree_duration = finish_parse_query_tree_time - finish_init_query_builder_time;
-    LOG_INFO(fmt::format("PhysicalMatch Part 0.2: Parse QueryNode tree time: {} ms", parse_query_tree_duration.count()));
+    LOG_TRACE(fmt::format("PhysicalMatch Part 0.2: Parse QueryNode tree time: {} ms", parse_query_tree_duration.count()));
 
     // 2 build query iterator
     // result
@@ -649,7 +649,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     auto finish_query_builder_time = std::chrono::high_resolution_clock::now();
     TimeDurationType query_builder_duration = finish_query_builder_time - finish_parse_query_tree_time;
-    LOG_INFO(fmt::format("PhysicalMatch Part 1: Build Query iterator time: {} ms", query_builder_duration.count()));
+    LOG_TRACE(fmt::format("PhysicalMatch Part 1: Build Query iterator time: {} ms", query_builder_duration.count()));
     if (use_block_max_iter) {
         blockmax_score_result = MakeUniqueForOverwrite<float[]>(top_n);
         blockmax_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n);
@@ -735,7 +735,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     }
     auto finish_query_time = std::chrono::high_resolution_clock::now();
     TimeDurationType query_duration = finish_query_time - finish_query_builder_time;
-    LOG_INFO(fmt::format("PhysicalMatch Part 2: Full text search time: {} ms", query_duration.count()));
+    LOG_TRACE(fmt::format("PhysicalMatch Part 2: Full text search time: {} ms", query_duration.count()));
 #ifdef INFINITY_DEBUG
     {
         OStringStream stat_info;
@@ -753,7 +753,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             stat_info << "blockmax_duration_3: " << blockmax_duration_3 << std::endl;
             stat_info << "blockmax_loop_cnt_2: " << blockmax_loop_cnt_2 << std::endl;
         }
-        LOG_INFO(std::move(stat_info).str());
+        LOG_TRACE(std::move(stat_info).str());
     }
     if (use_ordinary_iter and use_block_max_iter) {
         OStringStream compare_info;
@@ -764,7 +764,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         compare_info << "duration ratio 2/1: " << blockmax_duration_2.count() / blockmax_duration.count() << std::endl;
         compare_info << "duration ratio 3/2: " << blockmax_duration_3.count() / blockmax_duration_2.count() << std::endl;
         compare_info << "loop count ratio: " << (static_cast<float>(blockmax_loop_cnt) / ordinary_loop_cnt) << std::endl;
-        LOG_INFO(std::move(compare_info).str());
+        LOG_TRACE(std::move(compare_info).str());
         if (blockmax_result_count != blockmax_result_count_2 or ordinary_result_count != blockmax_result_count or
             blockmax_loop_cnt != blockmax_loop_cnt_2) {
             RecoverableError(Status::SyntaxError("Debug Info: result count mismatch!"));
@@ -778,7 +778,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     LOG_TRACE(fmt::format("Full text search result count: {}", result_count));
     auto begin_output_time = std::chrono::high_resolution_clock::now();
     TimeDurationType output_info_duration = begin_output_time - finish_query_time;
-    LOG_INFO(fmt::format("PhysicalMatch Part 3: Output stat info time: {} ms", output_info_duration.count()));
+    LOG_TRACE(fmt::format("PhysicalMatch Part 3: Output stat info time: {} ms", output_info_duration.count()));
     // 4 populate result DataBlock
     // 4.1 prepare first output_data_block
     auto &output_data_blocks = operator_state->data_block_array_;
@@ -827,7 +827,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     operator_state->SetComplete();
     auto finish_output_time = std::chrono::high_resolution_clock::now();
     TimeDurationType output_duration = finish_output_time - begin_output_time;
-    LOG_INFO(fmt::format("PhysicalMatch Part 4: Output data time: {} ms", output_duration.count()));
+    LOG_TRACE(fmt::format("PhysicalMatch Part 4: Output data time: {} ms", output_duration.count()));
     return true;
 }
 
@@ -851,7 +851,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
         bool try_result = common_query_filter_->TryFinishBuild(query_context->GetTxn()->BeginTS(), query_context->GetTxn()->buffer_mgr());
         auto finish_filter_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::milli> filter_duration = finish_filter_time - start_time;
-        LOG_INFO(fmt::format("PhysicalMatch Prepare: Filter time: {} ms", filter_duration.count()));
+        LOG_TRACE(fmt::format("PhysicalMatch Prepare: Filter time: {} ms", filter_duration.count()));
         if (!try_result) {
             // not ready, abort and wait for next time
             return true;
@@ -860,7 +860,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     bool return_value = ExecuteInnerHomebrewed(query_context, operator_state);
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float, std::milli> duration = end_time - start_time;
-    LOG_INFO(fmt::format("PhysicalMatch Execute time: {} ms", duration.count()));
+    LOG_TRACE(fmt::format("PhysicalMatch Execute time: {} ms", duration.count()));
     return return_value;
 }
 

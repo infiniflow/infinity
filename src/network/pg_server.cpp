@@ -51,7 +51,7 @@ void PGServer::Run() {
     acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(io_service_, boost::asio::ip::tcp::endpoint(address, pg_port));
     CreateConnection();
 
-    fmt::print("Run 'psql -h {} -p {}' to connect to the server, only for test.\n", pg_listen_addr, pg_port);
+    fmt::print("Run 'psql -h {} -p {}' to connect to the server (SQL is only for test).\n", pg_listen_addr, pg_port);
 
     io_service_.run();
 }

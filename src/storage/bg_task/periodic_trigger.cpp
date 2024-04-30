@@ -38,7 +38,7 @@ void CleanupPeriodicTrigger::Trigger() {
         return;
     }
     last_visible_ts_ = visible_ts;
-    LOG_INFO(fmt::format("Cleanup visible timestamp: {}", visible_ts));
+    LOG_TRACE(fmt::format("Cleanup visible timestamp: {}", visible_ts));
 
     auto buffer_mgr = txn_mgr_->GetBufferMgr();
     auto cleanup_task = MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr);
@@ -47,7 +47,7 @@ void CleanupPeriodicTrigger::Trigger() {
 
 void CheckpointPeriodicTrigger::Trigger() {
     auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
-    LOG_INFO(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+    LOG_TRACE(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
         LOG_TRACE(
             fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));

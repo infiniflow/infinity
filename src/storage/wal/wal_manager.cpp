@@ -296,7 +296,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         }
     }
     try {
-        LOG_INFO(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
+        LOG_TRACE(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
                              is_full_checkpoint ? "FULL" : "DELTA",
                              txn->TxnID(),
                              txn->BeginTS(),
@@ -307,7 +307,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         }
         SetLastCkpWalSize(wal_size);
 
-        LOG_INFO(fmt::format("{} Checkpoint is done for commit_ts <= {}", is_full_checkpoint ? "FULL" : "DELTA", max_commit_ts));
+        LOG_TRACE(fmt::format("{} Checkpoint is done for commit_ts <= {}", is_full_checkpoint ? "FULL" : "DELTA", max_commit_ts));
     } catch (RecoverableException &e) {
         LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
     } catch (UnrecoverableException &e) {

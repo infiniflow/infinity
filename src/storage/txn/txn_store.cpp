@@ -294,7 +294,7 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
 
     // Attention: "compact" needs to be ahead of "delete"
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
-        LOG_INFO(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), commit_ts));
+        LOG_TRACE(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), commit_ts));
         Catalog::CommitCompact(table_entry_, txn_id, commit_ts, compact_state_);
     }
 

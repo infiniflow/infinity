@@ -115,13 +115,13 @@ UniquePtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
             }
         }
     }
-    LOG_INFO(fmt::format("Add compact task, picked, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
+    LOG_TRACE(fmt::format("Add compact task, picked, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
     return MakeUnique<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
 }
 
 UniquePtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn) {
     Vector<SegmentEntry *> segments = table_entry->PickCompactSegments(); // wait auto compaction to finish and pick segments
-    LOG_INFO(fmt::format("Add compact task, whole, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
+    LOG_TRACE(fmt::format("Add compact task, whole, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
     return MakeUnique<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactTable);
 }
 
@@ -170,7 +170,7 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
-            LOG_INFO(fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
+            LOG_TRACE(fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
         }
         segment_data.emplace_back(new_segment, std::move(to_compact_segments));
         old_segments.insert(old_segments.end(), to_compact_segments.begin(), to_compact_segments.end());
