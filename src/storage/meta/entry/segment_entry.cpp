@@ -313,11 +313,12 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
 }
 
 // One writer
-void SegmentEntry::DeleteData(TransactionID txn_id,
-                              TxnTimeStamp commit_ts,
-                              const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
-                              Txn *txn) {
+SizeT SegmentEntry::DeleteData(TransactionID txn_id,
+                               TxnTimeStamp commit_ts,
+                               const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
+                               Txn *txn) {
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
+    SizeT delete_row_n = 0;
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         BlockEntry *block_entry = nullptr;
@@ -326,13 +327,13 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
             block_entry = block_entries_.at(block_id).get();
         }
 
-        block_entry->DeleteData(txn_id, commit_ts, delete_rows);
+        delete_row_n += block_entry->DeleteData(txn_id, commit_ts, delete_rows);
         txn_store->AddBlockStore(this, block_entry);
         if (delete_rows.size() > block_entry->row_capacity()) {
             UnrecoverableError("Delete rows exceed block capacity");
         }
-        this->DecreaseRemainRow(delete_rows.size());
     }
+    this->DecreaseRemainRow(delete_row_n);
     {
         std::unique_lock w_lock(rw_locker_);
         if (this->first_delete_ts_ == UNCOMMIT_TS) {
@@ -361,6 +362,7 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
             }
         }
     }
+    return delete_row_n;
 }
 
 void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
