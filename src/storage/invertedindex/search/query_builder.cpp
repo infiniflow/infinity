@@ -66,7 +66,7 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
         } else {
             oss << "Empty tree!\n";
         }
-        LOG_INFO(std::move(oss).str());
+        LOG_TRACE(std::move(oss).str());
     }
 #endif
     return result;
@@ -88,7 +88,7 @@ UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullT
         } else {
             oss << "Empty tree!\n";
         }
-        LOG_INFO(std::move(oss).str());
+        LOG_TRACE(std::move(oss).str());
     }
 #endif
     return result;

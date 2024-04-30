@@ -63,11 +63,11 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kForceCheckpoint: {
-                    LOG_INFO("Force checkpoint in background");
+                    LOG_TRACE("Force checkpoint in background");
                     ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
                     auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
                     wal_manager_->Checkpoint(force_ckp_task, max_commit_ts, wal_size);
-                    LOG_INFO("Force checkpoint in background done");
+                    LOG_TRACE("Force checkpoint in background done");
                     break;
                 }
                 case BGTaskType::kAddDeltaEntry: {
@@ -76,26 +76,26 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kCheckpoint: {
-                    LOG_INFO("Checkpoint in background");
+                    LOG_TRACE("Checkpoint in background");
                     auto *task = static_cast<CheckpointTask *>(bg_task.get());
                     bool is_full_checkpoint = task->is_full_checkpoint_;
                     auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
                     wal_manager_->Checkpoint(is_full_checkpoint, max_commit_ts, wal_size);
-                    LOG_INFO("Checkpoint in background done");
+                    LOG_TRACE("Checkpoint in background done");
                     break;
                 }
                 case BGTaskType::kCleanup: {
-                    LOG_INFO("Cleanup in background");
+                    LOG_TRACE("Cleanup in background");
                     auto task = static_cast<CleanupTask *>(bg_task.get());
                     task->Execute();
-                    LOG_INFO("Cleanup in background done");
+                    LOG_TRACE("Cleanup in background done");
                     break;
                 }
                 case BGTaskType::kUpdateSegmentBloomFilterData: {
-                    LOG_INFO("Update segment bloom filter");
+                    LOG_TRACE("Update segment bloom filter");
                     auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());
                     task->Execute();
-                    LOG_INFO("Update segment bloom filter done");
+                    LOG_TRACE("Update segment bloom filter done");
                     break;
                 }
                 default: {

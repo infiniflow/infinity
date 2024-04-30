@@ -40,7 +40,7 @@ BlockMaxMaxscoreIterator::~BlockMaxMaxscoreIterator() {
     for (const auto &p : must_have_history_) {
         oss << "    must_have value: " << p.first << " at doc_id: " << p.second << '\n';
     }
-    LOG_INFO(std::move(oss).str());
+    LOG_TRACE(std::move(oss).str());
 }
 
 BlockMaxMaxscoreIterator::BlockMaxMaxscoreIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators) : sorted_iterators_(std::move(iterators)) {
