@@ -221,7 +221,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
         if (search_expr != nullptr && !search_exprs->empty()) {
             search_expr->SetExprs(search_exprs);
-            search_expr->Validate();
+            search_exprs = nullptr;
         }
 
         const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
