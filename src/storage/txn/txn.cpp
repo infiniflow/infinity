@@ -424,8 +424,7 @@ TxnTimeStamp Txn::Commit() {
         LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, commit_ts));
         wal_entry_ = nullptr;
         txn_mgr_->SendToWAL(this);
-        this->Rollback();
-        return commit_ts;
+        RecoverableError(Status::TxnRollback(txn_id_));
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
