@@ -804,6 +804,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 const auto &base_name = add_chunk_index_entry_op->base_name_;
                 auto base_rowid = add_chunk_index_entry_op->base_rowid_;
                 auto row_count = add_chunk_index_entry_op->row_count_;
+                auto commit_ts = add_chunk_index_entry_op->commit_ts_;
+                auto deprecate_ts = add_chunk_index_entry_op->deprecate_ts_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
@@ -819,7 +821,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
                     }
                     auto *segment_index_entry = iter2->second.get();
-                    segment_index_entry->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, buffer_mgr);
+                    segment_index_entry
+                        ->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
                 }
                 break;
             }

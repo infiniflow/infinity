@@ -118,6 +118,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                                      const String &base_name,
                                                                      RowID base_rowid,
                                                                      u32 row_count,
+                                                                     TxnTimeStamp commit_ts,
+                                                                     TxnTimeStamp deprecate_ts,
                                                                      BufferManager *buffer_mgr) {
     auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count));
     if (param->index_base_->index_type_ == IndexType::kFullText) {
@@ -133,6 +135,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
         auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, chunk_id);
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     }
+    chunk_index_entry->commit_ts_ = commit_ts;
+    chunk_index_entry->deprecate_ts_ = deprecate_ts;
     return chunk_index_entry;
 }
 
@@ -145,7 +149,7 @@ nlohmann::json ChunkIndexEntry::Serialize() {
     index_entry_json["base_rowid"] = this->base_rowid_.ToUint64();
     index_entry_json["row_count"] = this->row_count_;
     index_entry_json["commit_ts"] = this->commit_ts_.load();
-    index_entry_json["deprecate_ts_"] = this->deprecate_ts_.load();
+    index_entry_json["deprecate_ts"] = this->deprecate_ts_.load();
     return index_entry_json;
 }
 
@@ -157,9 +161,9 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
     String base_name = index_entry_json["base_name"];
     RowID base_rowid = RowID::FromUint64(index_entry_json["base_rowid"]);
     u32 row_count = index_entry_json["row_count"];
-    auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, buffer_mgr);
-    ret->commit_ts_.store(index_entry_json["commit_ts"]);
-    ret->deprecate_ts_.store(index_entry_json["deprecate_ts_"]);
+    TxnTimeStamp commit_ts = index_entry_json["commit_ts"];
+    TxnTimeStamp deprecate_ts = index_entry_json["deprecate_ts"];
+    auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
     return ret;
 }
 

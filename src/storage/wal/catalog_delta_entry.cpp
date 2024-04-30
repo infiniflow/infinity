@@ -374,6 +374,7 @@ UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
     add_chunk_index_op->base_name_ = ReadBufAdv<String>(ptr);
     add_chunk_index_op->base_rowid_ = RowID::FromUint64(ReadBufAdv<u64>(ptr));
     add_chunk_index_op->row_count_ = ReadBufAdv<u32>(ptr);
+    add_chunk_index_op->deprecate_ts_ = ReadBufAdv<u64>(ptr);
     return add_chunk_index_op;
 }
 
@@ -496,6 +497,7 @@ SizeT AddChunkIndexEntryOp::GetSizeInBytes() const {
     total_size += sizeof(i32) + this->base_name_.size();
     total_size += sizeof(RowID);
     total_size += sizeof(u32);
+    total_size += sizeof(TxnTimeStamp);
     return total_size;
 }
 
@@ -584,6 +586,7 @@ void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->base_name_);
     WriteBufAdv(buf, this->base_rowid_.ToUint64());
     WriteBufAdv(buf, this->row_count_);
+    WriteBufAdv(buf, this->deprecate_ts_);
 }
 
 const String AddDBEntryOp::ToString() const {
@@ -658,7 +661,12 @@ const String AddSegmentIndexEntryOp::ToString() const {
 }
 
 const String AddChunkIndexEntryOp::ToString() const {
-    return fmt::format("AddChunkIndexEntryOp base_name: {} base_rowid: {} row_count: {}", base_name_, base_rowid_.ToUint64(), row_count_);
+    return fmt::format("AddChunkIndexEntryOp base_name: {} base_rowid: {} row_count: {} commit_ts: {} deprecate_ts: {}",
+                       base_name_,
+                       base_rowid_.ToUint64(),
+                       row_count_,
+                       commit_ts_,
+                       deprecate_ts_);
 }
 
 bool AddDBEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
