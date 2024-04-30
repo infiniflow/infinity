@@ -276,7 +276,7 @@ bool TxnTableStore::CheckConflict(Catalog *catalog) const {
     return false;
 }
 
-bool TxnTableStore::CheckConflict(TxnTableStore *txn_table_store) const {
+bool TxnTableStore::CheckConflict(const TxnTableStore *txn_table_store) const {
     const auto &delete_state = delete_state_;
     const auto &other_delete_state = txn_table_store->delete_state_;
     if (delete_state.rows_.empty() || other_delete_state.rows_.empty()) {
@@ -292,7 +292,7 @@ bool TxnTableStore::CheckConflict(TxnTableStore *txn_table_store) const {
             if (other_block_iter == other_iter->second.end()) {
                 continue;
             }
-            const auto other_block_offsets = other_block_iter->second;
+            const auto &other_block_offsets = other_block_iter->second;
             SizeT j = 0;
             for (const auto &block_offset : block_offsets) {
                 while (j < other_block_offsets.size() && other_block_offsets[j] < block_offset) {
@@ -307,13 +307,18 @@ bool TxnTableStore::CheckConflict(TxnTableStore *txn_table_store) const {
             }
         }
     }
-    return true;
+    return false;
 }
 
 void TxnTableStore::PrepareCommit1() {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     for (auto *segment_entry : flushed_segments_) {
         segment_entry->CommitFlushed(commit_ts);
+    }
+    if (!delete_state_.rows_.empty()) {
+        if (!table_entry_->CheckDeleteVisible(delete_state_, txn_->BeginTS())) {
+            RecoverableError(Status::TxnConflict(txn_->TxnID(), "Txn conflict reason."));
+        }
     }
 }
 
@@ -482,7 +487,8 @@ bool TxnStore::CheckConflict(const TxnStore &txn_store) {
         if (other_iter == txn_store.txn_tables_store_.end()) {
             continue;
         }
-        if (table_store->CheckConflict(other_iter->second.get())) {
+        const TxnTableStore *other_table_store = other_iter->second.get();
+        if (table_store->CheckConflict(other_table_store)) {
             return true;
         }
     }

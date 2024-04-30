@@ -107,6 +107,8 @@ public:
 
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
 
+    bool CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, TxnTimeStamp check_ts) const;
+
     bool CheckVisible(TxnTimeStamp check_ts) const;
 
     bool CheckDeprecate(TxnTimeStamp check_ts) const;

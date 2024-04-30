@@ -148,6 +148,24 @@ bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
 }
 
+bool BlockEntry::CheckDeleteVisible(Vector<BlockOffset> &block_offsets, TxnTimeStamp check_ts) const {
+    Vector<BlockOffset> new_block_offsets;
+
+    std::shared_lock lock(rw_locker_);
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+    const auto &deleted = block_version->deleted_;
+    for (BlockOffset block_offset : block_offsets) {
+        if (deleted[block_offset] > check_ts) {
+            return false;
+        } else if (deleted[block_offset] == 0) {
+            new_block_offsets.push_back(block_offset);
+        }
+    }
+    block_offsets = std::move(new_block_offsets);
+    return true;
+}
+
 void BlockEntry::SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const {
     BlockOffset read_offset = 0;
     while (true) {
@@ -224,10 +242,15 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
 
     SizeT delete_row_n = 0;
     for (BlockOffset block_offset : rows) {
-        if (block_version->deleted_[block_offset] == 0) {
-            block_version->deleted_[block_offset] = commit_ts;
-            delete_row_n++;
+        if (block_version->deleted_[block_offset] != 0) {
+            UnrecoverableError(fmt::format("Segment {} Block {} Row {} is already deleted at {}",
+                                           segment_id,
+                                           block_id,
+                                           block_offset,
+                                           block_version->deleted_[block_offset]));
         }
+        block_version->deleted_[block_offset] = commit_ts;
+        delete_row_n++;
     }
 
     LOG_TRACE(fmt::format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));

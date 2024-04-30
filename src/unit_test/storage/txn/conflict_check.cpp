@@ -123,23 +123,20 @@ TEST_F(ConflictCheckTest, conflict_check_delete) {
         txn_mgr->CommitTxn(txn1);
         ExpectConflict(txn2);
         ExpectConflict(txn3);
-        for (auto txn_id : txn_ids) {
-            EXPECT_THROW(txn_mgr->GetTxn(txn_id), std::out_of_range);
-        }
     }
     {
-        auto *txn1 = DeleteRow(0);
-        auto *txn2 = DeleteRow(0);
-        auto *txn3 = DeleteRow(0);
+        auto *txn1 = DeleteRow(1);
+        auto *txn2 = DeleteRow(1);
+        auto *txn3 = DeleteRow(1);
 
         txn_mgr->CommitTxn(txn2);
         ExpectConflict(txn1);
         ExpectConflict(txn3);
     }
     {
-        auto *txn1 = DeleteRow(0);
-        auto *txn2 = DeleteRow(0);
-        auto *txn3 = DeleteRow(0);
+        auto *txn1 = DeleteRow(2);
+        auto *txn2 = DeleteRow(2);
+        auto *txn3 = DeleteRow(2);
 
         txn_mgr->CommitTxn(txn3);
         ExpectConflict(txn2);

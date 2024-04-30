@@ -901,6 +901,16 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     return result;
 }
 
+bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, TxnTimeStamp begin_ts) {
+    for (auto &[segment_id, block_offsets_map] : delete_state.rows_) {
+        auto *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
+        if (!segment_entry->CheckDeleteVisible(block_offsets_map, begin_ts)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool TableEntry::CheckVisible(SegmentID segment_id, TxnTimeStamp begin_ts) const {
     std::shared_lock lock(this->rw_locker_);
     auto iter = segment_map_.find(segment_id);

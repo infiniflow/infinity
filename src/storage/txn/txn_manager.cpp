@@ -110,14 +110,19 @@ bool TxnManager::CheckConflict(Txn *txn) {
     Vector<Txn *> candidate_txns;
     {
         std::lock_guard guard(rw_locker_);
-        // use binary search to find the first txn in finished finished_txns_ that commit_ts > begin_ts
-        auto iter1 =
-            std::lower_bound(finished_txns_.begin(), finished_txns_.end(), begin_ts, [](Txn *txn, TxnTimeStamp ts) { return txn->CommitTS() < ts; });
-        // find the first txn in finished_txns_ that commit_ts >= commit_ts
-        auto iter2 = std::lower_bound(finished_txns_.begin(), finished_txns_.end(), commit_ts, [](Txn *txn, TxnTimeStamp ts) {
-            return txn->CommitTS() < ts;
-        });
-        candidate_txns.insert(candidate_txns.end(), iter1, iter2); // so not include itself
+        // use binary search find the first txn whose commit ts is greater than `begin_ts`
+        auto iter =
+            std::lower_bound(finished_txns_.begin(), finished_txns_.end(), begin_ts, [](Txn *txn, TxnTimeStamp ts) { return txn->CommitTS() <= ts; });
+        for (; iter != finished_txns_.end(); ++iter) {
+            if ((*iter)->CommitTS() >= commit_ts) {
+                break; // not include itself
+            }
+            auto state = (*iter)->GetTxnState();
+            if (state == TxnState::kRollbacking || state == TxnState::kRollbacked) {
+                continue;
+            }
+            candidate_txns.push_back(*iter);
+        }
     }
     for (auto *candidate_txn : candidate_txns) {
         if (txn->CheckConflict(candidate_txn)) {

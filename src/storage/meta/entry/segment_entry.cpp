@@ -216,6 +216,16 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
     return block_entry->CheckRowVisible(block_offset, check_ts);
 }
 
+bool SegmentEntry::CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, TxnTimeStamp check_ts) const {
+    for (auto &[block_id, block_offsets] : block_offsets_map) {
+        auto *block_entry = GetBlockEntryByID(block_id).get();
+        if (!block_entry->CheckDeleteVisible(block_offsets, check_ts)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
     return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;

@@ -113,7 +113,7 @@ public:
 
     bool CheckConflict(Catalog *catalog) const;
 
-    bool CheckConflict(TxnTableStore *txn_table_store) const;
+    bool CheckConflict(const TxnTableStore *txn_table_store) const;
 
     void PrepareCommit1();
 
