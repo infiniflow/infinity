@@ -34,7 +34,7 @@ TEST_F(ConfigTest, test1) {
     Config config;
     config.Init(path);
 
-    EXPECT_EQ(config.version(), "0.1.0");
+    EXPECT_EQ(config.version(), "0.2.0");
     EXPECT_EQ(config.time_zone(), "UTC");
     EXPECT_EQ(config.time_zone_bias(), 8);
 
@@ -72,7 +72,7 @@ TEST_F(ConfigTest, test2) {
     Config config;
     config.Init(path);
 
-    EXPECT_EQ(config.version(), "0.1.0");
+    EXPECT_EQ(config.version(), "0.2.0");
     EXPECT_EQ(config.time_zone(), "UTC");
     EXPECT_EQ(config.time_zone_bias(), -9);
 

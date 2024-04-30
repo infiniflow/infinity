@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.1.0)
+project(infinity VERSION 0.2.0)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -156,7 +156,7 @@ add_subdirectory(client)
 
 # CPack settings
 set(CPACK_PACKAGE_NAME "infinity")
-set(CPACK_PACKAGE_VERSION "0.1.0")
+set(CPACK_PACKAGE_VERSION "0.2.0-dev")
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM applications, offering incredibly fast vector and full-text search.")

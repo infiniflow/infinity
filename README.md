@@ -66,13 +66,13 @@ You can download the binary package (deb, rpm, or tgz) for your respective host 
 
 Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-sudo rpm -i infinity-0.1.0-x86_64.rpm
+sudo rpm -i infinity-0.2.0-dev-x86_64.rpm
 sudo systemctl start infinity
 ```
 
 Ubuntu/Debian
 ```bash
-sudo dpkg -i infinity-0.1.0-x86_64.deb
+sudo dpkg -i infinity-0.2.0-dev-x86_64.deb
 sudo systemctl start infinity
 ```
 #### 🛠️ Build from Source
