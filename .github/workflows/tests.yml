@@ -83,7 +83,7 @@ jobs:
       - name: Stop infinity pysdk & http_api debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -102,7 +102,7 @@ jobs:
       - name: Stop infinity sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -178,7 +178,7 @@ jobs:
       - name: Stop infinity pysdk & http_api release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -196,7 +196,7 @@ jobs:
       - name: Stop infinity sqllogictest release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
