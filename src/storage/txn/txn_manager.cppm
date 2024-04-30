@@ -99,6 +99,9 @@ public:
 
     u64 NextSequence() { return ++sequence_; }
 
+    // for unit test
+    SizeT SavedTxnNum() const { return txn_map_.size(); }
+
 private:
     Catalog *catalog_{};
     std::shared_mutex rw_locker_{};

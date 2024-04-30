@@ -107,26 +107,25 @@ TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
 }
 
 bool TxnManager::CheckConflict(Txn *txn) {
-    // TEMP
-    // TxnTimeStamp begin_ts = txn->BeginTS();
-    // TxnTimeStamp commit_ts = txn->CommitTS();
-    // Vector<Txn *> candidate_txns;
-    // {
-    //     std::lock_guard guard(rw_locker_);
-    //     // use binary search to find the first txn in finished finished_txns_ that commit_ts > begin_ts
-    //     auto iter1 =
-    //         std::lower_bound(finished_txns_.begin(), finished_txns_.end(), begin_ts, [](Txn *txn, TxnTimeStamp ts) { return txn->CommitTS() < ts; });
-    //     // find the first txn in finished_txns_ that commit_ts >= commit_ts
-    //     auto iter2 = std::lower_bound(finished_txns_.begin(), finished_txns_.end(), commit_ts, [](Txn *txn, TxnTimeStamp ts) {
-    //         return txn->CommitTS() <= ts;
-    //     });
-    //     candidate_txns.insert(candidate_txns.end(), iter1, iter2); // so not include itself
-    // }
-    // for (auto *candidate_txn : candidate_txns) {
-    //     if (txn->CheckConflict(candidate_txn)) {
-    //         return true;
-    //     }
-    // }
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
+    Vector<Txn *> candidate_txns;
+    {
+        std::lock_guard guard(rw_locker_);
+        // use binary search to find the first txn in finished finished_txns_ that commit_ts > begin_ts
+        auto iter1 =
+            std::lower_bound(finished_txns_.begin(), finished_txns_.end(), begin_ts, [](Txn *txn, TxnTimeStamp ts) { return txn->CommitTS() < ts; });
+        // find the first txn in finished_txns_ that commit_ts >= commit_ts
+        auto iter2 = std::lower_bound(finished_txns_.begin(), finished_txns_.end(), commit_ts, [](Txn *txn, TxnTimeStamp ts) {
+            return txn->CommitTS() < ts;
+        });
+        candidate_txns.insert(candidate_txns.end(), iter1, iter2); // so not include itself
+    }
+    for (auto *candidate_txn : candidate_txns) {
+        if (txn->CheckConflict(candidate_txn)) {
+            return true;
+        }
+    }
     return txn->CheckConflict();
 }
 
