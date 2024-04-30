@@ -318,7 +318,7 @@ public:
 
     explicit AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
-          base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_) {}
+          base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {}
 
     String GetTypeStr() const final { return "ADD_CHUNK_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -332,6 +332,7 @@ public:
     String base_name_{};
     RowID base_rowid_;
     u32 row_count_{0};
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};
 };
 
 // size of payload, including the header, round to multi

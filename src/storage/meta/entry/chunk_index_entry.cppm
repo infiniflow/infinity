@@ -71,6 +71,8 @@ public:
                                                                const String &base_name,
                                                                RowID base_rowid,
                                                                u32 row_count,
+                                                               TxnTimeStamp commit_ts,
+                                                               TxnTimeStamp deprecate_ts,
                                                                BufferManager *buffer_mgr);
 
     void SetRowCount(u32 row_count) { row_count_ = row_count; }
