@@ -178,7 +178,6 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                         return;
                     }
                 }
-                search_expr->Validate();
             } else if (IsEqual(key, "knn")) {
                 search_expr = new SearchExpr();
                 if (fusion_expr != nullptr or knn_expr != nullptr or match_expr != nullptr) {
