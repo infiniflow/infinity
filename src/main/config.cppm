@@ -19,6 +19,7 @@ import stl;
 import third_party;
 import options;
 import status;
+import command_statement;
 
 namespace infinity {
 
@@ -164,10 +165,12 @@ export enum class SysVar {
 };
 
 export struct SystemVariables {
-    static HashMap<String, SysVar> map_;
+    static HashMap<String, SysVar> name_map_;
+    static HashMap<String, SetVarType> type_map_;
 
     static void InitVariablesMap();
-    static SysVar GetSysVarEnumByName(const String &var_name);
+    static SysVar GetSysVarEnumByName(const String &variable_name);
+    SetVarType GetVariableType(const String &variable_name);
 };
 
 } // namespace infinity

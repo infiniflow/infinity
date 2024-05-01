@@ -57,6 +57,8 @@ import extra_ddl_info;
 import drop_index_info;
 import drop_table_info;
 
+import infinity_exception;
+
 namespace infinity {
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
@@ -194,6 +196,32 @@ QueryResult Infinity::Flush() {
     flush_statement->type_ = FlushType::kData;
 
     QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
+    return result;
+}
+
+QueryResult Infinity::SetVariable(const String &variable_name, const String &variable_value, SetScope scope) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    switch(scope) {
+        case SetScope::kGlobal: {
+//            command_statement->command_info_ = MakeUnique<SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
+            break;
+        }
+        case SetScope::kSession: {
+//            command_statement->command_info_ = MakeUnique<SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid set scope.");
+        }
+    }
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 
@@ -490,7 +518,6 @@ QueryResult Infinity::ShowBlockColumn(const String &db_name,
     show_statement->show_type_ = ShowStmtType::kBlockColumn;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
-
 }
 
 QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {

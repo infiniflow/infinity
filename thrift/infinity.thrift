@@ -575,6 +575,19 @@ struct ShowBlockColumnResponse {
 8: string extra_file_names,
 }
 
+enum SetScope{
+SessionScope,
+GlobalScope,
+InvalidScope,
+}
+
+struct SetVariableRequest {
+1: i64 session_id,
+2: string variable_name,
+3: string variable_value,
+4: SetScope scope,
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(),
@@ -594,6 +607,8 @@ CommonResponse Update(1:UpdateRequest request),
 ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),
 ListIndexResponse ListIndex(1:ListIndexRequest request),
+
+CommonResponse SetVariable(1:SetVariableRequest request),
 
 SelectResponse ShowVariable(1:ShowVariableRequest request),
 ShowTableResponse ShowTable(1:ShowTableRequest request),

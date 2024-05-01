@@ -17,7 +17,7 @@ import infinity
 import pytest
 from infinity.errors import ErrorCode
 
-from infinity.infinity import ShowVariable
+from infinity.infinity import Variable
 from infinity.remote_thrift.client import ThriftInfinityClient
 
 from common import common_values
@@ -55,46 +55,46 @@ class TestInfinity(TestSdk):
         # TIME_ZONE = "time_zone"
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        res = infinity_obj.show_variable(ShowVariable.QUERY_COUNT)
+        res = infinity_obj.show_variable(Variable.QUERY_COUNT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SESSION_COUNT)
+        res = infinity_obj.show_variable(Variable.SESSION_COUNT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.BUFFER_POOL_USAGE)
+        res = infinity_obj.show_variable(Variable.BUFFER_POOL_USAGE)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.VERSION)
+        res = infinity_obj.show_variable(Variable.VERSION)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.QUERY_MEMORY_LIMIT)
+        res = infinity_obj.show_variable(Variable.QUERY_MEMORY_LIMIT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.QUERY_CPU_LIMIT)
+        res = infinity_obj.show_variable(Variable.QUERY_CPU_LIMIT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.LOG_LEVEL)
+        res = infinity_obj.show_variable(Variable.LOG_LEVEL)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SCHEDULE_POLICY)
+        res = infinity_obj.show_variable(Variable.SCHEDULE_POLICY)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.LISTEN_ADDRESS)
+        res = infinity_obj.show_variable(Variable.LISTEN_ADDRESS)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SQL_PORT)
+        res = infinity_obj.show_variable(Variable.SQL_PORT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SDK_PORT)
+        res = infinity_obj.show_variable(Variable.SDK_PORT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.HTTP_API_PORT)
+        res = infinity_obj.show_variable(Variable.HTTP_API_PORT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.DATA_URL)
+        res = infinity_obj.show_variable(Variable.DATA_URL)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.TIME_ZONE)
+        res = infinity_obj.show_variable(Variable.TIME_ZONE)
         print(res)
 
     @pytest.mark.slow
@@ -103,44 +103,44 @@ class TestInfinity(TestSdk):
         time.sleep(3600)
         database_res = infinity_obj.get_database("default_db")
         print(database_res)
-        res = infinity_obj.show_variable(ShowVariable.QUERY_COUNT)
+        res = infinity_obj.show_variable(Variable.QUERY_COUNT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SESSION_COUNT)
+        res = infinity_obj.show_variable(Variable.SESSION_COUNT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.BUFFER_POOL_USAGE)
+        res = infinity_obj.show_variable(Variable.BUFFER_POOL_USAGE)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.VERSION)
+        res = infinity_obj.show_variable(Variable.VERSION)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.QUERY_MEMORY_LIMIT)
+        res = infinity_obj.show_variable(Variable.QUERY_MEMORY_LIMIT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.QUERY_CPU_LIMIT)
+        res = infinity_obj.show_variable(Variable.QUERY_CPU_LIMIT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.LOG_LEVEL)
+        res = infinity_obj.show_variable(Variable.LOG_LEVEL)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SCHEDULE_POLICY)
+        res = infinity_obj.show_variable(Variable.SCHEDULE_POLICY)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.LISTEN_ADDRESS)
+        res = infinity_obj.show_variable(Variable.LISTEN_ADDRESS)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SQL_PORT)
+        res = infinity_obj.show_variable(Variable.SQL_PORT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.SDK_PORT)
+        res = infinity_obj.show_variable(Variable.SDK_PORT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.HTTP_API_PORT)
+        res = infinity_obj.show_variable(Variable.HTTP_API_PORT)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.DATA_URL)
+        res = infinity_obj.show_variable(Variable.DATA_URL)
         print(res)
 
-        res = infinity_obj.show_variable(ShowVariable.TIME_ZONE)
+        res = infinity_obj.show_variable(Variable.TIME_ZONE)
         print(res)

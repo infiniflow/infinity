@@ -73,6 +73,8 @@ public:
 
     void Explain(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ExplainRequest &request) final;
 
+    void SetVariable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::SetVariableRequest &request) final;
+
     void ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) final;
 
     void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) final;

@@ -80,6 +80,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     return true;
                 }
 
+                if (set_command->value_str() == "debug") {
+                    SetLogLevel(LogLevel::kDebug);
+                    return true;
+                }
+
                 if (set_command->value_str() == "info") {
                     SetLogLevel(LogLevel::kInfo);
                     return true;
@@ -95,12 +100,12 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     return true;
                 }
 
-                if (set_command->value_str() == "fatal") {
-                    SetLogLevel(LogLevel::kFatal);
+                if (set_command->value_str() == "critical") {
+                    SetLogLevel(LogLevel::kCritical);
                     return true;
                 }
 
-                RecoverableError(Status::SetInvalidVarValue("log level", "trace, info, warning, error, fatal"));
+                RecoverableError(Status::SetInvalidVarValue("log level", "trace, debug, info, warning, error, critical"));
                 return true;
             }
 

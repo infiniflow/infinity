@@ -31,6 +31,7 @@ import column_def;
 import create_index_info;
 import update_statement;
 import explain_statement;
+import command_statement;
 
 namespace infinity {
 
@@ -67,6 +68,8 @@ public:
     QueryResult ShowDatabase(const String &db_name);
 
     QueryResult Flush();
+
+    QueryResult SetVariable(const String &variable_name, const String &variable_value, SetScope scope);
 
     QueryResult ShowVariable(const String &variable_name);
 

@@ -18,7 +18,8 @@ from thrift.transport import TSocket
 from thrift.transport.TTransport import TTransportException
 
 from infinity import URI
-from infinity.infinity import ShowVariable
+from infinity.infinity import Variable
+from infinity.infinity import Scope
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.errors import ErrorCode
@@ -202,7 +203,20 @@ class ThriftInfinityClient:
         self.transport.close()
         return res
 
-    def show_variable(self, variable: ShowVariable):
+    def set_variable(self, variable: Variable, value: str, var_scope: Scope):
+        if var_scope == Scope.Session:
+            return self.client.SetVariable(SetVariableRequest(session_id=self.session_id,
+                                                              variable_name=str(variable.value),
+                                                              variable_value=value,
+                                                              scope=SetScope.SessionScope))
+        else:
+            return self.client.SetVariable(SetVariableRequest(session_id=self.session_id,
+                                                              variable_name=str(variable.value),
+                                                              variable_value=value,
+                                                              scope=SetScope.GlobalScope))
+
+
+    def show_variable(self, variable: Variable):
         return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,
                                                             variable_name=str(variable.value)))
 

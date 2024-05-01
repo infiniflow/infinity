@@ -39,6 +39,11 @@ LOG_TRACE(const String& msg) {
 }
 
 export inline void
+LOG_DEBUG(const String& msg) {
+    infinity_logger->debug(msg);
+}
+
+export inline void
 LOG_INFO(const String& msg) {
     infinity_logger->info(msg);
 }

@@ -61,9 +61,10 @@ private:
 enum class SetScope {
     kSession,
     kGlobal,
+    kInvalid,
 };
 
-enum class SetVarType { kBool, kInteger, kDouble, kString };
+enum class SetVarType { kBool, kInteger, kDouble, kString, kInvalid };
 
 class SetCmd final : public CommandInfo {
 public:
@@ -99,6 +100,9 @@ public:
             }
             case SetVarType::kString: {
                 return "String";
+            }
+            case SetVarType::kInvalid: {
+                return "Invalid";
             }
         };
     }

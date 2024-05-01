@@ -39,6 +39,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  ListDatabaseResponse ListDatabase(ListDatabaseRequest request)')
     print('  ListTableResponse ListTable(ListTableRequest request)')
     print('  ListIndexResponse ListIndex(ListIndexRequest request)')
+    print('  CommonResponse SetVariable(SetVariableRequest request)')
     print('  SelectResponse ShowVariable(ShowVariableRequest request)')
     print('  ShowTableResponse ShowTable(ShowTableRequest request)')
     print('  SelectResponse ShowColumns(ShowColumnsRequest request)')
@@ -222,6 +223,12 @@ elif cmd == 'ListIndex':
         print('ListIndex requires 1 args')
         sys.exit(1)
     pp.pprint(client.ListIndex(eval(args[0]),))
+
+elif cmd == 'SetVariable':
+    if len(args) != 1:
+        print('SetVariable requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.SetVariable(eval(args[0]),))
 
 elif cmd == 'ShowVariable':
     if len(args) != 1:

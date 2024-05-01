@@ -17,7 +17,7 @@ from enum import Enum
 from infinity import URI
 
 
-class ShowVariable(Enum):
+class Variable(Enum):
     QUERY_COUNT = "query_count"
     SESSION_COUNT = "session_count"
     BUFFER_POOL_USAGE = "buffer_pool_usage"
@@ -33,6 +33,9 @@ class ShowVariable(Enum):
     DATA_URL = "data_url"
     TIME_ZONE = "time_zone"
 
+class Scope(object):
+    Session = 0
+    Global = 1
 
 # abstract class
 class InfinityConnection(ABC):
@@ -64,5 +67,5 @@ class InfinityConnection(ABC):
         pass
 
     @abstractmethod
-    def show_variable(self, variable: ShowVariable):
+    def show_variable(self, variable: Variable):
         pass

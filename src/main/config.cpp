@@ -30,6 +30,7 @@ import local_file_system;
 import utility;
 import status;
 import options;
+import command_statement;
 
 namespace infinity {
 
@@ -391,6 +392,8 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             String log_level = log_config["log_level"].value_or("default_db");
             if (IsEqual(log_level, "trace")) {
                 system_option_.log_level = LogLevel::kTrace;
+            } else if (IsEqual(log_level, "debug")) {
+                system_option_.log_level = LogLevel::kDebug;
             } else if (IsEqual(log_level, "info")) {
                 system_option_.log_level = LogLevel::kInfo;
             } else if (IsEqual(log_level, "warning")) {
@@ -398,7 +401,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             } else if (IsEqual(log_level, "error")) {
                 system_option_.log_level = LogLevel::kError;
             } else if (IsEqual(log_level, "critical")) {
-                system_option_.log_level = LogLevel::kFatal;
+                system_option_.log_level = LogLevel::kCritical;
             } else if (IsEqual(log_level, "default_db")) {
                 system_option_.log_level = default_log_level;
             } else {
@@ -556,37 +559,46 @@ void Config::PrintAll() const {
 }
 
 void SystemVariables::InitVariablesMap() {
-    map_["query_count"] = SysVar::kQueryCount;
-    map_["session_count"] = SysVar::kSessionCount;
-    map_["buffer_pool_usage"] = SysVar::kBufferPoolUsage;
-    map_["version"] = SysVar::kVersion;
-    map_["query_memory_limit"] = SysVar::kQueryMemoryLimit;
-    map_["query_cpu_limit"] = SysVar::kQueryCpuLimit;
-    map_["log_level"] = SysVar::kLogLevel;
-    map_["schedule_policy"] = SysVar::kSchedulePolicy;
-    map_["listen_address"] = SysVar::kListenAddress;
-    map_["sql_port"] = SysVar::kSQLPort;
-    map_["sdk_port"] = SysVar::kSDKPort;
-    map_["http_api_port"] = SysVar::kHttpAPIPort;
-    map_["data_url"] = SysVar::kDataURL;
-    map_["time_zone"] = SysVar::kTimezone;
-    map_["flush_at_commit"] = SysVar::kLogFlushPolicy;
-    map_["wal_log_size"] = SysVar::kWALLogSize;
-    map_["next_transaction_id"] = SysVar::kNextTxnID;
-    map_["buffered_object_count"] = SysVar::kBufferedObjectCount;
-    map_["object_count_for_gc"] = SysVar::kGCListSizeOfBufferPool;
-    map_["active_transaction_count"] = SysVar::kActiveTxnCount;
-    map_["current_ts"] = SysVar::kCurrentTs;
+    name_map_["query_count"] = SysVar::kQueryCount;
+    name_map_["session_count"] = SysVar::kSessionCount;
+    name_map_["buffer_pool_usage"] = SysVar::kBufferPoolUsage;
+    name_map_["version"] = SysVar::kVersion;
+    name_map_["query_memory_limit"] = SysVar::kQueryMemoryLimit;
+    name_map_["query_cpu_limit"] = SysVar::kQueryCpuLimit;
+    name_map_["log_level"] = SysVar::kLogLevel;
+    name_map_["schedule_policy"] = SysVar::kSchedulePolicy;
+    name_map_["listen_address"] = SysVar::kListenAddress;
+    name_map_["sql_port"] = SysVar::kSQLPort;
+    name_map_["sdk_port"] = SysVar::kSDKPort;
+    name_map_["http_api_port"] = SysVar::kHttpAPIPort;
+    name_map_["data_url"] = SysVar::kDataURL;
+    name_map_["time_zone"] = SysVar::kTimezone;
+    name_map_["flush_at_commit"] = SysVar::kLogFlushPolicy;
+    name_map_["wal_log_size"] = SysVar::kWALLogSize;
+    name_map_["next_transaction_id"] = SysVar::kNextTxnID;
+    name_map_["buffered_object_count"] = SysVar::kBufferedObjectCount;
+    name_map_["object_count_for_gc"] = SysVar::kGCListSizeOfBufferPool;
+    name_map_["active_transaction_count"] = SysVar::kActiveTxnCount;
+    name_map_["current_ts"] = SysVar::kCurrentTs;
 }
 
-HashMap<String, SysVar> SystemVariables::map_;
+HashMap<String, SysVar> SystemVariables::name_map_;
+HashMap<String, SetVarType> SystemVariables::type_map_;
 
-SysVar SystemVariables::GetSysVarEnumByName(const String &var_name) {
-    auto it = map_.find(var_name);
-    if (it != map_.end()) {
+SysVar SystemVariables::GetSysVarEnumByName(const String &variable_name) {
+    auto it = name_map_.find(variable_name);
+    if (it != name_map_.end()) {
         return it->second;
     }
     return SysVar::kInvalid;
+}
+
+SetVarType SystemVariables::GetVariableType(const String& variable_name) {
+    auto it = type_map_.find(variable_name);
+    if(it != type_map_.end()) {
+        return it->second;
+    }
+    return SetVarType::kInvalid;
 }
 
 } // namespace infinity

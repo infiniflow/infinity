@@ -418,6 +418,37 @@ std::string to_string(const ExplainType::type& val) {
   }
 }
 
+int _kSetScopeValues[] = {
+  SetScope::SessionScope,
+  SetScope::GlobalScope,
+  SetScope::InvalidScope
+};
+const char* _kSetScopeNames[] = {
+  "SessionScope",
+  "GlobalScope",
+  "InvalidScope"
+};
+const std::map<int, const char*> _SetScope_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(3, _kSetScopeValues, _kSetScopeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+
+std::ostream& operator<<(std::ostream& out, const SetScope::type& val) {
+  std::map<int, const char*>::const_iterator it = _SetScope_VALUES_TO_NAMES.find(val);
+  if (it != _SetScope_VALUES_TO_NAMES.end()) {
+    out << it->second;
+  } else {
+    out << static_cast<int>(val);
+  }
+  return out;
+}
+
+std::string to_string(const SetScope::type& val) {
+  std::map<int, const char*>::const_iterator it = _SetScope_VALUES_TO_NAMES.find(val);
+  if (it != _SetScope_VALUES_TO_NAMES.end()) {
+    return std::string(it->second);
+  } else {
+    return std::to_string(static_cast<int>(val));
+  }
+}
+
 
 Property::~Property() noexcept {
 }
@@ -11657,6 +11688,160 @@ void ShowBlockColumnResponse::printTo(std::ostream& out) const {
   out << ", " << "path=" << to_string(path);
   out << ", " << "extra_file_count=" << to_string(extra_file_count);
   out << ", " << "extra_file_names=" << to_string(extra_file_names);
+  out << ")";
+}
+
+
+SetVariableRequest::~SetVariableRequest() noexcept {
+}
+
+
+void SetVariableRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void SetVariableRequest::__set_variable_name(const std::string& val) {
+  this->variable_name = val;
+}
+
+void SetVariableRequest::__set_variable_value(const std::string& val) {
+  this->variable_value = val;
+}
+
+void SetVariableRequest::__set_scope(const SetScope::type val) {
+  this->scope = val;
+}
+std::ostream& operator<<(std::ostream& out, const SetVariableRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t SetVariableRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->variable_name);
+          this->__isset.variable_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->variable_value);
+          this->__isset.variable_value = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast370;
+          xfer += iprot->readI32(ecast370);
+          this->scope = static_cast<SetScope::type>(ecast370);
+          this->__isset.scope = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t SetVariableRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("SetVariableRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("variable_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->variable_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("variable_value", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->variable_value);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("scope", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(static_cast<int32_t>(this->scope));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(SetVariableRequest &a, SetVariableRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.variable_name, b.variable_name);
+  swap(a.variable_value, b.variable_value);
+  swap(a.scope, b.scope);
+  swap(a.__isset, b.__isset);
+}
+
+SetVariableRequest::SetVariableRequest(const SetVariableRequest& other371) {
+  session_id = other371.session_id;
+  variable_name = other371.variable_name;
+  variable_value = other371.variable_value;
+  scope = other371.scope;
+  __isset = other371.__isset;
+}
+SetVariableRequest& SetVariableRequest::operator=(const SetVariableRequest& other372) {
+  session_id = other372.session_id;
+  variable_name = other372.variable_name;
+  variable_value = other372.variable_value;
+  scope = other372.scope;
+  __isset = other372.__isset;
+  return *this;
+}
+void SetVariableRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "SetVariableRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "variable_name=" << to_string(variable_name);
+  out << ", " << "variable_value=" << to_string(variable_value);
+  out << ", " << "scope=" << to_string(scope);
   out << ")";
 }
 
