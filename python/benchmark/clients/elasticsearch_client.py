@@ -3,12 +3,12 @@ from typing import Any
 from elasticsearch import Elasticsearch, helpers
 import json
 import time
-from typing import List, Optional
+from typing import List
 import os
 import h5py
 import uuid
 import numpy as np
-import csv
+import logging
 
 from .base_client import BaseClient
 
@@ -74,7 +74,7 @@ class ElasticsearchClient(BaseClient):
                 for i, line in enumerate(data_file):
                     row = line.strip().split('\t')
                     if len(row) != len(headers):
-                        print(f"row = {i}, row_len = {len(row)}, not equal headers len, skip")
+                        logging.info(f"row = {i}, row_len = {len(row)}, not equal headers len, skip")
                         continue
                     row_dict = {header: value for header, value in zip(headers, row)}
                     current_batch.append({"_index": self.collection_name, "_id": uuid.UUID(int=i).hex, "_source": row_dict})
@@ -133,7 +133,7 @@ class ElasticsearchClient(BaseClient):
         The function returns id list.
         """
         query_path = os.path.join(self.path_prefix, self.data["query_path"])
-        print(query_path)
+        logging.info(query_path)
         results = []
         _, ext = os.path.splitext(query_path)
         if ext == '.json' or ext == '.jsonl':
@@ -184,7 +184,7 @@ class ElasticsearchClient(BaseClient):
                         latency = (end - start) * 1000
                         result = [(uuid.UUID(hex=hit['_id']).int, hit['_score']) for hit in result['hits']['hits']]
                         result.append(latency)
-                        print(f"{line[:-1]}, {latency}")
+                        logging.info(f"{line[:-1]}, {latency}")
                         results.append(result)
         else:
             raise TypeError("Unsupported file type")
@@ -214,7 +214,7 @@ class ElasticsearchClient(BaseClient):
                         precisions.append(precision)
                         latencies.append(result[-1])
 
-            print(
+            logging.info(
                 f'''mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)},
                     std_time: {np.std(latencies)}, min_time: {np.min(latencies)}, \n
                     max_time: {np.max(latencies)}, p95_time: {np.percentile(latencies, 95)},
@@ -223,7 +223,7 @@ class ElasticsearchClient(BaseClient):
             latencies = []
             for result in results:
                 latencies.append(result[-1])
-            print(
+            logging.info(
                 f'''mean_time: {np.mean(latencies)}, std_time: {np.std(latencies)},
                     max_time: {np.max(latencies)}, min_time: {np.min(latencies)}, 
                     p95_time: {np.percentile(latencies, 95)}, p99_time: {np.percentile(latencies, 99)}''')

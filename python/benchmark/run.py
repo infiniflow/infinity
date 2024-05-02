@@ -1,10 +1,10 @@
 import argparse
 import os
+import logging
 
 from clients.elasticsearch_client import ElasticsearchClient
 from clients.infinity_client import InfinityClient
 from clients.qdrant_client import QdrantClient
-from generate_query_json import generate_query_json
 from generate_query_json import generate_query_txt
 
 ENGINES = ['infinity', 'qdrant', 'elasticsearch']
@@ -53,6 +53,7 @@ def get_client(engine: str, config: str, options: argparse.Namespace):
         raise ValueError(f"Unknown engine: {engine}")
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)-8s %(message)s')
     args = parse_args()
     config_paths = generate_config_paths(args)
 
@@ -65,9 +66,9 @@ if __name__ == '__main__':
 
     for path, engine in config_paths:
         if not os.path.exists(path):
-            print(f"qdrant does not support full text search")
+            logging.info("qdrant does not support full text search")
             continue
-        print("Running", engine, "with", path)
+        logging.info("Running {} with {}".format(engine, path))
         client = get_client(engine, path, args)
         client.run_experiment(args)
-        print("Finished", engine, "with", path)
+        logging.info("Finished {} with {}".format(engine, path))

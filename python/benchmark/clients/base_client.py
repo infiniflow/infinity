@@ -1,12 +1,10 @@
 import argparse
 from abc import abstractmethod
-from typing import Any, List, Optional, Dict, Union
-from enum import Enum
+from typing import Any
 import subprocess
-import sys
 import os
-from urllib.parse import urlparse
 import time
+import logging
 
 
 class BaseClient:
@@ -71,7 +69,7 @@ class BaseClient:
             start_time = time.time()
             self.upload()
             finish_time = time.time()
-            print(f"upload finish, cost time = {finish_time - start_time}")
+            logging.info(f"upload finish, cost time = {finish_time - start_time}")
         if args.query:
             results = self.search()
             self.check_and_save_results(results)

@@ -5,13 +5,12 @@ import h5py
 import time
 import numpy as np
 from typing import Any, List
+import logging
 
 import infinity
 import infinity.index as index
 from infinity import NetworkAddress
 from .base_client import BaseClient
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-import csv
 
 class InfinityClient(BaseClient):
     def __init__(self,
@@ -93,9 +92,9 @@ class InfinityClient(BaseClient):
                     for i, line in enumerate(data_file):
                         row = line.strip().split('\t')
                         if (i % 100000 == 0):
-                            print(f"row {i}")
+                            logging.info(f"row {i}")
                         if len(row) != len(headers):
-                            print(f"row = {i}, row_len = {len(row)}, not equal headers len, skip")
+                            logging.info(f"row = {i}, row_len = {len(row)}, not equal headers len, skip")
                             continue
                         row_dict = {header: value for header, value in zip(headers, row)}
                         current_batch.append(row_dict)
@@ -166,7 +165,7 @@ class InfinityClient(BaseClient):
                         latency = (time.time() - start) * 1000
                         result = [(row_id[0], score) for row_id, score in zip(res['ROW_ID'], res['SCORE'])]
                         result.append(latency)
-                        print(f"{query}, {latency}")
+                        logging.info(f"{query}, {latency}")
                         results.append(result)
         else:
             raise TypeError("Unsupported file type")
@@ -197,7 +196,7 @@ class InfinityClient(BaseClient):
                         precisions.append(precision)
                         latencies.append(result[-1])
 
-            print(
+            logging.info(
                 f'''mean_time: {np.mean(latencies)}, mean_precisions: {np.mean(precisions)},
                     std_time: {np.std(latencies)}, min_time: {np.min(latencies)},
                     max_time: {np.max(latencies)}, p95_time: {np.percentile(latencies, 95)},
@@ -206,7 +205,7 @@ class InfinityClient(BaseClient):
             latencies = []
             for result in results:
                 latencies.append(result[-1])
-            print(
+            logging.info(
                 f'''mean_time: {np.mean(latencies)}, std_time: {np.std(latencies)},
                     max_time: {np.max(latencies)}, min_time: {np.min(latencies)},
                     p95_time: {np.percentile(latencies, 95)}, p99_time: {np.percentile(latencies, 99)}''')
