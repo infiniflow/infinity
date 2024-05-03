@@ -13,11 +13,11 @@ This document compares the following key specifications of Elasticsearch, Qdrant
 - Peak memory usage
 
 ## Versions
-|                   |    QPS    |
-| ----------------- | --------- |
-| **Elasticsearch** | v8.13.0   |
-| **Qdrant**        | v1.8.2    |
-| **Infinity**      | v0.1.0    |
+|                   | Version |
+| ----------------- |---------|
+| **Elasticsearch** | v8.13.0 |
+| **Qdrant**        | v1.8.2  |
+| **Infinity**      | v0.1.0  |
 
 ## Run Benchmark
 
