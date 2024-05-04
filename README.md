@@ -84,7 +84,7 @@ See [Build from Source](docs/build_from_source.md).
 `infinity-sdk` requires Python 3.10+.
 
 ```bash
-pip3 install infinity-sdk
+pip3 install infinity-sdk==v0.1.0
 ```
 
 ### Import necessary modules
