@@ -2,7 +2,10 @@ name: tests
 
 on:
   push:
-    branches: [ main, libcxx ]
+    branches:
+      - 'main'
+      - '*.*.*'
+      - 'libcxx'
     paths-ignore:
       - 'docs/**'
       - '*.md'

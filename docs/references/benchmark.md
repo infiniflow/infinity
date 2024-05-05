@@ -3,6 +3,23 @@ sidebar_position: 1
 slug: /benchmark
 ---
 # Benchmark
+This document compares the following key specifications of Elasticsearch, Qdrant, and Infinity:
+
+- QPS
+- Recall
+- Time to insert & build index
+- Time to import & build index
+- Disk usage
+- Peak memory usage
+
+## Versions
+|                   | Version |
+| ----------------- |---------|
+| **Elasticsearch** | v8.13.0 |
+| **Qdrant**        | v1.8.2  |
+| **Infinity**      | v0.1.0  |
+
+## Run Benchmark
 
 1. Install necessary dependencies. 
 
