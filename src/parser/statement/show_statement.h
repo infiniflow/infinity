@@ -38,7 +38,11 @@ enum class ShowStmtType {
     kBlockColumn,
     kSessionStatus,
     kGlobalStatus,
-    kVar,
+    kSessionVariable,
+    kSessionVariables,
+    kGlobalVariable,
+    kGlobalVariables,
+    kConfig,
 };
 
 class ShowStatement : public BaseStatement {

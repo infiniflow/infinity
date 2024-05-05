@@ -47,7 +47,7 @@ TxnManager::TxnManager(Catalog *catalog,
     catalog_->SetTxnMgr(this);
 }
 
-Txn *TxnManager::BeginTxn() {
+Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         UnrecoverableError("TxnManager is not running, cannot create txn");
@@ -62,7 +62,7 @@ Txn *TxnManager::BeginTxn() {
     TxnTimeStamp ts = ++start_ts_;
 
     // Create txn instance
-    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts));
+    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;

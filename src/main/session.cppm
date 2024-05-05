@@ -25,6 +25,14 @@ import catalog;
 
 namespace infinity {
 
+export class SessionVar {
+public:
+    i64 query_count_{};
+    i64 total_commit_count_{};
+    bool enable_profile_{false};
+    i64 profile_record_capacity_{128};
+};
+
 export enum class SessionType {
     kLocal,
     kRemote,
@@ -38,7 +46,7 @@ public:
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
-    SessionOptions *options() { return &session_options; }
+    SessionVar *SessionVariables() { return &session_variables_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
@@ -59,7 +67,7 @@ protected:
 
     SessionType session_type_{SessionType::kRemote};
 
-    SessionOptions session_options;
+    SessionVar session_variables_;
 
     u64 session_id_{0};
 

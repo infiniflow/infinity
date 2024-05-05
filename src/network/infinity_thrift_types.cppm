@@ -33,8 +33,6 @@ export using infinity_thrift_rpc::ImportRequest;
 export using infinity_thrift_rpc::SelectRequest;
 export using infinity_thrift_rpc::SelectResponse;
 export using infinity_thrift_rpc::ExplainRequest;
-export using infinity_thrift_rpc::SetVariableRequest;
-export using infinity_thrift_rpc::ShowVariableRequest;
 export using infinity_thrift_rpc::DeleteRequest;
 export using infinity_thrift_rpc::UpdateRequest;
 export using infinity_thrift_rpc::ListDatabaseRequest;
@@ -91,7 +89,6 @@ export using infinity_thrift_rpc::EmbeddingType;
 export using infinity_thrift_rpc::InfinityServiceIfFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessorFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessor;
-export using infinity_thrift_rpc::SetScope;
 
 }
 

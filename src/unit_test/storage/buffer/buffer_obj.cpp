@@ -533,14 +533,14 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             column_defs.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), column_defs);
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     // CreateIndex
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         parameters1.emplace_back(new InitParameter("metric", "l2"));
@@ -574,7 +574,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // Insert data
     {
         for (SizeT i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
@@ -601,7 +601,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     }
     // Get Index
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get index"));
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
@@ -627,7 +627,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
@@ -652,7 +652,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     }
     // Drop Table
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
         txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
@@ -685,14 +685,14 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     }
     {
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
         for (SizeT i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
@@ -714,7 +714,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
         }
     }
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
@@ -766,14 +766,14 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     }
     {
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
     {
         for (SizeT i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
@@ -797,7 +797,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
     Vector<std::thread> ths;
     for (SizeT i = 0; i < kThreadN; ++i) {
         std::thread th([&]() {
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());

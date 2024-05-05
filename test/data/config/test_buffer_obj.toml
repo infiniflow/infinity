@@ -2,13 +2,18 @@
 version = "0.2.0"
 timezone = "utc-8"
 
+[network]
+[log]
+
 [storage]
-cleanup_interval = 1
+cleanup_interval = "1s"
 
 [wal]
 #short checkpoint interval to allow quick cleanup
-delta_checkpoint_interval_sec = 1
+delta_checkpoint_interval = "1s"
 
 [buffer]
-buffer_pool_size = "512kb"
+buffer_manager_size = "512kb"
 temp_dir         = "/var/infinity/tmp"
+
+[resource]

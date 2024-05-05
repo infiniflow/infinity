@@ -373,7 +373,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
-%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS PROFILES STATUS VAR
+%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES STATUS VARIABLES VARIABLE
 %token SEARCH MATCH QUERY FUSION
 
 %token NUMBER
@@ -1525,6 +1525,13 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kConfigs;
 }
+| SHOW CONFIG IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kConfig;
+    ParserHelper::ToLower($3);
+    $$->var_name_ = std::string($3);
+    free($3);
+}
 | SHOW PROFILES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kProfiles;
@@ -1537,12 +1544,25 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kGlobalStatus;
 }
-| SHOW VAR IDENTIFIER {
+| SHOW SESSION VARIABLES {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kVar;
-    ParserHelper::ToLower($3);
-    $$->var_name_ = std::string($3);
-    free($3);
+    $$->show_type_ = infinity::ShowStmtType::kSessionVariables;
+}
+| SHOW GLOBAL VARIABLES {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kGlobalVariables;
+}
+| SHOW SESSION VARIABLE IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kSessionVariable;
+    $$->var_name_ = std::string($4);
+    free($4);
+}
+| SHOW GLOBAL VARIABLE IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kGlobalVariable;
+    $$->var_name_ = std::string($4);
+    free($4);
 }
 | SHOW DATABASE IDENTIFIER {
     $$ = new infinity::ShowStatement();

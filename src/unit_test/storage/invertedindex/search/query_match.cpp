@@ -157,7 +157,7 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         txn->CreateTable(db_name, table_def, ConflictType::kError);
 
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
@@ -177,7 +177,7 @@ void QueryMatchTest::CreateIndex(const String& db_name, const String& table_name
     Vector<String> col_name_list{"text"};
     String index_file_name = index_name + ".json";
     {
-        auto *txn_idx = txn_mgr->BeginTxn();
+        auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
         auto [table_entry, status1] = txn_idx->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status1.ok());
 
@@ -240,7 +240,7 @@ void QueryMatchTest::InsertData(const String& db_name, const String& table_name)
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn();
+    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
     auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
     EXPECT_TRUE(status.ok());
 
@@ -284,7 +284,7 @@ void QueryMatchTest::QueryMatch(const String& db_name,
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn();
+    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("query match"));
 
     auto [table_entry, status_table] = txn->GetTableByName(db_name, table_name);
     EXPECT_TRUE(status_table.ok());

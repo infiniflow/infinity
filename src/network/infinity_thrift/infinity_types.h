@@ -207,20 +207,6 @@ std::ostream& operator<<(std::ostream& out, const ExplainType::type& val);
 
 std::string to_string(const ExplainType::type& val);
 
-struct SetScope {
-  enum type {
-    SessionScope = 0,
-    GlobalScope = 1,
-    InvalidScope = 2
-  };
-};
-
-extern const std::map<int, const char*> _SetScope_VALUES_TO_NAMES;
-
-std::ostream& operator<<(std::ostream& out, const SetScope::type& val);
-
-std::string to_string(const SetScope::type& val);
-
 class Property;
 
 class CreateOption;
@@ -337,8 +323,6 @@ class DeleteRequest;
 
 class UpdateRequest;
 
-class ShowVariableRequest;
-
 class ShowTablesRequest;
 
 class ShowSegmentsRequest;
@@ -356,8 +340,6 @@ class ShowBlockResponse;
 class ShowBlockColumnRequest;
 
 class ShowBlockColumnResponse;
-
-class SetVariableRequest;
 
 typedef struct _Property__isset {
   _Property__isset() : key(false), value(false) {}
@@ -4036,56 +4018,6 @@ void swap(UpdateRequest &a, UpdateRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const UpdateRequest& obj);
 
-typedef struct _ShowVariableRequest__isset {
-  _ShowVariableRequest__isset() : session_id(false), variable_name(false) {}
-  bool session_id :1;
-  bool variable_name :1;
-} _ShowVariableRequest__isset;
-
-class ShowVariableRequest : public virtual ::apache::thrift::TBase {
- public:
-
-  ShowVariableRequest(const ShowVariableRequest&);
-  ShowVariableRequest& operator=(const ShowVariableRequest&);
-  ShowVariableRequest() noexcept
-                      : session_id(0),
-                        variable_name() {
-  }
-
-  virtual ~ShowVariableRequest() noexcept;
-  int64_t session_id;
-  std::string variable_name;
-
-  _ShowVariableRequest__isset __isset;
-
-  void __set_session_id(const int64_t val);
-
-  void __set_variable_name(const std::string& val);
-
-  bool operator == (const ShowVariableRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(variable_name == rhs.variable_name))
-      return false;
-    return true;
-  }
-  bool operator != (const ShowVariableRequest &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const ShowVariableRequest & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(ShowVariableRequest &a, ShowVariableRequest &b);
-
-std::ostream& operator<<(std::ostream& out, const ShowVariableRequest& obj);
-
 typedef struct _ShowTablesRequest__isset {
   _ShowTablesRequest__isset() : session_id(false), db_name(false) {}
   bool session_id :1;
@@ -4766,74 +4698,6 @@ class ShowBlockColumnResponse : public virtual ::apache::thrift::TBase {
 void swap(ShowBlockColumnResponse &a, ShowBlockColumnResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const ShowBlockColumnResponse& obj);
-
-typedef struct _SetVariableRequest__isset {
-  _SetVariableRequest__isset() : session_id(false), variable_name(false), variable_value(false), scope(false) {}
-  bool session_id :1;
-  bool variable_name :1;
-  bool variable_value :1;
-  bool scope :1;
-} _SetVariableRequest__isset;
-
-class SetVariableRequest : public virtual ::apache::thrift::TBase {
- public:
-
-  SetVariableRequest(const SetVariableRequest&);
-  SetVariableRequest& operator=(const SetVariableRequest&);
-  SetVariableRequest() noexcept
-                     : session_id(0),
-                       variable_name(),
-                       variable_value(),
-                       scope(static_cast<SetScope::type>(0)) {
-  }
-
-  virtual ~SetVariableRequest() noexcept;
-  int64_t session_id;
-  std::string variable_name;
-  std::string variable_value;
-  /**
-   * 
-   * @see SetScope
-   */
-  SetScope::type scope;
-
-  _SetVariableRequest__isset __isset;
-
-  void __set_session_id(const int64_t val);
-
-  void __set_variable_name(const std::string& val);
-
-  void __set_variable_value(const std::string& val);
-
-  void __set_scope(const SetScope::type val);
-
-  bool operator == (const SetVariableRequest & rhs) const
-  {
-    if (!(session_id == rhs.session_id))
-      return false;
-    if (!(variable_name == rhs.variable_name))
-      return false;
-    if (!(variable_value == rhs.variable_value))
-      return false;
-    if (!(scope == rhs.scope))
-      return false;
-    return true;
-  }
-  bool operator != (const SetVariableRequest &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const SetVariableRequest & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(SetVariableRequest &a, SetVariableRequest &b);
-
-std::ostream& operator<<(std::ostream& out, const SetVariableRequest& obj);
 
 } // namespace
 

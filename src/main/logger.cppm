@@ -27,7 +27,7 @@ class Config;
 export class Logger {
 public:
     static void
-    Initialize(const Config* config_ptr);
+    Initialize(Config* config_ptr);
 
     static void
     Shutdown();

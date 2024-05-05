@@ -203,23 +203,6 @@ class ThriftInfinityClient:
         self.transport.close()
         return res
 
-    def set_variable(self, variable: Variable, value: str, var_scope: Scope):
-        if var_scope == Scope.Session:
-            return self.client.SetVariable(SetVariableRequest(session_id=self.session_id,
-                                                              variable_name=str(variable.value),
-                                                              variable_value=value,
-                                                              scope=SetScope.SessionScope))
-        else:
-            return self.client.SetVariable(SetVariableRequest(session_id=self.session_id,
-                                                              variable_name=str(variable.value),
-                                                              variable_value=value,
-                                                              scope=SetScope.GlobalScope))
-
-
-    def show_variable(self, variable: Variable):
-        return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,
-                                                            variable_name=str(variable.value)))
-
     def show_tables(self, db_name: str):
         return self.client.ShowTables(ShowTablesRequest(session_id=self.session_id, db_name=db_name))
 

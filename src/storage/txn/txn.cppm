@@ -63,13 +63,16 @@ enum class CompactSegmentsTaskType;
 
 export class Txn {
 public:
+    // For new txn
     explicit Txn(TxnManager *txn_manager,
                  BufferManager *buffer_manager,
                  Catalog *catalog,
                  BGTaskProcessor *bg_task_processor,
                  TransactionID txn_id,
-                 TxnTimeStamp begin_ts);
+                 TxnTimeStamp begin_ts,
+                 UniquePtr<String> txn_text);
 
+    // For replay txn
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
@@ -239,6 +242,9 @@ private:
     std::mutex lock_{};
     std::condition_variable cond_var_{};
     bool done_bottom_{false};
+
+    // String
+    UniquePtr<String> txn_text_{nullptr};
 };
 
 } // namespace infinity

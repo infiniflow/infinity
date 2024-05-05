@@ -559,8 +559,24 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW GLOBAL STATUS"));
             break;
         }
-        case ShowStmtType::kVar: {
-            result->emplace_back(MakeShared<String>("SHOW VARIABLES"));
+        case ShowStmtType::kSessionVariable: {
+            result->emplace_back(MakeShared<String>("SHOW SESSION VARIABLE"));
+            break;
+        }
+        case ShowStmtType::kSessionVariables: {
+            result->emplace_back(MakeShared<String>("SHOW SESSION VARIABLES"));
+            break;
+        }
+        case ShowStmtType::kGlobalVariable: {
+            result->emplace_back(MakeShared<String>("SHOW GLOBAL VARIABLE"));
+            break;
+        }
+        case ShowStmtType::kGlobalVariables: {
+            result->emplace_back(MakeShared<String>("SHOW GLOBAL VARIABLES"));
+            break;
+        }
+        case ShowStmtType::kConfig: {
+            result->emplace_back(MakeShared<String>("SHOW CONFIG"));
             break;
         }
     }

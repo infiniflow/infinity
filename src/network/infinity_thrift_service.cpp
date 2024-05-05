@@ -308,9 +308,6 @@ void InfinityThriftService::Import(infinity_thrift_rpc::CommonResponse &response
         return;
     }
 
-    Path path(
-        fmt::format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
-
     auto [copy_file_type, status] = GetCopyFileType(request.import_option.copy_file_type);
     if (!status.ok()) {
         ProcessStatus(response, status);
@@ -656,54 +653,6 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     auto explain_type = GetExplainTypeFromProto(request.explain_type);
     const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, output_columns);
 
-    if (result.IsOk()) {
-        auto &columns = response.column_fields;
-        columns.resize(result.result_table_->ColumnCount());
-        ProcessDataBlocks(result, response, columns);
-    } else {
-        ProcessQueryResult(response, result);
-    }
-}
-
-void InfinityThriftService::SetVariable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::SetVariableRequest &request) {
-    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
-    if (!infinity_status.ok()) {
-        ProcessStatus(response, infinity_status);
-        return;
-    }
-
-    SetScope scope;
-    switch(request.scope) {
-        case infinity_thrift_rpc::SetScope::type::SessionScope: {
-            scope = SetScope::kSession;
-            break;
-        }
-        case infinity_thrift_rpc::SetScope::type::GlobalScope: {
-            scope = SetScope::kGlobal;
-            break;
-        }
-        default: {
-            scope = SetScope::kInvalid;
-            UnrecoverableError("SetVariable: invalid scope type.");
-        }
-    }
-
-    const QueryResult result = infinity->SetVariable(request.variable_name, request.variable_value, scope);
-    if (result.IsOk()) {
-        ProcessQueryResult(response, result);
-    } else {
-        ProcessQueryResult(response, result);
-    }
-}
-
-void InfinityThriftService::ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) {
-    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
-    if (!infinity_status.ok()) {
-        ProcessStatus(response, infinity_status);
-        return;
-    }
-
-    const QueryResult result = infinity->ShowVariable(request.variable_name);
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());

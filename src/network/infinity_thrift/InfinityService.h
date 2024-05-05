@@ -37,8 +37,6 @@ class InfinityServiceIf {
   virtual void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) = 0;
   virtual void ListTable(ListTableResponse& _return, const ListTableRequest& request) = 0;
   virtual void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) = 0;
-  virtual void SetVariable(CommonResponse& _return, const SetVariableRequest& request) = 0;
-  virtual void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) = 0;
   virtual void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) = 0;
   virtual void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) = 0;
   virtual void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) = 0;
@@ -125,12 +123,6 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void ListIndex(ListIndexResponse& /* _return */, const ListIndexRequest& /* request */) override {
-    return;
-  }
-  void SetVariable(CommonResponse& /* _return */, const SetVariableRequest& /* request */) override {
-    return;
-  }
-  void ShowVariable(SelectResponse& /* _return */, const ShowVariableRequest& /* request */) override {
     return;
   }
   void ShowTable(ShowTableResponse& /* _return */, const ShowTableRequest& /* request */) override {
@@ -1725,214 +1717,6 @@ class InfinityService_ListIndex_presult {
 
 };
 
-typedef struct _InfinityService_SetVariable_args__isset {
-  _InfinityService_SetVariable_args__isset() : request(false) {}
-  bool request :1;
-} _InfinityService_SetVariable_args__isset;
-
-class InfinityService_SetVariable_args {
- public:
-
-  InfinityService_SetVariable_args(const InfinityService_SetVariable_args&);
-  InfinityService_SetVariable_args& operator=(const InfinityService_SetVariable_args&);
-  InfinityService_SetVariable_args() noexcept {
-  }
-
-  virtual ~InfinityService_SetVariable_args() noexcept;
-  SetVariableRequest request;
-
-  _InfinityService_SetVariable_args__isset __isset;
-
-  void __set_request(const SetVariableRequest& val);
-
-  bool operator == (const InfinityService_SetVariable_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
-  bool operator != (const InfinityService_SetVariable_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_SetVariable_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class InfinityService_SetVariable_pargs {
- public:
-
-
-  virtual ~InfinityService_SetVariable_pargs() noexcept;
-  const SetVariableRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_SetVariable_result__isset {
-  _InfinityService_SetVariable_result__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_SetVariable_result__isset;
-
-class InfinityService_SetVariable_result {
- public:
-
-  InfinityService_SetVariable_result(const InfinityService_SetVariable_result&);
-  InfinityService_SetVariable_result& operator=(const InfinityService_SetVariable_result&);
-  InfinityService_SetVariable_result() noexcept {
-  }
-
-  virtual ~InfinityService_SetVariable_result() noexcept;
-  CommonResponse success;
-
-  _InfinityService_SetVariable_result__isset __isset;
-
-  void __set_success(const CommonResponse& val);
-
-  bool operator == (const InfinityService_SetVariable_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
-  bool operator != (const InfinityService_SetVariable_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_SetVariable_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_SetVariable_presult__isset {
-  _InfinityService_SetVariable_presult__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_SetVariable_presult__isset;
-
-class InfinityService_SetVariable_presult {
- public:
-
-
-  virtual ~InfinityService_SetVariable_presult() noexcept;
-  CommonResponse* success;
-
-  _InfinityService_SetVariable_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
-};
-
-typedef struct _InfinityService_ShowVariable_args__isset {
-  _InfinityService_ShowVariable_args__isset() : request(false) {}
-  bool request :1;
-} _InfinityService_ShowVariable_args__isset;
-
-class InfinityService_ShowVariable_args {
- public:
-
-  InfinityService_ShowVariable_args(const InfinityService_ShowVariable_args&);
-  InfinityService_ShowVariable_args& operator=(const InfinityService_ShowVariable_args&);
-  InfinityService_ShowVariable_args() noexcept {
-  }
-
-  virtual ~InfinityService_ShowVariable_args() noexcept;
-  ShowVariableRequest request;
-
-  _InfinityService_ShowVariable_args__isset __isset;
-
-  void __set_request(const ShowVariableRequest& val);
-
-  bool operator == (const InfinityService_ShowVariable_args & rhs) const
-  {
-    if (!(request == rhs.request))
-      return false;
-    return true;
-  }
-  bool operator != (const InfinityService_ShowVariable_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_ShowVariable_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class InfinityService_ShowVariable_pargs {
- public:
-
-
-  virtual ~InfinityService_ShowVariable_pargs() noexcept;
-  const ShowVariableRequest* request;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_ShowVariable_result__isset {
-  _InfinityService_ShowVariable_result__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_ShowVariable_result__isset;
-
-class InfinityService_ShowVariable_result {
- public:
-
-  InfinityService_ShowVariable_result(const InfinityService_ShowVariable_result&);
-  InfinityService_ShowVariable_result& operator=(const InfinityService_ShowVariable_result&);
-  InfinityService_ShowVariable_result() noexcept {
-  }
-
-  virtual ~InfinityService_ShowVariable_result() noexcept;
-  SelectResponse success;
-
-  _InfinityService_ShowVariable_result__isset __isset;
-
-  void __set_success(const SelectResponse& val);
-
-  bool operator == (const InfinityService_ShowVariable_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
-  bool operator != (const InfinityService_ShowVariable_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InfinityService_ShowVariable_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _InfinityService_ShowVariable_presult__isset {
-  _InfinityService_ShowVariable_presult__isset() : success(false) {}
-  bool success :1;
-} _InfinityService_ShowVariable_presult__isset;
-
-class InfinityService_ShowVariable_presult {
- public:
-
-
-  virtual ~InfinityService_ShowVariable_presult() noexcept;
-  SelectResponse* success;
-
-  _InfinityService_ShowVariable_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
-};
-
 typedef struct _InfinityService_ShowTable_args__isset {
   _InfinityService_ShowTable_args__isset() : request(false) {}
   bool request :1;
@@ -3459,12 +3243,6 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override;
   void send_ListIndex(const ListIndexRequest& request);
   void recv_ListIndex(ListIndexResponse& _return);
-  void SetVariable(CommonResponse& _return, const SetVariableRequest& request) override;
-  void send_SetVariable(const SetVariableRequest& request);
-  void recv_SetVariable(CommonResponse& _return);
-  void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
-  void send_ShowVariable(const ShowVariableRequest& request);
-  void recv_ShowVariable(SelectResponse& _return);
   void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override;
   void send_ShowTable(const ShowTableRequest& request);
   void recv_ShowTable(ShowTableResponse& _return);
@@ -3537,8 +3315,6 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_SetVariable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ShowVariable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -3571,8 +3347,6 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
     processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
     processMap_["ListIndex"] = &InfinityServiceProcessor::process_ListIndex;
-    processMap_["SetVariable"] = &InfinityServiceProcessor::process_SetVariable;
-    processMap_["ShowVariable"] = &InfinityServiceProcessor::process_ShowVariable;
     processMap_["ShowTable"] = &InfinityServiceProcessor::process_ShowTable;
     processMap_["ShowColumns"] = &InfinityServiceProcessor::process_ShowColumns;
     processMap_["ShowDatabase"] = &InfinityServiceProcessor::process_ShowDatabase;
@@ -3762,26 +3536,6 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
       ifaces_[i]->ListIndex(_return, request);
     }
     ifaces_[i]->ListIndex(_return, request);
-    return;
-  }
-
-  void SetVariable(CommonResponse& _return, const SetVariableRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->SetVariable(_return, request);
-    }
-    ifaces_[i]->SetVariable(_return, request);
-    return;
-  }
-
-  void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ShowVariable(_return, request);
-    }
-    ifaces_[i]->ShowVariable(_return, request);
     return;
   }
 
@@ -4002,12 +3756,6 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void ListIndex(ListIndexResponse& _return, const ListIndexRequest& request) override;
   int32_t send_ListIndex(const ListIndexRequest& request);
   void recv_ListIndex(ListIndexResponse& _return, const int32_t seqid);
-  void SetVariable(CommonResponse& _return, const SetVariableRequest& request) override;
-  int32_t send_SetVariable(const SetVariableRequest& request);
-  void recv_SetVariable(CommonResponse& _return, const int32_t seqid);
-  void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
-  int32_t send_ShowVariable(const ShowVariableRequest& request);
-  void recv_ShowVariable(SelectResponse& _return, const int32_t seqid);
   void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override;
   int32_t send_ShowTable(const ShowTableRequest& request);
   void recv_ShowTable(ShowTableResponse& _return, const int32_t seqid);

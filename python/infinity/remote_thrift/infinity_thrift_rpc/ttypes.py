@@ -310,24 +310,6 @@ class ExplainType(object):
     }
 
 
-class SetScope(object):
-    SessionScope = 0
-    GlobalScope = 1
-    InvalidScope = 2
-
-    _VALUES_TO_NAMES = {
-        0: "SessionScope",
-        1: "GlobalScope",
-        2: "InvalidScope",
-    }
-
-    _NAMES_TO_VALUES = {
-        "SessionScope": 0,
-        "GlobalScope": 1,
-        "InvalidScope": 2,
-    }
-
-
 class Property(object):
     """
     Attributes:
@@ -5830,74 +5812,6 @@ class UpdateRequest(object):
         return not (self == other)
 
 
-class ShowVariableRequest(object):
-    """
-    Attributes:
-     - session_id
-     - variable_name
-
-    """
-
-
-    def __init__(self, session_id=None, variable_name=None,):
-        self.session_id = session_id
-        self.variable_name = variable_name
-
-    def read(self, iprot):
-        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
-            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
-            return
-        iprot.readStructBegin()
-        while True:
-            (fname, ftype, fid) = iprot.readFieldBegin()
-            if ftype == TType.STOP:
-                break
-            if fid == 1:
-                if ftype == TType.I64:
-                    self.session_id = iprot.readI64()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 2:
-                if ftype == TType.STRING:
-                    self.variable_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                else:
-                    iprot.skip(ftype)
-            else:
-                iprot.skip(ftype)
-            iprot.readFieldEnd()
-        iprot.readStructEnd()
-
-    def write(self, oprot):
-        if oprot._fast_encode is not None and self.thrift_spec is not None:
-            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
-            return
-        oprot.writeStructBegin('ShowVariableRequest')
-        if self.session_id is not None:
-            oprot.writeFieldBegin('session_id', TType.I64, 1)
-            oprot.writeI64(self.session_id)
-            oprot.writeFieldEnd()
-        if self.variable_name is not None:
-            oprot.writeFieldBegin('variable_name', TType.STRING, 2)
-            oprot.writeString(self.variable_name.encode('utf-8') if sys.version_info[0] == 2 else self.variable_name)
-            oprot.writeFieldEnd()
-        oprot.writeFieldStop()
-        oprot.writeStructEnd()
-
-    def validate(self):
-        return
-
-    def __repr__(self):
-        L = ['%s=%r' % (key, value)
-             for key, value in self.__dict__.items()]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
-
-
 class ShowTablesRequest(object):
     """
     Attributes:
@@ -6871,96 +6785,6 @@ class ShowBlockColumnResponse(object):
 
     def __ne__(self, other):
         return not (self == other)
-
-
-class SetVariableRequest(object):
-    """
-    Attributes:
-     - session_id
-     - variable_name
-     - variable_value
-     - scope
-
-    """
-
-
-    def __init__(self, session_id=None, variable_name=None, variable_value=None, scope=None,):
-        self.session_id = session_id
-        self.variable_name = variable_name
-        self.variable_value = variable_value
-        self.scope = scope
-
-    def read(self, iprot):
-        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
-            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
-            return
-        iprot.readStructBegin()
-        while True:
-            (fname, ftype, fid) = iprot.readFieldBegin()
-            if ftype == TType.STOP:
-                break
-            if fid == 1:
-                if ftype == TType.I64:
-                    self.session_id = iprot.readI64()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 2:
-                if ftype == TType.STRING:
-                    self.variable_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 3:
-                if ftype == TType.STRING:
-                    self.variable_value = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 4:
-                if ftype == TType.I32:
-                    self.scope = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
-            else:
-                iprot.skip(ftype)
-            iprot.readFieldEnd()
-        iprot.readStructEnd()
-
-    def write(self, oprot):
-        if oprot._fast_encode is not None and self.thrift_spec is not None:
-            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
-            return
-        oprot.writeStructBegin('SetVariableRequest')
-        if self.session_id is not None:
-            oprot.writeFieldBegin('session_id', TType.I64, 1)
-            oprot.writeI64(self.session_id)
-            oprot.writeFieldEnd()
-        if self.variable_name is not None:
-            oprot.writeFieldBegin('variable_name', TType.STRING, 2)
-            oprot.writeString(self.variable_name.encode('utf-8') if sys.version_info[0] == 2 else self.variable_name)
-            oprot.writeFieldEnd()
-        if self.variable_value is not None:
-            oprot.writeFieldBegin('variable_value', TType.STRING, 3)
-            oprot.writeString(self.variable_value.encode('utf-8') if sys.version_info[0] == 2 else self.variable_value)
-            oprot.writeFieldEnd()
-        if self.scope is not None:
-            oprot.writeFieldBegin('scope', TType.I32, 4)
-            oprot.writeI32(self.scope)
-            oprot.writeFieldEnd()
-        oprot.writeFieldStop()
-        oprot.writeStructEnd()
-
-    def validate(self):
-        return
-
-    def __repr__(self):
-        L = ['%s=%r' % (key, value)
-             for key, value in self.__dict__.items()]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
 all_structs.append(Property)
 Property.thrift_spec = (
     None,  # 0
@@ -7436,12 +7260,6 @@ UpdateRequest.thrift_spec = (
     ], ),  # 4
     (5, TType.I64, 'session_id', None, None, ),  # 5
 )
-all_structs.append(ShowVariableRequest)
-ShowVariableRequest.thrift_spec = (
-    None,  # 0
-    (1, TType.I64, 'session_id', None, None, ),  # 1
-    (2, TType.STRING, 'variable_name', 'UTF8', None, ),  # 2
-)
 all_structs.append(ShowTablesRequest)
 ShowTablesRequest.thrift_spec = (
     None,  # 0
@@ -7528,14 +7346,6 @@ ShowBlockColumnResponse.thrift_spec = (
     (6, TType.STRING, 'path', 'UTF8', None, ),  # 6
     (7, TType.I64, 'extra_file_count', None, None, ),  # 7
     (8, TType.STRING, 'extra_file_names', 'UTF8', None, ),  # 8
-)
-all_structs.append(SetVariableRequest)
-SetVariableRequest.thrift_spec = (
-    None,  # 0
-    (1, TType.I64, 'session_id', None, None, ),  # 1
-    (2, TType.STRING, 'variable_name', 'UTF8', None, ),  # 2
-    (3, TType.STRING, 'variable_value', 'UTF8', None, ),  # 3
-    (4, TType.I32, 'scope', None, None, ),  # 4
 )
 fix_spec(all_structs)
 del all_structs

@@ -108,8 +108,15 @@ private:
 
     void ExecuteShowGlobalStatus(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowVar(QueryContext *query_context, ShowOperatorState *operator_state);
+    void ExecuteShowSessionVariable(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowSessionVariables(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowGlobalVariable(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowGlobalVariables(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state);
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};

@@ -225,7 +225,7 @@ QueryResult Infinity::SetVariable(const String &variable_name, const String &var
     return result;
 }
 
-QueryResult Infinity::ShowVariable(const String &variable_name) {
+QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -235,7 +235,63 @@ QueryResult Infinity::ShowVariable(const String &variable_name) {
 
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->var_name_ = variable_name;
-    show_statement->show_type_ = ShowStmtType::kVar;
+    switch(scope) {
+        case SetScope::kGlobal: {
+            show_statement->show_type_ = ShowStmtType::kGlobalVariable;
+            break;
+        }
+        case SetScope::kSession: {
+            show_statement->show_type_ = ShowStmtType::kSessionVariable;
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid set scope.");
+        }
+    }
+
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ShowVariables(SetScope scope) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    switch(scope) {
+        case SetScope::kGlobal: {
+            show_statement->show_type_ = ShowStmtType::kGlobalVariables;
+            break;
+        }
+        case SetScope::kSession: {
+            show_statement->show_type_ = ShowStmtType::kSessionVariables;
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid set scope.");
+        }
+    }
+
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ShowConfig(const String &config_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->var_name_ = config_name;
+    show_statement->show_type_ = ShowStmtType::kConfig;
+
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
