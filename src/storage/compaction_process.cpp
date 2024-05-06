@@ -51,9 +51,9 @@ void CompactionProcessor::Stop() {
 void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
 Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
-    auto generate_txn = [this]() { return txn_mgr_->BeginTxn(); };
+    auto generate_txn = [this]() { return txn_mgr_->BeginTxn(MakeUnique<String>("Compact")); };
 
-    Txn *scan_txn = txn_mgr_->BeginTxn();
+    Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
 
     Vector<UniquePtr<CompactSegmentsTask>> compaction_tasks;
     TransactionID txn_id = scan_txn->TxnID();
@@ -80,7 +80,7 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
 }
 
 void CompactionProcessor::ScanAndOptimize() {
-    Txn *opt_txn = txn_mgr_->BeginTxn();
+    Txn *opt_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"));
     TransactionID txn_id = opt_txn->TxnID();
     TxnTimeStamp begin_ts = opt_txn->BeginTS();
 

@@ -52,6 +52,7 @@ import embedding_info;
 import decimal_info;
 import status;
 import constant_expr;
+import command_statement;
 
 namespace {
 
@@ -1438,7 +1439,7 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         auto variable_name = request->getPathVariable("variable_name");
-        auto result = infinity->ShowVariable(variable_name);
+        auto result = infinity->ShowVariable(variable_name, SetScope::kGlobal);
 
         nlohmann::json json_response;
         HTTPStatus http_status;

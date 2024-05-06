@@ -65,10 +65,10 @@ TEST_F(CatalogTest, simple_test1) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn();
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
     // start txn2
-    auto *txn2 = txn_mgr->BeginTxn();
+    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
 
     HashMap<String, BaseEntry *> databases;
 
@@ -123,10 +123,10 @@ TEST_F(CatalogTest, simple_test2) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn();
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
     // start txn2
-    auto *txn2 = txn_mgr->BeginTxn();
+    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
 
     // create db in empty catalog should be success
     {
@@ -147,7 +147,7 @@ TEST_F(CatalogTest, simple_test2) {
 
     txn_mgr->CommitTxn(txn2);
 
-    auto *txn3 = txn_mgr->BeginTxn();
+    auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
 
     // should be visible to txn3
     {
@@ -174,8 +174,8 @@ TEST_F(CatalogTest, concurrent_test) {
 
     for (int loop = 0; loop < 1; ++loop) {
         // start txn1 && txn2
-        auto *txn1 = txn_mgr->BeginTxn();
-        auto *txn2 = txn_mgr->BeginTxn();
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+        auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
         auto write_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
@@ -195,8 +195,8 @@ TEST_F(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn2);
 
         // start txn3 && txn4
-        auto *txn3 = txn_mgr->BeginTxn();
-        auto *txn4 = txn_mgr->BeginTxn();
+        auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+        auto *txn4 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
 
         auto read_routine = [&](Txn *txn) {
             for (int db_id = 0; db_id < 1000; ++db_id) {
@@ -217,8 +217,8 @@ TEST_F(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn4);
 
         // start txn5 && txn6
-        auto *txn5 = txn_mgr->BeginTxn();
-        auto *txn6 = txn_mgr->BeginTxn();
+        auto *txn5 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
+        auto *txn6 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
 
         auto drop_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
@@ -237,7 +237,7 @@ TEST_F(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn6);
 
         // start txn7
-        auto *txn7 = txn_mgr->BeginTxn();
+        auto *txn7 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
 
         // check all has been dropped
         for (int db_id = 0; db_id < 1000; ++db_id) {

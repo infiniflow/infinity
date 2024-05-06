@@ -57,9 +57,11 @@ Txn::Txn(TxnManager *txn_manager,
          Catalog *catalog,
          BGTaskProcessor *bg_task_processor,
          TransactionID txn_id,
-         TxnTimeStamp begin_ts)
+         TxnTimeStamp begin_ts,
+         UniquePtr<String> txn_text)
     : txn_store_(this, catalog), txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog),
-      txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
+      txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
+      txn_text_(std::move(txn_text)) {}
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts)
     : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), txn_context_(begin_ts),

@@ -46,18 +46,20 @@ import log_file;
 
 namespace infinity {
 
-Storage::Storage(const Config *config_ptr) : config_ptr_(config_ptr) {}
+Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
 
 void Storage::Init() {
     // Construct buffer manager
-    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->buffer_pool_size(), config_ptr_->data_dir(), config_ptr_->temp_dir());
+    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            MakeShared<String>(config_ptr_->DataDir()),
+                                            MakeShared<String>(config_ptr_->TempDir()));
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
-                                      *config_ptr_->wal_dir(),
-                                      config_ptr_->wal_size_threshold(),
-                                      config_ptr_->delta_checkpoint_interval_wal_bytes(),
-                                      config_ptr_->flush_at_commit());
+                                      config_ptr_->WALDir(),
+                                      config_ptr_->WALCompactThreshold(),
+                                      config_ptr_->DeltaCheckpointThreshold(),
+                                      config_ptr_->FlushMethodAtCommit());
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
@@ -69,7 +71,7 @@ void Storage::Init() {
 
     bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
     // Construct txn manager
-    std::chrono::seconds compact_interval = config_ptr_->compact_interval();
+    std::chrono::seconds compact_interval = static_cast<std::chrono::seconds>(config_ptr_->CompactInterval());
     bool enable_compaction = compact_interval.count() > 0;
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
@@ -79,7 +81,7 @@ void Storage::Init() {
                                       system_start_ts,
                                       enable_compaction);
 
-    std::chrono::seconds optimize_interval = config_ptr_->optimize_interval();
+    std::chrono::seconds optimize_interval = static_cast<std::chrono::seconds>(config_ptr_->OptimizeIndexInterval());
     bool enable_optimize = optimize_interval.count() > 0;
 
     if (enable_compaction || enable_optimize) {
@@ -99,7 +101,7 @@ void Storage::Init() {
         compact_processor_->Start();
     }
 
-    auto txn = txn_mgr_->BeginTxn();
+    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
@@ -119,7 +121,7 @@ void Storage::Init() {
             LOG_WARN("Optimize interval is not set, auto optimize task will not be triggered");
         }
 
-        std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();
+        std::chrono::seconds cleanup_interval = static_cast<std::chrono::seconds>(config_ptr_->CleanupInterval());
         if (cleanup_interval.count() > 0) {
             periodic_trigger_thread_->AddTrigger(
                 MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
@@ -127,7 +129,7 @@ void Storage::Init() {
             LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
         }
 
-        i64 full_checkpoint_interval_sec = config_ptr_->full_checkpoint_interval_sec();
+        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval();
         if (full_checkpoint_interval_sec > 0) {
             periodic_trigger_thread_->AddTrigger(
                 MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(full_checkpoint_interval_sec), wal_mgr_.get(), true));
@@ -135,7 +137,7 @@ void Storage::Init() {
             LOG_WARN("Full checkpoint interval is not set, auto full checkpoint task will NOT be triggered");
         }
 
-        i64 delta_checkpoint_interval_sec = config_ptr_->delta_checkpoint_interval_sec();
+        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval();
         if (delta_checkpoint_interval_sec > 0) {
             periodic_trigger_thread_->AddTrigger(
                 MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(delta_checkpoint_interval_sec), wal_mgr_.get(), false));
@@ -174,8 +176,9 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
 
 void Storage::InitNewCatalog() {
     LOG_INFO("Init new catalog");
-    auto data_dir = config_ptr_->data_dir();
-    new_catalog_ = Catalog::NewCatalog(std::move(data_dir), true);
+    auto data_dir = config_ptr_->DataDir();
+    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
+    new_catalog_ = Catalog::NewCatalog(std::move(data_dir_ptr), true);
 }
 
 } // namespace infinity

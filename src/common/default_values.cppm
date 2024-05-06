@@ -85,15 +85,47 @@ export {
     constexpr SizeT DEFAULT_BASE_NUM = 2;
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
-    constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
-    constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
-    constexpr SizeT DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
-    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 128 * 8192; // 128 * 8192 = 1M rows
 
-    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * GB;
-    constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 30;          // 30 seconds
-    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 5;         // 5 seconds
-    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * MB;
+    constexpr SizeT MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
+    constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
+    constexpr String DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr SizeT MAX_CLEANUP_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr SizeT MIN_COMPACT_INTERVAL_SEC = 0; // 0 means disable the function
+    constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
+    constexpr String DEFAULT_COMPACT_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr SizeT MAX_COMPACT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr SizeT MIN_OPTIMIZE_INTERVAL_SEC = 1;
+    constexpr SizeT DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
+    constexpr String DEFAULT_OPTIMIZE_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr SizeT MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr SizeT MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;           // 1 Block
+    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 128 * DEFAULT_BLOCK_CAPACITY; // 128 * 8192 = 1M rows
+    constexpr SizeT MAX_MEMINDEX_CAPACITY = DEFAULT_SEGMENT_CAPACITY;         // 1 Segment
+
+    constexpr i64 MIN_WAL_FILE_SIZE_THRESHOLD = 1024;                                    // 1KB
+    constexpr i64 DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * 1024l * 1024l * 1024l;           // 1GB
+    constexpr String DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR = "1GB";           // 1GB
+    constexpr i64 MAX_WAL_FILE_SIZE_THRESHOLD = 1024l * DEFAULT_WAL_FILE_SIZE_THRESHOLD; // 1TB
+
+    constexpr i64 MIN_FULL_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable full checkpoint
+    constexpr i64 DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC = 30; // 30 seconds
+    constexpr String DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
+    constexpr i64 MAX_FULL_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr i64 MIN_DELTA_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable delta checkpoint
+    constexpr i64 DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC = 5; // 5 seconds
+    constexpr String DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR = "5s"; // 5 seconds
+    constexpr i64 MAX_DELTA_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr i64 MIN_CHECKPOINT_INTERVAL_WAL_BYTES = 1024; // 1K
+    constexpr i64 DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024l * 1024l; // 64 MB
+    constexpr String DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR = "64MB"; // 64 MB
+    constexpr i64 MAX_CHECKPOINT_INTERVAL_WAL_BYTES = 1024l * 1024l * 1024l; // 1GB
+
+
     constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
     constexpr std::string_view WAL_FILE_PREFIX = "wal.log";
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
@@ -118,7 +150,12 @@ export {
 
     // default query option parameter
     constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 10;
+
+    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
+    constexpr String DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
+
+    constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
+    constexpr String DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
 }
 
-// constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
 } // namespace infinity

@@ -17,7 +17,6 @@ from abc import ABC
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity import InfinityConnection
 from infinity.errors import ErrorCode
-from infinity.infinity import ShowVariable
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.utils import name_validity_check, select_res_to_polars
@@ -103,10 +102,3 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
     @property
     def client(self):
         return self._client
-
-    def show_variable(self, variable: ShowVariable):
-        res = self._client.show_variable(variable)
-        if res.error_code == ErrorCode.OK:
-            return select_res_to_polars(res)
-        else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")

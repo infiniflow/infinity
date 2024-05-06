@@ -2,8 +2,15 @@
 version = "0.2.0"
 timezone = "utc-8"
 
+[network]
+[log]
+
 [storage]
 # close auto optimize
-optimize_interval = 0
+optimize_interval = "0s"
 # close auto compaction
-compaction_interval = 0
+compact_interval = "0s"
+
+[wal]
+[buffer]
+[resource]

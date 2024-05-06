@@ -146,8 +146,15 @@ public:
 
     Status BuildShowGlobalStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildShowVar(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildShowSessionVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowSessionVariables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowGlobalVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowGlobalVariables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowConfig(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

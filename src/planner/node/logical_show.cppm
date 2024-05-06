@@ -44,7 +44,11 @@ export enum class ShowType {
     kShowBlockColumn,
     kShowSessionStatus,
     kShowGlobalStatus,
-    kShowVar,
+    kShowSessionVariable,
+    kShowSessionVariables,
+    kShowGlobalVariable,
+    kShowGlobalVariables,
+    kShowConfig,
 };
 
 export String ToString(ShowType type);

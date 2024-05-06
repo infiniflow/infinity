@@ -31,7 +31,7 @@ namespace infinity {
 
 export class Storage {
 public:
-    explicit Storage(const Config *config_ptr);
+    explicit Storage(Config *config_ptr);
 
     [[nodiscard]] inline Catalog *catalog() noexcept { return new_catalog_.get(); }
 
@@ -51,10 +51,10 @@ public:
 
     void InitNewCatalog();
 
-    const Config *config() const { return config_ptr_; }
+    Config *config() const { return config_ptr_; }
 
 private:
-    const Config *config_ptr_{};
+    Config *config_ptr_{};
     UniquePtr<Catalog> new_catalog_{};
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};

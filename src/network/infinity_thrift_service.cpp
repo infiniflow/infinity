@@ -51,6 +51,7 @@ import update_statement;
 import search_expr;
 import explain_statement;
 import create_index_info;
+import command_statement;
 import data_block;
 import table_def;
 import extra_ddl_info;
@@ -306,9 +307,6 @@ void InfinityThriftService::Import(infinity_thrift_rpc::CommonResponse &response
         ProcessStatus(response, infinity_status);
         return;
     }
-
-    Path path(
-        fmt::format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
 
     auto [copy_file_type, status] = GetCopyFileType(request.import_option.copy_file_type);
     if (!status.ok()) {
@@ -655,23 +653,6 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     auto explain_type = GetExplainTypeFromProto(request.explain_type);
     const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, output_columns);
 
-    if (result.IsOk()) {
-        auto &columns = response.column_fields;
-        columns.resize(result.result_table_->ColumnCount());
-        ProcessDataBlocks(result, response, columns);
-    } else {
-        ProcessQueryResult(response, result);
-    }
-}
-
-void InfinityThriftService::ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) {
-    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
-    if (!infinity_status.ok()) {
-        ProcessStatus(response, infinity_status);
-        return;
-    }
-
-    const QueryResult result = infinity->ShowVariable(request.variable_name);
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());

@@ -92,8 +92,24 @@ std::string ShowStatement::ToString() const {
             ss << "Show global status";
             break;
         }
-        case ShowStmtType::kVar: {
-            ss << "Show variable";
+        case ShowStmtType::kGlobalVariable: {
+            ss << "Show global variable";
+            break;
+        }
+        case ShowStmtType::kSessionVariable: {
+            ss << "Show session variable";
+            break;
+        }
+        case ShowStmtType::kGlobalVariables: {
+            ss << "Show global variables";
+            break;
+        }
+        case ShowStmtType::kSessionVariables: {
+            ss << "Show session variables";
+            break;
+        }
+        case ShowStmtType::kConfig: {
+            ss << "Show config";
             break;
         }
     }

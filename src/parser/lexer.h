@@ -2,9 +2,9 @@
 #define sqlHEADER_H 1
 #define sqlIN_HEADER 1
 
-#line 5 "lexer.h"
+#line 6 "lexer.h"
 
-#line 7 "lexer.h"
+#line 8 "lexer.h"
 
 #define  YY_INT_ALIGNED short int
 
@@ -846,9 +846,9 @@ extern int yylex \
 #undef yyTABLES_NAME
 #endif
 
-#line 233 "lexer.l"
+#line 235 "lexer.l"
 
 
-#line 852 "lexer.h"
+#line 853 "lexer.h"
 #undef sqlIN_HEADER
 #endif /* sqlHEADER_H */

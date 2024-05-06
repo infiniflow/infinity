@@ -91,6 +91,9 @@ String LogicalCommand::ToString(i64 &space) const {
                     ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_str();
                     break;
                 }
+                case SetVarType::kInvalid: {
+                    UnrecoverableError("Invalid variable type.");
+                }
             }
             break;
         }

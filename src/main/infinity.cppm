@@ -31,6 +31,7 @@ import column_def;
 import create_index_info;
 import update_statement;
 import explain_statement;
+import command_statement;
 
 namespace infinity {
 
@@ -68,7 +69,13 @@ public:
 
     QueryResult Flush();
 
-    QueryResult ShowVariable(const String &variable_name);
+    QueryResult SetVariable(const String &variable_name, const String &variable_value, SetScope scope);
+
+    QueryResult ShowVariable(const String &variable_name, SetScope scope);
+
+    QueryResult ShowVariables(SetScope scope);
+
+    QueryResult ShowConfig(const String &config_name);
 
     // For embedded sqllogictest
     QueryResult Query(const String &query_text);

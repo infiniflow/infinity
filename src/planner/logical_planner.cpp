@@ -1022,8 +1022,20 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kGlobalStatus: {
             return BuildShowGlobalStatus(statement, bind_context_ptr);
         }
-        case ShowStmtType::kVar: {
-            return BuildShowVar(statement, bind_context_ptr);
+        case ShowStmtType::kSessionVariable: {
+            return BuildShowSessionVariable(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kSessionVariables: {
+            return BuildShowSessionVariables(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kGlobalVariable: {
+            return BuildShowGlobalVariable(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kGlobalVariables: {
+            return BuildShowGlobalVariables(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kConfig: {
+            return BuildShowConfig(statement, bind_context_ptr);
         }
         default: {
             UnrecoverableError("Unexpected show statement type.");
@@ -1228,9 +1240,53 @@ Status LogicalPlanner::BuildShowGlobalStatus(const ShowStatement *statement, Sha
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildShowVar(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildShowSessionVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                  ShowType::kShowVar,
+                                                                  ShowType::kShowSessionVariable,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowSessionVariables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowSessionVariables,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowGlobalVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowGlobalVariable,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowGlobalVariables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowGlobalVariables,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowConfig(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowConfig,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->var_name_,
                                                                   bind_context_ptr->GenerateTableIndex());

@@ -2,10 +2,16 @@
 version = "0.2.0"
 timezone = "utc-8"
 
+[network]
+[log]
+
 [storage]
 # close auto compaction
-compaction_interval = 0
+compact_interval = "0s"
 
 [wal]
 #short checkpoint interval for test
-delta_checkpoint_interval_sec = 1
+delta_checkpoint_interval_sec = "1s"
+
+[buffer]
+[resource]

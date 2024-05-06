@@ -21,80 +21,139 @@ import third_party;
 
 namespace infinity {
 
-export enum class FlushOption {
+export enum class BaseOptionDataType {
+    kInteger,
+    kFloat,
+    kString,
+    kBoolean,
+    kLogLevel,
+    kFlush,
+    kInvalid,
+};
+
+export struct BaseOption {
+    explicit BaseOption(String name, BaseOptionDataType data_type) : name_(std::move(name)), data_type_(data_type) {}
+    virtual ~BaseOption() = default;
+
+    String name_{};
+    BaseOptionDataType data_type_{BaseOptionDataType::kInvalid};
+};
+
+export struct IntegerOption : public BaseOption {
+    explicit IntegerOption(String name, i64 default_value, i64 upper_bound, i64 lower_bound)
+        : BaseOption(std::move(name), BaseOptionDataType::kInteger), value_(default_value), upper_bound_(upper_bound), lower_bound_(lower_bound) {}
+
+    [[nodiscard]] inline bool Validate() const { return value_ >= lower_bound_ && value_ <= upper_bound_; }
+
+    i64 value_{};
+    i64 upper_bound_{};
+    i64 lower_bound_{};
+};
+
+export struct FloatOption : public BaseOption {
+    explicit FloatOption(String name, f64 default_value, f64 upper_bound, f64 lower_bound)
+        : BaseOption(std::move(name), BaseOptionDataType::kFloat), value_(default_value), upper_bound_(upper_bound), lower_bound_(lower_bound) {}
+
+    f64 value_{};
+    f64 upper_bound_{};
+    f64 lower_bound_{};
+};
+
+export struct StringOption : public BaseOption {
+    explicit StringOption(String name, String default_value)
+        : BaseOption(std::move(name), BaseOptionDataType::kString), value_(std::move(default_value)) {}
+
+    String value_{};
+};
+
+export struct BooleanOption : public BaseOption {
+    explicit BooleanOption(String name, bool default_value) : BaseOption(std::move(name), BaseOptionDataType::kBoolean), value_(default_value) {}
+
+    bool value_{};
+};
+
+export struct LogLevelOption : public BaseOption {
+    explicit LogLevelOption(String name, LogLevel log_level) : BaseOption(std::move(name), BaseOptionDataType::kLogLevel), value_(log_level) {}
+
+    LogLevel value_{};
+};
+
+export enum class FlushOptionType {
     kFlushAtOnce,
     kOnlyWrite,
     kFlushPerSecond,
 };
 
-export struct SessionOptions {
-    inline bool enable_profiling() const { return enable_profiling_; }
-    inline u64 profile_history_capacity() const { return profile_history_capacity_; }
+export String FlushOptionTypeToString(FlushOptionType flush_option_type) {
+    String flush_str;
+    switch (flush_option_type) {
+        case FlushOptionType::kFlushAtOnce: {
+            flush_str = "FlushAtOnce";
+            break;
+        }
+        case FlushOptionType::kOnlyWrite: {
+            flush_str = "OnlyWrite";
+            break;
+        }
+        case FlushOptionType::kFlushPerSecond: {
+            flush_str = "FlushPerSecond";
+            break;
+        }
+    }
+    return flush_str;
+}
 
-    bool enable_profiling_{false};      // enable_profile
-    u64 profile_history_capacity_{128}; // profile_history_capacity
+export struct FlushOption : public BaseOption {
+    explicit FlushOption(String name, FlushOptionType flush_type) : BaseOption(std::move(name), BaseOptionDataType::kFlush), value_(flush_type) {}
+
+    FlushOptionType value_{};
 };
 
-export struct SystemOptions {
-    // General
-    String version{};
-    String time_zone{};
-    i32 time_zone_bias{};
+export enum class GlobalOptionIndex {
+    // System config
+    kVersion = 0,
+    kTimeZone = 1,
+    kTimeZoneBias = 2,
+    kWorkerCPULimit = 3,
+    kServerAddress = 4,
+    kPostgresPort = 5,
+    kHTTPPort = 6,
+    kClientPort = 7,
+    kConnectionPoolSize = 8,
+    kLogFileName = 9,
+    kLogDir = 10,
+    kLogToStdout = 11,
+    kLogFileMaxSize = 12,
+    kLogFileRotateCount = 13,
+    kLogLevel = 14,
+    kDataDir = 15,
+    kCleanupInterval = 16,
+    kCompactInterval = 17,
+    kOptimizeIndexInterval = 18,
+    kMemIndexCapacity = 19,
+    kBufferManagerSize = 20,
+    kTempDir = 21,
+    kWALDir = 22,
+    kWALCompactThreshold = 23,
+    kFullCheckpointInterval = 24,
+    kDeltaCheckpointInterval = 25,
+    kDeltaCheckpointThreshold = 26,
+    kFlushMethodAtCommit = 27,
+    kResourcePath = 28,
+};
 
-    // System
-    u64 worker_cpu_limit{};
-    u64 total_memory_size{};
-    u64 query_cpu_limit{};
-    u64 query_memory_limit{};
+export struct GlobalOptions {
+    void AddOption(UniquePtr<BaseOption> option, GlobalOptionIndex option_index);
+    GlobalOptionIndex GetOptionIndex(const String &option_name);
+    BaseOption *GetOptionByName(const String &option_name);
+    BaseOption *GetOptionByIndex(GlobalOptionIndex option_index);
 
-    // profiler
-    bool enable_profiler{};
-    u64 profile_record_capacity{};
+    String GetStringValue(GlobalOptionIndex option_index);
+    i64 GetIntegerValue(GlobalOptionIndex option_index);
+    bool GetBoolValue(GlobalOptionIndex option_index);
 
-    // Network
-    String listen_address{};
-    u16 pg_port{};
-    u32 http_port{};
-    u32 sdk_port{};
-    i32 connection_limit_{};
-
-    // Log
-    SharedPtr<String> log_filename{MakeShared<String>("infinity.log")};
-    SharedPtr<String> log_dir{};
-    SharedPtr<String> log_file_path{};
-    bool log_to_stdout{};
-    u64 log_max_size{};
-    SizeT log_file_rotate_count{};
-    LogLevel log_level{};
-    //    spdlog::level::level_enum log_level{spdlog::level::info};
-
-    // Storage
-    SharedPtr<String> data_dir{};
-    u64 default_row_size{};
-    u64 storage_capacity_{};
-    u64 garbage_collection_interval_{}; // unit: seconds, 0 means real-time
-    double garbage_collection_storage_ratio_{}; // 0~1.0, 0 means disable the function
-
-    std::chrono::seconds cleanup_interval_{};
-    std::chrono::seconds compact_interval_{};
-    std::chrono::seconds optimize_interval_{};
-    SizeT memindex_capacity_{};
-
-    // Buffer
-    u64 buffer_pool_size{};
-    SharedPtr<String> temp_dir{};
-
-    // Wal
-    SharedPtr<String> wal_dir{};
-    u64 wal_size_threshold_{};
-    u64 full_checkpoint_interval_sec_{};
-    u64 full_checkpoint_txn_interval_{};
-    u64 delta_checkpoint_interval_sec_{};
-    u64 delta_checkpoint_interval_wal_bytes_{};
-    FlushOption flush_at_commit_{FlushOption::kOnlyWrite}; // 0: flush_at_once, 1: only_write, 2: flush_per_second
-
-    // Resource
-    String resource_dict_path_{};
+    Vector<UniquePtr<BaseOption>> options_;
+    HashMap<String, GlobalOptionIndex> name2index_;
 };
 
 } // namespace infinity

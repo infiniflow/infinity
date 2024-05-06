@@ -58,7 +58,7 @@ module wal_manager;
 
 namespace infinity {
 
-WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option)
+WalManager::WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0),
       checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {}
@@ -193,15 +193,15 @@ void WalManager::Flush() {
         }
 
         switch (flush_option_) {
-            case FlushOption::kFlushAtOnce: {
+            case FlushOptionType::kFlushAtOnce: {
                 ofs_.flush();
                 break;
             }
-            case FlushOption::kOnlyWrite: {
+            case FlushOptionType::kOnlyWrite: {
                 ofs_.flush(); // FIXME: not flush, only write
                 break;
             }
-            case FlushOption::kFlushPerSecond: {
+            case FlushOptionType::kFlushPerSecond: {
                 ofs_.flush(); // FIXME: not flush, flush per second
                 break;
             }
@@ -259,7 +259,7 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size) {
     TxnManager *txn_mgr = storage_->txn_manager();
-    Txn *txn = txn_mgr->BeginTxn();
+    Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"));
 
     this->CheckpointInner(is_full_checkpoint, txn, max_commit_ts, wal_size);
     txn_mgr->CommitTxn(txn);

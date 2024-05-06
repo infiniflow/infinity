@@ -1,23 +1,14 @@
 [general]
 version                 = "0.2.0"
 timezone                = "utc-9"
-
-[system]
-worker_cpu_limit        = 2
-total_memory_size       = "8GB"
-query_cpu_limit         = 2
-query_memory_limit      = "4MB"
+cpu_limit               = 2
 
 [network]
-listen_address          = "127.0.0.1"
-pg_port                 = 25432
+server_address          = "127.0.0.1"
+postgres_port           = 25432
 http_port               = 24821
-sdk_port                = 24817
-connection_limit        = 128
-
-[profiler]
-enable                  = false
-profile_record_capacity = 100
+client_port             = 24817
+connection_pool_size    = 128
 
 [log]
 log_filename            = "info.log"
@@ -34,11 +25,11 @@ data_dir                = "/var/infinity/data"
 default_row_size        = 4096
 
 [buffer]
-buffer_pool_size        = "3GB"
+buffer_manager_size        = "3GB"
 temp_dir                = "/tmp"
 
 [wal]
 wal_dir                 = "/var/infinity/wal"
 
 [resource]
-dictionary_dir                = "/var/infinity/resource"
+resource_dir          = "/var/infinity/resource"

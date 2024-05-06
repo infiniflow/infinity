@@ -492,11 +492,6 @@ struct UpdateRequest {
 5:  i64 session_id,
 }
 
-struct ShowVariableRequest{
-1: i64 session_id,
-2: string variable_name,
-}
-
 struct ShowTablesRequest{
 1: i64 session_id,
 2: string db_name,
@@ -595,7 +590,6 @@ ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),
 ListIndexResponse ListIndex(1:ListIndexRequest request),
 
-SelectResponse ShowVariable(1:ShowVariableRequest request),
 ShowTableResponse ShowTable(1:ShowTableRequest request),
 SelectResponse ShowColumns(1:ShowColumnsRequest request),
 ShowDatabaseResponse ShowDatabase(1:ShowDatabaseRequest request),

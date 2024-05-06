@@ -37,8 +37,8 @@ void PGServer::Run() {
 
     initialized_ = true;
 
-    u16 pg_port = InfinityContext::instance().config()->pg_port();
-    const String &pg_listen_addr = InfinityContext::instance().config()->listen_address();
+    u16 pg_port = InfinityContext::instance().config()->PostgresPort();
+    const String &pg_listen_addr = InfinityContext::instance().config()->ServerAddress();
 
     boost::system::error_code error;
     boost::asio::ip::address address = boost::asio::ip::make_address(pg_listen_addr, error);

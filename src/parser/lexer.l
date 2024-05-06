@@ -54,6 +54,7 @@ COLUMN          { return COLUMN; }
 COLUMNS         { return COLUMNS; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
+CONFIG          { return CONFIG; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
 CROSS           { return CROSS; }
@@ -173,7 +174,8 @@ UPDATE          { return UPDATE; }
 UUID            { return UUID; }
 USE             { return USE; }
 VALUES          { return VALUES; }
-VAR             { return VAR; }
+VARIABLE        { return VARIABLE; }
+VARIABLES       { return VARIABLES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 VIEW            { return VIEW; }
