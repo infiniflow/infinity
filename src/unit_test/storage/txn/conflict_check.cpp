@@ -53,11 +53,13 @@ protected:
         RemoveDbDirs();
     }
 
-    Txn *DeleteRow(const String &db_name, const String &table_name, SegmentOffset delete_off) {
+    Txn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {
         auto *txn = txn_mgr_->BeginTxn();
 
-        RowID row_id(0 /*segment_id*/, delete_off);
-        Vector<RowID> row_ids{row_id};
+        Vector<RowID> row_ids;
+        for (auto segment_offset : segment_offsets) {
+            row_ids.push_back(RowID(0 /*segment_id*/, segment_offset));
+        }
         auto status = txn->Delete(db_name, table_name, row_ids, true);
         EXPECT_TRUE(status.ok());
         return txn;
@@ -107,6 +109,16 @@ protected:
         }
     }
 
+    void CheckRowCnt(const String &db_name, const String &table_name, SizeT expected_row_cnt) {
+        auto *txn = txn_mgr_->BeginTxn();
+        auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
+        EXPECT_TRUE(status.ok());
+
+        EXPECT_EQ(table_entry->row_count(), expected_row_cnt);
+
+        txn_mgr_->CommitTxn(txn);
+    }
+
 protected:
     Storage *storage_;
     TxnManager *txn_mgr_;
@@ -123,31 +135,60 @@ TEST_F(ConflictCheckTest, conflict_check_delete) {
 
     InitTable(*db_name, *table_name, table_def, row_cnt);
     {
-        auto *txn1 = DeleteRow(*db_name, *table_name, 0);
-        auto *txn2 = DeleteRow(*db_name, *table_name, 0);
-        auto *txn3 = DeleteRow(*db_name, *table_name, 0);
+        auto *txn1 = DeleteRow(*db_name, *table_name, {0});
+        auto *txn2 = DeleteRow(*db_name, *table_name, {0});
+        auto *txn3 = DeleteRow(*db_name, *table_name, {0});
         Vector<TransactionID> txn_ids{txn1->TxnID(), txn2->TxnID(), txn3->TxnID()};
 
         txn_mgr_->CommitTxn(txn1);
         ExpectConflict(txn2);
         ExpectConflict(txn3);
+
+        --row_cnt;
+        CheckRowCnt(*db_name, *table_name, row_cnt);
     }
     {
-        auto *txn1 = DeleteRow(*db_name, *table_name, 1);
-        auto *txn2 = DeleteRow(*db_name, *table_name, 1);
-        auto *txn3 = DeleteRow(*db_name, *table_name, 1);
+        auto *txn1 = DeleteRow(*db_name, *table_name, {1});
+        auto *txn2 = DeleteRow(*db_name, *table_name, {1});
+        auto *txn3 = DeleteRow(*db_name, *table_name, {1});
 
         txn_mgr_->CommitTxn(txn2);
         ExpectConflict(txn1);
         ExpectConflict(txn3);
+
+        --row_cnt;
+        CheckRowCnt(*db_name, *table_name, row_cnt);
     }
     {
-        auto *txn1 = DeleteRow(*db_name, *table_name, 2);
-        auto *txn2 = DeleteRow(*db_name, *table_name, 2);
-        auto *txn3 = DeleteRow(*db_name, *table_name, 2);
+        auto *txn1 = DeleteRow(*db_name, *table_name, {2});
+        auto *txn2 = DeleteRow(*db_name, *table_name, {2});
+        auto *txn3 = DeleteRow(*db_name, *table_name, {2});
 
         txn_mgr_->CommitTxn(txn3);
         ExpectConflict(txn2);
         ExpectConflict(txn1);
+
+        --row_cnt;
+        CheckRowCnt(*db_name, *table_name, row_cnt);
+    }
+    {
+        auto *txn1 = DeleteRow(*db_name, *table_name, {3});
+        auto *txn2 = DeleteRow(*db_name, *table_name, {3, 4});
+
+        txn_mgr_->CommitTxn(txn1);
+        ExpectConflict(txn2);
+
+        --row_cnt;
+        CheckRowCnt(*db_name, *table_name, row_cnt);
+    }
+    {
+        auto *txn1 = DeleteRow(*db_name, *table_name, {5, 6});
+        auto *txn2 = DeleteRow(*db_name, *table_name, {5});
+
+        txn_mgr_->CommitTxn(txn1);
+        ExpectConflict(txn2);
+
+        row_cnt -= 2;
+        CheckRowCnt(*db_name, *table_name, row_cnt);
     }
 }
