@@ -1,18 +1,5 @@
 #!/usr/bin/env bash
 
-# This script will download the following files:
-# bison-3.8.2.tar.xz
-# binutils-2.41.tar.xz
-# gcc-13.2.0.tar.xz
-# cmake-3.29.0-linux-x86_64.tar.gz
-# ninja-linux.zip
-# llvm-project-17.0.6.src.tar.xz
-# boost_1_81_0.tar.bz2
-# flex-2.6.4.tar.gz
-# liburing-2.5.tar.gz
-# libevent-2.1.12-stable.tar.gz
-# lz4-1.9.4.tar.gz
-
 download()
 {
     echo "download $1"
@@ -35,7 +22,10 @@ https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
 https://github.com/axboe/liburing/archive/refs/tags/liburing-2.5.tar.gz
 https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
 https://github.com/lz4/lz4/releases/download/v1.9.4/lz4-1.9.4.tar.gz
-https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2"
+https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
+https://github.com/gperftools/gperftools/releases/download/gperftools-2.15/gperftools-2.15.tar.gz
+https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-1.1.1w.tar.gz
+https://www.python.org/ftp/python/3.12.3/Python-3.12.3.tar.xz"
 
 SAVEIFS=$IFS   # Save current IFS (Internal Field Separator)
 IFS=$'\n'      # Change IFS to newline char
