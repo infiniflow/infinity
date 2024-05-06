@@ -28,6 +28,7 @@ import logical_type;
 import internal_types;
 import data_type;
 import segment_entry;
+import buffer_handle;
 
 namespace infinity {
 class ChunkIndexEntry;
@@ -134,6 +135,8 @@ public:
     virtual void ReadIndexInner(FileHandler &file_handler) = 0;
 
     virtual void InsertData(void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) = 0;
+
+    virtual void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks, SharedPtr<ChunkIndexEntry> &merged_chunk_index_entry) = 0;
 };
 
 export SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);

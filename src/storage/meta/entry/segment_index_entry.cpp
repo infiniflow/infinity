@@ -819,6 +819,31 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
             return merged_chunk_index_entry.get();
         }
+        case IndexType::kSecondary: {
+            BufferManager *buffer_mgr = txn->buffer_mgr();
+            Vector<ChunkIndexEntry *> old_chunks;
+            u32 row_count = 0;
+            {
+                std::shared_lock lock(rw_locker_);
+                if (chunk_index_entries_.size() <= 1) {
+                    return nullptr;
+                }
+                for (const auto &chunk_index_entry : chunk_index_entries_) {
+                    if (chunk_index_entry->CheckVisible(begin_ts)) {
+                        row_count += chunk_index_entry->GetRowCount();
+                        old_chunks.push_back(chunk_index_entry.get());
+                    }
+                }
+            }
+            RowID base_rowid(segment_id_, 0);
+            SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = CreateSecondaryIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
+            BufferHandle handle = merged_chunk_index_entry->GetIndex();
+            auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
+            data_ptr->InsertMergeData(old_chunks, merged_chunk_index_entry);
+            ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+            txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
+            return merged_chunk_index_entry.get();
+        }
         default: {
             UnrecoverableError("RebuildChunkIndexEntries is not supported for this index type.");
         }

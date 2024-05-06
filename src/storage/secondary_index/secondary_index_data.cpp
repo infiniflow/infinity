@@ -35,6 +35,74 @@ import buffer_handle;
 namespace infinity {
 
 template <typename RawValueType>
+struct SecondaryIndexChunkDataReader {
+    using OrderedKeyType = ConvertToOrderedType<RawValueType>;
+    static constexpr u32 PairSize = sizeof(OrderedKeyType) + sizeof(SegmentOffset);
+    ChunkIndexEntry *chunk_index_;
+    BufferHandle current_handle_;
+    u32 part_count_ = 0;
+    u32 current_offset_ = 0;
+    u32 current_part_id_ = 0;
+    u32 current_part_size_ = 0;
+    SecondaryIndexChunkDataReader(ChunkIndexEntry *chunk_index) : chunk_index_(chunk_index) {
+        part_count_ = chunk_index_->GetPartNum();
+        current_part_size_ = chunk_index_->GetPartRowCount(current_part_id_);
+    }
+    bool GetNextDataPair(OrderedKeyType &key, u32 &offset) {
+        if (current_offset_ == 0) {
+            if (current_part_id_ >= part_count_) {
+                return false;
+            }
+            current_handle_ = chunk_index_->GetIndexPartAt(current_part_id_);
+        }
+        const auto *data_ptr = static_cast<const char *>(current_handle_.GetData());
+        std::memcpy(&key, data_ptr + current_offset_ * PairSize, sizeof(OrderedKeyType));
+        std::memcpy(&offset, data_ptr + current_offset_ * PairSize + sizeof(OrderedKeyType), sizeof(SegmentOffset));
+        if (++current_offset_ == current_part_size_) {
+            current_offset_ = 0;
+            if (++current_part_id_ < part_count_) {
+                current_part_size_ = chunk_index_->GetPartRowCount(current_part_id_);
+            }
+        }
+        return true;
+    }
+};
+
+template <typename RawValueType>
+struct SecondaryIndexChunkMerger {
+    using OrderedKeyType = ConvertToOrderedType<RawValueType>;
+    Vector<SecondaryIndexChunkDataReader<RawValueType>> readers_;
+    std::priority_queue<Tuple<OrderedKeyType, u32, u32>, Vector<Tuple<OrderedKeyType, u32, u32>>, std::greater<Tuple<OrderedKeyType, u32, u32>>> pq_;
+    explicit SecondaryIndexChunkMerger(const Vector<ChunkIndexEntry *> &old_chunks) {
+        for (ChunkIndexEntry *chunk : old_chunks) {
+            readers_.emplace_back(chunk);
+        }
+        OrderedKeyType key = {};
+        u32 offset = 0;
+        for (u32 i = 0; i < readers_.size(); ++i) {
+            if (readers_[i].GetNextDataPair(key, offset)) {
+                pq_.emplace(key, offset, i);
+            }
+        }
+    }
+    bool GetNextDataPair(OrderedKeyType &out_key, u32 &out_offset) {
+        if (pq_.empty()) {
+            return false;
+        }
+        const auto [key, offset, reader_id] = pq_.top();
+        out_key = key;
+        out_offset = offset;
+        pq_.pop();
+        OrderedKeyType next_key = {};
+        u32 next_offset = 0;
+        if (readers_[reader_id].GetNextDataPair(next_key, next_offset)) {
+            pq_.emplace(next_key, next_offset, reader_id);
+        }
+        return true;
+    }
+};
+
+template <typename RawValueType>
 class SecondaryIndexDataT final : public SecondaryIndexData {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     // sorted values in chunk
@@ -86,6 +154,29 @@ public:
         if (i != chunk_row_count_) {
             UnrecoverableError(fmt::format("InsertData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
         }
+        OutputAndBuild(chunk_index);
+    }
+
+    void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks, SharedPtr<ChunkIndexEntry> &merged_chunk_index_entry) override {
+        if (!need_save_) {
+            UnrecoverableError("InsertMergeData(): error: SecondaryIndexDataT is not allocated.");
+        }
+        SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
+        OrderedKeyType key = {};
+        u32 offset = 0;
+        u32 i = 0;
+        while (merger.GetNextDataPair(key, offset)) {
+            key_[i] = key;
+            offset_[i] = offset;
+            ++i;
+        }
+        if (i != chunk_row_count_) {
+            UnrecoverableError(fmt::format("InsertMergeData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
+        }
+        OutputAndBuild(merged_chunk_index_entry);
+    }
+
+    void OutputAndBuild(SharedPtr<ChunkIndexEntry> &chunk_index) {
         const u32 part_num = chunk_index->GetPartNum();
         for (u32 part_id = 0; part_id < part_num; ++part_id) {
             const u32 part_row_count = chunk_index->GetPartRowCount(part_id);
@@ -94,10 +185,8 @@ public:
             auto data_ptr = static_cast<char *>(handle.GetDataMut());
             for (u32 j = 0; j < part_row_count; ++j) {
                 const u32 index = part_offset + j;
-                const OrderedKeyType key = key_[index];
-                const u32 offset = offset_[index];
-                std::memcpy(data_ptr + j * PairSize, &key, sizeof(OrderedKeyType));
-                std::memcpy(data_ptr + j * PairSize + sizeof(OrderedKeyType), &offset, sizeof(SegmentOffset));
+                std::memcpy(data_ptr + j * PairSize, key_.get() + index, sizeof(OrderedKeyType));
+                std::memcpy(data_ptr + j * PairSize + sizeof(OrderedKeyType), offset_.get() + index, sizeof(SegmentOffset));
             }
         }
         pgm_index_->BuildIndex(chunk_row_count_, key_.get());
