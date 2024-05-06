@@ -26,6 +26,8 @@ import resource_manager;
 import task_scheduler;
 import storage;
 import session_manager;
+import status;
+import third_party;
 
 namespace infinity {
 

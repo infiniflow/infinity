@@ -280,10 +280,6 @@ void TxnManager::FinishTxn(TransactionID txn_id) {
         }
         finished_txns_.pop_front();
     }
-
-    if (txn_map_.size() > 1000) {
-        LOG_WARN(fmt::format("Txn map size: {} is too large. Something error may occurred", txn_map_.size()));
-    }
 }
 
 void TxnManager::AddWaitFlushTxn(const Vector<TransactionID> &txn_ids) {
