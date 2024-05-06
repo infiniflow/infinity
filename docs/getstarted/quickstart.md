@@ -29,13 +29,13 @@ You can download the binary package (deb, rpm, or tgz) for your respective host 
 
 Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-sudo rpm -i infinity-0.2.0-dev-x86_64.rpm
+sudo rpm -i infinity-0.1.0-x86_64.rpm
 sudo systemctl start infinity
 ```
 
 Ubuntu/Debian
 ```bash
-sudo dpkg -i infinity-0.2.0-dev-x86_64.deb
+sudo dpkg -i infinity-0.1.0-x86_64.deb
 sudo systemctl start infinity
 ```
 ### 🛠️ Build from Source
@@ -59,21 +59,17 @@ from infinity.common import REMOTE_HOST
 from infinity.common import ConflictType
 ```
 
-
-
 ## Connect to the remote server
 
 ```python
 infinity_obj = infinity.connect(REMOTE_HOST)
 ```
 
-
 ## Get a database
 
 ```python
 db = infinity_obj.get_database("default_db")
 ```
-
 
 ## Create a table
 
@@ -89,14 +85,12 @@ table = db.create_table(
           })
 ```
 
-
 ## Insert two records 
 
 ```python
 table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
 table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
 ```
-
 
 ## Execute a vector search
 
