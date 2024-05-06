@@ -80,6 +80,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, S
                                                                      table_entry->ColumnCount(),
                                                                      SegmentStatus::kUnsealed);
     segment_entry->begin_ts_ = txn->BeginTS();
+    segment_entry->txn_id_ = txn->TxnID();
     return segment_entry;
 }
 
@@ -216,10 +217,13 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
     return block_entry->CheckRowVisible(block_offset, check_ts);
 }
 
-bool SegmentEntry::CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, TxnTimeStamp check_ts) const {
+bool SegmentEntry::CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, Txn *txn) const {
     for (auto &[block_id, block_offsets] : block_offsets_map) {
         auto *block_entry = GetBlockEntryByID(block_id).get();
-        if (!block_entry->CheckDeleteVisible(block_offsets, check_ts)) {
+        if (block_entry == nullptr) {
+            return false;
+        }
+        if (!block_entry->CheckDeleteVisible(block_offsets, txn->BeginTS())) {
             return false;
         }
     }

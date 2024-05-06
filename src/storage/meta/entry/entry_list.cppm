@@ -66,8 +66,6 @@ public:
 
     Tuple<Entry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    bool CheckConflict(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts, Entry *&result) const;
-
     Tuple<Entry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Replay op
@@ -357,28 +355,6 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntry(std::shared_lock<std::shared_m
     r_lock.unlock();
 
     return this->GetEntryInner2(entry_ptr, find_res);
-}
-
-template <EntryConcept Entry>
-bool EntryList<Entry>::CheckConflict(std::shared_lock<std::shared_mutex> &&r_lock,
-                                     TransactionID txn_id,
-                                     TxnTimeStamp begin_ts,
-                                     Entry *&result) const {
-    result = nullptr;
-    for (const auto &entry : entry_list_) {
-        if (entry->Committed()) {
-            if (begin_ts < entry->commit_ts_) {
-                return true;
-            }
-            result = entry.get();
-            return false;
-        } else if (txn_id == entry->txn_id_) {
-            result = entry.get();
-            return false;
-        }
-    }
-    UnrecoverableError("Check conflict is not for non-existed entry.");
-    return true;
 }
 
 template <EntryConcept Entry>

@@ -92,8 +92,6 @@ public:
 
     TxnTimeStamp Commit();
 
-    bool CheckConflict();
-
     bool CheckConflict(Txn *txn);
 
     void CommitBottom();

@@ -124,8 +124,7 @@ public:
 
     AddDBEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY) {}
 
-    explicit AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()) {}
+    AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts);
 
     String GetTypeStr() const final { return "ADD_DATABASE_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -145,10 +144,7 @@ public:
 
     AddTableEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY) {}
 
-    explicit AddTableEntryOp(TableEntry *table_entry, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, table_entry, commit_ts), table_entry_dir_(table_entry->TableEntryDir()),
-          column_defs_(table_entry->column_defs()), row_count_(table_entry->row_count()), // TODO: fix it
-          unsealed_id_(table_entry->unsealed_id()), next_segment_id_(table_entry->next_segment_id()) {}
+    AddTableEntryOp(TableEntry *table_entry, TxnTimeStamp commit_ts);
 
     String GetTypeStr() const final { return "ADD_TABLE_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -173,12 +169,7 @@ public:
 
     AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY){};
 
-    explicit AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data = "")
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry, commit_ts), status_(segment_entry->status()),
-          column_count_(segment_entry->column_count()), row_count_(segment_entry->row_count()), // FIXME: use append_state
-          actual_row_count_(segment_entry->actual_row_count()),                                 // FIXME: use append_state
-          row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()),
-          deprecate_ts_(segment_entry->deprecate_ts()), segment_filter_binary_data_(std::move(segment_filter_binary_data)) {}
+    AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data = "");
 
     String GetTypeStr() const final { return "ADD_SEGMENT_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -206,11 +197,7 @@ public:
 
     AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY){};
 
-    explicit AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts, String block_filter_binary_data = "")
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry, commit_ts), block_entry_(block_entry),
-          row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()), min_row_ts_(block_entry->min_row_ts()),
-          max_row_ts_(block_entry->max_row_ts()), checkpoint_ts_(block_entry->checkpoint_ts()),
-          checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+    AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts, String block_filter_binary_data = "");
 
     String GetTypeStr() const final { return "ADD_BLOCK_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -242,9 +229,7 @@ public:
 
     AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY){};
 
-    explicit AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts), next_outline_idx_(column_entry->OutlineBufferCount()),
-          last_chunk_offset_(column_entry->LastChunkOff()) {}
+    AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts);
 
     String GetTypeStr() const final { return "ADD_COLUMN_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -265,9 +250,7 @@ public:
 
     AddTableIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {}
 
-    explicit AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, table_index_entry, commit_ts), index_dir_(table_index_entry->index_dir()),
-          index_base_(table_index_entry->table_index_def()) {}
+    AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts);
 
     String GetTypeStr() const final { return "ADD_TABLE_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -288,10 +271,7 @@ public:
 
     AddSegmentIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {}
 
-    explicit AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_entry, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY, segment_index_entry, commit_ts),
-          segment_index_entry_(segment_index_entry), min_ts_(segment_index_entry->min_ts()), max_ts_(segment_index_entry->max_ts()),
-          next_chunk_id_(segment_index_entry->next_chunk_id()) {}
+    AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_entry, TxnTimeStamp commit_ts);
 
     String GetTypeStr() const final { return "ADD_SEGMENT_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;
@@ -316,9 +296,7 @@ public:
 
     AddChunkIndexEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {}
 
-    explicit AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
-          base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {}
+    AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts);
 
     String GetTypeStr() const final { return "ADD_CHUNK_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final;

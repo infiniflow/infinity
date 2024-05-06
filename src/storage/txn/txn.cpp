@@ -450,12 +450,6 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-bool Txn::CheckConflict() {
-    LOG_TRACE(fmt::format("Txn check conflict: {} is started.", txn_id_));
-
-    return txn_store_.CheckConflict();
-}
-
 bool Txn::CheckConflict(Txn *txn) {
     LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
 

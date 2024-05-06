@@ -63,8 +63,8 @@ UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
 
-    auto begin_ts = txn->BeginTS();
-    block_entry->begin_ts_ = begin_ts;
+    block_entry->begin_ts_ = txn->BeginTS();
+    block_entry->txn_id_ = txn->TxnID();
 
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);

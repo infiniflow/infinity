@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+#include <string>
 
 module txn_store;
 
@@ -260,23 +261,15 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     }
 }
 
-bool TxnTableStore::CheckConflict(Catalog *catalog) const {
-    TransactionID txn_id = txn_->TxnID();
-    TableEntry *latest_table_entry;
-    const auto &db_name = *table_entry_->GetDBName();
-    const auto &table_name = *table_entry_->GetTableName();
-    TxnTimeStamp begin_ts = txn_->BeginTS();
-    bool conflict = catalog->CheckTableConflict(db_name, table_name, txn_id, begin_ts, latest_table_entry);
-    if (conflict) {
-        return true;
-    }
-    if (latest_table_entry != table_entry_) {
-        UnrecoverableError(fmt::format("Table entry should conflict, table name: {}", table_name));
-    }
-    return false;
-}
-
 bool TxnTableStore::CheckConflict(const TxnTableStore *txn_table_store) const {
+    for (const auto &[index_name, _] : txn_indexes_store_) {
+        for (const auto [index_entry, _] : txn_table_store->txn_indexes_) {
+            if (index_name == *index_entry->GetIndexName()) {
+                return true;
+            }
+        }
+    }
+
     const auto &delete_state = delete_state_;
     const auto &other_delete_state = txn_table_store->delete_state_;
     if (delete_state.rows_.empty() || other_delete_state.rows_.empty()) {
@@ -316,7 +309,7 @@ void TxnTableStore::PrepareCommit1() {
         segment_entry->CommitFlushed(commit_ts);
     }
     if (!delete_state_.rows_.empty()) {
-        if (!table_entry_->CheckDeleteVisible(delete_state_, txn_->BeginTS())) {
+        if (!table_entry_->CheckDeleteVisible(delete_state_, txn_)) {
             RecoverableError(Status::TxnConflict(txn_->TxnID(), "Txn conflict reason."));
         }
     }
@@ -472,17 +465,14 @@ void TxnStore::MaintainCompactionAlg() const {
     }
 }
 
-bool TxnStore::CheckConflict() const {
-    for (const auto &[table_name, table_store] : txn_tables_store_) {
-        if (table_store->CheckConflict(catalog_)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool TxnStore::CheckConflict(const TxnStore &txn_store) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
+        for (const auto [table_entry, _] : txn_store.txn_tables_) {
+            if (table_name == *table_entry->GetTableName()) {
+                return true;
+            }
+        }
+
         auto other_iter = txn_store.txn_tables_store_.find(table_name);
         if (other_iter == txn_store.txn_tables_store_.end()) {
             continue;

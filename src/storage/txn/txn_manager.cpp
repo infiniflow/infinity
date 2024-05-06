@@ -129,7 +129,7 @@ bool TxnManager::CheckConflict(Txn *txn) {
             return true;
         }
     }
-    return txn->CheckConflict();
+    return false;
 }
 
 void TxnManager::SendToWAL(Txn *txn) {
