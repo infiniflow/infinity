@@ -63,7 +63,7 @@ private:
     float common_block_max_bm25_score_ = 0.0f;
     Vector<float> common_block_max_bm25_score_parts_; // value at i: blockmax of sum of BM25 scores for iter i + 1, i + 2, ..., n - 1
     // pivot and must_have info
-    // seperate the iterators into two parts:
+    // separate the iterators into two parts:
     // 1. [0, pivot) : cannot add into part 2
     // 2. [pivot, n) : sum < threshold
     u32 pivot_ = sorted_iterators_.size();
