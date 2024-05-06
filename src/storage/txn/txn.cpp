@@ -412,6 +412,7 @@ TxnTimeStamp Txn::Commit() {
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
     this->SetTxnCommitting(commit_ts);
+    // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->CheckConflict(this)) {
         LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, commit_ts));
@@ -442,7 +443,7 @@ TxnTimeStamp Txn::Commit() {
 }
 
 bool Txn::CheckConflict(Txn *txn) {
-    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
+    LOG_INFO(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
 
     return txn_store_.CheckConflict(txn->txn_store_);
 }

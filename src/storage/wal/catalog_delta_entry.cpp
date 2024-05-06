@@ -206,7 +206,6 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
                     return MergeFlag::kDeleteAndNew;
                 }
                 default: {
-                    LOG_CRITICAL(fmt::format("Invalid MergeFlag {}", this->ToString()));
                     UnrecoverableError(fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag)));
                 }
             }
@@ -1111,7 +1110,17 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             } else if (prune_flag == PruneFlag::kPruneSub) {
                 PruneOpWithSamePrefix(encode);
             }
-            op->Merge(*new_op);
+            try {
+                op->Merge(*new_op);
+            } catch (const UnrecoverableException &e) {
+                std::stringstream ss;
+                ss << "Merge failed, encode: " << encode << " txn_ids: ";
+                for (const auto txn_id : delta_entry->txn_ids()) {
+                    ss << txn_id << " ";
+                }
+                LOG_INFO(ss.str());
+                throw e;
+            }
         } else {
             PruneFlag prune_flag = CatalogDeltaOperation::ToPrune(None, new_op->merge_flag_);
             delta_ops_[encode] = std::move(new_op);

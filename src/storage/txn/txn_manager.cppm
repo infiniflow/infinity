@@ -107,7 +107,6 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    std::mutex mutex_{};
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
     Deque<Txn *> finished_txns_;        // sorted by commit ts
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{};

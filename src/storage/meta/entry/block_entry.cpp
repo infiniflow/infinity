@@ -243,11 +243,12 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
     SizeT delete_row_n = 0;
     for (BlockOffset block_offset : rows) {
         if (block_version->deleted_[block_offset] != 0) {
-            UnrecoverableError(fmt::format("Segment {} Block {} Row {} is already deleted at {}",
+            UnrecoverableError(fmt::format("Segment {} Block {} Row {} is already deleted at {}, cur commit_ts: {}.",
                                            segment_id,
                                            block_id,
                                            block_offset,
-                                           block_version->deleted_[block_offset]));
+                                           block_version->deleted_[block_offset],
+                                           commit_ts));
         }
         block_version->deleted_[block_offset] = commit_ts;
         delete_row_n++;

@@ -60,6 +60,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
 
     // Record the start ts of the txn
     TxnTimeStamp ts = ++start_ts_;
+    // LOG_INFO(fmt::format("Txn {} begin ts: {}", new_txn_id, ts));
 
     // Create txn instance
     auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
@@ -89,14 +90,14 @@ SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
 TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
-    std::unique_lock w_locker(mutex_);
+    std::lock_guard guard(rw_locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     txn->SetTxnRead();
     return commit_ts;
 }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
-    std::unique_lock w_locker(mutex_);
+    std::lock_guard guard(rw_locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     finished_txns_.emplace_back(txn);
@@ -144,7 +145,7 @@ void TxnManager::SendToWAL(Txn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     WalEntry *wal_entry = txn->GetWALEntry();
 
-    std::unique_lock w_locker(mutex_);
+    std::lock_guard guard(rw_locker_);
     if (wait_conflict_ck_.empty()) {
         UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS()));
     }
@@ -243,6 +244,7 @@ void TxnManager::FinishTxn(TransactionID txn_id) {
     }
     if (txn->GetTxnType() == TxnType::kRead) {
         txn_map_.erase(txn_id);
+        // LOG_INFO(fmt::format("Erase txn 1: {}", txn_id));
         return;
     }
 
@@ -275,6 +277,7 @@ void TxnManager::FinishTxn(TransactionID txn_id) {
         auto finished_txn_id = finished_txn->TxnID();
         // LOG_INFO(fmt::format("Txn: {} is erased from txn map", finished_txn_id));
         SizeT remove_n = txn_map_.erase(finished_txn_id);
+        // LOG_INFO(fmt::format("Erase txn 2: {}", finished_txn_id));
         if (remove_n == 0) {
             UnrecoverableError(fmt::format("Txn: {} not found in txn map", finished_txn_id));
         }
