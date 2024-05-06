@@ -89,7 +89,10 @@ TEST_F(RepeatReplayTest, append) {
         auto data_block = DataBlock::Make();
         data_block->Init(column_vectors);
 
-        auto status = txn->Append(*db_name, *table_name, data_block);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->Append(table_entry, data_block);
         ASSERT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     };

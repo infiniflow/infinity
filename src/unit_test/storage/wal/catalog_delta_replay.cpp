@@ -398,11 +398,6 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
-        }
-        {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
-
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
                 SharedPtr<DataType> data_type = table_def->columns()[i]->type();
@@ -420,7 +415,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto status = txn->Append(*db_name, *table_name, data_block);
+            status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
@@ -512,7 +507,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(*db_name, *table_name, data_block);
+            status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
@@ -567,11 +562,6 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
-            last_commit_ts = txn_mgr->CommitTxn(txn);
-        }
-        {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert"));
-
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
                 SharedPtr<DataType> data_type = table_def->columns()[i]->type();
@@ -589,12 +579,15 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto status = txn->Append(*db_name, *table_name, data_block);
+            status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert"));
+
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -613,7 +606,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto status = txn->Append(*db_name, *table_name, data_block);
+            status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
@@ -661,7 +654,10 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto status = txn_record3->Append(*db_name, *table_name, data_block);
+            auto [table_entry, status] = txn_record3->GetTableByName(*db_name, *table_name);
+            ASSERT_TRUE(status.ok());
+
+            status = txn_record3->Append(table_entry, data_block);
             ASSERT_TRUE(status.ok());
 
             last_commit_ts = txn_mgr->CommitTxn(txn_record3);

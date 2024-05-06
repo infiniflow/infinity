@@ -593,7 +593,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(*db_name, *table_name, data_block);
+            auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -707,7 +707,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(*db_name, *table_name, data_block);
+            auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -788,7 +788,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(*db_name, *table_name, data_block);
+            auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);

@@ -159,7 +159,7 @@ public:
     // DML
     Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
 
-    Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
+    Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
 

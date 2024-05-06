@@ -76,7 +76,7 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
 
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(column_vectors);
-            txn->Append(db_name, *table_name, output_data_block);
+            txn->Append(table_entry_ptr_, output_data_block);
             txn->Delete(db_name, *table_name, row_ids);
 
             UpdateOperatorState* update_operator_state = static_cast<UpdateOperatorState*>(operator_state);

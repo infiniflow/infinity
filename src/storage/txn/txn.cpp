@@ -89,10 +89,12 @@ Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entr
     return Status::OK();
 }
 
-Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
-    this->CheckTxn(db_name);
+Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block) {
+    const String &db_name = *table_entry->GetDBName();
+    const String &table_name = *table_entry->GetTableName();
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    this->CheckTxn(db_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
     auto [err_msg, append_status] = table_store->Append(input_block);

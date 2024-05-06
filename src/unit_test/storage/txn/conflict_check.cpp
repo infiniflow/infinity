@@ -85,11 +85,6 @@ protected:
             auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
             EXPECT_TRUE(status.ok());
 
-            txn_mgr_->CommitTxn(txn);
-        }
-        {
-            auto *txn = txn_mgr_->BeginTxn();
-
             Vector<SharedPtr<ColumnVector>> column_vectors;
             {
                 auto column_vector = MakeShared<ColumnVector>(table_def->columns()[0]->type());
@@ -102,7 +97,7 @@ protected:
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto status = txn->Append(db_name, table_name, data_block);
+            status = txn->Append(table_entry, data_block);
             EXPECT_TRUE(status.ok());
 
             txn_mgr_->CommitTxn(txn);
