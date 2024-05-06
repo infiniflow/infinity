@@ -73,14 +73,17 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
 }
 
 // DML
-Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
+Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry) {
+    const String &db_name = *table_entry->GetDBName();
+    const String &table_name = *table_entry->GetTableName();
+
     this->CheckTxn(db_name);
 
     // build WalCmd
     WalSegmentInfo segment_info(segment_entry.get());
     wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info)));
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
     table_store->Import(std::move(segment_entry), this);
 
     return Status::OK();

@@ -327,7 +327,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(*db_name, *table_name, segment_entry);
+            txn->Import(table_entry, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
@@ -850,7 +850,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(*db_name, *table_name, segment_entry);
+            txn->Import(table_entry, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
@@ -1016,7 +1016,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(*db_name, *table_name, segment_entry);
+            txn->Import(table_entry, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
@@ -1166,7 +1166,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(*db_name, *table_name, segment_entry);
+            txn->Import(table_entry, segment_entry);
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }

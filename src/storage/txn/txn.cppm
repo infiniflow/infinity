@@ -157,7 +157,7 @@ public:
     Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
 
     // DML
-    Status Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry);
+    Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
 
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
