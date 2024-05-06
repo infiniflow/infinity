@@ -17,7 +17,6 @@ import infinity
 import pytest
 from infinity.errors import ErrorCode
 
-from infinity.infinity import Variable
 from infinity.remote_thrift.client import ThriftInfinityClient
 
 from common import common_values

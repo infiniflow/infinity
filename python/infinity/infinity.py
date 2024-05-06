@@ -44,7 +44,3 @@ class InfinityConnection(ABC):
     @abstractmethod
     def disconnect(self):
         pass
-
-    @abstractmethod
-    def show_variable(self, variable: Variable):
-        pass

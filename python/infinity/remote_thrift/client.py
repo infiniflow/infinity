@@ -18,8 +18,6 @@ from thrift.transport import TSocket
 from thrift.transport.TTransport import TTransportException
 
 from infinity import URI
-from infinity.infinity import Variable
-from infinity.infinity import Scope
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.errors import ErrorCode
