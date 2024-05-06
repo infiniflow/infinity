@@ -7,7 +7,7 @@ slug: /html_api_reference
 
 ## Create database
 
-Creates a new database.
+Create a database.
 
 #### Request
 
@@ -24,7 +24,7 @@ curl --request POST \
 
 #### Response
 
-- 200 Success
+- 200 Success.
 
 ```
 {
@@ -32,7 +32,7 @@ curl --request POST \
 }
 ```
 
-- 500 Internal Service Error
+- 500 Error.
 
 ```
 {
@@ -43,7 +43,7 @@ curl --request POST \
 
 ## Drop database
 
-Drops a database.
+Drop a database.
 
 #### Request
 
@@ -60,7 +60,7 @@ curl --request DELETE \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -68,7 +68,7 @@ curl --request DELETE \
 }
 ```
 
-- 500 Internal Service Error
+- 500 Error.
 
 ```
 {
@@ -79,7 +79,7 @@ curl --request DELETE \
 
 ## Show database
 
-Show database detailed information.
+Show detailed information of a specified database.
 
 #### Request
 
@@ -91,7 +91,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -102,7 +102,7 @@ curl --request GET \
 }
 ```
 
-- 500 Internal Service Error
+- 500 Error.
 
 ```
 {
@@ -113,7 +113,7 @@ curl --request GET \
 
 ## List databases
 
-Retrieves all databases of the system.
+Retrieve all databases in the system.
 
 #### Request
 
@@ -125,7 +125,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -139,7 +139,7 @@ curl --request GET \
 
 ## Create table
 
-creates a new table.
+Create a table in a specified database.
 
 #### Request
 
@@ -191,7 +191,7 @@ curl --request POST \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -199,7 +199,7 @@ curl --request POST \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -210,7 +210,7 @@ curl --request POST \
 
 ## Drop table
 
-Drops a table.
+Drop a table from a specified database.
 
 #### Request
 
@@ -227,7 +227,7 @@ curl --request DELETE \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -235,7 +235,7 @@ curl --request DELETE \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -246,7 +246,7 @@ curl --request DELETE \
 
 ## List tables
 
-Lists tables of the database.
+List all tables in a specified database.
 
 #### Request
 
@@ -258,7 +258,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -289,7 +289,7 @@ curl --request GET \
 
 ## Show table
 
-Show a table detailed information from a database.
+Show detailed information of a specified table.
 
 #### Request
 
@@ -301,7 +301,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -315,7 +315,7 @@ curl --request GET \
 }
 ```
 
-- 500 Internal Service Error
+- 500 Error.
 
 ```
 {
@@ -326,7 +326,7 @@ curl --request GET \
 
 ## Show table columns
 
-Show a table columns information from a database.
+Show the column information of a specific table in a specified database.
 
 #### Request
 
@@ -338,7 +338,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -363,7 +363,7 @@ curl --request GET \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -372,9 +372,9 @@ curl --request GET \
 }
 ```
 
-## Create index
+## Create an index
 
-Creates an index on the table.
+Creates an index on a specified table.
 
 #### Request
 
@@ -407,7 +407,7 @@ curl --request POST \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -415,7 +415,7 @@ curl --request POST \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -424,9 +424,9 @@ curl --request POST \
 }
 ```
 
-## Drop index
+## Drop an index
 
-Drops an index.
+Drop an index.
 
 #### Request
 
@@ -443,7 +443,7 @@ curl --request DELETE \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -451,7 +451,7 @@ curl --request DELETE \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -460,9 +460,9 @@ curl --request DELETE \
 }
 ```
 
-## Show Index
+## Show index
 
-Show a index detailed information from a table.
+Show detailed information of a specified index.
 
 #### Request
 
@@ -474,7 +474,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -491,7 +491,7 @@ curl --request GET \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -502,7 +502,7 @@ curl --request GET \
 
 ## List indexes
 
-Lists indexes of the table.
+Lists all indexes of a specified table.
 
 #### Request
 
@@ -514,7 +514,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -535,9 +535,9 @@ curl --request GET \
 }
 ```
 
-## Import
+## Import data
 
-Imports data into a specified table.
+Import data into a specified table.
 
 #### Request
 
@@ -557,7 +557,7 @@ curl --request PUT \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -565,7 +565,7 @@ curl --request PUT \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -574,9 +574,9 @@ curl --request PUT \
 }
 ```
 
-## Insert
+## Insert data
 
-Inserts data into a specified table.
+Insert data into a specified table.
 
 #### Request
 
@@ -588,7 +588,7 @@ curl --request POST \
      --data ' \
 [    
     {
-        "name": "Tommy",
+        "name": "Tom",
         "age": 16,
         "score": 95
     },
@@ -602,7 +602,7 @@ curl --request POST \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -610,7 +610,7 @@ curl --request POST \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -619,9 +619,9 @@ curl --request POST \
 }
 ```
 
-## Delete
+## Delete data
 
-Deletes data from a specified table.
+Delete data in a specified table.
 
 #### Request
 
@@ -638,7 +638,7 @@ curl --request DELETE \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -647,7 +647,7 @@ curl --request DELETE \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -658,7 +658,7 @@ curl --request DELETE \
 
 ## Update
 
-Updates data in a specified table.
+Update data in a specified table.
 
 #### Request
 
@@ -679,7 +679,7 @@ curl --request PUT \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -688,7 +688,7 @@ curl --request PUT \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -697,9 +697,9 @@ curl --request PUT \
 }
 ```
 
-## Search
+## Search data
 
-Search data from a specified table.
+Search data in a specified table.
 
 #### Request
 
@@ -739,21 +739,21 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
     "error_code": 0,
     "output": [
         {
-            "name": "Tommy",
+            "name": "Tom",
             "age": 16
         }
     ]
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -762,9 +762,9 @@ curl --request GET \
 }
 ```
 
-## Show variables
+## Show variable
 
-Gets variables.
+Get a system variable.
 
 #### Request
 
@@ -776,16 +776,16 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
     "error_code": 0,
-    "time_zone": "UTC-8"
+    "query_count": 30
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -794,9 +794,9 @@ curl --request GET \
 }
 ```
 
-## Show segments list
+## Show segments
 
-Show segments list of specific table
+Show all segments of a specified table.
 
 #### Request
 
@@ -808,7 +808,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -824,9 +824,18 @@ curl --request GET \
 }
 ```
 
-## Show segment
+- 500 Error.
 
-Show specific segment details
+```
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
+}
+```
+
+## Show segment details
+
+Show details of a specified segment. 
 
 #### Request
 
@@ -838,7 +847,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -856,7 +865,7 @@ curl --request GET \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -865,9 +874,9 @@ curl --request GET \
 }
 ```
 
-## Show blocks list
+## Show blocks
 
-Show blocks list of specific segment
+Show all blocks of specified segment.
 
 #### Request
 
@@ -879,7 +888,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -895,9 +904,18 @@ curl --request GET \
 }
 ```
 
-## Show block
+- 500 Error.
 
-Show specific block detail
+```
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
+}
+```
+
+## Show block details
+
+Show details of a specified block.
 
 #### Request
 
@@ -909,7 +927,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -925,7 +943,7 @@ curl --request GET \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -936,7 +954,7 @@ curl --request GET \
 
 ## Show block column
 
-Show block column information
+Show details of a specified column in a specific block.
 
 #### Request
 
@@ -948,7 +966,7 @@ curl --request GET \
 
 #### Response
 
-- 200 success
+- 200 Success.
 
 ```
 {
@@ -961,7 +979,7 @@ curl --request GET \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
