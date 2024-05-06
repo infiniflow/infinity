@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 module txn_store;
 
@@ -385,8 +385,10 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
 
 void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace(segment_entry); }
 
-void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts) const {
-    local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
+void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const {
+    if (!added) {
+        local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
+    }
 
     Vector<Pair<TableIndexEntry *, int>> txn_indexes_vec(txn_indexes_.begin(), txn_indexes_.end());
     std::sort(txn_indexes_vec.begin(), txn_indexes_vec.end(), [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
@@ -427,11 +429,6 @@ void TxnStore::DropTableStore(TableEntry *dropped_table_entry) {
     }
 }
 
-TxnTableStore *TxnStore::GetTxnTableStore(const String &table_name) {
-    auto iter = txn_tables_store_.find(table_name);
-    return iter == txn_tables_store_.end() ? nullptr : iter->second.get();
-}
-
 TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
     const String &table_name = *table_entry->GetTableName();
     if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
@@ -455,7 +452,8 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mg
         local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry, commit_ts));
     }
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->AddDeltaOp(local_delta_ops, txn_mgr, commit_ts);
+        bool added = txn_tables_.contains(table_store->table_entry_);
+        table_store->AddDeltaOp(local_delta_ops, txn_mgr, commit_ts, added);
     }
 }
 

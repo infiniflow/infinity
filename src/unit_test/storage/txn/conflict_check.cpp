@@ -60,7 +60,10 @@ protected:
         for (auto segment_offset : segment_offsets) {
             row_ids.push_back(RowID(0 /*segment_id*/, segment_offset));
         }
-        auto status = txn->Delete(db_name, table_name, row_ids, true);
+
+        auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
+        EXPECT_TRUE(status.ok());
+        status = txn->Delete(table_entry, row_ids, true);
         EXPECT_TRUE(status.ok());
         return txn;
     };
@@ -78,30 +81,28 @@ protected:
     };
 
     void InitTable(const String &db_name, const String &table_name, SharedPtr<TableDef> table_def, SizeT row_cnt) {
+        auto *txn = txn_mgr_->BeginTxn();
+
+        txn->CreateTable(db_name, table_def, ConflictType::kError);
+        auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SharedPtr<ColumnVector>> column_vectors;
         {
-            auto *txn = txn_mgr_->BeginTxn();
-
-            txn->CreateTable(db_name, table_def, ConflictType::kError);
-            auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
-            EXPECT_TRUE(status.ok());
-
-            Vector<SharedPtr<ColumnVector>> column_vectors;
-            {
-                auto column_vector = MakeShared<ColumnVector>(table_def->columns()[0]->type());
-                column_vector->Initialize();
-                for (SizeT i = 0; i < row_cnt; i++) {
-                    column_vector->AppendValue(Value::MakeInt(i));
-                }
-                column_vectors.push_back(column_vector);
+            auto column_vector = MakeShared<ColumnVector>(table_def->columns()[0]->type());
+            column_vector->Initialize();
+            for (SizeT i = 0; i < row_cnt; i++) {
+                column_vector->AppendValue(Value::MakeInt(i));
             }
-            auto data_block = DataBlock::Make();
-            data_block->Init(column_vectors);
-
-            status = txn->Append(table_entry, data_block);
-            EXPECT_TRUE(status.ok());
-
-            txn_mgr_->CommitTxn(txn);
+            column_vectors.push_back(column_vector);
         }
+        auto data_block = DataBlock::Make();
+        data_block->Init(column_vectors);
+
+        status = txn->Append(table_entry, data_block);
+        EXPECT_TRUE(status.ok());
+
+        txn_mgr_->CommitTxn(txn);
     }
 
     void CheckRowCnt(const String &db_name, const String &table_name, SizeT expected_row_cnt) {

@@ -127,7 +127,7 @@ public:
 
     void AddSealedSegment(SegmentEntry *segment_entry);
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const;
 
 public: // Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
@@ -172,8 +172,6 @@ public:
     void DropTableStore(TableEntry *dropped_table_entry);
 
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
-
-    TxnTableStore *GetTxnTableStore(const String &table_name);
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, TxnManager *txn_mgr) const;
 

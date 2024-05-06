@@ -520,7 +520,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
 
             Vector<infinity::RowID> del_row_ids{};
             del_row_ids.push_back(del_row);
-            status = txn->Delete(*db_name, *table_name, del_row_ids, true);
+            status = txn->Delete(table_entry, del_row_ids, true);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }

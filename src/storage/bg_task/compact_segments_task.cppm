@@ -66,10 +66,6 @@ struct ToDeleteInfo {
 
 export struct CompactSegmentsTaskState {
     // default copy construct of table ref
-    CompactSegmentsTaskState(TableEntry *table_entry) : table_entry_(table_entry) {}
-
-    TableEntry *const table_entry_;
-
     RowIDRemapper remapper_;
 
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
@@ -103,7 +99,7 @@ public:
         }
     }
 
-    bool Execute();
+    void Execute();
 
     // Called by `SegmentEntry::DeleteData` which is called by wal thread in
     // So to_deletes_ is thread-safe.
@@ -124,15 +120,14 @@ public:
 
 public:
     // Getter
-    const String &table_name() const { return *table_name_; }
+    const String &table_name() const;
 
 private:
     SharedPtr<SegmentEntry> CompactSegmentsToOne(CompactSegmentsTaskState &state, const Vector<SegmentEntry *> &segments);
 
 private:
     const CompactSegmentsTaskType task_type_;
-    SharedPtr<String> db_name_;
-    SharedPtr<String> table_name_;
+    TableEntry *table_entry_;
     TxnTimeStamp commit_ts_;
     Vector<SegmentEntry *> segments_;
 

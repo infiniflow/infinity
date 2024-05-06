@@ -161,7 +161,7 @@ public:
 
     Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
-    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
+    Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status
     Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
@@ -211,8 +211,6 @@ public:
     WalEntry *GetWALEntry() const;
 
 private:
-    TxnTableStore *GetTxnTableStore(const String &table_name);
-
     void CheckTxnStatus();
 
     void CheckTxn(const String &db_name);

@@ -101,19 +101,18 @@ Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_bl
     return append_status;
 }
 
-Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
+Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict) {
+    const String &db_name = *table_entry->GetDBName();
+    const String &table_name = *table_entry->GetTableName();
+
     this->CheckTxn(db_name);
 
-    auto [table_entry, status] = GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
     if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
         LOG_WARN(fmt::format("Rollback delete in table {} due to conflict.", table_name));
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
@@ -122,26 +121,13 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
 
 Status
 Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
-    const String &table_name = *table_entry->GetTableName();
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store_.GetTxnTableStore(table_entry); }
-
-TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
-    auto *store = txn_store_.GetTxnTableStore(table_name);
-    if (store == nullptr) {
-        auto [table_entry, status] = this->GetTableByName(db_name_, table_name);
-        if (table_entry == nullptr) {
-            UnrecoverableError(status.message());
-        }
-        store = txn_store_.GetTxnTableStore(table_entry);
-    }
-    return store;
-}
 
 void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
@@ -348,8 +334,8 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
     if (table_index_entry.get() == nullptr) {
         return index_status;
     }
-
-    auto *txn_table_store = this->GetTxnTableStore(table_name);
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    auto *txn_table_store = this->GetTxnTableStore(table_entry);
     txn_table_store->DropIndexStore(table_index_entry.get());
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
