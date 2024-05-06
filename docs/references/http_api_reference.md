@@ -32,7 +32,7 @@ curl --request POST \
 }
 ```
 
-- 500 Internal service error.
+- 500 Error.
 
 ```
 {
@@ -68,7 +68,7 @@ curl --request DELETE \
 }
 ```
 
-- 500 Internal service error.
+- 500 Error.
 
 ```
 {
@@ -102,7 +102,7 @@ curl --request GET \
 }
 ```
 
-- 500 Internal service error.
+- 500 Error.
 
 ```
 {
@@ -199,7 +199,7 @@ curl --request POST \
 }
 ```
 
-- 500 Error
+- 500 Error.
 
 ```
 {
@@ -289,7 +289,7 @@ curl --request GET \
 
 ## Show table
 
-Show detailed information of a specific table in a specified database.
+Show detailed information of a specified table.
 
 #### Request
 
@@ -315,7 +315,7 @@ curl --request GET \
 }
 ```
 
-- 500 Internal service error.
+- 500 Error.
 
 ```
 {
@@ -762,9 +762,9 @@ curl --request GET \
 }
 ```
 
-## Show variables
+## Show variable
 
-Get variables.
+Get a system variable.
 
 #### Request
 
@@ -781,7 +781,7 @@ curl --request GET \
 ```
 {
     "error_code": 0,
-    "time_zone": "UTC-8"
+    "query_count": 30
 }
 ```
 
@@ -821,6 +821,15 @@ curl --request GET \
             "status": "Unsealed"
         }
     ]
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
 
@@ -895,6 +904,15 @@ curl --request GET \
 }
 ```
 
+- 500 Error.
+
+```
+{
+    "error_code": 3022,
+    "error_message": "Table {table_name} doesn't exist in {database_name}."
+}
+```
+
 ## Show block details
 
 Show details of a specified block.
@@ -936,7 +954,7 @@ curl --request GET \
 
 ## Show block column
 
-Show detailed of a specified column in a specific block.
+Show details of a specified column in a specific block.
 
 #### Request
 
