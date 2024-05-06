@@ -839,7 +839,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 }
                 break;
             }
-            case IndexType::kHnsw: {
+            case IndexType::kHnsw:
+            case IndexType::kSecondary: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
                 for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
                     SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
