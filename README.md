@@ -56,8 +56,8 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ```bash
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-docker pull infiniflow/infinity:nightly
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
+docker pull infiniflow/infinity:v0.1.0
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:v0.1.0
 ```
 
 #### Deploy Infinity using binary package on Linux x86_64
