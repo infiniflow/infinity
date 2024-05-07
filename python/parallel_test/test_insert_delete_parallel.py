@@ -16,7 +16,6 @@ kNumThread = 8
 
 
 class TestInsertDeleteParallel:
-    # @pytest.mark.skip(reason="varchar bug, No such chunk in heap")
     def test_insert_and_delete_parallel(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()

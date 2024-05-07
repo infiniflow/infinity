@@ -1,0 +1,23 @@
+[general]
+version = "0.2.0"
+timezone = "utc-8"
+
+[network]
+[log]
+
+[storage]
+# close auto optimize
+optimize_interval = "0s"
+# close auto cleanup task
+cleanup_interval = "0s"
+# close auto compaction
+compact_interval = "0s"
+
+[buffer]
+[wal]
+# close delta checkpoint
+delta_checkpoint_interval_sec = "0s"
+# close full checkpoint
+full_checkpoint_interval_sec = "0s"
+
+[resource]

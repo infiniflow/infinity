@@ -74,10 +74,6 @@ private:
         return db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
     }
 
-    bool CheckConflict(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts, DBEntry *&db_entry) {
-        return db_entry_list_.CheckConflict(std::move(r_lock), txn_id, begin_ts, db_entry);
-    }
-
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<DBEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryNolock(txn_id, begin_ts); }

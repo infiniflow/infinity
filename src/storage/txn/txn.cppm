@@ -92,7 +92,7 @@ public:
 
     TxnTimeStamp Commit();
 
-    bool CheckConflict();
+    bool CheckConflict(Txn *txn);
 
     void CommitBottom();
 
@@ -157,11 +157,11 @@ public:
     Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
 
     // DML
-    Status Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry);
+    Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
 
-    Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
+    Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
-    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
+    Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status
     Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
@@ -175,13 +175,15 @@ public:
 
     inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
 
+    TxnTimeStamp CommittedTS() { return txn_context_.GetCommittedTS(); }
+
     inline TxnTimeStamp BeginTS() { return txn_context_.GetBeginTS(); }
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
 
     inline TxnType GetTxnType() const { return txn_context_.GetTxnType(); }
 
-    void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
+    void SetTxnCommitted(TxnTimeStamp committed_ts);
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 
@@ -211,8 +213,6 @@ public:
     WalEntry *GetWALEntry() const;
 
 private:
-    TxnTableStore *GetTxnTableStore(const String &table_name);
-
     void CheckTxnStatus();
 
     void CheckTxn(const String &db_name);

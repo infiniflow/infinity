@@ -126,30 +126,14 @@ UniquePtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(Table
 }
 
 CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type)
-    : task_type_(type), db_name_(table_entry->GetDBName()), table_name_(table_entry->GetTableName()), commit_ts_(table_entry->commit_ts_),
-      segments_(std::move(segments)), txn_(txn) {}
+    : task_type_(type), table_entry_(table_entry), commit_ts_(table_entry->commit_ts_), segments_(std::move(segments)), txn_(txn) {}
 
-bool CompactSegmentsTask::Execute() {
-    auto [table_entry, status] = txn_->GetTableByName(*db_name_, *table_name_);
-    if (!status.ok()) {
-        // the table is dropped before the background task is executed.
-        if (status.code() == ErrorCode::kTableNotExist) {
-            LOG_INFO(fmt::format("Table {} not exist, skip compact", *table_name_));
-            return false;
-        } else {
-            UnrecoverableError("Get table entry failed");
-        }
-    }
-    if (table_entry->commit_ts_ != commit_ts_) {
-        // If the table is compacted, the table will be removed.
-        return false;
-    }
-    CompactSegmentsTaskState state(table_entry);
+void CompactSegmentsTask::Execute() {
+    CompactSegmentsTaskState state;
     CompactSegments(state);
     CreateNewIndex(state);
     SaveSegmentsData(state);
     ApplyDeletes(state);
-    return true;
 }
 
 // generate new_table_ref_ to compact
@@ -165,13 +149,7 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
 
         auto new_segment = CompactSegmentsToOne(state, to_compact_segments);
         block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
-        {
-            String ss;
-            for (auto *segment : to_compact_segments) {
-                ss += std::to_string(segment->segment_id()) + " ";
-            }
-            LOG_TRACE(fmt::format("Table {}, type: {}, compacting segments: {} into {}", *table_name_, (u8)task_type_, ss, new_segment->segment_id()));
-        }
+
         segment_data.emplace_back(new_segment, std::move(to_compact_segments));
         old_segments.insert(old_segments.end(), to_compact_segments.begin(), to_compact_segments.end());
     };
@@ -215,7 +193,7 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
     }
 
     // FIXME: fake table ref here
-    state.new_table_ref_ = MakeUnique<BaseTableRef>(state.table_entry_, block_index);
+    state.new_table_ref_ = MakeUnique<BaseTableRef>(table_entry_, block_index);
 }
 
 void CompactSegmentsTask::CreateNewIndex(CompactSegmentsTaskState &state) {
@@ -244,7 +222,7 @@ void CompactSegmentsTask::CreateNewIndex(CompactSegmentsTaskState &state) {
 }
 
 void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
-    auto *table_entry = state.table_entry_;
+    auto *table_entry = table_entry_;
     auto segment_data = std::move(state.segment_data_);
 
     Vector<WalSegmentInfo> segment_infos;
@@ -261,7 +239,8 @@ void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
         }
     }
     txn_->Compact(table_entry, std::move(segment_data), task_type_);
-    String db_name = *db_name_, table_name = *table_name_;
+    String db_name = *table_entry->GetDBName();
+    String table_name = *table_entry->GetTableName();
     txn_->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(segment_infos), std::move(old_segment_ids)));
 }
 
@@ -281,7 +260,7 @@ void CompactSegmentsTask::ApplyDeletes(CompactSegmentsTaskState &state) {
             row_ids.push_back(new_row_id);
         }
     }
-    txn_->Delete(*db_name_, *table_name_, row_ids, false);
+    txn_->Delete(table_entry_, row_ids, false);
 }
 
 void CompactSegmentsTask::AddToDelete(SegmentID segment_id, Vector<SegmentOffset> &&delete_offsets) {
@@ -289,8 +268,10 @@ void CompactSegmentsTask::AddToDelete(SegmentID segment_id, Vector<SegmentOffset
     to_deletes_.emplace_back(ToDeleteInfo{segment_id, std::move(delete_offsets)});
 }
 
+const String &CompactSegmentsTask::table_name() const { return *table_entry_->GetTableName(); }
+
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(CompactSegmentsTaskState &state, const Vector<SegmentEntry *> &segments) {
-    auto *table_entry = state.table_entry_;
+    auto *table_entry = table_entry_;
     auto &remapper = state.remapper_;
     auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn_);
 

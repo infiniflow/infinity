@@ -152,7 +152,8 @@ protected:
                 return {false, INVALID_ROWID};
             }
             if (cache_need_check_delete_) [[unlikely]] {
-                DeleteFilter delete_filter(cache_segment_entry_, common_query_filter_->begin_ts_);
+                SegmentOffset max_segment_offset = cache_segment_offset_;
+                DeleteFilter delete_filter(cache_segment_entry_, common_query_filter_->begin_ts_, max_segment_offset);
                 if (delete_filter(id.segment_offset_)) {
                     return {true, id};
                 }

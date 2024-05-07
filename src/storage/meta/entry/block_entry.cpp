@@ -63,8 +63,8 @@ UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
 
-    auto begin_ts = txn->BeginTS();
-    block_entry->begin_ts_ = begin_ts;
+    block_entry->begin_ts_ = txn->BeginTS();
+    block_entry->txn_id_ = txn->TxnID();
 
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
@@ -117,6 +117,14 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
     }
 }
 
+SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+    return block_version->GetRowCount(check_ts);
+}
+
 Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
     std::shared_lock lock(rw_locker_);
     begin_ts = std::min(begin_ts, this->max_row_ts_);
@@ -138,14 +146,35 @@ Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts
     return {block_offset_begin, row_idx};
 }
 
-bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const {
+bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const {
     std::shared_lock lock(rw_locker_);
 
     auto block_version_handle = this->block_version_->Load();
     const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
 
-    auto &deleted = block_version->deleted_;
+    if (check_append && block_version->GetRowCount(check_ts) <= block_offset) {
+        return false;
+    }
+    const auto &deleted = block_version->deleted_;
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
+}
+
+bool BlockEntry::CheckDeleteVisible(Vector<BlockOffset> &block_offsets, TxnTimeStamp check_ts) const {
+    Vector<BlockOffset> new_block_offsets;
+
+    std::shared_lock lock(rw_locker_);
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+    const auto &deleted = block_version->deleted_;
+    for (BlockOffset block_offset : block_offsets) {
+        if (deleted[block_offset] > check_ts) {
+            return false;
+        } else if (deleted[block_offset] == 0) {
+            new_block_offsets.push_back(block_offset);
+        }
+    }
+    block_offsets = std::move(new_block_offsets);
+    return true;
 }
 
 void BlockEntry::SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const {
@@ -224,10 +253,16 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
 
     SizeT delete_row_n = 0;
     for (BlockOffset block_offset : rows) {
-        if (block_version->deleted_[block_offset] == 0) {
-            block_version->deleted_[block_offset] = commit_ts;
-            delete_row_n++;
+        if (block_version->deleted_[block_offset] != 0) {
+            UnrecoverableError(fmt::format("Segment {} Block {} Row {} is already deleted at {}, cur commit_ts: {}.",
+                                           segment_id,
+                                           block_id,
+                                           block_offset,
+                                           block_version->deleted_[block_offset],
+                                           commit_ts));
         }
+        block_version->deleted_[block_offset] = commit_ts;
+        delete_row_n++;
     }
 
     LOG_TRACE(fmt::format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));

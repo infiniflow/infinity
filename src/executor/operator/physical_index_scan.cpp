@@ -625,7 +625,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     const u32 segment_row_actual_count = segment_entry->actual_row_count(); // count of rows in segment, exclude deleted rows
 
     // prepare filter for deleted rows
-    DeleteFilter delete_filter(segment_entry, begin_ts);
+    DeleteFilter delete_filter(segment_entry, begin_ts, segment_entry->row_count(begin_ts));
     // output
     auto result = SolveSecondaryIndexFilterInner(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count);
     result.Output(output_data_blocks, segment_id, delete_filter);
