@@ -1006,10 +1006,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     } else {
         // Continuous
         do {
-            if (wal_size_ > wal_size) {
-                UnrecoverableError(fmt::format("wal_size_ {} > wal_size {}", wal_size_, wal_size));
-            }
-            wal_size_ = wal_size;
+            wal_size_ = std::max(wal_size_, wal_size);
             this->AddDeltaEntryInner(delta_entry.get());
 
             ++last_sequence_;
