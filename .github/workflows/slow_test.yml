@@ -1,11 +1,8 @@
 name: slow_tests
 
 on:
-  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
-  create:
-    tags:
-      - "v*.*.*"                  # normal release
-      - "nightly"                 # the only one mutable tag
+  schedule:
+    - cron: '0 21 * * *'  # This schedule runs every 21:00:00Z(05:00:00+08:00)
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
