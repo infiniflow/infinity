@@ -77,7 +77,7 @@ sudo systemctl start infinity
 ```
 #### 🛠️ Build from Source
 
-See [Build from Source](docs/build_from_source.md).
+See [Build from Source](docs/getstarted/build_from_source.md).
 
 ### Install Infinity's Python client
 
