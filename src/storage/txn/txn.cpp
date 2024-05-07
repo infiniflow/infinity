@@ -379,6 +379,11 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViews"};
 }
 
+void Txn::SetTxnCommitted(TxnTimeStamp committed_ts) {
+    // LOG_INFO(fmt::format("Txn {} is committed, committed_ts: {}", txn_id_, committed_ts));
+    txn_context_.SetTxnCommitted(committed_ts);
+}
+
 void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
     txn_context_.SetTxnCommitting(commit_ts);
     wal_entry_->commit_ts_ = commit_ts;
@@ -404,13 +409,14 @@ TxnTimeStamp Txn::Commit() {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
         this->SetTxnCommitting(commit_ts);
-        this->SetTxnCommitted();
-        LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
+        this->SetTxnCommitted(commit_ts);
         return commit_ts;
     }
 
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
+    // LOG_INFO(fmt::format("Txn: {} is committing, committing ts: {}", txn_id_, commit_ts));
+
     this->SetTxnCommitting(commit_ts);
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
@@ -428,7 +434,6 @@ TxnTimeStamp Txn::Commit() {
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
-    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->enable_compaction()) {
         txn_store_.MaintainCompactionAlg();
@@ -437,13 +442,11 @@ TxnTimeStamp Txn::Commit() {
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }
 
-    this->SetTxnCommitted();
-
     return commit_ts;
 }
 
 bool Txn::CheckConflict(Txn *txn) {
-    LOG_INFO(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
+    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
 
     return txn_store_.CheckConflict(txn->txn_store_);
 }
@@ -498,8 +501,6 @@ void Txn::Rollback() {
     txn_context_.SetTxnRollbacking(abort_ts);
 
     txn_store_.Rollback(txn_id_, abort_ts);
-
-    this->SetTxnRollbacked();
 
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }

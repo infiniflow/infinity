@@ -41,6 +41,11 @@ public:
         return commit_ts_;
     }
 
+    TxnTimeStamp GetCommittedTS() {
+        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+        return committed_ts_;
+    }
+
     inline TxnState GetTxnState() {
         std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return state_;
@@ -63,12 +68,13 @@ public:
         state_ = TxnState::kRollbacked;
     }
 
-    inline void SetTxnCommitted() {
+    inline void SetTxnCommitted(TxnTimeStamp committed_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting) {
             UnrecoverableError("Transaction isn't in COMMITTING status.");
         }
         state_ = TxnState::kCommitted;
+        committed_ts_ = committed_ts;
     }
 
     inline void SetTxnCommitting(TxnTimeStamp commit_ts) {
@@ -88,6 +94,7 @@ private:
     std::shared_mutex rw_locker_{};
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
+    TxnTimeStamp committed_ts_{};
     TxnState state_{TxnState::kStarted};
     TxnType type_{TxnType::kInvalid};
 };

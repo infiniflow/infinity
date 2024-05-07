@@ -1118,8 +1118,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
                 for (const auto txn_id : delta_entry->txn_ids()) {
                     ss << txn_id << " ";
                 }
-                LOG_INFO(ss.str());
-                throw e;
+                UnrecoverableError(ss.str());
             }
         } else {
             PruneFlag prune_flag = CatalogDeltaOperation::ToPrune(None, new_op->merge_flag_);

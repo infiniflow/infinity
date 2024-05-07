@@ -175,13 +175,15 @@ public:
 
     inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
 
+    TxnTimeStamp CommittedTS() { return txn_context_.GetCommittedTS(); }
+
     inline TxnTimeStamp BeginTS() { return txn_context_.GetBeginTS(); }
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
 
     inline TxnType GetTxnType() const { return txn_context_.GetTxnType(); }
 
-    void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
+    void SetTxnCommitted(TxnTimeStamp committed_ts);
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 
