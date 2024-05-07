@@ -395,8 +395,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             IVFFlatScan(filter);
                         }
                     } else {
+                        SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                         if (segment_entry->CheckAnyDelete(begin_ts)) {
-                            DeleteFilter filter(segment_entry, begin_ts);
+                            DeleteFilter filter(segment_entry, begin_ts, max_segment_offset);
                             IVFFlatScan(filter);
                         } else {
                             IVFFlatScan();
@@ -407,7 +408,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 case IndexType::kHnsw: {
                     const auto *index_hnsw = static_cast<const IndexHnsw *>(segment_index_entry->table_index_entry()->index_base());
 
-                    auto hnsw_search = [&](BufferHandle index_handle, bool with_lock) {
+                    auto hnsw_search = [&](BufferHandle index_handle, bool with_lock, int chunk_id = -1) {
                         AbstractHnsw<f32, SegmentOffset> abstract_hnsw(index_handle.GetDataMut(), index_hnsw);
 
                         for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
@@ -436,15 +437,16 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                         abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, with_lock);
                                 }
                             } else {
+                                SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                 if (segment_entry->CheckAnyDelete(begin_ts)) {
-                                    DeleteFilter filter(segment_entry, begin_ts);
+                                    DeleteFilter filter(segment_entry, begin_ts, max_segment_offset);
                                     std::tie(result_n1, d_ptr, l_ptr) =
                                         abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, with_lock);
                                 } else {
                                     if (!with_lock) {
                                         std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, false);
                                     } else {
-                                        AppendFilter filter(block_index->GetSegmentOffset(segment_id));
+                                        AppendFilter filter(max_segment_offset);
                                         std::tie(result_n1, d_ptr, l_ptr) = abstract_hnsw.KnnSearch(query, knn_scan_shared_data->topk_, filter, true);
                                     }
                                 }
@@ -476,16 +478,24 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
                             for (i64 i = 0; i < result_n; ++i) {
                                 row_ids[i] = RowID{segment_id, l_ptr[i]};
+
+                                BlockID block_id = l_ptr[i] / DEFAULT_BLOCK_CAPACITY;
+                                auto *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+                                if (block_entry == nullptr) {
+                                    UnrecoverableError(
+                                        fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id));
+                                }
                             }
                             merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                         }
                     };
 
                     auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetHnswIndexSnapshot();
+                    int i = 0;
                     for (auto &chunk_index_entry : chunk_index_entries) {
                         if (chunk_index_entry->CheckVisible(begin_ts)) {
                             BufferHandle index_handle = chunk_index_entry->GetIndex();
-                            hnsw_search(index_handle, false);
+                            hnsw_search(index_handle, false, i++);
                         }
                     }
                     if (memory_index_entry.get() != nullptr) {

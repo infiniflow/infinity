@@ -14,6 +14,7 @@
 
 module;
 
+#include <string>
 #include <vector>
 
 module txn_store;
@@ -260,18 +261,44 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     }
 }
 
-bool TxnTableStore::CheckConflict(Catalog *catalog) const {
-    TransactionID txn_id = txn_->TxnID();
-    TableEntry *latest_table_entry;
-    const auto &db_name = *table_entry_->GetDBName();
-    const auto &table_name = *table_entry_->GetTableName();
-    TxnTimeStamp begin_ts = txn_->BeginTS();
-    bool conflict = catalog->CheckTableConflict(db_name, table_name, txn_id, begin_ts, latest_table_entry);
-    if (conflict) {
-        return true;
+bool TxnTableStore::CheckConflict(const TxnTableStore *txn_table_store) const {
+    for (const auto &[index_name, _] : txn_indexes_store_) {
+        for (const auto [index_entry, _] : txn_table_store->txn_indexes_) {
+            if (index_name == *index_entry->GetIndexName()) {
+                return true;
+            }
+        }
     }
-    if (latest_table_entry != table_entry_) {
-        UnrecoverableError(fmt::format("Table entry should conflict, table name: {}", table_name));
+
+    const auto &delete_state = delete_state_;
+    const auto &other_delete_state = txn_table_store->delete_state_;
+    if (delete_state.rows_.empty() || other_delete_state.rows_.empty()) {
+        return false;
+    }
+    for (const auto &[segment_id, block_map] : delete_state.rows_) {
+        auto other_iter = other_delete_state.rows_.find(segment_id);
+        if (other_iter == other_delete_state.rows_.end()) {
+            continue;
+        }
+        for (const auto &[block_id, block_offsets] : block_map) {
+            auto other_block_iter = other_iter->second.find(block_id);
+            if (other_block_iter == other_iter->second.end()) {
+                continue;
+            }
+            const auto &other_block_offsets = other_block_iter->second;
+            SizeT j = 0;
+            for (const auto &block_offset : block_offsets) {
+                while (j < other_block_offsets.size() && other_block_offsets[j] < block_offset) {
+                    ++j;
+                }
+                if (j == other_block_offsets.size()) {
+                    break;
+                }
+                if (other_block_offsets[j] == block_offset) {
+                    return true;
+                }
+            }
+        }
     }
     return false;
 }
@@ -280,6 +307,11 @@ void TxnTableStore::PrepareCommit1() {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     for (auto *segment_entry : flushed_segments_) {
         segment_entry->CommitFlushed(commit_ts);
+    }
+    if (!delete_state_.rows_.empty()) {
+        if (!table_entry_->CheckDeleteVisible(delete_state_, txn_)) {
+            RecoverableError(Status::TxnConflict(txn_->TxnID(), "Txn conflict reason."));
+        }
     }
 }
 
@@ -353,8 +385,10 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
 
 void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace(segment_entry); }
 
-void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts) const {
-    local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
+void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const {
+    if (!added) {
+        local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
+    }
 
     Vector<Pair<TableIndexEntry *, int>> txn_indexes_vec(txn_indexes_.begin(), txn_indexes_.end());
     std::sort(txn_indexes_vec.begin(), txn_indexes_vec.end(), [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
@@ -395,11 +429,6 @@ void TxnStore::DropTableStore(TableEntry *dropped_table_entry) {
     }
 }
 
-TxnTableStore *TxnStore::GetTxnTableStore(const String &table_name) {
-    auto iter = txn_tables_store_.find(table_name);
-    return iter == txn_tables_store_.end() ? nullptr : iter->second.get();
-}
-
 TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
     const String &table_name = *table_entry->GetTableName();
     if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
@@ -423,7 +452,8 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mg
         local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry, commit_ts));
     }
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->AddDeltaOp(local_delta_ops, txn_mgr, commit_ts);
+        bool added = txn_tables_.contains(table_store->table_entry_);
+        table_store->AddDeltaOp(local_delta_ops, txn_mgr, commit_ts, added);
     }
 }
 
@@ -433,9 +463,20 @@ void TxnStore::MaintainCompactionAlg() const {
     }
 }
 
-bool TxnStore::CheckConflict() const {
+bool TxnStore::CheckConflict(const TxnStore &txn_store) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        if (table_store->CheckConflict(catalog_)) {
+        for (const auto [table_entry, _] : txn_store.txn_tables_) {
+            if (table_name == *table_entry->GetTableName()) {
+                return true;
+            }
+        }
+
+        auto other_iter = txn_store.txn_tables_store_.find(table_name);
+        if (other_iter == txn_store.txn_tables_store_.end()) {
+            continue;
+        }
+        const TxnTableStore *other_table_store = other_iter->second.get();
+        if (table_store->CheckConflict(other_table_store)) {
             return true;
         }
     }

@@ -619,10 +619,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 
 void PhysicalImport::SaveSegmentData(TableEntry *table_entry, Txn *txn, SharedPtr<SegmentEntry> segment_entry) {
     segment_entry->FlushNewData();
-
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
-    txn->Import(db_name, table_name, std::move(segment_entry));
+    txn->Import(table_entry, std::move(segment_entry));
 }
 
 } // namespace infinity

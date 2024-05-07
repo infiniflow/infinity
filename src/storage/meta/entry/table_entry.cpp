@@ -875,6 +875,19 @@ SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTime
     return segment;
 }
 
+SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID seg_id, Txn *txn) const {
+    std::shared_lock lock(this->rw_locker_);
+    auto iter = segment_map_.find(seg_id);
+    if (iter == segment_map_.end()) {
+        return nullptr;
+    }
+    const auto &segment = iter->second;
+    if (segment->commit_ts_ > txn->BeginTS() && segment->txn_id_ != txn->TxnID()) {
+        return nullptr;
+    }
+    return segment;
+}
+
 Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     auto iter = this->segment_map_.find(seg_id);
     if (iter != this->segment_map_.end()) {
@@ -909,6 +922,19 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     }
 
     return result;
+}
+
+bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
+    for (auto &[segment_id, block_offsets_map] : delete_state.rows_) {
+        auto *segment_entry = GetSegmentByID(segment_id, txn).get();
+        if (segment_entry == nullptr) {
+            return false;
+        }
+        if (!segment_entry->CheckDeleteVisible(block_offsets_map, txn)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool TableEntry::CheckVisible(SegmentID segment_id, TxnTimeStamp begin_ts) const {

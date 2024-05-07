@@ -86,7 +86,7 @@ public:
     TxnTimeStamp CurrentTS() const;
 
 private:
-    void FinishTxn(TransactionID txn_id);
+    void FinishTxn(Txn *txn);
 
     void AddWaitFlushTxn(const Vector<TransactionID> &txn_ids);
 
@@ -107,10 +107,10 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    std::mutex mutex_{};
-    Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
-    Deque<Txn *> finished_txns_;        // sorted by commit ts
-    Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{};
+    Deque<WeakPtr<Txn>> beginned_txns_;                // sorted by begin ts
+    HashSet<Txn *> finishing_txns_;                    // the txns for conflict check
+    Deque<Pair<TxnTimeStamp, Txn *>> finished_txns_;   // sorted by finished ts
+    Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
     // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue

@@ -70,45 +70,74 @@ Txn *TxnManager::BeginTxn() {
     beginned_txns_.emplace_back(new_txn);
     rw_locker_.unlock();
 
-    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
+    // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
     return new_txn.get();
 }
 
 Txn *TxnManager::GetTxn(TransactionID txn_id) {
-    rw_locker_.lock_shared();
+    std::lock_guard guard(rw_locker_);
     Txn *res = txn_map_.at(txn_id).get();
-    rw_locker_.unlock_shared();
     return res;
 }
 
 SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
-    rw_locker_.lock_shared();
+    std::lock_guard guard(rw_locker_);
     SharedPtr<Txn> res = txn_map_.at(txn_id);
-    rw_locker_.unlock_shared();
     return res;
 }
 
 TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
-    std::unique_lock w_locker(mutex_);
+    std::lock_guard guard(rw_locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     txn->SetTxnRead();
     return commit_ts;
 }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
-    std::unique_lock w_locker(mutex_);
+    std::lock_guard guard(rw_locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
-    finished_txns_.emplace_back(txn);
+    finishing_txns_.emplace(txn);
     txn->SetTxnWrite();
     return commit_ts;
 }
 
 bool TxnManager::CheckConflict(Txn *txn) {
-    // TEMP
-    return txn->CheckConflict();
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp commit_ts = txn->CommitTS();
+    Vector<Txn *> candidate_txns;
+    {
+        std::lock_guard guard(rw_locker_);
+        // LOG_INFO(fmt::format("Txn {} check conflict", txn->TxnID()));
+        for (auto *finishing_txn : finishing_txns_) {
+            // LOG_INFO(fmt::format("Txn {} tries to test txn {}", txn->TxnID(), finishing_txn->TxnID()));
+            const auto &finishing_state = finishing_txn->GetTxnState();
+            bool add = false;
+            if (finishing_state == TxnState::kCommitted) {
+                TxnTimeStamp committed_ts = finishing_txn->CommittedTS();
+                if (begin_ts < committed_ts) {
+                    add = true;
+                }
+            } else if (finishing_state == TxnState::kCommitting) {
+                TxnTimeStamp finishing_commit_ts = finishing_txn->CommitTS();
+                if (commit_ts > finishing_commit_ts) {
+                    add = true;
+                }
+            }
+            if (add) {
+                // LOG_INFO(fmt::format("Txn {} tests txn {}", txn->TxnID(), finishing_txn->TxnID()));
+                candidate_txns.push_back(finishing_txn);
+            }
+        }
+    }
+    for (auto *candidate_txn : candidate_txns) {
+        if (txn->CheckConflict(candidate_txn)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void TxnManager::SendToWAL(Txn *txn) {
@@ -123,7 +152,7 @@ void TxnManager::SendToWAL(Txn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     WalEntry *wal_entry = txn->GetWALEntry();
 
-    std::unique_lock w_locker(mutex_);
+    std::lock_guard guard(rw_locker_);
     if (wait_conflict_ck_.empty()) {
         UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS()));
     }
@@ -189,16 +218,14 @@ void TxnManager::Stop() {
 bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
-    TransactionID txn_id = txn->TxnID();
     TxnTimeStamp commit_ts = txn->Commit();
-    this->FinishTxn(txn_id);
+    this->FinishTxn(txn);
     return commit_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
-    TransactionID txn_id = txn->TxnID();
     txn->Rollback();
-    this->FinishTxn(txn_id);
+    this->FinishTxn(txn);
 }
 
 SizeT TxnManager::ActiveTxnCount() {
@@ -210,22 +237,26 @@ TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
 // A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
 // So maintain the least uncommitted begin ts
-void TxnManager::FinishTxn(TransactionID txn_id) {
+void TxnManager::FinishTxn(Txn *txn) {
     std::lock_guard guard(rw_locker_);
-    auto iter = txn_map_.find(txn_id);
-    if (iter == txn_map_.end()) {
-        return;
-    }
-    auto *txn = iter->second.get();
+
     if (txn->GetTxnType() == TxnType::kInvalid) {
         UnrecoverableError("Txn type is invalid");
-    }
-    if (txn->GetTxnType() == TxnType::kRead) {
-        txn_map_.erase(txn_id);
+    } else if (txn->GetTxnType() == TxnType::kRead) {
+        txn_map_.erase(txn->TxnID());
         return;
     }
 
-    TxnTimeStamp least_uncommitted_begin_ts = txn->BeginTS() + 1;
+    TxnTimeStamp finished_ts = ++start_ts_;
+    finished_txns_.emplace_back(finished_ts, txn);
+    auto state = txn->GetTxnState();
+    if (state == TxnState::kCommitting) {
+        txn->SetTxnCommitted(finished_ts);
+    } else if (state == TxnState::kRollbacking) {
+        txn->SetTxnRollbacked();
+    }
+
+    TxnTimeStamp least_uncommitted_begin_ts = txn->CommitTS() + 1;
     while (!beginned_txns_.empty()) {
         auto first_txn = beginned_txns_.front().lock();
         if (first_txn.get() == nullptr) {
@@ -242,26 +273,22 @@ void TxnManager::FinishTxn(TransactionID txn_id) {
     }
 
     while (!finished_txns_.empty()) {
-        auto *finished_txn = finished_txns_.front();
+        const auto &[finished_ts, finished_txn] = finished_txns_.front();
         auto finished_state = finished_txn->GetTxnState();
         if (finished_state != TxnState::kCommitted && finished_state != TxnState::kRollbacked) {
             break;
         }
-        TxnTimeStamp finished_commit_ts = finished_txn->CommitTS();
-        if (finished_commit_ts > least_uncommitted_begin_ts) {
+        if (finished_ts > least_uncommitted_begin_ts) {
             break;
         }
         auto finished_txn_id = finished_txn->TxnID();
-        // LOG_INFO(fmt::format("Txn: {} is erased from txn map", finished_txn_id));
+        finishing_txns_.erase(finished_txn);
+        // LOG_INFO(fmt::format("Txn: {} is erased", finished_txn_id));
         SizeT remove_n = txn_map_.erase(finished_txn_id);
         if (remove_n == 0) {
             UnrecoverableError(fmt::format("Txn: {} not found in txn map", finished_txn_id));
         }
         finished_txns_.pop_front();
-    }
-
-    if (txn_map_.size() > 1000) {
-        LOG_WARN(fmt::format("Txn map size: {} is too large. Something error may occurred", txn_map_.size()));
     }
 }
 

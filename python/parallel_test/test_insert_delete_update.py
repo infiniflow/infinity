@@ -13,8 +13,6 @@ kNumThread = 4
 
 
 class TestInsertDeleteUpdate:
-    @pytest.mark.skip(
-        reason="#issue 1087 Decrease row count exceed actual row count@src/storage/meta/entry/segment_entry.cppm:184")
     def test_insert_delete_update_parallel_vec(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()

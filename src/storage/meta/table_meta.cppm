@@ -86,10 +86,6 @@ private:
         return table_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
     }
 
-    bool CheckConflict(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *&table_entry) {
-        return table_entry_list_.CheckConflict(std::move(r_lock), txn_id, begin_ts, table_entry);
-    }
-
     Tuple<TableEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
         return table_entry_list_.GetEntryNolock(txn_id, begin_ts);
     }
