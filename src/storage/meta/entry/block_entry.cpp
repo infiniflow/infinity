@@ -117,6 +117,14 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
     }
 }
 
+SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+    return block_version->GetRowCount(check_ts);
+}
+
 Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
     std::shared_lock lock(rw_locker_);
     begin_ts = std::min(begin_ts, this->max_row_ts_);
@@ -138,13 +146,16 @@ Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts
     return {block_offset_begin, row_idx};
 }
 
-bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const {
+bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const {
     std::shared_lock lock(rw_locker_);
 
     auto block_version_handle = this->block_version_->Load();
     const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
 
-    auto &deleted = block_version->deleted_;
+    if (check_append && block_version->GetRowCount(check_ts) <= block_offset) {
+        return false;
+    }
+    const auto &deleted = block_version->deleted_;
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
 }
 

@@ -22,7 +22,6 @@ insert_delete_size = 100
 
 class TestIndexParallel:
 
-    @pytest.mark.skip(reason="Cannot find segment id: 0, block id: 9@src/executor/operator/physical_knn_scan.cpp:542")
     def test_chaos(self, get_infinity_connection_pool):
         data = read_out_data()
         connection_pool = get_infinity_connection_pool
