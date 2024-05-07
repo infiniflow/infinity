@@ -54,7 +54,7 @@ protected:
     }
 
     Txn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {
-        auto *txn = txn_mgr_->BeginTxn();
+        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Delete row"));
 
         Vector<RowID> row_ids;
         for (auto segment_offset : segment_offsets) {
@@ -81,7 +81,7 @@ protected:
     };
 
     void InitTable(const String &db_name, const String &table_name, SharedPtr<TableDef> table_def, SizeT row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn();
+        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Init table"));
 
         txn->CreateTable(db_name, table_def, ConflictType::kError);
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
@@ -106,7 +106,7 @@ protected:
     }
 
     void CheckRowCnt(const String &db_name, const String &table_name, SizeT expected_row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn();
+        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Check row count"));
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status.ok());
 
