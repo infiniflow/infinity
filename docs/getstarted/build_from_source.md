@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-slug: /
+slug: /build_from_source
 ---
 
 # Build from Source
