@@ -31,6 +31,7 @@ import logical_type;
 import column_vector;
 import data_block;
 import index_hnsw;
+import index_secondary;
 import statement_common;
 import embedding_info;
 import knn_expr;
@@ -215,6 +216,100 @@ TEST_F(OptimizeKnnTest, test1) {
 
         ASSERT_EQ(memory_index_entry.get(), nullptr);
 
+        txn_mgr->CommitTxn(txn);
+    }
+}
+
+TEST_F(OptimizeKnnTest, test_secondary_index_optimize) {
+    Storage *storage = InfinityContext::instance().storage();
+    Catalog *catalog = storage->catalog();
+    TxnManager *txn_mgr = storage->txn_manager();
+
+    auto db_name = std::make_shared<std::string>("default_db");
+    auto column_def1 =
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, {column_def1});
+    auto index_name = std::make_shared<std::string>("idx1");
+
+    {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        txn->CreateTable(*db_name, table_def, ConflictType::kError);
+        txn_mgr->CommitTxn(txn);
+    }
+
+    {
+        Vector<String> column_names{"col1"};
+        const String &file_name = "idx_file.idx";
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        ASSERT_TRUE(status.ok());
+        auto index_secondary = IndexSecondary::Make(index_name, file_name, column_names);
+        auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_secondary, ConflictType::kError);
+        ASSERT_TRUE(status2.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+
+    auto DoAppend = [&]() {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+        Vector<SharedPtr<ColumnVector>> column_vectors;
+        for (SizeT i = 0; i < table_def->columns().size(); ++i) {
+            SharedPtr<DataType> data_type = table_def->columns()[i]->type();
+            column_vectors.push_back(MakeShared<ColumnVector>(data_type));
+            column_vectors.back()->Initialize();
+        }
+        Vector<int> col1{2, 4, 6, 8};
+        SizeT row_cnt = 4;
+        for (SizeT i = 0; i < row_cnt; ++i) {
+            column_vectors[0]->AppendByPtr(reinterpret_cast<const char *>(&col1[i]));
+        }
+        auto data_block = DataBlock::Make();
+        data_block->Init(column_vectors);
+
+        auto status = txn->Append(*db_name, *table_name, data_block);
+        ASSERT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    };
+
+    for (int j = 0; j < 3; ++j) {
+        for (int i = 0; i < 2; ++i) {
+            DoAppend();
+        }
+        {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
+            ASSERT_TRUE(status1.ok());
+            auto [table_index_entry, status] = txn->GetIndexByName(*db_name, *table_name, *index_name);
+            ASSERT_TRUE(status.ok());
+            TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
+            TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
+            table_index_entry->MemIndexDump(txn_index_store, true);
+            txn_mgr->CommitTxn(txn);
+        }
+    }
+    TxnTimeStamp last_commit_ts = 0;
+    {
+        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        ASSERT_TRUE(status.ok());
+        table_entry->OptimizeIndex(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
+    }
+    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"));
+        auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
+        ASSERT_TRUE(status1.ok());
+        auto [table_index_entry, status] = txn->GetIndexByName(*db_name, *table_name, *index_name);
+        ASSERT_TRUE(status.ok());
+        auto &segment_index_entries = table_index_entry->index_by_segment();
+        ASSERT_EQ(segment_index_entries.size(), 1ul);
+        auto &segment_index_entry = segment_index_entries.begin()->second;
+        auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetSecondaryIndexSnapshot();
+        ASSERT_EQ(chunk_index_entries.size(), 1ul);
+        auto &chunk_index_entry = chunk_index_entries[0];
+        ASSERT_EQ(chunk_index_entry->row_count_, 24u);
+        ASSERT_EQ(memory_index_entry.get(), nullptr);
         txn_mgr->CommitTxn(txn);
     }
 }

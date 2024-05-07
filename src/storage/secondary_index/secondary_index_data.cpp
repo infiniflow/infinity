@@ -74,6 +74,7 @@ struct SecondaryIndexChunkMerger {
     Vector<SecondaryIndexChunkDataReader<RawValueType>> readers_;
     std::priority_queue<Tuple<OrderedKeyType, u32, u32>, Vector<Tuple<OrderedKeyType, u32, u32>>, std::greater<Tuple<OrderedKeyType, u32, u32>>> pq_;
     explicit SecondaryIndexChunkMerger(const Vector<ChunkIndexEntry *> &old_chunks) {
+        readers_.reserve(old_chunks.size());
         for (ChunkIndexEntry *chunk : old_chunks) {
             readers_.emplace_back(chunk);
         }
