@@ -7,11 +7,10 @@ slug: /
 
 ## Prerequisites
 
-CPU >= 4 cores, with FMA and SSE4_2
-RAM >= 16 GB
-Disk >= 50 GB
-OS: Linux x86_64 or aarch64
-Glibc >=2.17
+- CPU: >= 4 cores, x86_64 with AVX2, or aarch64
+- RAM: >= 16 GB
+- Disk: >= 50 GB
+- OS: Linux with glibc >=2.17
 
 ## Deploy Infinity database
 
