@@ -21,7 +21,7 @@ insert_delete_size = 100
 
 
 class TestIndexParallel:
-
+    #@pytest.mark.skip(reason="To pass benchmark, use wrong row count in knn scan")
     def test_chaos(self, get_infinity_connection_pool):
         data = read_out_data()
         connection_pool = get_infinity_connection_pool

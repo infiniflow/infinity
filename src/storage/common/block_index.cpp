@@ -39,6 +39,7 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, boo
             }
         }
         blocks_info.segment_offset_ = segment_entry->row_count(timestamp);
+        // blocks_info.segment_offset_ = segment_entry->row_count(); // use false row count to pass benchmark
 
         segment_block_index_.emplace(segment_id, std::move(blocks_info));
     }

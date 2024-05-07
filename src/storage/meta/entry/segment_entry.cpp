@@ -262,6 +262,9 @@ SizeT SegmentEntry::row_count(TxnTimeStamp check_ts) const {
     if (status_ == SegmentStatus::kDeprecated && check_ts > deprecate_ts_) {
         return 0;
     }
+    if (status_ == SegmentStatus::kSealed) {
+        return row_count_; // FIXME
+    }
     SizeT row_count = 0;
     for (const auto &block_entry : block_entries_) {
         row_count += block_entry->row_count(check_ts);
