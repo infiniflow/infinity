@@ -65,7 +65,6 @@ struct ToDeleteInfo {
 };
 
 export struct CompactSegmentsTaskState {
-    // default copy construct of table ref
     RowIDRemapper remapper_;
 
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;

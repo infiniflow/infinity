@@ -92,6 +92,7 @@ public:
             if (end - start > 10) {
                 UnrecoverableException("WaitCleanup timeout");
             }
+            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
             usleep(1000 * 1000);
         }
 

@@ -60,7 +60,6 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
 
     // Record the start ts of the txn
     TxnTimeStamp ts = ++start_ts_;
-    // LOG_INFO(fmt::format("Txn {} begin ts: {}", new_txn_id, ts));
 
     // Create txn instance
     auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
