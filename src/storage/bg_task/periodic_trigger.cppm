@@ -20,8 +20,8 @@ import stl;
 import background_process;
 import compaction_process;
 import catalog;
-import txn_manager;
 import wal_manager;
+import buffer_manager;
 
 namespace infinity {
 
@@ -51,15 +51,20 @@ private:
 
 export class CleanupPeriodicTrigger final : public PeriodicTrigger {
 public:
-    CleanupPeriodicTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
-        : PeriodicTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
+    CleanupPeriodicTrigger(std::chrono::milliseconds interval,
+                           BGTaskProcessor *bg_processor,
+                           Catalog *catalog,
+                           WalManager *wal_mgr,
+                           BufferManager *buffer_mgr)
+        : PeriodicTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), wal_mgr_(wal_mgr), buffer_mgr_(buffer_mgr) {}
 
     virtual void Trigger() override;
 
 private:
     BGTaskProcessor *const bg_processor_{};
     Catalog *const catalog_{};
-    TxnManager *const txn_mgr_{};
+    WalManager *const wal_mgr_{};
+    BufferManager *const buffer_mgr_{};
 
     TxnTimeStamp last_visible_ts_{0};
 };

@@ -70,6 +70,8 @@ public:
 
     i64 GetLastCkpWalSize();
 
+    TxnTimeStamp GetLastCkpTS();
+
 private:
     // Checkpoint Helper
     void CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size);
@@ -123,7 +125,7 @@ private:
     i64 last_ckp_wal_size_{};
     Atomic<bool> checkpoint_in_progress_{false};
 
-    // Only Checkpoint thread access following members
+    // Only Checkpoint/Cleanup thread access following members
     TxnTimeStamp last_ckp_ts_{};
     TxnTimeStamp last_full_ckp_ts_{};
 };

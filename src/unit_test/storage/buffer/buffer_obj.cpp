@@ -49,6 +49,7 @@ import embedding_info;
 import bg_task;
 import physical_import;
 import chunk_index_entry;
+import wal_manager;
 
 using namespace infinity;
 
@@ -77,12 +78,16 @@ class BufferObjTest : public BaseTest {
 public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
-    void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+        Catalog *catalog = storage->catalog();
+        WalManager *wal_mgr = storage->wal_manager();
+        BufferManager *buffer_mgr = storage->buffer_manager();
+
         LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = wal_mgr->GetLastCkpTS() + 1;
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
@@ -96,7 +101,6 @@ public:
             usleep(1000 * 1000);
         }
 
-        auto buffer_mgr = txn_mgr->GetBufferMgr();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
@@ -515,7 +519,6 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default_db");
@@ -661,7 +664,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
 }
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {

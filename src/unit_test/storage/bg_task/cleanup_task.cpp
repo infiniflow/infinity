@@ -40,17 +40,22 @@ import third_party;
 import base_table_ref;
 import index_secondary;
 import infinity_exception;
+import wal_manager;
 
 using namespace infinity;
 
 class CleanupTaskTest : public BaseTest {
 protected:
-    void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+        Catalog *catalog = storage->catalog();
+        WalManager *wal_mgr = storage->wal_manager();
+        BufferManager *buffer_mgr = storage->buffer_manager();
+
         LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = wal_mgr->GetLastCkpTS() + 1;
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
@@ -58,12 +63,12 @@ protected:
             }
             // wait for at most 10s
             if (end - start > 10) {
-                UnrecoverableException("WaitCleanup timeout");
+                UnrecoverableError("WaitCleanup timeout");
             }
+            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
             usleep(1000 * 1000);
         }
 
-        auto buffer_mgr = txn_mgr->GetBufferMgr();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
@@ -79,7 +84,6 @@ TEST_F(CleanupTaskTest, test_delete_db_simple) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("db1");
@@ -94,7 +98,7 @@ TEST_F(CleanupTaskTest, test_delete_db_simple) {
         EXPECT_TRUE(status.ok());
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"));
         auto [db_entry, status] = txn->GetDatabase(*db_name);
@@ -114,7 +118,6 @@ TEST_F(CleanupTaskTest, test_delete_db_complex) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("db1");
@@ -143,7 +146,7 @@ TEST_F(CleanupTaskTest, test_delete_db_complex) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"));
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        WaitCleanup(catalog, txn_mgr, last_commit_ts);
+        WaitCleanup(storage, last_commit_ts);
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -165,7 +168,6 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
@@ -193,7 +195,7 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
@@ -215,7 +217,6 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
@@ -262,7 +263,7 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
 
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        WaitCleanup(catalog, txn_mgr, last_commit_ts);
+        WaitCleanup(storage, last_commit_ts);
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -290,7 +291,6 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
@@ -362,7 +362,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
 
     InfinityContext::instance().UnInit();
 }
@@ -381,7 +381,6 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default_db");
@@ -474,7 +473,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
 
     InfinityContext::instance().UnInit();
 }

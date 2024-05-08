@@ -52,6 +52,7 @@ import default_values;
 import global_resource_usage;
 import infinity;
 import background_process;
+import wal_manager;
 
 using namespace infinity;
 
@@ -65,12 +66,13 @@ protected:
 
     void TearDown() override { RemoveDbDirs(); }
 
-    void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+    void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
+        WalManager *wal_mgr = storage->wal_manager();
         LOG_INFO("Waiting flush delta op");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = wal_mgr->GetLastCkpTS() + 1;
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Flush delta op finished after {}", end - start));
@@ -83,12 +85,16 @@ protected:
         }
     }
 
-    void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+        Catalog *catalog = storage->catalog();
+        WalManager *wal_mgr = storage->wal_manager();
+        BufferManager *buffer_mgr = storage->buffer_manager();
+
         LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = wal_mgr->GetLastCkpTS() + 1;
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
@@ -96,12 +102,12 @@ protected:
             }
             // wait for at most 10s
             if (end - start > 10) {
-                UnrecoverableException("WaitCleanup timeout");
+                UnrecoverableError("WaitCleanup timeout");
             }
+            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
             usleep(1000 * 1000);
         }
 
-        auto buffer_mgr = txn_mgr->GetBufferMgr();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
@@ -155,7 +161,6 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_manager = storage->buffer_manager();
     TxnManager *txn_mgr = storage->txn_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> columns;
@@ -214,9 +219,9 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
 
         txn_mgr->CommitTxn(txn5);
     }
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
     usleep(5000 * 1000);
-    WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+    WaitFlushDeltaOp(storage, last_commit_ts);
     infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -298,7 +303,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
 
         auto last_commit_ts = txn_mgr->CommitTxn(txn);
 
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -422,7 +427,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         }
 
         usleep(5000 * 1000);
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }

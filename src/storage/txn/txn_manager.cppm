@@ -88,12 +88,7 @@ public:
 private:
     void FinishTxn(Txn *txn);
 
-    void AddWaitFlushTxn(const Vector<TransactionID> &txn_ids);
-
 public:
-    void RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids);
-
-    TxnTimeStamp GetMinUnflushedTS();
 
     bool enable_compaction() const { return enable_compaction_; }
 
@@ -113,9 +108,6 @@ private:
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
-    // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
-    Map<TxnTimeStamp, TransactionID> ts_map_{}; // optimize the data structure
-    HashSet<TransactionID> wait_flush_txns_{};
 
     // For stop the txn manager
     atomic_bool is_running_{false};
