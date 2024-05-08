@@ -493,7 +493,7 @@ TEST_F(BufferObjTest, test1) {
 // }
 
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
-    GTEST_SKIP(); // FIXME
+    // GTEST_SKIP(); // FIXME
 
 #ifdef INFINITY_DEBUG
     infinity::InfinityContext::instance().UnInit();
