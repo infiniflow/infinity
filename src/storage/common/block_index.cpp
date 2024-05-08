@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module block_index;
 
 import stl;
@@ -31,15 +33,16 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, boo
         segment_index_.emplace(segment_id, segment_entry);
         BlocksInfo blocks_info;
 
-        auto block_entry_iter = BlockEntryIter(segment_entry);
-        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-            if (timestamp >= block_entry->min_row_ts()) {
-                blocks_info.block_map_.emplace(block_entry->block_id(), block_entry);
-                global_blocks_.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
+        {
+            auto block_guard = segment_entry->GetBlocksGuard();
+            for (const auto &block_entry : block_guard.block_entries_) {
+                if (timestamp >= block_entry->commit_ts_) {
+                    blocks_info.block_map_.emplace(block_entry->block_id(), block_entry.get());
+                    global_blocks_.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
+                }
             }
         }
         blocks_info.segment_offset_ = segment_entry->row_count(timestamp);
-        // blocks_info.segment_offset_ = segment_entry->row_count(); // use false row count to pass benchmark
 
         segment_block_index_.emplace(segment_id, std::move(blocks_info));
     }

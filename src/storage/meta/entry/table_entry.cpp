@@ -474,10 +474,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
 
             auto *segment_entry = segment_store.segment_entry_;
 
-            segment_entry->CommitSegment(txn_id, commit_ts);
-            for (auto [block_id, block_entry] : segment_store.block_entries_) {
-                block_entry->CommitBlock(txn_id, commit_ts);
-            }
+            segment_entry->CommitSegment(txn_id, commit_ts, segment_store);
 
             for (const auto &old_segment : old_segments) {
                 // old_segment->TrySetDeprecated(commit_ts);
@@ -581,10 +578,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
 Status TableEntry::CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
     for (const auto &[segment_id, segment_store] : segment_stores) {
         auto *segment_entry = segment_store.segment_entry_;
-        segment_entry->CommitSegment(txn_id, commit_ts);
-        for (auto [block_id, block_entry] : segment_store.block_entries_) {
-            block_entry->CommitBlock(txn_id, commit_ts);
-        }
+        segment_entry->CommitSegment(txn_id, commit_ts, segment_store);
     }
     return Status::OK();
 }

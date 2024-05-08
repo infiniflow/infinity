@@ -403,7 +403,7 @@ void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
     }
 }
 
-void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
+void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnSegmentStore &segment_store) {
     std::unique_lock w_lock(rw_locker_);
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
@@ -413,6 +413,10 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (!this->Committed()) {
         this->txn_id_ = txn_id;
         this->Commit(commit_ts);
+    }
+    // hold the lock here
+    for (const auto &[block_id, block_entry] : segment_store.block_entries_) {
+        block_entry->CommitBlock(txn_id, commit_ts);
     }
 }
 
