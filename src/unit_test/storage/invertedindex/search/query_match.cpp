@@ -97,7 +97,7 @@ void QueryMatchTest::InitData() {
     };
 }
 
-TEST_F(QueryMatchTest, DISABLED_basic_phrase) {
+TEST_F(QueryMatchTest, basic_phrase) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);
@@ -115,7 +115,7 @@ TEST_F(QueryMatchTest, DISABLED_basic_phrase) {
     }
 }
 
-TEST_F(QueryMatchTest, DISABLED_basic_term) {
+TEST_F(QueryMatchTest, basic_term) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);
@@ -322,7 +322,8 @@ void QueryMatchTest::QueryMatch(const String& db_name,
         fmt::print("iter_row_id is INVALID_ROWID\n");
     } else {
         do {
-            query_builder.Score(iter_row_id);
+            auto score = query_builder.Score(iter_row_id);
+            fmt::print("iter_row_id = {}, score = {}\n", iter_row_id.ToUint64(), score);
             iter_row_id = doc_iterator->Next();
         } while (iter_row_id != INVALID_ROWID);
         if (query_type == DocIteratorType::kPhraseIterator) {

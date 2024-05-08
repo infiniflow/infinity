@@ -359,7 +359,6 @@ std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
 }
 
 // create search iterator
-
 std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
@@ -430,7 +429,7 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), column_id, GetWeight());
+    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight());
 
     search->terms_ptr_ = &terms_;
     search->column_name_ptr_ = &column_;
@@ -454,16 +453,16 @@ PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, Index
         fetch_position = true;
     }
 
-    Vector<std::unique_ptr<BlockMaxTermDocIterator>> term_doc_iterators;
-    for (auto &term : terms_) {
-        auto term_doc_iterator = column_index_reader->LookupBlockMax(term, index_reader.session_pool_.get(), GetWeight(), fetch_position);
-        if (nullptr == term_doc_iterator) {
+    Vector<std::unique_ptr<PostingIterator>> posting_iterators;
+    for (auto& term : terms_) {
+        auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
+        if (nullptr == posting_iterator) {
+            fmt::print("not found term = {}\n", term);
             return nullptr;
         }
-        term_doc_iterators.emplace_back(std::move(term_doc_iterator));
+        posting_iterators.emplace_back(std::move(posting_iterator));
     }
-
-    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(term_doc_iterators), column_id);
+    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(posting_iterators), GetWeight());
     if (!search) {
         return nullptr;
     }

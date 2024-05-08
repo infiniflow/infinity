@@ -13,20 +13,27 @@ import index_defines;
 namespace infinity {
 export class PhraseDocIterator final : public DocIterator {
 public:
-    PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, u64 column_id, float weight, u32 slop = 1)
-        : iters_(std::move(iters)), column_id_(column_id), weight_(weight), slop_(slop) {
+    PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop = 1)
+        : iters_(std::move(iters)), weight_(weight), slop_(slop) {
         doc_ids_.resize(iters_.size());
         doc_freq_ = 0;
         phrase_freq_ = 0;
+        if (iters_.size()) {
+            estimate_doc_freq_ = iters_[0]->GetDocFreq();
+        } else {
+            estimate_doc_freq_ = 0;
+        }
         for (SizeT i = 0; i < iters_.size(); ++i) {
             all_df_.push_back(iters_[i]->GetDocFreq());
-            // doc_freq_ = std::max(doc_freq_, iters_[i]->GetDocFreq());
+            estimate_doc_freq_ = std::min(estimate_doc_freq_, iters_[i]->GetDocFreq());
         }
     }
 
     void DoSeek(RowID doc_id) override;
 
     u32 GetDF() const override;
+
+    u32 GetEstimateDF() const { return estimate_doc_freq_; }
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 
@@ -49,8 +56,8 @@ public:
 private:
     Vector<UniquePtr<PostingIterator>> iters_;
     Vector<RowID> doc_ids_;
-    u64 column_id_;
     u32 doc_freq_{0};
+    u32 estimate_doc_freq_{0};
     u64 phrase_freq_{0};
     Set<RowID> all_doc_ids_{};
     float weight_;
