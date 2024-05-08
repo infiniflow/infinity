@@ -23,11 +23,9 @@ public:
         } else {
             estimate_doc_freq_ = 0;
         }
-        fmt::print("phrase doc iterator size = {}, estimate_doc_freq_ = {}\n", iters_.size(), estimate_doc_freq_);
         for (SizeT i = 0; i < iters_.size(); ++i) {
             all_df_.push_back(iters_[i]->GetDocFreq());
             estimate_doc_freq_ = std::min(estimate_doc_freq_, iters_[i]->GetDocFreq());
-            // doc_freq_ = std::max(doc_freq_, iters_[i]->GetDocFreq());
         }
     }
 

@@ -17,27 +17,9 @@ namespace infinity {
 
 export class BlockMaxPhraseDocIterator final : public EarlyTerminateIterator {
 public:
-//    BlockMaxPhraseDocIterator(Vector<UniquePtr<BlockMaxTermDocIterator>> &&iters)
-//        : term_doc_iters_(std::move(iters)) {
-//        auto iter_size = term_doc_iters_.size();
-//        fmt::print("iter size = {}\n", iter_size);
-//        term_column_length_reader_.resize(iter_size, nullptr);
-//        term_block_max_bm25_score_cache_.resize(iter_size, 0.0f);
-//        term_bm25_common_score_.resize(iter_size, 0.0f);
-//        term_block_max_bm25_score_cache_end_id_.resize(iter_size, INVALID_ROWID);
-//        term_bm25_score_upper_bound_.resize(iter_size, 0.0f);
-//        term_column_length_reader_.resize(iter_size, nullptr);
-//        // cache for PeekInBlockRange
-//        term_peek_doc_id_range_start_.resize(iter_size, INVALID_ROWID);
-//        term_peek_doc_id_range_end_.resize(iter_size, INVALID_ROWID);
-//        term_peek_doc_id_val_.resize(iter_size, INVALID_ROWID);
-//        term_doc_id_.resize(iter_size, INVALID_ROWID);
-//    }
-
-    BlockMaxPhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters)
-        : pos_iters_(std::move(iters)) {
+    BlockMaxPhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight)
+        : pos_iters_(std::move(iters)), weight_(weight) {
         auto iter_size = pos_iters_.size();
-        fmt::print("iter size = {}\n", iter_size);
         term_column_length_reader_.resize(iter_size, nullptr);
         term_block_max_bm25_score_cache_.resize(iter_size, 0.0f);
         term_bm25_common_score_.resize(iter_size, 0.0f);
@@ -49,6 +31,7 @@ public:
         term_peek_doc_id_range_end_.resize(iter_size, INVALID_ROWID);
         term_peek_doc_id_val_.resize(iter_size, INVALID_ROWID);
         term_doc_id_.resize(iter_size, INVALID_ROWID);
+        block_last_doc_id_ = 0;
         if (iter_size) {
             estimate_doc_freq_ = pos_iters_[0]->GetDocFreq();
         } else {
@@ -127,6 +110,7 @@ private:
     float bm25_common_score_ = 0.0f;
     float block_max_bm25_score_cache_ = 0.0f;
     RowID block_max_bm25_score_cache_end_id_{INVALID_ROWID};
+    RowID block_last_doc_id_{INVALID_DOCID};
 
     // info for sub terms
     Vector<FullTextColumnLengthReader*> term_column_length_reader_;

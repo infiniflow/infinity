@@ -80,7 +80,6 @@ bool BlockMaxAndIterator::BlockSkipTo(RowID doc_id, float threshold) {
                 sum_score += sorted_iterators_[j - 1]->BlockMaxBM25Score();
                 common_block_max_bm25_score_parts_[j - 1] = prev_sum_score;
             }
-            fmt::print("sum_score: {}, bm25_score_upper_bound_: {}\n", sum_score, bm25_score_upper_bound_);
             // assert((sum_score <= bm25_score_upper_bound_));
             if (sum_score >= threshold) {
                 common_block_max_bm25_score_ = sum_score;

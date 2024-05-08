@@ -28,15 +28,12 @@ namespace infinity {
 
 Pair<RowID, float> EarlyTerminateIterator::BlockNextWithThreshold(float threshold) {
     for (RowID next_skip = doc_id_ + 1;;) {
-        fmt::print("next skip = {}\n", next_skip.ToUint64());
         if (!BlockSkipTo(next_skip, threshold)) [[unlikely]] {
             return {INVALID_ROWID, 0.0F};
         }
         next_skip = std::max(next_skip, BlockMinPossibleDocID());
-        fmt::print("next_skip: {}, block_last_doc_id = {}\n", next_skip.ToUint64(), BlockLastDocID().ToUint64());
         assert((next_skip <= BlockLastDocID()));
         auto [success, score, id] = SeekInBlockRange(next_skip, BlockLastDocID(), threshold);
-        fmt::print("success = {}, score = {}, id = {}\n", success, score, id.ToUint64());
         if (success) {
             // success in SeekInBlockRange, inner doc_id_ is updated
             return {id, score};

@@ -65,6 +65,17 @@ Anarchism 30-APR-2012 03:25:17.000 8589934592 25.498550
 # Anarchism 30-APR-2012 03:25:17.000 0 50.997105
 # Anarchism 30-APR-2012 03:25:17.000 8589934592 50.997105
 
+# only phrase
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', '\"social customs\"', 'topn=3;block_max=compare');
+----
+Anarchism 30-APR-2012 03:25:17.000 6 20.881144
+
+# phrase and term
+# query TTI
+# SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle,body^5', '\"social customs\" harmful', 'topn=3');
+
+
 statement ok
 CREATE INDEX ft_index2 ON enwiki(doctitle) USING FULLTEXT;
 

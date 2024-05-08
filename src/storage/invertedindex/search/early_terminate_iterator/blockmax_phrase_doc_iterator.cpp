@@ -18,13 +18,6 @@ import third_party;
 namespace infinity {
 
 bool BlockMaxPhraseDocIterator::BlockSkipTo(RowID doc_id, float threshold) {
-//    for (auto &iter : term_doc_iters_) {
-//        if (!iter->BlockSkipTo(doc_id, threshold)) {
-//            return false;
-//        }
-//    }
-//    return true;
-    fmt::print("Phrase BlockSkipTo doc_id = {}, threshold = {}, BM25ScoreUpperBound = {}\n", doc_id.ToUint64(), threshold, BM25ScoreUpperBound());
     if (threshold > BM25ScoreUpperBound()) [[unlikely]] {
         return false;
     }
@@ -48,11 +41,9 @@ RowID BlockMaxPhraseDocIterator::BlockMinPossibleDocID() const { return pos_iter
 
 RowID BlockMaxPhraseDocIterator::BlockLastDocID() const { return TermBlockLastDocID(0); }
 
-
 void BlockMaxPhraseDocIterator::SeekDoc(RowID doc_id, RowID seek_end) {
     assert(pos_iters_.size() > 0);
     bool need_loop = true;
-    fmt::print("SeekDoc, doc_id = {}, seek_end = {}\n", doc_id.ToUint64(), seek_end.ToUint64());
     while (need_loop) {
         if (doc_id == INVALID_ROWID || doc_id > seek_end) {
             break;
@@ -70,10 +61,10 @@ void BlockMaxPhraseDocIterator::SeekDoc(RowID doc_id, RowID seek_end) {
                 break;
             }
         }
-        fmt::print("loop, max_doc_id = {}\n", max_doc_id.ToUint64());
         doc_id = max_doc_id;
     }
     doc_id_ = doc_id;
+    // block_last_doc_id_ = doc_id;
 }
 
 bool BlockMaxPhraseDocIterator::CheckBeginPosition(pos_t position) {
@@ -81,10 +72,7 @@ bool BlockMaxPhraseDocIterator::CheckBeginPosition(pos_t position) {
     for (SizeT i = 1; i < pos_iters_.size(); ++i) {
         auto& iter = pos_iters_[i];
         pos_t next_position = 0;
-        fmt::print("iter:{}, has position: {}\n", i, iter->HasPosition());
-        fmt::print("iter:{}, seek position = {}\n", i, now_position);
         iter->SeekPosition(now_position, next_position);
-        fmt::print("iter:{}, last position = {}, find postion = {}\n", i, now_position, next_position);
         if (next_position != now_position + 1) {
             return false;
         }
@@ -102,9 +90,7 @@ bool BlockMaxPhraseDocIterator::GetPhraseMatchData(PhraseColumnMatchData &match_
     match_data.tf_ = 0;
     while (true) {
         pos_t position = INVALID_POSITION;
-        fmt::print("first iter, doc_id = {}, has position: {}\n", doc_id.ToUint64(), iter->HasPosition());
         iter->SeekPosition(beg_position, position);
-        fmt::print("first iter, doc_id = {}, begin position = {}, find position = {}\n", doc_id.ToUint64(), beg_position, position);
         if (position == INVALID_POSITION) {
             break;
         }
@@ -126,25 +112,20 @@ bool BlockMaxPhraseDocIterator::GetPhraseMatchData(PhraseColumnMatchData &match_
             doc_freq_++;
             phrase_freq_ += match_data.begin_positions_.size();
         }
-        fmt::print("query res: doc_id = {}, phrase_freq = {}\n", doc_id_.ToUint64(), match_data.begin_positions_.size());
         return true;
     }
     return false;
 }
 
 Tuple<bool, float, RowID> BlockMaxPhraseDocIterator::SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) {
-    fmt::print("SeekInBlockRange, doc_id = {}, threshold = {}, block_max_bm25score = {}\n", doc_id.ToUint64(), threshold, BlockMaxBM25Score());
     if (threshold > BlockMaxBM25Score()) [[unlikely]] {
         return {false, 0.0F, INVALID_ROWID};
     }
     const RowID block_last = BlockLastDocID();
     const RowID seek_end = std::min(doc_id_no_beyond, block_last);
-    fmt::print("doc_id = {}, seek_end = {}\n", doc_id.ToUint64(), seek_end.ToUint64());
     while (doc_id <= seek_end) {
         SeekDoc(doc_id, seek_end);
         doc_id = doc_id_;
-        fmt::print("doc_id: {}, block_last: {}\n", doc_id.ToUint64(), block_last.ToUint64());
-
         // assert((doc_id <= block_last));
         if (doc_id > seek_end) {
             return {false, 0.0F, INVALID_ROWID};
@@ -152,7 +133,6 @@ Tuple<bool, float, RowID> BlockMaxPhraseDocIterator::SeekInBlockRange(RowID doc_
         PhraseColumnMatchData phrase_match_data;
         if (GetPhraseMatchData(phrase_match_data, doc_id)) {
             current_phrase_freq_ = phrase_match_data.tf_;
-            fmt::print("doc_id = {}, current_phrase_freq_: {}\n", doc_id.ToUint64(), current_phrase_freq_);
             if (const float score = BM25Score(); score >= threshold) {
                 return {true, score, doc_id};
             }
@@ -160,33 +140,25 @@ Tuple<bool, float, RowID> BlockMaxPhraseDocIterator::SeekInBlockRange(RowID doc_
         ++doc_id;
     }
     return {false, 0.0F, INVALID_ROWID};
-//    Vector<Tuple<bool, float, RowID>> all_res;
-//    for (SizeT i = 0; i < pos_iters_.size(); ++i) {
-//        auto res = TermSeekInBlockRange(i, doc_id, doc_id_no_beyond, threshold);
-//        if (!std::get<0>(res)) {
-//            return {false, 0.0F, INVALID_ROWID};
-//        }
-//        all_res.push_back(res);
-//    }
-//    if (all_res.empty()) {
-//        return {false, 0.0F, INVALID_ROWID};
-//    }
-//    return all_res[0];
 }
 
 Pair<bool, RowID> BlockMaxPhraseDocIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
-    Vector<Pair<bool, RowID>> all_res;
-    for (SizeT i = 0; i < pos_iters_.size(); ++i) {
-        auto res = TermPeekInBlockRange(i, doc_id, doc_id_no_beyond);
-        if (!std::get<0>(res)) {
+    const RowID seek_end = doc_id_no_beyond;
+    while (doc_id <= seek_end) {
+        SeekDoc(doc_id, seek_end);
+        doc_id = doc_id_;
+        // assert((doc_id <= block_last));
+        if (doc_id > seek_end) {
             return {false, INVALID_ROWID};
         }
-        all_res.push_back(res);
+        PhraseColumnMatchData phrase_match_data;
+        if (GetPhraseMatchData(phrase_match_data, doc_id)) {
+            current_phrase_freq_ = phrase_match_data.tf_;
+            return {true, doc_id};
+        }
+        ++doc_id;
     }
-    if (all_res.empty()) {
-        return {false, INVALID_ROWID};
-    }
-    return all_res[0];
+    return {false, INVALID_ROWID};
 }
 
 bool BlockMaxPhraseDocIterator::NotPartCheckExist(RowID doc_id) {
@@ -232,23 +204,12 @@ void BlockMaxPhraseDocIterator::InitBM25Info(u64 total_df, float avg_column_len,
 }
 
 float BlockMaxPhraseDocIterator::BM25Score() {
-    //    float bm25_score = 0;
-    //    for (SizeT i = 0; i < pos_iters_.size(); ++i) {
-    //        bm25_score += TermBM25Score(i, phrase_freq_);
-    //    }
-    //    return bm25_score;
     auto tf = current_phrase_freq_;
     auto doc_len = column_length_reader_->GetColumnLength(doc_id_);
     return bm25_common_score_ * tf / (tf + k1 * (1.0F - b + b * doc_len / avg_column_len_));
 }
 
 float BlockMaxPhraseDocIterator::BlockMaxBM25Score() {
-//    float bm25_score = 0;
-//    for (SizeT i = 0; i < pos_iters_.size(); ++i) {
-//        bm25_score += TermBlockMaxBM25Score(i);
-//    }
-//    return bm25_score;
-
     if (auto last_doc_id = BlockLastDocID(); last_doc_id != block_max_bm25_score_cache_end_id_) {
         block_max_bm25_score_cache_end_id_ = last_doc_id;
         // bm25_common_score_ / (1.0F + k1 * ((1.0F - b) / block_max_tf + b / block_max_percentage / avg_column_len));

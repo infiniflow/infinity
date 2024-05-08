@@ -62,7 +62,6 @@ namespace infinity {
             auto& iter = iters_[i];
             pos_t next_position = 0;
             iter->SeekPosition(now_position, next_position);
-            fmt::print("iter: {}, last_position: {}, next_position: {}\n", i, now_position, next_position);
             if (next_position != now_position + 1) {
                 return false;
             }
@@ -81,7 +80,6 @@ namespace infinity {
         while (true) {
             pos_t position = INVALID_POSITION;
             iter->SeekPosition(beg_position, position);
-            fmt::print("doc_id = {}, position = {}\n", doc_id_.ToUint64(), position);
             if (position == INVALID_POSITION) {
                 break;
             }
