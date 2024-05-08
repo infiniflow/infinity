@@ -36,6 +36,9 @@ namespace infinity {
             doc_id = max_doc_id;
         }
         doc_id_ = doc_id;
+        for (SizeT i = 0; i < iters_.size(); ++i) {
+            iters_[i]->SeekDoc(doc_id_);
+        }
     }
 
     void PhraseDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
@@ -73,6 +76,7 @@ namespace infinity {
         }
         auto& iter = iters_[0];
         pos_t beg_position = 0;
+        match_data.tf_ = 0;
         while (true) {
             pos_t position = INVALID_POSITION;
             iter->SeekPosition(beg_position, position);
@@ -81,6 +85,7 @@ namespace infinity {
             }
             if (CheckBeginPosition(position)) {
                 match_data.begin_positions_.push_back(position);
+                ++(match_data.tf_);
             }
             beg_position = position + 1;
         }

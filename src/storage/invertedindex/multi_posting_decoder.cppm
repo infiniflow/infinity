@@ -71,9 +71,13 @@ private:
     }
 
     bool MoveToSegment(RowID start_row_id);
+
     bool MemSegMoveToSegment(const SharedPtr<PostingWriter> &posting_writer);
+
     bool DiskSegMoveToSegment(SegmentPosting &cur_segment_posting);
+
     IndexDecoder *CreateDocIndexDecoder(u32 doc_list_begin_pos);
+
 private:
     PostingFormatOption format_option_;
     bool need_decode_doc_id_ = false;

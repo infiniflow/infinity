@@ -47,8 +47,8 @@ void PositionListDecoder::InitPositionSkipList(const ByteSliceList *pos_list,
         state->SetRecordOffset(pos_skiplist_end);
     } else {
         pos_skiplist_reader_ = session_pool_ ? new ((session_pool_)->Allocate(sizeof(SkipListReaderByteSlice)))
-                                                   SkipListReaderByteSlice(option_.GetDocListFormatOption())
-                                             : new SkipListReaderByteSlice(option_.GetDocListFormatOption());
+                                                   SkipListReaderByteSlice(option_.GetPosListFormatOption())
+                                             : new SkipListReaderByteSlice(option_.GetPosListFormatOption());
         skiplist_reader_real_size_ = sizeof(SkipListReaderByteSlice);
         static_cast<SkipListReaderByteSlice *>(pos_skiplist_reader_)->Load(pos_list, pos_skiplist_start, pos_skiplist_end);
         decoded_pos_count_ = 0;
@@ -66,8 +66,8 @@ void PositionListDecoder::InitPositionSkipList(ByteSlice *pos_list,
         state->SetRecordOffset(pos_skiplist_end);
     } else {
         pos_skiplist_reader_ = session_pool_ ? new ((session_pool_)->Allocate(sizeof(SkipListReaderByteSlice)))
-                                                   SkipListReaderByteSlice(option_.GetDocListFormatOption())
-                                             : new SkipListReaderByteSlice(option_.GetDocListFormatOption());
+                                                   SkipListReaderByteSlice(option_.GetPosListFormatOption())
+                                             : new SkipListReaderByteSlice(option_.GetPosListFormatOption());
         skiplist_reader_real_size_ = sizeof(SkipListReaderByteSlice);
         static_cast<SkipListReaderByteSlice *>(pos_skiplist_reader_)->Load(pos_list, pos_skiplist_start, pos_skiplist_end);
         decoded_pos_count_ = 0;
