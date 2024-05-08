@@ -42,7 +42,7 @@ BlockMaxTermDocIterator::~BlockMaxTermDocIterator() {
     if (duplicate_calc_score_cnt_) {
         oss << "!!! duplicate_calc_score_cnt: " << duplicate_calc_score_cnt_ << '\n';
     }
-    LOG_INFO(std::move(oss).str());
+    LOG_TRACE(std::move(oss).str());
 }
 
 BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool) : iter_(flag, session_pool) {}
@@ -90,7 +90,7 @@ void BlockMaxTermDocIterator::InitBM25Info(u64 total_df, float avg_column_len, F
     OStringStream oss;
     oss << "BlockMaxTermDocIterator: " << *column_name_ptr_ << " " << *term_ptr_ << " bm25_common_score: " << bm25_common_score_
         << " bm25_score_upper_bound: " << bm25_score_upper_bound_ << " avg_column_len: " << avg_column_len_ << " f1: " << f1 << " f2: " << f2 << '\n';
-    LOG_INFO(std::move(oss).str());
+    LOG_TRACE(std::move(oss).str());
 }
 
 // weight included

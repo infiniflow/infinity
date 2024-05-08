@@ -6,7 +6,8 @@ import os
 import time
 import json
 import h5py
-from typing import Any, List, Optional
+from typing import Any
+import logging
 
 from .base_client import BaseClient
 
@@ -137,7 +138,7 @@ class QdrantClient(BaseClient):
                         with_payload=False
                     )
                     end = time.time()
-                    print(f"latency of search: {(end - start)*1000:.2f} milliseconds")
+                    logging.info(f"latency of search: {(end - start)*1000:.2f} milliseconds")
                     results.append(result)
         elif ext == '.hdf5' and self.data['mode'] == 'vector':
             with h5py.File(query_path, 'r') as f:
@@ -150,7 +151,7 @@ class QdrantClient(BaseClient):
                     )
                     results.append(result)
                 end = time.time()
-                print(f"latency of KNN search: {(end - start)*1000/len(f['test']):.2f} milliseconds")
+                logging.info(f"latency of KNN search: {(end - start)*1000/len(f['test']):.2f} milliseconds")
         else:
             raise TypeError("Unsupported file type")
         return results

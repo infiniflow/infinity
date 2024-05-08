@@ -5812,74 +5812,6 @@ class UpdateRequest(object):
         return not (self == other)
 
 
-class ShowVariableRequest(object):
-    """
-    Attributes:
-     - session_id
-     - variable_name
-
-    """
-
-
-    def __init__(self, session_id=None, variable_name=None,):
-        self.session_id = session_id
-        self.variable_name = variable_name
-
-    def read(self, iprot):
-        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
-            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
-            return
-        iprot.readStructBegin()
-        while True:
-            (fname, ftype, fid) = iprot.readFieldBegin()
-            if ftype == TType.STOP:
-                break
-            if fid == 1:
-                if ftype == TType.I64:
-                    self.session_id = iprot.readI64()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 2:
-                if ftype == TType.STRING:
-                    self.variable_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                else:
-                    iprot.skip(ftype)
-            else:
-                iprot.skip(ftype)
-            iprot.readFieldEnd()
-        iprot.readStructEnd()
-
-    def write(self, oprot):
-        if oprot._fast_encode is not None and self.thrift_spec is not None:
-            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
-            return
-        oprot.writeStructBegin('ShowVariableRequest')
-        if self.session_id is not None:
-            oprot.writeFieldBegin('session_id', TType.I64, 1)
-            oprot.writeI64(self.session_id)
-            oprot.writeFieldEnd()
-        if self.variable_name is not None:
-            oprot.writeFieldBegin('variable_name', TType.STRING, 2)
-            oprot.writeString(self.variable_name.encode('utf-8') if sys.version_info[0] == 2 else self.variable_name)
-            oprot.writeFieldEnd()
-        oprot.writeFieldStop()
-        oprot.writeStructEnd()
-
-    def validate(self):
-        return
-
-    def __repr__(self):
-        L = ['%s=%r' % (key, value)
-             for key, value in self.__dict__.items()]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
-
-
 class ShowTablesRequest(object):
     """
     Attributes:
@@ -7327,12 +7259,6 @@ UpdateRequest.thrift_spec = (
     (4, TType.LIST, 'update_expr_array', (TType.STRUCT, [UpdateExpr, None], False), [
     ], ),  # 4
     (5, TType.I64, 'session_id', None, None, ),  # 5
-)
-all_structs.append(ShowVariableRequest)
-ShowVariableRequest.thrift_spec = (
-    None,  # 0
-    (1, TType.I64, 'session_id', None, None, ),  # 1
-    (2, TType.STRING, 'variable_name', 'UTF8', None, ),  # 2
 )
 all_structs.append(ShowTablesRequest)
 ShowTablesRequest.thrift_spec = (

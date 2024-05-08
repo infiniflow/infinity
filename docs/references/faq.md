@@ -1,6 +1,6 @@
 ---
-sidebar_position: 1
-slug: /faq
+sidebar_position: 2
+slug: /FAQ
 ---
 
 ## Extensive Reading: Frequently Asked Questions

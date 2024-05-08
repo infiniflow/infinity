@@ -96,7 +96,7 @@ protected:
     u16
     AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
+    SizeT DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
     void CommitFlushed(TxnTimeStamp commit_ts);
 
@@ -138,10 +138,14 @@ public:
 
     const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
 
+    SizeT row_count(TxnTimeStamp check_ts) const;
+
     // Get visible range of the BlockEntry since the given row number for a txn
     Pair<BlockOffset, BlockOffset> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
 
-    bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const;
+    bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const;
+
+    bool CheckDeleteVisible(Vector<BlockOffset> &block_offsets, TxnTimeStamp check_ts) const;
 
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 

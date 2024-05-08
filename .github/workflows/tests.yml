@@ -2,7 +2,10 @@ name: tests
 
 on:
   push:
-    branches: [ main, libcxx ]
+    branches:
+      - 'main'
+      - '*.*.*'
+      - 'libcxx'
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -56,7 +59,10 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main"
+        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
+
+      - name: Collect infinity unit test debug output
+        run: cat unittest_debug.log 2>/dev/null || true
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -83,7 +89,7 @@ jobs:
       - name: Stop infinity pysdk & http_api debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -102,7 +108,7 @@ jobs:
       - name: Stop infinity sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -110,7 +116,6 @@ jobs:
 
       - name: Collect infinity debug output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat debug.log 2>/dev/null || true
 
   release_tests:
@@ -151,7 +156,10 @@ jobs:
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main"
+        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
+      
+      - name: Collect infinity unit test release output
+        run: cat unittest_release.log 2>/dev/null || true
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -178,7 +186,7 @@ jobs:
       - name: Stop infinity pysdk & http_api release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -196,7 +204,7 @@ jobs:
       - name: Stop infinity sqllogictest release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -204,7 +212,6 @@ jobs:
 
       - name: Collect infinity release output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat release.log 2>/dev/null || true
 
       - name: Prepare sift dataset

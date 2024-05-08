@@ -14,9 +14,12 @@
 
 module;
 
+#include <cstdlib>
+
 module infinity_context;
 
 import stl;
+import third_party;
 import logger;
 import config;
 import resource_manager;
@@ -32,11 +35,15 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
     } else {
         // Config
         config_ = MakeUnique<Config>();
-        config_->Init(config_path);
+        auto status = config_->Init(config_path);
+        if(!status.ok()) {
+            fmt::print("Error: {}", *status.msg_);
+            std::exit(static_cast<int>(status.code()));
+        }
 
         Logger::Initialize(config_.get());
 
-        resource_manager_ = MakeUnique<ResourceManager>(config_->worker_cpu_limit(), config_->total_memory_size());
+        resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
         task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 

@@ -117,7 +117,7 @@ TEST_F(TableEntryTest, test2) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn();
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase("db1", ConflictType::kError);
@@ -160,7 +160,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr->BeginTxn();
+        new_txn = txn_mgr->BeginTxn(MakeUnique<String>("insert data"));
 
         // Txn2: Get db1, OK
         auto [table_entry, s2] = new_txn->GetTableByName("db1", "tbl1");
@@ -193,7 +193,7 @@ TEST_F(TableEntryTest, test2) {
         input_block->Finalize();
         EXPECT_EQ(input_block->Finalized(), true);
 
-        Status append_status = new_txn->Append("db1", "tbl1", input_block);
+        Status append_status = new_txn->Append(table_entry, input_block);
         EXPECT_TRUE(append_status.ok());
         // Txn2: Commit, OK
         txn_mgr->CommitTxn(new_txn);
@@ -201,7 +201,7 @@ TEST_F(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr->BeginTxn();
+        new_txn = txn_mgr->BeginTxn(MakeUnique<String>("insert data"));
 
         //        {
         //            // Get column 0 and column 2 from global storage;
@@ -279,7 +279,9 @@ TEST_F(TableEntryTest, test2) {
             input_block->Finalize();
             EXPECT_EQ(input_block->Finalized(), true);
 
-            new_txn->Append("db1", "tbl1", input_block);
+            auto [table_entry, status] = new_txn->GetTableByName("db1", "tbl1");
+            ASSERT_TRUE(status.ok());
+            new_txn->Append(table_entry, input_block);
         }
 
         //        {
@@ -349,60 +351,5 @@ TEST_F(TableEntryTest, test2) {
             // Txn2: Rollback, OK
             txn_mgr->RollBackTxn(new_txn);
         }
-    }
-
-    {
-        // Txn3: Create, OK
-        new_txn = txn_mgr->BeginTxn();
-
-        //        {
-        //            // Get column 0 and column 2 from global storage;
-        //            Vector<ColumnID> column_ids{0, 1, 2};
-        //
-        //            UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
-        //            new_txn->GetMetaTableState(read_table_meta.get(), "db1", "tbl1", column_ids);
-        //            EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
-        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-        //            for (const auto &segment_pair : read_table_meta->segment_map_) {
-        //                EXPECT_EQ(segment_pair.first, 0);
-        //                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-        //                EXPECT_EQ(segment_pair.second.block_map_.size(), 1);
-        //                for (const auto &block_pair : segment_pair.second.block_map_) {
-        //                    //                    EXPECT_EQ(block_pair.first, 0);
-        //                    EXPECT_NE(block_pair.second.block_entry_, nullptr);
-        //
-        //                    EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(0));
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(1));
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(2));
-        //
-        //                    BlockColumnEntry *column0 = block_pair.second.column_data_map_.at(0).block_column_;
-        //                    BlockColumnEntry *column1 = block_pair.second.column_data_map_.at(1).block_column_;
-        //                    BlockColumnEntry *column2 = block_pair.second.column_data_map_.at(2).block_column_;
-        //
-        //                    SizeT row_count = block_pair.second.block_entry_->row_count_;
-        //                    ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_mgr);
-        //                    i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_EQ(col0_ptr[row], (i8)(row));
-        //                    }
-        //
-        //                    ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_mgr);
-        //                    i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_EQ(col1_ptr[row], (i64)(row));
-        //                    }
-        //
-        //                    ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_mgr);
-        //                    f64 *col2_ptr = (f64 *)(col2_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-        //                    }
-        //                }
-        //            }
-        //        }
-
-        // Txn3: Commit, OK
-        txn_mgr->CommitTxn(new_txn);
     }
 }

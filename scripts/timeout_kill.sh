@@ -2,7 +2,7 @@
 
 # Check arguments
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <pid> <duration>"
+    echo "Usage: $0 <pid> <duration_in_seconds>"
     exit 1
 fi
 
@@ -12,14 +12,26 @@ DURATION=$2
 # Send SIGTERM
 kill -15 $PID
 
-# Wait for the specified duration
-sleep $DURATION
+# Start a timer
+start_time=$(date +%s)
+end_time=$((start_time + DURATION))
 
-# Check if the process is still running
-if ps -p $PID > /dev/null; then
-   echo "Process $PID is still running. Sending SIGKILL."
-   kill -9 $PID
-   exit 2  # Return a different value
-else
-   echo "Process $PID has terminated successfully."
-fi
+# Wait and check process status in a loop
+while true; do
+    # Check if the process is still running
+    if ! ps -p $PID > /dev/null; then
+        echo "Process $PID has terminated successfully."
+        exit 0
+    fi
+
+    # Check if the duration has elapsed
+    current_time=$(date +%s)
+    if [ $current_time -ge $end_time ]; then
+        echo "Process $PID did not terminate in time. Sending SIGKILL."
+        kill -9 $PID
+        exit 2  # Return a different value
+    fi
+
+    # Sleep briefly to avoid a tight loop
+    sleep 1
+done

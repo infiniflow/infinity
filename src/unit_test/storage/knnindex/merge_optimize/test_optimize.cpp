@@ -107,7 +107,7 @@ TEST_F(OptimizeKnnTest, test1) {
     auto index_name = std::make_shared<std::string>("idx1");
 
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
         txn_mgr->CommitTxn(txn);
@@ -125,7 +125,7 @@ TEST_F(OptimizeKnnTest, test1) {
         }
         // index_param_list
 
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
@@ -138,7 +138,7 @@ TEST_F(OptimizeKnnTest, test1) {
     }
 
     auto DoAppend = [&]() {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
         Vector<SharedPtr<ColumnVector>> column_vectors;
         for (SizeT i = 0; i < table_def->columns().size(); ++i) {
             SharedPtr<DataType> data_type = table_def->columns()[i]->type();
@@ -155,7 +155,10 @@ TEST_F(OptimizeKnnTest, test1) {
         auto data_block = DataBlock::Make();
         data_block->Init(column_vectors);
 
-        auto status = txn->Append(*db_name, *table_name, data_block);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        ASSERT_TRUE(status.ok());
+
+        status = txn->Append(table_entry, data_block);
         ASSERT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     };
@@ -165,7 +168,7 @@ TEST_F(OptimizeKnnTest, test1) {
             DoAppend();
         }
         {
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
 
             auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
             ASSERT_TRUE(status1.ok());
@@ -182,7 +185,7 @@ TEST_F(OptimizeKnnTest, test1) {
     }
     TxnTimeStamp last_commit_ts = 0;
     {
-        Txn *txn = txn_mgr->BeginTxn();
+        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
@@ -193,7 +196,7 @@ TEST_F(OptimizeKnnTest, test1) {
 
     WaitCleanup(catalog, txn_mgr, last_commit_ts);
     {
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"));
 
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status1.ok());

@@ -199,7 +199,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
 void QueryContext::BeginTxn() {
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn* new_txn = storage_->txn_manager()->BeginTxn();
+        Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr);
         session_ptr_->SetTxn(new_txn);
     }
 }

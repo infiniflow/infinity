@@ -46,7 +46,7 @@ UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
                     // InfinityContext has not been initialized.
                     path = "/var/infinity/resource";
                 } else {
-                    path = config->resource_dict_path();
+                    path = config->ResourcePath();
                 }
                 UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
                 if (!analyzer->Load()) {

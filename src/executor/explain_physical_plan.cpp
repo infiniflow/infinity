@@ -1410,13 +1410,85 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowVar: {
+        case ShowType::kShowSessionVariable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW VARIABLE ";
+                show_str += "-> SHOW SESSION VARIABLE ";
             } else {
-                show_str = "SHOW VARIABLE ";
+                show_str = "SHOW SESSION VARIABLE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowSessionVariables: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW SESSION VARIABLES ";
+            } else {
+                show_str = "SHOW SESSION VARIABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowGlobalVariable: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW GLOBAL VARIABLE ";
+            } else {
+                show_str = "SHOW GLOBAL VARIABLE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowGlobalVariables: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW GLOBAL VARIABLES ";
+            } else {
+                show_str = "SHOW GLOBAL VARIABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowConfig: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW CONFIG ";
+            } else {
+                show_str = "SHOW CONFIG ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());

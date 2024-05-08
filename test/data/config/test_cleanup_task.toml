@@ -1,13 +1,18 @@
 [general]
-version = "0.1.0"
+version = "0.2.0"
 timezone = "utc-8"
+
+[network]
+[log]
 
 [storage]
 # close auto cleanup task
-cleanup_interval = 0
-# close auto compaction
-compaction_interval = 0
+cleanup_interval = "0s"
+# close auto compact
+compact_interval = "0s"
 
+[buffer]
 [wal]
 #short checkpoint interval to allow quick cleanup
-delta_checkpoint_interval_sec = 1
+delta_checkpoint_interval = "1s"
+[resource]

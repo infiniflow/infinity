@@ -89,6 +89,7 @@ export namespace std {
     using std::is_same;
     using std::fill;
     using std::lower_bound;
+    using std::upper_bound;
 
     using std::condition_variable;
     using std::condition_variable_any;

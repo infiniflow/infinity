@@ -55,16 +55,14 @@ bool BlockVersion::operator==(const BlockVersion &rhs) const {
 }
 
 i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
-    if (created_.empty())
-        return 0;
-    i64 idx = created_.size() - 1;
-    for (; idx >= 0; idx--) {
-        if (created_[idx].create_ts_ <= begin_ts)
-            break;
+    // use binary search find the last create_field that has create_ts_ <= check_ts
+    auto iter =
+        std::upper_bound(created_.begin(), created_.end(), begin_ts, [](TxnTimeStamp ts, const CreateField &field) { return ts < field.create_ts_; });
+    if (iter == created_.begin()) {
+        return false;
     }
-    if (idx < 0)
-        return 0;
-    return created_[idx].row_count_;
+    --iter;
+    return iter->row_count_;
 }
 
 void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, FileHandler &file_handler) const {

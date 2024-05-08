@@ -37,8 +37,8 @@ void PGServer::Run() {
 
     initialized_ = true;
 
-    u16 pg_port = InfinityContext::instance().config()->pg_port();
-    const String &pg_listen_addr = InfinityContext::instance().config()->listen_address();
+    u16 pg_port = InfinityContext::instance().config()->PostgresPort();
+    const String &pg_listen_addr = InfinityContext::instance().config()->ServerAddress();
 
     boost::system::error_code error;
     boost::asio::ip::address address = boost::asio::ip::make_address(pg_listen_addr, error);
@@ -51,7 +51,7 @@ void PGServer::Run() {
     acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(io_service_, boost::asio::ip::tcp::endpoint(address, pg_port));
     CreateConnection();
 
-    fmt::print("Run 'psql -h {} -p {}' to connect to the server, only for test.\n", pg_listen_addr, pg_port);
+    fmt::print("Run 'psql -h {} -p {}' to connect to the server (SQL is only for test).\n", pg_listen_addr, pg_port);
 
     io_service_.run();
 }

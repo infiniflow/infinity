@@ -18,7 +18,6 @@ from thrift.transport import TSocket
 from thrift.transport.TTransport import TTransportException
 
 from infinity import URI
-from infinity.infinity import ShowVariable
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.errors import ErrorCode
@@ -27,9 +26,13 @@ from infinity.errors import ErrorCode
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
         self.uri = uri
+        self.transport = None
         self.reconnect()
 
     def reconnect(self):
+        if self.transport is not None:
+            self.transport.close()
+            self.transport = None
         # self.transport = TTransport.TFramedTransport(TSocket.TSocket(self.uri.ip, self.uri.port))  # async
         self.transport = TTransport.TBufferedTransport(
             TSocket.TSocket(self.uri.ip, self.uri.port))  # sync
@@ -126,7 +129,8 @@ class ThriftInfinityClient:
 
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
         retry = 0
-        while retry <= 10:
+        inner_ex = None
+        while retry <= 2:
             try:
                 res = self.client.Insert(InsertRequest(session_id=self.session_id,
                                                        db_name=db_name,
@@ -135,12 +139,14 @@ class ThriftInfinityClient:
                                                        fields=fields))
                 return res
             except TTransportException as ex:
-                if ex.type == ex.END_OF_FILE:
-                    self.reconnect()
-                    retry += 1
-                else:
-                    break
-        return CommonResponse(ErrorCode.TOO_MANY_CONNECTIONS, "retry insert failed")
+                #import traceback
+                #traceback.print_exc()
+                self.reconnect()
+                inner_ex = ex
+                retry += 1
+            except Exception as ex:
+                inner_ex = ex
+        return CommonResponse(ErrorCode.TOO_MANY_CONNECTIONS, "insert failed with exception: " + str(inner_ex))
 
     # Can be used in compact mode
     # def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
@@ -198,13 +204,13 @@ class ThriftInfinityClient:
                                                 update_expr_array=update_expr_array))
 
     def disconnect(self):
-        res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
+        res = None
+        try:
+            res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
+        except Exception:
+            pass
         self.transport.close()
         return res
-
-    def show_variable(self, variable: ShowVariable):
-        return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,
-                                                            variable_name=str(variable.value)))
 
     def show_tables(self, db_name: str):
         return self.client.ShowTables(ShowTablesRequest(session_id=self.session_id, db_name=db_name))

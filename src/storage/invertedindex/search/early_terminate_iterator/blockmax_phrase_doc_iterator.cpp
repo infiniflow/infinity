@@ -142,7 +142,28 @@ Tuple<bool, float, RowID> BlockMaxPhraseDocIterator::SeekInBlockRange(RowID doc_
     return {false, 0.0F, INVALID_ROWID};
 }
 
+Pair<bool, RowID> BlockMaxPhraseDocIterator::SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+    const RowID block_last = BlockLastDocID();
+    const RowID seek_end = std::min(doc_id_no_beyond, block_last);
+    if (doc_id > seek_end) {
+        return {false, INVALID_ROWID};
+    }
+    SeekDoc(doc_id, seek_end);
+    doc_id = doc_id_;
+    if (doc_id > seek_end) {
+        return {false, INVALID_ROWID};
+    }
+    PhraseColumnMatchData phrase_match_data;
+    if (GetPhraseMatchData(phrase_match_data, doc_id)) {
+        current_phrase_freq_ = phrase_match_data.tf_;
+        return {true, doc_id};
+    }
+    return {false, INVALID_ROWID};
+}
+
 Pair<bool, RowID> BlockMaxPhraseDocIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
+    return TermPeekInBlockRange(0, doc_id, doc_id_no_beyond);
+    /*
     const RowID seek_end = doc_id_no_beyond;
     while (doc_id <= seek_end) {
         SeekDoc(doc_id, seek_end);
@@ -159,6 +180,7 @@ Pair<bool, RowID> BlockMaxPhraseDocIterator::PeekInBlockRange(RowID doc_id, RowI
         ++doc_id;
     }
     return {false, INVALID_ROWID};
+    */
 }
 
 bool BlockMaxPhraseDocIterator::NotPartCheckExist(RowID doc_id) {

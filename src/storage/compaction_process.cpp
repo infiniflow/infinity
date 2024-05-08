@@ -51,9 +51,9 @@ void CompactionProcessor::Stop() {
 void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
 Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
-    auto generate_txn = [this]() { return txn_mgr_->BeginTxn(); };
+    auto generate_txn = [this]() { return txn_mgr_->BeginTxn(MakeUnique<String>("Compact")); };
 
-    Txn *scan_txn = txn_mgr_->BeginTxn();
+    Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
 
     Vector<UniquePtr<CompactSegmentsTask>> compaction_tasks;
     TransactionID txn_id = scan_txn->TxnID();
@@ -80,7 +80,7 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
 }
 
 void CompactionProcessor::ScanAndOptimize() {
-    Txn *opt_txn = txn_mgr_->BeginTxn();
+    Txn *opt_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"));
     TransactionID txn_id = opt_txn->TxnID();
     TxnTimeStamp begin_ts = opt_txn->BeginTS();
 
@@ -112,20 +112,20 @@ void CompactionProcessor::Process() {
                 case BGTaskType::kNotifyCompact: {
                     Vector<UniquePtr<CompactSegmentsTask>> compact_tasks = this->ScanForCompact();
                     for (auto &compact_task : compact_tasks) {
-                        LOG_INFO(fmt::format("Compact {} start.", compact_task->table_name()));
+                        LOG_TRACE(fmt::format("Compact {} start.", compact_task->table_name()));
                         compact_task->Execute();
                         if (compact_task->TryCommitTxn()) {
-                            LOG_INFO(fmt::format("Compact {} done.", compact_task->table_name()));
+                            LOG_TRACE(fmt::format("Compact {} done.", compact_task->table_name()));
                         } else {
-                            LOG_INFO(fmt::format("Compact {} rollback.", compact_task->table_name()));
+                            LOG_TRACE(fmt::format("Compact {} rollback.", compact_task->table_name()));
                         }
                     }
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
-                    LOG_INFO("Optimize start.");
+                    LOG_TRACE("Optimize start.");
                     ScanAndOptimize();
-                    LOG_INFO("Optimize done.");
+                    LOG_TRACE("Optimize done.");
                     break;
                 }
                 default: {

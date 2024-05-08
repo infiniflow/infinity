@@ -1,17 +1,17 @@
 [project]
 name = "infinity_sdk"
-version = "0.1.0-dev22"
+version = "0.2.0.dev1"
 dependencies = [
-    "sqlglot==11.7.1",
-    "pydantic",
-    "thrift",
-    "setuptools",
-    "pytest",
-    "pandas",
-    "numpy",
-    "pyarrow",
-    "openpyxl",
-    "polars"
+    "sqlglot~=11.7.1",
+    "pydantic~=2.7.1",
+    "thrift~=0.20.0",
+    "setuptools~=69.5.1",
+    "pytest~=8.2.0",
+    "pandas~=2.2.2",
+    "numpy~=1.26.4",
+    "pyarrow~=16.0.0",
+    "polars~=0.20.23",
+    "openpyxl~=3.1.2"
 ]
 description = "infinity"
 readme = "README.md"

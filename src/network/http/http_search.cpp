@@ -51,6 +51,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         }
 
         Vector<ParsedExpr *> *output_columns{nullptr};
+        Vector<ParsedExpr *> *search_exprs{nullptr};
         ParsedExpr *filter{nullptr};
         FusionExpr *fusion_expr{nullptr};
         KnnExpr *knn_expr{nullptr};
@@ -85,8 +86,17 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 delete search_expr;
                 search_expr = nullptr;
             }
+            if (search_exprs != nullptr) {
+                for (auto &expr : *search_exprs) {
+                    delete expr;
+                    expr = nullptr;
+                }
+                delete search_exprs;
+                search_exprs = nullptr;
+            }
         });
 
+        search_exprs = new Vector<ParsedExpr *>();
         for (const auto &elem : input_json.items()) {
             String key = elem.key();
             ToLower(key);
@@ -147,18 +157,18 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                             return;
                         }
                         knn_expr = ParseKnn(knn_json, http_status, response);
-                        if(knn_expr == nullptr) {
-                            return ;
+                        if (knn_expr == nullptr) {
+                            return;
                         }
-                        search_expr->AddExpr(knn_expr);
+                        search_exprs->push_back(knn_expr);
                         knn_expr = nullptr;
                     } else if (IsEqual(key, "match")) {
                         auto &match_json = expression.value();
                         match_expr = ParseMatch(match_json, http_status, response);
-                        if(match_expr == nullptr) {
-                            return ;
+                        if (match_expr == nullptr) {
+                            return;
                         }
-                        search_expr->AddExpr(match_expr);
+                        search_exprs->push_back(match_expr);
                         match_expr = nullptr;
                     } else if (IsEqual(key, "method")) {
                         if (fusion_expr != nullptr && !fusion_expr->method_.empty()) {
@@ -168,7 +178,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                         }
                         fusion_expr = new FusionExpr();
                         fusion_expr->method_ = expression.value();
-                        search_expr->AddExpr(fusion_expr);
+                        search_exprs->push_back(fusion_expr);
                         fusion_expr = nullptr;
                     } else {
                         response["error_code"] = ErrorCode::kInvalidExpression;
@@ -176,7 +186,6 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                         return;
                     }
                 }
-                search_expr->Validate();
             } else if (IsEqual(key, "knn")) {
                 search_expr = new SearchExpr();
                 if (fusion_expr != nullptr or knn_expr != nullptr or match_expr != nullptr) {
@@ -192,10 +201,10 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     return;
                 }
                 knn_expr = ParseKnn(knn_json, http_status, response);
-                if(knn_expr == nullptr) {
-                    return ;
+                if (knn_expr == nullptr) {
+                    return;
                 }
-                search_expr->AddExpr(knn_expr);
+                search_exprs->push_back(knn_expr);
                 knn_expr = nullptr;
             } else if (IsEqual(key, "match")) {
                 if (fusion_expr != nullptr or knn_expr != nullptr or match_expr != nullptr) {
@@ -206,16 +215,21 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 }
                 auto &match_json = elem.value();
                 match_expr = ParseMatch(match_json, http_status, response);
-                if(match_expr == nullptr) {
-                    return ;
+                if (match_expr == nullptr) {
+                    return;
                 }
-                search_expr->AddExpr(match_expr);
+                search_exprs->push_back(match_expr);
                 match_expr = nullptr;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Unknown expression: " + key;
                 return;
             }
+        }
+
+        if (search_exprs != nullptr && !search_exprs->empty()) {
+            search_expr->SetExprs(search_exprs);
+            search_exprs = nullptr;
         }
 
         const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
@@ -335,7 +349,7 @@ KnnExpr *HTTPSearch::ParseKnn(nlohmann::json &knn_json_object, HTTPStatus &http_
         ToLower(key);
         if (IsEqual(key, "fields")) {
             ColumnExpr *column_expr = new ColumnExpr();
-            const auto& fields_value = field_json_obj.value();
+            const auto &fields_value = field_json_obj.value();
             SizeT fields_count = fields_value.size();
             for (SizeT i = 0; i < fields_count; i++) {
                 column_expr->names_.emplace_back(fields_value[i]);
@@ -358,7 +372,7 @@ KnnExpr *HTTPSearch::ParseKnn(nlohmann::json &knn_json_object, HTTPStatus &http_
         } else if (IsEqual(key, "element_type")) {
             ;
         } else if (IsEqual(key, "top_k")) {
-            if(field_json_obj.value().is_number_unsigned()) {
+            if (field_json_obj.value().is_number_unsigned()) {
                 knn_expr->topn_ = field_json_obj.value();
             } else {
                 response["error_code"] = ErrorCode::kInvalidTopKType;

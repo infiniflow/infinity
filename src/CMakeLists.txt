@@ -16,16 +16,26 @@ add_subdirectory(parser)
 # add_definitions(-msse4.2 -mfma)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
-execute_process(COMMAND grep -q avx2 /proc/cpuinfo  
-                RESULT_VARIABLE SUPPORT_AVX2  
-                OUTPUT_QUIET  
-                ERROR_QUIET)  
+execute_process(COMMAND grep -q fma /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
-execute_process(COMMAND grep -q avx512 /proc/cpuinfo  
-RESULT_VARIABLE SUPPORT_AVX512  
-OUTPUT_QUIET  
-ERROR_QUIET)  
-  
+execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2  
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
 
 file(GLOB_RECURSE
         main_cpp
@@ -209,6 +219,14 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
+
+if (NOT SUPPORT_FMA EQUAL 0)
+        message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
+endif()
+
+if (NOT SUPPORT_SSE42 EQUAL 0)
+        message(FATAL_ERROR "This project requires the processor support sse4_2 instructions.")
+endif()
 
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
         message("Compiled by AVX2 or AVX512")

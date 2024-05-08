@@ -36,15 +36,15 @@ module;
 
 #include "magic_enum.hpp"
 
-#include "concurrentqueue.h"
 #include "blockingconcurrentqueue.h"
+#include "concurrentqueue.h"
 
 #include "parallel_hashmap/phmap.h"
 #include "pgm/pgm_index.hpp"
 
-#include "oatpp/web/server/HttpConnectionHandler.hpp"
 #include "oatpp/network/Server.hpp"
 #include "oatpp/network/tcp/server/ConnectionProvider.hpp"
+#include "oatpp/web/server/HttpConnectionHandler.hpp"
 
 #pragma clang diagnostic pop
 
@@ -52,24 +52,25 @@ export module third_party;
 
 namespace fmt {
 
-    export using fmt::format;
-    export using fmt::print;
-}
+export using fmt::format;
+export using fmt::print;
+
+} // namespace fmt
 
 namespace spdlog {
-    export using spdlog::shutdown;
-    export using spdlog::logger;
-    export using spdlog::sink_ptr;
+export using spdlog::shutdown;
+export using spdlog::logger;
+export using spdlog::sink_ptr;
 
-    namespace sinks {
-        export using spdlog::sinks::stdout_color_sink_mt;
-        export using spdlog::sinks::rotating_file_sink_mt;
-    }
+namespace sinks {
+export using spdlog::sinks::stdout_color_sink_mt;
+export using spdlog::sinks::rotating_file_sink_mt;
+} // namespace sinks
 
-    namespace details {
-        export using spdlog::details::registry;
-    }
+namespace details {
+export using spdlog::details::registry;
 }
+} // namespace spdlog
 
 namespace CLI {
 export using CLI::App;
@@ -91,33 +92,36 @@ export using CLI::ignore_case;
 } // namespace CLI
 
 namespace toml {
-    // Toml parser
-    export using toml::table;
-    export using toml::parse_file;
-}
+// Toml parser
+export using toml::table;
+export using toml::parse_file;
+} // namespace toml
 
 namespace nlohmann {
-    export using nlohmann::json;
+export using nlohmann::json;
 }
 
 namespace magic_enum {
-    export using magic_enum::underlying_type_t;
+export using magic_enum::underlying_type_t;
 }
 
 namespace moodycamel {
-    export using moodycamel::ConcurrentQueue;
+export using moodycamel::ConcurrentQueue;
 }
 
 namespace infinity {
 
 // spdlog
-export enum class LogLevel { kTrace, kInfo, kWarning, kError, kFatal };
+export enum class LogLevel { kTrace, kDebug, kInfo, kWarning, kError, kCritical };
 
 export std::string LogLevel2Str(LogLevel log_level) {
     switch (log_level) {
 
         case LogLevel::kTrace: {
             return "Trace";
+        }
+        case LogLevel::kDebug: {
+            return "Debug";
         }
         case LogLevel::kInfo: {
             return "Info";
@@ -128,8 +132,8 @@ export std::string LogLevel2Str(LogLevel log_level) {
         case LogLevel::kError: {
             return "Error";
         }
-        case LogLevel::kFatal: {
-            return "Fatal";
+        case LogLevel::kCritical: {
+            return "Critical";
         }
     }
 }
@@ -138,13 +142,15 @@ export void SetLogLevel(LogLevel log_level) {
     switch (log_level) {
         case LogLevel::kTrace:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::trace);
+        case LogLevel::kDebug:
+            return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::debug);
         case LogLevel::kInfo:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::info);
         case LogLevel::kWarning:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::warn);
         case LogLevel::kError:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::err);
-        case LogLevel::kFatal:
+        case LogLevel::kCritical:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::critical);
     }
 }
@@ -172,7 +178,6 @@ using FlatHashSet = phmap::flat_hash_set<T, Hash, Eq, Alloc>;
 
 export template <typename K, size_t Epsilon = 64, size_t EpsilonRecursive = 4, typename Floating = float>
 using PGMIndex = pgm::PGMIndex<K, Epsilon, EpsilonRecursive, Floating>;
-
 
 // Http
 export using HttpRequestHandler = oatpp::web::server::HttpRequestHandler;

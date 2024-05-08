@@ -80,6 +80,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, S
                                                                      table_entry->ColumnCount(),
                                                                      SegmentStatus::kUnsealed);
     segment_entry->begin_ts_ = txn->BeginTS();
+    segment_entry->txn_id_ = txn->TxnID();
     return segment_entry;
 }
 
@@ -206,14 +207,30 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
     return false;
 }
 
-bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const {
+bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts, bool check_append) const {
     // FIXME: get the block_capacity from config?
     u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
     BlockID block_id = segment_offset / block_capacity;
     BlockOffset block_offset = segment_offset % block_capacity;
 
     auto *block_entry = GetBlockEntryByID(block_id).get();
-    return block_entry->CheckRowVisible(block_offset, check_ts);
+    if (block_entry == nullptr || block_entry->commit_ts_ > check_ts) {
+        return false;
+    }
+    return block_entry->CheckRowVisible(block_offset, check_ts, check_append);
+}
+
+bool SegmentEntry::CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, Txn *txn) const {
+    for (auto &[block_id, block_offsets] : block_offsets_map) {
+        auto *block_entry = GetBlockEntryByID(block_id).get();
+        if (block_entry == nullptr) {
+            return false;
+        }
+        if (!block_entry->CheckDeleteVisible(block_offsets, txn->BeginTS())) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
@@ -238,6 +255,21 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
     std::unique_lock lock(this->rw_locker_);
     IncreaseRowCount(block_entry->row_count());
     block_entries_.emplace_back(std::move(block_entry));
+}
+
+SizeT SegmentEntry::row_count(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    if (status_ == SegmentStatus::kDeprecated && check_ts > deprecate_ts_) {
+        return 0;
+    }
+    if (status_ == SegmentStatus::kSealed) {
+        return row_count_; // FIXME
+    }
+    SizeT row_count = 0;
+    for (const auto &block_entry : block_entries_) {
+        row_count += block_entry->row_count(check_ts);
+    }
+    return row_count;
 }
 
 // One writer
@@ -313,11 +345,12 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
 }
 
 // One writer
-void SegmentEntry::DeleteData(TransactionID txn_id,
-                              TxnTimeStamp commit_ts,
-                              const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
-                              Txn *txn) {
+SizeT SegmentEntry::DeleteData(TransactionID txn_id,
+                               TxnTimeStamp commit_ts,
+                               const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
+                               Txn *txn) {
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
+    SizeT delete_row_n = 0;
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         BlockEntry *block_entry = nullptr;
@@ -326,13 +359,13 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
             block_entry = block_entries_.at(block_id).get();
         }
 
-        block_entry->DeleteData(txn_id, commit_ts, delete_rows);
+        delete_row_n += block_entry->DeleteData(txn_id, commit_ts, delete_rows);
         txn_store->AddBlockStore(this, block_entry);
         if (delete_rows.size() > block_entry->row_capacity()) {
             UnrecoverableError("Delete rows exceed block capacity");
         }
-        this->DecreaseRemainRow(delete_rows.size());
     }
+    this->DecreaseRemainRow(delete_row_n);
     {
         std::unique_lock w_lock(rw_locker_);
         if (this->first_delete_ts_ == UNCOMMIT_TS) {
@@ -361,6 +394,7 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
             }
         }
     }
+    return delete_row_n;
 }
 
 void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {

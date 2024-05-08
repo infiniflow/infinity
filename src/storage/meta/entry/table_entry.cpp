@@ -425,11 +425,9 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
+        SizeT delete_row_n = segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
 
-        for (const auto &[_, block_row_offsets] : block_row_hashmap) {
-            row_count += block_row_offsets.size();
-        }
+        row_count += delete_row_n;
     }
     this->row_count_ -= row_count;
     return Status::OK();
@@ -504,12 +502,12 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     switch (compact_store.task_type_) {
         case CompactSegmentsTaskType::kCompactPickedSegments: {
             compaction_alg_->CommitCompact(txn_id);
-            LOG_INFO(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
+            LOG_TRACE(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
             break;
         }
         case CompactSegmentsTaskType::kCompactTable: {
             //  reinitialize compaction_alg_ with new segments and enable it
-            LOG_INFO(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
+            LOG_TRACE(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
             compaction_alg_->Enable({});
             break;
         }
@@ -666,7 +664,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
         segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
-        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->memindex_capacity()) {
+        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->MemIndexCapacity()) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
             if (chunk_index_entry.get() != nullptr) {
                 chunk_index_entry->Commit(txn->CommitTS());
@@ -867,6 +865,19 @@ SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTime
     return segment;
 }
 
+SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID seg_id, Txn *txn) const {
+    std::shared_lock lock(this->rw_locker_);
+    auto iter = segment_map_.find(seg_id);
+    if (iter == segment_map_.end()) {
+        return nullptr;
+    }
+    const auto &segment = iter->second;
+    if (segment->commit_ts_ > txn->BeginTS() && segment->txn_id_ != txn->TxnID()) {
+        return nullptr;
+    }
+    return segment;
+}
+
 Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     auto iter = this->segment_map_.find(seg_id);
     if (iter != this->segment_map_.end()) {
@@ -901,6 +912,19 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     }
 
     return result;
+}
+
+bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
+    for (auto &[segment_id, block_offsets_map] : delete_state.rows_) {
+        auto *segment_entry = GetSegmentByID(segment_id, txn).get();
+        if (segment_entry == nullptr) {
+            return false;
+        }
+        if (!segment_entry->CheckDeleteVisible(block_offsets_map, txn)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool TableEntry::CheckVisible(SegmentID segment_id, TxnTimeStamp begin_ts) const {

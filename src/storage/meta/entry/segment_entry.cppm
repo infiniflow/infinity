@@ -105,7 +105,9 @@ public:
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
-    bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
+    bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts, bool check_append) const;
+
+    bool CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, Txn *txn) const;
 
     bool CheckVisible(TxnTimeStamp check_ts) const;
 
@@ -173,9 +175,11 @@ public:
     SharedPtr<BlockEntry> GetBlockEntryByID(BlockID block_id) const;
 
 public:
+    SizeT row_count(TxnTimeStamp check_ts) const;
+
     u64 AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
+    SizeT DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
     void CommitFlushed(TxnTimeStamp commit_ts);
 

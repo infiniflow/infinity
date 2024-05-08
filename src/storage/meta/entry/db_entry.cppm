@@ -95,8 +95,6 @@ public:
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    bool CheckConflict(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *&table_entry);
-
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);

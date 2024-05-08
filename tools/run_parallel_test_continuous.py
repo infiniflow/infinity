@@ -12,6 +12,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("python test path is {}".format(python_test_dir))
     # run test
     print(f"start pysdk test with {pytest_mark}")
+    i = 0
     begin_time = time.time()
     while time.time() - begin_time < 8 * 3600: 
         process = subprocess.Popen(
@@ -24,7 +25,8 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
         process.wait()
         if process.returncode != 0:
             raise Exception(f"An error occurred: {process.stderr}")
-        print(f"{i} complete")
+        print(f"iteration {i} complete")
+        i += 1
         directory = "/var/infinity"
         folder_size = shutil.disk_usage(directory)
         print(f"{directory} size: {folder_size.used / (1024 * 1024)} MB")

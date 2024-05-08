@@ -111,14 +111,6 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name
     return table_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-bool DBEntry::CheckConflict(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *&table_entry) {
-    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
-    if (!status.ok()) {
-        UnrecoverableError("Check conflict if not for non-exist table meta");
-    }
-    return table_meta->CheckConflict(std::move(r_lock), txn_id, begin_ts, table_entry);
-}
-
 Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     LOG_TRACE(fmt::format("Get a table entry {}", table_name));
     auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);

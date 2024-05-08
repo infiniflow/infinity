@@ -48,7 +48,7 @@ class CompactTaskTest : public BaseTest {
 protected:
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"));
 
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
@@ -107,7 +107,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
         }
         { // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -118,7 +118,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
         { // add compact
-            auto txn4 = txn_mgr->BeginTxn();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
             auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -131,7 +131,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
         }
 
         {
-            auto txn5 = txn_mgr->BeginTxn();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
             auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -184,7 +184,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
         }
         { // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -197,7 +197,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
         { // add compact
-            auto txn4 = txn_mgr->BeginTxn();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
             auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -209,7 +209,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto txn5 = txn_mgr->BeginTxn();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
             auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -265,7 +265,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
         }
         { // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -279,7 +279,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
 
         SizeT delete_n = 0;
         {
-            auto txn3 = txn_mgr->BeginTxn();
+            auto txn3 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
             Vector<RowID> delete_row_ids;
             for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -295,13 +295,16 @@ TEST_F(CompactTaskTest, compact_with_delete) {
                 }
                 delete_n += offsets.size();
             }
-            txn3->Delete("default_db", table_name, delete_row_ids);
+
+            auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            EXPECT_TRUE(status.ok());
+            txn3->Delete(table_entry, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
 
         { // add compact
-            auto txn4 = txn_mgr->BeginTxn();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
             auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -313,7 +316,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto txn5 = txn_mgr->BeginTxn();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
             auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -365,7 +368,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
         }
         { // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -379,7 +382,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 
         int delete_n = 0;
         {
-            auto txn3 = txn_mgr->BeginTxn();
+            auto txn3 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
             Vector<RowID> delete_row_ids;
             for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -395,24 +398,27 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                 }
                 delete_n += offsets.size();
             }
-            txn3->Delete("default_db", table_name, delete_row_ids);
+
+            auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            EXPECT_TRUE(status.ok());
+            txn3->Delete(table_entry, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
 
         { // add compact
-            auto txn4 = txn_mgr->BeginTxn();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
             auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-                CompactSegmentsTaskState state(table_entry);
+                CompactSegmentsTaskState state;
                 compact_task->CompactSegments(state);
 
                 {
-                    auto txn5 = txn_mgr->BeginTxn();
+                    auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
                     Vector<RowID> delete_row_ids;
                     for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -429,7 +435,9 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                         delete_n += offsets.size();
                     }
 
-                    txn5->Delete("default_db", table_name, delete_row_ids);
+                    auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
+                    EXPECT_TRUE(status.ok());
+                    txn5->Delete(table_entry, delete_row_ids);
                     txn_mgr->CommitTxn(txn5);
                 }
 
@@ -440,7 +448,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto txn5 = txn_mgr->BeginTxn();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
             auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -494,7 +502,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
         }
         { // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -508,7 +516,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
         SizeT delete_n = 0;
         {
-            auto txn3 = txn_mgr->BeginTxn();
+            auto txn3 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
             Vector<RowID> delete_row_ids;
             for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -524,13 +532,15 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 }
                 delete_n += offsets.size();
             }
-            txn3->Delete("default_db", table_name, delete_row_ids);
+            auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            EXPECT_TRUE(status.ok());
+            txn3->Delete(table_entry, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
 
         { // add compact
-            auto compact_txn = txn_mgr->BeginTxn();
+            auto compact_txn = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
             auto [table_entry, status] = compact_txn->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
@@ -539,7 +549,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             {
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
 
-                CompactSegmentsTaskState state(table_entry);
+                CompactSegmentsTaskState state;
                 compact_task->CompactSegments(state);
 
                 Vector<RowID> delete_row_ids;
@@ -569,12 +579,17 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     delete_row_n2 += offsets2.size();
                 }
 
-                auto delete_txn2 = txn_mgr->BeginTxn();
-                delete_txn2->Delete("default_db", table_name, delete_row_ids2);
+                auto delete_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
+                auto [table_entry, status] = delete_txn2->GetTableByName("default_db", table_name);
+                EXPECT_TRUE(status.ok());
+                delete_txn2->Delete(table_entry, delete_row_ids2);
                 {
-                    auto delete_txn1 = txn_mgr->BeginTxn();
+                    auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
-                    delete_txn1->Delete("default_db", table_name, delete_row_ids);
+                    auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
+                    EXPECT_TRUE(status.ok());
+
+                    delete_txn1->Delete(table_entry, delete_row_ids);
                     txn_mgr->CommitTxn(delete_txn1);
 
                     delete_n += delete_row_n1;
@@ -593,9 +608,11 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
             txn_mgr->CommitTxn(compact_txn);
             {
-                auto txn5 = txn_mgr->BeginTxn();
+                auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
                 try {
-                    txn5->Delete("default_db", table_name, delete_row_ids2);
+                    auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
+                    EXPECT_TRUE(status.ok());
+                    txn5->Delete(table_entry, delete_row_ids2);
                     ASSERT_EQ(0, 1);
                 } catch (const RecoverableException &e) {
                     EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
@@ -604,7 +621,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
 
             {
-                auto txn5 = txn_mgr->BeginTxn();
+                auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
                 TxnTimeStamp begin_ts = txn5->BeginTS();
                 auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
                 EXPECT_NE(table_entry, nullptr);
@@ -643,6 +660,17 @@ TEST_F(CompactTaskTest, compact_not_exist_table) {
     BufferManager *buffer_mgr = storage->buffer_manager();
     TxnManager *txn_mgr = storage->txn_manager();
 
+    auto ExpectRollback = [&](Txn *txn) {
+        try {
+            txn_mgr->CommitTxn(txn);
+            FAIL();
+        } catch (const RecoverableException &e) {
+            EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnConflict);
+        } catch (...) {
+            FAIL();
+        }
+    };
+
     String table_name = "tb1";
     SharedPtr<TableDef> tbl1_def = nullptr;
     {
@@ -655,7 +683,7 @@ TEST_F(CompactTaskTest, compact_not_exist_table) {
     }
     {
         // create table
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
         Status status = txn->CreateTable("default_db", tbl1_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -667,31 +695,29 @@ TEST_F(CompactTaskTest, compact_not_exist_table) {
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_mgr);
     }
     {
-        auto txn = txn_mgr->BeginTxn();
-        auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
+        auto *compact_txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto [table_entry, status] = compact_txn->GetTableByName("default_db", table_name);
         ASSERT_TRUE(status.ok());
-        txn_mgr->CommitTxn(txn);
 
         { // drop tb1
-            auto drop_txn = txn_mgr->BeginTxn();
+            auto drop_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
             auto status = drop_txn->DropTableCollectionByName("default_db", table_name, ConflictType::kError);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(drop_txn);
         }
 
-        auto compact_txn = txn_mgr->BeginTxn();
         auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
 
-        bool res = compact_task->Execute();
-        ASSERT_FALSE(res);
-        txn_mgr->CommitTxn(compact_txn);
+        compact_task->Execute();
+
+        ExpectRollback(compact_txn);
     }
 
     //------------------------------------------
 
     {
         // create table
-        auto *txn = txn_mgr->BeginTxn();
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
         Status status = txn->CreateTable("default_db", tbl1_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -703,30 +729,28 @@ TEST_F(CompactTaskTest, compact_not_exist_table) {
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_mgr);
     }
     {
-        auto txn = txn_mgr->BeginTxn();
-        auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
+        auto *compact_txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto [table_entry, status] = compact_txn->GetTableByName("default_db", table_name);
         ASSERT_TRUE(status.ok());
-        txn_mgr->CommitTxn(txn);
 
         { // drop tb1
-            auto drop_txn = txn_mgr->BeginTxn();
+            auto drop_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
             auto status = drop_txn->DropTableCollectionByName("default_db", table_name, ConflictType::kError);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(drop_txn);
         }
         { // create table with same name
-            auto *txn = txn_mgr->BeginTxn();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
             Status status = txn->CreateTable("default_db", tbl1_def, ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
         }
-        auto compact_txn = txn_mgr->BeginTxn();
         auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
-        bool res = compact_task->Execute();
-        ASSERT_FALSE(res);
-        txn_mgr->CommitTxn(compact_txn);
+        compact_task->Execute();
+
+        ExpectRollback(compact_txn);
     }
 
     infinity::InfinityContext::instance().UnInit();

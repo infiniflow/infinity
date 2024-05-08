@@ -197,6 +197,8 @@ public:
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
+    SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, Txn *txn) const;
+
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
     inline SharedPtr<ColumnDef> GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)]; }
@@ -238,6 +240,8 @@ public:
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
         return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
+
+    bool CheckDeleteVisible(DeleteState &delete_state, Txn *txn);
 
     bool CheckVisible(SegmentID segment_id, TxnTimeStamp check_ts) const;
 

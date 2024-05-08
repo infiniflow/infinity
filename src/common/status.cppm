@@ -34,6 +34,7 @@ export enum class ErrorCode : long {
     kInvalidByteSize = 1005,
     kInvalidIPAddr = 1006,
     kInvalidLogLevel = 1007,
+    kInvalidConfig = 1008,
 
     // 2. Auth error
     kWrongPasswd = 2001,
@@ -173,6 +174,7 @@ public:
     static Status InvalidByteSize(const String &byte_size);
     static Status InvalidIPAddr(const String &ip_addr);
     static Status InvalidLogLevel(const String &log_level);
+    static Status InvalidConfig(const String &detailed_info);
 
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);

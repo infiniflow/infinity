@@ -39,11 +39,11 @@ struct Worker {
 
 export class TaskScheduler {
 public:
-    explicit TaskScheduler(const Config *config_ptr);
+    explicit TaskScheduler(Config *config_ptr);
 
     ~TaskScheduler() = default;
 
-    void Init(const Config *config_ptr);
+    void Init(Config *config_ptr);
 
     void UnInit();
 

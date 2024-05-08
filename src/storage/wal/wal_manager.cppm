@@ -33,7 +33,7 @@ class SegmentEntry;
 
 export class WalManager {
 public:
-    WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOption flush_option);
+    WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
 
     ~WalManager();
 
@@ -116,7 +116,7 @@ private:
     std::ofstream ofs_{};
     TxnTimeStamp max_commit_ts_{};
     i64 wal_size_{};
-    FlushOption flush_option_{FlushOption::kOnlyWrite};
+    FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
 
     // Flush and Checkpoint threads access following members
     mutable std::mutex mutex2_{};

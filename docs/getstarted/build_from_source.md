@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-slug: /
+slug: /build_from_source
 ---
 
 # Build from Source
@@ -28,7 +28,7 @@ The `CMAKE_BUILD_TYPE` (cmake build type) can be one of:
 
 - `Debug`: no inline, with symbol info, with address sanitize, normally ~10x slower than `RelWithDebInfo` and `Release`. This aims daily development.
 - `RelWithDebInfo`: optimize with `-O2`, with symbol info. This aims performance analysis.
-- `Release`: optimize with `-O3`, without symbol info. The built one executables are much smaller than `RelWithDebInfo`. This aims [project releases](https://github.com/infiniflow/infinity/releases).
+- `Release`: optimize with `-O3`, without symbol info. The executables built out are much smaller than `RelWithDebInfo`. This aims [project releases](https://github.com/infiniflow/infinity/releases).
 
 Following procedures use `Debug`. Change it as you need.
 
@@ -45,10 +45,10 @@ git clone https://github.com/infiniflow/infinity.git
 ### Step2 Build the source code using Docker
 
 ```shell
-cd infinity && mkdir build
+cd infinity && mkdir cmake-build-debug
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu2310
-docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
+docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
+docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
 ```
 
 ### Step3 Start up the Infinity server

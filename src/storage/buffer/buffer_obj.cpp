@@ -61,7 +61,8 @@ BufferHandle BufferObj::Load() {
             if (type_ == BufferType::kEphemeral) {
                 UnrecoverableError("Invalid state.");
             }
-            file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
+            bool from_spill = type_ != BufferType::kPersistent;
+            file_worker_->ReadFromFile(from_spill);
             break;
         }
         case BufferStatus::kNew: {

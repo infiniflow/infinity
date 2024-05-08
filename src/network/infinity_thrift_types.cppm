@@ -33,7 +33,6 @@ export using infinity_thrift_rpc::ImportRequest;
 export using infinity_thrift_rpc::SelectRequest;
 export using infinity_thrift_rpc::SelectResponse;
 export using infinity_thrift_rpc::ExplainRequest;
-export using infinity_thrift_rpc::ShowVariableRequest;
 export using infinity_thrift_rpc::DeleteRequest;
 export using infinity_thrift_rpc::UpdateRequest;
 export using infinity_thrift_rpc::ListDatabaseRequest;

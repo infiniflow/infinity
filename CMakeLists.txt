@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.1.0)
+project(infinity VERSION 0.2.0)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -120,7 +120,7 @@ if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GR
 endif ()
 
 execute_process(
-        COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y $(realpath /boot/config-$(uname -r)) 2>/dev/null"
+        COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"
         OUTPUT_VARIABLE HAVE_EFFICIENT_UNALIGNED_ACCESS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 if("${HAVE_EFFICIENT_UNALIGNED_ACCESS}" STREQUAL "CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y")
@@ -156,7 +156,7 @@ add_subdirectory(client)
 
 # CPack settings
 set(CPACK_PACKAGE_NAME "infinity")
-set(CPACK_PACKAGE_VERSION "0.1.0-dev")
+set(CPACK_PACKAGE_VERSION "0.2.0-dev")
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM applications, offering incredibly fast vector and full-text search.")

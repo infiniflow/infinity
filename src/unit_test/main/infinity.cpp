@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "statement/command_statement.h"
 #include "unit_test/base_test.h"
 
 import stl;
@@ -255,28 +256,28 @@ TEST_F(InfinityTest, test2) {
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
 
     {
-        QueryResult result = infinity->ShowVariable("version");
+        QueryResult result = infinity->ShowVariable("version", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("session_count");
+        QueryResult result = infinity->ShowVariable("session_count", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("query_count");
+        QueryResult result = infinity->ShowVariable("query_count", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("buffer_pool_usage");
+        QueryResult result = infinity->ShowVariable("buffer_manager_usage", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("error");
-        EXPECT_EQ(result.IsOk(), false);
+        QueryResult result = infinity->ShowVariable("error", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
     }
 
     infinity->LocalDisconnect();

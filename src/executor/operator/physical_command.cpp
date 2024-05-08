@@ -54,7 +54,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 if (set_command->value_type() != SetVarType::kBool) {
                     RecoverableError(Status::DataTypeMismatch("Boolean", set_command->value_type_str()));
                 }
-                query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
+                query_context->current_session()->SessionVariables()->enable_profile_ = set_command->value_bool();
                 return true;
             }
 
@@ -62,7 +62,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 if (set_command->value_type() != SetVarType::kInteger) {
                     RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
                 }
-                query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
+                query_context->current_session()->SessionVariables()->profile_record_capacity_ = set_command->value_int();
                 return true;
             }
 
@@ -77,6 +77,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
                 if (set_command->value_str() == "trace") {
                     SetLogLevel(LogLevel::kTrace);
+                    return true;
+                }
+
+                if (set_command->value_str() == "debug") {
+                    SetLogLevel(LogLevel::kDebug);
                     return true;
                 }
 
@@ -95,12 +100,12 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     return true;
                 }
 
-                if (set_command->value_str() == "fatal") {
-                    SetLogLevel(LogLevel::kFatal);
+                if (set_command->value_str() == "critical") {
+                    SetLogLevel(LogLevel::kCritical);
                     return true;
                 }
 
-                RecoverableError(Status::SetInvalidVarValue("log level", "trace, info, warning, error, fatal"));
+                RecoverableError(Status::SetInvalidVarValue("log level", "trace, debug, info, warning, error, critical"));
                 return true;
             }
 

@@ -231,23 +231,6 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-bool Catalog::CheckTableConflict(const String &db_name,
-                                 const String &table_name,
-                                 TransactionID txn_id,
-                                 TxnTimeStamp begin_ts,
-                                 TableEntry *&table_entry) {
-    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError);
-    if (!status.ok()) {
-        UnrecoverableError("Check conflict is not for non-exist db meta");
-    }
-    DBEntry *db_entry = nullptr;
-    bool conflict = db_meta->CheckConflict(std::move(r_lock), txn_id, begin_ts, db_entry);
-    if (conflict) {
-        return true;
-    }
-    return db_entry->CheckConflict(table_name, txn_id, begin_ts, table_entry);
-}
-
 Tuple<SharedPtr<TableInfo>, Status>
 Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
@@ -804,6 +787,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 const auto &base_name = add_chunk_index_entry_op->base_name_;
                 auto base_rowid = add_chunk_index_entry_op->base_rowid_;
                 auto row_count = add_chunk_index_entry_op->row_count_;
+                auto commit_ts = add_chunk_index_entry_op->commit_ts_;
+                auto deprecate_ts = add_chunk_index_entry_op->deprecate_ts_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
@@ -819,7 +804,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
                     }
                     auto *segment_index_entry = iter2->second.get();
-                    segment_index_entry->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, buffer_mgr);
+                    segment_index_entry
+                        ->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
                 }
                 break;
             }
@@ -907,7 +893,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
         return true;
     }
-    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
+    LOG_TRACE(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
 
     for (auto &op : flush_delta_entry->operations()) {
         switch (op->GetType()) {
@@ -954,7 +940,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     //     }
     //     LOG_INFO(ss.str());
     // }
-    LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    LOG_TRACE(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     return false;
 }

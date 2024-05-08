@@ -42,10 +42,10 @@ namespace infinity {
 
 // Non-static memory methods
 
-TaskScheduler::TaskScheduler(const Config *config_ptr) { Init(config_ptr); }
+TaskScheduler::TaskScheduler(Config *config_ptr) { Init(config_ptr); }
 
-void TaskScheduler::Init(const Config *config_ptr) {
-    worker_count_ = config_ptr->worker_cpu_limit();
+void TaskScheduler::Init(Config *config_ptr) {
+    worker_count_ = config_ptr->CPULimit();
     worker_array_.reserve(worker_count_);
     worker_workloads_.resize(worker_count_);
     u64 cpu_count = Thread::hardware_concurrency();

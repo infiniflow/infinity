@@ -3,11 +3,6 @@ name: slow_tests
 on:
   schedule:
     - cron: '0 21 * * *'  # This schedule runs every 21:00:00Z(05:00:00+08:00)
-  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
-  create:
-    tags:
-      - "v*.*.*"                  # normal release
-      - "nightly"                 # the only one mutable tag
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -31,11 +26,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:ubuntu2310
+          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=2 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -43,7 +38,7 @@ jobs:
 
       - name: Prepare dataset
         if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p test/data/benchmark && sudo ln -s $HOME/benchmark_dataset/dbpedia-entity test/data/benchmark/dbpedia-entity && sudo ln -s $HOME/benchmark_dataset/sift1M test/data/benchmark/sift_1m
+        run: sudo mkdir -p test/data/benchmark && sudo ln -s $HOME/benchmark/dbpedia-entity test/data/benchmark/dbpedia-entity && sudo ln -s $HOME/benchmark/sift1M test/data/benchmark/sift_1m
 
       - name: benchmark test
         if: ${{ !cancelled() && !failure() }}
