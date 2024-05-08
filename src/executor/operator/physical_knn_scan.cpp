@@ -241,7 +241,8 @@ SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_i
 
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+    Txn *txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
 
     if (!common_query_filter_->TryFinishBuild(begin_ts, query_context->GetTxn()->buffer_mgr())) {
         // not ready, abort and wait for next time
@@ -484,7 +485,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 if (block_entry == nullptr) {
                                     UnrecoverableError(
                                         fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id));
-                                }
+                                } // this is for debug
                             }
                             merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                         }
@@ -493,7 +494,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetHnswIndexSnapshot();
                     int i = 0;
                     for (auto &chunk_index_entry : chunk_index_entries) {
-                        if (chunk_index_entry->CheckVisible(begin_ts)) {
+                        if (chunk_index_entry->CheckVisible(txn)) {
                             BufferHandle index_handle = chunk_index_entry->GetIndex();
                             hnsw_search(index_handle, false, i++);
                         }

@@ -20,10 +20,12 @@ export module base_entry;
 
 import stl;
 import default_values;
+import txn;
 
 namespace infinity {
 
 class Catalog;
+class TxnManager;
 
 export enum class EntryType : i8 {
     kDatabase,
@@ -63,6 +65,8 @@ public:
     const String &encode() const { return *encode_; }
 
     SharedPtr<String> encode_ptr() const { return encode_; }
+
+    virtual bool CheckVisible(Txn *txn) const;
 
 public:
     atomic_u64 txn_id_{0};

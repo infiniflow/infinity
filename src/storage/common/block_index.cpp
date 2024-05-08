@@ -22,12 +22,12 @@ import stl;
 import segment_entry;
 import global_block_id;
 import block_iter;
-import segment_iter;
+import txn;
 
 namespace infinity {
 
-void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, bool check_ts) {
-    if (!check_ts || segment_entry->CheckVisible(timestamp)) {
+void BlockIndex::Insert(SegmentEntry *segment_entry, Txn *txn) {
+    if (segment_entry->CheckVisible(txn)) {
         u32 segment_id = segment_entry->segment_id();
         segments_.emplace_back(segment_entry);
         segment_index_.emplace(segment_id, segment_entry);
@@ -36,13 +36,14 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, boo
         {
             auto block_guard = segment_entry->GetBlocksGuard();
             for (const auto &block_entry : block_guard.block_entries_) {
-                if (timestamp >= block_entry->commit_ts_) {
+                if (block_entry->CheckVisible(txn)) {
                     blocks_info.block_map_.emplace(block_entry->block_id(), block_entry.get());
                     global_blocks_.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
                 }
             }
         }
-        blocks_info.segment_offset_ = segment_entry->row_count(timestamp);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        blocks_info.segment_offset_ = segment_entry->row_count(begin_ts);
 
         segment_block_index_.emplace(segment_id, std::move(blocks_info));
     }

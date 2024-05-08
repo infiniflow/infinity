@@ -111,14 +111,14 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name
     return table_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String &table_name, Txn *txn) {
     LOG_TRACE(fmt::format("Get a table entry {}", table_name));
     auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
     if (table_meta == nullptr) {
         return {nullptr, status};
     }
 
-    return table_meta->GetTableInfo(std::move(r_lock), txn_id, begin_ts);
+    return table_meta->GetTableInfo(std::move(r_lock), txn);
 }
 
 void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
@@ -200,7 +200,9 @@ Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStam
     return results;
 }
 
-Status DBEntry::GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array) {
+Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_array) {
+    TransactionID txn_id = txn->TxnID();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     Vector<TableEntry *> table_collection_entries = this->TableCollections(txn_id, begin_ts);
     output_table_array.reserve(table_collection_entries.size());
     for (TableEntry *table_entry : table_collection_entries) {
@@ -213,7 +215,7 @@ Status DBEntry::GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vec
         table_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
         table_detail.block_capacity_ = DEFAULT_BLOCK_CAPACITY;
 
-        SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(begin_ts);
+        SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(txn);
 
         table_detail.segment_count_ = segment_index->SegmentCount();
         table_detail.block_count_ = segment_index->BlockCount();

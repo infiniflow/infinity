@@ -21,7 +21,7 @@ export module base_table_ref;
 import stl;
 import table_ref;
 import table_entry;
-
+import txn;
 import table_function;
 import block_index;
 import internal_types;
@@ -48,8 +48,8 @@ public:
     explicit BaseTableRef(TableEntry *table_entry, SharedPtr<BlockIndex> block_index)
         : TableRef(TableRefType::kTable, ""), table_entry_ptr_(table_entry), block_index_(std::move(block_index)) {}
 
-    static SharedPtr<BaseTableRef> FakeTableRef(TableEntry *table_entry, TxnTimeStamp ts) {
-        SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(ts);
+    static SharedPtr<BaseTableRef> FakeTableRef(TableEntry *table_entry, Txn *txn) {
+        SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn);
         return MakeShared<BaseTableRef>(table_entry, std::move(block_index));
     }
 

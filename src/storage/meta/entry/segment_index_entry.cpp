@@ -780,7 +780,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     return nullptr;
                 }
                 for (const auto &chunk_index_entry : chunk_index_entries_) {
-                    if (chunk_index_entry->CheckVisible(begin_ts)) {
+                    if (chunk_index_entry->CheckVisible(txn)) {
                         row_count += chunk_index_entry->row_count_;
                         old_chunks.push_back(chunk_index_entry.get());
                     }
@@ -829,7 +829,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     return nullptr;
                 }
                 for (const auto &chunk_index_entry : chunk_index_entries_) {
-                    if (chunk_index_entry->CheckVisible(begin_ts)) {
+                    if (chunk_index_entry->CheckVisible(txn)) {
                         row_count += chunk_index_entry->GetRowCount();
                         old_chunks.push_back(chunk_index_entry.get());
                     }

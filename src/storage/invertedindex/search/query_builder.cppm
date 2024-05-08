@@ -27,6 +27,7 @@ import base_table_ref;
 
 namespace infinity {
 
+class Txn;
 struct QueryNode;
 export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_;
@@ -37,7 +38,7 @@ class EarlyTerminateIterator;
 
 export class QueryBuilder {
 public:
-    QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<BaseTableRef> &base_table_ref);
+    QueryBuilder(Txn *txn, SharedPtr<BaseTableRef> &base_table_ref);
 
     ~QueryBuilder();
 
@@ -50,8 +51,6 @@ public:
     inline float Score(RowID doc_id) { return scorer_.Score(doc_id); }
 
 private:
-    TransactionID txn_id_{};
-    TxnTimeStamp begin_ts_{};
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     Scorer scorer_;

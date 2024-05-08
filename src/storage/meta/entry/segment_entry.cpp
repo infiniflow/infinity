@@ -233,9 +233,10 @@ bool SegmentEntry::CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &blo
     return true;
 }
 
-bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
+bool SegmentEntry::CheckVisible(Txn *txn) const {
+    TxnTimeStamp begin_ts = txn->BeginTS();
     std::shared_lock lock(rw_locker_);
-    return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;
+    return begin_ts < deprecate_ts_ && BaseEntry::CheckVisible(txn);
 }
 
 bool SegmentEntry::CheckDeprecate(TxnTimeStamp check_ts) const {
@@ -411,7 +412,6 @@ void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, c
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
-        this->txn_id_ = txn_id;
         this->Commit(commit_ts);
     }
     // hold the lock here

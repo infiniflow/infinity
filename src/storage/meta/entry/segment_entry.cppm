@@ -115,7 +115,7 @@ public:
 
     bool CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, Txn *txn) const;
 
-    bool CheckVisible(TxnTimeStamp check_ts) const;
+    virtual bool CheckVisible(Txn *txn) const override;
 
     bool CheckDeprecate(TxnTimeStamp check_ts) const;
 

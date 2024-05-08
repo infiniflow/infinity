@@ -876,7 +876,7 @@ SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID seg_id, Txn *txn) c
         return nullptr;
     }
     const auto &segment = iter->second;
-    if (segment->commit_ts_ > txn->BeginTS() && segment->txn_id_ != txn->TxnID()) {
+    if (!segment->CheckVisible(txn)) {
         return nullptr;
     }
     return segment;
@@ -904,7 +904,7 @@ String TableEntry::GetPathNameTail() const {
     return table_entry_dir_->substr(delimiter_i + 1);
 }
 
-SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
+SharedPtr<BlockIndex> TableEntry::GetBlockIndex(Txn *txn) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
@@ -912,7 +912,7 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
 
     // Add segment that is not deprecated
     for (const auto &segment_pair : this->segment_map_) {
-        result->Insert(segment_pair.second.get(), begin_ts);
+        result->Insert(segment_pair.second.get(), txn);
     }
 
     return result;
@@ -929,16 +929,6 @@ bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
         }
     }
     return true;
-}
-
-bool TableEntry::CheckVisible(SegmentID segment_id, TxnTimeStamp begin_ts) const {
-    std::shared_lock lock(this->rw_locker_);
-    auto iter = segment_map_.find(segment_id);
-    if (iter == segment_map_.end()) {
-        return false;
-    }
-    const auto &segment = iter->second;
-    return segment->CheckVisible(begin_ts);
 }
 
 nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
@@ -1190,8 +1180,8 @@ void TableEntry::Cleanup() {
     LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return fulltext_column_index_cache_.GetIndexReader(txn_id, begin_ts, this);
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) {
+    return fulltext_column_index_cache_.GetIndexReader(txn, this);
 }
 
 } // namespace infinity

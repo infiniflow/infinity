@@ -83,7 +83,29 @@ SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
     return res;
 }
 
-TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
+TxnState TxnManager::GetTxnState(TransactionID txn_id) {
+    std::lock_guard guard(rw_locker_);
+    auto iter = txn_map_.find(txn_id);
+    if (iter == txn_map_.end()) {
+        return TxnState::kCommitted;
+    }
+    Txn *txn = iter->second.get();
+    return txn->GetTxnState();
+}
+
+bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    std::lock_guard guard(rw_locker_);
+    auto iter = txn_map_.find(txn_id);
+    if (iter == txn_map_.end()) {
+        return true; // committed
+    }
+    Txn *txn = iter->second.get();
+    auto state = txn->GetTxnState();
+    if (state != TxnState::kCommitting && state != TxnState::kCommitted) {
+        return false;
+    }
+    return txn->CommitTS() < begin_ts;
+}
 
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     std::lock_guard guard(rw_locker_);
