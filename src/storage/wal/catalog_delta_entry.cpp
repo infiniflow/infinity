@@ -967,7 +967,7 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) {
 
 // called by wal thread
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts, u64 sequence) {
-    LOG_TRACE(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
+    LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}, seq_num: {}", txn_id, commit_ts, sequence));
     if (max_commit_ts_ != UNCOMMIT_TS || !txn_ids_.empty()) {
         UnrecoverableError(fmt::format("CatalogDeltaEntry SaveState failed, max_commit_ts_ {} txn_ids_ size {}", max_commit_ts_, txn_ids_.size()));
     }
@@ -998,15 +998,17 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     //     }
     // }
     std::lock_guard<std::mutex> lock(catalog_delta_locker_);
-    if (delta_entry->sequence() != last_sequence_ + 1) {
+    u64 entry_sequence = delta_entry->sequence();
+    if (entry_sequence != last_sequence_ + 1) {
         // Discontinuous
-        u64 entry_sequence = delta_entry->sequence();
+        LOG_INFO(fmt::format("Add delta entry: {} in to sequence_heap_", entry_sequence));
         sequence_heap_.push(entry_sequence);
         delta_entry_map_.emplace(entry_sequence, std::move(delta_entry));
     } else {
         // Continuous
         do {
             wal_size_ = std::max(wal_size_, wal_size);
+            LOG_INFO(fmt::format("Add delta entry: {} in to delta_ops_", entry_sequence));
             this->AddDeltaEntryInner(delta_entry.get());
 
             ++last_sequence_;
