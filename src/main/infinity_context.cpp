@@ -14,6 +14,8 @@
 
 module;
 
+#include <cstdlib>
+
 module infinity_context;
 
 import stl;
@@ -23,6 +25,7 @@ import resource_manager;
 import task_scheduler;
 import storage;
 import session_manager;
+import third_party;
 
 namespace infinity {
 
@@ -32,7 +35,11 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
     } else {
         // Config
         config_ = MakeUnique<Config>();
-        config_->Init(config_path);
+        auto status = config_->Init(config_path);
+        if (!status.ok()) {
+            fmt::print("Error: {}", *status.msg_);
+            std::exit(static_cast<int>(status.code()));
+        }
 
         Logger::Initialize(config_.get());
 
