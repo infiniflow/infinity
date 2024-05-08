@@ -71,42 +71,46 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
 }
 
 // DML
-Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
+Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry) {
+    const String &db_name = *table_entry->GetDBName();
+    const String &table_name = *table_entry->GetTableName();
+
     this->CheckTxn(db_name);
 
     // build WalCmd
     WalSegmentInfo segment_info(segment_entry.get());
     wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info)));
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
     table_store->Import(std::move(segment_entry), this);
 
     return Status::OK();
 }
 
-Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
-    this->CheckTxn(db_name);
+Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block) {
+    const String &db_name = *table_entry->GetDBName();
+    const String &table_name = *table_entry->GetTableName();
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    this->CheckTxn(db_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
     auto [err_msg, append_status] = table_store->Append(input_block);
     return append_status;
 }
 
-Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
+Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict) {
+    const String &db_name = *table_entry->GetDBName();
+    const String &table_name = *table_entry->GetTableName();
+
     this->CheckTxn(db_name);
 
-    auto [table_entry, status] = GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
     if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
         LOG_WARN(fmt::format("Rollback delete in table {} due to conflict.", table_name));
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
@@ -115,26 +119,13 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
 
 Status
 Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
-    const String &table_name = *table_entry->GetTableName();
-    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store_.GetTxnTableStore(table_entry); }
-
-TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
-    auto *store = txn_store_.GetTxnTableStore(table_name);
-    if (store == nullptr) {
-        auto [table_entry, status] = this->GetTableByName(db_name_, table_name);
-        if (table_entry == nullptr) {
-            UnrecoverableError(status.message());
-        }
-        store = txn_store_.GetTxnTableStore(table_entry);
-    }
-    return store;
-}
 
 void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
@@ -341,8 +332,8 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
     if (table_index_entry.get() == nullptr) {
         return index_status;
     }
-
-    auto *txn_table_store = this->GetTxnTableStore(table_name);
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    auto *txn_table_store = this->GetTxnTableStore(table_entry);
     txn_table_store->DropIndexStore(table_index_entry.get());
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
@@ -386,6 +377,11 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViews"};
 }
 
+void Txn::SetTxnCommitted(TxnTimeStamp committed_ts) {
+    // LOG_INFO(fmt::format("Txn {} is committed, committed_ts: {}", txn_id_, committed_ts));
+    txn_context_.SetTxnCommitted(committed_ts);
+}
+
 void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
     txn_context_.SetTxnCommitting(commit_ts);
     wal_entry_->commit_ts_ = commit_ts;
@@ -411,20 +407,22 @@ TxnTimeStamp Txn::Commit() {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
         this->SetTxnCommitting(commit_ts);
-        this->SetTxnCommitted();
-        LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
+        this->SetTxnCommitted(commit_ts);
         return commit_ts;
     }
 
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
+    // LOG_INFO(fmt::format("Txn: {} is committing, committing ts: {}", txn_id_, commit_ts));
+
     this->SetTxnCommitting(commit_ts);
+    // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->CheckConflict(this)) {
         LOG_ERROR(fmt::format("Txn: {} is rollbacked. rollback ts: {}", txn_id_, commit_ts));
         wal_entry_ = nullptr;
         txn_mgr_->SendToWAL(this);
-        RecoverableError(Status::TxnRollback(txn_id_));
+        RecoverableError(Status::TxnConflict(txn_id_, "Txn conflict reason."));
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
@@ -434,7 +432,6 @@ TxnTimeStamp Txn::Commit() {
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
-    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->enable_compaction()) {
         txn_store_.MaintainCompactionAlg();
@@ -443,15 +440,13 @@ TxnTimeStamp Txn::Commit() {
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }
 
-    this->SetTxnCommitted();
-
     return commit_ts;
 }
 
-bool Txn::CheckConflict() {
-    LOG_TRACE(fmt::format("Txn check conflict: {} is started.", txn_id_));
+bool Txn::CheckConflict(Txn *txn) {
+    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
 
-    return txn_store_.CheckConflict();
+    return txn_store_.CheckConflict(txn->txn_store_);
 }
 
 void Txn::CommitBottom() {
@@ -504,8 +499,6 @@ void Txn::Rollback() {
     txn_context_.SetTxnRollbacking(abort_ts);
 
     txn_store_.Rollback(txn_id_, abort_ts);
-
-    this->SetTxnRollbacked();
 
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }

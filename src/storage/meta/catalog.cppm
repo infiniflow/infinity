@@ -163,8 +163,6 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    bool CheckTableConflict(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *&lastest_entry);
-
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);

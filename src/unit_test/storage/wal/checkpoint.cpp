@@ -415,7 +415,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(*db_name, *table_name, data_block);
+            auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
             last_commit_ts = txn_mgr->CommitTxn(txn);

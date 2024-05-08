@@ -86,9 +86,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     output_block->Finalize();
 
     auto *txn = query_context->GetTxn();
-    const String &db_name = *table_entry_->GetDBName();
-    const String &table_name = *table_entry_->GetTableName();
-    txn->Append(db_name, table_name, output_block);
+    txn->Append(table_entry_, output_block);
 
     UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("INSERTED {} Rows", output_block->row_count()));
     if (operator_state == nullptr) {

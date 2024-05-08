@@ -21,9 +21,7 @@ insert_delete_size = 100
 
 
 class TestIndexParallel:
-
-    @pytest.mark.skip(
-        reason="Decrease row count exceed actual row count@src/storage/meta/entry/segment_entry.cppm:184, and update vector fail due to 'Not support to convert Embedding to Embedding'")
+    #@pytest.mark.skip(reason="To pass benchmark, use wrong row count in knn scan")
     def test_chaos(self, get_infinity_connection_pool):
         data = read_out_data()
         connection_pool = get_infinity_connection_pool
