@@ -61,6 +61,8 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
     // Record the start ts of the txn
     TxnTimeStamp ts = ++start_ts_;
 
+    LOG_INFO(fmt::format("Txn: {} is begin, begin ts: {}, text: {}", new_txn_id, ts, txn_text != nullptr ? *txn_text : "empty"));
+
     // Create txn instance
     auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
 
@@ -293,21 +295,21 @@ void TxnManager::FinishTxn(Txn *txn) {
 }
 
 void TxnManager::AddWaitFlushTxn(const Vector<TransactionID> &txn_ids) {
-    // std::stringstream ss;
-    // for (auto txn_id : txn_ids) {
-    //     ss << txn_id << " ";
-    // }
-    // LOG_INFO(fmt::format("Add txns: {} to wait flush set", ss.str()));
+    std::stringstream ss;
+    for (auto txn_id : txn_ids) {
+        ss << txn_id << " ";
+    }
+    LOG_INFO(fmt::format("Add txns: {} to wait flush set", ss.str()));
     std::unique_lock w_lock(rw_locker_);
     wait_flush_txns_.insert(txn_ids.begin(), txn_ids.end());
 }
 
 void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
-    // std::stringstream ss2;
-    // for (auto txn_id : txn_ids) {
-    //     ss2 << txn_id << " ";
-    // }
-    // LOG_INFO(fmt::format("Remove txn: {} from wait flush set", ss2.str()));
+    std::stringstream ss2;
+    for (auto txn_id : txn_ids) {
+        ss2 << txn_id << " ";
+    }
+    LOG_INFO(fmt::format("Remove txn: {} from wait flush set", ss2.str()));
     std::unique_lock w_lock(rw_locker_);
     for (auto txn_id : txn_ids) {
         if (!wait_flush_txns_.erase(txn_id)) {
@@ -321,16 +323,16 @@ TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
         auto &[ts, txn_id] = *iter;
         if (txn_map_.find(txn_id) != txn_map_.end()) {
-            LOG_TRACE(fmt::format("Txn: {} found in txn map", txn_id));
+            LOG_INFO(fmt::format("Txn: {} found in txn map", txn_id));
             return ts;
         }
         if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
-            LOG_TRACE(fmt::format("Txn: {} wait flush", txn_id));
+            LOG_INFO(fmt::format("Txn: {} wait flush", txn_id));
             return ts;
         }
         iter = ts_map_.erase(iter);
     }
-    LOG_TRACE(fmt::format("No txn is active, return the next ts {}", start_ts_));
+    LOG_INFO(fmt::format("No txn is active, return the next ts {}", start_ts_));
     return start_ts_;
 }
 

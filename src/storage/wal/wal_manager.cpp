@@ -276,7 +276,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
 
     if (is_full_checkpoint) {
         if (max_commit_ts == last_full_ckp_ts_) {
-            LOG_TRACE(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
+            LOG_INFO(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
             return;
         }
         if (last_full_ckp_ts_ != UNCOMMIT_TS && last_full_ckp_ts_ >= max_commit_ts) {
@@ -288,7 +288,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         }
     } else {
         if (max_commit_ts == last_ckp_ts_) {
-            LOG_TRACE(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
+            LOG_INFO(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
             return;
         }
         if (last_ckp_ts_ >= max_commit_ts) {
@@ -296,7 +296,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         }
     }
     try {
-        LOG_TRACE(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
+        LOG_INFO(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
                              is_full_checkpoint ? "FULL" : "DELTA",
                              txn->TxnID(),
                              txn->BeginTS(),
@@ -307,7 +307,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         }
         SetLastCkpWalSize(wal_size);
 
-        LOG_TRACE(fmt::format("{} Checkpoint is done for commit_ts <= {}", is_full_checkpoint ? "FULL" : "DELTA", max_commit_ts));
+        LOG_INFO(fmt::format("{} Checkpoint is done for commit_ts <= {}", is_full_checkpoint ? "FULL" : "DELTA", max_commit_ts));
     } catch (RecoverableException &e) {
         LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
     } catch (UnrecoverableException &e) {

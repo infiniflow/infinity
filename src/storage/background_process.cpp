@@ -76,12 +76,12 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kCheckpoint: {
-                    LOG_TRACE("Checkpoint in background");
+                    LOG_INFO("Checkpoint in background");
                     auto *task = static_cast<CheckpointTask *>(bg_task.get());
                     bool is_full_checkpoint = task->is_full_checkpoint_;
                     auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
                     wal_manager_->Checkpoint(is_full_checkpoint, max_commit_ts, wal_size);
-                    LOG_TRACE("Checkpoint in background done");
+                    LOG_INFO("Checkpoint in background done");
                     break;
                 }
                 case BGTaskType::kCleanup: {
