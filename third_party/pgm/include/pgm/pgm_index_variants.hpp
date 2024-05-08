@@ -15,22 +15,35 @@
 
 #pragma once
 
-#include <string>
-#include <fstream>
-#include <cstring>
-#include <iostream>
-#include <stdexcept>
+#include "morton_nd.hpp"
+#include "piecewise_linear_model.hpp"
+#include "pgm_index.hpp"
+#include "sdsl.hpp"
+
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include "sdsl.hpp"
-#include "morton_nd.hpp"
-#include "pgm_index.hpp"
+#include <algorithm>
+#include <cerrno>
+#include <climits>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <numeric>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace pgm {
 
-/** Computes the smallest integral value not less than x / y, where x and y must be positive integers. */
-#define CEIL_UINT_DIV(x, y) ((x) / (y) + ((x) % (y) != 0))
+/** Computes the smallest integral value not less than x / y, where y must be a positive integer. */
+#define CEIL_INT_DIV(x, y) ((x) / (y) + ((x) % (y) > 0))
 
 /** Computes the number of bits needed to store x, that is, 0 if x is 0, 1 + floor(log2(x)) otherwise. */
 #define BIT_WIDTH(x) ((x) == 0 ? 0 : 64 - __builtin_clzll(x))
@@ -62,9 +75,13 @@ class CompressedPGMIndex {
     K first_key;                          ///< The smallest element in the data.
     Floating root_slope;                  ///< The slope of the root segment.
     int64_t root_intercept;               ///< The intercept of the root segment.
+    size_t root_range;                    ///< The size of the level below the root segment.
     std::vector<Floating> slopes_table;   ///< The vector containing the slopes used by the segments in the index.
     std::vector<CompressedLevel> levels;  ///< The levels composing the compressed index.
 
+    /// Sentinel value to avoid bounds checking.
+    static constexpr K sentinel = std::numeric_limits<K>::has_infinity ? std::numeric_limits<K>::infinity()
+                                                                       : std::numeric_limits<K>::max();
     using floating_pair = std::pair<Floating, Floating>;
     using canonical_segment = typename internal::OptimalPiecewiseLinearModel<K, size_t>::CanonicalSegment;
 
@@ -96,24 +113,19 @@ public:
         std::vector<canonical_segment> segments;
         segments.reserve(n / (Epsilon * Epsilon));
 
-        auto ignore_last = *std::prev(last) == std::numeric_limits<K>::max(); // max is reserved for padding
-        auto last_n = n - ignore_last;
-        last -= ignore_last;
+        if (*std::prev(last) == sentinel)
+            throw std::invalid_argument("The value " + std::to_string(sentinel) + " is reserved as a sentinel.");
 
         // Build first level
-        auto in_fun = [this, first](auto i) {
-            auto x = first[i];
-            auto flag = i > 0 && i + 1u < n && x == first[i - 1] && x != first[i + 1] && x + 1 != first[i + 1];
-            return std::pair<K, size_t>(x + flag, i);
-        };
-        auto out_fun = [&, this](auto cs) { segments.emplace_back(cs); };
-        last_n = internal::make_segmentation_par(last_n, Epsilon, in_fun, out_fun);
+        auto in_fun = [&](auto i) { return first[i]; };
+        auto out_fun = [&](auto cs) { segments.emplace_back(cs); };
+        auto last_n = internal::make_segmentation_par(n, Epsilon, in_fun, out_fun);
         levels_offsets.push_back(levels_offsets.back() + last_n);
 
         // Build upper levels
         while (EpsilonRecursive && last_n > 1) {
             auto offset = levels_offsets[levels_offsets.size() - 2];
-            auto in_fun_rec = [&, this](auto i) { return std::pair<K, size_t>(segments[offset + i].get_first_x(), i); };
+            auto in_fun_rec = [&](auto i) { return segments[offset + i].get_first_x(); };
             last_n = internal::make_segmentation(last_n, EpsilonRecursive, in_fun_rec, out_fun);
             levels_offsets.push_back(levels_offsets.back() + last_n);
         }
@@ -123,14 +135,16 @@ public:
         slopes_table = tmp_table;
 
         // Build levels
+        auto n_levels = levels_offsets.size() - 1;
         first_key = *first;
         if constexpr (EpsilonRecursive > 0) {
             auto root = *std::prev(levels_offsets.end(), 2);
             std::tie(root_slope, root_intercept) = segments[root].get_floating_point_segment(first_key);
+            root_range = n_levels == 1 ? n : levels_offsets[n_levels - 1] - levels_offsets[n_levels - 2];
         }
 
-        levels.reserve(levels_offsets.size() - 2);
-        for (auto i = EpsilonRecursive == 0 ? 1 : int(levels_offsets.size()) - 2; i > 0; --i) {
+        levels.reserve(n_levels - 1);
+        for (int i = EpsilonRecursive == 0 ? 1 : n_levels - 1; i > 0; --i) {
             auto l = levels_offsets[i - 1];
             auto r = levels_offsets[i];
             auto prev_level_size = i == 1 ? n : l - levels_offsets[i - 2];
@@ -163,8 +177,7 @@ public:
         if constexpr (EpsilonRecursive == 0) {
             auto &level = levels.front();
             auto it = std::upper_bound(level.keys.begin(), level.keys.begin() + level.size(), key);
-            auto i = std::distance(level.keys.begin(), it);
-            i = i == 0 ? 0 : i - 1;
+            auto i = std::distance(level.keys.begin(), it) - 1;
             auto pos = std::min<size_t>(level(slopes_table, i, k), level.get_intercept(i + 1));
             auto lo = PGM_SUB_EPS(pos, Epsilon);
             auto hi = PGM_ADD_EPS(pos, Epsilon, n);
@@ -172,9 +185,9 @@ public:
         }
 
         auto p = int64_t(root_slope * (k - first_key)) + root_intercept;
-        auto pos = std::min<size_t>(p > 0 ? size_t(p) : 0ull, levels.front().size());
+        auto pos = std::min<size_t>(p > 0 ? size_t(p) : 0ull, root_range);
 
-        for (auto &level : levels) {
+        for (const auto &level : levels) {
             auto lo = level.keys.begin() + PGM_SUB_EPS(pos, EpsilonRecursive + 1);
 
             static constexpr size_t linear_search_threshold = 8 * 64 / sizeof(K);
@@ -183,8 +196,7 @@ public:
                     continue;
             } else {
                 auto hi = level.keys.begin() + PGM_ADD_EPS(pos, EpsilonRecursive, level.size());
-                auto it = std::upper_bound(lo, hi, k);
-                lo == level.keys.begin() ? it : std::prev(it);
+                auto it = std::prev(std::upper_bound(lo, hi, k));
             }
 
             auto i = std::distance(level.keys.begin(), lo);
@@ -294,28 +306,27 @@ struct CompressedPGMIndex<K, Epsilon, EpsilonRecursive, Floating>::CompressedLev
             keys.emplace_back(it->get_first_x());
         if (need_extra_segment)
             keys.emplace_back(last_key + 1);
-        keys.emplace_back(std::numeric_limits<K>::max());
+        keys.emplace_back(sentinel);
 
         // Compress and store intercepts
-        sdsl::bit_vector intercept_bv(prev_level_size - intercept_offset + 1);
-        intercept_bv[prev_level_size - intercept_offset] = true;
-        for (auto it = first_intercept; it != last_intercept; ++it) {
-            auto idx = std::min<int64_t>(prev_level_size - 1, *it) - intercept_offset;
-            intercept_bv[idx] = true;
-        }
+        auto max_intercept = prev_level_size - intercept_offset + 2;
+        auto intercepts_count = std::distance(first_intercept, last_intercept) + need_extra_segment + 1;
+        sdsl::sd_vector_builder builder(max_intercept, intercepts_count);
+        builder.set(0);
+        for (auto it = first_intercept + 1; it != last_intercept; ++it)
+            builder.set(std::clamp<int64_t>(*it, *(it - 1) + 1, prev_level_size - 1) - intercept_offset);
         if (need_extra_segment)
-            intercept_bv[prev_level_size + 1 - intercept_offset] = true;
-        compressed_intercepts = sdsl::sd_vector<>(intercept_bv);
+            builder.set(max_intercept - 2);
+        builder.set(max_intercept - 1);
+        compressed_intercepts = sdsl::sd_vector<>(builder);
         sdsl::util::init_support(sel1, &compressed_intercepts);
 
         // Compress and store slopes_map
-        size_t i = 0;
-        size_t map_size = std::distance(first_slope, last_slope) + need_extra_segment;
+        auto map_size = std::distance(first_slope, last_slope) + need_extra_segment;
         slopes_map = sdsl::int_vector<>(map_size, 0, sdsl::bits::hi(slopes_table.size() - 1) + 1);
-        for (auto it = first_slope; it != last_slope; ++it)
-            slopes_map[i++] = *it;
+        std::copy(first_slope, last_slope, slopes_map.begin());
         if (need_extra_segment)
-            slopes_map[slopes_map.size() - 1] = slopes_table[*std::prev(last_slope)];
+            slopes_map.back() = slopes_table[*std::prev(last_slope)];
     }
 
     inline size_t operator()(const std::vector<Floating> &slopes, size_t i, K k) const {
@@ -341,51 +352,63 @@ struct CompressedPGMIndex<K, Epsilon, EpsilonRecursive, Floating>::CompressedLev
 };
 
 /**
- * A simple variant of @ref OneLevelPGMIndex that builds a top-level lookup table to speed up the search on the
- * segments.
+ * A simple variant of @ref OneLevelPGMIndex that uses length reduction to speed up the search on the segments.
  *
- * The size of the top-level table is specified as a constructor argument. Additionally, the @p TopLevelBitSize template
- * argument allows to specify the bit-size of the memory cells in the top-level table. It can be set either to a power
- * of two or to 0. If set to 0, the bit-size of the cells will be determined dynamically so that the table is
- * bit-compressed.
+ * Segments are assigned to a number of buckets specified with the @p TopLevelSize template argument. A top-level table
+ * of size @p TopLevelSize stores the position of the first segment in each bucket. The @p TopLevelBitSize template
+ * argument allows to specify the bit-size of the memory cells in the top-level table. If set to 0, the bit-size of the
+ * cells will be determined dynamically so that the table is bit-compressed.
  *
  * @tparam K the type of the indexed keys
  * @tparam Epsilon controls the size of the returned search range
- * @tparam TopLevelBitSize the bit-size of the cells in the top-level table, must be either 0 or a power of two
+ * @tparam TopLevelSize the number of cells allocated for the top-level table
+ * @tparam TopLevelBitSize the bit-size of the cells in the top-level table
  * @tparam Floating the floating-point type to use for slopes
  */
-template<typename K, size_t Epsilon = 64, uint8_t TopLevelBitSize = 32, typename Floating = float>
+template<typename K, size_t Epsilon, size_t TopLevelSize, uint8_t TopLevelBitSize = 32, typename Floating = float>
 class BucketingPGMIndex {
 protected:
-    static_assert(Epsilon > 0);
-    static_assert(TopLevelBitSize == 0 || (TopLevelBitSize & (TopLevelBitSize - 1u)) == 0);
+    static_assert(Epsilon > 0 && TopLevelSize > 0);
 
     using Segment = typename PGMIndex<K, Epsilon, 0, Floating>::Segment;
+    static constexpr bool pow_two_top_level = (TopLevelSize & (TopLevelSize - 1u)) == 0;
 
     size_t n;                                     ///< The number of elements this index was built on.
     K first_key;                                  ///< The smallest element.
+    K last_key;                                   ///< The largest element.
     std::vector<Segment> segments;                ///< The segments composing the index.
     sdsl::int_vector<TopLevelBitSize> top_level;  ///< The structure on the segment.
     K step;
 
-    template<typename RandomIt>
-    void build_top_level(RandomIt, RandomIt last, size_t top_level_size) {
+    void build_top_level() {
+        // Compute the size of the partitioned universe
+        size_t actual_top_level_size = TopLevelSize + 2;
+        if constexpr (pow_two_top_level) {
+            step = K(1) << (sizeof(K) * CHAR_BIT - BIT_WIDTH(TopLevelSize) + 1);
+            actual_top_level_size = CEIL_INT_DIV(last_key - first_key, step) + 2;
+        } else
+            step = std::max<K>(CEIL_INT_DIV(last_key - first_key, TopLevelSize), 1);
+
+        // Allocate the top-level table
         auto log_segments = (size_t) BIT_WIDTH(segments.size());
         if constexpr (TopLevelBitSize == 0)
-            top_level = sdsl::int_vector<>(top_level_size, segments.size(), log_segments);
+            top_level = sdsl::int_vector<>(actual_top_level_size, 0, log_segments);
         else {
-            if (log_segments > TopLevelBitSize)
-                throw std::invalid_argument("The value TopLevelBitSize=" + std::to_string(TopLevelBitSize) +
-                    " is too low. Try to set it to " + std::to_string(TopLevelBitSize << 1));
-            top_level = sdsl::int_vector<TopLevelBitSize>(top_level_size, segments.size(), TopLevelBitSize);
+            if (TopLevelBitSize < log_segments)
+                throw std::invalid_argument("TopLevelBitSize must be >=" + std::to_string(log_segments));
+            top_level = sdsl::int_vector<TopLevelBitSize>(actual_top_level_size, 0, TopLevelBitSize);
         }
 
-        step = (size_t) CEIL_UINT_DIV(*std::prev(last), top_level_size);
-        for (auto i = 0ull, k = 1ull; i < top_level_size - 1; ++i) {
-            while (k < segments.size() && segments[k].key < (i + 1) * step)
+        // Fill the top-level table
+        for (uint64_t i = 1, k = 1; i < actual_top_level_size - 1; ++i) {
+            K upper_bound;
+            if (__builtin_mul_overflow(K(i), step, &upper_bound))
+                upper_bound = std::numeric_limits<K>::max();
+            while (k < segments.size() && (segments[k].key - first_key) < upper_bound)
                 ++k;
             top_level[i] = k;
         }
+        top_level[actual_top_level_size - 1] = segments.size();
     }
 
     /**
@@ -394,9 +417,13 @@ protected:
      * @return an iterator to the segment responsible for the given key
      */
     auto segment_for_key(const K &key) const {
-        auto j = std::min<size_t>(key / step, top_level.size() - 1);
-        auto first = segments.begin() + (key < step ? 1 : top_level[j - 1]);
-        auto last = segments.begin() + top_level[j];
+        size_t j;
+        if constexpr (pow_two_top_level)
+            j = (key - first_key) >> (sizeof(K) * CHAR_BIT - BIT_WIDTH(TopLevelSize) + 1);
+        else
+            j = (key - first_key) / step;
+        auto first = segments.begin() + top_level[j];
+        auto last = segments.begin() + top_level[j + 1];
         return std::prev(std::upper_bound(first, last, key));
     }
 
@@ -410,28 +437,27 @@ public:
     BucketingPGMIndex() = default;
 
     /**
-     * Constructs the index on the given sorted vector, with the specified top level size.
+     * Constructs the index on the given sorted vector.
      * @param data the vector of keys, must be sorted
-     * @param top_level_size the number of cells allocated for the top-level table
      */
-    explicit BucketingPGMIndex(const std::vector<K> &data, size_t top_level_size)
-        : BucketingPGMIndex(data.begin(), data.end(), top_level_size) {}
+    BucketingPGMIndex(const std::vector<K> &data) : BucketingPGMIndex(data.begin(), data.end()) {}
 
     /**
-     * Constructs the index on the sorted keys in the range [first, last), with the specified top level size.
+     * Constructs the index on the sorted keys in the range [first, last).
      * @param first, last the range containing the sorted keys to be indexed
-     * @param top_level_size the number of cells allocated for the top-level table
      */
     template<typename RandomIt>
-    BucketingPGMIndex(RandomIt first, RandomIt last, size_t top_level_size)
+    BucketingPGMIndex(RandomIt first, RandomIt last)
         : n(std::distance(first, last)),
-          first_key(n ? *first : 0),
+          first_key(n ? *first : K(0)),
+          last_key(n ? *(last - 1) : K(0)),
           segments(),
           top_level() {
-        std::vector<size_t> sizes;
+        if (n == 0)
+            return;
         std::vector<size_t> offsets;
-        PGMIndex<K, Epsilon, 0, Floating>::build(first, last, Epsilon, 0, segments, sizes, offsets);
-        build_top_level(first, last, top_level_size);
+        PGMIndex<K, Epsilon, 0, Floating>::build(first, last, Epsilon, 0, segments, offsets);
+        build_top_level();
     }
 
     /**
@@ -440,9 +466,12 @@ public:
      * @return a struct with the approximate position and bounds of the range
      */
     ApproxPos search(const K &key) const {
-        auto k = std::max(first_key, key);
-        auto it = segment_for_key(k);
-        auto pos = std::min<size_t>((*it)(k), std::next(it)->intercept);
+        if (__builtin_expect(key < first_key, 0))
+            return {0, 0, 0};
+        if (__builtin_expect(key > last_key, 0))
+            return {n, n, n};
+        auto it = segment_for_key(key);
+        auto pos = std::min<size_t>((*it)(key), std::next(it)->intercept);
         auto lo = PGM_SUB_EPS(pos, Epsilon);
         auto hi = PGM_ADD_EPS(pos, Epsilon, n);
         return {pos, lo, hi};
@@ -469,7 +498,7 @@ public:
      * @return the size of the index in bytes
      */
     size_t size_in_bytes() const {
-        return segments.size() * sizeof(Segment) + top_level.size() * top_level.width();
+        return segments.size() * sizeof(Segment) + top_level.size() * top_level.width() / CHAR_BIT;
     }
 };
 
@@ -502,11 +531,10 @@ protected:
         }
     };
 
-    size_t n;                                ///< The number of elements this index was built on.
-    K first_key;                             ///< The smallest segment key.
-    std::vector<SegmentData> segments;       ///< The segments composing the index.
-    sdsl::sd_vector<> ef;                    ///< The Elias-Fano structure on the segment.
-    sdsl::sd_vector<>::rank_1_type rank;     ///< The rank1 structure.
+    size_t n;                           ///< The number of elements this index was built on.
+    K first_key;                        ///< The smallest segment key.
+    std::vector<SegmentData> segments;  ///< The segments composing the index.
+    sdsl::sd_vector<> ef;               ///< The Elias-Fano structure on the segment.
 
 public:
 
@@ -530,16 +558,15 @@ public:
     template<typename RandomIt>
     EliasFanoPGMIndex(RandomIt first, RandomIt last)
         : n(std::distance(first, last)),
-          first_key(n ? *first : 0),
+          first_key(n ? *first : K(0)),
           segments(),
           ef() {
         if (n == 0)
             return;
 
         std::vector<Segment> tmp;
-        std::vector<size_t> sizes;
         std::vector<size_t> offsets;
-        PGMIndex<K, Epsilon, 0, Floating>::build(first, last, Epsilon, 0, tmp, sizes, offsets);
+        PGMIndex<K, Epsilon, 0, Floating>::build(first, last, Epsilon, 0, tmp, offsets);
 
         segments.reserve(tmp.size());
         for (auto &x: tmp) {
@@ -548,7 +575,6 @@ public:
         }
 
         ef = decltype(ef)(tmp.begin(), std::prev(tmp.end()));
-        sdsl::util::init_support(rank, &ef);
     }
 
     /**
@@ -558,7 +584,7 @@ public:
      */
     ApproxPos search(const K &key) const {
         auto k = std::max(first_key, key);
-        auto[r, origin] = rank.pred(k - first_key);
+        auto[r, origin] = pred(k - first_key);
         auto pos = std::min<size_t>(segments[r](origin + first_key, k), segments[r + 1].intercept);
         auto lo = PGM_SUB_EPS(pos, Epsilon);
         auto hi = PGM_ADD_EPS(pos, Epsilon, n);
@@ -587,6 +613,40 @@ public:
      */
     size_t size_in_bytes() const {
         return segments.size() * sizeof(SegmentData) + sdsl::size_in_bytes(ef);
+    }
+
+private:
+
+    std::pair<size_t, uint64_t> pred(uint64_t i) const {
+        if (i > ef.size()) {
+            auto j = ef.low.size();
+            return {j - 1, ef.low[j - 1] + ((ef.high_1_select(j) + 1 - j) << (ef.wl))};
+        }
+        ++i;
+
+        auto high_val = (i >> (ef.wl));
+        auto sel_high = ef.high_0_select(high_val + 1);
+        auto rank_hi = sel_high - high_val;
+        if (0 == rank_hi)
+            return {0, ef.low[0] + (high_val << ef.wl)};
+
+        auto rank_lo = high_val == 0 ? 0 : ef.high_0_select(high_val) - high_val + 1;
+        auto val_low = i & sdsl::bits::lo_set[ef.wl];
+        auto count = rank_hi - rank_lo;
+        while (count > 0) {
+            auto step = count / 2;
+            auto mid = rank_lo + step;
+            if (ef.low[mid] < val_low) {
+                rank_lo = mid + 1;
+                count -= step + 1;
+            } else {
+                count = step;
+            }
+        }
+        --rank_lo;
+        sel_high -= rank_hi - rank_lo;
+        auto h = ef.high[sel_high] ? high_val : sdsl::bits::prev(ef.high.data(), sel_high) - rank_lo;
+        return {rank_lo, ef.low[rank_lo] + (h << ef.wl)};
     }
 };
 
@@ -644,7 +704,7 @@ public:
         auto in_data = map_file(in_filename, in_bytes);
         this->n = in_bytes / sizeof(K);
         this->template build(in_data, in_data + this->n, Epsilon, EpsilonRecursive,
-                             this->segments, this->levels_sizes, this->levels_offsets);
+                             this->segments, this->levels_offsets);
         serialize_and_map(in_data, in_data + this->n, out_filename);
         unmap_file(in_data, in_bytes);
     }
@@ -662,7 +722,6 @@ public:
         read_member(header_bytes, in);
         read_member(this->n, in);
         read_member(this->first_key, in);
-        read_container(this->levels_sizes, in);
         read_container(this->levels_offsets, in);
         read_container(this->segments, in);
         file_bytes = header_bytes + this->n * sizeof(K);
@@ -752,7 +811,6 @@ private:
         header_bytes += write_member(header_bytes, out);
         header_bytes += write_member(this->n, out);
         header_bytes += write_member(this->first_key, out);
-        header_bytes += write_container(this->levels_sizes, out);
         header_bytes += write_container(this->levels_offsets, out);
         header_bytes += write_container(this->segments, out);
         for (auto it = first; it != last; ++it)
@@ -816,6 +874,8 @@ private:
 };
 
 #ifdef MORTON_ND_BMI2_ENABLED
+
+#include <immintrin.h>
 
 /**
  * A multidimensional container that uses a @ref PGMIndex for fast orthogonal range queries.
@@ -913,6 +973,87 @@ public:
      * @return an iterator pointing to an element inside the query hyperrectangle
      */
     iterator range(const value_type &min, const value_type &max) { return iterator(this, min, max); }
+    
+    /**
+     * (approximate) k-nearest neighbor query.
+     * Returns @p k nearest points from query point @p p.
+     * 
+     * @param p the query point.
+     * @param k the number of nearest points.
+     * @return a vector of k nearest points.
+     */
+    std::vector<value_type> knn(const value_type &p, uint32_t k){
+        // to access coordinate of point dynamically
+        using swallow = int[];
+        auto sequence = std::make_index_sequence<Dimensions>{};
+
+        // return euclidean distance between given point and query point p
+        auto dist_from_p = [&]<std::size_t... indices>(value_type point, std::index_sequence<indices...>){
+            uint64_t squared_sum = 0;
+            squared_sum = (std::pow((int64_t)std::get<indices>(point) - (int64_t)std::get<indices>(p), 2) + ... );
+            return std::sqrt(squared_sum);
+        };
+
+        // return first point of range query for knn query
+        auto k_range_first = [&]<std::size_t... indices>(uint64_t dist, std::index_sequence<indices...>) -> value_type{
+            value_type point;
+            swallow{
+                (std::get<indices>(point) = std::max<int64_t>((int64_t)std::get<indices>(p) - dist, 0), 0)...
+            };
+            return point;
+        };
+
+        // return end point of range query for knn query
+        auto k_range_end = [&]<std::size_t... indices>(uint64_t dist, std::index_sequence<indices...>) -> value_type{
+            value_type point;
+            swallow{
+                (std::get<indices>(point) = std::min<uint64_t>(std::get<indices>(p) + dist, this->data.size()), 0)...
+            };
+            return point;
+        };
+
+        // for debug
+        auto print_point = [&]<std::size_t... indices>(value_type point, std::index_sequence<indices...>){
+            std::cout << "(";
+            swallow{
+                (std::cout << std::get<indices>(point) << " , ", 0)...
+            };
+            std::cout << ")";
+        };
+
+        // get 2k points around zp to make temporary answer
+        auto zp = encode(p);
+        auto range = pgm.search(zp);
+        auto it = std::lower_bound(data.begin() + range.lo, data.begin() + range.hi, zp);
+
+        std::vector<value_type> tmp_ans;
+        for (auto i = it - k >= data.begin() ? it - k : data.begin(); i != it + k && i != data.end(); ++i)
+            tmp_ans.push_back(morton::Decode(*i));
+
+        std::sort(tmp_ans.begin(), tmp_ans.end(), [&](auto const& lhs, auto const& rhs) {
+            double dist_l = dist_from_p(lhs, sequence);
+            double dist_r = dist_from_p(rhs, sequence);
+            return dist_l < dist_r;
+        });
+
+        // calc distance of k nearest point in tmp_ans, and get a range(hyperrectangle) that contains more than k points around p
+        uint64_t k_range_dist = dist_from_p(tmp_ans[k - 1], sequence) + 1;
+        value_type first = k_range_first(k_range_dist, sequence);
+        value_type end = k_range_end(k_range_dist, sequence);
+        
+        // execute range query and get k nearest points
+        std::vector<value_type> ans;
+        for (auto it = this->range(first, end); it != this->end(); ++it)
+            ans.push_back(*it);
+
+        std::sort(ans.begin(), ans.end(), [&](auto const& lhs, auto const& rhs) {
+            double dist_l = dist_from_p(lhs, sequence);
+            double dist_r = dist_from_p(rhs, sequence);
+            return dist_l < dist_r;
+        });
+        
+        return std::vector<value_type> {ans.begin(), ans.begin() + k};
+    }
 
 private:
 
@@ -923,7 +1064,7 @@ private:
     public:
 
         using value_type = multidimensional_pgm_type::value_type;
-        using difference_type = ssize_t;
+        using difference_type = typename internal_iterator::difference_type;
         using pointer = const value_type *;
         using reference = const value_type &;
         using iterator_category = std::forward_iterator_tag;
@@ -967,7 +1108,7 @@ private:
 
         RangeIterator(internal_iterator it) : RangeIterator(it, morton::Decode(*it)) {}
 
-        RangeIterator(internal_iterator it, const value_type &p) : it(it), p(p), miss(-1) {}
+        RangeIterator(internal_iterator it, const value_type &p) : p(p), it(it), miss(-1) {}
 
         RangeIterator(const decltype(super) super, const value_type &min, const value_type &max)
             : super(super),

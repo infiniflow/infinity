@@ -109,6 +109,7 @@ export std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector
                                                                     const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
                                                                     const SegmentID segment_id,
                                                                     const u32 segment_row_count,
-                                                                    const u32 segment_row_actual_count);
+                                                                    const u32 segment_row_actual_count,
+                                                                    const TxnTimeStamp ts);
 
 } // namespace infinity

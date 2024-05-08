@@ -16,16 +16,15 @@ module;
 export module common_query_filter;
 import stl;
 import bitmask;
-import base_expression;
-import base_table_ref;
-import fast_rough_filter;
-import table_index_entry;
-import segment_entry;
 import secondary_index_scan_execute_expression;
-import query_context;
-import buffer_manager;
 
 namespace infinity {
+class FastRoughFilterEvaluator;
+class BaseTableRef;
+class BaseExpression;
+class QueryContext;
+class BufferManager;
+struct TableIndexEntry;
 
 export struct CommonQueryFilter {
     TxnTimeStamp begin_ts_;
@@ -56,19 +55,7 @@ export struct CommonQueryFilter {
     u32 begin_task_num_ = 0;
     atomic_u32 end_task_num_ = 0;
 
-    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts)
-        : begin_ts_(begin_ts), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
-        const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref_->block_index_->segment_index_;
-        if (segment_index.empty()) {
-            finish_build_.test_and_set(std::memory_order_release);
-        } else {
-            tasks_.reserve(segment_index.size());
-            for (const auto &[segment_id, _] : segment_index) {
-                tasks_.push_back(segment_id);
-            }
-            total_task_num_ = tasks_.size();
-        }
-    }
+    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts);
 
     // 1. try to finish building the filter
     // 2. return true if the filter is available for query

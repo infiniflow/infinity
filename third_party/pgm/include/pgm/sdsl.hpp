@@ -10154,16 +10154,13 @@ public:
 
     sd_vector(const bit_vector& bv)
     {
-        m_size		   = bv.size();
+        m_size = bv.size();
         size_type m	= util::cnt_one_bits(bv);
-        uint8_t   logm = bits::hi(m) + 1;
-        uint8_t   logn = bits::hi(m_size) + 1;
-        if (logm == logn) {
-            --logm; // to ensure logn-logm > 0
-        }
-        m_wl				 = logn - logm;
-        m_low				 = int_vector<>(m, 0, m_wl);
-        bit_vector		high = bit_vector(m + (1ULL << logm), 0); //
+        std::pair<size_type, size_type> params = get_params(m_size, m);
+        m_wl = params.first;
+        m_low = int_vector<>(m, 0, params.first);
+        bit_vector high = bit_vector(params.second, 0);
+
         const uint64_t* bvp  = bv.data();
         for (size_type i = 0, mm = 0, last_high = 0, highpos = 0; i < (bv.size() + 63) / 64;
              ++i, ++bvp) {
@@ -10198,19 +10195,13 @@ public:
         if (begin == end) {
             return;
         }
-        if (!is_sorted(begin, end)) {
-            throw std::runtime_error("sd_vector: source list is not sorted.");
-        }
-        size_type m  = std::distance(begin, end);
-        m_size		 = *(end - 1) + 1;
-        uint8_t logm = bits::hi(m) + 1;
-        uint8_t logn = bits::hi(m_size) + 1;
-        if (logm == logn) {
-            --logm; // to ensure logn-logm > 0
-        }
-        m_wl			= logn - logm;
-        m_low			= int_vector<>(m, 0, m_wl);
-        bit_vector high = bit_vector(m + (1ULL << logm), 0);
+        size_type m = std::distance(begin, end);
+        m_size = *(end - 1) + 1;
+        std::pair<size_type, size_type> params = get_params(m_size, m);
+        m_wl = params.first;
+        m_low = int_vector<>(m, 0, params.first);
+        bit_vector high = bit_vector(params.second, 0);
+
         auto	   itr  = begin;
         size_type  mm = 0, last_high = 0, highpos = 0;
         while (itr != end) {
@@ -10244,6 +10235,37 @@ public:
         util::init_support(m_high_0_select, &(this->m_high));
 
         builder = sd_vector_builder();
+    }
+
+    // Returns `(low.width(), high.size())`.
+    //
+    // This is based on:
+    //
+    //   Ma, Puglisi, Raman, Zhukova:
+    //   On Elias-Fano for Rank Queries in FM-Indexes.
+    //   DCC 2021.
+    //
+    // Implementation credit: Jouni Siren, https://github.com/vgteam/sdsl-lite
+    static std::pair<size_type, size_type> get_params(size_type universe, size_type ones)
+    {
+        size_type low_width = 1;
+        // Multisets with too many ones will have width 1.
+        if (ones > 0 && ones <= universe) {
+            double ideal_width = std::log2((static_cast<double>(universe) * std::log(2.0)) / static_cast<double>(ones));
+            low_width = std::round(std::max(ideal_width, 1.0));
+        }
+        size_type buckets = get_buckets(universe, low_width);
+        return std::pair<size_type, size_type>(low_width, ones + buckets);
+    }
+
+    // Returns the number of buckets.
+    static size_type get_buckets(size_type universe, size_type low_width)
+    {
+        size_type buckets = universe >> low_width;
+        if ((universe & bits::lo_set[low_width]) != 0) {
+            buckets++;
+        }
+        return buckets;
     }
 
     //! Accessing the i-th element of the original bit_vector
@@ -10450,33 +10472,6 @@ public:
             --rank_low;
         } while (m_v->high[sel_high] and m_v->low[rank_low] >= val_low);
         return rank_support_sd_trait<t_b>::adjust_rank(rank_low + 1, i);
-    }
-
-    std::pair<size_type, uint64_t> pred(size_type i) const
-    {
-        assert(m_v != nullptr);
-        if (i > m_v->size()) {
-            auto j = m_v->low.size();
-            return {j - 1,  m_v->low[j-1] +  ((m_v->high_1_select(j) + 1 - j)  << (m_v->wl))};
-        }
-        ++i;
-        // split problem in two parts:
-        // (1) find  >=
-        size_type high_val = (i >> (m_v->wl));
-        size_type sel_high = m_v->high_0_select(high_val + 1);
-        size_type rank_low = sel_high - high_val; //
-        if (0 == rank_low)
-            return {rank_support_sd_trait<t_b>::adjust_rank(0, i), m_v->low[0] + (high_val << m_v->wl)};
-        size_type val_low = i & bits::lo_set[ m_v->wl ];
-        // now since rank_low > 0 => sel_high > 0
-        do {
-            if (!sel_high) {
-                return {rank_support_sd_trait<t_b>::adjust_rank(0, i), m_v->low[rank_low] + (high_val < m_v->wl)};
-            }
-            --sel_high; --rank_low;
-        } while (m_v->high[sel_high] and m_v->low[rank_low] >= val_low);
-        auto h = m_v->high[sel_high] ? high_val : bits::prev(m_v->high.data(), sel_high) - rank_low;
-        return {rank_support_sd_trait<t_b>::adjust_rank(rank_low, i), m_v->low[rank_low] + (h << m_v->wl)};
     }
 
     size_type operator()(size_type i) const { return rank(i); }
@@ -10806,13 +10801,10 @@ inline sd_vector_builder::sd_vector_builder(size_type n, size_type m)
             "sd_vector_builder: requested capacity is larger than vector size.");
     }
 
-    size_type logm = bits::hi(m_capacity) + 1, logn = bits::hi(m_size) + 1;
-    if (logm == logn) {
-        logm--; // to ensure logn-logm > 0
-    }
-    m_wl   = logn - logm;
-    m_low  = int_vector<>(m_capacity, 0, m_wl);
-    m_high = bit_vector(m_capacity + (1ULL << logm), 0);
+    std::pair<size_type, size_type> params = sd_vector<>::get_params(m_size, m_capacity);
+    m_wl = params.first;
+    m_low = int_vector<>(m_capacity, 0, params.first);
+    m_high = bit_vector(params.second, 0);
 }
 
 template <>
