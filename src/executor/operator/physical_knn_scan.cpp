@@ -244,7 +244,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     Txn *txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    if (!common_query_filter_->TryFinishBuild(begin_ts, query_context->GetTxn()->buffer_mgr())) {
+    if (!common_query_filter_->TryFinishBuild(txn)) {
         // not ready, abort and wait for next time
         return;
     }

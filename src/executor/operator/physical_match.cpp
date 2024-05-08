@@ -804,7 +804,8 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     auto start_time = std::chrono::high_resolution_clock::now();
     assert(common_query_filter_);
     {
-        bool try_result = common_query_filter_->TryFinishBuild(query_context->GetTxn()->BeginTS(), query_context->GetTxn()->buffer_mgr());
+        Txn *txn = query_context->GetTxn();
+        bool try_result = common_query_filter_->TryFinishBuild(txn);
         auto finish_filter_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::milli> filter_duration = finish_filter_time - start_time;
         LOG_TRACE(fmt::format("PhysicalMatch Prepare: Filter time: {} ms", filter_duration.count()));
