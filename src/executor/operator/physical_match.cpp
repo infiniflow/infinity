@@ -547,8 +547,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
     }
 
-    // use_block_max_iter = false;
-    // use_ordinary_iter = true;
     auto finish_parse_query_tree_time = std::chrono::high_resolution_clock::now();
     TimeDurationType parse_query_tree_duration = finish_parse_query_tree_time - finish_init_query_builder_time;
     LOG_TRACE(fmt::format("PhysicalMatch Part 0.2: Parse QueryNode tree time: {} ms", parse_query_tree_duration.count()));
