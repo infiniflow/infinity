@@ -327,11 +327,19 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         if (!status.ok())
             continue;
         const IndexBase *index_base = table_index_entry->index_base();
-        if (index_base->index_type_ != IndexType::kFullText && index_base->index_type_ != IndexType::kHnsw) {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_WARN(*err_msg);
-            continue;
+        switch (index_base->index_type_) {
+            case IndexType::kFullText:
+            case IndexType::kSecondary:
+            case IndexType::kHnsw: {
+                // support realtime index
+                break;
+            }
+            default: {
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                LOG_WARN(*err_msg);
+                continue;
+            }
         }
         PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
         SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
@@ -618,7 +626,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
         const IndexBase *index_base = table_index_entry->index_base();
         switch (index_base->index_type_) {
             case IndexType::kHnsw:
-            case IndexType::kFullText: {
+            case IndexType::kFullText:
+            case IndexType::kSecondary: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
@@ -830,7 +839,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 }
                 break;
             }
-            case IndexType::kHnsw: {
+            case IndexType::kHnsw:
+            case IndexType::kSecondary: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
                 for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
                     SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
