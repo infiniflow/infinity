@@ -30,8 +30,23 @@ struct SecondaryIndexApproxPos {
     SizeT upper_bound_{}; ///< The upper bound of the range.
 };
 
+template <typename T>
+struct PGMT;
+
+template <typename T>
+    requires std::is_integral_v<T> || std::is_same_v<T, float>
+struct PGMT<T> {
+    using type = PGMIndex<T, 64, 4, float>;
+};
+
+template <typename T>
+    requires std::is_same_v<T, double>
+struct PGMT<T> {
+    using type = PGMIndex<T, 64, 4, double>;
+};
+
 template <typename IndexValueType>
-using PGMIndexType = PGMIndex<IndexValueType, 8>;
+using PGMIndexType = PGMT<IndexValueType>::type;
 
 // PGMIndex member objects:
 // size_t n;                           ///< The number of elements this index was built on.
