@@ -20,18 +20,24 @@ import stl;
 import txn_manager;
 import txn_state;
 import txn;
+import infinity_exception;
+import third_party;
 
 namespace infinity {
 
 bool BaseEntry::CheckVisible(Txn *txn) const {
     TxnTimeStamp begin_ts = txn->BeginTS();
-    TxnManager *txn_mgr = txn->txn_mgr();
     TransactionID txn_id = txn_id_.load();
-    if (begin_ts < commit_ts_ || txn_id_ == txn->TxnID()) {
+    if (begin_ts >= commit_ts_ || txn_id == txn->TxnID()) {
         return true;
     }
+    TxnManager *txn_mgr = txn->txn_mgr();
     if (txn_mgr == nullptr) { // when replay
-        return false;
+        UnrecoverableError(fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
+                                       begin_ts,
+                                       commit_ts_,
+                                       txn->TxnID(),
+                                       txn_id));
     }
     return txn_mgr->CheckIfCommitting(txn_id, begin_ts);
 }

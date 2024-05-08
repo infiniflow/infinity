@@ -242,16 +242,18 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
             if (memory_indexer_.get() == nullptr) {
                 String base_name = fmt::format("ft_{:016x}", begin_row_id.ToUint64());
-                std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
-                                                            base_name,
-                                                            begin_row_id,
-                                                            index_fulltext->flag_,
-                                                            index_fulltext->analyzer_,
-                                                            table_index_entry_->GetFulltextByteSlicePool(),
-                                                            table_index_entry_->GetFulltextBufferPool(),
-                                                            table_index_entry_->GetFulltextInvertingThreadPool(),
-                                                            table_index_entry_->GetFulltextCommitingThreadPool());
+                {
+                    std::unique_lock<std::shared_mutex> lck(rw_locker_);
+                    memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
+                                                                base_name,
+                                                                begin_row_id,
+                                                                index_fulltext->flag_,
+                                                                index_fulltext->analyzer_,
+                                                                table_index_entry_->GetFulltextByteSlicePool(),
+                                                                table_index_entry_->GetFulltextBufferPool(),
+                                                                table_index_entry_->GetFulltextInvertingThreadPool(),
+                                                                table_index_entry_->GetFulltextCommitingThreadPool());
+                }
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
                 RowID exp_begin_row_id = memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount();
