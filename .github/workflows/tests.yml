@@ -59,16 +59,7 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          sudo docker exec infinity_build bash -c "mkdir -p /var/infinity \
-          && cd /infinity/ \
-          && for i in $(seq 1 5); do \
-            echo \"Run $i\" \
-            cmake-build-debug/src/test_main > unittest_debug.log 2>&1 \
-            if [ $? -eq 0 ]; then \
-              break \
-            fi \
-          done"
+        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
         run: cat unittest_debug.log 2>/dev/null || true
