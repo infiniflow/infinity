@@ -3,7 +3,10 @@ version = "0.1.0"
 timezone = "utc-8"
 
 [storage]
-cleanup_interval = 1
+# close auto cleanup task
+cleanup_interval = 0
+# close auto compaction
+compaction_interval = 0
 
 [wal]
 #short checkpoint interval to allow quick cleanup
