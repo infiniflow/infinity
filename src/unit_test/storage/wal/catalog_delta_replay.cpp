@@ -50,31 +50,19 @@ import logger;
 import infinity_exception;
 import default_values;
 import block_index;
+import wal_manager;
 
 using namespace infinity;
 
 class CatalogDeltaReplayTest : public BaseTest {
 protected:
-    void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
-        // TxnTimeStamp visible_ts = 0;
-        // auto start = std::chrono::steady_clock::now();
-        // while (true) {
-        //     visible_ts = txn_mgr->GetMinUnflushedTS();
-        //     if (visible_ts <= last_commit_ts) {
-        //         break;
-        //     }
-        //     auto end = std::chrono::steady_clock::now();
-        //     auto duration = std::chrono::duration_cast<Seconds>(end - start);
-        //     if (duration.count() > 10) {
-        //         UnrecoverableException("WaitFlushDeltaOp timeout");
-        //     }
-        //     std::this_thread::sleep_for(Seconds(1));
-        // };
+    void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
+        TxnManager *txn_mgr = storage->txn_manager();
 
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = txn_mgr->GetCleanupScanTS();
             if (visible_ts >= last_commit_ts) {
                 break;
             }
@@ -155,7 +143,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
             txn->CreateDatabase(*db_name3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -232,7 +220,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -331,7 +319,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -419,7 +407,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -525,7 +513,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             txn_mgr->CommitTxn(txn);
         }
 
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -661,7 +649,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             ASSERT_TRUE(status.ok());
 
             last_commit_ts = txn_mgr->CommitTxn(txn_record3);
-            WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+            WaitFlushDeltaOp(storage, last_commit_ts);
         }
         infinity::InfinityContext::instance().UnInit();
     }
@@ -929,7 +917,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -1095,7 +1083,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -1265,7 +1253,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
