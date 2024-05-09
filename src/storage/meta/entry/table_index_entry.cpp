@@ -191,7 +191,7 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<SharedPtr<SegmentIndexEntry>> segment_index_entry_candidates;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
-        json["txn_id"] = this->txn_id_.load();
+        json["txn_id"] = this->txn_id_;
         json["begin_ts"] = this->begin_ts_;
         json["commit_ts"] = this->commit_ts_.load();
         json["deleted"] = this->deleted_;

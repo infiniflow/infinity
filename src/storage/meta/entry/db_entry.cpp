@@ -55,7 +55,7 @@ DBEntry::DBEntry(DBMeta *db_meta,
                  TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kDatabase, is_delete, DBEntry::EncodeIndex(*db_name)), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
     begin_ts_ = begin_ts;
-    txn_id_.store(txn_id);
+    txn_id_ = txn_id;
 }
 
 SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
@@ -238,7 +238,7 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts) {
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["db_name"] = *this->db_name_;
-        json_res["txn_id"] = this->txn_id_.load();
+        json_res["txn_id"] = this->txn_id_;
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
         json_res["deleted"] = this->deleted_;

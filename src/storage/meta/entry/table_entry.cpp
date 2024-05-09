@@ -208,7 +208,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
 
 /// replay
 void TableEntry::UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry) {
-    txn_id_.store(table_entry->txn_id_);
+    txn_id_ = table_entry->txn_id_;
     begin_ts_ = table_entry->begin_ts_;
     commit_ts_.store(table_entry->commit_ts_);
     row_count_ = table_entry->row_count();
@@ -944,7 +944,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["table_entry_type"] = this->table_entry_type_;
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
-        json_res["txn_id"] = this->txn_id_.load();
+        json_res["txn_id"] = this->txn_id_;
         json_res["deleted"] = this->deleted_;
         if (!this->deleted_) {
             json_res["table_entry_dir"] = *this->table_entry_dir_;
@@ -1180,8 +1180,6 @@ void TableEntry::Cleanup() {
     LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) {
-    return fulltext_column_index_cache_.GetIndexReader(txn, this);
-}
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
 
 } // namespace infinity

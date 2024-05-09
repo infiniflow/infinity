@@ -97,7 +97,7 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
     std::lock_guard guard(rw_locker_);
     auto iter = txn_map_.find(txn_id);
     if (iter == txn_map_.end()) {
-        return true; // committed
+        return true; // Txn is already committed
     }
     Txn *txn = iter->second.get();
     auto state = txn->GetTxnState();
