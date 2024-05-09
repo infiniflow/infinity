@@ -67,14 +67,14 @@ protected:
 
     void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
         Catalog *catalog = storage->catalog();
-        WalManager *wal_mgr = storage->wal_manager();
+        TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_mgr = storage->buffer_manager();
 
         LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = wal_mgr->GetLastCkpTS() + 1;
+            visible_ts = txn_mgr->GetCleanupScanTS();
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Cleanup finished after {}", end - start));

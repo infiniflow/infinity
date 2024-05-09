@@ -67,12 +67,12 @@ protected:
     void TearDown() override { RemoveDbDirs(); }
 
     void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
-        WalManager *wal_mgr = storage->wal_manager();
+        TxnManager *txn_mgr = storage->txn_manager();
         LOG_INFO("Waiting flush delta op");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = wal_mgr->GetLastCkpTS() + 1;
+            visible_ts = txn_mgr->GetCleanupScanTS();
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Flush delta op finished after {}", end - start));
@@ -87,14 +87,14 @@ protected:
 
     void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
         Catalog *catalog = storage->catalog();
-        WalManager *wal_mgr = storage->wal_manager();
+        TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_mgr = storage->buffer_manager();
 
         LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = wal_mgr->GetLastCkpTS() + 1;
+            visible_ts = txn_mgr->GetCleanupScanTS();
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
@@ -220,8 +220,6 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
         txn_mgr->CommitTxn(txn5);
     }
     WaitCleanup(storage, last_commit_ts);
-    usleep(5000 * 1000);
-    WaitFlushDeltaOp(storage, last_commit_ts);
     infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);

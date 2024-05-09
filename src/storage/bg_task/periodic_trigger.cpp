@@ -28,7 +28,7 @@ import third_party;
 namespace infinity {
 
 void CleanupPeriodicTrigger::Trigger() {
-    TxnTimeStamp visible_ts = wal_mgr_->GetLastCkpTS() + 1;
+    TxnTimeStamp visible_ts = txn_mgr_->GetCleanupScanTS();
     // if (visible_ts == last_visible_ts_) {
     //     LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
     //     return;
@@ -40,7 +40,8 @@ void CleanupPeriodicTrigger::Trigger() {
     last_visible_ts_ = visible_ts;
     LOG_TRACE(fmt::format("Cleanup visible timestamp: {}", visible_ts));
 
-    auto cleanup_task = MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr_);
+    auto buffer_mgr = txn_mgr_->GetBufferMgr();
+    auto cleanup_task = MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr);
     bg_processor_->Submit(std::move(cleanup_task));
 }
 

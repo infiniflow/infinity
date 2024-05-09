@@ -233,6 +233,20 @@ SizeT TxnManager::ActiveTxnCount() {
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
+TxnTimeStamp TxnManager::GetCleanupScanTS() {
+    std::lock_guard guard(rw_locker_);
+    TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
+    while (!beginned_txns_.empty()) {
+        auto first_txn = beginned_txns_.front().lock();
+        if (first_txn.get() != nullptr) {
+            first_uncommitted_begin_ts = first_txn->BeginTS();
+        }
+        beginned_txns_.pop_front();
+    }
+    TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
+    return std::min(first_uncommitted_begin_ts, checkpointed_ts);
+}
+
 // A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
 // So maintain the least uncommitted begin ts
 void TxnManager::FinishTxn(Txn *txn) {

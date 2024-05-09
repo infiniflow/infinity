@@ -57,12 +57,12 @@ using namespace infinity;
 class CatalogDeltaReplayTest : public BaseTest {
 protected:
     void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
-        WalManager *wal_mgr = storage->wal_manager();
+        TxnManager *txn_mgr = storage->txn_manager();
 
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = wal_mgr->GetLastCkpTS() + 1;
+            visible_ts = txn_mgr->GetCleanupScanTS();
             if (visible_ts >= last_commit_ts) {
                 break;
             }

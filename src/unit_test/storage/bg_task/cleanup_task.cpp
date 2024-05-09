@@ -48,29 +48,34 @@ class CleanupTaskTest : public BaseTest {
 protected:
     void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
         Catalog *catalog = storage->catalog();
-        WalManager *wal_mgr = storage->wal_manager();
         BufferManager *buffer_mgr = storage->buffer_manager();
 
-        LOG_INFO("Waiting cleanup");
-        TxnTimeStamp visible_ts = 0;
-        time_t start = time(nullptr);
-        while (true) {
-            visible_ts = wal_mgr->GetLastCkpTS() + 1;
-            time_t end = time(nullptr);
-            if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
-                break;
-            }
-            // wait for at most 10s
-            if (end - start > 10) {
-                UnrecoverableError("WaitCleanup timeout");
-            }
-            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
-            usleep(1000 * 1000);
-        }
+        auto visible_ts = WaitFlushDeltaOp(storage, last_commit_ts);
 
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
+    }
+
+    TxnTimeStamp WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
+        TxnManager *txn_mgr = storage->txn_manager();
+
+        TxnTimeStamp visible_ts = 0;
+        time_t start = time(nullptr);
+        while (true) {
+            visible_ts = txn_mgr->GetCleanupScanTS();
+            // wait for at most 10s
+            time_t end = time(nullptr);
+            if (visible_ts >= last_commit_ts) {
+                LOG_INFO(fmt::format("FlushDeltaOp finished after {}", end - start));
+                break;
+            }
+            if (end - start > 10) {
+                UnrecoverableException("WaitFlushDeltaOp timeout");
+            }
+            LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
+            usleep(1000 * 1000);
+        }
+        return visible_ts;
     }
 };
 
@@ -90,8 +95,9 @@ TEST_F(CleanupTaskTest, test_delete_db_simple) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
         txn->CreateDatabase(*db_name, ConflictType::kError);
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
+    WaitFlushDeltaOp(storage, last_commit_ts);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"));
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
@@ -184,8 +190,9 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table1"));
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
+    WaitFlushDeltaOp(storage, last_commit_ts);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"));
 

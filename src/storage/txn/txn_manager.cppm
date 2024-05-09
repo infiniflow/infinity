@@ -85,6 +85,8 @@ public:
 
     TxnTimeStamp CurrentTS() const;
 
+    TxnTimeStamp GetCleanupScanTS();
+
 private:
     void FinishTxn(Txn *txn);
 

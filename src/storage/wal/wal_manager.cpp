@@ -65,7 +65,7 @@ WalManager::WalManager(Storage *storage,
                        FlushOptionType flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_dir_(wal_dir),
       wal_path_(wal_dir + "/" + WalFile::TempWalFilename()), storage_(storage), running_(false), flush_option_(flush_option), last_ckp_wal_size_(0),
-      checkpoint_in_progress_(false), last_ckp_ts_(0), last_full_ckp_ts_(0) {}
+      checkpoint_in_progress_(false), last_ckp_ts_(UNCOMMIT_TS), last_full_ckp_ts_(UNCOMMIT_TS) {}
 
 WalManager::~WalManager() {
     if (running_.load()) {
@@ -146,7 +146,7 @@ i64 WalManager::WalSize() const {
     return wal_size_;
 }
 
-TxnTimeStamp WalManager::GetLastCkpTS() { return last_ckp_ts_; }
+TxnTimeStamp WalManager::GetCheckpointedTS() { return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_ + 1; }
 
 // Flush is scheduled regularly. It collects a batch of transactions, sync
 // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -280,17 +280,18 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_comm
 void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size) {
     DeferFn defer([&] { checkpoint_in_progress_.store(false); });
 
-    TxnTimeStamp last_ckp_ts = GetLastCkpTS();
+    TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    TxnTimeStamp last_full_ckp_ts = last_full_ckp_ts_;
     if (is_full_checkpoint) {
-        if (max_commit_ts == last_full_ckp_ts_) {
+        if (max_commit_ts == last_full_ckp_ts) {
             LOG_INFO(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
             return;
         }
-        if (last_full_ckp_ts_ >= max_commit_ts) {
+        if (last_full_ckp_ts != UNCOMMIT_TS && last_full_ckp_ts >= max_commit_ts) {
             UnrecoverableError(
-                fmt::format("WalManager::UpdateLastFullMaxCommitTS last_full_ckp_ts_ {} >= max_commit_ts {}", last_full_ckp_ts_, max_commit_ts));
+                fmt::format("WalManager::UpdateLastFullMaxCommitTS last_full_ckp_ts {} >= max_commit_ts {}", last_full_ckp_ts, max_commit_ts));
         }
-        if (last_ckp_ts > max_commit_ts) {
+        if (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts > max_commit_ts) {
             UnrecoverableError(fmt::format("WalManager::UpdateLastFullMaxCommitTS last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts));
         }
     } else {

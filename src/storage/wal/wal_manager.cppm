@@ -70,7 +70,7 @@ public:
 
     i64 GetLastCkpWalSize();
 
-    TxnTimeStamp GetLastCkpTS();
+    TxnTimeStamp GetCheckpointedTS();
 
 private:
     // Checkpoint Helper
