@@ -114,7 +114,7 @@ public:
         deprecate_ts_.store(commit_ts);
     }
 
-    bool CheckVisible(TxnTimeStamp ts) {
+    bool CheckVisibleByTS(TxnTimeStamp ts) { // FIXME: should overload BaseEntry::CheckVisible
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();
         TxnTimeStamp commit_ts = commit_ts_.load();
         assert(commit_ts == UNCOMMIT_TS || commit_ts < deprecate_ts);

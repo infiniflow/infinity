@@ -139,7 +139,7 @@ public:
         SizeT num = chunk_index_entries_.size();
         for (SizeT i = 0; i < num; i++) {
             auto &chunk_index_entry = chunk_index_entries_[i];
-            if (chunk_index_entry->CheckVisible(begin_ts)) {
+            if (chunk_index_entry->CheckVisibleByTS(begin_ts)) {
                 chunk_index_entries.push_back(chunk_index_entry);
             }
         }

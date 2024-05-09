@@ -217,7 +217,7 @@ public:
 
     Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
-    SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
+    SharedPtr<BlockIndex> GetBlockIndex(Txn *txn);
 
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
@@ -235,15 +235,13 @@ public:
 
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
-    IndexReader GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts);
+    IndexReader GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
         return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
     bool CheckDeleteVisible(DeleteState &delete_state, Txn *txn);
-
-    bool CheckVisible(SegmentID segment_id, TxnTimeStamp check_ts) const;
 
 private:
     TableMeta *const table_meta_{};

@@ -43,9 +43,7 @@ TxnManager::TxnManager(Catalog *catalog,
                        TxnTimeStamp start_ts,
                        bool enable_compaction)
     : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false),
-      enable_compaction_(enable_compaction) {
-    catalog_->SetTxnMgr(this);
-}
+      enable_compaction_(enable_compaction) {}
 
 Txn *TxnManager::BeginTxn() {
     // Check if the is_running_ is true
@@ -66,7 +64,6 @@ Txn *TxnManager::BeginTxn() {
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
-    ts_map_.emplace(ts, new_txn_id);
     beginned_txns_.emplace_back(new_txn);
     rw_locker_.unlock();
 
@@ -86,7 +83,29 @@ SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
     return res;
 }
 
-TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
+TxnState TxnManager::GetTxnState(TransactionID txn_id) {
+    std::lock_guard guard(rw_locker_);
+    auto iter = txn_map_.find(txn_id);
+    if (iter == txn_map_.end()) {
+        return TxnState::kCommitted;
+    }
+    Txn *txn = iter->second.get();
+    return txn->GetTxnState();
+}
+
+bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    std::lock_guard guard(rw_locker_);
+    auto iter = txn_map_.find(txn_id);
+    if (iter == txn_map_.end()) {
+        return true; // Txn is already committed
+    }
+    Txn *txn = iter->second.get();
+    auto state = txn->GetTxnState();
+    if (state != TxnState::kCommitting && state != TxnState::kCommitted) {
+        return false;
+    }
+    return txn->CommitTS() < begin_ts;
+}
 
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     std::lock_guard guard(rw_locker_);
@@ -182,8 +201,6 @@ void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
         UnrecoverableError("TxnManager is not running, cannot add delta entry");
     }
     i64 wal_size = wal_mgr_->WalSize();
-    const auto &txn_ids = delta_entry->txn_ids();
-    this->AddWaitFlushTxn(txn_ids);
     bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry), wal_size));
 }
 
@@ -234,6 +251,21 @@ SizeT TxnManager::ActiveTxnCount() {
 }
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
+
+TxnTimeStamp TxnManager::GetCleanupScanTS() {
+    std::lock_guard guard(rw_locker_);
+    TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
+    while (!beginned_txns_.empty()) {
+        auto first_txn = beginned_txns_.front().lock();
+        if (first_txn.get() != nullptr) {
+            first_uncommitted_begin_ts = first_txn->BeginTS();
+            break;
+        }
+        beginned_txns_.pop_front();
+    }
+    TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
+    return std::min(first_uncommitted_begin_ts, checkpointed_ts);
+}
 
 // A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
 // So maintain the least uncommitted begin ts
@@ -290,48 +322,6 @@ void TxnManager::FinishTxn(Txn *txn) {
         }
         finished_txns_.pop_front();
     }
-}
-
-void TxnManager::AddWaitFlushTxn(const Vector<TransactionID> &txn_ids) {
-    // std::stringstream ss;
-    // for (auto txn_id : txn_ids) {
-    //     ss << txn_id << " ";
-    // }
-    // LOG_INFO(fmt::format("Add txns: {} to wait flush set", ss.str()));
-    std::unique_lock w_lock(rw_locker_);
-    wait_flush_txns_.insert(txn_ids.begin(), txn_ids.end());
-}
-
-void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
-    // std::stringstream ss2;
-    // for (auto txn_id : txn_ids) {
-    //     ss2 << txn_id << " ";
-    // }
-    // LOG_INFO(fmt::format("Remove txn: {} from wait flush set", ss2.str()));
-    std::unique_lock w_lock(rw_locker_);
-    for (auto txn_id : txn_ids) {
-        if (!wait_flush_txns_.erase(txn_id)) {
-            UnrecoverableError(fmt::format("Txn: {} not found in wait flush set", txn_id));
-        }
-    }
-}
-
-TxnTimeStamp TxnManager::GetMinUnflushedTS() {
-    std::unique_lock w_locker(rw_locker_);
-    for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
-        auto &[ts, txn_id] = *iter;
-        if (txn_map_.find(txn_id) != txn_map_.end()) {
-            LOG_TRACE(fmt::format("Txn: {} found in txn map", txn_id));
-            return ts;
-        }
-        if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
-            LOG_TRACE(fmt::format("Txn: {} wait flush", txn_id));
-            return ts;
-        }
-        iter = ts_map_.erase(iter);
-    }
-    LOG_TRACE(fmt::format("No txn is active, return the next ts {}", start_ts_));
-    return start_ts_;
 }
 
 } // namespace infinity

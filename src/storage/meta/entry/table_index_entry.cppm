@@ -95,7 +95,7 @@ public:
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot(const TableEntry *table_entry, TxnTimeStamp begin_ts);
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot(const TableEntry *table_entry, Txn *txn);
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     String GetPathNameTail() const;
     bool GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry);
@@ -115,7 +115,7 @@ public:
     Tuple<Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
-    Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
+    Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
 
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }

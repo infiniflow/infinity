@@ -130,7 +130,9 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
     }
 }
 
-void CommonQueryFilter::BuildFilter(u32 task_id, TxnTimeStamp begin_ts, BufferManager *buffer_mgr) {
+void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
+    auto *buffer_mgr = txn->buffer_mgr();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref_->block_index_->segment_index_;
     const SegmentID segment_id = tasks_[task_id];
     const SegmentEntry *segment_entry = segment_index.at(segment_id);
@@ -145,7 +147,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id, TxnTimeStamp begin_ts, BufferMa
                                                  segment_id,
                                                  segment_row_count,
                                                  segment_actual_row_count,
-                                                 begin_ts);
+                                                 txn);
     if (std::visit(Overload{[](const Vector<u32> &v) -> bool { return v.empty(); }, [](const Bitmask &) -> bool { return false; }}, result_elem)) {
         // empty result
         return;

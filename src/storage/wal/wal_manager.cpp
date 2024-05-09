@@ -142,6 +142,8 @@ i64 WalManager::WalSize() const {
     return wal_size_;
 }
 
+TxnTimeStamp WalManager::GetCheckpointedTS() { return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_ + 1; }
+
 // Flush is scheduled regularly. It collects a batch of transactions, sync
 // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
 // ~10s. So it's necessary to sync for a batch of transactions, and to
@@ -274,33 +276,35 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_comm
 void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size) {
     DeferFn defer([&] { checkpoint_in_progress_.store(false); });
 
+    TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    TxnTimeStamp last_full_ckp_ts = last_full_ckp_ts_;
     if (is_full_checkpoint) {
-        if (max_commit_ts == last_full_ckp_ts_) {
+        if (max_commit_ts == last_full_ckp_ts) {
             LOG_TRACE(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
             return;
         }
-        if (last_full_ckp_ts_ != UNCOMMIT_TS && last_full_ckp_ts_ >= max_commit_ts) {
+        if (last_full_ckp_ts != UNCOMMIT_TS && last_full_ckp_ts >= max_commit_ts) {
             UnrecoverableError(
-                fmt::format("WalManager::UpdateLastFullMaxCommitTS last_full_ckp_ts_ {} >= max_commit_ts {}", last_full_ckp_ts_, max_commit_ts));
+                fmt::format("WalManager::UpdateLastFullMaxCommitTS last_full_ckp_ts {} >= max_commit_ts {}", last_full_ckp_ts, max_commit_ts));
         }
-        if (last_ckp_ts_ != UNCOMMIT_TS && last_ckp_ts_ > max_commit_ts) {
-            UnrecoverableError(fmt::format("WalManager::UpdateLastFullMaxCommitTS last_ckp_ts_ {} >= max_commit_ts {}", last_ckp_ts_, max_commit_ts));
+        if (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts > max_commit_ts) {
+            UnrecoverableError(fmt::format("WalManager::UpdateLastFullMaxCommitTS last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts));
         }
     } else {
-        if (max_commit_ts == last_ckp_ts_) {
+        if (max_commit_ts == last_ckp_ts) {
             LOG_TRACE(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
             return;
         }
-        if (last_ckp_ts_ >= max_commit_ts) {
-            UnrecoverableError(fmt::format("WalManager::UpdateLastMaxCommitTS last_ckp_ts_ {} >= max_commit_ts {}", last_ckp_ts_, max_commit_ts));
+        if (last_ckp_ts >= max_commit_ts) {
+            UnrecoverableError(fmt::format("WalManager::UpdateLastMaxCommitTS last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts));
         }
     }
     try {
         LOG_TRACE(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                             is_full_checkpoint ? "FULL" : "DELTA",
-                             txn->TxnID(),
-                             txn->BeginTS(),
-                             max_commit_ts));
+                              is_full_checkpoint ? "FULL" : "DELTA",
+                              txn->TxnID(),
+                              txn->BeginTS(),
+                              max_commit_ts));
 
         if (!txn->Checkpoint(max_commit_ts, is_full_checkpoint)) {
             return;
@@ -643,7 +647,8 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
-    auto block_index = table_entry->GetBlockIndex(commit_ts);
+    auto txn = MakeUnique<Txn>(nullptr /*buffer_mgr*/, nullptr /*txn_mgr*/, nullptr /*catalog*/, txn_id, begin_ts);
+    auto block_index = table_entry->GetBlockIndex(txn.get());
     table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
@@ -699,7 +704,8 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
                                                            commit_ts,             /*commit_ts*/
                                                            commit_ts,             /*checkpoint_ts*/
                                                            block_info.row_count_, /*checkpoint_row_count*/
-                                                           buffer_mgr);
+                                                           buffer_mgr,
+                                                           txn_id);
         for (ColumnID column_id = 0; column_id < (ColumnID)block_info.outline_infos_.size(); ++column_id) {
             auto [next_idx, last_off] = block_info.outline_infos_[column_id];
             auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_idx, last_off, commit_ts);
