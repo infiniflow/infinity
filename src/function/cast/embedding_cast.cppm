@@ -84,6 +84,9 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
 template <typename SourceElemType>
 inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
     switch (target->Type()) {
+        case EmbeddingDataType::kElemBit: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, BooleanT, EmbeddingTryCastToFixlen>);
+        }
         case EmbeddingDataType::kElemInt8: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, TinyIntT, EmbeddingTryCastToFixlen>);
         }
@@ -112,6 +115,16 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
 struct EmbeddingTryCastToFixlen {
     template <typename SourceElemType, typename TargetElemType>
     static inline bool Run(const SourceElemType *source, TargetElemType *target, SizeT len) {
+        if constexpr (std::is_same_v<TargetElemType, bool>) {
+            auto *dst = reinterpret_cast<u8 *>(target);
+            std::fill_n(dst, len / 8, 0);
+            for (SizeT i = 0; i < len; ++i) {
+                if (source[i] > SourceElemType{}) {
+                    dst[i / 8] |= (1 << (i % 8));
+                }
+            }
+            return true;
+        }
         if constexpr (std::is_same<SourceElemType, TinyIntT>() || std::is_same<SourceElemType, SmallIntT>() ||
                       std::is_same<SourceElemType, IntegerT>() || std::is_same<SourceElemType, BigIntT>()) {
             for (SizeT i = 0; i < len; ++i) {
