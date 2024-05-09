@@ -133,133 +133,133 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Version
         String current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
-        UniquePtr<StringOption> version_option = MakeUnique<StringOption>("version", current_version);
+        UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
         global_options_.AddOption(std::move(version_option), GlobalOptionIndex::kVersion);
 
         // Timezone
         String time_zone_str = "UTC";
-        UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>("time_zone", time_zone_str);
+        UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>(TIME_ZONE_OPTION_NAME, time_zone_str);
         global_options_.AddOption(std::move(time_zone_option), GlobalOptionIndex::kTimeZone);
 
         // Timezone Bias
         i64 time_zone_bias = 8;
-        UniquePtr<IntegerOption> time_zone_bias_option = MakeUnique<IntegerOption>("time_zone_bias", time_zone_bias, 12, -12);
+        UniquePtr<IntegerOption> time_zone_bias_option = MakeUnique<IntegerOption>(TIME_ZONE_BIAS_OPTION_NAME, time_zone_bias, 12, -12);
         global_options_.AddOption(std::move(time_zone_bias_option), GlobalOptionIndex::kTimeZoneBias);
 
         // CPU limit
-        UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>("cpu_limit", Thread::hardware_concurrency(), 16384, 1);
+        UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>(CPU_LIMIT_OPTION_NAME, Thread::hardware_concurrency(), 16384, 1);
         global_options_.AddOption(std::move(cpu_limit_option), GlobalOptionIndex::kWorkerCPULimit);
 
         // Server address
         String server_address_str = "0.0.0.0";
-        UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>("server_address", server_address_str);
+        UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address_str);
         global_options_.AddOption(std::move(server_address_option), GlobalOptionIndex::kServerAddress);
 
         // Postgres port
         i64 pg_port = 5432;
-        UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>("postgres_port", pg_port, 65535, 1024);
+        UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
         global_options_.AddOption(std::move(pg_port_option), GlobalOptionIndex::kPostgresPort);
 
         // HTTP port
         i64 http_port = 23820;
-        UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>("http_port", http_port, 65535, 1024);
+        UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
         global_options_.AddOption(std::move(http_port_option), GlobalOptionIndex::kHTTPPort);
 
         // RPC Client port
         i64 rpc_client_port = 23817;
-        UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>("client_port", rpc_client_port, 65535, 1024);
+        UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
         global_options_.AddOption(std::move(client_port_option), GlobalOptionIndex::kClientPort);
 
         // Client pool size
         i64 connection_pool_size = 256;
-        UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>("connection_pool_size", connection_pool_size, 65536, 1);
+        UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
         global_options_.AddOption(std::move(connection_pool_size_option), GlobalOptionIndex::kConnectionPoolSize);
 
         // Log file name
         String log_filename = "infinity.log";
-        UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>("log_filename", log_filename);
+        UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>(LOG_FILENAME_OPTION_NAME, log_filename);
         global_options_.AddOption(std::move(log_file_name_option), GlobalOptionIndex::kLogFileName);
 
         // Log dir
         String log_dir = "/var/infinity/log";
-        UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>("log_dir", log_dir);
+        UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_dir);
         global_options_.AddOption(std::move(log_dir_option), GlobalOptionIndex::kLogDir);
 
         // Log To Stdout
         bool log_to_stdout = false;
-        UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>("log_to_stdout", log_to_stdout);
+        UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
         global_options_.AddOption(std::move(log_to_stdout_option), GlobalOptionIndex::kLogToStdout);
 
         // Log File Max Size
         i64 log_file_max_size = 1024lu * 1024lu * 1024lu;
         UniquePtr<IntegerOption> log_file_max_size_option =
-            MakeUnique<IntegerOption>("log_file_max_size", log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
+            MakeUnique<IntegerOption>(LOG_FILE_MAX_SIZE_OPTION_NAME, log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
         global_options_.AddOption(std::move(log_file_max_size_option), GlobalOptionIndex::kLogFileMaxSize);
 
         // Log File Rotate count
         i64 log_file_rotate_count = 8;
-        UniquePtr<IntegerOption> log_file_rotate_count_option = MakeUnique<IntegerOption>("log_file_rotate_count", log_file_rotate_count, 65536, 1);
+        UniquePtr<IntegerOption> log_file_rotate_count_option = MakeUnique<IntegerOption>(LOG_FILE_ROTATE_COUNT_OPTION_NAME, log_file_rotate_count, 65536, 1);
         global_options_.AddOption(std::move(log_file_rotate_count_option), GlobalOptionIndex::kLogFileRotateCount);
 
         // Log Level
         LogLevel log_level = LogLevel::kInfo;
-        UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>("log_level", log_level);
+        UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
         global_options_.AddOption(std::move(log_level_option), GlobalOptionIndex::kLogLevel);
 
         // Data Dir
         String data_dir = "/var/infinity/data";
-        UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>("data_dir", data_dir);
+        UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
         global_options_.AddOption(std::move(data_dir_option), GlobalOptionIndex::kDataDir);
 
         // Cleanup Interval
         i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
         UniquePtr<IntegerOption> cleanup_interval_option =
-            MakeUnique<IntegerOption>("cleanup_interval", cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
+            MakeUnique<IntegerOption>(CLEANUP_INTERVAL_OPTION_NAME, cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
         global_options_.AddOption(std::move(cleanup_interval_option), GlobalOptionIndex::kCleanupInterval);
 
         // Compact Interval
         i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
         UniquePtr<IntegerOption> compact_interval_option =
-            MakeUnique<IntegerOption>("compact_interval", compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+            MakeUnique<IntegerOption>(COMPACT_INTERVAL_OPTION_NAME, compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
         global_options_.AddOption(std::move(compact_interval_option), GlobalOptionIndex::kCompactInterval);
 
         // Optimize Index Interval
         i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
         UniquePtr<IntegerOption> optimize_interval_option =
-            MakeUnique<IntegerOption>("optimize_interval", optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+            MakeUnique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME, optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
         global_options_.AddOption(std::move(optimize_interval_option), GlobalOptionIndex::kOptimizeIndexInterval);
 
         // Mem Index Capacity
         i64 mem_index_capacity = DEFAULT_MEMINDEX_CAPACITY;
         UniquePtr<IntegerOption> mem_index_capacity_option =
-            MakeUnique<IntegerOption>("mem_index_capacity", mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
+            MakeUnique<IntegerOption>(MEM_INDEX_CAPACITY_OPTION_NAME, mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
         global_options_.AddOption(std::move(mem_index_capacity_option), GlobalOptionIndex::kMemIndexCapacity);
 
         // Buffer Manager Size
         i64 buffer_manager_size = DEFAULT_BUFFER_MANAGER_SIZE;
         UniquePtr<IntegerOption> buffer_manager_size_option =
-            MakeUnique<IntegerOption>("buffer_manager_size", buffer_manager_size, std::numeric_limits<i64>::max(), 0);
+            MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
         global_options_.AddOption(std::move(buffer_manager_size_option), GlobalOptionIndex::kBufferManagerSize);
 
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
-        UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>("temp_dir", temp_dir);
+        UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
         global_options_.AddOption(std::move(temp_dir_option), GlobalOptionIndex::kTempDir);
 
         // WAL Dir
         String wal_dir = "/var/infinity/wal";
-        UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>("wal_dir", wal_dir);
+        UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
         global_options_.AddOption(std::move(wal_dir_option), GlobalOptionIndex::kWALDir);
 
         // WAL Compact Threshold
         i64 wal_compact_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
         UniquePtr<IntegerOption> wal_compact_threshold_option =
-            MakeUnique<IntegerOption>("wal_compact_threshold", wal_compact_threshold, MAX_WAL_FILE_SIZE_THRESHOLD, MIN_WAL_FILE_SIZE_THRESHOLD);
+            MakeUnique<IntegerOption>(WAL_COMPACT_THRESHOLD_OPTION_NAME, wal_compact_threshold, MAX_WAL_FILE_SIZE_THRESHOLD, MIN_WAL_FILE_SIZE_THRESHOLD);
         global_options_.AddOption(std::move(wal_compact_threshold_option), GlobalOptionIndex::kWALCompactThreshold);
 
         // Full Checkpoint Interval
         i64 full_checkpoint_interval = DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC;
-        UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>("full_checkpoint_interval",
+        UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(FULL_CHECKPOINT_INTERVAL_OPTION_NAME,
                                                                                              full_checkpoint_interval,
                                                                                              MAX_FULL_CHECKPOINT_INTERVAL_SEC,
                                                                                              MIN_FULL_CHECKPOINT_INTERVAL_SEC);
@@ -267,7 +267,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Delta Checkpoint Interval
         i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-        UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>("delta_checkpoint_interval",
+        UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
                                                                                               delta_checkpoint_interval,
                                                                                               MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
                                                                                               MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
@@ -275,7 +275,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Delta Checkpoint Threshold
         i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-        UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>("delta_checkpoint_threshold",
+        UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
                                                                                                delta_checkpoint_threshold,
                                                                                                MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
                                                                                                MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
@@ -283,8 +283,8 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Flush Method At Commit
         FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
-        UniquePtr<FlushOption> flush_option = MakeUnique<FlushOption>("flush_option", flush_option_type);
-        global_options_.AddOption(std::move(flush_option), GlobalOptionIndex::kFlushMethodAtCommit);
+        UniquePtr<FlushOption> wal_flush_option = MakeUnique<FlushOption>(WAL_FLUSH_OPTION_NAME, flush_option_type);
+        global_options_.AddOption(std::move(wal_flush_option), GlobalOptionIndex::kFlushMethodAtCommit);
 
         // Resource Dir
         String resource_dir = "/var/infinity/resource";
@@ -302,14 +302,14 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 String invalid_str = "invalid";
                 {
                     // Version
-                    String version_str = general_config["version"].value_or("invalid");
+                    String version_str = general_config[VERSION_OPTION_NAME].value_or("invalid");
                     ToLower(version_str);
                     if (IsEqual(version_str, invalid_str)) {
                         return Status::InvalidConfig("Invalid version field");
                     } else {
                         String current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
                         if (IsEqual(version_str, current_version)) {
-                            UniquePtr<StringOption> version_option = MakeUnique<StringOption>("version", current_version);
+                            UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
                             global_options_.AddOption(std::move(version_option), GlobalOptionIndex::kVersion);
                         } else {
                             Status::MismatchVersion(version_str, current_version);
@@ -319,7 +319,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
                 {
                     // Timezone
-                    String time_zone_str = general_config["timezone"].value_or("invalid");
+                    String time_zone_str = general_config[TIME_ZONE_OPTION_NAME].value_or("invalid");
                     ToLower(time_zone_str);
                     if (time_zone_str == "invalid") {
                         return Status::InvalidTimezone(time_zone_str);
@@ -333,11 +333,11 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         }
 
                         // Timezone
-                        UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>("time_zone", time_zone);
+                        UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>(TIME_ZONE_OPTION_NAME, time_zone);
                         global_options_.AddOption(std::move(time_zone_option), GlobalOptionIndex::kTimeZone);
 
                         // Timezone Bias
-                        UniquePtr<IntegerOption> time_zone_bias_option = MakeUnique<IntegerOption>("time_zone_bias", time_zone_bias, 12, -12);
+                        UniquePtr<IntegerOption> time_zone_bias_option = MakeUnique<IntegerOption>(TIME_ZONE_BIAS_OPTION_NAME, time_zone_bias, 12, -12);
                         if (!time_zone_bias_option->Validate()) {
                             return Status::InvalidConfig(fmt::format("Invalid timezone bias: {}", time_zone_bias));
                         }
@@ -348,9 +348,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Worker CPU Limit
                     i64 total_cpu_number = Thread::hardware_concurrency();
-                    if (general_config["cpu_limit"]) {
-                        if (general_config["cpu_limit"].is_integer()) {
-                            total_cpu_number = general_config["cpu_limit"].value_or(total_cpu_number);
+                    if (general_config[CPU_LIMIT_OPTION_NAME]) {
+                        if (general_config[CPU_LIMIT_OPTION_NAME].is_integer()) {
+                            total_cpu_number = general_config[CPU_LIMIT_OPTION_NAME].value_or(total_cpu_number);
                         } else {
                             return Status::InvalidConfig("'cpu_limit' field isn't integer.");
                         }
@@ -358,7 +358,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>("cpu_limit", total_cpu_number, 16384, 1);
+                    UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>(CPU_LIMIT_OPTION_NAME, total_cpu_number, 16384, 1);
                     if (!cpu_limit_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid cpu limit: {}", total_cpu_number));
                     }
@@ -376,9 +376,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Server address
                     String server_address = "0.0.0.0";
-                    if (network_config["server_address"]) {
-                        if (network_config["server_address"].is_string()) {
-                            server_address = network_config["server_address"].value_or(server_address);
+                    if (network_config[SERVER_ADDRESS_OPTION_NAME]) {
+                        if (network_config[SERVER_ADDRESS_OPTION_NAME].is_string()) {
+                            server_address = network_config[SERVER_ADDRESS_OPTION_NAME].value_or(server_address);
                         } else {
                             return Status::InvalidConfig("'server_address' field isn't string.");
                         }
@@ -393,15 +393,15 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         return Status::InvalidIPAddr(server_address);
                     }
 
-                    UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>("server_address", server_address);
+                    UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address);
                     global_options_.AddOption(std::move(server_address_option), GlobalOptionIndex::kServerAddress);
                 }
                 {
                     // Postgres port
                     i64 pg_port = 5432;
-                    if (network_config["postgres_port"]) {
-                        if (network_config["postgres_port"].is_integer()) {
-                            pg_port = network_config["postgres_port"].value_or(pg_port);
+                    if (network_config[POSTGRES_PORT_OPTION_NAME]) {
+                        if (network_config[POSTGRES_PORT_OPTION_NAME].is_integer()) {
+                            pg_port = network_config[POSTGRES_PORT_OPTION_NAME].value_or(pg_port);
                         } else {
                             return Status::InvalidConfig("'postgres_port' field isn't integer.");
                         }
@@ -409,7 +409,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>("postgres_port", pg_port, 65535, 1024);
+                    UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
                     if (!pg_port_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid postgres port: {}", pg_port));
                     }
@@ -418,9 +418,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // HTTP port
                     i64 http_port = 23820;
-                    if (network_config["http_port"]) {
-                        if (network_config["http_port"].is_integer()) {
-                            http_port = network_config["http_port"].value_or(http_port);
+                    if (network_config[HTTP_PORT_OPTION_NAME]) {
+                        if (network_config[HTTP_PORT_OPTION_NAME].is_integer()) {
+                            http_port = network_config[HTTP_PORT_OPTION_NAME].value_or(http_port);
                         } else {
                             return Status::InvalidConfig("'http_port' field isn't integer.");
                         }
@@ -428,7 +428,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>("http_port", http_port, 65535, 1024);
+                    UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
                     if (!http_port_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid HTTP port: {}", http_port));
                     }
@@ -438,9 +438,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // RPC Client port
                     i64 rpc_client_port = 23817;
-                    if (network_config["client_port"]) {
-                        if (network_config["client_port"].is_integer()) {
-                            rpc_client_port = network_config["client_port"].value_or(rpc_client_port);
+                    if (network_config[CLIENT_PORT_OPTION_NAME]) {
+                        if (network_config[CLIENT_PORT_OPTION_NAME].is_integer()) {
+                            rpc_client_port = network_config[CLIENT_PORT_OPTION_NAME].value_or(rpc_client_port);
                         } else {
                             return Status::InvalidConfig("'client_port' field isn't integer.");
                         }
@@ -448,7 +448,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>("client_port", rpc_client_port, 65535, 1024);
+                    UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
                     if (!client_port_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid client RPC port: {}", rpc_client_port));
                     }
@@ -458,9 +458,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Client pool size
                     i64 connection_pool_size = 256;
-                    if (network_config["connection_pool_size"]) {
-                        if (network_config["connection_pool_size"].is_integer()) {
-                            connection_pool_size = network_config["connection_pool_size"].value_or(connection_pool_size);
+                    if (network_config[CONNECTION_POOL_SIZE_OPTION_NAME]) {
+                        if (network_config[CONNECTION_POOL_SIZE_OPTION_NAME].is_integer()) {
+                            connection_pool_size = network_config[CONNECTION_POOL_SIZE_OPTION_NAME].value_or(connection_pool_size);
                         } else {
                             return Status::InvalidConfig("'connection_pool_size' field isn't integer.");
                         }
@@ -469,7 +469,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> connection_pool_size_option =
-                        MakeUnique<IntegerOption>("connection_pool_size", connection_pool_size, 65536, 1);
+                        MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
                     if (!connection_pool_size_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid connection pool size: {}", connection_pool_size));
                     }
@@ -489,9 +489,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Log file name
                     String log_filename = "infinity.log";
-                    if (log_config["log_filename"]) {
-                        if (log_config["log_filename"].is_string()) {
-                            log_filename = log_config["log_filename"].value_or(log_filename);
+                    if (log_config[LOG_FILENAME_OPTION_NAME]) {
+                        if (log_config[LOG_FILENAME_OPTION_NAME].is_string()) {
+                            log_filename = log_config[LOG_FILENAME_OPTION_NAME].value_or(log_filename);
                         } else {
                             return Status::InvalidConfig("'log_filename' field isn't string.");
                         }
@@ -499,16 +499,16 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>("log_filename", log_filename);
+                    UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>(LOG_FILENAME_OPTION_NAME, log_filename);
                     global_options_.AddOption(std::move(log_file_name_option), GlobalOptionIndex::kLogFileName);
                 }
 
                 {
                     // Log dir
                     String log_filename = "/var/infinity/log";
-                    if (log_config["log_dir"]) {
-                        if (log_config["log_dir"].is_string()) {
-                            log_filename = log_config["log_dir"].value_or(log_filename);
+                    if (log_config[LOG_DIR_OPTION_NAME]) {
+                        if (log_config[LOG_DIR_OPTION_NAME].is_string()) {
+                            log_filename = log_config[LOG_DIR_OPTION_NAME].value_or(log_filename);
                         } else {
                             return Status::InvalidConfig("'log_dir' field isn't string.");
                         }
@@ -516,16 +516,16 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>("log_dir", log_filename);
+                    UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_filename);
                     global_options_.AddOption(std::move(log_dir_option), GlobalOptionIndex::kLogDir);
                 }
 
                 {
                     // Log To Stdout
                     bool log_to_stdout = false;
-                    if (log_config["log_to_stdout"]) {
-                        if (log_config["log_to_stdout"].is_boolean()) {
-                            log_to_stdout = log_config["log_to_stdout"].value_or(log_to_stdout);
+                    if (log_config[LOG_TO_STDOUT_OPTION_NAME]) {
+                        if (log_config[LOG_TO_STDOUT_OPTION_NAME].is_boolean()) {
+                            log_to_stdout = log_config[LOG_TO_STDOUT_OPTION_NAME].value_or(log_to_stdout);
                         } else {
                             return Status::InvalidConfig("'log_to_stdout' field isn't boolean.");
                         }
@@ -533,16 +533,16 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>("log_to_stdout", log_to_stdout);
+                    UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
                     global_options_.AddOption(std::move(log_to_stdout_option), GlobalOptionIndex::kLogToStdout);
                 }
 
                 {
                     // Log File Max Size
                     i64 log_file_max_size = DEFAULT_LOG_FILE_SIZE;
-                    if (log_config["log_file_max_size"]) {
-                        if (log_config["log_file_max_size"].is_string()) {
-                            String log_file_max_size_str = log_config["log_file_max_size"].value_or(DEFAULT_LOG_FILE_SIZE_STR);
+                    if (log_config[LOG_FILE_MAX_SIZE_OPTION_NAME]) {
+                        if (log_config[LOG_FILE_MAX_SIZE_OPTION_NAME].is_string()) {
+                            String log_file_max_size_str = log_config[LOG_FILE_MAX_SIZE_OPTION_NAME].value_or(DEFAULT_LOG_FILE_SIZE_STR);
                             auto res = ParseByteSize(log_file_max_size_str, log_file_max_size);
                             if (!res.ok()) {
                                 return res;
@@ -555,7 +555,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> log_file_max_size_option =
-                        MakeUnique<IntegerOption>("log_file_max_size", log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
+                        MakeUnique<IntegerOption>(LOG_FILE_MAX_SIZE_OPTION_NAME, log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
 
                     if (!log_file_max_size_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid max log file size: {}", log_file_max_size));
@@ -566,9 +566,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Log File Rotate count
                     i64 log_file_rotate_count = 8;
-                    if (log_config["log_file_rotate_count"]) {
-                        if (log_config["log_file_rotate_count"].is_integer()) {
-                            log_file_rotate_count = log_config["log_file_rotate_count"].value_or(log_file_rotate_count);
+                    if (log_config[LOG_FILE_ROTATE_COUNT_OPTION_NAME]) {
+                        if (log_config[LOG_FILE_ROTATE_COUNT_OPTION_NAME].is_integer()) {
+                            log_file_rotate_count = log_config[LOG_FILE_ROTATE_COUNT_OPTION_NAME].value_or(log_file_rotate_count);
                         } else {
                             return Status::InvalidConfig("'log_file_rotate_count' field isn't integer.");
                         }
@@ -577,7 +577,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> log_file_rotate_count_option =
-                        MakeUnique<IntegerOption>("log_file_rotate_count", log_file_rotate_count, 65536, 1);
+                        MakeUnique<IntegerOption>(LOG_FILE_ROTATE_COUNT_OPTION_NAME, log_file_rotate_count, 65536, 1);
 
                     if (!log_file_rotate_count_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid log file rotate count: {}", log_file_rotate_count));
@@ -588,9 +588,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Log Level
                     LogLevel log_level = LogLevel::kInfo;
-                    if (log_config["log_level"]) {
-                        if (log_config["log_level"].is_string()) {
-                            String log_level_str = log_config["log_level"].value_or("info");
+                    if (log_config[LOG_LEVEL_OPTION_NAME]) {
+                        if (log_config[LOG_LEVEL_OPTION_NAME].is_string()) {
+                            String log_level_str = log_config[LOG_LEVEL_OPTION_NAME].value_or("info");
                             ToLower(log_level_str);
                             if (IsEqual(log_level_str, "trace")) {
                                 log_level = LogLevel::kTrace;
@@ -614,7 +614,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>("log_level", log_level);
+                    UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
                     global_options_.AddOption(std::move(log_level_option), GlobalOptionIndex::kLogLevel);
                 }
 
@@ -630,9 +630,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Data Dir
                     String data_dir = "/var/infinity/data";
-                    if (storage_config["data_dir"]) {
-                        if (storage_config["data_dir"].is_string()) {
-                            data_dir = storage_config["data_dir"].value_or(data_dir);
+                    if (storage_config[DATA_DIR_OPTION_NAME]) {
+                        if (storage_config[DATA_DIR_OPTION_NAME].is_string()) {
+                            data_dir = storage_config[DATA_DIR_OPTION_NAME].value_or(data_dir);
                         } else {
                             return Status::InvalidConfig("'data_dir' field isn't string.");
                         }
@@ -640,16 +640,16 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>("data_dir", data_dir);
+                    UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
                     global_options_.AddOption(std::move(data_dir_option), GlobalOptionIndex::kDataDir);
                 }
 
                 {
                     // Cleanup Interval
                     i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
-                    if (storage_config["cleanup_interval"]) {
-                        if (storage_config["cleanup_interval"].is_string()) {
-                            String cleanup_interval_str = storage_config["cleanup_interval"].value_or(DEFAULT_CLEANUP_INTERVAL_SEC_STR);
+                    if (storage_config[CLEANUP_INTERVAL_OPTION_NAME]) {
+                        if (storage_config[CLEANUP_INTERVAL_OPTION_NAME].is_string()) {
+                            String cleanup_interval_str = storage_config[CLEANUP_INTERVAL_OPTION_NAME].value_or(DEFAULT_CLEANUP_INTERVAL_SEC_STR);
                             auto res = ParseTimeInfo(cleanup_interval_str, cleanup_interval);
                             if (!res.ok()) {
                                 return res;
@@ -662,7 +662,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> cleanup_interval_option =
-                        MakeUnique<IntegerOption>("cleanup_interval", cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
+                        MakeUnique<IntegerOption>(CLEANUP_INTERVAL_OPTION_NAME, cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
                     if (!cleanup_interval_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid cleanup interval: {}", cleanup_interval));
                     }
@@ -672,9 +672,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Compact Interval
                     i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
-                    if (storage_config["compact_interval"]) {
-                        if (storage_config["compact_interval"].is_string()) {
-                            String compact_interval_str = storage_config["compact_interval"].value_or(DEFAULT_COMPACT_INTERVAL_SEC_STR);
+                    if (storage_config[COMPACT_INTERVAL_OPTION_NAME]) {
+                        if (storage_config[COMPACT_INTERVAL_OPTION_NAME].is_string()) {
+                            String compact_interval_str = storage_config[COMPACT_INTERVAL_OPTION_NAME].value_or(DEFAULT_COMPACT_INTERVAL_SEC_STR);
                             auto res = ParseTimeInfo(compact_interval_str, compact_interval);
                             if (!res.ok()) {
                                 return res;
@@ -687,7 +687,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> compact_interval_option =
-                        MakeUnique<IntegerOption>("compact_interval", compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+                        MakeUnique<IntegerOption>(COMPACT_INTERVAL_OPTION_NAME, compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
                     if (!compact_interval_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid compact interval: {}", compact_interval));
                     }
@@ -697,9 +697,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Optimize Index Interval
                     i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
-                    if (storage_config["optimize_interval"]) {
-                        if (storage_config["optimize_interval"].is_string()) {
-                            String optimize_index_interval_str = storage_config["buffer_manager_size"].value_or(DEFAULT_OPTIMIZE_INTERVAL_SEC_STR);
+                    if (storage_config[OPTIMIZE_INTERVAL_OPTION_NAME]) {
+                        if (storage_config[OPTIMIZE_INTERVAL_OPTION_NAME].is_string()) {
+                            String optimize_index_interval_str = storage_config[OPTIMIZE_INTERVAL_OPTION_NAME].value_or(DEFAULT_OPTIMIZE_INTERVAL_SEC_STR);
                             auto res = ParseTimeInfo(optimize_index_interval_str, optimize_index_interval);
                             if (!res.ok()) {
                                 return res;
@@ -712,7 +712,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> optimize_interval_option =
-                        MakeUnique<IntegerOption>("optimize_interval", optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+                        MakeUnique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME, optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
                     if (!optimize_interval_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid optimize interval: {}", optimize_index_interval));
                     }
@@ -722,9 +722,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Mem Index Capacity
                     i64 mem_index_capacity = DEFAULT_MEMINDEX_CAPACITY;
-                    if (storage_config["mem_index_capacity"]) {
-                        if (storage_config["mem_index_capacity"].is_integer()) {
-                            mem_index_capacity = storage_config["mem_index_capacity"].value_or(mem_index_capacity);
+                    if (storage_config[MEM_INDEX_CAPACITY_OPTION_NAME]) {
+                        if (storage_config[MEM_INDEX_CAPACITY_OPTION_NAME].is_integer()) {
+                            mem_index_capacity = storage_config[MEM_INDEX_CAPACITY_OPTION_NAME].value_or(mem_index_capacity);
                         } else {
                             return Status::InvalidConfig("'mem_index_capacity' field isn't integer.");
                         }
@@ -733,7 +733,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> mem_index_capacity_option =
-                        MakeUnique<IntegerOption>("mem_index_capacity", mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
+                        MakeUnique<IntegerOption>(MEM_INDEX_CAPACITY_OPTION_NAME, mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
                     if (!mem_index_capacity_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid memory index capacity: {}", mem_index_capacity));
                     }
@@ -753,9 +753,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Buffer Manager Size
                     i64 buffer_manager_size = DEFAULT_BUFFER_MANAGER_SIZE;
-                    if (buffer_config["buffer_manager_size"]) {
-                        if (buffer_config["buffer_manager_size"].is_string()) {
-                            String buffer_manager_size_str = buffer_config["buffer_manager_size"].value_or(DEFAULT_BUFFER_MANAGER_SIZE_STR);
+                    if (buffer_config[BUFFER_MANAGER_SIZE_OPTION_NAME]) {
+                        if (buffer_config[BUFFER_MANAGER_SIZE_OPTION_NAME].is_string()) {
+                            String buffer_manager_size_str = buffer_config[BUFFER_MANAGER_SIZE_OPTION_NAME].value_or(DEFAULT_BUFFER_MANAGER_SIZE_STR);
                             auto res = ParseByteSize(buffer_manager_size_str, buffer_manager_size);
                             if (!res.ok()) {
                                 return res;
@@ -768,7 +768,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     }
 
                     UniquePtr<IntegerOption> buffer_manager_size_option =
-                        MakeUnique<IntegerOption>("buffer_manager_size", buffer_manager_size, std::numeric_limits<i64>::max(), 0);
+                        MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
                     if (!buffer_manager_size_option->Validate()) {
                         return Status::InvalidConfig(fmt::format("Invalid buffer manager size: {}", buffer_manager_size));
                     }
@@ -778,9 +778,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Temp Dir
                     String temp_dir = "/var/infinity/tmp";
-                    if (buffer_config["temp_dir"]) {
-                        if (buffer_config["temp_dir"].is_string()) {
-                            temp_dir = buffer_config["temp_dir"].value_or(temp_dir);
+                    if (buffer_config[TEMP_DIR_OPTION_NAME]) {
+                        if (buffer_config[TEMP_DIR_OPTION_NAME].is_string()) {
+                            temp_dir = buffer_config[TEMP_DIR_OPTION_NAME].value_or(temp_dir);
                         } else {
                             return Status::InvalidConfig("'temp_dir' field isn't string.");
                         }
@@ -788,7 +788,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>("temp_dir", temp_dir);
+                    UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
                     global_options_.AddOption(std::move(temp_dir_option), GlobalOptionIndex::kTempDir);
                 }
 
@@ -805,9 +805,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // WAL Dir
                     String wal_dir = "/var/infinity/wal";
-                    if (wal_config["wal_dir"]) {
-                        if (wal_config["wal_dir"].is_string()) {
-                            wal_dir = wal_config["wal_dir"].value_or(wal_dir);
+                    if (wal_config[WAL_DIR_OPTION_NAME]) {
+                        if (wal_config[WAL_DIR_OPTION_NAME].is_string()) {
+                            wal_dir = wal_config[WAL_DIR_OPTION_NAME].value_or(wal_dir);
                         } else {
                             return Status::InvalidConfig("'wal_dir' field isn't string.");
                         }
@@ -815,16 +815,16 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>("wal_dir", wal_dir);
+                    UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
                     global_options_.AddOption(std::move(wal_dir_option), GlobalOptionIndex::kWALDir);
                 }
 
                 {
                     // WAL Compact Threshold
                     i64 wal_compact_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
-                    if (wal_config["wal_compact_threshold"]) {
-                        if (wal_config["wal_compact_threshold"].is_string()) {
-                            String wal_compact_threshold_str = wal_config["wal_compact_threshold"].value_or(DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR);
+                    if (wal_config[WAL_COMPACT_THRESHOLD_OPTION_NAME]) {
+                        if (wal_config[WAL_COMPACT_THRESHOLD_OPTION_NAME].is_string()) {
+                            String wal_compact_threshold_str = wal_config[WAL_COMPACT_THRESHOLD_OPTION_NAME].value_or(DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR);
                             auto res = ParseByteSize(wal_compact_threshold_str, wal_compact_threshold);
                             if (!res.ok()) {
                                 return res;
@@ -836,7 +836,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> wal_compact_threshold_option = MakeUnique<IntegerOption>("wal_compact_threshold",
+                    UniquePtr<IntegerOption> wal_compact_threshold_option = MakeUnique<IntegerOption>(WAL_COMPACT_THRESHOLD_OPTION_NAME,
                                                                                                       wal_compact_threshold,
                                                                                                       MAX_WAL_FILE_SIZE_THRESHOLD,
                                                                                                       MIN_WAL_FILE_SIZE_THRESHOLD);
@@ -849,10 +849,10 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Full Checkpoint Interval
                     i64 full_checkpoint_interval = DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC;
-                    if (wal_config["full_checkpoint_interval"]) {
-                        if (wal_config["full_checkpoint_interval"].is_string()) {
+                    if (wal_config[FULL_CHECKPOINT_INTERVAL_OPTION_NAME]) {
+                        if (wal_config[FULL_CHECKPOINT_INTERVAL_OPTION_NAME].is_string()) {
                             String full_checkpoint_interval_str =
-                                wal_config["full_checkpoint_interval"].value_or(DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR);
+                                wal_config[FULL_CHECKPOINT_INTERVAL_OPTION_NAME].value_or(DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR);
                             auto res = ParseTimeInfo(full_checkpoint_interval_str, full_checkpoint_interval);
                             if (!res.ok()) {
                                 return res;
@@ -864,7 +864,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>("full_checkpoint_interval",
+                    UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(FULL_CHECKPOINT_INTERVAL_OPTION_NAME,
                                                                                                          full_checkpoint_interval,
                                                                                                          MAX_FULL_CHECKPOINT_INTERVAL_SEC,
                                                                                                          MIN_FULL_CHECKPOINT_INTERVAL_SEC);
@@ -878,10 +878,10 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Delta Checkpoint Interval
                     i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
-                    if (wal_config["delta_checkpoint_interval"]) {
-                        if (wal_config["delta_checkpoint_interval"].is_string()) {
+                    if (wal_config[DELTA_CHECKPOINT_INTERVAL_OPTION_NAME]) {
+                        if (wal_config[DELTA_CHECKPOINT_INTERVAL_OPTION_NAME].is_string()) {
                             String delta_checkpoint_interval_str =
-                                wal_config["delta_checkpoint_interval"].value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR);
+                                wal_config[DELTA_CHECKPOINT_INTERVAL_OPTION_NAME].value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR);
                             auto res = ParseTimeInfo(delta_checkpoint_interval_str, delta_checkpoint_interval);
                             if (!res.ok()) {
                                 return res;
@@ -893,7 +893,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>("delta_checkpoint_interval",
+                    UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
                                                                                                           delta_checkpoint_interval,
                                                                                                           MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
                                                                                                           MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
@@ -907,10 +907,10 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Delta Checkpoint Threshold
                     i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-                    if (wal_config["delta_checkpoint_threshold"]) {
-                        if (wal_config["delta_checkpoint_threshold"].is_string()) {
+                    if (wal_config[DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME]) {
+                        if (wal_config[DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME].is_string()) {
                             String delta_checkpoint_threshold_str =
-                                wal_config["delta_checkpoint_threshold"].value_or(DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR);
+                                wal_config[DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME].value_or(DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR);
                             auto res = ParseByteSize(delta_checkpoint_threshold_str, delta_checkpoint_threshold);
                             if (!res.ok()) {
                                 return res;
@@ -922,7 +922,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>("delta_checkpoint_threshold",
+                    UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
                                                                                                            delta_checkpoint_threshold,
                                                                                                            MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
                                                                                                            MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
@@ -936,9 +936,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 {
                     // Flush Method At Commit
                     FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
-                    if (wal_config["flush_option"]) {
-                        if (wal_config["flush_option"].is_string()) {
-                            String flush_option_str = wal_config["flush_option"].value_or("flush_at_once");
+                    if (wal_config[WAL_FLUSH_OPTION_NAME]) {
+                        if (wal_config[WAL_FLUSH_OPTION_NAME].is_string()) {
+                            String flush_option_str = wal_config[WAL_FLUSH_OPTION_NAME].value_or("flush_at_once");
                             ToLower(flush_option_str);
                             if (IsEqual(flush_option_str, "flush_at_once")) {
                                 flush_option_type = FlushOptionType::kFlushAtOnce;
@@ -956,7 +956,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         ;
                     }
 
-                    UniquePtr<FlushOption> flush_option = MakeUnique<FlushOption>("flush_option", flush_option_type);
+                    UniquePtr<FlushOption> flush_option = MakeUnique<FlushOption>(WAL_FLUSH_OPTION_NAME, flush_option_type);
                     global_options_.AddOption(std::move(flush_option), GlobalOptionIndex::kFlushMethodAtCommit);
                 }
 
@@ -1083,6 +1083,10 @@ String Config::ResourcePath() { return global_options_.GetStringValue(GlobalOpti
 // bool enable_profiler() const { return system_option_.enable_profiler; }
 //
 // SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
+
+Tuple<BaseOption *, Status> Config::GetConfigByName(const String &name) {
+    return global_options_.GetOptionByName(name);
+}
 
 void Config::PrintAll() {
     fmt::print("Infinity system configs: \n");

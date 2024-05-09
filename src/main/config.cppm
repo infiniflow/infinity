@@ -91,6 +91,10 @@ public:
     // Resource
     String ResourcePath();
 
+public:
+    // Get config by name
+    Tuple<BaseOption *, Status> GetConfigByName(const String& name);
+
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 

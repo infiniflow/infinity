@@ -18,6 +18,7 @@ module options;
 
 import infinity_exception;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -32,14 +33,14 @@ void GlobalOptions::AddOption(UniquePtr<BaseOption> option, GlobalOptionIndex gl
 
 GlobalOptionIndex GlobalOptions::GetOptionIndex(const String &option_name) { return name2index_[option_name]; }
 
-BaseOption *GlobalOptions::GetOptionByName(const String &option_name) {
+Tuple<BaseOption *, Status> GlobalOptions::GetOptionByName(const String &option_name) {
     auto iter = name2index_.find(option_name);
     if (iter == name2index_.end()) {
-        UnrecoverableError(fmt::format("Attempt to get option: {} which doesn't exist.", option_name));
+        return {nullptr, Status::InvalidConfig(fmt::format("Attempt to get option: {} which doesn't exist.", option_name))};
     }
 
     SizeT option_index = static_cast<SizeT>(iter->second);
-    return options_[option_index].get();
+    return {options_[option_index].get(), Status::OK()};
 }
 
 BaseOption *GlobalOptions::GetOptionByIndex(GlobalOptionIndex global_option_index) {

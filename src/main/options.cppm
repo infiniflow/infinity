@@ -18,6 +18,7 @@ export module options;
 
 import stl;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -145,7 +146,7 @@ export enum class GlobalOptionIndex {
 export struct GlobalOptions {
     void AddOption(UniquePtr<BaseOption> option, GlobalOptionIndex option_index);
     GlobalOptionIndex GetOptionIndex(const String &option_name);
-    BaseOption *GetOptionByName(const String &option_name);
+    Tuple<BaseOption *, Status> GetOptionByName(const String &option_name);
     BaseOption *GetOptionByIndex(GlobalOptionIndex option_index);
 
     String GetStringValue(GlobalOptionIndex option_index);

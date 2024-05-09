@@ -58,6 +58,7 @@ import segment_index_entry;
 import segment_iter;
 import segment_entry;
 import variables;
+import default_values;
 
 namespace infinity {
 
@@ -451,7 +452,7 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             break;
         }
         case ShowType::kShowSessionVariable: {
-//            ExecuteShowVar(query_context, show_operator_state);
+            //            ExecuteShowVar(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowGlobalVariable: {
@@ -467,13 +468,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             break;
         }
         case ShowType::kShowConfig: {
-            //            ExecuteShowVar(query_context, show_operator_state);
+            ExecuteShowConfig(query_context, show_operator_state);
             break;
         }
         default: {
             UnrecoverableError("Invalid chunk scan type");
         }
     }
+    operator_state->SetComplete();
     return true;
 }
 
@@ -1837,7 +1839,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     {
         {
             // option name
-            Value value = Value::MakeVarchar("version");
+            Value value = Value::MakeVarchar(VERSION_OPTION_NAME);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
@@ -1865,7 +1867,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         {
             // option name type
             i64 time_zone_bias = global_config->TimeZoneBias();
-            if(time_zone_bias >= 0) {
+            if (time_zone_bias >= 0) {
                 Value value = Value::MakeVarchar(fmt::format("{}+{}", global_config->TimeZone(), time_zone_bias));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
@@ -2008,7 +2010,6 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
     }
-
 
     {
         {
@@ -2220,8 +2221,6 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
     }
 
-
-
     {
         {
             // option name
@@ -2372,7 +2371,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     {
         {
             // option name
-            Value value = Value::MakeVarchar("flush_method_at_commit");
+            Value value = Value::MakeVarchar(WAL_FLUSH_OPTION_NAME);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
@@ -2393,7 +2392,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     {
         {
             // option name
-            Value value = Value::MakeVarchar("resource_path");
+            Value value = Value::MakeVarchar("resource_dir");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
@@ -2711,7 +2710,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
         }
         case SysVariable::kEnableProfile: {
             bool enable_profile = query_context->is_enable_profiling();
-            if(enable_profile) {
+            if (enable_profile) {
                 Value value = Value::MakeVarchar("True");
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -2751,24 +2750,132 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
 }
 
 void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state) {
-    RecoverableError(Status::NotSupport("Not implemented"));
+    Config *global_config = query_context->global_config();
+    auto [base_option, status] = global_config->GetConfigByName(object_name_);
+    if (!status.ok()) {
+        operator_state->status_ = status;
+        return;
+    }
+    if(object_name_ == "time_zone_bias") {
+        operator_state->status_ = Status::InvalidConfig(fmt::format("Option: {} doesn't exist.", object_name_));
+        return;
+    }
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto double_type = MakeShared<DataType>(LogicalType::kDouble);
+    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+
+    switch (base_option->data_type_) {
+        case BaseOptionDataType::kInteger: {
+            Vector<SharedPtr<DataType>> output_column_types{
+                bigint_type,
+            };
+            output_block_ptr->Init(output_column_types);
+
+            IntegerOption *integer_option = static_cast<IntegerOption *>(base_option);
+            Value value = Value::MakeBigInt(integer_option->value_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case BaseOptionDataType::kFloat: {
+            Vector<SharedPtr<DataType>> output_column_types{
+                double_type,
+            };
+            output_block_ptr->Init(output_column_types);
+
+            FloatOption *float_option = static_cast<FloatOption *>(base_option);
+            Value value = Value::MakeDouble(float_option->value_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case BaseOptionDataType::kString: {
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+            output_block_ptr->Init(output_column_types);
+
+            StringOption *string_option = static_cast<StringOption *>(base_option);
+            String value_str;
+            if(object_name_ == "time_zone") {
+                auto [time_zone_bias, _] = global_config->GetConfigByName("time_zone_bias");
+
+                IntegerOption *time_zone_bias_int = static_cast<IntegerOption *>(time_zone_bias);
+                if(time_zone_bias_int->value_ >= 0) {
+                    value_str = fmt::format("{}+{}", string_option->value_, time_zone_bias_int->value_);
+                } else {
+                    value_str = fmt::format("{}-{}", string_option->value_, time_zone_bias_int->value_);
+                }
+            }
+            Value value = Value::MakeVarchar(value_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case BaseOptionDataType::kBoolean: {
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+            output_block_ptr->Init(output_column_types);
+
+            BooleanOption *boolean_option = static_cast<BooleanOption *>(base_option);
+            Value value = Value::MakeBool(boolean_option->value_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case BaseOptionDataType::kLogLevel: {
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+            output_block_ptr->Init(output_column_types);
+
+            LogLevelOption *loglevel_option = static_cast<LogLevelOption *>(base_option);
+            Value value = Value::MakeVarchar(LogLevel2Str(loglevel_option->value_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case BaseOptionDataType::kFlush: {
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+            output_block_ptr->Init(output_column_types);
+
+            FlushOption *flush_option = static_cast<FlushOption *>(base_option);
+            Value value = Value::MakeVarchar(FlushOptionTypeToString(flush_option->value_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid option data type.");
+            break;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
-//void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-//    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-//    Vector<SharedPtr<ColumnDef>> output_column_defs = {
-//        MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
-//    };
+// void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+//     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+//     Vector<SharedPtr<ColumnDef>> output_column_defs = {
+//         MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
+//     };
 //
-//    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
-//    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+//     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+//     output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 //
-//    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-//    Vector<SharedPtr<DataType>> output_column_types{
-//        varchar_type,
-//    };
+//     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+//     Vector<SharedPtr<DataType>> output_column_types{
+//         varchar_type,
+//     };
 //
-//    output_block_ptr->Init(output_column_types);
+//     output_block_ptr->Init(output_column_types);
 //
 ////    kQueryCount,                // global and session
 ////        kSessionCount,              // global
@@ -2878,31 +2985,16 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 ////            break;
 ////        }
 ////        case SysVar::kTimezone: {
-////            String time_zone = fmt::format("{}-{}", query_context->global_config()->time_zone(), query_context->global_config()->time_zone_bias());
-////            Value value = Value::MakeVarchar(time_zone);
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
-////        case SysVar::kLogFlushPolicy: {
-////            switch (query_context->global_config()->flush_at_commit()) {
-////                case FlushOption::kFlushAtOnce: {
-////                    Value value = Value::MakeVarchar("Write and flush log at each commit");
-////                    ValueExpression value_expr(value);
-////                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////                    break;
-////                }
-////                case FlushOption::kOnlyWrite: {
-////                    Value value = Value::MakeVarchar("Only write log at each commit");
-////                    ValueExpression value_expr(value);
-////                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////                    break;
-////                }
-////                case FlushOption::kFlushPerSecond: {
-////                    Value value = Value::MakeVarchar("Write log at each commit and commit log per second");
-////                    ValueExpression value_expr(value);
-////                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////                    break;
+////            String time_zone = fmt::format("{}-{}", query_context->global_config()->time_zone(),
+///query_context->global_config()->time_zone_bias()); /            Value value = Value::MakeVarchar(time_zone); /            ValueExpression
+///value_expr(value); /            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        } /        case
+///SysVar::kLogFlushPolicy: { /            switch (query_context->global_config()->flush_at_commit()) { /                case
+///FlushOption::kFlushAtOnce: { /                    Value value = Value::MakeVarchar("Write and flush log at each commit"); / ValueExpression
+///value_expr(value); /                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /                    break; / } / case
+///FlushOption::kOnlyWrite: { /                    Value value = Value::MakeVarchar("Only write log at each commit"); / ValueExpression
+///value_expr(value); /                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /                    break; / } / case
+///FlushOption::kFlushPerSecond: { /                    Value value = Value::MakeVarchar("Write log at each commit and commit log per second"); /
+///ValueExpression value_expr(value); /                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /                    break;
 ////                }
 ////                default: {
 ////                    UnrecoverableError("Invalid log flush policy: {}");
@@ -2910,54 +3002,26 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 ////            }
 ////        }
 ////        case SysVar::kWALLogSize: {
-////            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize() - query_context->storage()->wal_manager()->GetLastCkpWalSize();
-////            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
-////        case SysVar::kDeltaLogCount: {
-////            SizeT delta_log_count = query_context->storage()->catalog()->GetDeltaLogCount();
-////            Value value = Value::MakeVarchar(std::to_string(delta_log_count));
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
-////        case SysVar::kNextTxnID: {
-////            TransactionID next_transaction_id = query_context->storage()->catalog()->next_txn_id();
-////            Value value = Value::MakeVarchar(std::to_string(next_transaction_id));
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
-////        case SysVar::kBufferedObjectCount: {
-////            SizeT wal_log_size = query_context->storage()->buffer_manager()->BufferedObjectCount();
-////            Value value = Value::MakeVarchar(std::to_string(wal_log_size));
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
-////        case SysVar::kGCListSizeOfBufferPool: {
-////            SizeT waiting_gc_object_count = query_context->storage()->buffer_manager()->WaitingGCObjectCount();
-////            Value value = Value::MakeVarchar(std::to_string(waiting_gc_object_count));
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
-////        case SysVar::kActiveTxnCount: {
-////            SizeT active_txn_count = query_context->storage()->txn_manager()->ActiveTxnCount();
-////            Value value = Value::MakeVarchar(std::to_string(active_txn_count));
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
-////        case SysVar::kCurrentTs: {
-////            SizeT current_ts = query_context->storage()->txn_manager()->CurrentTS();
-////            Value value = Value::MakeVarchar(std::to_string(current_ts));
-////            ValueExpression value_expr(value);
-////            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-////            break;
-////        }
+////            SizeT wal_log_size = query_context->storage()->wal_manager()->WalSize() -
+///query_context->storage()->wal_manager()->GetLastCkpWalSize(); /            Value value = Value::MakeVarchar(std::to_string(wal_log_size)); /
+///ValueExpression value_expr(value); /            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        } /
+///case SysVar::kDeltaLogCount: { /            SizeT delta_log_count = query_context->storage()->catalog()->GetDeltaLogCount(); /            Value
+///value = Value::MakeVarchar(std::to_string(delta_log_count)); /            ValueExpression value_expr(value); /
+///value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        } /        case SysVar::kNextTxnID: { / TransactionID
+///next_transaction_id = query_context->storage()->catalog()->next_txn_id(); /            Value value =
+///Value::MakeVarchar(std::to_string(next_transaction_id)); /            ValueExpression value_expr(value); /
+///value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        } /        case SysVar::kBufferedObjectCount: { / SizeT
+///wal_log_size = query_context->storage()->buffer_manager()->BufferedObjectCount(); /            Value value =
+///Value::MakeVarchar(std::to_string(wal_log_size)); /            ValueExpression value_expr(value); /
+///value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        } /        case SysVar::kGCListSizeOfBufferPool: { /
+///SizeT waiting_gc_object_count = query_context->storage()->buffer_manager()->WaitingGCObjectCount(); /            Value value =
+///Value::MakeVarchar(std::to_string(waiting_gc_object_count)); /            ValueExpression value_expr(value); /
+///value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        } /        case SysVar::kActiveTxnCount: { / SizeT
+///active_txn_count = query_context->storage()->txn_manager()->ActiveTxnCount(); /            Value value =
+///Value::MakeVarchar(std::to_string(active_txn_count)); /            ValueExpression value_expr(value); /
+///value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        } /        case SysVar::kCurrentTs: { / SizeT
+///current_ts = query_context->storage()->txn_manager()->CurrentTS(); /            Value value = Value::MakeVarchar(std::to_string(current_ts)); /
+///ValueExpression value_expr(value); /            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]); /            break; /        }
 //        default: {
 //            RecoverableError(Status::NoSysVar(object_name_));
 //        }
