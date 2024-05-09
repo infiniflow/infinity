@@ -39,6 +39,8 @@ import catalog;
 import infinity_exception;
 import bg_task;
 import txn_store;
+import wal_manager;
+import buffer_manager;
 
 using namespace infinity;
 
@@ -63,12 +65,16 @@ protected:
         RemoveDbDirs();
     }
 
-    void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+        Catalog *catalog = storage->catalog();
+        TxnManager *txn_mgr = storage->txn_manager();
+        BufferManager *buffer_mgr = storage->buffer_manager();
+
         LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = txn_mgr->GetCleanupScanTS();
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
@@ -78,10 +84,10 @@ protected:
             if (end - start > 10) {
                 UnrecoverableError("WaitCleanup timeout");
             }
+            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
             usleep(1000 * 1000);
         }
 
-        auto buffer_mgr = txn_mgr->GetBufferMgr();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
@@ -89,7 +95,6 @@ protected:
 
 TEST_F(OptimizeKnnTest, test1) {
     Storage *storage = InfinityContext::instance().storage();
-    Catalog *catalog = storage->catalog();
     TxnManager *txn_mgr = storage->txn_manager();
 
     auto db_name = std::make_shared<std::string>("default_db");
@@ -195,7 +200,7 @@ TEST_F(OptimizeKnnTest, test1) {
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
     {
         auto *txn = txn_mgr->BeginTxn();
 
@@ -222,7 +227,6 @@ TEST_F(OptimizeKnnTest, test1) {
 
 TEST_F(OptimizeKnnTest, test_secondary_index_optimize) {
     Storage *storage = InfinityContext::instance().storage();
-    Catalog *catalog = storage->catalog();
     TxnManager *txn_mgr = storage->txn_manager();
 
     auto db_name = std::make_shared<std::string>("default_db");
@@ -297,7 +301,7 @@ TEST_F(OptimizeKnnTest, test_secondary_index_optimize) {
         table_entry->OptimizeIndex(txn);
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
     {
         auto *txn = txn_mgr->BeginTxn();
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);

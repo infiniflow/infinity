@@ -106,8 +106,6 @@ public:
 
     ~Catalog();
 
-    void SetTxnMgr(TxnManager *txn_mgr);
-
 public:
     // Database related functions
     Tuple<DBEntry *, Status> CreateDatabase(const String &db_name,
@@ -290,8 +288,6 @@ public:
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
-
-    TxnManager *txn_mgr_{nullptr};
 
 private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }

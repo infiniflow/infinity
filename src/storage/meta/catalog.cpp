@@ -77,8 +77,6 @@ Catalog::~Catalog() {
     mem_index_commit_thread_.join();
 }
 
-void Catalog::SetTxnMgr(TxnManager *txn_mgr) { txn_mgr_ = txn_mgr; }
-
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
@@ -890,8 +888,6 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
 
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
-
-    DeferFn defer_fn([&]() { txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids()); });
 
     if (flush_delta_entry->operations().empty()) {
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
