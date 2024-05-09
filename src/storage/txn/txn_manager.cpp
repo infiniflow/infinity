@@ -59,14 +59,11 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
     // Record the start ts of the txn
     TxnTimeStamp ts = ++start_ts_;
 
-    LOG_INFO(fmt::format("Txn: {} is begin, begin ts: {}, text: {}", new_txn_id, ts, txn_text != nullptr ? *txn_text : "empty"));
-
     // Create txn instance
     auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
-    // ts_map_.emplace(ts, new_txn_id);
     beginned_txns_.emplace_back(new_txn);
     rw_locker_.unlock();
 
