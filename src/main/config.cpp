@@ -881,7 +881,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     if (wal_config["delta_checkpoint_interval"]) {
                         if (wal_config["delta_checkpoint_interval"].is_string()) {
                             String delta_checkpoint_interval_str =
-                                wal_config["full_checkpoint_interval"].value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR);
+                                wal_config["delta_checkpoint_interval"].value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR);
                             auto res = ParseTimeInfo(delta_checkpoint_interval_str, delta_checkpoint_interval);
                             if (!res.ok()) {
                                 return res;

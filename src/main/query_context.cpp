@@ -50,6 +50,7 @@ import session_manager;
 import base_statement;
 import parser_result;
 import parser_assert;
+import plan_fragment;
 
 namespace infinity {
 
@@ -106,6 +107,10 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     QueryResult query_result;
+    SharedPtr<LogicalNode> logical_plan = nullptr;
+    UniquePtr<PlanFragment> plan_fragment = nullptr;
+    UniquePtr<PhysicalOperator> physical_plan = nullptr;
+
 //    ProfilerStart("Query");
 //    BaseProfiler profiler;
 //    profiler.Begin();
@@ -127,7 +132,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
-        SharedPtr<LogicalNode> logical_plan = logical_planner_->LogicalPlan();
+        logical_plan = logical_planner_->LogicalPlan();
         StopProfile(QueryPhase::kLogicalPlan);
 //        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
         // Apply optimized rule to the logical plan
@@ -137,13 +142,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
         // Build physical plan
         StartProfile(QueryPhase::kPhysicalPlan);
-        UniquePtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
+        physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
         StopProfile(QueryPhase::kPhysicalPlan);
 //        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
-        auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
+        plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
         StopProfile(QueryPhase::kPipelineBuild);
 
         auto notifier = MakeUnique<Notifier>();
@@ -159,14 +164,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StopProfile(QueryPhase::kExecution);
 //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
-        try {
-            this->CommitTxn();
-        } catch (RecoverableException &e) {
-            StopProfile();
-            this->RollbackTxn();
-            query_result.result_table_ = nullptr;
-            query_result.status_.Init(e.ErrorCode(), e.what());
-        }
+        this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
 
     } catch (RecoverableException &e) {
