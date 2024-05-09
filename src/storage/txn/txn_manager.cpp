@@ -237,6 +237,7 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
         auto first_txn = beginned_txns_.front().lock();
         if (first_txn.get() != nullptr) {
             first_uncommitted_begin_ts = first_txn->BeginTS();
+            break;
         }
         beginned_txns_.pop_front();
     }
