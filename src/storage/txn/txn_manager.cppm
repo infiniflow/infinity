@@ -49,6 +49,8 @@ public:
 
     TxnState GetTxnState(TransactionID txn_id);
 
+    bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
+
     inline void Lock() { rw_locker_.lock(); }
 
     inline void UnLock() { rw_locker_.unlock(); }

@@ -846,7 +846,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
                 auto result = txn->CreateIndexDef(table_entry, index_base_ivf, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
@@ -953,7 +953,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
                 auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);

@@ -159,11 +159,11 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr);
 
-    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, Txn *txn);
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, Txn *txn);
 
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);
 

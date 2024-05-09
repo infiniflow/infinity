@@ -31,6 +31,7 @@ export module column_index_reader;
 namespace infinity {
 struct TableEntry;
 class BlockMaxTermDocIterator;
+class Txn;
 
 export class ColumnIndexReader {
 public:
@@ -75,7 +76,7 @@ export class TableIndexReaderCache {
 public:
     void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
 
-    IndexReader GetIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *table_entry_ptr);
+    IndexReader GetIndexReader(Txn *txn, TableEntry *table_entry_ptr);
 
 private:
     std::mutex mutex_;

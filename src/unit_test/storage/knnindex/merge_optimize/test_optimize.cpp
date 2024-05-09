@@ -76,7 +76,7 @@ protected:
             }
             // wait for at most 10s
             if (end - start > 10) {
-                UnrecoverableException("WaitCleanup timeout");
+                UnrecoverableError("WaitCleanup timeout");
             }
             usleep(1000 * 1000);
         }

@@ -564,7 +564,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
         EXPECT_EQ(table_status.ok(), true);
         {
-            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
             auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
             auto *table_index_entry = std::get<0>(result);
             auto status = std::get<1>(result);

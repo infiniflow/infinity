@@ -206,8 +206,7 @@ void QueryMatchTest::CreateIndex(const String& db_name, const String& table_name
                 columns.emplace_back(idx);
             }
 
-            TxnTimeStamp begin_ts = txn_idx->BeginTS();
-            SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+            SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
             u64 table_idx = 0;
             auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
@@ -292,12 +291,9 @@ void QueryMatchTest::QueryMatch(const String& db_name,
     auto [table_index_entry, status_index] = txn->GetIndexByName(db_name, table_name, index_name);
     EXPECT_TRUE(status_index.ok());
 
-    auto txn_id = txn->TxnID();
-    auto begin_ts = txn->BeginTS();
+    auto fake_table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
 
-    auto fake_table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
-
-    QueryBuilder query_builder(txn_id, begin_ts, fake_table_ref);
+    QueryBuilder query_builder(txn, fake_table_ref);
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
 
     auto match_expr = MakeShared<MatchExpr>();
