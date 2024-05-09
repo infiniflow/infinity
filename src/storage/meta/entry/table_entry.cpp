@@ -208,7 +208,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
 
 /// replay
 void TableEntry::UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry) {
-    txn_id_.store(table_entry->txn_id_);
+    txn_id_ = table_entry->txn_id_;
     begin_ts_ = table_entry->begin_ts_;
     commit_ts_.store(table_entry->commit_ts_);
     row_count_ = table_entry->row_count();
@@ -474,10 +474,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
 
             auto *segment_entry = segment_store.segment_entry_;
 
-            segment_entry->CommitSegment(txn_id, commit_ts);
-            for (auto [block_id, block_entry] : segment_store.block_entries_) {
-                block_entry->CommitBlock(txn_id, commit_ts);
-            }
+            segment_entry->CommitSegment(txn_id, commit_ts, segment_store);
 
             for (const auto &old_segment : old_segments) {
                 // old_segment->TrySetDeprecated(commit_ts);
@@ -581,10 +578,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
 Status TableEntry::CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
     for (const auto &[segment_id, segment_store] : segment_stores) {
         auto *segment_entry = segment_store.segment_entry_;
-        segment_entry->CommitSegment(txn_id, commit_ts);
-        for (auto [block_id, block_entry] : segment_store.block_entries_) {
-            block_entry->CommitBlock(txn_id, commit_ts);
-        }
+        segment_entry->CommitSegment(txn_id, commit_ts, segment_store);
     }
     return Status::OK();
 }
@@ -882,7 +876,7 @@ SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID seg_id, Txn *txn) c
         return nullptr;
     }
     const auto &segment = iter->second;
-    if (segment->commit_ts_ > txn->BeginTS() && segment->txn_id_ != txn->TxnID()) {
+    if (!segment->CheckVisible(txn)) {
         return nullptr;
     }
     return segment;
@@ -910,7 +904,7 @@ String TableEntry::GetPathNameTail() const {
     return table_entry_dir_->substr(delimiter_i + 1);
 }
 
-SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
+SharedPtr<BlockIndex> TableEntry::GetBlockIndex(Txn *txn) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
@@ -918,7 +912,7 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
 
     // Add segment that is not deprecated
     for (const auto &segment_pair : this->segment_map_) {
-        result->Insert(segment_pair.second.get(), begin_ts);
+        result->Insert(segment_pair.second.get(), txn);
     }
 
     return result;
@@ -937,16 +931,6 @@ bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
     return true;
 }
 
-bool TableEntry::CheckVisible(SegmentID segment_id, TxnTimeStamp begin_ts) const {
-    std::shared_lock lock(this->rw_locker_);
-    auto iter = segment_map_.find(segment_id);
-    if (iter == segment_map_.end()) {
-        return false;
-    }
-    const auto &segment = iter->second;
-    return segment->CheckVisible(begin_ts);
-}
-
 nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
@@ -960,7 +944,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["table_entry_type"] = this->table_entry_type_;
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
-        json_res["txn_id"] = this->txn_id_.load();
+        json_res["txn_id"] = this->txn_id_;
         json_res["deleted"] = this->deleted_;
         if (!this->deleted_) {
             json_res["table_entry_dir"] = *this->table_entry_dir_;
@@ -1196,8 +1180,6 @@ void TableEntry::Cleanup() {
     LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return fulltext_column_index_cache_.GetIndexReader(txn_id, begin_ts, this);
-}
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
 
 } // namespace infinity

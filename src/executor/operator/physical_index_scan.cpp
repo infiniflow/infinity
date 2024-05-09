@@ -452,14 +452,13 @@ struct FilterResult {
     }
 
     template <typename ColumnValueType>
-    inline void
-    ExecuteSingleRangeT(const FilterIntervalRangeT<ColumnValueType> &interval_range, SegmentIndexEntry &index_entry, const TxnTimeStamp ts) {
+    inline void ExecuteSingleRangeT(const FilterIntervalRangeT<ColumnValueType> &interval_range, SegmentIndexEntry &index_entry, Txn *txn) {
         Vector<UniquePtr<TrunkReader<ColumnValueType>>> trunk_readers;
         Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> chunks_snapshot = index_entry.GetSecondaryIndexSnapshot();
         const u32 segment_row_count = SegmentRowCount();
         auto &[chunk_index_entries, memory_secondary_index] = chunks_snapshot;
         for (const auto &chunk_index_entry : chunk_index_entries) {
-            if (chunk_index_entry->CheckVisible(ts)) {
+            if (chunk_index_entry->CheckVisible(txn)) {
                 trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, chunk_index_entry));
             }
         }
@@ -492,7 +491,7 @@ struct FilterResult {
     inline void ExecuteSingleRange(const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
                                    const FilterExecuteSingleRange &single_range,
                                    SegmentID segment_id,
-                                   const TxnTimeStamp ts) {
+                                   Txn *txn) {
         // step 1. check if range is empty
         if (single_range.IsEmpty()) {
             return SetEmptyResult();
@@ -504,7 +503,7 @@ struct FilterResult {
         // step 3. search index
         auto &interval_range_variant = single_range.GetIntervalRange();
         std::visit(Overload{[&]<typename ColumnValueType>(const FilterIntervalRangeT<ColumnValueType> &interval_range) {
-                                ExecuteSingleRangeT(interval_range, index_entry, ts);
+                                ExecuteSingleRangeT(interval_range, index_entry, txn);
                             },
                             [](const std::monostate &empty) {
                                 UnrecoverableError("FilterResult::ExecuteSingleRange(): class member interval_range_ not initialized!");
@@ -598,7 +597,7 @@ FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &fil
                                             const SegmentID segment_id,
                                             const u32 segment_row_count,
                                             const u32 segment_row_actual_count,
-                                            const TxnTimeStamp ts) {
+                                            Txn *txn) {
     Vector<FilterResult> result_stack;
     // execute filter_execute_command_ (Reverse Polish notation)
     for (auto const &elem : filter_execute_command) {
@@ -628,7 +627,7 @@ FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &fil
                             },
                             [&](const FilterExecuteSingleRange &single_range) {
                                 result_stack.emplace_back(segment_row_count, segment_row_actual_count);
-                                result_stack.back().ExecuteSingleRange(column_index_map, single_range, segment_id, ts);
+                                result_stack.back().ExecuteSingleRange(column_index_map, single_range, segment_id, txn);
                             }},
                    elem);
     }
@@ -644,13 +643,13 @@ std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<Filter
                                                              const SegmentID segment_id,
                                                              const u32 segment_row_count,
                                                              const u32 segment_row_actual_count,
-                                                             const TxnTimeStamp ts) {
+                                                             Txn *txn) {
     if (filter_execute_command.empty()) {
         // return all true
         return std::variant<Vector<u32>, Bitmask>(std::in_place_type<Bitmask>);
     }
     auto result =
-        SolveSecondaryIndexFilterInner(filter_execute_command, column_index_map, segment_id, segment_row_count, segment_row_actual_count, ts);
+        SolveSecondaryIndexFilterInner(filter_execute_command, column_index_map, segment_id, segment_row_count, segment_row_actual_count, txn);
     return std::move(result.selected_rows_);
 }
 
@@ -709,7 +708,7 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     DeleteFilter delete_filter(segment_entry, begin_ts, segment_entry->row_count(begin_ts));
     // output
     const auto result =
-        SolveSecondaryIndexFilterInner(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count, begin_ts);
+        SolveSecondaryIndexFilterInner(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count, txn);
     result.Output(output_data_blocks, segment_id, delete_filter);
 
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, finished", next_idx, segment_ids.size()));

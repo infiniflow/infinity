@@ -651,7 +651,8 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
-    auto block_index = table_entry->GetBlockIndex(commit_ts);
+    auto txn = MakeUnique<Txn>(nullptr /*buffer_mgr*/, nullptr /*txn_mgr*/, nullptr /*catalog*/, txn_id, begin_ts);
+    auto block_index = table_entry->GetBlockIndex(txn.get());
     table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
@@ -707,7 +708,8 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
                                                            commit_ts,             /*commit_ts*/
                                                            commit_ts,             /*checkpoint_ts*/
                                                            block_info.row_count_, /*checkpoint_row_count*/
-                                                           buffer_mgr);
+                                                           buffer_mgr,
+                                                           txn_id);
         for (ColumnID column_id = 0; column_id < (ColumnID)block_info.outline_infos_.size(); ++column_id) {
             auto [next_idx, last_off] = block_info.outline_infos_[column_id];
             auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_idx, last_off, commit_ts);

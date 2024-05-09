@@ -69,7 +69,7 @@ protected:
             // wait for at most 10s
             time_t end = time(nullptr);
             if (end - start > 10) {
-                UnrecoverableException("WaitFlushDeltaOp timeout");
+                UnrecoverableError("WaitFlushDeltaOp timeout");
             }
         }
     }
@@ -877,8 +877,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                         columns.emplace_back(idx);
                     }
 
-                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
-                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
@@ -1043,8 +1042,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                         columns.emplace_back(idx);
                     }
 
-                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
-                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
@@ -1193,8 +1191,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                         columns.emplace_back(idx);
                     }
 
-                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
-                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);

@@ -24,6 +24,7 @@ class BaseTableRef;
 class BaseExpression;
 class QueryContext;
 class BufferManager;
+class Txn;
 struct TableIndexEntry;
 
 export struct CommonQueryFilter {
@@ -61,7 +62,7 @@ export struct CommonQueryFilter {
     // 2. return true if the filter is available for query
     // if other threads are building the filter, the filter is not available for query
     // in this case, physical operator should return early and wait for next scheduling
-    bool TryFinishBuild(TxnTimeStamp begin_ts, BufferManager *buffer_mgr) {
+    bool TryFinishBuild(Txn *txn) {
         if (finish_build_.test(std::memory_order_acquire)) {
             return true;
         }
@@ -74,7 +75,7 @@ export struct CommonQueryFilter {
                 }
                 task_id = begin_task_num_++;
             }
-            BuildFilter(task_id, begin_ts, buffer_mgr);
+            BuildFilter(task_id, txn);
             if (++end_task_num_ == total_task_num_) {
                 finish_build_.test_and_set(std::memory_order_release);
                 break;
@@ -89,7 +90,7 @@ export struct CommonQueryFilter {
     void TryApplySecondaryIndexFilterOptimizer(QueryContext *query_context);
 
 private:
-    void BuildFilter(u32 task_id, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
+    void BuildFilter(u32 task_id, Txn *txn);
 };
 
 } // namespace infinity

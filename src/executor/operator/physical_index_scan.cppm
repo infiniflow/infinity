@@ -39,6 +39,8 @@ import bitmask;
 
 namespace infinity {
 
+class Txn;
+
 // for int range filter, x > n is equivalent to x >= n + 1
 // for float range filter, x > f is equivalent to x >= std::nextafter(f, INFINITY)
 // we can use this to simplify the filter
@@ -110,6 +112,6 @@ export std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector
                                                                     const SegmentID segment_id,
                                                                     const u32 segment_row_count,
                                                                     const u32 segment_row_actual_count,
-                                                                    const TxnTimeStamp ts);
+                                                                    Txn *txn);
 
 } // namespace infinity

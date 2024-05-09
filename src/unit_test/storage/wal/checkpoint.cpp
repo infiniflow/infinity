@@ -80,7 +80,7 @@ protected:
             }
             // wait for at most 10s
             if (end - start > 10) {
-                UnrecoverableException("WaitFlushDeltaOp timeout");
+                UnrecoverableError("WaitFlushDeltaOp timeout");
             }
         }
     }
@@ -274,8 +274,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
         auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
@@ -316,8 +315,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
         auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
@@ -384,8 +382,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
         auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);

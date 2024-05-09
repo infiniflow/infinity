@@ -70,7 +70,7 @@ protected:
                 break;
             }
             if (end - start > 10) {
-                UnrecoverableException("WaitFlushDeltaOp timeout");
+                UnrecoverableError("WaitFlushDeltaOp timeout");
             }
             LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
             usleep(1000 * 1000);
@@ -456,8 +456,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
 

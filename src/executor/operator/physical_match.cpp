@@ -23,7 +23,7 @@ module;
 module physical_match;
 
 import stl;
-
+import txn;
 import query_context;
 import operator_state;
 import physical_operator;
@@ -517,9 +517,8 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     auto execute_start_time = std::chrono::high_resolution_clock::now();
     // 1. build QueryNode tree
     // 1.1 populate column2analyzer
-    TransactionID txn_id = query_context->GetTxn()->TxnID();
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
-    QueryBuilder query_builder(txn_id, begin_ts, base_table_ref_);
+    Txn *txn = query_context->GetTxn();
+    QueryBuilder query_builder(txn, base_table_ref_);
     auto finish_init_query_builder_time = std::chrono::high_resolution_clock::now();
     TimeDurationType query_builder_init_duration = finish_init_query_builder_time - execute_start_time;
     LOG_TRACE(fmt::format("PhysicalMatch Part 0.1: Init QueryBuilder time: {} ms", query_builder_init_duration.count()));
@@ -805,7 +804,8 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     auto start_time = std::chrono::high_resolution_clock::now();
     assert(common_query_filter_);
     {
-        bool try_result = common_query_filter_->TryFinishBuild(query_context->GetTxn()->BeginTS(), query_context->GetTxn()->buffer_mgr());
+        Txn *txn = query_context->GetTxn();
+        bool try_result = common_query_filter_->TryFinishBuild(txn);
         auto finish_filter_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::milli> filter_duration = finish_filter_time - start_time;
         LOG_TRACE(fmt::format("PhysicalMatch Prepare: Filter time: {} ms", filter_duration.count()));

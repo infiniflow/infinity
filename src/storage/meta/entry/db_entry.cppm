@@ -95,7 +95,7 @@ public:
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &table_name, Txn *txn);
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
@@ -120,7 +120,7 @@ public:
 
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
+    Status GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_array);
 
 private:
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {

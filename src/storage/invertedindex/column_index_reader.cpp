@@ -132,7 +132,9 @@ void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mut
     last_known_update_ts_ = std::max(last_known_update_ts_, ts);
 }
 
-IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *self_table_entry_ptr) {
+IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_table_entry_ptr) {
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    TransactionID txn_id = txn->TxnID();
     IndexReader result;
     result.session_pool_ = MakeShared<MemoryPool>();
     std::scoped_lock lock(mutex_);
@@ -176,7 +178,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(TransactionID txn_id, TxnTimeS
                     optionflag_t flag = index_full_text->flag_;
                     String index_dir = *(table_index_entry->index_dir());
                     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment =
-                        table_index_entry->GetIndexBySegmentSnapshot(self_table_entry_ptr, begin_ts);
+                        table_index_entry->GetIndexBySegmentSnapshot(self_table_entry_ptr, txn);
                     column_index_reader->Open(flag, std::move(index_dir), std::move(index_by_segment));
                     (*result.column_index_readers_)[column_id] = std::move(column_index_reader);
                 }

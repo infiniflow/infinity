@@ -89,7 +89,9 @@ Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropEntry(std::shared_lock<std::
 }
 
 Tuple<SharedPtr<TableInfo>, Status>
-TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn) {
+    TransactionID txn_id = txn->TxnID();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     auto [table_entry, status] = table_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
     if (!status.ok()) {
         return {nullptr, status};
@@ -101,7 +103,7 @@ TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
     table_info->column_count_ = table_entry->ColumnCount();
     table_info->row_count_ = table_entry->row_count();
 
-    SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(begin_ts);
+    SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(txn);
     table_info->segment_count_ = segment_index->SegmentCount();
 
     return {table_info, status};

@@ -71,7 +71,8 @@ public:
                                                      TxnTimeStamp commit_ts,
                                                      TxnTimeStamp check_point_ts,
                                                      u16 checkpoint_row_count,
-                                                     BufferManager *buffer_mgr);
+                                                     BufferManager *buffer_mgr,
+                                                     TransactionID txn_id);
 
     void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
