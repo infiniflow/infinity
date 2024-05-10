@@ -291,9 +291,11 @@ Tuple<Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     Vector<SegmentIndexEntry *> segment_index_entries;
     SegmentID unsealed_id = table_entry->unsealed_id();
-    for (const auto *segment_entry : block_index->segments_) {
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_count(), column_def_);
-        SegmentID segment_id = segment_entry->segment_id();
+    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+        SegmentOffset segment_offset = segment_info.segment_offset_;
+
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_offset, column_def_);
+        auto *segment_entry = segment_info.segment_entry_;
         SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         if (!is_replay) {
             segment_index_entry->CreateIndexPrepare(segment_entry, txn, prepare, check_ts);

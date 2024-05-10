@@ -41,6 +41,7 @@ import infinity_exception;
 import value;
 import third_party;
 import base_table_ref;
+import block_index;
 import load_meta;
 import block_entry;
 import block_column_entry;
@@ -81,7 +82,7 @@ protected:
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
     const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
-    const HashMap<SegmentID, SegmentEntry *> *segment_index_ = &common_query_filter_->base_table_ref_->block_index_->segment_index_;
+    const Map<SegmentID, SegmentInfo> &segment_index = common_query_filter_->base_table_ref_->block_index_->segment_block_index_;
 
     const TxnTimeStamp begin_ts_ = common_query_filter_->begin_ts_;
     SegmentID current_segment_id_ = filter_result_ptr_->size() ? filter_result_ptr_->begin()->first : INVALID_SEGMENT_ID;
@@ -104,8 +105,9 @@ protected:
     RowID SelfBlockLastDocID() const {
         if (current_segment_id_ != cache_segment_id_) {
             cache_segment_id_ = current_segment_id_;
-            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
-            cache_segment_offset_ = cache_segment_entry_->row_count();
+            const auto &segment_info = segment_index.at(cache_segment_id_);
+            cache_segment_entry_ = segment_info.segment_entry_;
+            cache_segment_offset_ = segment_info.segment_offset_;
             cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }
         return RowID(current_segment_id_, cache_segment_offset_);
@@ -138,7 +140,7 @@ protected:
         assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
         if (current_segment_id_ != cache_segment_id_) {
             cache_segment_id_ = current_segment_id_;
-            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
+            cache_segment_entry_ = segment_index.at(cache_segment_id_).segment_entry_;
             cache_segment_offset_ = cache_segment_entry_->row_count();
             cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }

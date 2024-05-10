@@ -908,7 +908,6 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(Txn *txn) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
-    result->Reserve(this->segment_map_.size());
 
     // Add segment that is not deprecated
     for (const auto &segment_pair : this->segment_map_) {

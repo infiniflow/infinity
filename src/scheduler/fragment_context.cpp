@@ -578,7 +578,7 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
 SizeT InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index_do_operator, FragmentContext *fragment_ctx) {
     auto *table_ref = create_index_do_operator->base_table_ref_.get();
     // FIXME: to create index on unsealed_segment
-    SizeT segment_cnt = table_ref->block_index_->segments_.size();
+    SizeT segment_cnt = table_ref->block_index_->SegmentCount();
 
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
     parallel_materialize_fragment_ctx->create_index_shared_data_ = MakeUnique<CreateIndexSharedData>(table_ref->block_index_.get());

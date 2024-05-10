@@ -21,6 +21,7 @@ import stl;
 import bitmask;
 import base_expression;
 import base_table_ref;
+import block_index;
 import segment_entry;
 import fast_rough_filter;
 import table_index_entry;
@@ -118,7 +119,7 @@ void MergeIntoBitmask(const VectorBuffer *input_bool_column_buffer,
 
 CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts)
     : begin_ts_(begin_ts), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
-    const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref_->block_index_->segment_index_;
+    const auto &segment_index = base_table_ref_->block_index_->segment_block_index_;
     if (segment_index.empty()) {
         finish_build_.test_and_set(std::memory_order_release);
     } else {
@@ -133,9 +134,9 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
 void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
     auto *buffer_mgr = txn->buffer_mgr();
     TxnTimeStamp begin_ts = txn->BeginTS();
-    const HashMap<SegmentID, SegmentEntry *> &segment_index = base_table_ref_->block_index_->segment_index_;
+    const auto &segment_index = base_table_ref_->block_index_->segment_block_index_;
     const SegmentID segment_id = tasks_[task_id];
-    const SegmentEntry *segment_entry = segment_index.at(segment_id);
+    const SegmentEntry *segment_entry = segment_index.at(segment_id).segment_entry_;
     if (!fast_rough_filter_evaluator_->Evaluate(begin_ts, *segment_entry->GetFastRoughFilter())) {
         // skip this segment
         return;
