@@ -121,7 +121,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     SharedPtr<String> result;
 
     // Default general config
-    String default_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
+    String default_version = "0.1.1";
 
     String default_time_zone = "UTC";
     i32 default_time_zone_bias = 8;
