@@ -169,6 +169,44 @@ struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyTy
     bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
 };
 
+template <typename LenType>
+struct KeyAddress<TermTuple, LenType> {
+    char *data{nullptr};
+    u64 addr;
+    u32 idx;
+
+    KeyAddress(char *p, u64 ad, u32 i) {
+        data = p;
+        addr = ad;
+        idx = i;
+    }
+
+    KeyAddress() {
+        data = nullptr;
+        addr = -1;
+        idx = -1;
+    }
+
+    TermTuple KEY() { return TermTuple(data + sizeof(LenType), LEN()); }
+    TermTuple KEY() const { return TermTuple(data + sizeof(LenType), LEN()); }
+    LenType LEN() const { return *(LenType *)data; }
+    u64 &ADDR() { return addr; }
+    u64 ADDR() const { return addr; }
+    u32 IDX() const { return idx; }
+    u32 &IDX() { return idx; }
+
+    int Compare(const KeyAddress &p) const {
+        return KEY().Compare(p.KEY());
+    }
+
+    bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
+
+    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+
+    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+};
+
+
 export template <typename KeyType, typename LenType>
 class SortMerger {
     typedef SortMerger<KeyType, LenType> self_t;
