@@ -1112,11 +1112,11 @@ void TableEntry::AddDeleteToCompactionAlg(SegmentID segment_id) {
     compaction_alg_->DeleteInSegment(segment_id);
 }
 
-Optional<CompactionInfo> TableEntry::CheckCompaction(std::function<Txn *()> generate_txn) {
+Vector<SegmentEntry *> TableEntry::CheckCompaction(TransactionID txn_id) {
     if (compaction_alg_.get() == nullptr) {
-        return None;
+        return {};
     }
-    return compaction_alg_->CheckCompaction(generate_txn);
+    return compaction_alg_->CheckCompaction(txn_id);
 }
 
 Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {

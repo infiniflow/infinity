@@ -278,7 +278,7 @@ public:
 
     void AddDeleteToCompactionAlg(SegmentID segment_id);
 
-    Optional<CompactionInfo> CheckCompaction(std::function<Txn *()> generate_txn);
+    Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id);
 
     Vector<SegmentEntry *> PickCompactSegments() const;
 

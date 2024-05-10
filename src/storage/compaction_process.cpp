@@ -51,8 +51,6 @@ void CompactionProcessor::Stop() {
 void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
 Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
-    auto generate_txn = [this]() { return txn_mgr_->BeginTxn(MakeUnique<String>("Compact")); };
-
     Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
 
     Vector<UniquePtr<CompactSegmentsTask>> compaction_tasks;
@@ -63,13 +61,16 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
         Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
         for (auto *table_entry : table_entries) {
             while (true) {
-                auto compaction_info = table_entry->CheckCompaction(generate_txn);
-                if (!compaction_info) {
+                Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Compact"));
+                TransactionID txn_id = txn->TxnID();
+                auto compact_segments = table_entry->CheckCompaction(txn_id);
+                if (compact_segments.empty()) {
+                    txn_mgr_->RollBackTxn(txn);
                     break;
                 }
 
                 UniquePtr<CompactSegmentsTask> compact_task =
-                    CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry, std::move(compaction_info->segments_), compaction_info->txn_);
+                    CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry, std::move(compact_segments), txn);
                 compaction_tasks.emplace_back(std::move(compact_task));
             }
         }
