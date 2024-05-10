@@ -19,8 +19,8 @@ Glibc >=2.17
 
 ```bash
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-docker pull infiniflow/infinity:v0.1.0
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:v0.1.0
+docker pull infiniflow/infinity:v0.1.1
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:v0.1.1
 ```
 
 ### Deploy Infinity using binary package on Linux x86_64
@@ -29,13 +29,13 @@ You can download the binary package (deb, rpm, or tgz) for your respective host 
 
 Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-sudo rpm -i infinity-0.1.0-x86_64.rpm
+sudo rpm -i infinity-0.1.1-x86_64.rpm
 sudo systemctl start infinity
 ```
 
 Ubuntu/Debian
 ```bash
-sudo dpkg -i infinity-0.1.0-x86_64.deb
+sudo dpkg -i infinity-0.1.1-x86_64.deb
 sudo systemctl start infinity
 ```
 ### 🛠️ Build from Source
@@ -47,7 +47,7 @@ See [Build from Source](./build_from_source.md).
 `infinity-sdk` requires Python 3.10+.
 
 ```bash
-pip3 install infinity-sdk==0.1.0
+pip3 install infinity-sdk==0.1.1
 ```
 
 ## Import necessary modules

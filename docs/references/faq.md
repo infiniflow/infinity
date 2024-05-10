@@ -2,8 +2,7 @@
 sidebar_position: 2
 slug: /faq
 ---
-
-## Extensive Reading: Frequently Asked Questions
+# FAQ
 
 ## What is Retrieval-Augmented Generation?
 
