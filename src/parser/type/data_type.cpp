@@ -74,6 +74,10 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
             plain_type_ = true;
             break;
         }
+        case kTensor: {
+            plain_type_ = true;
+            break;
+        }
         case kInvalid:
             break;
     }
@@ -114,7 +118,7 @@ size_t DataType::Size() const {
     }
 
     // embedding, varchar data can get data here.
-    if (type_info_ != nullptr) {
+    if (type_info_ != nullptr and type_ != kTensor) {
         return type_info_->Size();
     }
 
@@ -179,6 +183,7 @@ int32_t DataType::GetSizeInBytes() const {
             case LogicalType::kDecimal:
                 size += sizeof(int64_t) * 2;
                 break;
+            case LogicalType::kTensor:
             case LogicalType::kEmbedding:
                 size += sizeof(EmbeddingDataType);
                 size += sizeof(int32_t);
@@ -220,6 +225,7 @@ void DataType::WriteAdv(char *&ptr) const {
             WriteBufAdv<int64_t>(ptr, scale);
             break;
         }
+        case LogicalType::kTensor:
         case LogicalType::kEmbedding: {
             const EmbeddingInfo *embedding_info = dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
             ParserAssert(embedding_info != nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
@@ -253,6 +259,7 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
             type_info = DecimalInfo::Make(precision, scale);
             break;
         }
+        case LogicalType::kTensor:
         case LogicalType::kEmbedding: {
             EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
             int32_t dimension = ReadBufAdv<int32_t>(ptr);
@@ -300,6 +307,7 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
                 type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
                 break;
             }
+            case LogicalType::kTensor:
             case LogicalType::kEmbedding: {
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
                 break;
@@ -478,6 +486,11 @@ std::string DataType::TypeToString<RowID>() {
 template <>
 std::string DataType::TypeToString<MixedT>() {
     return "Heterogeneous";
+}
+
+template <>
+std::string DataType::TypeToString<TensorT>() {
+    return "Tensor";
 }
 
 template <>

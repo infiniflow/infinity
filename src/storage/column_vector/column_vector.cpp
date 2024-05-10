@@ -78,6 +78,7 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
             vector_buffer_type = VectorBufferType::kCompactBit;
             break;
         }
+        case LogicalType::kTensor:
         case LogicalType::kVarchar: {
             vector_buffer_type = VectorBufferType::kHeap;
             break;
@@ -191,6 +192,11 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             }
             case kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
+            }
+            case kTensor: {
+                //TODO:tensor
+                //CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
             case kDate: {
@@ -329,6 +335,11 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTensor: {
+                //TODO:tensor
+                //CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kDate: {
@@ -488,6 +499,11 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
         }
         case kVarchar: {
             CopyRowFrom<VarcharT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case kTensor: {
+            //TODO:tensor
+            //CopyRowFrom<TensorT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
         case kDate: {
@@ -938,6 +954,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             ((RowID *)data_ptr_)[index] = value.GetValue<RowID>();
             break;
         }
+        //TODO:tensor
         case kVarchar: {
             // Copy string
             const String &src_str = value.GetVarchar();
@@ -1037,6 +1054,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             ((DecimalT *)data_ptr_)[index] = *(DecimalT *)(raw_ptr);
             break;
         }
+        //TODO:tensor
         case kVarchar: {
             // Copy string
             const VarcharT &src_ref = *(VarcharT *)(raw_ptr);

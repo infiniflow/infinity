@@ -59,6 +59,9 @@ export using infinity::EmbeddingT;
 // Heterogeneous
 export using infinity::MixedT;
 
+// tensor
+export using infinity::TensorT;
+
 export using infinity::RowID;
 export using infinity::TimeUnit;
 

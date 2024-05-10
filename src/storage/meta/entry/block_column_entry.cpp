@@ -35,6 +35,7 @@ import data_file_worker;
 import catalog_delta_entry;
 import internal_types;
 import data_type;
+import logical_type;
 
 namespace infinity {
 
@@ -100,7 +101,13 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 
     for (i32 outline_idx = 0; outline_idx < next_outline_idx; ++outline_idx) {
         // FIXME: not use default value
-        auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(outline_idx), DEFAULT_FIXLEN_CHUNK_SIZE);
+        SizeT buffer_size = 0;
+        if (column_type->type() == LogicalType::kTensor) {
+            buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
+        } else {
+            buffer_size = DEFAULT_FIXLEN_CHUNK_SIZE;
+        }
+        auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(outline_idx), buffer_size);
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(file_worker));
         column_entry->outline_buffers_.emplace_back(buffer_obj);
     }
@@ -164,6 +171,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
 
             break;
         }
+        case kTensor:
         case kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
             LOG_TRACE(fmt::format("Saving varchar {}", block_column_entry->column_id()));

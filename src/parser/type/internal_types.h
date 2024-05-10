@@ -27,6 +27,7 @@
 #include "type/geo/box_type.h"
 #include "type/geo/circle_type.h"
 #include "type/complex/embedding_type.h"
+#include "type/complex/tensor_type.h"
 #include "type/complex/row_id.h"
 #include "type/complex/varchar.h"
 #include "type/complex/uuid_type.h"
@@ -86,5 +87,8 @@ using EmbeddingT = EmbeddingType;
 
 // Heterogeneous
 using MixedT = MixedType;
+
+// tensor
+using TensorT = TensorType;
 
 }
