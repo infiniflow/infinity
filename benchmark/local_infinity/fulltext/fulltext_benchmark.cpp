@@ -222,8 +222,8 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
 
 void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
-    //std::vector<std::string> query_vec = {"one of", "is", "a", "\"is a\"", "\"one of\""};// {"Animalia", "Algorithms", "Animalia Algorithms", "network space", "harmful chemical anarchism"};
-    std::vector<std::string> query_vec = {"harmful chemical anarchism", "\"harmful chemical\"", "\"one of\"", "harmful chemical"};
+    std::vector<std::string> query_vec = {"harmful \"social custom\"", "social custom \"harmful chemical\"", "\"annual American awards\"", "harmful chemical", "\"one of\""};
+
     for (auto match_text : query_vec) {
         BaseProfiler profiler;
         profiler.Begin();
@@ -314,7 +314,7 @@ int main(int argc, char *argv[]) {
     };
     Mode mode(Mode::kInsert);
     SizeT insert_batch = 500;
-    app.add_option("--mode", mode, "Bencmark mode, one of insert, import, merge, query")
+    app.add_option("--mode", mode, "Benchmark mode, one of insert, import, merge, query")
         ->required()
         ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
     app.add_option("--insert-batch", insert_batch, "batch size of each insert, valid only at insert and merge mode, default value 500");
@@ -331,7 +331,7 @@ int main(int argc, char *argv[]) {
     String srcfile = test_data_path();
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
-// #define DEL_LOCAL_DATA
+//#define DEL_LOCAL_DATA
 #ifdef DEL_LOCAL_DATA
     system("rm -rf /var/infinity/data /var/infinity/wal /var/infinity/log /var/infinity/tmp");
 #endif
@@ -358,7 +358,7 @@ int main(int argc, char *argv[]) {
         case Mode::kQuery: {
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
-            // BenchmarkOptimize(infinity, db_name, table_name);
+            BenchmarkOptimize(infinity, db_name, table_name);
             sleep(10);
             BenchmarkMoreQuery(infinity, db_name, table_name, 1);
             break;

@@ -48,6 +48,8 @@ export String BufferStatusToString(BufferStatus status) {
             return "Freed";
         case BufferStatus::kNew:
             return "New";
+        case BufferStatus::kClean:
+            return "Clean";
         default:
             return "Invalid";
     }
@@ -77,7 +79,7 @@ public:
 
     void CleanupFile() const;
 
-    void CleanupTempFile() const ;
+    void CleanupTempFile() const;
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 

@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <bit>
 #include <vector>
 
@@ -32,9 +33,10 @@ import secondary_index_scan_execute_expression;
 import logical_type;
 import table_index_entry;
 import segment_index_entry;
+import chunk_index_entry;
+import secondary_index_in_mem;
 import segment_entry;
 import fast_rough_filter;
-// TODO:use bitset
 import bitmask;
 import filter_value_type_classification;
 
@@ -99,7 +101,231 @@ bool PhysicalIndexScan::Execute(QueryContext *query_context, OperatorState *oper
     return true;
 }
 
-// TODO: replace bitmask with bitmap
+template <typename ColumnValueType>
+struct TrunkReader {
+    virtual ~TrunkReader() = default;
+    virtual u32 GetResultCnt(const FilterIntervalRangeT<ColumnValueType> &interval_range) = 0;
+    virtual void OutPut(std::variant<Vector<u32>, Bitmask> &selected_rows_) = 0;
+};
+
+template <typename ColumnValueType>
+struct TrunkReaderT final : public TrunkReader<ColumnValueType> {
+    using KeyType = ConvertToOrderedType<ColumnValueType>;
+    static constexpr u32 data_pair_size = sizeof(KeyType) + sizeof(u32);
+    const u32 segment_row_count_;
+    SharedPtr<ChunkIndexEntry> chunk_index_entry_;
+    u32 begin_pos_ = 0;
+    u32 end_pos_ = 0;
+    TrunkReaderT(const u32 segment_row_count, const SharedPtr<ChunkIndexEntry> &chunk_index_entry)
+        : segment_row_count_(segment_row_count), chunk_index_entry_(chunk_index_entry) {}
+    u32 GetResultCnt(const FilterIntervalRangeT<ColumnValueType> &interval_range) override {
+        static_assert(std::is_same_v<KeyType, typename FilterIntervalRangeT<ColumnValueType>::T>);
+        BufferHandle index_handle_head = chunk_index_entry_->GetIndex();
+        auto index = static_cast<const SecondaryIndexData *>(index_handle_head.GetData());
+        u32 index_data_num = index->GetChunkRowCount();
+        auto [begin_val, end_val] = interval_range.GetRange();
+        // 1. search PGM and get approximate search range
+        // result:
+        //    1. size_t pos_;         ///< The approximate position of the key.
+        //    2. size_t lower_bound_; ///< The lower bound of the range.
+        //    3. size_t upper_bound_; ///< The upper bound of the range.
+        // NOTICE: PGM return a range [lower_bound_, upper_bound_) which must include **one** key when the key exists
+        // NOTICE: but the range may not include the complete [start, end] range
+        auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
+        auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
+        u32 begin_pos = begin_lower;
+        u32 end_pos = std::min<u32>(end_upper, index_data_num - 1);
+        if (end_pos < begin_pos) {
+            return 0;
+        }
+        const auto column_data_type = chunk_index_entry_->segment_index_entry_->table_index_entry()->column_def()->type();
+        const auto index_part_num = chunk_index_entry_->GetPartNum();
+        // 2. find the exact range
+        // 2.1 find the exact begin_pos which is the first position that index_key >= begin_val
+        u32 begin_part_id = begin_pos / 8192;
+        u32 begin_part_offset = begin_pos % 8192;
+        auto index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
+        auto index_data_b = index_handle_b.GetData();
+        auto index_key_b_ptr = [&index_data_b](u32 i) -> KeyType {
+            KeyType key = {};
+            std::memcpy(&key, static_cast<const char *>(index_data_b) + i * data_pair_size, sizeof(KeyType));
+            return key;
+        };
+        auto begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
+        if (index_key_b_ptr(begin_part_offset) < begin_val) {
+            // search forward
+            while (index_key_b_ptr(begin_part_offset) < begin_val) {
+                if (++begin_part_offset == begin_part_size) {
+                    if (++begin_part_id >= index_part_num) {
+                        // nothing found
+                        return 0;
+                    }
+                    index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
+                    index_data_b = index_handle_b.GetData();
+                    begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
+                    begin_part_offset = 0;
+                }
+            }
+        } else {
+            // search backward
+            auto test_begin_part_id = begin_part_id;
+            auto test_begin_part_offset = begin_part_offset;
+            while (index_key_b_ptr(test_begin_part_offset) >= begin_val) {
+                // keep valid begin_pos
+                begin_part_id = test_begin_part_id;
+                begin_part_offset = test_begin_part_offset;
+                if (test_begin_part_offset-- == 0) {
+                    if (test_begin_part_id-- == 0) {
+                        // left bound is the leftmost
+                        break;
+                    }
+                    index_handle_b = chunk_index_entry_->GetIndexPartAt(test_begin_part_id);
+                    index_data_b = index_handle_b.GetData();
+                    begin_part_size = chunk_index_entry_->GetPartRowCount(test_begin_part_id);
+                    test_begin_part_offset = begin_part_size - 1;
+                }
+            }
+            // recover valid pointers
+            index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
+            index_data_b = index_handle_b.GetData();
+            begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
+        }
+        // update begin_pos
+        begin_pos = begin_part_id * 8192 + begin_part_offset;
+        // 2.2 find the exact end_pos which is the first position that index_key > end_val (or the position past the end)
+        u32 end_part_id = end_pos / 8192;
+        u32 end_part_offset = end_pos % 8192;
+        auto index_handle_e = chunk_index_entry_->GetIndexPartAt(end_part_id);
+        auto index_data_e = index_handle_e.GetData();
+        auto index_key_e_ptr = [&index_data_e](u32 i) -> KeyType {
+            KeyType key = {};
+            std::memcpy(&key, static_cast<const char *>(index_data_e) + i * data_pair_size, sizeof(KeyType));
+            return key;
+        };
+        auto end_part_size = chunk_index_entry_->GetPartRowCount(end_part_id);
+        if (index_key_e_ptr(end_part_offset) <= end_val) {
+            // search forward
+            while (index_key_e_ptr(end_part_offset) <= end_val) {
+                if (++end_part_offset == end_part_size) {
+                    if (++end_part_id >= index_part_num) {
+                        // right bound is the rightmost
+                        // recover end_part_id and keep end_part_offset
+                        // they will be used to calculate end_pos
+                        --end_part_id;
+                        break;
+                    }
+                    index_handle_e = chunk_index_entry_->GetIndexPartAt(end_part_id);
+                    index_data_e = index_handle_e.GetData();
+                    end_part_size = chunk_index_entry_->GetPartRowCount(end_part_id);
+                    end_part_offset = 0;
+                }
+            }
+        } else {
+            // search backward
+            auto test_end_part_id = end_part_id;
+            auto test_end_part_offset = end_part_offset;
+            while (index_key_e_ptr(test_end_part_offset) > end_val) {
+                end_part_id = test_end_part_id;
+                end_part_offset = test_end_part_offset;
+                if (test_end_part_offset-- == 0) {
+                    if (test_end_part_id-- == 0) {
+                        // nothing found
+                        return 0;
+                    }
+                    index_handle_e = chunk_index_entry_->GetIndexPartAt(test_end_part_id);
+                    index_data_e = index_handle_e.GetData();
+                    // no need to update end_part_size
+                    test_end_part_offset = chunk_index_entry_->GetPartRowCount(test_end_part_id) - 1;
+                }
+            }
+            // does not need to recover valid values like index_handle_e, index_data_e, index_key_e_ptr, end_part_size
+        }
+        // update end_pos
+        end_pos = end_part_id * 8192 + end_part_offset;
+        // 3. now we know result size
+        if (end_pos <= begin_pos) {
+            // nothing found
+            return 0;
+        }
+        // have result
+        begin_pos_ = begin_pos;
+        end_pos_ = end_pos;
+        const u32 result_size = end_pos - begin_pos;
+        return result_size;
+    }
+    void OutPut(std::variant<Vector<u32>, Bitmask> &selected_rows_) override {
+        const u32 begin_pos = begin_pos_;
+        const u32 end_pos = end_pos_;
+        const u32 result_size = end_pos - begin_pos;
+        u32 begin_part_id = begin_pos / 8192;
+        u32 begin_part_offset = begin_pos % 8192;
+        auto index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
+        auto index_data_b = index_handle_b.GetData();
+        auto index_offset_b_ptr = [&index_data_b](const u32 i) -> u32 {
+            u32 result = 0;
+            std::memcpy(&result, static_cast<const char *>(index_data_b) + i * data_pair_size + sizeof(KeyType), sizeof(u32));
+            return result;
+        };
+        auto begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
+        // output result
+        std::visit(Overload{[&](Vector<u32> &selected_rows) {
+                                for (u32 i = 0; i < result_size; ++i) {
+                                    if (begin_part_offset == begin_part_size) {
+                                        index_handle_b = chunk_index_entry_->GetIndexPartAt(++begin_part_id);
+                                        index_data_b = index_handle_b.GetData();
+                                        begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
+                                        begin_part_offset = 0;
+                                    }
+                                    selected_rows.push_back(index_offset_b_ptr(begin_part_offset));
+                                    ++begin_part_offset;
+                                }
+                            },
+                            [&](Bitmask &bitmask) {
+                                for (u32 i = 0; i < result_size; ++i) {
+                                    if (begin_part_offset == begin_part_size) {
+                                        index_handle_b = chunk_index_entry_->GetIndexPartAt(++begin_part_id);
+                                        index_data_b = index_handle_b.GetData();
+                                        begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
+                                        begin_part_offset = 0;
+                                    }
+                                    bitmask.SetTrue(index_offset_b_ptr(begin_part_offset));
+                                    ++begin_part_offset;
+                                }
+                            }},
+                   selected_rows_);
+    }
+};
+
+template <typename ColumnValueType>
+struct TrunkReaderM final : public TrunkReader<ColumnValueType> {
+    using KeyType = ConvertToOrderedType<ColumnValueType>;
+    const u32 segment_row_count_;
+    SharedPtr<SecondaryIndexInMem> memory_secondary_index_;
+    Pair<u32, std::variant<Vector<u32>, Bitmask>> result_cache_;
+    TrunkReaderM(const u32 segment_row_count, const SharedPtr<SecondaryIndexInMem> &memory_secondary_index)
+        : segment_row_count_(segment_row_count), memory_secondary_index_(memory_secondary_index) {}
+    u32 GetResultCnt(const FilterIntervalRangeT<ColumnValueType> &interval_range) override {
+        auto [begin_val, end_val] = interval_range.GetRange();
+        Tuple<u32, KeyType, KeyType> arg_tuple = {segment_row_count_, begin_val, end_val};
+        result_cache_ = memory_secondary_index_->RangeQuery(&arg_tuple);
+        return result_cache_.first;
+    }
+    void OutPut(std::variant<Vector<u32>, Bitmask> &selected_rows_) override {
+        std::visit(Overload{[&](Vector<u32> &selected_rows, const Vector<u32> &result) {
+                                selected_rows.insert(selected_rows.end(), result.begin(), result.end());
+                            },
+                            [](Vector<u32> &, const Bitmask &) { UnrecoverableError("TrunkReaderM::OutPut(): result count error."); },
+                            [&](Bitmask &bitmask, const Vector<u32> &result) {
+                                for (const auto offset : result) {
+                                    bitmask.SetTrue(offset);
+                                }
+                            },
+                            [&](Bitmask &bitmask, const Bitmask &result) { bitmask.MergeOr(result); }},
+                   selected_rows_,
+                   result_cache_.second);
+    }
+};
+
 // Vector<u32>: selected rows in segment (used when selected_num <= (segment_row_cnt / 32)), i.e. size(Vector) <= size(Bitmask)
 // Bitmask: selected rows in segment (used when selected_num > (segment_row_cnt / 32))
 struct FilterResult {
@@ -226,195 +452,46 @@ struct FilterResult {
     }
 
     template <typename ColumnValueType>
-    inline void
-    ExecuteSingleRangeT(const FilterIntervalRangeT<ColumnValueType> &interval_range, SegmentIndexEntry &index_entry, SegmentID segment_id) {
-        using T = FilterIntervalRangeT<ColumnValueType>::T;
-        BufferHandle index_handle_head = index_entry.GetIndex();
-        auto index = static_cast<const SecondaryIndexDataHead *>(index_handle_head.GetData());
-        auto index_part_capacity = index->GetPartCapacity();
-        auto index_part_num = index->GetPartNum();
-        auto index_data_num = index->GetDataNum();
-        if (index_data_num != SegmentRowActualCount()) {
-            if (index_data_num < SegmentRowActualCount()) {
-                UnrecoverableError("FilterResult::ExecuteSingleRange(): index_data_num < SegmentRowActualCount(). index error.");
-            } else {
-                LOG_INFO(fmt::format("FilterResult::ExecuteSingleRange(): index_data_num: {}, SegmentRowActualCount(): {}. Some rows are deleted.",
-                                     index_data_num,
-                                     SegmentRowActualCount()));
+    inline void ExecuteSingleRangeT(const FilterIntervalRangeT<ColumnValueType> &interval_range, SegmentIndexEntry &index_entry, Txn *txn) {
+        Vector<UniquePtr<TrunkReader<ColumnValueType>>> trunk_readers;
+        Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> chunks_snapshot = index_entry.GetSecondaryIndexSnapshot();
+        const u32 segment_row_count = SegmentRowCount();
+        auto &[chunk_index_entries, memory_secondary_index] = chunks_snapshot;
+        for (const auto &chunk_index_entry : chunk_index_entries) {
+            if (chunk_index_entry->CheckVisible(txn)) {
+                trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, chunk_index_entry));
             }
         }
-        auto [begin_val, end_val] = interval_range.GetRange();
-        // 1. search PGM and get approximate search range
-        // result:
-        //    1. size_t pos_;         ///< The approximate position of the key.
-        //    2. size_t lower_bound_; ///< The lower bound of the range.
-        //    3. size_t upper_bound_; ///< The upper bound of the range.
-        // NOTICE: PGM return a range [lower_bound_, upper_bound_) which must include **one** key when the key exists
-        // NOTICE: but the range may not include the complete [start, end] range
-        auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
-        auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
-        u32 begin_pos = begin_lower;
-        u32 end_pos = std::min<u32>(end_upper, index_data_num - 1);
-        if (end_pos < begin_pos) {
-            return SetEmptyResult();
+        if (memory_secondary_index) {
+            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, memory_secondary_index));
         }
-        // 2. find the exact range
-        // 2.1 find the exact begin_pos which is the first position that index_key >= begin_val
-        u32 begin_part_id = begin_pos / index_part_capacity;
-        u32 begin_part_offset = begin_pos % index_part_capacity;
-        auto index_handle_b = index_entry.GetIndexPartAt(begin_part_id);
-        auto index_data_b = static_cast<const SecondaryIndexDataPart *>(index_handle_b.GetData());
-        auto index_key_b_ptr = static_cast<const T *>(index_data_b->GetColumnKeyData());
-        auto begin_part_size = index_data_b->GetPartSize();
-        if (index_data_b->GetPartId() != begin_part_id) {
-            UnrecoverableError("FilterResult::ExecuteSingleRange(): index_data_b->GetPartId() error.");
+        u32 result_size = 0;
+        for (auto &trunk_reader : trunk_readers) {
+            result_size += trunk_reader->GetResultCnt(interval_range);
         }
-        if (index_key_b_ptr[begin_part_offset] < begin_val) {
-            // search forward
-            while (index_key_b_ptr[begin_part_offset] < begin_val) {
-                if (++begin_part_offset == begin_part_size) {
-                    if (++begin_part_id >= index_part_num) {
-                        // nothing found
-                        return SetEmptyResult();
-                    }
-                    index_handle_b = index_entry.GetIndexPartAt(begin_part_id);
-                    index_data_b = static_cast<const SecondaryIndexDataPart *>(index_handle_b.GetData());
-                    index_key_b_ptr = static_cast<const T *>(index_data_b->GetColumnKeyData());
-                    begin_part_size = index_data_b->GetPartSize();
-                    begin_part_offset = 0;
-                }
-            }
-        } else {
-            // search backward
-            auto test_begin_part_id = begin_part_id;
-            auto test_begin_part_offset = begin_part_offset;
-            while (index_key_b_ptr[test_begin_part_offset] >= begin_val) {
-                // keep valid begin_pos
-                begin_part_id = test_begin_part_id;
-                begin_part_offset = test_begin_part_offset;
-                if (test_begin_part_offset-- == 0) {
-                    if (test_begin_part_id-- == 0) {
-                        // left bound is the leftmost
-                        break;
-                    }
-                    index_handle_b = index_entry.GetIndexPartAt(test_begin_part_id);
-                    index_data_b = static_cast<const SecondaryIndexDataPart *>(index_handle_b.GetData());
-                    index_key_b_ptr = static_cast<const T *>(index_data_b->GetColumnKeyData());
-                    begin_part_size = index_data_b->GetPartSize();
-                    test_begin_part_offset = begin_part_size - 1;
-                }
-            }
-            if (test_begin_part_id != begin_part_id) {
-                // recover valid pointers
-                index_handle_b = index_entry.GetIndexPartAt(begin_part_id);
-                index_data_b = static_cast<const SecondaryIndexDataPart *>(index_handle_b.GetData());
-                index_key_b_ptr = static_cast<const T *>(index_data_b->GetColumnKeyData());
-                begin_part_size = index_data_b->GetPartSize();
-            }
-        }
-        // update begin_pos
-        begin_pos = begin_part_id * index_part_capacity + begin_part_offset;
-        // 2.2 find the exact end_pos which is the first position that index_key > end_val (or the position past the end)
-        u32 end_part_id = end_pos / index_part_capacity;
-        u32 end_part_offset = end_pos % index_part_capacity;
-        auto index_handle_e = index_entry.GetIndexPartAt(end_part_id);
-        auto index_data_e = static_cast<const SecondaryIndexDataPart *>(index_handle_e.GetData());
-        auto index_key_e_ptr = static_cast<const T *>(index_data_e->GetColumnKeyData());
-        auto end_part_size = index_data_e->GetPartSize();
-        if (index_data_e->GetPartId() != end_part_id) {
-            UnrecoverableError("FilterResult::ExecuteSingleRange(): index_data_e->GetPartId() error.");
-        }
-        if (index_key_e_ptr[end_part_offset] <= end_val) {
-            // search forward
-            while (index_key_e_ptr[end_part_offset] <= end_val) {
-                if (++end_part_offset == end_part_size) {
-                    if (++end_part_id >= index_part_num) {
-                        // right bound is the rightmost
-                        // recover end_part_id and keep end_part_offset
-                        // they will be used to calculate end_pos
-                        --end_part_id;
-                        break;
-                    }
-                    index_handle_e = index_entry.GetIndexPartAt(end_part_id);
-                    index_data_e = static_cast<const SecondaryIndexDataPart *>(index_handle_e.GetData());
-                    index_key_e_ptr = static_cast<const T *>(index_data_e->GetColumnKeyData());
-                    end_part_size = index_data_e->GetPartSize();
-                    end_part_offset = 0;
-                }
-            }
-        } else {
-            // search backward
-            auto test_end_part_id = end_part_id;
-            auto test_end_part_offset = end_part_offset;
-            while (index_key_e_ptr[test_end_part_offset] > end_val) {
-                end_part_id = test_end_part_id;
-                end_part_offset = test_end_part_offset;
-                if (test_end_part_offset-- == 0) {
-                    if (test_end_part_id-- == 0) {
-                        // nothing found
-                        return SetEmptyResult();
-                    }
-                    index_handle_e = index_entry.GetIndexPartAt(test_end_part_id);
-                    index_data_e = static_cast<const SecondaryIndexDataPart *>(index_handle_e.GetData());
-                    index_key_e_ptr = static_cast<const T *>(index_data_e->GetColumnKeyData());
-                    // no need to update end_part_size
-                    test_end_part_offset = index_data_e->GetPartSize() - 1;
-                }
-            }
-            // does not need to recover valid values like index_handle_e, index_data_e, index_key_e_ptr, end_part_size
-        }
-        // update end_pos
-        end_pos = end_part_id * index_part_capacity + end_part_offset;
-        // 3. now we know result size
-        if (end_pos <= begin_pos) {
-            // nothing found
-            return SetEmptyResult();
-        }
-        u32 result_size = end_pos - begin_pos;
         // use array or bitmask for result
         // use array when result_size <= 1024 or size of array (u32 type) <= size of bitmask
-        bool use_array = result_size <= 1024 or result_size <= (std::bit_ceil(SegmentRowCount()) / 32);
-        // 4. output result
-        auto index_offset_b_ptr = static_cast<const u32 *>(index_data_b->GetColumnOffsetData());
+        const bool use_array = result_size <= 1024 or result_size <= (std::bit_ceil(SegmentRowCount()) / 32);
+        // output result
         if (use_array) {
-            auto &selected_rows = selected_rows_.emplace<Vector<u32>>();
-            selected_rows.reserve(result_size);
-            for (u32 i = 0; i < result_size; ++i) {
-                if (begin_part_offset == begin_part_size) {
-                    index_handle_b = index_entry.GetIndexPartAt(++begin_part_id);
-                    index_data_b = static_cast<const SecondaryIndexDataPart *>(index_handle_b.GetData());
-                    index_offset_b_ptr = static_cast<const u32 *>(index_data_b->GetColumnOffsetData());
-                    begin_part_size = index_data_b->GetPartSize();
-                    begin_part_offset = 0;
-                }
-                selected_rows.emplace_back(index_offset_b_ptr[begin_part_offset]);
-                ++begin_part_offset;
-            }
-            // need to sort
-            std::sort(selected_rows.begin(), selected_rows.end());
-            return;
+            auto &vec = selected_rows_.emplace<Vector<u32>>();
+            vec.reserve(result_size);
         } else {
             auto &bitmask = selected_rows_.emplace<Bitmask>();
             bitmask.Initialize(std::bit_ceil(SegmentRowCount()));
             bitmask.SetAllFalse();
-            for (u32 i = 0; i < result_size; ++i) {
-                if (begin_part_offset == begin_part_size) {
-                    index_handle_b = index_entry.GetIndexPartAt(++begin_part_id);
-                    index_data_b = static_cast<const SecondaryIndexDataPart *>(index_handle_b.GetData());
-                    index_offset_b_ptr = static_cast<const u32 *>(index_data_b->GetColumnOffsetData());
-                    begin_part_size = index_data_b->GetPartSize();
-                    begin_part_offset = 0;
-                }
-                bitmask.SetTrue(index_offset_b_ptr[begin_part_offset]);
-                ++begin_part_offset;
-            }
-            return;
         }
+        for (auto &trunk_reader : trunk_readers) {
+            trunk_reader->OutPut(selected_rows_);
+        }
+        std::visit(Overload{[](Vector<u32> &selected_rows) { std::sort(selected_rows.begin(), selected_rows.end()); }, [](Bitmask &) {}},
+                   selected_rows_);
     }
 
     inline void ExecuteSingleRange(const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
                                    const FilterExecuteSingleRange &single_range,
-                                   SegmentID segment_id) {
+                                   SegmentID segment_id,
+                                   Txn *txn) {
         // step 1. check if range is empty
         if (single_range.IsEmpty()) {
             return SetEmptyResult();
@@ -426,7 +503,7 @@ struct FilterResult {
         // step 3. search index
         auto &interval_range_variant = single_range.GetIntervalRange();
         std::visit(Overload{[&]<typename ColumnValueType>(const FilterIntervalRangeT<ColumnValueType> &interval_range) {
-                                ExecuteSingleRangeT(interval_range, index_entry, segment_id);
+                                ExecuteSingleRangeT(interval_range, index_entry, txn);
                             },
                             [](const std::monostate &empty) {
                                 UnrecoverableError("FilterResult::ExecuteSingleRange(): class member interval_range_ not initialized!");
@@ -519,7 +596,8 @@ FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &fil
                                             const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
                                             const SegmentID segment_id,
                                             const u32 segment_row_count,
-                                            const u32 segment_row_actual_count) {
+                                            const u32 segment_row_actual_count,
+                                            Txn *txn) {
     Vector<FilterResult> result_stack;
     // execute filter_execute_command_ (Reverse Polish notation)
     for (auto const &elem : filter_execute_command) {
@@ -549,7 +627,7 @@ FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &fil
                             },
                             [&](const FilterExecuteSingleRange &single_range) {
                                 result_stack.emplace_back(segment_row_count, segment_row_actual_count);
-                                result_stack.back().ExecuteSingleRange(column_index_map, single_range, segment_id);
+                                result_stack.back().ExecuteSingleRange(column_index_map, single_range, segment_id, txn);
                             }},
                    elem);
     }
@@ -564,12 +642,14 @@ std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<Filter
                                                              const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
                                                              const SegmentID segment_id,
                                                              const u32 segment_row_count,
-                                                             const u32 segment_row_actual_count) {
+                                                             const u32 segment_row_actual_count,
+                                                             Txn *txn) {
     if (filter_execute_command.empty()) {
         // return all true
         return std::variant<Vector<u32>, Bitmask>(std::in_place_type<Bitmask>);
     }
-    auto result = SolveSecondaryIndexFilterInner(filter_execute_command, column_index_map, segment_id, segment_row_count, segment_row_actual_count);
+    auto result =
+        SolveSecondaryIndexFilterInner(filter_execute_command, column_index_map, segment_id, segment_row_count, segment_row_actual_count, txn);
     return std::move(result.selected_rows_);
 }
 
@@ -627,7 +707,8 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     // prepare filter for deleted rows
     DeleteFilter delete_filter(segment_entry, begin_ts, segment_entry->row_count(begin_ts));
     // output
-    auto result = SolveSecondaryIndexFilterInner(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count);
+    const auto result =
+        SolveSecondaryIndexFilterInner(filter_execute_command_, column_index_map_, segment_id, segment_row_count, segment_row_actual_count, txn);
     result.Output(output_data_blocks, segment_id, delete_filter);
 
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, finished", next_idx, segment_ids.size()));

@@ -106,8 +106,6 @@ public:
 
     ~Catalog();
 
-    void SetTxnMgr(TxnManager *txn_mgr);
-
 public:
     // Database related functions
     Tuple<DBEntry *, Status> CreateDatabase(const String &db_name,
@@ -159,11 +157,11 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr);
 
-    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, Txn *txn);
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, Txn *txn);
 
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);
 
@@ -290,8 +288,6 @@ public:
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
-
-    TxnManager *txn_mgr_{nullptr};
 
 private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }

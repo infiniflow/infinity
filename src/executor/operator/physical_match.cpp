@@ -23,7 +23,7 @@ module;
 module physical_match;
 
 import stl;
-
+import txn;
 import query_context;
 import operator_state;
 import physical_operator;
@@ -494,45 +494,6 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     }
 }
 
-void AnalyzeFunc(const String &analyzer_name, String &&text, TermList &output_terms) {
-    UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
-    // (dynamic_cast<CommonLanguageAnalyzer*>(analyzer.get()))->SetExtractEngStem(false);
-    if (analyzer.get() == nullptr) {
-        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name)));
-    }
-    Term input_term;
-    input_term.text_ = std::move(text);
-    TermList temp_output_terms;
-    analyzer->Analyze(input_term, temp_output_terms);
-    if (analyzer_name == AnalyzerPool::STANDARD) {
-        // remove duplicates and only keep the root words for query
-        const u32 INVALID_TERM_OFFSET = -1;
-        Term last_term;
-        last_term.word_offset_ = INVALID_TERM_OFFSET;
-        for (const Term &term : temp_output_terms) {
-            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                assert(term.word_offset_ >= last_term.word_offset_);
-            }
-            if (last_term.word_offset_ != term.word_offset_) {
-                if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                    output_terms.emplace_back(last_term);
-                }
-                last_term.text_ = term.text_;
-                last_term.word_offset_ = term.word_offset_;
-                last_term.stats_ = term.stats_;
-            } else {
-                if (term.text_.size() < last_term.text_.size()) {
-                    last_term.text_ = term.text_;
-                    last_term.stats_ = term.stats_;
-                }
-            }
-        }
-        if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-            output_terms.emplace_back(last_term);
-        }
-    }
-}
-
 void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
     if (et_iter) {
         while (true) {
@@ -556,9 +517,8 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     auto execute_start_time = std::chrono::high_resolution_clock::now();
     // 1. build QueryNode tree
     // 1.1 populate column2analyzer
-    TransactionID txn_id = query_context->GetTxn()->TxnID();
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
-    QueryBuilder query_builder(txn_id, begin_ts, base_table_ref_);
+    Txn *txn = query_context->GetTxn();
+    QueryBuilder query_builder(txn, base_table_ref_);
     auto finish_init_query_builder_time = std::chrono::high_resolution_clock::now();
     TimeDurationType query_builder_init_duration = finish_init_query_builder_time - execute_start_time;
     LOG_TRACE(fmt::format("PhysicalMatch Part 0.1: Init QueryBuilder time: {} ms", query_builder_init_duration.count()));
@@ -585,12 +545,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
     }
-    if (query_tree->type_ == QueryNodeType::PHRASE) {
-        // TODO: make sure there is no problem with block max phrase and delete this code
-        // LOG_INFO(fmt::format("Block max phrase not supported, use ordinary iterator, query: {}", match_expr_->matching_text_));
-        use_block_max_iter = false;
-        use_ordinary_iter = true;
-    }
+
     auto finish_parse_query_tree_time = std::chrono::high_resolution_clock::now();
     TimeDurationType parse_query_tree_duration = finish_parse_query_tree_time - finish_init_query_builder_time;
     LOG_TRACE(fmt::format("PhysicalMatch Part 0.2: Parse QueryNode tree time: {} ms", parse_query_tree_duration.count()));
@@ -849,7 +804,8 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     auto start_time = std::chrono::high_resolution_clock::now();
     assert(common_query_filter_);
     {
-        bool try_result = common_query_filter_->TryFinishBuild(query_context->GetTxn()->BeginTS(), query_context->GetTxn()->buffer_mgr());
+        Txn *txn = query_context->GetTxn();
+        bool try_result = common_query_filter_->TryFinishBuild(txn);
         auto finish_filter_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::milli> filter_duration = finish_filter_time - start_time;
         LOG_TRACE(fmt::format("PhysicalMatch Prepare: Filter time: {} ms", filter_duration.count()));
@@ -868,8 +824,9 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
 SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
     result_names->reserve(base_table_ref_->column_names_->size() + 2);
-    for (auto &name : *base_table_ref_->column_names_)
+    for (auto &name : *base_table_ref_->column_names_) {
         result_names->emplace_back(name);
+    }
     result_names->emplace_back(COLUMN_NAME_SCORE);
     result_names->emplace_back(COLUMN_NAME_ROW_ID);
     return result_names;

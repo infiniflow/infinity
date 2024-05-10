@@ -77,8 +77,6 @@ Catalog::~Catalog() {
     mem_index_commit_thread_.join();
 }
 
-void Catalog::SetTxnMgr(TxnManager *txn_mgr) { txn_mgr_ = txn_mgr; }
-
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
@@ -208,7 +206,9 @@ Tuple<SharedPtr<TableEntry>, Status> Catalog::DropTableByName(const String &db_n
     return db_entry->DropTable(table_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Status Catalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Status Catalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, Txn *txn) {
+    TransactionID txn_id = txn->TxnID();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     // Check the db entries
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
@@ -216,7 +216,7 @@ Status Catalog::GetTables(const String &db_name, Vector<TableDetail> &output_tab
         LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
         return status;
     }
-    return db_entry->GetTablesDetail(txn_id, begin_ts, output_table_array);
+    return db_entry->GetTablesDetail(txn, output_table_array);
 }
 
 Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -231,8 +231,9 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableInfo>, Status>
-Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, Txn *txn) {
+    TransactionID txn_id = txn->TxnID();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
@@ -240,7 +241,7 @@ Catalog::GetTableInfo(const String &db_name, const String &table_name, Transacti
         return {nullptr, status};
     }
 
-    return db_entry->GetTableInfo(table_name, txn_id, begin_ts);
+    return db_entry->GetTableInfo(table_name, txn);
 }
 
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
@@ -659,7 +660,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                  commit_ts,
                                                                  check_point_ts,
                                                                  check_point_row_count,
-                                                                 buffer_mgr);
+                                                                 buffer_mgr,
+                                                                 txn_id);
 
                 if (merge_flag == MergeFlag::kNew) {
                     if (!block_filter_binary_data.empty()) {
@@ -886,8 +888,6 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
 
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
-
-    DeferFn defer_fn([&]() { txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids()); });
 
     if (flush_delta_entry->operations().empty()) {
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");

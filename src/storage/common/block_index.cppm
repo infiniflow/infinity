@@ -23,6 +23,7 @@ namespace infinity {
 
 struct BlockEntry;
 struct SegmentEntry;
+class Txn;
 
 export struct BlockIndex {
 private:
@@ -32,7 +33,7 @@ private:
     };
 
 public:
-    void Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, bool check_ts = true);
+    void Insert(SegmentEntry *segment_entry, Txn *txn);
 
     void Reserve(SizeT n);
 

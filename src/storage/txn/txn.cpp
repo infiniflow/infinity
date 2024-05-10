@@ -207,9 +207,7 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
 Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_array) {
     this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
-
-    return catalog_->GetTables(db_name, output_table_array, txn_id_, begin_ts);
+    return catalog_->GetTables(db_name, output_table_array, this);
 }
 
 Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
@@ -302,7 +300,7 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
         UnrecoverableError("Index is not created by this txn. Something error happened.");
     }
 
-    return table_index_entry->CreateIndexDo(table_entry, create_index_idxes);
+    return table_index_entry->CreateIndexDo(table_entry, create_index_idxes, this);
 }
 
 Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
@@ -351,8 +349,7 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
 }
 
 Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, const String &table_name) {
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
-    return catalog_->GetTableInfo(db_name, table_name, txn_id_, begin_ts);
+    return catalog_->GetTableInfo(db_name, table_name, this);
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {

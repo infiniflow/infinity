@@ -71,6 +71,7 @@ import data_type;
 import logical_type;
 import base_entry;
 import view_entry;
+import txn;
 
 namespace infinity {
 
@@ -425,10 +426,9 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         columns.emplace_back(idx);
     }
 
-//    TransactionID txn_id = query_context->GetTxn()->TxnID();
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+    Txn *txn = query_context->GetTxn();
 
-    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);

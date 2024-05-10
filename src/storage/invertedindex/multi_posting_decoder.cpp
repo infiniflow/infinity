@@ -201,6 +201,7 @@ bool MultiPostingDecoder::DiskSegMoveToSegment(SegmentPosting &cur_segment_posti
     u32 doc_skiplist_end = doc_skiplist_start + doc_skiplist_size;
 
     index_decoder_->InitSkipList(doc_skiplist_start, doc_skiplist_end, posting_list, term_meta.GetDocFreq());
+
     if (format_option_.HasPositionList()) {
         u32 pos_list_begin = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
         in_doc_state_keeper_.MoveToSegment(posting_list, term_meta.GetTotalTermFreq(), pos_list_begin, format_option_);

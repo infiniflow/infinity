@@ -49,6 +49,7 @@ import embedding_info;
 import bg_task;
 import physical_import;
 import chunk_index_entry;
+import wal_manager;
 
 using namespace infinity;
 
@@ -77,28 +78,36 @@ class BufferObjTest : public BaseTest {
 public:
     void SaveBufferObj(BufferObj *buffer_obj) { buffer_obj->Save(); };
 
-    void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
-        LOG_INFO("Waiting cleanup");
+    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+        Catalog *catalog = storage->catalog();
+        BufferManager *buffer_mgr = storage->buffer_manager();
+
+        auto visible_ts = WaitFlushDeltaOp(storage, last_commit_ts);
+
+        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
+        cleanup_task->Execute();
+    }
+
+    TxnTimeStamp WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
+        TxnManager *txn_mgr = storage->txn_manager();
+
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = txn_mgr->GetCleanupScanTS();
+            // wait for at most 10s
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
-                LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
+                LOG_INFO(fmt::format("FlushDeltaOp finished after {}", end - start));
                 break;
             }
-            // wait for at most 10s
-            if (end - start > 10) {
-                UnrecoverableError("WaitCleanup timeout");
+            if (end - start > 5) {
+                UnrecoverableError("WaitFlushDeltaOp timeout");
             }
-            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
+            LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
             usleep(1000 * 1000);
         }
-
-        auto buffer_mgr = txn_mgr->GetBufferMgr();
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
-        cleanup_task->Execute();
+        return visible_ts;
     }
 };
 
@@ -493,7 +502,7 @@ TEST_F(BufferObjTest, test1) {
 // }
 
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
-    GTEST_SKIP(); // FIXME
+    // GTEST_SKIP(); // FIXME
 
 #ifdef INFINITY_DEBUG
     infinity::InfinityContext::instance().UnInit();
@@ -515,7 +524,6 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default_db");
@@ -564,7 +572,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
         EXPECT_EQ(table_status.ok(), true);
         {
-            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
             auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
             auto *table_index_entry = std::get<0>(result);
             auto status = std::get<1>(result);
@@ -599,9 +607,10 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             auto append_status = txn->Append(table_entry, data_block);
             ASSERT_TRUE(append_status.ok());
 
-            txn_mgr->CommitTxn(txn);
+            last_commit_ts = txn_mgr->CommitTxn(txn);
         }
     }
+    WaitFlushDeltaOp(storage, last_commit_ts);
     // Get Index
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get index"));
@@ -661,7 +670,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         last_commit_ts = txn_mgr->CommitTxn(txn);
     }
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
 }
 
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {

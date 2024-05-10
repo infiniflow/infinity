@@ -148,7 +148,7 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
         }
 
         auto new_segment = CompactSegmentsToOne(state, to_compact_segments);
-        block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
+        block_index->Insert(new_segment.get(), txn_);
 
         segment_data.emplace_back(new_segment, std::move(to_compact_segments));
         old_segments.insert(old_segments.end(), to_compact_segments.begin(), to_compact_segments.end());

@@ -28,7 +28,7 @@ import third_party;
 namespace infinity {
 
 void CleanupPeriodicTrigger::Trigger() {
-    TxnTimeStamp visible_ts = txn_mgr_->GetMinUnflushedTS();
+    TxnTimeStamp visible_ts = txn_mgr_->GetCleanupScanTS();
     // if (visible_ts == last_visible_ts_) {
     //     LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
     //     return;
@@ -49,8 +49,7 @@ void CheckpointPeriodicTrigger::Trigger() {
     auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
     LOG_INFO(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
-        LOG_TRACE(
-            fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+        LOG_TRACE(fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     }
 }
 
