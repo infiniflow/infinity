@@ -9,12 +9,15 @@ import doc_list_format_option;
 import memory_pool;
 import posting_byte_slice;
 import posting_byte_slice_reader;
+import position_list_format_option;
 
 namespace infinity {
 
 export class SkipListReader {
 public:
-    explicit SkipListReader(const DocListFormatOption &doc_list_format_option) : doc_list_format_option_(doc_list_format_option) {
+    explicit SkipListReader(const DocListFormatOption &doc_list_format_option)
+        : has_tf_list_(doc_list_format_option.HasTfList()),
+          has_block_max_(doc_list_format_option.HasBlockMax()) {
         if (has_tf_list_) {
             ttf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
         }
@@ -23,6 +26,8 @@ public:
             block_max_tf_percentage_buffer_ = MakeUnique<u16[]>(SKIP_LIST_BUFFER_SIZE);
         }
     }
+
+    explicit SkipListReader(const PositionListFormatOption &doc_list_format_option) {}
 
     virtual ~SkipListReader() = default;
 
@@ -55,9 +60,8 @@ public:
 protected:
     virtual Pair<int, bool> LoadBuffer() = 0;
 
-    DocListFormatOption doc_list_format_option_;
-    const bool has_tf_list_ = doc_list_format_option_.HasTfList();
-    const bool has_block_max_ = doc_list_format_option_.HasBlockMax();
+    const bool has_tf_list_ = false;
+    const bool has_block_max_ = false;
     i32 skipped_item_count_ = 0;
     u32 current_doc_id_ = 0;
     u32 current_offset_ = 0;
@@ -79,6 +83,8 @@ protected:
 export class SkipListReaderByteSlice final : public SkipListReader {
 public:
     explicit SkipListReaderByteSlice(const DocListFormatOption &doc_list_format_option) : SkipListReader(doc_list_format_option) {}
+
+    explicit SkipListReaderByteSlice(const PositionListFormatOption &pos_list_format_option) : SkipListReader(pos_list_format_option) {}
 
     void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end);
 

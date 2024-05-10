@@ -57,7 +57,9 @@ public:
     // if seek failed in current block, return false, doc_id_ may be unchanged or changed
     // if seek succeed in current block, return true, doc_id_ is updated
     virtual Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) = 0;
+
     virtual Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) = 0;
+
     virtual float BM25Score() = 0;
 
     virtual Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) = 0;
