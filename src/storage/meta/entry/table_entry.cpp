@@ -917,6 +917,19 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(Txn *txn) {
     return result;
 }
 
+SharedPtr<IndexIndex> TableEntry::GetIndexIndex(Txn *txn) {
+    SharedPtr<IndexIndex> result = MakeShared<IndexIndex>();
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (!status.ok()) {
+            continue;
+        }
+        result->Insert(table_index_entry, txn);
+    }
+    return result;
+}
+
 bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
     for (auto &[segment_id, block_offsets_map] : delete_state.rows_) {
         auto *segment_entry = GetSegmentByID(segment_id, txn).get();

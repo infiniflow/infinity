@@ -66,6 +66,7 @@ public:
     TableEntry *table_entry_ptr_{};
     Vector<SizeT> column_ids_{};
     SharedPtr<BlockIndex> block_index_{};
+    SharedPtr<IndexIndex> index_index_{};
 
     SharedPtr<Vector<String>> column_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};

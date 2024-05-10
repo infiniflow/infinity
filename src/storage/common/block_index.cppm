@@ -21,11 +21,13 @@ export module block_index;
 
 namespace infinity {
 
-struct BlockEntry;
 struct SegmentEntry;
+struct BlockEntry;
+struct TableIndexEntry;
+struct SegmentIndexEntry;
 class Txn;
 
-export struct SegmentInfo {
+export struct SegmentSnapshot {
     SegmentEntry *segment_entry_{};
 
     Vector<BlockEntry *> block_map_;
@@ -51,7 +53,22 @@ public:
 
     SegmentOffset GetSegmentOffset(SegmentID segment_id) const;
 
-    Map<SegmentID, SegmentInfo> segment_block_index_;
+public:
+    Map<SegmentID, SegmentSnapshot> segment_block_index_;
+};
+
+export struct IndexSnapshot {
+    TableIndexEntry *table_index_entry_;
+
+    Map<SegmentID, SegmentIndexEntry *> segment_index_entries_;
+};
+
+export struct IndexIndex {
+public:
+    void Insert(TableIndexEntry *table_index_entry, Txn *txn);
+
+public:
+    HashMap<String, IndexSnapshot> index_snapshots_;
 };
 
 } // namespace infinity

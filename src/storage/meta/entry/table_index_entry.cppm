@@ -46,6 +46,11 @@ struct SegmentEntry;
 class BaseTableRef;
 class AddTableIndexEntryOp;
 
+export struct SegmentIndexesGuard {
+    const Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment_;
+    std::shared_lock<std::shared_mutex> lock_;
+};
+
 export struct TableIndexEntry : public BaseEntry, public EntryInterface {
     friend struct TableEntry;
 
@@ -95,6 +100,9 @@ public:
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
+
+    SegmentIndexesGuard GetSegmentIndexesGuard() { return {index_by_segment_, std::shared_lock(rw_locker_)}; }
+
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot(const TableEntry *table_entry, Txn *txn);
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     String GetPathNameTail() const;

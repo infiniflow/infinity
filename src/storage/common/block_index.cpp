@@ -21,14 +21,15 @@ module block_index;
 import stl;
 import segment_entry;
 import global_block_id;
-import block_iter;
 import txn;
+import table_index_entry;
+import segment_index_entry;
 
 namespace infinity {
 
 void BlockIndex::Insert(SegmentEntry *segment_entry, Txn *txn) {
     if (segment_entry->CheckVisible(txn)) {
-        SegmentInfo segment_info;
+        SegmentSnapshot segment_info;
         segment_info.segment_entry_ = segment_entry;
         {
             auto block_guard = segment_entry->GetBlocksGuard();
@@ -65,6 +66,23 @@ BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
         return nullptr;
     }
     return blocks_info.block_map_[block_id];
+}
+
+void IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
+    if (table_index_entry->CheckVisible(txn)) {
+        IndexSnapshot index_info;
+        index_info.table_index_entry_ = table_index_entry;
+
+        SegmentIndexesGuard segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
+        for (const auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {
+            if (segment_index_entry->CheckVisible(txn)) {
+                index_info.segment_index_entries_.emplace(segment_id, segment_index_entry.get());
+            }
+        }
+
+        String index_name = *table_index_entry->GetIndexName();
+        index_snapshots_.emplace(std::move(index_name), std::move(index_info));
+    }
 }
 
 } // namespace infinity

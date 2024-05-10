@@ -82,7 +82,7 @@ protected:
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
     const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
-    const Map<SegmentID, SegmentInfo> &segment_index = common_query_filter_->base_table_ref_->block_index_->segment_block_index_;
+    const Map<SegmentID, SegmentSnapshot> &segment_index = common_query_filter_->base_table_ref_->block_index_->segment_block_index_;
 
     const TxnTimeStamp begin_ts_ = common_query_filter_->begin_ts_;
     SegmentID current_segment_id_ = filter_result_ptr_->size() ? filter_result_ptr_->begin()->first : INVALID_SEGMENT_ID;

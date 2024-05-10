@@ -219,6 +219,8 @@ public:
 
     SharedPtr<BlockIndex> GetBlockIndex(Txn *txn);
 
+    SharedPtr<IndexIndex> GetIndexIndex(Txn *txn);
+
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
 public:
