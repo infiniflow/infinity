@@ -199,9 +199,6 @@ Value Value::MakeVarchar(const VarcharT &input) {
     if (input.IsInlined()) {
         String tmp_str(input.short_.data_, input.length_);
         value.value_info_ = MakeShared<StringValueInfo>(std::move(tmp_str));
-    } else if (input.IsValue()) {
-        String tmp_str(input.value_.ptr_, input.length_);
-        value.value_info_ = MakeShared<StringValueInfo>(std::move(tmp_str));
     } else {
         UnrecoverableError("Value::MakeVarchar(VectorVarchar) is unsupported!");
     }

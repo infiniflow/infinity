@@ -245,9 +245,6 @@ private:
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
-    // Use by Append value
-    void SetByPtr(SizeT index, const_ptr_t value_ptr);
-
     void CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx);
 
     template <typename DataT>
@@ -330,7 +327,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
             // Only prefix is enough to contain all string data.
             std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
         } else {
-            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
             auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
                                                                                        src_ptr->vector_.chunk_id_,
                                                                                        src_ptr->vector_.chunk_offset_,
@@ -496,7 +493,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
             // Only prefix is enough to contain all string data.
             std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
         } else {
-            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
             auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
                                                                                        src_ptr->vector_.chunk_id_,
                                                                                        src_ptr->vector_.chunk_offset_,
@@ -660,7 +657,7 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
         // Only prefix is enough to contain all string data.
         std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
     } else {
-        std::memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+        std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
         auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
                                                                                    src_ptr->vector_.chunk_id_,
                                                                                    src_ptr->vector_.chunk_offset_,

@@ -280,12 +280,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             return false;
         }
     } else {
-        if(source.IsValue()) {
-            auto [ptr, ec] = std::from_chars(source.value_.ptr_, source.value_.ptr_ + source.length_, target);
-            if (ec != std::errc()) {
-                return false;
-            }
-        } else {
+        {
             // varchar is vector
             SizeT varchar_len = source.length_;
             u32 chunk_id = source.vector_.chunk_id_;
@@ -312,12 +307,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             return false;
         }
     } else {
-        if(source.IsValue()) {
-            auto [ptr, ec] = std::from_chars(source.value_.ptr_, source.value_.ptr_ + source.length_, target);
-            if (ec != std::errc()) {
-                return false;
-            }
-        } else {
+        {
             // varchar is vector
             SizeT varchar_len = source.length_;
             u32 chunk_id = source.vector_.chunk_id_;
@@ -344,12 +334,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             return false;
         }
     } else {
-        if(source.IsValue()) {
-            auto [ptr, ec] = std::from_chars(source.value_.ptr_, source.value_.ptr_ + source.length_, target);
-            if (ec != std::errc()) {
-                return false;
-            }
-        } else {
+        {
             // varchar is vector
             SizeT varchar_len = source.length_;
             u32 chunk_id = source.vector_.chunk_id_;

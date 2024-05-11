@@ -634,9 +634,6 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                if (varchar_ref.IsValue()) {
-                    UnrecoverableError("Must be vector type of varchar, here");
-                }
                 String result_str;
                 result_str.resize(varchar_ref.length_);
                 buffer_->fix_heap_mgr_->ReadFromHeap(result_str.data(),
@@ -1056,26 +1053,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         }
         //TODO:tensor
         case kVarchar: {
-            // Copy string
-            const VarcharT &src_ref = *(VarcharT *)(raw_ptr);
-            if (!src_ref.IsValue()) {
-                UnrecoverableError("Only can set value not column vector here.");
-            }
-
-            u64 varchar_len = src_ref.length_;
-            VarcharT &target_ref = ((VarcharT *)data_ptr_)[index];
-            target_ref.is_value_ = false;
-            target_ref.length_ = varchar_len;
-            if (src_ref.IsInlined()) {
-                // Only prefix is enough to contain all string data.
-                std::memcpy(target_ref.short_.data_, src_ref.short_.data_, varchar_len);
-            } else {
-                std::memcpy(target_ref.vector_.prefix_, src_ref.value_.prefix_, VARCHAR_PREFIX_LEN);
-                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ref.value_.ptr_, varchar_len);
-                target_ref.vector_.chunk_id_ = chunk_id;
-                target_ref.vector_.chunk_offset_ = chunk_offset;
-            }
-            break;
+            UnrecoverableError("Cannot SetByRawPtr to Varchar.");
         }
         case kDate: {
             ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
@@ -1157,16 +1135,6 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     }
 }
 
-void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
-    // We assume the value_ptr point to the same type data.
-    if (data_type_->type() == LogicalType::kEmbedding) {
-        auto *embedding_ptr = (EmbeddingT *)(value_ptr);
-        SetByRawPtr(index, embedding_ptr->ptr);
-    } else {
-        SetByRawPtr(index, value_ptr);
-    }
-}
-
 void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     if (!initialized) {
         UnrecoverableError("Column vector isn't initialized.");
@@ -1179,11 +1147,7 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     if (tail_index_ >= capacity_) {
         UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     }
-    if (data_type_->type() == LogicalType::kEmbedding) {
-        SetByRawPtr(tail_index_++, value_ptr);
-    } else {
-        SetByPtr(tail_index_++, value_ptr);
-    }
+    SetByRawPtr(tail_index_++, value_ptr);
 }
 
 namespace {
