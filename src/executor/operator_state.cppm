@@ -23,6 +23,7 @@ import fragment_data;
 import data_block;
 import table_scan_function_data;
 import knn_scan_data;
+import compact_state_data;
 import table_def;
 
 import merge_knn_data;
@@ -35,6 +36,8 @@ import column_def;
 import data_type;
 
 namespace infinity {
+
+struct SegmentEntry;
 
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
@@ -50,7 +53,7 @@ export struct OperatorState {
     // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     Vector<UniquePtr<DataBlock>> data_block_array_{};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
     bool empty_source_{false};
 
@@ -360,6 +363,21 @@ export struct FusionOperatorState : public OperatorState {
     Map<u64, Vector<UniquePtr<DataBlock>>> input_data_blocks_{};
 };
 
+// Compact
+export struct CompactOperatorState : public OperatorState {
+    CompactStateData compact_state_data_{};
+
+    SharedPtr<SegmentEntry> result_segment_entry_{};
+};
+
+export struct CompactIndexOperatorState : public OperatorState {
+    //
+};
+
+export struct CompactFinishOperatorState : public OperatorState {
+    //
+};
+
 // Source
 export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kIndexScan, kKnnScan, kEmpty };
 
@@ -375,7 +393,7 @@ export struct SourceState {
     bool complete_{false};
     OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
 };
 
@@ -403,7 +421,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-//    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
+    //    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -455,7 +473,7 @@ export struct SinkState {
     u64 task_id_{};
     OperatorState *prev_op_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
 };
 

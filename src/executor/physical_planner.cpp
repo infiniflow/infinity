@@ -71,6 +71,9 @@ import physical_union_all;
 import physical_update;
 import physical_drop_index;
 import physical_command;
+import physical_compact;
+import physical_compact_index;
+import physical_compact_finish;
 import physical_match;
 import physical_fusion;
 import physical_create_index_prepare;
@@ -111,6 +114,9 @@ import logical_dummy_scan;
 import logical_explain;
 import logical_drop_index;
 import logical_command;
+import logical_compact;
+import logical_compact_index;
+import logical_compact_finish;
 import logical_match;
 import logical_fusion;
 
@@ -287,6 +293,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kCommand: {
             result = BuildCommand(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCompact: {
+            result = BuildCompact(logical_operator);
             break;
         }
         case LogicalNodeType::kExplain: {
@@ -901,6 +911,58 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<Logica
         ret->table_entry_ = logical_command->table_entry_;
     }
     return ret;
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact = static_cast<const LogicalCompact *>(logical_operator.get());
+    if (logical_compact->left_node().get() != nullptr || logical_compact->right_node().get() != nullptr) {
+        UnrecoverableError("Compact node shouldn't have child.");
+    }
+    return MakeUnique<PhysicalCompact>(logical_compact->node_id(),
+                                       logical_compact->base_table_ref_,
+                                       logical_compact->GetOutputNames(),
+                                       logical_compact->GetOutputTypes(),
+                                       logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactIndex(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact_index = static_cast<const LogicalCompactIndex *>(logical_operator.get());
+    if (logical_compact_index->right_node().get() != nullptr) {
+        UnrecoverableError("Compact index node shouldn't have right child.");
+    }
+    UniquePtr<PhysicalOperator> left{};
+    if (logical_compact_index->left_node().get() != nullptr) {
+        const auto &left_node = logical_compact_index->left_node();
+        left = BuildPhysicalOperator(left_node);
+    }
+    return MakeUnique<PhysicalCompactIndex>(logical_compact_index->node_id(),
+                                            std::move(left),
+                                            logical_compact_index->base_table_ref_,
+                                            logical_compact_index->GetOutputNames(),
+                                            logical_compact_index->GetOutputTypes(),
+                                            logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BulidCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact_finish = static_cast<const LogicalCompactFinish *>(logical_operator.get());
+    UniquePtr<PhysicalOperator> left{}, right{};
+    if (logical_compact_finish->left_node().get() != nullptr) {
+        const auto &left_logical_node = logical_compact_finish->left_node();
+        left = BuildPhysicalOperator(left_logical_node);
+        if (logical_compact_finish->right_node().get() != nullptr) {
+            const auto &right_logical_node = logical_compact_finish->right_node();
+            right = BuildPhysicalOperator(right_logical_node);
+        }
+    } else if (logical_compact_finish->right_node().get() != nullptr) {
+        UnrecoverableError("Compact finish node shouldn't have right child.");
+    }
+    return MakeUnique<PhysicalCompactFinish>(logical_compact_finish->node_id(),
+                                             std::move(left),
+                                             std::move(right),
+                                             logical_compact_finish->base_table_ref_,
+                                             logical_compact_finish->GetOutputNames(),
+                                             logical_compact_finish->GetOutputTypes(),
+                                             logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {

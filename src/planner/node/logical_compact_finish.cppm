@@ -40,7 +40,7 @@ public:
 
     inline String name() final { return "LogicalCompactFinish"; }
 
-private:
+public:
     SharedPtr<BaseTableRef> base_table_ref_;
 };
 

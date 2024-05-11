@@ -41,7 +41,7 @@ public:
 
     inline String name() final { return "LogicalCompact"; }
 
-private:
+public:
     SharedPtr<BaseTableRef> base_table_ref_;
 };
 
