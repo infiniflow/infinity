@@ -91,8 +91,9 @@ MemoryIndexer::~MemoryIndexer() {
 }
 
 void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline) {
-    if (is_spilled_)
+    if (is_spilled_) {
         Load();
+    }
 
     u64 seq_inserted(0);
     u32 doc_count(0);
@@ -121,8 +122,9 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         auto func = [this, task, inverter](int id) {
             SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             column_length_sum_ += column_length_sum;
-            if (column_length_sum > 0)
+            if (column_length_sum > 0) {
                 inverter->SortForOfflineDump();
+            }
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
         inverting_thread_pool_.push(std::move(func));
@@ -145,8 +147,9 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
 }
 
 void MemoryIndexer::InsertGap(u32 row_count) {
-    if (is_spilled_)
+    if (is_spilled_) {
         Load();
+    }
 
     std::unique_lock<std::mutex> lock(mutex_);
     doc_count_ += row_count;
@@ -155,14 +158,16 @@ void MemoryIndexer::InsertGap(u32 row_count) {
 void MemoryIndexer::Commit(bool offline) {
     if (offline) {
         commiting_thread_pool_.push([this](int id) { this->CommitOffline(); });
-    } else
+    } else {
         commiting_thread_pool_.push([this](int id) { this->CommitSync(); });
+    }
 }
 
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
-    if (!lock.try_lock())
+    if (!lock.try_lock()) {
         return 0;
+    }
 
     if (nullptr == spill_file_handle_) {
         PrepareSpillFile();
@@ -200,14 +205,16 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
     };
 
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
-    if (!lock.try_lock())
+    if (!lock.try_lock()) {
         return 0;
+    }
 
     while (1) {
         this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
         // num_merged = inverters.size();
-        if (inverters.empty())
+        if (inverters.empty()) {
             break;
+        }
         for (auto &inverter : inverters) {
             inverter->GeneratePosting();
             num_generated += inverter->GetMerged();
@@ -353,8 +360,9 @@ void MemoryIndexer::OfflineDump() {
     // 2. Generate posting
     // 3. Dump disk segment data
     // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}", num_runs_));
-    if (tuple_count_ == 0)
+    if (tuple_count_ == 0) {
         return;
+    }
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
     SortMerger<TermTuple, u32> *merger = new SortMerger<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
