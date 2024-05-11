@@ -30,6 +30,7 @@ import binding;
 import bound_select_statement;
 import bound_delete_statement;
 import bound_update_statement;
+import bound_compact_statement;
 import table_ref;
 import bind_alias_proxy;
 import base_expression;
@@ -58,6 +59,7 @@ import base_statement;
 import select_statement;
 import delete_statement;
 import update_statement;
+import command_statement;
 import parsed_expr;
 import column_expr;
 import knn_expr;
@@ -71,6 +73,7 @@ import data_type;
 import logical_type;
 import base_entry;
 import view_entry;
+import table_entry;
 import txn;
 
 namespace infinity {
@@ -185,7 +188,7 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     if (statement.where_expr_) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-        if(where_expr->Type().type() != LogicalType::kBoolean) {
+        if (where_expr->Type().type() != LogicalType::kBoolean) {
             RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
         }
         bound_select_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -952,7 +955,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-        if(where_expr->Type().type() != LogicalType::kBoolean) {
+        if (where_expr->Type().type() != LogicalType::kBoolean) {
             RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
         }
         bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -974,7 +977,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-        if(where_expr->Type().type() != LogicalType::kBoolean) {
+        if (where_expr->Type().type() != LogicalType::kBoolean) {
             RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
         }
         bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -1002,6 +1005,17 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     }
     std::sort(bound_update_statement->update_columns_.begin(), bound_update_statement->update_columns_.end());
     return bound_update_statement;
+}
+
+UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CommandStatement &statement) {
+    auto *compact_table = static_cast<CompactTable *>(statement.command_info_.get());
+    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(compact_table->schema_name_, compact_table->table_name_);
+
+    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
+    Txn *txn = query_context_ptr_->GetTxn();
+    base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
+
+    return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref);
 }
 
 } // namespace infinity

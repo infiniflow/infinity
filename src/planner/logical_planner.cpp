@@ -29,6 +29,7 @@ import query_binder;
 import bound_delete_statement;
 import bound_update_statement;
 import bound_select_statement;
+import bound_compact_statement;
 import insert_binder;
 import logical_insert;
 import logical_node;
@@ -947,6 +948,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             break;
         }
         case CommandType::kCompactTable: {
+            // return BuildCompact(command_statement, bind_context_ptr);
             auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
             BindSchemaName(compact_table->schema_name_);
 
@@ -965,6 +967,13 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             UnrecoverableError("Invalid command type.");
         }
     }
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildCompact(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    UniquePtr<BoundCompactStatement> bound_statement_ptr = query_binder_ptr->BindCompact(*statement);
+    this->logical_plans_ = bound_statement_ptr->BuildPlans(query_context_ptr_);
     return Status::OK();
 }
 

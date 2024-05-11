@@ -107,15 +107,16 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     QueryResult query_result;
-    SharedPtr<LogicalNode> logical_plan = nullptr;
-    UniquePtr<PlanFragment> plan_fragment = nullptr;
-    UniquePtr<PhysicalOperator> physical_plan = nullptr;
+    Vector<SharedPtr<LogicalNode>> logical_plans{};
+    Vector<UniquePtr<PhysicalOperator>> physical_plans{};
+    Vector<UniquePtr<PlanFragment>> plan_fragments{};
+    Vector<UniquePtr<Notifier>> notifiers{};
 
+    this->BeginTxn();
 //    ProfilerStart("Query");
 //    BaseProfiler profiler;
 //    profiler.Begin();
     try {
-        this->BeginTxn();
 //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
 //                        session_ptr_->GetTxn()->TxnID(),
 //                        session_ptr_->GetTxn()->BeginTS(),
@@ -132,35 +133,50 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
-        logical_plan = logical_planner_->LogicalPlan();
+        logical_plans = logical_planner_->LogicalPlans();
         StopProfile(QueryPhase::kLogicalPlan);
 //        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
-        optimizer_->optimize(logical_plan, statement->type_);
+        for (auto &logical_plan : logical_plans) {
+            optimizer_->optimize(logical_plan, statement->type_);
+        }
         StopProfile(QueryPhase::kOptimizer);
 
         // Build physical plan
         StartProfile(QueryPhase::kPhysicalPlan);
-        physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
+        for (auto &logical_plan : logical_plans) {
+            auto physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);    
+            physical_plans.push_back(std::move(physical_plan));
+        }
         StopProfile(QueryPhase::kPhysicalPlan);
 //        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
-        plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
+        for (auto &physical_plan : physical_plans) {
+            plan_fragments.push_back(fragment_builder_->BuildFragment(physical_plan.get()));
+        }
+        // plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
         StopProfile(QueryPhase::kPipelineBuild);
 
-        auto notifier = MakeUnique<Notifier>();
-
         StartProfile(QueryPhase::kTaskBuild);
-        FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
+        for (auto &plan_fragment : plan_fragments) {
+            auto notifier = MakeUnique<Notifier>();
+            FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
+            notifiers.push_back(std::move(notifier));
+        }
         StopProfile(QueryPhase::kTaskBuild);
 //        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
-        scheduler_->Schedule(plan_fragment.get(), statement);
-        query_result.result_table_ = plan_fragment->GetResult();
-        query_result.root_operator_type_ = logical_plan->operator_type();
+        for (SizeT i = 0; i < plan_fragments.size(); i++) {
+            auto &plan_fragment = plan_fragments[i];
+            scheduler_->Schedule(plan_fragment.get(), statement);
+            if (i == plan_fragments.size() - 1) {
+                query_result.result_table_ = plan_fragment->GetResult();
+                query_result.root_operator_type_ = logical_plans.back()->operator_type();
+            }
+        }
         StopProfile(QueryPhase::kExecution);
 //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);

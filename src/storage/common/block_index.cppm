@@ -67,6 +67,8 @@ export struct IndexIndex {
 public:
     void Insert(TableIndexEntry *table_index_entry, Txn *txn);
 
+    bool IsEmpty() const { return index_snapshots_.empty(); }
+
 public:
     HashMap<String, IndexSnapshot> index_snapshots_;
 };
