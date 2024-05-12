@@ -29,6 +29,8 @@ import infinity_exception;
 import internal_types;
 import column_def;
 import data_type;
+import variables;
+import data_block;
 
 namespace infinity {
 
@@ -117,6 +119,7 @@ private:
     void ExecuteShowGlobalVariables(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};

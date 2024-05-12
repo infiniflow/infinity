@@ -360,6 +360,10 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     LOG_INFO(fmt::format("Open new wal file {}", wal_path_));
 }
 
+String WalManager::GetWalFilename() const {
+    return wal_path_;
+}
+
 /*****************************************************************************
  * REPLAY WAL FILE
  *****************************************************************************/

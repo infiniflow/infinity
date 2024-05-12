@@ -89,6 +89,14 @@ public:
 
     TxnTimeStamp GetCleanupScanTS();
 
+    void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
+
+    u64 total_committed_txn_count() const { return total_committed_txn_count_; }
+
+    void IncreaseRollbackedTxnCount() { ++total_rollbacked_txn_count_; }
+
+    u64 total_rollbacked_txn_count() const { return total_rollbacked_txn_count_; }
+
 private:
     void FinishTxn(Txn *txn);
 
@@ -118,6 +126,9 @@ private:
     bool enable_compaction_{};
 
     u64 sequence_{};
+
+    Atomic<u64> total_committed_txn_count_{0};
+    Atomic<u64> total_rollbacked_txn_count_{0};
 };
 
 } // namespace infinity

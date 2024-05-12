@@ -26,6 +26,7 @@ import resource_manager;
 import task_scheduler;
 import storage;
 import session_manager;
+import variables;
 
 namespace infinity {
 
@@ -33,10 +34,13 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
     if (initialized_) {
         return;
     } else {
+        // Variables
+        VarUtil::InitVariablesMap();
+
         // Config
         config_ = MakeUnique<Config>();
         auto status = config_->Init(config_path);
-        if(!status.ok()) {
+        if (!status.ok()) {
             fmt::print("Error: {}", *status.msg_);
             std::exit(static_cast<int>(status.code()));
         }

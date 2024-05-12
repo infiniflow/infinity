@@ -157,6 +157,7 @@ export {
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr String DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
 
+    // config name
     const String VERSION_OPTION_NAME = "version";
     const String TIME_ZONE_OPTION_NAME = "time_zone";
     const String TIME_ZONE_BIAS_OPTION_NAME = "time_zone_bias";
@@ -186,6 +187,25 @@ export {
     const String DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME = "delta_checkpoint_threshold";
     const String WAL_FLUSH_OPTION_NAME = "wal_flush";
     const String RESOURCE_DIR_OPTION_NAME = "resource_dir";
+
+    // Variable name
+    const String QUERY_COUNT_VAR_NAME = "query_count";        // global and session
+    const String SESSION_COUNT_VAR_NAME = "session_count";    // global
+    const String BUFFER_USAGE_VAR_NAME = "buffer_usage";    // global
+    const String SCHEDULE_POLICY_VAR_NAME = "schedule_policy";    // global
+    const String DELTA_LOG_COUNT_VAR_NAME = "delta_log_count";    // global
+    const String NEXT_TXN_ID_VAR_NAME = "next_transaction_id";    // global
+    const String BUFFER_OBJECT_COUNT_VAR_NAME = "buffer_object_count";    // global
+    const String UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME = "unused_buffer_object";    // global
+    const String ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";    // global
+    const String CURRENT_TS_VAR_NAME = "current_timestamp";    // global
+    const String TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count"; // global and session
+    const String CONNECTED_TS_VAR_NAME = "connected_timestamp"; // session
+    const String CATALOG_VERSION_VAR_NAME = "catalog_version";   // global
+    const String ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
+    const String ENABLE_PROFILE_VAR_NAME = "enable_profile";  // session
+    const String PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity";  // session
+
 }
 
 } // namespace infinity

@@ -190,6 +190,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
 //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
+    session_manager_->IncreaseQueryCount();
 //    profiler.End();
 //    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
     return query_result;
@@ -206,12 +207,16 @@ void QueryContext::CommitTxn() {
     Txn* txn = session_ptr_->GetTxn();
     storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
+    session_ptr_->IncreaseCommittedTxnCount();
+    storage_->txn_manager()->IncreaseCommittedTxnCount();
 }
 
 void QueryContext::RollbackTxn() {
     Txn* txn = session_ptr_->GetTxn();
     storage_->txn_manager()->RollBackTxn(txn);
     session_ptr_->SetTxn(nullptr);
+    session_ptr_->IncreaseRollbackedTxnCount();
+    storage_->txn_manager()->IncreaseRollbackedTxnCount();
 }
 
 } // namespace infinity
