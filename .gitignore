@@ -122,4 +122,5 @@ callgrind.out.*
 # ignore vscode clangd cache file
 .cache/
 
+# ignore all benchmark files
 python/benchmark/datasets/
