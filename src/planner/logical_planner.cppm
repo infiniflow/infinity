@@ -142,10 +142,6 @@ public:
 
     Status BuildShowProfiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildShowSessionStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
-
-    Status BuildShowGlobalStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
-
     Status BuildShowSessionVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowSessionVariables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

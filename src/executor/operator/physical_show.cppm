@@ -106,10 +106,6 @@ private:
 
     void ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowSessionStatus(QueryContext *query_context, ShowOperatorState *operator_state);
-
-    void ExecuteShowGlobalStatus(QueryContext *query_context, ShowOperatorState *operator_state);
-
     void ExecuteShowSessionVariable(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowSessionVariables(QueryContext *query_context, ShowOperatorState *operator_state);

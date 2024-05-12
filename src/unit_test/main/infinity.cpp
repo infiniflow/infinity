@@ -256,7 +256,52 @@ TEST_F(InfinityTest, test2) {
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
 
     {
-        QueryResult result = infinity->ShowVariable("version", SetScope::kGlobal);
+        QueryResult result = infinity->ShowVariable("total_commit_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("active_txn_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("total_rollback_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("buffer_object_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("unused_buffer_object", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("next_transaction_id", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("delta_log_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("schedule_policy", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("active_wal_filename", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("current_timestamp", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
@@ -271,13 +316,48 @@ TEST_F(InfinityTest, test2) {
     }
 
     {
-        QueryResult result = infinity->ShowVariable("buffer_manager_usage", SetScope::kGlobal);
+        QueryResult result = infinity->ShowVariable("buffer_usage", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
         QueryResult result = infinity->ShowVariable("error", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), false);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("connected_timestamp", SetScope::kSession);
         EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("profile_record_capacity", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("total_rollback_count", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("enable_profile", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("total_commit_count", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("query_count", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("error", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), false);
     }
 
     infinity->LocalDisconnect();

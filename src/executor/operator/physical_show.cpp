@@ -304,28 +304,6 @@ void PhysicalShow::Init() {
             break;
         }
 
-        case ShowType::kShowSessionStatus: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
-
-            output_names_->emplace_back("name");
-            output_names_->emplace_back("value");
-
-            output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
-            break;
-        }
-        case ShowType::kShowGlobalStatus: {
-            output_names_->reserve(2);
-            output_types_->reserve(2);
-
-            output_names_->emplace_back("name");
-            output_names_->emplace_back("value");
-
-            output_types_->emplace_back(varchar_type);
-            output_types_->emplace_back(varchar_type);
-            break;
-        }
         case ShowType::kShowSessionVariable: {
             output_names_->reserve(1);
             output_types_->reserve(1);
@@ -444,14 +422,6 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowViews: {
             ExecuteShowViews(query_context, show_operator_state);
-            break;
-        }
-        case ShowType::kShowSessionStatus: {
-            ExecuteShowSessionStatus(query_context, show_operator_state);
-            break;
-        }
-        case ShowType::kShowGlobalStatus: {
-            ExecuteShowGlobalStatus(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowSessionVariable: {
@@ -2548,99 +2518,6 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
 
     output_block_ptr->Finalize();
     output_->Append(output_block_ptr);
-}
-
-void PhysicalShow::ExecuteShowSessionStatus(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    Vector<SharedPtr<ColumnDef>> output_column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
-    };
-
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("session status"), output_column_defs);
-    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> output_column_types{
-        varchar_type,
-        varchar_type,
-    };
-
-    output_block_ptr->Init(output_column_types);
-
-    {
-        {
-            // option name
-            Value value = Value::MakeVarchar("query count");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        }
-        {
-            // option value
-            SizeT query_count = query_context->current_session()->query_count();
-            Value value = Value::MakeVarchar(std::to_string(query_count));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-        }
-    }
-
-    output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
-}
-
-void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    Vector<SharedPtr<ColumnDef>> output_column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
-    };
-
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("global status"), output_column_defs);
-    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> output_column_types{
-        varchar_type,
-        varchar_type,
-    };
-
-    output_block_ptr->Init(output_column_types);
-
-    {{// option name
-      Value value = Value::MakeVarchar("buffer manager usage");
-    ValueExpression value_expr(value);
-    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-}
-{
-    // option value
-    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-    u64 memory_limit = buffer_manager->memory_limit();
-    u64 memory_usage = buffer_manager->memory_usage();
-    Value value = Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
-    ValueExpression value_expr(value);
-    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-}
-}
-
-{
-    {
-        // option name
-        Value value = Value::MakeVarchar("session count");
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-    }
-    {
-        // option value
-        SessionManager *session_manager = query_context->session_manager();
-        u64 session_count = session_manager->GetSessionCount();
-        Value value = Value::MakeVarchar(std::to_string(session_count));
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-    }
-}
-
-output_block_ptr->Finalize();
-show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowOperatorState *operator_state) {

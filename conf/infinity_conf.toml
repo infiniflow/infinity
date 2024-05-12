@@ -1,6 +1,6 @@
 [general]
 version                 = "0.2.0"
-timezone                = "utc-8"
+time_zone                = "utc-8"
 
 [system]
 # 0 means use all cpus

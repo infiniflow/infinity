@@ -373,7 +373,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
-%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES STATUS VARIABLES VARIABLE
+%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
 %token SEARCH MATCH QUERY FUSION
 
 %token NUMBER
@@ -1535,14 +1535,6 @@ show_statement: SHOW DATABASES {
 | SHOW PROFILES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kProfiles;
-}
-| SHOW SESSION STATUS {
-    $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kSessionStatus;
-}
-| SHOW GLOBAL STATUS {
-    $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kGlobalStatus;
 }
 | SHOW SESSION VARIABLES {
     $$ = new infinity::ShowStatement();
