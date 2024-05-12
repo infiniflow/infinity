@@ -24,7 +24,7 @@ This document compares the following key specifications of Elasticsearch, Qdrant
 1. Install necessary dependencies. 
 
 ```python
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 
 2. Download the required Benchmark datasets to your **/datasets** folder：
