@@ -2,26 +2,12 @@
 version                 = "0.2.0"
 time_zone                = "utc-8"
 
-[system]
-# 0 means use all cpus
-worker_cpu_limit        = 0
-# 0 means use all memory
-total_memory_size       = "8GB"
-# memory limit per query
-query_memory_limit      = 0
-# query cpu limit per query
-query_cpu_limit         = "4MB"
-
 [network]
-listen_address          = "0.0.0.0"
-pg_port                 = 5432
+server_address          = "0.0.0.0"
+postgres_port                 = 5432
 http_port               = 23820
-sdk_port                = 23817
+client_port                = 23817
 connection_pool_size        = 128
-
-[profiler]
-enable                  = false
-profile_record_capacity = 100
 
 [log]
 log_filename            = "infinity.log"
@@ -43,11 +29,7 @@ storage_capacity        = "64GB"
 # m means minutes, for example "60m", 60 minutes
 # h means hours, for example "1h", 1 hour
 cleanup_interval = "60s"
-
-# storage ratio activates garbage collection:
-# 0 means disable,
-# 0.1 means, once the storage reach 10% storage capacity, GC is triggered.
-garbage_collection_storage_ratio = 0.1
+compact_interval = "120s"
 
 # dump memory index entry when it reachs the capacity
 mem_index_capacity       = 1048576
@@ -69,4 +51,4 @@ wal_compact_threshold            = "1GB"
 flush_option                   = "only_write"
 
 [resource]
-dictionary_dir                = "/var/infinity/resource"
+resource_dir          = "/var/infinity/resource"
