@@ -10,7 +10,7 @@ import stl;
 namespace infinity {
 
 //! LoserTreeBase class definition
-export template <typename ValueType>
+export template <typename ValueType, typename Comparator = std::greater<ValueType>>
 class LoserTreeBase {
 public:
     using Source = u32;
@@ -38,12 +38,13 @@ protected:
     //! Array containing loser tree nodes.
     Vector<Loser> losers_;
     //! Function object for comparing ValueTypes.
-    std::function<bool(const ValueType&, const ValueType&)> cmp_;
+    // std::function<bool(const ValueType&, const ValueType&)> cmp_;
+    Comparator cmp_;
 
     bool first_insert_;
 public:
     explicit LoserTreeBase(const Source& k,
-                           std::function<bool(const ValueType&, const ValueType&)> cmp = std::greater<ValueType>())
+                           const Comparator& cmp = Comparator())
          : ik_(k), k_(round_up_to_power_of_two(k)),
           losers_(2 * k_), cmp_(cmp), first_insert_(true) {
         // : ik_(k), k_(static_cast<Source>(1) << static_cast<Source>(std::ceil(std::log2(static_cast<float>(k))))),
@@ -118,16 +119,17 @@ public:
 };
 
 //! Unguarded loser tree, keeping only pointers to the elements in the tree structure.
-export template <typename ValueType>
-class LoserTree : public LoserTreeBase<ValueType> {
+export template <typename ValueType, typename Comparator = std::greater<ValueType>>
+class LoserTree : public LoserTreeBase<ValueType, Comparator> {
 public:
-    using Super = LoserTreeBase<ValueType>;
+    using Super = LoserTreeBase<ValueType, Comparator>;
     using Source = typename Super::Source;
 
 public:
     //! Constructor.
     explicit LoserTree(const Source& k,
-                       std::function<bool(const ValueType&, const ValueType&)> cmp = std::greater<ValueType>())
+                       const Comparator& cmp = Comparator())
+                       // const std::function<bool(const ValueType&, const ValueType&)>& cmp = std::greater<ValueType>())
         : Super(k, cmp) {}
 
     //! Delete the current minimum and insert a new element.

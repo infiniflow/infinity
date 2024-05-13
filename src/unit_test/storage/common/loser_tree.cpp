@@ -54,7 +54,7 @@ void LoserTreeTest::GenerateData(infinity::SizeT num_size, infinity::SizeT loser
 }
 
 void LoserTreeTest::MultiWayMerge(infinity::SizeT num_size, infinity::SizeT loser_num, infinity::u64 max_val) {
-    auto loser_tree = MakeShared<LoserTree<u64>>(loser_num, std::less<u64>());
+    auto loser_tree = MakeShared<LoserTree<u64, std::less<u64>>>(loser_num);
     for (SizeT i = 0; i < loser_num; ++i) {
         if (!loser[i].empty()) {
             loser_tree->InsertStart(&loser[i][num_idx[i]], static_cast<LoserTree<u64>::Source>(i), false);
