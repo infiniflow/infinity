@@ -175,9 +175,15 @@ Value Value::MakeRow(RowID input) {
     return value;
 }
 
-Value Value::MakeVarchar(const String &str) {
+//Value Value::MakeVarchar(const String &str) {
+//    Value value(LogicalType::kVarchar);
+//    value.value_info_ = MakeShared<StringValueInfo>(str);
+//    return value;
+//}
+
+Value Value::MakeVarchar(const std::string_view str_view) {
     Value value(LogicalType::kVarchar);
-    value.value_info_ = MakeShared<StringValueInfo>(str);
+    value.value_info_ = MakeShared<StringValueInfo>(str_view);
     return value;
 }
 

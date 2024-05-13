@@ -158,53 +158,58 @@ export {
     constexpr String DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
 
     // config name
-    const String VERSION_OPTION_NAME = "version";
-    const String TIME_ZONE_OPTION_NAME = "time_zone";
-    const String TIME_ZONE_BIAS_OPTION_NAME = "time_zone_bias";
-    const String CPU_LIMIT_OPTION_NAME = "cpu_limit";
-    const String SERVER_ADDRESS_OPTION_NAME = "server_address";
-    const String POSTGRES_PORT_OPTION_NAME = "postgres_port";
-    const String HTTP_PORT_OPTION_NAME = "http_port";
-    const String CLIENT_PORT_OPTION_NAME = "client_port";
-    const String CONNECTION_POOL_SIZE_OPTION_NAME = "connection_pool_size";
-    const String LOG_FILENAME_OPTION_NAME = "log_filename";
-    const String LOG_DIR_OPTION_NAME = "log_dir";
-    const String LOG_TO_STDOUT_OPTION_NAME = "log_to_stdout";
-    const String LOG_FILE_MAX_SIZE_OPTION_NAME = "log_file_max_size";
-    const String LOG_FILE_ROTATE_COUNT_OPTION_NAME = "log_file_rotate_count";
-    const String LOG_LEVEL_OPTION_NAME = "log_level";
-    const String DATA_DIR_OPTION_NAME = "data_dir";
-    const String CLEANUP_INTERVAL_OPTION_NAME = "cleanup_interval";
-    const String COMPACT_INTERVAL_OPTION_NAME = "compact_interval";
-    const String OPTIMIZE_INTERVAL_OPTION_NAME = "optimize_interval";
-    const String MEM_INDEX_CAPACITY_OPTION_NAME = "mem_index_capacity";
-    const String BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
-    const String TEMP_DIR_OPTION_NAME = "temp_dir";
-    const String WAL_DIR_OPTION_NAME = "wal_dir";
-    const String WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
-    const String FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";
-    const String DELTA_CHECKPOINT_INTERVAL_OPTION_NAME = "delta_checkpoint_interval";
-    const String DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME = "delta_checkpoint_threshold";
-    const String WAL_FLUSH_OPTION_NAME = "wal_flush";
-    const String RESOURCE_DIR_OPTION_NAME = "resource_dir";
+    constexpr std::string_view VERSION_OPTION_NAME = "version";
+    constexpr std::string_view TIME_ZONE_OPTION_NAME = "time_zone";
+    constexpr std::string_view TIME_ZONE_BIAS_OPTION_NAME = "time_zone_bias";
+    constexpr std::string_view CPU_LIMIT_OPTION_NAME = "cpu_limit";
+    constexpr std::string_view SERVER_ADDRESS_OPTION_NAME = "server_address";
+
+    constexpr std::string_view POSTGRES_PORT_OPTION_NAME = "postgres_port";
+    constexpr std::string_view HTTP_PORT_OPTION_NAME = "http_port";
+    constexpr std::string_view CLIENT_PORT_OPTION_NAME = "client_port";
+    constexpr std::string_view CONNECTION_POOL_SIZE_OPTION_NAME = "connection_pool_size";
+    constexpr std::string_view LOG_FILENAME_OPTION_NAME = "log_filename";
+
+    constexpr std::string_view LOG_DIR_OPTION_NAME = "log_dir";
+    constexpr std::string_view LOG_TO_STDOUT_OPTION_NAME = "log_to_stdout";
+    constexpr std::string_view LOG_FILE_MAX_SIZE_OPTION_NAME = "log_file_max_size";
+    constexpr std::string_view LOG_FILE_ROTATE_COUNT_OPTION_NAME = "log_file_rotate_count";
+    constexpr std::string_view LOG_LEVEL_OPTION_NAME = "log_level";
+
+    constexpr std::string_view DATA_DIR_OPTION_NAME = "data_dir";
+    constexpr std::string_view CLEANUP_INTERVAL_OPTION_NAME = "cleanup_interval";
+    constexpr std::string_view COMPACT_INTERVAL_OPTION_NAME = "compact_interval";
+    constexpr std::string_view OPTIMIZE_INTERVAL_OPTION_NAME = "optimize_interval";
+    constexpr std::string_view MEM_INDEX_CAPACITY_OPTION_NAME = "mem_index_capacity";
+
+    constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
+    constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
+    constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
+    constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
+    constexpr std::string_view FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";
+
+    constexpr std::string_view DELTA_CHECKPOINT_INTERVAL_OPTION_NAME = "delta_checkpoint_interval";
+    constexpr std::string_view DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME = "delta_checkpoint_threshold";
+    constexpr std::string_view WAL_FLUSH_OPTION_NAME = "wal_flush";
+    constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
 
     // Variable name
-    const String QUERY_COUNT_VAR_NAME = "query_count";        // global and session
-    const String SESSION_COUNT_VAR_NAME = "session_count";    // global
-    const String BUFFER_USAGE_VAR_NAME = "buffer_usage";    // global
-    const String SCHEDULE_POLICY_VAR_NAME = "schedule_policy";    // global
-    const String DELTA_LOG_COUNT_VAR_NAME = "delta_log_count";    // global
-    const String NEXT_TXN_ID_VAR_NAME = "next_transaction_id";    // global
-    const String BUFFER_OBJECT_COUNT_VAR_NAME = "buffer_object_count";    // global
-    const String UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME = "unused_buffer_object";    // global
-    const String ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";    // global
-    const String CURRENT_TS_VAR_NAME = "current_timestamp";    // global
-    const String TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count"; // global and session
-    const String CONNECTED_TS_VAR_NAME = "connected_timestamp"; // session
-    const String CATALOG_VERSION_VAR_NAME = "catalog_version";   // global
-    const String ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
-    const String ENABLE_PROFILE_VAR_NAME = "enable_profile";  // session
-    const String PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity";  // session
+    constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";        // global and session
+    constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";    // global
+    constexpr std::string_view BUFFER_USAGE_VAR_NAME = "buffer_usage";    // global
+    constexpr std::string_view SCHEDULE_POLICY_VAR_NAME = "schedule_policy";    // global
+    constexpr std::string_view DELTA_LOG_COUNT_VAR_NAME = "delta_log_count";    // global
+    constexpr std::string_view NEXT_TXN_ID_VAR_NAME = "next_transaction_id";    // global
+    constexpr std::string_view BUFFER_OBJECT_COUNT_VAR_NAME = "buffer_object_count";    // global
+    constexpr std::string_view UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME = "unused_buffer_object";    // global
+    constexpr std::string_view ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";    // global
+    constexpr std::string_view CURRENT_TS_VAR_NAME = "current_timestamp";    // global
+    constexpr std::string_view TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count"; // global and session
+    constexpr std::string_view CONNECTED_TS_VAR_NAME = "connected_timestamp"; // session
+    constexpr std::string_view CATALOG_VERSION_VAR_NAME = "catalog_version";   // global
+    constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
+    constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "enable_profile";  // session
+    constexpr std::string_view PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity";  // session
 
 }
 

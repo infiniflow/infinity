@@ -27,7 +27,7 @@ profile_record_capacity = 100
 log_filename            = "infinity.log"
 log_dir                 = "/var/infinity/log"
 log_to_stdout           = false
-log_max_size           = "10GB"
+log_file_max_size           = "10GB"
 log_file_rotate_count   = 10
 
 # trace/info/warning/error/critical 5 log levels, default: info
@@ -35,7 +35,6 @@ log_level               = "info"
 
 [storage]
 data_dir                = "/var/infinity/data"
-default_row_size        = 8192
 storage_capacity        = "64GB"
 
 # periodically activates garbage collection:
