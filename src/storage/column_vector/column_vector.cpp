@@ -1785,7 +1785,7 @@ i32 ColumnVector::GetSizeInBytes() const {
     } else {
         size += this->tail_index_ * this->data_type_size_;
     }
-    if (data_type_->type() == kVarchar) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor) {
         size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
     }
     size += this->nulls_ptr_->GetSizeInBytes();
@@ -1816,7 +1816,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         ptr += this->tail_index_ * this->data_type_size_;
     }
     // write variable part
-    if (data_type_->type() == kVarchar) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor) {
         i32 heap_len = buffer_->fix_heap_mgr_->total_size();
         WriteBufAdv<i32>(ptr, heap_len);
         buffer_->fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
@@ -1845,7 +1845,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         ptr += tail_index * data_type_size;
     }
     // read variable part
-    if (data_type->type() == kVarchar) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
         if (heap_len > 0) {
             column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);

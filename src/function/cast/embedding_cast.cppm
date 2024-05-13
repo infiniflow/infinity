@@ -316,8 +316,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     const auto source_embedding_dim = embedding_info->Dimension();
     const auto target_embedding_dim = target_embedding_info->Dimension();
     if (source_embedding_dim % target_embedding_dim != 0) {
-        UnrecoverableError(
-            fmt::format("Can't cast from embedding with dimension {} to tensor with unit dimension {}", source_embedding_dim, target_embedding_dim));
+        RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
     const auto target_tensor_num = source_embedding_dim / target_embedding_dim;
     target.embedding_num_ = target_tensor_num;

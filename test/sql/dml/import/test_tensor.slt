@@ -1,0 +1,28 @@
+statement ok
+DROP TABLE IF EXISTS test_tensor_type;
+
+statement ok
+CREATE TABLE test_tensor_type ( c1 int, c2 tensor(float,4));
+
+query I
+COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4.csv' WITH ( DELIMITER ',' );
+----
+
+query II
+SELECT c1, c2 FROM test_tensor_type;
+----
+2 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]
+4 [0.2,0.1,0.3,0.4]
+6 [0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]
+8 [0.4,0.3,0.2,0.1]
+
+query II
+SELECT count(*) FROM test_tensor_type;
+----
+4
+
+# Clean up
+statement ok
+DROP TABLE test_tensor_type;
+
+
