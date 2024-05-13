@@ -65,7 +65,7 @@ struct ToDeleteInfo {
 };
 
 export struct CompactSegmentsTaskState {
-    RowIDRemapper remapper_;
+    RowIDRemapper remapper_{};
 
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
     Vector<SegmentEntry *> old_segments_;

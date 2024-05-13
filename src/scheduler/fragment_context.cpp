@@ -39,6 +39,9 @@ import physical_create_index_do;
 import physical_sort;
 import physical_top;
 import physical_merge_top;
+import physical_compact;
+import physical_compact_index;
+import physical_compact_finish;
 
 import global_block_id;
 import knn_expression;
@@ -53,6 +56,7 @@ import data_block;
 import physical_merge_knn;
 import merge_knn_data;
 import create_index_data;
+import compact_state_data;
 import logger;
 import task_scheduler;
 import plan_fragment;
@@ -60,6 +64,7 @@ import aggregate_expression;
 import expression_state;
 import column_def;
 import explain_statement;
+import segment_entry;
 
 namespace infinity {
 
@@ -130,6 +135,24 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
     }
 
     return operator_state;
+}
+
+UniquePtr<OperatorState> MakeCompactState(PhysicalCompact *physical_compact, FragmentTask *task, FragmentContext *fragment_ctx) {
+    if (fragment_ctx->ContextType() != FragmentType::kParallelMaterialize) {
+        UnrecoverableError("Compact operator should be in parallel materialized fragment.");
+    }
+    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
+    auto compact_operator_state = MakeUnique<CompactOperatorState>(task->TaskID(), parallel_materialize_fragment_ctx->compact_state_data_);
+    return compact_operator_state;
+}
+
+UniquePtr<OperatorState> MakeCompactFinishState(PhysicalCompactFinish *physical_compact_finish, FragmentContext *fragment_ctx) {
+    if (fragment_ctx->ContextType() != FragmentType::kSerialMaterialize) {
+        UnrecoverableError("Compact finish operator should be in serial materialized fragment.");
+    }
+    auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
+    auto compact_finish_operator_state = MakeUnique<CompactFinishOperatorState>(serial_materialize_fragment_ctx->compact_state_data_);
+    return compact_finish_operator_state;
 }
 
 UniquePtr<OperatorState> MakeAggregateState(PhysicalAggregate *physical_aggregate, FragmentTask *task) {
@@ -329,6 +352,14 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kCommand: {
             return MakeTaskStateTemplate<CommandOperatorState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kCompact: {
+            auto *physical_compact = static_cast<PhysicalCompact *>(physical_ops[operator_id]);
+            return MakeCompactState(physical_compact, task, fragment_ctx);
+        }
+        case PhysicalOperatorType::kCompactFinish: {
+            auto *physical_compact_finish = static_cast<PhysicalCompactFinish *>(physical_ops[operator_id]);
+            return MakeCompactFinishState(physical_compact_finish, fragment_ctx);
+        }
         case PhysicalOperatorType::kExplain: {
             return MakeTaskStateTemplate<ExplainOperatorState>(physical_ops[operator_id]);
         }
@@ -408,7 +439,7 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
     i64 parallel_size = static_cast<i64>(query_context->cpu_number_limit());
     // i64 parallel_size = 1;
 
-    fragment_context->CreateTasks(parallel_size, operator_count);
+    fragment_context->CreateTasks(parallel_size, operator_count, parent_context);
 
     Vector<UniquePtr<FragmentTask>> &tasks = fragment_context->Tasks();
     i64 real_parallel_size = tasks.size();
@@ -585,6 +616,31 @@ SizeT InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index
     return segment_cnt;
 }
 
+SizeT InitCompactFragmentContext(PhysicalCompact *compact_operator, FragmentContext *fragment_context, FragmentContext *parent_context) {
+    SizeT task_n = compact_operator->TaskletCount();
+    if (fragment_context->ContextType() != FragmentType::kParallelMaterialize) {
+        UnrecoverableError("Compact operator should be in parallel materialized fragment.");
+    }
+    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
+    if (parent_context->ContextType() != FragmentType::kSerialMaterialize) {
+        UnrecoverableError("Compact operator should be in parallel materialized fragment.");
+    }
+    auto *parent_serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(parent_context);
+
+    auto &compact_state_data = parent_serial_materialize_fragment_ctx->compact_state_data_;
+    compact_state_data->segment_data_list_.resize(task_n);
+    parallel_materialize_fragment_ctx->compact_state_data_ = compact_state_data;
+    return task_n;
+}
+
+void InitCompactFinishFragmentContext(PhysicalCompactFinish *compact_finish_operator, FragmentContext *fragment_context) {
+    if (fragment_context->ContextType() != FragmentType::kSerialMaterialize) {
+        UnrecoverableError("Compact finish operator should be in serial materialized fragment.");
+    }
+    SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
+    serial_materialize_fragment_ctx->compact_state_data_ = MakeShared<CompactStateData>();
+}
+
 void FragmentContext::MakeSourceState(i64 parallel_count) {
     PhysicalOperator *first_operator = this->GetOperators().back();
     switch (first_operator->operator_type()) {
@@ -610,7 +666,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kProjection: {
-            if(this->GetOperators().size() == 1) {
+            if (this->GetOperators().size() == 1) {
                 // Only one operator and it's project
                 tasks_[0]->source_state_ = MakeUnique<EmptySourceState>();
             } else {
@@ -649,7 +705,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             tasks_[0]->source_state_ = MakeUnique<QueueSourceState>();
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
+        case PhysicalOperatorType::kCreateIndexDo:
+        case PhysicalOperatorType::kCompact: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -733,7 +790,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kShow:
         case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kOptimize:
-        case PhysicalOperatorType::kFlush: {
+        case PhysicalOperatorType::kFlush:
+        case PhysicalOperatorType::kCompactFinish: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -958,7 +1016,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
+        case PhysicalOperatorType::kCreateIndexDo:
+        case PhysicalOperatorType::kCompact: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -980,7 +1039,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView:
         case PhysicalOperatorType::kOptimize:
-        case PhysicalOperatorType::kFlush: {
+        case PhysicalOperatorType::kFlush:
+        case PhysicalOperatorType::kCompactFinish: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -1000,7 +1060,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
 }
 
 // Allocate tasks for the fragment and determine the sink and source
-void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
+void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentContext *parent_context) {
     i64 parallel_count = cpu_count;
     PhysicalOperator *first_operator = this->GetOperators().back();
     switch (first_operator->operator_type()) {
@@ -1042,6 +1102,24 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             parallel_count = std::max(parallel_count, 1l);
             break;
         }
+        case PhysicalOperatorType::kCompact: {
+            auto *compact_operator = static_cast<PhysicalCompact *>(first_operator);
+            SizeT task_n = InitCompactFragmentContext(compact_operator, this, parent_context);
+            parallel_count = std::min(parallel_count, (i64)task_n);
+            if (parallel_count == 0) {
+                parallel_count = 1;
+            }
+            break;
+        }
+        case PhysicalOperatorType::kCompactFinish: {
+            auto *compact_finish_operator = static_cast<PhysicalCompactFinish *>(first_operator);
+            InitCompactFinishFragmentContext(compact_finish_operator, this);
+            parallel_count = 1;
+        }
+        // case PhysicalOperatorType::kCompactIndex: {
+        //     const auto *compact_index_operator = static_cast<const PhysicalCompactIndex *>(first_operator);
+        //     break;
+        // }
         default: {
             break;
         }

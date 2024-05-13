@@ -303,6 +303,14 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             result = BuildExplain(logical_operator);
             break;
         }
+        case LogicalNodeType::kCompactIndex: {
+            result = BuildCompactIndex(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCompactFinish: {
+            result = BuildCompactFinish(logical_operator);
+            break;
+        }
         default: {
             UnrecoverableError(fmt::format("Unknown logical node type: {}", logical_operator->name()));
             //            result = MakeShared<PhysicalDummyOperator>(numeric_limits<uint64_t>::max());
@@ -943,7 +951,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactIndex(const SharedPtr<L
                                             logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BulidCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const {
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const {
     const auto *logical_compact_finish = static_cast<const LogicalCompactFinish *>(logical_operator.get());
     UniquePtr<PhysicalOperator> left{}, right{};
     if (logical_compact_finish->left_node().get() != nullptr) {

@@ -37,6 +37,7 @@ import physical_sink;
 import base_statement;
 import extra_ddl_info;
 import create_statement;
+import command_statement;
 
 namespace infinity {
 
@@ -121,12 +122,11 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
     }
     // DumpPlanFragment(plan_fragment);
     bool use_scheduler = false;
-    switch(base_statement->Type()) {
+    switch (base_statement->Type()) {
         case StatementType::kSelect:
         case StatementType::kExplain:
         case StatementType::kDelete:
-        case StatementType::kUpdate:
-        {
+        case StatementType::kUpdate: {
             use_scheduler = true; // continue;
             break;
         }
@@ -138,17 +138,25 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
             }
             break;
         }
+        case StatementType::kCommand: {
+            const CommandStatement *command_statement = static_cast<const CommandStatement *>(base_statement);
+            const CommandInfo *command_info = command_statement->command_info_.get();
+            if (command_info->type() == CommandType::kCompactTable) {
+                use_scheduler = true;
+            }
+            break;
+        }
         default: {
             ;
         }
     }
 
-    if(!use_scheduler) {
+    if (!use_scheduler) {
         if (!plan_fragment->HasChild()) {
             if (plan_fragment->GetContext()->Tasks().size() == 1) {
                 FragmentTask *task = plan_fragment->GetContext()->Tasks()[0].get();
                 RunTask(task);
-                return ;
+                return;
             } else {
                 UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
             }

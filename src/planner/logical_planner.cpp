@@ -948,7 +948,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             break;
         }
         case CommandType::kCompactTable: {
-            // return BuildCompact(command_statement, bind_context_ptr);
+            return BuildCompact(command_statement, bind_context_ptr);
             auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
             BindSchemaName(compact_table->schema_name_);
 

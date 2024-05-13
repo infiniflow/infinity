@@ -282,6 +282,8 @@ public:
 
     Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id);
 
+    bool CompactPrepare() const;
+
     Vector<SegmentEntry *> PickCompactSegments() const;
 
 private:

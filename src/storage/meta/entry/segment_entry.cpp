@@ -40,6 +40,7 @@ import segment_iter;
 import catalog_delta_entry;
 import status;
 import compact_segments_task;
+import compact_state_data;
 import cleanup_scanner;
 import background_process;
 import wal_entry;
@@ -164,6 +165,19 @@ bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
     return true;
 }
 
+bool SegmentEntry::TrySetCompacting1(CompactStateData *compact_state_data) {
+    std::unique_lock lock(rw_locker_);
+    if (status_ == SegmentStatus::kUnsealed) {
+        UnrecoverableError("Assert: Compactable segment should be sealed.");
+    }
+    if (status_ != SegmentStatus::kSealed) {
+        return false;
+    }
+    compact_state_data_ = compact_state_data;
+    status_ = SegmentStatus::kCompacting;
+    return true;
+}
+
 void SegmentEntry::SetNoDelete() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kCompacting) {
@@ -171,7 +185,11 @@ void SegmentEntry::SetNoDelete() {
     }
     status_ = SegmentStatus::kNoDelete;
     no_delete_complete_cv_.wait(lock, [this] { return delete_txns_.empty(); });
-    compact_task_ = nullptr;
+    if (compact_task_ != nullptr) {
+        compact_task_ = nullptr;
+    } else {
+        compact_state_data_ = nullptr; 
+    }
 }
 
 void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
@@ -375,7 +393,7 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
         if (status_ == SegmentStatus::kDeprecated) {
             UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
         }
-        if (compact_task_ != nullptr) {
+        if (compact_task_ != nullptr || compact_state_data_ != nullptr) {
             if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
                 UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
             }
@@ -386,7 +404,11 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
                     segment_offsets.push_back(segment_offset);
                 }
             }
-            compact_task_->AddToDelete(segment_id_, std::move(segment_offsets));
+            if (compact_task_ != nullptr) {
+                compact_task_->AddToDelete(segment_id_, std::move(segment_offsets));
+            } else {
+                compact_state_data_->AddToDelete(segment_id_, segment_offsets);
+            }
         }
         {
             delete_txns_.erase(txn_id);

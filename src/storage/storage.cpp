@@ -110,7 +110,7 @@ void Storage::Init() {
     {
         periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-        if (enable_compaction) {
+        if (enable_compaction && false) {
             periodic_trigger_thread_->AddTrigger(MakeUnique<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get()));
         } else {
             LOG_WARN("Compact interval is not set, auto compact task will not be triggered");

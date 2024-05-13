@@ -365,9 +365,12 @@ export struct FusionOperatorState : public OperatorState {
 
 // Compact
 export struct CompactOperatorState : public OperatorState {
-    CompactStateData compact_state_data_{};
+    inline explicit CompactOperatorState(SizeT idx, SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompact), idx_(idx), compact_state_data_(compact_state_data) {}
 
-    SharedPtr<SegmentEntry> result_segment_entry_{};
+    SizeT idx_{};
+
+    SharedPtr<CompactStateData> compact_state_data_{};
 };
 
 export struct CompactIndexOperatorState : public OperatorState {
@@ -375,11 +378,23 @@ export struct CompactIndexOperatorState : public OperatorState {
 };
 
 export struct CompactFinishOperatorState : public OperatorState {
-    //
+    explicit CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompactFinish), compact_state_data_(compact_state_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
 };
 
 // Source
-export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kIndexScan, kKnnScan, kEmpty };
+export enum class SourceStateType {
+    kInvalid,
+    kQueue,
+    kAggregate,
+    kTableScan,
+    kIndexScan,
+    kKnnScan,
+    kCompact,
+    kEmpty,
+};
 
 export struct SourceState {
     inline explicit SourceState(SourceStateType state_type) : state_type_(state_type) {}

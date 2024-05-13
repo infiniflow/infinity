@@ -1132,9 +1132,17 @@ Vector<SegmentEntry *> TableEntry::CheckCompaction(TransactionID txn_id) {
     return compaction_alg_->CheckCompaction(txn_id);
 }
 
+bool TableEntry::CompactPrepare() const {
+    if (compaction_alg_.get() == nullptr) {
+        return false;
+    }
+    compaction_alg_->Disable(); // wait for current compaction to finish
+    return true;
+}
+
 Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->Disable(); // wait for current compaction to finish
+    if (!this->CompactPrepare()) {
+        return {};
     }
     Vector<SegmentEntry *> result;
     std::shared_lock lock(this->rw_locker_);

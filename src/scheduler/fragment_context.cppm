@@ -27,6 +27,7 @@ import knn_scan_data;
 import create_index_data;
 import logger;
 import third_party;
+import compact_state_data;
 
 export module fragment_context;
 
@@ -133,7 +134,7 @@ public:
 
     [[nodiscard]] PhysicalSource *GetSourceOperator() const;
 
-    void CreateTasks(i64 parallel_count, i64 operator_count);
+    void CreateTasks(i64 parallel_count, i64 operator_count, FragmentContext *parent_context);
 
     inline Vector<UniquePtr<FragmentTask>> &Tasks() { return tasks_; }
 
@@ -207,6 +208,8 @@ public:
 
 public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
+
+    SharedPtr<CompactStateData> compact_state_data_{};
 };
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {
@@ -222,6 +225,8 @@ public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
 
     UniquePtr<CreateIndexSharedData> create_index_shared_data_{};
+
+    SharedPtr<CompactStateData> compact_state_data_{};
 
 protected:
     HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};

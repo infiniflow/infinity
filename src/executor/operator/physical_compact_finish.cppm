@@ -25,6 +25,7 @@ import load_meta;
 import data_type;
 import infinity_exception;
 import base_table_ref;
+import compact_state_data;
 
 namespace infinity {
 
@@ -44,7 +45,7 @@ public:
 
     void Init() override {}
 
-    bool Execute(QueryContext *query_context, OperatorState *output_state) override;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 
@@ -54,6 +55,11 @@ public:
         UnrecoverableError("Not implement: TaskletCount not Implement");
         return 0;
     }
+
+private:
+    void SaveSegmentData(QueryContext *query_context, const CompactStateData *compact_state_data);
+
+    void ApplyDeletes(QueryContext *query_context, const CompactStateData *compact_state_data);
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_;

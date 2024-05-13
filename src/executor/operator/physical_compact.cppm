@@ -27,6 +27,8 @@ import data_type;
 
 namespace infinity {
 
+struct SegmentEntry;
+
 export class PhysicalCompact : public PhysicalOperator {
 public:
     PhysicalCompact(u64 id,
@@ -39,11 +41,13 @@ public:
 
     ~PhysicalCompact() override = default;
 
-    void Init() override {}
+    void Init() override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SizeT TaskletCount() override;
+    SizeT TaskletCount() override { return compactible_segments_group_.size(); }
+
+    Vector<Vector<Vector<SegmentEntry *>>> PlanCompact(SizeT parallel_count);
 
     SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 
@@ -51,6 +55,7 @@ public:
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_;
+    Vector<Vector<SegmentEntry *>> compactible_segments_group_;
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

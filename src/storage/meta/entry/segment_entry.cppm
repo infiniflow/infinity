@@ -38,6 +38,7 @@ struct TxnSegmentStore;
 struct TableEntry;
 class CompactSegmentsTask;
 class BlockEntryIter;
+class CompactStateData;
 
 export struct BlocksGuard {
     const Vector<SharedPtr<BlockEntry>> &block_entries_;
@@ -100,6 +101,8 @@ public:
     bool SetSealed();
 
     bool TrySetCompacting(CompactSegmentsTask *compact_task);
+
+    bool TrySetCompacting1(CompactStateData *compact_state_data);
 
     void SetNoDelete();
 
@@ -235,6 +238,7 @@ private:
     FastRoughFilter fast_rough_filter_;
 
     CompactSegmentsTask *compact_task_{};
+    CompactStateData *compact_state_data_{};
     SegmentStatus status_;
 
     std::condition_variable_any no_delete_complete_cv_{};

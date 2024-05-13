@@ -23,16 +23,18 @@ import infinity_exception;
 import global_block_id;
 import internal_types;
 import default_values;
+import segment_entry;
 
 namespace infinity {
 
-export class CompactStateData {
+export class RowIDRemap {
     using RowIDMap = HashMap<GlobalBlockID, Vector<Pair<BlockOffset, RowID>>, GlobalBlockIDHash>;
 
 public:
-    CompactStateData(SizeT block_capacity = DEFAULT_BLOCK_CAPACITY) : block_capacity_(block_capacity) {}
+    RowIDRemap(SizeT block_capacity = DEFAULT_BLOCK_CAPACITY) : block_capacity_(block_capacity) {}
 
     void AddMap(SegmentID segment_id, BlockID block_id, BlockOffset block_offset, RowID new_row_id) {
+        std::lock_guard lock(mutex_);
         auto &block_vec = row_id_map_[GlobalBlockID(segment_id, block_id)];
         block_vec.emplace_back(block_offset, new_row_id);
     }
@@ -55,6 +57,7 @@ public:
     }
 
     void AddMap(RowID old_row_id, RowID new_row_id) {
+        std::lock_guard lock(mutex_);
         AddMap(old_row_id.segment_id_, old_row_id.segment_offset_ / block_capacity_, old_row_id.segment_offset_ % block_capacity_, new_row_id);
     }
 
@@ -63,9 +66,36 @@ public:
     }
 
 private:
-    SizeT block_capacity_;
+    std::mutex mutex_;
+    const SizeT block_capacity_;
 
     RowIDMap row_id_map_;
+};
+
+export class CompactSegmentData {
+public:
+    SharedPtr<SegmentEntry> new_segment_{};
+    Vector<SegmentEntry *> old_segments_{};
+};
+
+export class CompactStateData {
+public:
+    CompactStateData() = default;
+
+    void AddToDelete(SegmentID segment_id, const Vector<SegmentOffset> &delete_offsets) {
+        std::lock_guard lock(mutex_);
+        to_delete_[segment_id].insert(to_delete_[segment_id].end(), delete_offsets.begin(), delete_offsets.end());
+    }
+
+    const HashMap<SegmentID, Vector<SegmentOffset>> &GetToDelete() const { return to_delete_; }
+
+public:
+    Vector<CompactSegmentData> segment_data_list_;
+    RowIDRemap remapper_{};
+
+private:
+    std::mutex mutex_;
+    HashMap<SegmentID, Vector<SegmentOffset>> to_delete_;
 };
 
 } // namespace infinity
