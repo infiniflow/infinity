@@ -17,7 +17,7 @@ listen_address          = "0.0.0.0"
 pg_port                 = 5432
 http_port               = 23820
 sdk_port                = 23817
-connection_limit        = 128
+connection_pool_size        = 128
 
 [profiler]
 enable                  = false
