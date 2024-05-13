@@ -212,6 +212,8 @@ public:
 
     static Value MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
 
+    static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
+
     // Object member
 public:
     // Value getter template for all types in union

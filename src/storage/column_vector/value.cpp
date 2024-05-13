@@ -219,6 +219,22 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     return value;
 }
 
+Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
+        UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+    }
+    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
+    if (const SizeT len = embedding_info->Size(); bytes % len != 0) {
+        UnrecoverableError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding size={}", bytes, len));
+    }
+    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>();
+    embedding_value_info->data_.resize(bytes);
+    std::memcpy(embedding_value_info->data_.data(), ptr, bytes);
+    Value value(LogicalType::kTensor, std::move(type_info_ptr));
+    value.value_info_ = std::move(embedding_value_info);
+    return value;
+}
+
 // Value getter
 template <>
 BooleanT Value::GetValue() const {
@@ -774,7 +790,7 @@ String Value::ToString() const {
             return value_info_->Get<StringValueInfo>().GetString();
         }
         case LogicalType::kEmbedding: {
-            EmbeddingInfo* embedding_info = static_cast<EmbeddingInfo*>(type_.type_info().get());
+            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
             return value_info_->Get<EmbeddingValueInfo>().GetString(embedding_info);
         }
         default: {
@@ -785,66 +801,66 @@ String Value::ToString() const {
     return {};
 }
 
-String EmbeddingValueInfo::GetString(EmbeddingInfo* embedding_info) {
+String EmbeddingValueInfo::GetString(EmbeddingInfo *embedding_info) {
     String res;
     SizeT count = embedding_info->Dimension();
-    char* ptr = data_.data();
-    switch(embedding_info->Type()) {
+    char *ptr = data_.data();
+    switch (embedding_info->Type()) {
         case EmbeddingDataType::kElemBit: {
             UnrecoverableError("Not implemented embedding data type: bit.");
             break;
         }
         case EmbeddingDataType::kElemInt8: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i8 element = ((i8*)ptr)[i];
+            for (SizeT i = 0; i < count - 1; ++i) {
+                i8 element = ((i8 *)ptr)[i];
                 res += std::to_string(element) + ", ";
             }
-            i8 element = ((i8*)ptr)[count - 1];
+            i8 element = ((i8 *)ptr)[count - 1];
             res += std::to_string(element);
             break;
         }
         case EmbeddingDataType::kElemInt16: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i16 element = ((i16*)ptr)[i];
+            for (SizeT i = 0; i < count - 1; ++i) {
+                i16 element = ((i16 *)ptr)[i];
                 res += std::to_string(element) + ", ";
             }
-            i16 element = ((i16*)ptr)[count - 1];
+            i16 element = ((i16 *)ptr)[count - 1];
             res += std::to_string(element);
             break;
         }
         case EmbeddingDataType::kElemInt32: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i32 element = ((i32*)ptr)[i];
+            for (SizeT i = 0; i < count - 1; ++i) {
+                i32 element = ((i32 *)ptr)[i];
                 res += std::to_string(element) + ", ";
             }
-            i32 element = ((i32*)ptr)[count - 1];
+            i32 element = ((i32 *)ptr)[count - 1];
             res += std::to_string(element);
             break;
         }
         case EmbeddingDataType::kElemInt64: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i64 element = ((i64*)ptr)[i];
+            for (SizeT i = 0; i < count - 1; ++i) {
+                i64 element = ((i64 *)ptr)[i];
                 res += std::to_string(element) + ", ";
             }
-            i64 element = ((i64*)ptr)[count - 1];
+            i64 element = ((i64 *)ptr)[count - 1];
             res += std::to_string(element);
             break;
         }
         case EmbeddingDataType::kElemFloat: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                f32 element = ((f32*)ptr)[i];
+            for (SizeT i = 0; i < count - 1; ++i) {
+                f32 element = ((f32 *)ptr)[i];
                 res += std::to_string(element) + ", ";
             }
-            f32 element = ((f32*)ptr)[count - 1];
+            f32 element = ((f32 *)ptr)[count - 1];
             res += std::to_string(element);
             break;
         }
         case EmbeddingDataType::kElemDouble: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                f64 element = ((f64*)ptr)[i];
+            for (SizeT i = 0; i < count - 1; ++i) {
+                f64 element = ((f64 *)ptr)[i];
                 res += std::to_string(element) + ", ";
             }
-            f64 element = ((f64*)ptr)[count - 1];
+            f64 element = ((f64 *)ptr)[count - 1];
             res += std::to_string(element);
             break;
         }
@@ -855,6 +871,5 @@ String EmbeddingValueInfo::GetString(EmbeddingInfo* embedding_info) {
     }
     return res;
 }
-
 
 } // namespace infinity

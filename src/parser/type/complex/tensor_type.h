@@ -20,58 +20,12 @@ namespace infinity {
 
 #pragma pack(1)
 
-struct OnDiskTensorFormat {
-    uint64_t is_in_mem_ : 1 = 0;
-    uint64_t embedding_num_ : 15 = 0;
-    uint64_t chunk_id_ : 16 = 0;
-    uint64_t chunk_offset_ : 32 = 0;
-};
-
-struct InMemTensorFormat {
-    uint64_t is_in_mem_ : 1 = 1;
-    uint64_t new_allocated_ : 1 = 0;
-    uint64_t ptr_val_ : 62 = 0;
-};
-
-static_assert(sizeof(OnDiskTensorFormat) == sizeof(uint64_t));
-static_assert(sizeof(InMemTensorFormat) == sizeof(uint64_t));
-
 struct TensorType {
-    union {
-        OnDiskTensorFormat on_disk_val_;
-        InMemTensorFormat in_mem_val_;
-    };
+    uint16_t embedding_num_ = 0;
+    uint16_t chunk_id_ = 0;
+    uint32_t chunk_offset_ = 0;
 
-    char *GetMemPtr() const;
-
-    [[nodiscard]] static std::string
-    Tensor2String(const TensorType &tensor, EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
-
-    TensorType(char *&&from_ptr, bool new_alllocated);
-
-    TensorType(EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
-
-    ~TensorType();
-
-    TensorType(const TensorType &other) = delete;
-
-    TensorType(TensorType &&other) noexcept;
-
-    TensorType &operator=(const TensorType &other) = delete;
-
-    TensorType &operator=(TensorType &&other) noexcept;
-
-    void Init(const void *ptr, size_t size);
-
-    bool operator==(const TensorType &other) const = delete;
-
-    bool operator!=(const TensorType &other) const = delete;
-
-    void Reset();
-
-    void SetNull();
-
-    [[nodiscard]] std::string ToString() const;
+    [[nodiscard]] static std::string Tensor2String(char *tensor_ptr, EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
 };
 
 static_assert(sizeof(TensorType) == sizeof(uint64_t));

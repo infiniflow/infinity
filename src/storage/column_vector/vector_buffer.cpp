@@ -21,6 +21,7 @@ import buffer_manager;
 import buffer_handle;
 import infinity_exception;
 import block_column_entry;
+import default_values;
 
 module vector_buffer;
 
@@ -85,6 +86,8 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     }
     if (buffer_type_ == VectorBufferType::kHeap) {
         fix_heap_mgr_ = MakeUnique<FixHeapManager>();
+    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -125,6 +128,8 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
     ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kHeap) {
         fix_heap_mgr_ = MakeUnique<FixHeapManager>(buffer_mgr, block_column_entry);
+    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(buffer_mgr, block_column_entry, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -134,6 +139,8 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
 void VectorBuffer::ResetToInit() {
     if (buffer_type_ == VectorBufferType::kHeap) {
         fix_heap_mgr_ = MakeUnique<FixHeapManager>();
+    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
     }
 }
 

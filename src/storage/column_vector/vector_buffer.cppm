@@ -27,7 +27,13 @@ namespace infinity {
 class BufferManager;
 class BlockColumnEntry;
 
-export enum class VectorBufferType { kInvalid, kStandard, kHeap, kCompactBit };
+export enum class VectorBufferType {
+    kInvalid,
+    kStandard,
+    kHeap, // varchar, can be stored across multiple chunks
+    kCompactBit,
+    kTensorHeap, // tensor, should be stored in one chunk (maybe not necessary?)
+};
 
 export class VectorBuffer {
 public:

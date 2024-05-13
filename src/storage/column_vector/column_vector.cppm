@@ -340,6 +340,24 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
     }
 }
 
+template <>
+inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT count,
+                                            const Selection &input_select) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    for (SizeT idx = 0; idx < count; ++idx) {
+        SizeT row_id = input_select[idx];
+        TensorT *dst_ptr = &(((TensorT *)dst)[idx]);
+        const TensorT *src_ptr = &(((const TensorT *)src)[row_id]);
+        dst_ptr->embedding_num_ = src_ptr->embedding_num_;
+        const auto tensor_bytes = src_ptr->embedding_num_ * (data_type()->type_info()->Size());
+        std::tie(dst_ptr->chunk_id_, dst_ptr->chunk_offset_) =
+            this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(), src_ptr->chunk_id_, src_ptr->chunk_offset_, tensor_bytes);
+    }
+}
+
 #if 0
 
 template <>
@@ -507,6 +525,26 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
     }
 }
 
+template <>
+inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT source_start_idx,
+                                            SizeT dest_start_idx,
+                                            SizeT count) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    SizeT source_end_idx = source_start_idx + count;
+    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+        const TensorT &src_tensor = ((const TensorT *)src)[idx];
+        TensorT &dst_tensor = ((TensorT *)dst)[dest_start_idx];
+        dst_tensor.embedding_num_ = src_tensor.embedding_num_;
+        const auto tensor_bytes = src_tensor.embedding_num_ * (data_type()->type_info()->Size());
+        std::tie(dst_tensor.chunk_id_, dst_tensor.chunk_offset_) =
+            this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(), src_tensor.chunk_id_, src_tensor.chunk_offset_, tensor_bytes);
+        ++dest_start_idx;
+    }
+}
+
 #if 0
 template <>
 inline void ColumnVector::CopyFrom<PathT>(const VectorBuffer *__restrict src_buf,
@@ -667,6 +705,19 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
     }
 
     dst_ptr->length_ = varchar_len;
+}
+
+template <>
+inline void
+ColumnVector::CopyRowFrom<TensorT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const TensorT &src_tensor = ((const TensorT *)src)[src_idx];
+    TensorT &dst_tensor = ((TensorT *)dst)[dst_idx];
+    dst_tensor.embedding_num_ = src_tensor.embedding_num_;
+    const auto tensor_bytes = src_tensor.embedding_num_ * (data_type()->type_info()->Size());
+    std::tie(dst_tensor.chunk_id_, dst_tensor.chunk_offset_) =
+        this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(), src_tensor.chunk_id_, src_tensor.chunk_offset_, tensor_bytes);
 }
 
 #if 0

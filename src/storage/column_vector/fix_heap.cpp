@@ -35,6 +35,9 @@ FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size)
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
     current_chunk_idx_ = INVALID_CHUNK_ID;
+    if (chunk_size == DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+        allow_storage_across_chunks_ = false;
+    }
 }
 
 FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size)
@@ -48,6 +51,9 @@ FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *bloc
         current_chunk_idx_ = INVALID_CHUNK_ID;
     } else {
         current_chunk_idx_ = cnt - 1;
+    }
+    if (chunk_size == DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+        allow_storage_across_chunks_ = false;
     }
 }
 
@@ -82,6 +88,22 @@ Pair<ChunkId, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (current_chunk_idx_ == INVALID_CHUNK_ID) {
         current_chunk_idx_ = 0;
         chunks_.emplace(current_chunk_idx_, AllocateChunk());
+    }
+    if (!allow_storage_across_chunks_) {
+        if (nbytes > current_chunk_size_) {
+            UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the tensor heap", nbytes));
+        }
+        if (current_chunk_offset_ + nbytes <= current_chunk_size_) {
+            // use current chunk
+            auto old_chunk_offset = current_chunk_offset_;
+            current_chunk_offset_ += nbytes;
+            return {current_chunk_idx_, old_chunk_offset};
+        } else {
+            // allocate new chunk
+            chunks_.emplace(++current_chunk_idx_, AllocateChunk());
+            current_chunk_offset_ = nbytes;
+            return {current_chunk_idx_, 0};
+        }
     }
     ChunkId start_chunk_id = current_chunk_idx_;
     ChunkId start_chunk_offset = current_chunk_offset_;
@@ -223,6 +245,12 @@ void FixHeapManager::ReadFromHeap(char *buffer, ChunkId chunk_id, u64 chunk_offs
             chunk_offset = 0;
         }
     }
+}
+
+const char *FixHeapManager::GetRawPtrFromChunk(ChunkId chunk_id, u64 chunk_offset) {
+    const VectorHeapChunk &src_chunk = ReadChunk(chunk_id);
+    const char *start_ptr = src_chunk.GetPtr() + chunk_offset;
+    return start_ptr;
 }
 
 String FixHeapManager::Stats() const {
