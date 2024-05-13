@@ -26,10 +26,9 @@ std::string TensorType::Tensor2String(char *tensor_ptr, const EmbeddingDataType 
     embedding.ptr = tensor_ptr;
     oss << '[' << EmbeddingType::Embedding2String(embedding, type, embedding_dimension) << ']';
     for (size_t i = 1; i < embedding_num; ++i) {
-        oss << ",\n";
         // next embedding
         embedding.ptr = tensor_ptr + i * embedding_size;
-        oss << '[' << EmbeddingType::Embedding2String(embedding, type, embedding_dimension) << ']';
+        oss << ",[" << EmbeddingType::Embedding2String(embedding, type, embedding_dimension) << ']';
     }
     return std::move(oss).str();
 }

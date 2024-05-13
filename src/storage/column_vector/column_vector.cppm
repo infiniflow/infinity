@@ -32,6 +32,7 @@ import infinity_exception;
 import fix_heap;
 import internal_types;
 import data_type;
+import embedding_info;
 import constant_expr;
 
 namespace infinity {
@@ -240,6 +241,54 @@ private:
             ((T *)(data_ptr_ + dst_off))[i] = value;
             ++i;
         }
+    }
+
+    template <>
+    void AppendEmbedding<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+        const auto bit_bytes = (ele_str_views.size() + 7) / 8;
+        auto data_ptr = reinterpret_cast<u8 *>(data_ptr_ + dst_off);
+        std::fill_n(data_ptr, bit_bytes, 0);
+        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+            if (const auto value = DataType::StringToValue<float>(ele_str_view); value > 0.0f) {
+                const u8 mask = 1 << (i % 8);
+                data_ptr[i / 8] |= mask;
+            }
+            ++i;
+        }
+    }
+
+    template <typename T>
+    void AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
+        auto &[embedding_num, chunk_id, chunk_offset] = ((TensorT *)data_ptr_)[dst_off];
+        const auto total_elememt_count = ele_str_views.size();
+        const auto tensor_embedding_num = total_elememt_count / unit_embedding_dim;
+        embedding_num = tensor_embedding_num;
+        auto tmp_data = MakeUniqueForOverwrite<T[]>(total_elememt_count);
+        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+            T value = DataType::StringToValue<T>(ele_str_view);
+            tmp_data[i] = value;
+            ++i;
+        }
+        const auto input_bytes = total_elememt_count * sizeof(T);
+        std::tie(chunk_id, chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), input_bytes);
+    }
+
+    template <>
+    void AppendTensor<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
+        auto &[embedding_num, chunk_id, chunk_offset] = ((TensorT *)data_ptr_)[dst_off];
+        const auto total_elememt_count = ele_str_views.size();
+        const auto tensor_embedding_num = total_elememt_count / unit_embedding_dim;
+        embedding_num = tensor_embedding_num;
+        const auto bit_bytes = (total_elememt_count + 7) / 8;
+        auto tmp_data = MakeUnique<u8[]>(bit_bytes);
+        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+            if (const auto value = DataType::StringToValue<float>(ele_str_view); value > 0.0f) {
+                const u8 mask = 1 << (i % 8);
+                tmp_data[i / 8] |= mask;
+            }
+            ++i;
+        }
+        std::tie(chunk_id, chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), bit_bytes);
     }
 
     // Used by Append by Ptr

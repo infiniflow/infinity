@@ -1263,7 +1263,7 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             SizeT dst_off = index * data_type_->Size();
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    RecoverableError(Status::NotSupport("Not implemented"));
+                    AppendEmbedding<BooleanT>(ele_str_views, dst_off);
                     break;
                 }
                 case kElemInt8: {
@@ -1288,6 +1288,49 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
                 }
                 case kElemDouble: {
                     AppendEmbedding<DoubleT>(ele_str_views, dst_off);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid embedding type");
+                }
+            }
+            break;
+        }
+        case kTensor: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
+            const auto unit_embedding_dim = embedding_info->Dimension();
+            if (ele_str_views.size() % unit_embedding_dim != 0) {
+                RecoverableError(Status::ImportFileFormatError("Embedding data size is not multiple of tensor unit dimension."));
+            }
+            SizeT dst_off = index;
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    AppendTensor<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt8: {
+                    AppendTensor<TinyIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendTensor<SmallIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendTensor<IntegerT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendTensor<BigIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemFloat: {
+                    AppendTensor<FloatT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemDouble: {
+                    AppendTensor<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
                 default: {
