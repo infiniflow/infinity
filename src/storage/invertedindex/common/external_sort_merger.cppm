@@ -19,6 +19,7 @@ module;
 export module external_sort_merger;
 
 import stl;
+import loser_tree;
 
 namespace infinity {
 
@@ -221,6 +222,7 @@ class SortMerger {
 
     std::priority_queue<KeyAddr> pre_heap_;   //!< predict heap
     std::priority_queue<KeyAddr> merge_heap_; //!< merge heap
+    SharedPtr<LoserTree<KeyAddr>> merge_loser_tree_;
 
     u32 *micro_run_idx_{nullptr};   //!< the access index of each microruns
     u32 *micro_run_pos_{nullptr};   //!< the access position within each microruns
@@ -250,7 +252,7 @@ class SortMerger {
 
     u32 pre_buf_size_; //!< the current size of microrun that has been loaded onto prediect buffer
     u32 pre_buf_num_;  //!< the current records number of microrun that has been loaded onto prediect buffer
-    // u32 pre_idx_;//!< the index of microrun channel right in the predict buffer
+    //u32 pre_idx_;    //!< the index of microrun channel right in the predict buffer
     u32 out_buf_in_idx_;          //!< used by merge to get the current available output buffer
     u32 out_buf_out_idx_;         //!< used by output threads to get the index of the turn of outputting
     u32 *out_buf_size_{nullptr};  //!< data size of each output buffer

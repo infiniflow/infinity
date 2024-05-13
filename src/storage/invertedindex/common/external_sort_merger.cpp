@@ -31,6 +31,7 @@ namespace infinity {
             assert(false);                                                                                                                           \
         }                                                                                                                                            \
     }
+#define USE_LOSER_TREE
 
 template <typename KeyType, typename LenType>
 SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32 bs, u32 output_num)
@@ -58,6 +59,9 @@ SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32
 
     out_buf_size_ = new u32[OUT_BUF_NUM_];
     out_buf_full_ = new bool[OUT_BUF_NUM_];
+#ifdef USE_LOSER_TREE
+    merge_loser_tree_ = MakeShared<LoserTree<KeyAddr>>(MAX_GROUP_SIZE_);
+#endif
 }
 
 template <typename KeyType, typename LenType>
@@ -166,17 +170,29 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
             size_micro_run_[i] = s;
             io_stream.Read(micro_buf_[i], s);
         }
-        if (flag)
-            continue;
 
+#ifdef USE_LOSER_TREE
+        if (flag) {
+            merge_loser_tree_->InsertStart(nullptr, static_cast<LoserTree<u64>::Source>(i), true);
+            continue;
+        }
+        auto key = KeyAddr(micro_buf_[i], -1, i);
+        merge_loser_tree_->InsertStart(&key, static_cast<LoserTree<u64>::Source>(i), false);
+#else
+        if (flag) {
+            continue;
+        }
         merge_heap_.push(KeyAddr(micro_buf_[i], -1, i));
+#endif
         micro_run_idx_[i] = 1;
         micro_run_pos_[i] = KeyAddr(micro_buf_[i], -1, i).LEN() + sizeof(LenType);
         num_micro_run_[i] = 0;
 
         io_stream.Seek(next_run_pos);
     }
-
+#ifdef USE_LOSER_TREE
+    merge_loser_tree_->Init();
+#endif
     // initialize predict heap and records number of every microrun
     for (u32 i = 0; i < group_size_; ++i) {
         u32 pos = 0;
@@ -278,9 +294,14 @@ void SortMerger<KeyType, LenType>::Predict(DirectIO &io_stream) {
 
 template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Merge() {
+#ifdef USE_LOSER_TREE
+    while (merge_loser_tree_->TopSource() != LoserTree<KeyAddr>::invalid_) {
+        auto top = merge_loser_tree_->TopKey();
+#else
     while (merge_heap_.size() > 0) {
         KeyAddr top = merge_heap_.top();
         merge_heap_.pop();
+#endif
         u32 idx = top.IDX();
 
         // output
@@ -316,8 +337,12 @@ void SortMerger<KeyType, LenType>::Merge() {
             while (pre_buf_size_ == 0)
                 pre_buf_con_.wait(lock);
 
-            if (pre_buf_size_ == (u32)-1)
+            if (pre_buf_size_ == (u32)-1) {
+#ifdef USE_LOSER_TREE
+                merge_loser_tree_->DeleteTopInsert(nullptr, true);
+#endif
                 continue;
+            }
 
             assert(idx < MAX_GROUP_SIZE_);
             memcpy(micro_buf_[idx], pre_buf_, pre_buf_size_);
@@ -328,7 +353,12 @@ void SortMerger<KeyType, LenType>::Merge() {
         }
 
         assert(idx < MAX_GROUP_SIZE_);
+#ifdef USE_LOSER_TREE
+        auto key = KeyAddr(micro_buf_[idx] + micro_run_pos_[idx], -1, idx);
+        merge_loser_tree_->DeleteTopInsert(&key, false);
+#else
         merge_heap_.push(KeyAddr(micro_buf_[idx] + micro_run_pos_[idx], -1, idx));
+#endif
         ++micro_run_idx_[idx];
         micro_run_pos_[idx] += KeyAddr(micro_buf_[idx] + micro_run_pos_[idx], -1, idx).LEN() + sizeof(LenType);
     }
@@ -400,8 +430,9 @@ void SortMerger<KeyType, LenType>::Run() {
     IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
 
     Vector<Thread *> out_thread(OUT_BUF_NUM_);
-    for (u32 i = 0; i < OUT_BUF_NUM_; ++i)
+    for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
         out_thread[i] = new Thread(std::bind(&self_t::Output, this, out_f, i));
+    }
 
     predict_thread.join();
     merge_thread.join();
