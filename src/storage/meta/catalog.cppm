@@ -50,52 +50,36 @@ class TxnManager;
 class Txn;
 class ProfileHistory {
 private:
-    std::mutex lock_{};
-    Vector<SharedPtr<QueryProfiler>> queue{};
-    SizeT front{};
-    SizeT rear{};
-    SizeT max_size{};
+    mutable std::mutex lock_{};
+    Deque<SharedPtr<QueryProfiler>> deque_{};
+    SizeT max_size_{};
 
 public:
     explicit ProfileHistory(SizeT size) {
-        max_size = size + 1;
-        queue.resize(max_size);
-        front = 0;
-        rear = 0;
+        std::unique_lock<std::mutex> lk(lock_);
+        max_size_ = size;
     }
+
+    SizeT HistoryCapacity() const {
+        std::unique_lock<std::mutex> lk(lock_);
+        return max_size_;
+    }
+
+    void Resize(SizeT new_size);
 
     void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
         std::unique_lock<std::mutex> lk(lock_);
-        if ((rear + 1) % max_size == front) {
-            return;
+        if(deque_.size() >= max_size_) {
+            deque_.pop_back();
         }
-        queue[rear] = profiler;
-        rear = (rear + 1) % max_size;
+
+        deque_.emplace_front(profiler);
     }
 
-    QueryProfiler *GetElement(SizeT index) {
-        std::unique_lock<std::mutex> lk(lock_);
+    QueryProfiler *GetElement(SizeT index);
 
-        // FIXME: Bug, unsigned integer: index will always >= 0
-        if (index < 0 || index >= (rear - front + max_size) % max_size) {
-            return nullptr;
-        }
-        SizeT actualIndex = (front + index) % max_size;
-        return queue[actualIndex].get();
-    }
+    Vector<SharedPtr<QueryProfiler>> GetElements();
 
-    Vector<SharedPtr<QueryProfiler>> GetElements() {
-        Vector<SharedPtr<QueryProfiler>> elements;
-        elements.reserve(max_size);
-
-        std::unique_lock<std::mutex> lk(lock_);
-        for (SizeT i = 0; i < queue.size(); ++i) {
-            if (queue[i].get() != nullptr) {
-                elements.push_back(queue[i]);
-            }
-        }
-        return elements;
-    }
 };
 
 class GlobalCatalogDeltaEntry;
@@ -258,11 +242,19 @@ private:
 public:
     // Profile related methods
 
-    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { history.Enqueue(std::move(profiler)); }
+    void AppendProfileRecord(SharedPtr<QueryProfiler> profiler) { history_.Enqueue(std::move(profiler)); }
 
-    const QueryProfiler *GetProfilerRecord(SizeT index) { return history.GetElement(index); }
+    const QueryProfiler *GetProfileRecord(SizeT index) { return history_.GetElement(index); }
 
-    const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() { return history.GetElements(); }
+    const Vector<SharedPtr<QueryProfiler>> GetProfileRecords() { return history_.GetElements(); }
+
+    void ResizeProfileHistory(SizeT new_size) {
+        history_.Resize(new_size);
+    }
+
+    SizeT ProfileHistorySize() const {
+        return history_.HistoryCapacity();
+    }
 
 public:
     const SharedPtr<String> &DataDir() const { return data_dir_; }
@@ -287,7 +279,7 @@ public:
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
-    ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
+    ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
 
 private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }

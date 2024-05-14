@@ -24,7 +24,7 @@ import command_statement;
 namespace infinity {
 
 export constexpr std::string_view profile_history_capacity_name = "profile_history_capacity";
-export constexpr std::string_view enable_profiling_name = "enable_profile";
+export constexpr std::string_view enable_profile_name = "enable_profile";
 export constexpr std::string_view worker_cpu_limit = "cpu_count";
 export constexpr std::string_view log_level = "log_level";
 
@@ -95,6 +95,7 @@ public:
     // Get config by name
     Tuple<BaseOption *, Status> GetConfigByName(const String& name);
 
+    GlobalOptionIndex GetOptionIndex(const String& var_name) const { return global_options_.GetOptionIndex(var_name); }
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 

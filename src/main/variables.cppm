@@ -36,6 +36,7 @@ export enum class GlobalVariable {
     kTotalCommitCount,          // global
     kTotalRollbackCount,        // global
     kActiveWALFilename,         // global
+    kProfileRecordCapacity,     // global
 
     kInvalid,
 };
@@ -46,7 +47,6 @@ export enum class SessionVariable {
     kTotalRollbackCount,        // session
     kConnectedTime,             // session
     kEnableProfile,             // session
-    kProfileRecordCapacity,     // session
 
     kInvalid,
 };

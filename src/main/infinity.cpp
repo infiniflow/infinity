@@ -217,6 +217,9 @@ QueryResult Infinity::SetVariable(const String &variable_name, const String &var
 //            command_statement->command_info_ = MakeUnique<SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
             break;
         }
+        case SetScope::kConfig: {
+            break;
+        }
         default: {
             UnrecoverableError("Invalid set scope.");
         }

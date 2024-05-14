@@ -61,6 +61,7 @@ private:
 enum class SetScope {
     kSession,
     kGlobal,
+    kConfig,
     kInvalid,
 };
 

@@ -30,7 +30,6 @@ public:
     i64 query_count_{};
     i64 total_commit_count_{};
     bool enable_profile_{false};
-    i64 profile_record_capacity_{128};
     i64 connected_time_{};
 };
 
@@ -54,7 +53,7 @@ public:
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
     inline void SetTxn(Txn *txn) { txn_ = txn; }
 
-    const QueryProfiler *GetProfilerRecord(SizeT index) { return txn_->GetCatalog()->GetProfilerRecord(index); }
+    const QueryProfiler *GetProfileRecord(SizeT index) { return txn_->GetCatalog()->GetProfileRecord(index); }
 
     void IncreaseQueryCount() { ++query_count_; }
 

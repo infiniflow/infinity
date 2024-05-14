@@ -1149,7 +1149,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    auto records = catalog->GetProfilerRecords();
+    auto records = catalog->GetProfileRecords();
     for (SizeT i = 0; i < records.size(); ++i) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2677,25 +2677,6 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
-        case SessionVariable::kProfileRecordCapacity: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
-            };
-
-            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-            Vector<SharedPtr<DataType>> output_column_types{
-                integer_type,
-            };
-
-            output_block_ptr->Init(output_column_types);
-
-            Value value = Value::MakeBigInt(session_ptr->SessionVariables()->profile_record_capacity_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-            break;
-        }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
             RecoverableError(operator_state->status_);
@@ -2836,28 +2817,6 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
                 {
                     // option description
                     Value value = Value::MakeVarchar("Enable profile");
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-                }
-                break;
-            }
-            case SessionVariable::kProfileRecordCapacity: {
-                {
-                    // option name
-                    Value value = Value::MakeVarchar(var_name);
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-                }
-                {
-                    // option value
-                    u64 profile_record_capacity = session_ptr->SessionVariables()->profile_record_capacity_;
-                    Value value = Value::MakeVarchar(std::to_string(profile_record_capacity));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-                }
-                {
-                    // option description
-                    Value value = Value::MakeVarchar("Profile record history capacity");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
@@ -3143,6 +3102,26 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
+        case GlobalVariable::kProfileRecordCapacity: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                integer_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+
+            Catalog *catalog_ptr = query_context->storage()->catalog();
+            Value value = Value::MakeBigInt(catalog_ptr->ProfileHistorySize());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
             RecoverableError(operator_state->status_);
@@ -3373,7 +3352,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option description
-                    Value value = Value::MakeVarchar("Unused object in buffer manager waiting for garbage collection");
+                    Value value = Value::MakeVarchar("Active transaction count");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
@@ -3395,7 +3374,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option description
-                    Value value = Value::MakeVarchar("Unused object in buffer manager waiting for garbage collection");
+                    Value value = Value::MakeVarchar("Current timestamp");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
@@ -3462,6 +3441,28 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option description
                     Value value = Value::MakeVarchar("Write ahead log filename");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kProfileRecordCapacity: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    Catalog *catalog_ptr = query_context->storage()->catalog();
+                    Value value = Value::MakeVarchar(std::to_string(catalog_ptr->ProfileHistorySize()));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Profile record history capacity");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }

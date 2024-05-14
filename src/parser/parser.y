@@ -1737,7 +1737,7 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, false);
     free($3);
 }
-| SET SESSION IDENTIFIER STRING {
+| SET SESSION IDENTIFIER IDENTIFIER {
     ParserHelper::ToLower($3);
     ParserHelper::ToLower($4);
     $$ = new infinity::CommandStatement();
@@ -1769,7 +1769,7 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
     free($3);
 }
-| SET GLOBAL IDENTIFIER STRING {
+| SET GLOBAL IDENTIFIER IDENTIFIER {
     ParserHelper::ToLower($3);
     ParserHelper::ToLower($4);
     $$ = new infinity::CommandStatement();
@@ -1787,6 +1787,38 @@ command_statement: USE IDENTIFIER {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kDouble, $3, $4);
+    free($3);
+}
+| SET CONFIG IDENTIFIER ON {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kBool, $3, true);
+    free($3);
+}
+| SET CONFIG IDENTIFIER OFF {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kBool, $3, false);
+    free($3);
+}
+| SET CONFIG IDENTIFIER IDENTIFIER {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kString, $3, $4);
+    free($3);
+    free($4);
+}
+| SET CONFIG IDENTIFIER LONG_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kInteger, $3, $4);
+    free($3);
+}
+| SET CONFIG IDENTIFIER DOUBLE_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kDouble, $3, $4);
     free($3);
 }
 | COMPACT TABLE table_name {

@@ -57,6 +57,49 @@ import log_file;
 
 namespace infinity {
 
+void ProfileHistory::Resize(SizeT new_size) {
+    std::unique_lock<std::mutex> lk(lock_);
+    if(new_size == 0) {
+        deque_.clear();
+        return;
+    }
+
+    if(new_size == max_size_) {
+        return;
+    }
+
+    if(new_size < deque_.size()) {
+        SizeT diff = max_size_ - new_size;
+        for(SizeT i = 0; i < diff; ++ i) {
+            deque_.pop_back();
+        }
+    }
+
+    max_size_ = new_size;
+}
+
+QueryProfiler *ProfileHistory::GetElement(SizeT index) {
+    std::unique_lock<std::mutex> lk(lock_);
+    if (index < 0 || index > max_size_) {
+        return nullptr;
+    }
+
+    return deque_[index].get();
+}
+
+Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
+    Vector<SharedPtr<QueryProfiler>> elements;
+    elements.reserve(max_size_);
+
+    std::unique_lock<std::mutex> lk(lock_);
+    for (SizeT i = 0; i < deque_.size(); ++i) {
+        if (deque_[i].get() != nullptr) {
+            elements.push_back(deque_[i]);
+        }
+    }
+    return elements;
+}
+
 // TODO Consider letting it commit as a transaction.
 Catalog::Catalog(SharedPtr<String> data_dir)
     : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(*data_dir_ + "/" + String(CATALOG_FILE_DIR))), running_(true) {
@@ -65,6 +108,7 @@ Catalog::Catalog(SharedPtr<String> data_dir)
         fs.CreateDirectory(*catalog_dir_);
     }
     mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
+    ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
 }
 
 Catalog::~Catalog() {
