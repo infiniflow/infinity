@@ -59,6 +59,8 @@ public:
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
 
+    String GetWalFilename() const;
+
     i64 ReplayWalFile();
 
     void ReplayWalEntry(const WalEntry &entry);

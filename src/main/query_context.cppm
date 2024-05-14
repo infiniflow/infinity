@@ -90,7 +90,6 @@ public:
     void RollbackTxn();
 
 
-
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }
@@ -162,7 +161,7 @@ private:
     Storage *storage_{};
     BaseSession *session_ptr_{};
     ResourceManager *resource_manager_{};
-    SessionManager* session_manager_{};
+    SessionManager *session_manager_{};
 
     u64 catalog_version_{};
 

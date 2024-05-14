@@ -31,6 +31,7 @@ public:
     i64 total_commit_count_{};
     bool enable_profile_{false};
     i64 profile_record_capacity_{128};
+    i64 connected_time_{};
 };
 
 export enum class SessionType {
@@ -42,7 +43,8 @@ export class BaseSession {
 
 public:
     BaseSession(u64 session_id, SessionType session_type)
-        : current_database_("default_db"), session_type_(session_type), session_id_(session_id) {}
+        : connected_time_(std::time(nullptr)), current_database_("default_db"), session_type_(session_type),
+        session_id_(session_id) {}
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
@@ -58,7 +60,19 @@ public:
 
     [[nodiscard]] u64 query_count() const { return query_count_; }
 
+    void IncreaseCommittedTxnCount() { ++committed_txn_count_; }
+
+    u64 committed_txn_count() const { return committed_txn_count_; }
+
+    void IncreaseRollbackedTxnCount() { ++committed_txn_count_; }
+
+    u64 rollbacked_txn_count() const { return rollbacked_txn_count_; }
+
+    String ConnectedTimeToStr() const { return std::asctime(std::localtime(&connected_time_)); }
+
 protected:
+    std::time_t connected_time_;
+
     // Current schema
     String current_database_{};
 
@@ -72,6 +86,9 @@ protected:
     u64 session_id_{0};
 
     u64 query_count_{0};
+
+    u64 committed_txn_count_{0};
+    u64 rollbacked_txn_count_{0};
 };
 
 export class LocalSession : public BaseSession {

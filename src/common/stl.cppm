@@ -234,6 +234,10 @@ export namespace std {
 
     using std::begin;
     using std::end;
+
+    using std::time_t;
+    using std::asctime;
+    using std::localtime;
 } // namespace std
 
 namespace infinity {

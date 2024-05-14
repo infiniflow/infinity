@@ -158,7 +158,6 @@ SEGMENT         { return SEGMENT; }
 SEGMENTS         { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
-STATUS          { return STATUS; }
 THEN            { return THEN; }
 TIME            { return TIME; }
 TIMESTAMP       { return TIMESTAMP; }

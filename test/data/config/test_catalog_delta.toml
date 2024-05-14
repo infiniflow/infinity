@@ -1,6 +1,6 @@
 [general]
 version = "0.2.0"
-timezone = "utc-8"
+time_zone = "utc-8"
 
 [network]
 [log]

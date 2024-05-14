@@ -68,6 +68,7 @@ struct StringValueInfo : public ExtraValueInfo {
 
 public:
     explicit StringValueInfo(const String &str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_p) {}
+    explicit StringValueInfo(const std::string_view &str_view) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_view) {}
     explicit StringValueInfo(String &&str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(std::move(str_p)) {}
 
     const String &GetString() { return str_; }
@@ -163,7 +164,9 @@ public:
 
     static Value MakeRow(RowID input);
 
-    static Value MakeVarchar(const String &str);
+    // static Value MakeVarchar(const String &str);
+
+    static Value MakeVarchar(const std::string_view str_view);
 
     static Value MakeVarchar(const char *ptr, SizeT len);
 

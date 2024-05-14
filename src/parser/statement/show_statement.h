@@ -36,8 +36,6 @@ enum class ShowStmtType {
     kBlocks,
     kBlock,
     kBlockColumn,
-    kSessionStatus,
-    kGlobalStatus,
     kSessionVariable,
     kSessionVariables,
     kGlobalVariable,

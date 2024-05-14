@@ -1016,12 +1016,6 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kBlockColumn: {
             return BuildShowBlockColumn(statement, bind_context_ptr);
         }
-        case ShowStmtType::kSessionStatus: {
-            return BuildShowSessionStatus(statement, bind_context_ptr);
-        }
-        case ShowStmtType::kGlobalStatus: {
-            return BuildShowGlobalStatus(statement, bind_context_ptr);
-        }
         case ShowStmtType::kSessionVariable: {
             return BuildShowSessionVariable(statement, bind_context_ptr);
         }
@@ -1214,28 +1208,6 @@ Status LogicalPlanner::BuildShowDatabases(const ShowStatement *, SharedPtr<BindC
                                                                   query_context_ptr_->schema_name(),
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
-    this->logical_plan_ = logical_show;
-    return Status::OK();
-}
-
-Status LogicalPlanner::BuildShowSessionStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                  ShowType::kShowSessionStatus,
-                                                                  query_context_ptr_->schema_name(),
-                                                                  statement->table_name_,
-                                                                  bind_context_ptr->GenerateTableIndex());
-
-    this->logical_plan_ = logical_show;
-    return Status::OK();
-}
-
-Status LogicalPlanner::BuildShowGlobalStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                  ShowType::kShowGlobalStatus,
-                                                                  query_context_ptr_->schema_name(),
-                                                                  statement->table_name_,
-                                                                  bind_context_ptr->GenerateTableIndex());
-
     this->logical_plan_ = logical_show;
     return Status::OK();
 }
