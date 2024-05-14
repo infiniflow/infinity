@@ -158,6 +158,7 @@ SEGMENT         { return SEGMENT; }
 SEGMENTS         { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
+TENSOR          { return TENSOR; }
 THEN            { return THEN; }
 TIME            { return TIME; }
 TIMESTAMP       { return TIMESTAMP; }

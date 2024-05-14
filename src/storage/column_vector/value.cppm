@@ -96,6 +96,18 @@ public:
         std::memcpy(data_.data(), values_p.data(), len);
     }
 
+    template <>
+    explicit EmbeddingValueInfo(const Vector<bool> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+        SizeT len = values_p.size() / 8;
+        data_.resize(len);
+        auto *data_ptr = reinterpret_cast<u8 *>(data_.data());
+        for (SizeT i = 0; i < values_p.size(); i++) {
+            if (values_p[i]) {
+                data_ptr[i / 8] |= (static_cast<u8>(1) << (i % 8));
+            }
+        }
+    }
+
     String GetString(EmbeddingInfo* embedding_info);
 
     Pair<const_ptr_t, SizeT> GetData() const { return MakePair<const_ptr_t, SizeT>(data_.data(), data_.size()); }
@@ -199,6 +211,8 @@ public:
     }
 
     static Value MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
+
+    static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
 
     // Object member
 public:

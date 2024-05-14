@@ -19,7 +19,7 @@ import stl;
 import base_expression;
 import aggregate_function;
 import cast_table;
-
+import logger;
 import status;
 import infinity_exception;
 
@@ -54,23 +54,27 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
     if (candidates_index.empty()) {
         // No matched function
         std::stringstream ss;
-        ss << "Can't find matched function for " << FunctionSet::ToString(name_, {input_argument}) << std::endl;
+        String function_str = FunctionSet::ToString(name_, {input_argument});
+        ss << "Can't find matched function for " << function_str << std::endl;
         ss << "Candidate functions: " << std::endl;
         for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }
-        UnrecoverableError(ss.str());
+        LOG_ERROR(ss.str());
+        RecoverableError(Status::FunctionNotFound(function_str));
     }
 
     if (candidates_index.size() > 1) {
         // multiple functions matched
         std::stringstream ss;
-        ss << "Multiple matched functions of " << FunctionSet::ToString(name_, {input_argument}) << std::endl;
+        String function_str = FunctionSet::ToString(name_, {input_argument});
+        ss << "Multiple matched functions of " << function_str << std::endl;
         ss << "Matched candidate functions: " << std::endl;
         for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
         }
-        UnrecoverableError(ss.str());
+        LOG_ERROR(ss.str());
+        RecoverableError(Status::FunctionNotFound(function_str));
     }
 
     return functions_[candidates_index[0]];

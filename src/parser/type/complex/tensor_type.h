@@ -12,14 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
-#include "parser/type/complex/varchar.h"
+#pragma once
 
-class VarcharTest : public BaseTest {};
+#include "embedding_type.h"
 
-TEST_F(VarcharTest, structure_check) {
-    using namespace infinity;
-    EXPECT_EQ(sizeof(InlineVarchar), 13u);
-    EXPECT_EQ(sizeof(VectorVarchar), 13u);
-    EXPECT_EQ(sizeof(Varchar), 16u);
-}
+namespace infinity {
+
+#pragma pack(1)
+
+struct TensorType {
+    uint16_t embedding_num_ = 0;
+    uint16_t chunk_id_ = 0;
+    uint32_t chunk_offset_ = 0;
+
+    [[nodiscard]] static std::string Tensor2String(char *tensor_ptr, EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
+};
+
+static_assert(sizeof(TensorType) == sizeof(uint64_t));
+
+#pragma pack()
+
+} // namespace infinity

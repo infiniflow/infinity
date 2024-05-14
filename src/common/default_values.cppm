@@ -59,6 +59,7 @@ export {
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
     // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
+    constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 512UL * 1024UL * 4UL;
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows

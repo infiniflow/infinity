@@ -22,6 +22,7 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
+import infinity_exception;
 import column_vector;
 
 import function_set;
@@ -40,8 +41,19 @@ import logical_type;
 
 class VarcharTest : public BaseTest {};
 
+using namespace infinity;
+
+void InitVarcharAsInline(VarcharT& varchar, const std::string_view sv) {
+    varchar.is_value_ = false;
+    varchar.length_ = sv.size();
+    if (sv.size() <= VARCHAR_INLINE_LEN) {
+        std::memcpy(varchar.short_.data_, sv.data(), sv.size());
+    } else {
+        UnrecoverableError("Varchar length is too long");
+    }
+}
+
 TEST_F(VarcharTest, varchar_cast0) {
-    using namespace infinity;
     {
 
         DataType source_type(LogicalType::kVarchar);
@@ -49,7 +61,7 @@ TEST_F(VarcharTest, varchar_cast0) {
 
         {
             VarcharT v1;
-            v1.InitAsValue(s1);
+            InitVarcharAsInline(v1, s1);
             EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
@@ -62,7 +74,7 @@ TEST_F(VarcharTest, varchar_cast0) {
         s1 = "false";
         {
             VarcharT v1;
-            v1.InitAsValue(s1);
+            InitVarcharAsInline(v1, s1);
             EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
@@ -75,7 +87,7 @@ TEST_F(VarcharTest, varchar_cast0) {
         s1 = "falsk";
         {
             VarcharT v1;
-            v1.InitAsValue(s1);
+            InitVarcharAsInline(v1, s1);
             EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
@@ -92,7 +104,7 @@ TEST_F(VarcharTest, varchar_cast0) {
 
         {
             VarcharT v1;
-            v1.InitAsValue(s1);
+            InitVarcharAsInline(v1, s1);
             EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
@@ -105,7 +117,7 @@ TEST_F(VarcharTest, varchar_cast0) {
         s1 = "127";
         {
             VarcharT v1;
-            v1.InitAsValue(s1);
+            InitVarcharAsInline(v1, s1);
             EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
@@ -118,7 +130,7 @@ TEST_F(VarcharTest, varchar_cast0) {
         s1 = "190";
         {
             VarcharT v1;
-            v1.InitAsValue(s1);
+            InitVarcharAsInline(v1, s1);
             EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
@@ -130,7 +142,7 @@ TEST_F(VarcharTest, varchar_cast0) {
         s1 = "abc";
         {
             VarcharT v1;
-            v1.InitAsValue(s1);
+            InitVarcharAsInline(v1, s1);
             EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 

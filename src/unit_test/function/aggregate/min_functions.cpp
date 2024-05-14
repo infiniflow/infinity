@@ -36,7 +36,28 @@ import internal_types;
 import logical_type;
 import data_type;
 
-class MinFunctionTest : public BaseTest {};
+class MinFunctionTest : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
+        RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        RemoveDbDirs();
+        BaseTest::TearDown();
+    }
+};
 
 TEST_F(MinFunctionTest, min_func) {
     using namespace infinity;
@@ -287,6 +308,6 @@ TEST_F(MinFunctionTest, min_func) {
         DataType data_type(LogicalType::kVarchar);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
 
-        EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), UnrecoverableException);
+        EXPECT_THROW(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
     }
 }

@@ -50,6 +50,8 @@ public:
     // the size of data.
     void ReadFromHeap(char *buffer, ChunkId chunk_id, u64 chunk_offset, SizeT nbytes);
 
+    const char *GetRawPtrFromChunk(ChunkId chunk_id, u64 chunk_offset);
+
     [[nodiscard]] String Stats() const;
 
 public:
@@ -89,6 +91,7 @@ private:
     VectorHeapChunk &ReadChunk(ChunkId chunk_id);
 
 private:
+    bool allow_storage_across_chunks_{true};
     HashMap<ChunkId, VectorHeapChunk> chunks_{};
     u64 current_chunk_size_{DEFAULT_FIXLEN_CHUNK_SIZE};
     ChunkId current_chunk_idx_{INVALID_CHUNK_ID};

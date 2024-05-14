@@ -245,7 +245,6 @@ TEST_F(DoubleCastTest, double_cast0) {
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         // Not release the heap memory in varchar, due to the heap will be release in col_varchar's destructor
-        target.Reset(false);
     }
 }
 

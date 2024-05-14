@@ -27,11 +27,13 @@ import bitmask;
 import selection;
 import default_values;
 import value;
+import status;
 import third_party;
 import infinity_exception;
 import fix_heap;
 import internal_types;
 import data_type;
+import embedding_info;
 import constant_expr;
 
 namespace infinity {
@@ -242,11 +244,60 @@ private:
         }
     }
 
+    template <>
+    void AppendEmbedding<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+        const auto bit_bytes = (ele_str_views.size() + 7) / 8;
+        auto data_ptr = reinterpret_cast<u8 *>(data_ptr_ + dst_off);
+        std::fill_n(data_ptr, bit_bytes, 0);
+        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+            if (const auto value = DataType::StringToValue<float>(ele_str_view); value > 0.0f) {
+                const u8 mask = u8(1) << (i % 8);
+                data_ptr[i / 8] |= mask;
+            }
+            ++i;
+        }
+    }
+
+    template <typename T>
+    void AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
+        auto &[embedding_num, chunk_id, chunk_offset] = ((TensorT *)data_ptr_)[dst_off];
+        const auto total_elememt_count = ele_str_views.size();
+        const auto input_bytes = total_elememt_count * sizeof(T);
+        if (input_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+            RecoverableError(Status::SyntaxError("Tensor size exceeds the limit."));
+        }
+        embedding_num = total_elememt_count / unit_embedding_dim;
+        auto tmp_data = MakeUniqueForOverwrite<T[]>(total_elememt_count);
+        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+            T value = DataType::StringToValue<T>(ele_str_view);
+            tmp_data[i] = value;
+            ++i;
+        }
+        std::tie(chunk_id, chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), input_bytes);
+    }
+
+    template <>
+    void AppendTensor<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
+        auto &[embedding_num, chunk_id, chunk_offset] = ((TensorT *)data_ptr_)[dst_off];
+        const auto total_elememt_count = ele_str_views.size();
+        embedding_num = total_elememt_count / unit_embedding_dim;
+        const auto bit_bytes = (total_elememt_count + 7) / 8;
+        if (bit_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+            RecoverableError(Status::SyntaxError("Tensor size exceeds the limit."));
+        }
+        auto tmp_data = MakeUnique<u8[]>(bit_bytes);
+        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+            if (const auto value = DataType::StringToValue<float>(ele_str_view); value > 0.0f) {
+                const u8 mask = u8(1) << (i % 8);
+                tmp_data[i / 8] |= mask;
+            }
+            ++i;
+        }
+        std::tie(chunk_id, chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), bit_bytes);
+    }
+
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
-
-    // Use by Append value
-    void SetByPtr(SizeT index, const_ptr_t value_ptr);
 
     void CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx);
 
@@ -330,7 +381,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
             // Only prefix is enough to contain all string data.
             std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
         } else {
-            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
             auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
                                                                                        src_ptr->vector_.chunk_id_,
                                                                                        src_ptr->vector_.chunk_offset_,
@@ -340,6 +391,24 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
         }
 
         dst_ptr->length_ = varchar_len;
+    }
+}
+
+template <>
+inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT count,
+                                            const Selection &input_select) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    for (SizeT idx = 0; idx < count; ++idx) {
+        SizeT row_id = input_select[idx];
+        TensorT *dst_ptr = &(((TensorT *)dst)[idx]);
+        const TensorT *src_ptr = &(((const TensorT *)src)[row_id]);
+        dst_ptr->embedding_num_ = src_ptr->embedding_num_;
+        const auto tensor_bytes = src_ptr->embedding_num_ * (data_type()->type_info()->Size());
+        std::tie(dst_ptr->chunk_id_, dst_ptr->chunk_offset_) =
+            this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(), src_ptr->chunk_id_, src_ptr->chunk_offset_, tensor_bytes);
     }
 }
 
@@ -496,7 +565,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
             // Only prefix is enough to contain all string data.
             std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
         } else {
-            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
             auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
                                                                                        src_ptr->vector_.chunk_id_,
                                                                                        src_ptr->vector_.chunk_offset_,
@@ -506,6 +575,26 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
         }
 
         dst_ptr->length_ = varchar_len;
+        ++dest_start_idx;
+    }
+}
+
+template <>
+inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT source_start_idx,
+                                            SizeT dest_start_idx,
+                                            SizeT count) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    SizeT source_end_idx = source_start_idx + count;
+    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+        const TensorT &src_tensor = ((const TensorT *)src)[idx];
+        TensorT &dst_tensor = ((TensorT *)dst)[dest_start_idx];
+        dst_tensor.embedding_num_ = src_tensor.embedding_num_;
+        const auto tensor_bytes = src_tensor.embedding_num_ * (data_type()->type_info()->Size());
+        std::tie(dst_tensor.chunk_id_, dst_tensor.chunk_offset_) =
+            this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(), src_tensor.chunk_id_, src_tensor.chunk_offset_, tensor_bytes);
         ++dest_start_idx;
     }
 }
@@ -660,7 +749,7 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
         // Only prefix is enough to contain all string data.
         std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
     } else {
-        std::memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+        std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
         auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
                                                                                    src_ptr->vector_.chunk_id_,
                                                                                    src_ptr->vector_.chunk_offset_,
@@ -670,6 +759,19 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
     }
 
     dst_ptr->length_ = varchar_len;
+}
+
+template <>
+inline void
+ColumnVector::CopyRowFrom<TensorT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const TensorT &src_tensor = ((const TensorT *)src)[src_idx];
+    TensorT &dst_tensor = ((TensorT *)dst)[dst_idx];
+    dst_tensor.embedding_num_ = src_tensor.embedding_num_;
+    const auto tensor_bytes = src_tensor.embedding_num_ * (data_type()->type_info()->Size());
+    std::tie(dst_tensor.chunk_id_, dst_tensor.chunk_offset_) =
+        this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(), src_tensor.chunk_id_, src_tensor.chunk_offset_, tensor_bytes);
 }
 
 #if 0
