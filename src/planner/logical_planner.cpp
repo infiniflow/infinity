@@ -176,6 +176,9 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
         case StatementType::kCommand: {
             return BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
         }
+        case StatementType::kCompact: {
+            return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
+        }
         default: {
             UnrecoverableError("Invalid statement type.");
         }
@@ -947,22 +950,6 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             }
             break;
         }
-        case CommandType::kCompactTable: {
-            return BuildCompact(command_statement, bind_context_ptr);
-            // auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
-            // BindSchemaName(compact_table->schema_name_);
-
-            // Txn *txn = query_context_ptr_->GetTxn();
-            // auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name_, compact_table->table_name_);
-            // if (!status.ok()) {
-            //     RecoverableError(status);
-            // }
-            // auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
-            // logical_command->table_entry_ = table_entry;
-
-            // this->logical_plan_ = logical_command;
-            // break;
-        }
         default: {
             UnrecoverableError("Invalid command type.");
         }
@@ -970,7 +957,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildCompact(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     UniquePtr<BoundCompactStatement> bound_statement_ptr = query_binder_ptr->BindCompact(*statement);
     this->logical_plans_ = bound_statement_ptr->BuildPlans(query_context_ptr_);

@@ -14,21 +14,13 @@
 
 module;
 
-#include "command_statement.h"
+#include "compact_statement.h"
 
-export module command_statement;
+export module compact_statement;
 
 namespace infinity {
-
-export using infinity::CommandStatement;
-export using infinity::CommandInfo;
-export using infinity::CommandType;
-export using infinity::SetVarType;
-export using infinity::ExportType;
-export using infinity::SetScope;
-export using infinity::SetCmd;
-export using infinity::UseCmd;
-export using infinity::CheckTable;
-export using infinity::ExportCmd;
-
-}
+export using infinity::CompactStatementType;
+export using infinity::CompactStatement;
+export using infinity::ManualCompactStatement;
+export using infinity::AutoCompactStatement;
+};

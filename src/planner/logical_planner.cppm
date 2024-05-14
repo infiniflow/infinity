@@ -40,6 +40,7 @@ import execute_statement;
 import alter_statement;
 import explain_statement;
 import command_statement;
+import compact_statement;
 import data_type;
 import extra_ddl_info;
 
@@ -165,7 +166,7 @@ public:
 
     Status BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildCompact(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Explain
     Status BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

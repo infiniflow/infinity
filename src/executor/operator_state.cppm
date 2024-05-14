@@ -34,10 +34,9 @@ import status;
 import internal_types;
 import column_def;
 import data_type;
+import segment_entry;
 
 namespace infinity {
-
-struct SegmentEntry;
 
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}

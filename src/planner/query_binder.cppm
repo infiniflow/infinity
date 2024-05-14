@@ -30,7 +30,7 @@ import bound_compact_statement;
 import select_statement;
 import delete_statement;
 import update_statement;
-import command_statement;
+import compact_statement;
 import parsed_expr;
 import knn_expr;
 import table_reference;
@@ -54,7 +54,7 @@ public:
 
     UniquePtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
 
-    UniquePtr<BoundCompactStatement> BindCompact(const CommandStatement &statement);
+    UniquePtr<BoundCompactStatement> BindCompact(const CompactStatement &statement);
 
     SharedPtr<BaseTableRef> GetTableRef(const String &db_name, const String &table_name);
 

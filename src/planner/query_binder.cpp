@@ -59,7 +59,7 @@ import base_statement;
 import select_statement;
 import delete_statement;
 import update_statement;
-import command_statement;
+import compact_statement;
 import parsed_expr;
 import column_expr;
 import knn_expr;
@@ -1007,12 +1007,21 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     return bound_update_statement;
 }
 
-UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CommandStatement &statement) {
-    auto *compact_table = static_cast<CompactTable *>(statement.command_info_.get());
-    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(compact_table->schema_name_, compact_table->table_name_);
-
-    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
+UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement &statement) {
     Txn *txn = query_context_ptr_->GetTxn();
+    SharedPtr<BaseTableRef> base_table_ref = nullptr;
+    if (statement.compact_type_ == CompactStatementType::kManual) {
+        const auto &compact_statement = static_cast<const ManualCompactStatement &>(statement);
+        base_table_ref = GetTableRef(compact_statement.schema_name_, compact_statement.table_name_);
+    } else {
+        const auto &compact_statement = static_cast<const AutoCompactStatement &>(statement);
+        auto block_index = MakeShared<BlockIndex>();
+        for (auto *compactible_segment : compact_statement.compactible_segments_) {
+            block_index->Insert(compactible_segment, txn);
+        }
+        base_table_ref = MakeShared<BaseTableRef>(compact_statement.table_entry_, std::move(block_index));
+    }
+    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
     base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
 
     return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref);

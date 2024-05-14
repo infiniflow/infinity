@@ -24,10 +24,9 @@ import query_context;
 import operator_state;
 import load_meta;
 import data_type;
+import segment_entry;
 
 namespace infinity {
-
-struct SegmentEntry;
 
 export class PhysicalCompact : public PhysicalOperator {
 public:

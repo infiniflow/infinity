@@ -126,7 +126,8 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
         case StatementType::kSelect:
         case StatementType::kExplain:
         case StatementType::kDelete:
-        case StatementType::kUpdate: {
+        case StatementType::kUpdate: 
+        case StatementType::kCompact:{
             use_scheduler = true; // continue;
             break;
         }
@@ -134,14 +135,6 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
             const CreateStatement *create_statement = static_cast<const CreateStatement *>(base_statement);
             if (create_statement->create_info_->type_ == DDLType::kIndex) {
                 // Create index will generate multiple tasks
-                use_scheduler = true;
-            }
-            break;
-        }
-        case StatementType::kCommand: {
-            const CommandStatement *command_statement = static_cast<const CommandStatement *>(base_statement);
-            const CommandInfo *command_info = command_statement->command_info_.get();
-            if (command_info != nullptr && command_info->type() == CommandType::kCompactTable) {
                 use_scheduler = true;
             }
             break;

@@ -170,12 +170,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         case CommandType::kCheckTable: {
             break;
         }
-        case CommandType::kCompactTable: {
-            auto *txn = query_context->GetTxn();
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry_, txn); // copy the table ref shared_ptr here
-            compact_task->Execute();
-            break;
-        }
         default: {
             UnrecoverableError("Invalid command type.");
         }

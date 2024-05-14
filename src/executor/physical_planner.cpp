@@ -912,15 +912,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_command = (LogicalCommand *)(logical_operator.get());
     auto command_info = logical_command->command_info();
-    auto ret = MakeUnique<PhysicalCommand>(logical_command->node_id(),
-                                           command_info,
-                                           logical_command->GetOutputNames(),
-                                           logical_command->GetOutputTypes(),
-                                           logical_operator->load_metas());
-    if (command_info->type() == CommandType::kCompactTable) {
-        ret->table_entry_ = logical_command->table_entry_;
-    }
-    return ret;
+    return MakeUnique<PhysicalCommand>(logical_command->node_id(),
+                                       command_info,
+                                       logical_command->GetOutputNames(),
+                                       logical_command->GetOutputTypes(),
+                                       logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const {
