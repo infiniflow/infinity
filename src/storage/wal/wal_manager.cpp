@@ -53,6 +53,7 @@ import log_file;
 import default_values;
 import defer_op;
 import index_base;
+import base_table_ref;
 
 module wal_manager;
 
@@ -305,10 +306,10 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
     }
     try {
         LOG_TRACE(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                             is_full_checkpoint ? "FULL" : "DELTA",
-                             txn->TxnID(),
-                             txn->BeginTS(),
-                             max_commit_ts));
+                              is_full_checkpoint ? "FULL" : "DELTA",
+                              txn->TxnID(),
+                              txn->BeginTS(),
+                              max_commit_ts));
 
         if (!txn->Checkpoint(max_commit_ts, is_full_checkpoint)) {
             return;
@@ -656,8 +657,8 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
     auto txn = MakeUnique<Txn>(nullptr /*buffer_mgr*/, nullptr /*txn_mgr*/, nullptr /*catalog*/, txn_id, begin_ts);
-    auto block_index = table_entry->GetBlockIndex(txn.get());
-    table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
+    auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(txn.get()));
+    table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
     for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store()) {

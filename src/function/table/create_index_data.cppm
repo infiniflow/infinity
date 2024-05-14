@@ -25,7 +25,11 @@ import infinity_exception;
 namespace infinity {
 
 export struct CreateIndexSharedData {
-    explicit CreateIndexSharedData(BlockIndex *block_index) {
+    CreateIndexSharedData() = default;
+
+    explicit CreateIndexSharedData(BlockIndex *block_index) { Init(block_index); }
+
+    void Init(BlockIndex *block_index) {
         for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
             auto [iter, insert_ok] = create_index_idxes_.emplace(segment_id, 0);
             if (!insert_ok) {

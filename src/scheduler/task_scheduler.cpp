@@ -141,7 +141,7 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
         case StatementType::kCommand: {
             const CommandStatement *command_statement = static_cast<const CommandStatement *>(base_statement);
             const CommandInfo *command_info = command_statement->command_info_.get();
-            if (command_info->type() == CommandType::kCompactTable) {
+            if (command_info != nullptr && command_info->type() == CommandType::kCompactTable) {
                 use_scheduler = true;
             }
             break;

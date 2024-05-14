@@ -23,7 +23,12 @@ import infinity_exception;
 import global_block_id;
 import internal_types;
 import default_values;
+import table_entry;
+import table_index_entry;
 import segment_entry;
+import base_table_ref;
+import block_index;
+import txn;
 
 namespace infinity {
 
@@ -80,7 +85,7 @@ public:
 
 export class CompactStateData {
 public:
-    CompactStateData() = default;
+    CompactStateData(TableEntry *table_entry) : new_table_ref_(MakeShared<BaseTableRef>(table_entry, MakeShared<BlockIndex>())){};
 
     void AddToDelete(SegmentID segment_id, const Vector<SegmentOffset> &delete_offsets) {
         std::lock_guard lock(mutex_);
@@ -89,6 +94,20 @@ public:
 
     const HashMap<SegmentID, Vector<SegmentOffset>> &GetToDelete() const { return to_delete_; }
 
+    void AddNewSegment(SegmentEntry *new_segment, Txn *txn) {
+        std::lock_guard lock(mutex2_);
+        auto *block_index = new_table_ref_->block_index_.get();
+        block_index->Insert(new_segment, txn);
+    }
+
+    void AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn) {
+        std::lock_guard lock(mutex2_);
+        auto *index_index = new_table_ref_->index_index_.get();
+        index_index->Insert(table_index_entry, txn);
+    }
+
+    BaseTableRef *GetNewTableRef() const { return new_table_ref_.get(); }
+
 public:
     Vector<CompactSegmentData> segment_data_list_;
     RowIDRemap remapper_{};
@@ -96,6 +115,9 @@ public:
 private:
     std::mutex mutex_;
     HashMap<SegmentID, Vector<SegmentOffset>> to_delete_;
+
+    std::mutex mutex2_;
+    SharedPtr<BaseTableRef> new_table_ref_{}; // table ref after compact
 };
 
 } // namespace infinity

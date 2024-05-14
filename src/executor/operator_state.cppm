@@ -365,16 +365,34 @@ export struct FusionOperatorState : public OperatorState {
 
 // Compact
 export struct CompactOperatorState : public OperatorState {
-    inline explicit CompactOperatorState(SizeT idx, SharedPtr<CompactStateData> compact_state_data)
-        : OperatorState(PhysicalOperatorType::kCompact), idx_(idx), compact_state_data_(compact_state_data) {}
+    inline explicit CompactOperatorState(SizeT compact_idx, SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompact), compact_idx_(compact_idx), compact_state_data_(compact_state_data) {}
 
-    SizeT idx_{};
+    SizeT compact_idx_{};
 
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
-export struct CompactIndexOperatorState : public OperatorState {
-    //
+export struct CompactIndexPrepareOperatorState : public OperatorState {
+    inline explicit CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+        : OperatorState(PhysicalOperatorType::kCompactIndexPrepare), compact_state_data_(compact_state_data),
+          create_index_shared_data_(create_index_shared_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
+    SizeT create_index_idx_{};
+};
+
+export struct CompactIndexDoOperatorState : public OperatorState {
+    inline explicit CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+        : OperatorState(PhysicalOperatorType::kCompactIndexDo), compact_state_data_(compact_state_data),
+          create_index_shared_data_(create_index_shared_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
+    SizeT create_index_idx_{};
 };
 
 export struct CompactFinishOperatorState : public OperatorState {

@@ -14,32 +14,44 @@
 
 module;
 
+#include <sstream>
+
 module logical_compact_index;
 
 import stl;
 import column_binding;
 import data_type;
+import table_entry;
+import logical_type;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalCompactIndex::GetColumnBindings() const {
-    //
-    return {};
-}
+Vector<ColumnBinding> LogicalCompactIndex::GetColumnBindings() const { return {}; }
 
 SharedPtr<Vector<String>> LogicalCompactIndex::GetOutputNames() const {
-    //
-    return nullptr;
+    auto result = MakeShared<Vector<String>>();
+    result->push_back("OK");
+    return result;
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalCompactIndex::GetOutputTypes() const {
-    //
-    return nullptr;
+    auto result = MakeShared<Vector<SharedPtr<DataType>>>();
+    result->push_back(MakeShared<DataType>(LogicalType::kInteger));
+    return result;
 }
 
 String LogicalCompactIndex::ToString(i64 &space) const {
-    //
-    return {};
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "COMPACT INDEX";
+    auto *table_entry = base_table_ref_->table_entry_ptr_;
+    ss << *table_entry->GetDBName() << "." << *table_entry->GetTableName();
+    space += arrow_str.size();
+    return ss.str();
 }
 
 } // namespace infinity

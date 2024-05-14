@@ -41,7 +41,7 @@ public:
     inline String name() final { return "LogicalCompactIndex"; }
 
 public:
-    SharedPtr<BaseTableRef> base_table_ref_;
+    SharedPtr<BaseTableRef> base_table_ref_{};
 };
 
 } // namespace infinity

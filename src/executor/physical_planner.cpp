@@ -72,7 +72,8 @@ import physical_update;
 import physical_drop_index;
 import physical_command;
 import physical_compact;
-import physical_compact_index;
+import physical_compact_index_prepare;
+import physical_compact_index_do;
 import physical_compact_finish;
 import physical_match;
 import physical_fusion;
@@ -130,6 +131,7 @@ import create_index_info;
 import command_statement;
 import explain_statement;
 import load_meta;
+import block_index;
 
 namespace infinity {
 
@@ -943,12 +945,40 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactIndex(const SharedPtr<L
         const auto &left_node = logical_compact_index->left_node();
         left = BuildPhysicalOperator(left_node);
     }
-    return MakeUnique<PhysicalCompactIndex>(logical_compact_index->node_id(),
-                                            std::move(left),
-                                            logical_compact_index->base_table_ref_,
-                                            logical_compact_index->GetOutputNames(),
-                                            logical_compact_index->GetOutputTypes(),
-                                            logical_operator->load_metas());
+    auto &index_index = logical_compact_index->base_table_ref_->index_index_;
+
+    bool use_prepare = false;
+    for (const auto &[index_name, index_snapshot] : index_index->index_snapshots_) {
+        const auto *index_base = index_snapshot->table_index_entry_->index_base();
+        if (index_base->index_type_ == IndexType::kHnsw) {
+            use_prepare = true;
+            break;
+        }
+    }
+    if (!use_prepare) {
+        return MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
+                                                       std::move(left),
+                                                       logical_compact_index->base_table_ref_,
+                                                       false,
+                                                       logical_compact_index->GetOutputNames(),
+                                                       logical_compact_index->GetOutputTypes(),
+                                                       logical_operator->load_metas());
+    }
+    auto compact_index_prepare = MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
+                                                                         std::move(left),
+                                                                         logical_compact_index->base_table_ref_,
+                                                                         true,
+                                                                         logical_compact_index->GetOutputNames(),
+                                                                         logical_compact_index->GetOutputTypes(),
+                                                                         logical_operator->load_metas());
+
+    auto compact_index_do = MakeUnique<PhysicalCompactIndexDo>(logical_compact_index->node_id(),
+                                                               std::move(compact_index_prepare),
+                                                               logical_compact_index->base_table_ref_,
+                                                               logical_compact_index->GetOutputNames(),
+                                                               logical_compact_index->GetOutputTypes(),
+                                                               logical_operator->load_metas());
+    return compact_index_do;
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const {

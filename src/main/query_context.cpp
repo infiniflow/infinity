@@ -151,32 +151,33 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         }
         StopProfile(QueryPhase::kPhysicalPlan);
 //        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
+
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
-        // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
         for (auto &physical_plan : physical_plans) {
             plan_fragments.push_back(fragment_builder_->BuildFragment(physical_plan.get()));
         }
-        // plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
         StopProfile(QueryPhase::kPipelineBuild);
 
         StartProfile(QueryPhase::kTaskBuild);
-        for (auto &plan_fragment : plan_fragments) {
+        FragmentContext *parent_context = nullptr;
+        for (int i = (int)plan_fragments.size() - 1; i >= 0; --i) {
+            auto &plan_fragment = plan_fragments[i];
             auto notifier = MakeUnique<Notifier>();
-            FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
+            FragmentContext::BuildTask(this, parent_context, plan_fragment.get(), notifier.get());
+            parent_context = plan_fragment->GetContext();
             notifiers.push_back(std::move(notifier));
         }
         StopProfile(QueryPhase::kTaskBuild);
 //        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
+
         StartProfile(QueryPhase::kExecution);
-        for (SizeT i = 0; i < plan_fragments.size(); i++) {
-            auto &plan_fragment = plan_fragments[i];
+        for (auto &plan_fragment : plan_fragments) {
             scheduler_->Schedule(plan_fragment.get(), statement);
-            if (i == plan_fragments.size() - 1) {
-                query_result.result_table_ = plan_fragment->GetResult();
-                query_result.root_operator_type_ = logical_plans.back()->operator_type();
-            }
+            plan_fragment->WaitForFinish();
         }
+        query_result.result_table_ = plan_fragments.back()->GetResult();
+        query_result.root_operator_type_ = logical_plans.back()->operator_type();
         StopProfile(QueryPhase::kExecution);
 //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);

@@ -80,6 +80,8 @@ public:
 
     SharedPtr<DataTable> GetResult();
 
+    void WaitForFinish() { context_->WaitForFinish(); }
+
 private:
     u64 fragment_id_{};
 

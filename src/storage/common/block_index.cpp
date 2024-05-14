@@ -68,21 +68,41 @@ BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
     return blocks_info.block_map_[block_id];
 }
 
+void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot) {
+    index_snapshots_vec_.emplace_back(index_snapshot.get());
+    index_snapshots_.emplace(std::move(index_name), std::move(index_snapshot));
+}
+
 void IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
     if (table_index_entry->CheckVisible(txn)) {
-        IndexSnapshot index_info;
-        index_info.table_index_entry_ = table_index_entry;
+        auto index_snapshot = MakeUnique<IndexSnapshot>();
+        index_snapshot->table_index_entry_ = table_index_entry;
 
         SegmentIndexesGuard segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
         for (const auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {
             if (segment_index_entry->CheckVisible(txn)) {
-                index_info.segment_index_entries_.emplace(segment_id, segment_index_entry.get());
+                index_snapshot->segment_index_entries_.emplace(segment_id, segment_index_entry.get());
             }
         }
 
         String index_name = *table_index_entry->GetIndexName();
-        index_snapshots_.emplace(std::move(index_name), std::move(index_info));
+        Insert(std::move(index_name), std::move(index_snapshot));
     }
+}
+
+void IndexIndex::Insert(TableIndexEntry *table_index_entry, SegmentIndexEntry *segment_index_entry) {
+    auto index_snapshot_it = index_snapshots_.find(*table_index_entry->GetIndexName());
+    IndexSnapshot *index_snapshot_ptr = nullptr;
+    if (index_snapshot_it == index_snapshots_.end()) {
+        auto index_snapshot = MakeUnique<IndexSnapshot>();
+        index_snapshot_ptr = index_snapshot.get();
+        index_snapshot->table_index_entry_ = table_index_entry;
+        String index_name = *table_index_entry->GetIndexName();
+        Insert(std::move(index_name), std::move(index_snapshot));
+    } else {
+        index_snapshot_ptr = index_snapshot_it->second.get();
+    }
+    index_snapshot_ptr->segment_index_entries_.emplace(segment_index_entry->segment_id(), segment_index_entry);
 }
 
 } // namespace infinity

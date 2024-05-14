@@ -167,9 +167,6 @@ bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
 
 bool SegmentEntry::TrySetCompacting1(CompactStateData *compact_state_data) {
     std::unique_lock lock(rw_locker_);
-    if (status_ == SegmentStatus::kUnsealed) {
-        UnrecoverableError("Assert: Compactable segment should be sealed.");
-    }
     if (status_ != SegmentStatus::kSealed) {
         return false;
     }

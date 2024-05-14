@@ -121,9 +121,9 @@ public:
     SharedPtr<SegmentIndexEntry> PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config);
 
     Tuple<Vector<SegmentIndexEntry *>, Status>
-    CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
+    CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
-    Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
+    Status CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
 
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }

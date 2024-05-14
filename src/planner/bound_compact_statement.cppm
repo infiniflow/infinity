@@ -27,6 +27,7 @@ import query_context;
 import bind_context;
 import logger;
 import third_party;
+import table_entry;
 
 namespace infinity {
 
@@ -58,16 +59,14 @@ public:
                 SizeT idx = 0;
                 for (const auto &[index_name, index_snapshot] : index_index->index_snapshots_) {
                     if (idx == 0) {
-                        index_index1->index_snapshots_.emplace(index_name, index_snapshot);
+                        index_index1->Insert(index_name, index_snapshot);
                     } else {
-                        index_index2->index_snapshots_.emplace(index_name, index_snapshot);
+                        index_index2->Insert(index_name, index_snapshot);
                     }
                     ++idx;
                 }
-                auto base_table_ref1 = base_table_ref_;
-                base_table_ref1->index_index_ = index_index1;
-                auto base_table_ref2 = base_table_ref_;
-                base_table_ref2->index_index_ = index_index2;
+                auto base_table_ref1 = MakeShared<BaseTableRef>(base_table_ref_->table_entry_ptr_, base_table_ref_->block_index_, index_index1);
+                auto base_table_ref2 = MakeShared<BaseTableRef>(base_table_ref_->table_entry_ptr_, base_table_ref_->block_index_, index_index2);
                 auto compact_index_node1 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref1);
                 auto compact_index_node2 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref2);
                 auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_);

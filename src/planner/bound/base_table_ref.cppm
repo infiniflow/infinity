@@ -45,8 +45,8 @@ public:
           table_index_(table_index) {}
 
     // only use some fields
-    explicit BaseTableRef(TableEntry *table_entry, SharedPtr<BlockIndex> block_index)
-        : TableRef(TableRefType::kTable, ""), table_entry_ptr_(table_entry), block_index_(std::move(block_index)) {}
+    explicit BaseTableRef(TableEntry *table_entry, SharedPtr<BlockIndex> block_index, SharedPtr<IndexIndex> index_index = nullptr)
+        : TableRef(TableRefType::kTable, ""), table_entry_ptr_(table_entry), block_index_(block_index), index_index_(index_index) {}
 
     static SharedPtr<BaseTableRef> FakeTableRef(TableEntry *table_entry, Txn *txn) {
         SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn);

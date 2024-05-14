@@ -67,10 +67,15 @@ export struct IndexIndex {
 public:
     void Insert(TableIndexEntry *table_index_entry, Txn *txn);
 
+    void Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot);
+
+    void Insert(TableIndexEntry *table_index_entry, SegmentIndexEntry *segment_index_entry);
+
     bool IsEmpty() const { return index_snapshots_.empty(); }
 
 public:
-    HashMap<String, IndexSnapshot> index_snapshots_;
+    HashMap<String, SharedPtr<IndexSnapshot>> index_snapshots_;
+    Vector<IndexSnapshot *> index_snapshots_vec_;
 };
 
 } // namespace infinity

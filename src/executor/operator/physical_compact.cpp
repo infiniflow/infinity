@@ -42,8 +42,10 @@ public:
         const auto &block_index = *base_table_ref->block_index_;
         for (const auto &[segment_id, segment_snapshot] : block_index.segment_block_index_) {
             SegmentEntry *segment_entry = segment_snapshot.segment_entry_;
-            SizeT row_count = segment_entry->actual_row_count();
-            segments_.emplace(row_count, segment_entry);
+            if (segment_entry->status() == SegmentStatus::kSealed) {
+                SizeT row_count = segment_entry->actual_row_count();
+                segments_.emplace(row_count, segment_entry);
+            }
         }
     }
 
@@ -94,9 +96,13 @@ void PhysicalCompact::Init() {
 
 bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *compact_operator_state = static_cast<CompactOperatorState *>(operator_state);
-    SizeT group_idx = compact_operator_state->idx_;
+    SizeT group_idx = compact_operator_state->compact_idx_;
     CompactStateData *compact_state_data = compact_operator_state->compact_state_data_.get();
     RowIDRemap &remapper = compact_state_data->remapper_;
+    if (group_idx == compact_state_data->segment_data_list_.size()) {
+        compact_operator_state->SetComplete();
+        return true;
+    }
     CompactSegmentData &compact_segment_data = compact_state_data->segment_data_list_[group_idx];
     compact_segment_data.old_segments_ = compactible_segments_group_[group_idx];
     const auto &compactible_segments = compact_segment_data.old_segments_;
@@ -118,6 +124,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
 
     compact_segment_data.new_segment_ = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn);
     auto *new_segment = compact_segment_data.new_segment_.get();
+    compact_state_data->AddNewSegment(new_segment, txn);
     SegmentID new_segment_id = new_segment->segment_id();
 
     UniquePtr<BlockEntry> new_block = BlockEntry::NewBlockEntry(new_segment, new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
@@ -166,6 +173,10 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     }
     if (new_block->row_count() > 0) {
         new_segment->AppendBlockEntry(std::move(new_block));
+    }
+    compact_operator_state->compact_idx_ = ++group_idx;
+    if (group_idx == compact_state_data->segment_data_list_.size()) {
+        compact_operator_state->SetComplete();
     }
     compact_operator_state->SetComplete();
 

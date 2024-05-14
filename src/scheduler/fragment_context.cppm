@@ -142,9 +142,9 @@ public:
         return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize;
     }
 
-    inline SharedPtr<DataTable> GetResult() {
-        notifier_->Wait();
+    void WaitForFinish() { notifier_->Wait(); }
 
+    inline SharedPtr<DataTable> GetResult() {
         if (notifier_->error_fragment_ctx() != nullptr) {
             return notifier_->error_fragment_ctx()->GetResultInternal();
         }
@@ -209,6 +209,8 @@ public:
 public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
 
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_array_{};
+
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
@@ -225,6 +227,7 @@ public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
 
     UniquePtr<CreateIndexSharedData> create_index_shared_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_array_{};
 
     SharedPtr<CompactStateData> compact_state_data_{};
 

@@ -387,6 +387,16 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = MakeUnique<String>("Tmp for test");
             break;
         }
+        case PhysicalOperatorType::kCompactIndexPrepare: {
+            // auto *compact_index_output_state = static_cast<CompactIndexOperatorState *>(task_operator_state);
+            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
+            break;
+        }
+        case PhysicalOperatorType::kCompactIndexDo: {
+            // auto *compact_index_output_state = static_cast<CompactIndexOperatorState *>(task_operator_state);
+            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
+            break;
+        }
         default: {
             RecoverableError(
                 Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));

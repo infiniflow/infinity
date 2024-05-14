@@ -126,8 +126,10 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "Command";
         case PhysicalOperatorType::kCompact:
             return "Compact";
-        case PhysicalOperatorType::kCompactIndex:
-            return "CompactIndex";
+        case PhysicalOperatorType::kCompactIndexPrepare:
+            return "CompactIndexPrepare";
+        case PhysicalOperatorType::kCompactIndexDo:
+            return "CompactIndexDo";
         case PhysicalOperatorType::kCompactFinish:
             return "CompactFinish";
         case PhysicalOperatorType::kMatch:

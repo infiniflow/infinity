@@ -14,7 +14,7 @@
 
 module;
 
-export module physical_compact_index;
+export module physical_compact_index_do;
 
 import stl;
 import physical_operator;
@@ -27,32 +27,33 @@ import base_table_ref;
 
 namespace infinity {
 
-export class PhysicalCompactIndex : public PhysicalOperator {
+export class PhysicalCompactIndexDo : public PhysicalOperator {
 public:
-    explicit PhysicalCompactIndex(u64 id,
-                                  UniquePtr<PhysicalOperator> left,
-                                  SharedPtr<BaseTableRef> base_table_ref,
-                                  SharedPtr<Vector<String>> output_names,
-                                  SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                  SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCompactFinish, std::move(left), nullptr, id, load_metas), base_table_ref_(base_table_ref),
+    explicit PhysicalCompactIndexDo(u64 id,
+                                    UniquePtr<PhysicalOperator> left,
+                                    SharedPtr<BaseTableRef> base_table_ref,
+                                    SharedPtr<Vector<String>> output_names,
+                                    SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                    SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kCompactIndexDo, std::move(left), nullptr, id, load_metas), base_table_ref_(base_table_ref),
           output_names_(output_names), output_types_(output_types) {}
 
-    ~PhysicalCompactIndex() override = default;
+    ~PhysicalCompactIndexDo() override = default;
 
     void Init() override {}
 
-    bool Execute(QueryContext *query_context, OperatorState *output_state) override;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SizeT TaskletCount() override;
+    SizeT TaskletCount() override { return 0; }
 
     inline SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
-private:
+public:
     SharedPtr<BaseTableRef> base_table_ref_;
 
+private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
