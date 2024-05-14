@@ -183,6 +183,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
     } catch (UnrecoverableException &e) {
 
+        query_result.status_.Init(ErrorCode::kUnexpectedError, e.what());
         LOG_CRITICAL(e.what());
         raise(SIGUSR1);
 //        throw e;
