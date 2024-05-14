@@ -44,3 +44,88 @@ SELECT * FROM test_insert_tensor;
 
 statement ok
 DROP TABLE test_insert_tensor;
+
+statement ok
+CREATE TABLE test_insert_tensor (col1 INT, col2 TENSOR(BIT,16));
+
+query I
+INSERT INTO test_insert_tensor VALUES (0, [0,1,2,3,-4,5,6,7,8,9,-10,11,12,-13,14,15]);
+----
+
+query II
+SELECT * FROM test_insert_tensor;
+----
+0 [0111011111011011]
+
+# insert embedding with error dimension
+statement error
+INSERT INTO test_insert_tensor VALUES (1, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
+
+query I
+INSERT INTO test_insert_tensor VALUES (1, [1,2,3,-4,5,6,7,8,9,10,11,-12,13,14,15,16,2,-3,-4,5,6,7,8,9,10,11,-12,13,14,-15,16,17]);
+----
+
+query II
+SELECT * FROM test_insert_tensor;
+----
+0 [0111011111011011]
+1 [1110111111101111],[1001111111011011]
+
+statement ok
+DROP TABLE test_insert_tensor;
+
+statement ok
+CREATE TABLE test_insert_tensor (col1 INT, col2 TENSOR(BIT,16));
+
+query I
+INSERT INTO test_insert_tensor VALUES (0, [0.1,1.1,-2.1,3.1,4.1,5.1,-6.1,7.1,8.1,-9.1,10.1,11.1,-12.1,13.1,-14.1,15.1]);
+----
+
+query II
+SELECT * FROM test_insert_tensor;
+----
+0 [1101110110110101]
+
+statement ok
+DROP TABLE test_insert_tensor;
+
+statement ok
+CREATE TABLE test_insert_tensor (col1 INT, col2 TENSOR(BIT,8));
+
+statement ok
+INSERT INTO test_insert_tensor VALUES (0, [0,1,2,3,-4,5,6,7,8,9,-10,11,12,-13,14,15]);
+
+query II
+SELECT * FROM test_insert_tensor;
+----
+0 [01110111],[11011011]
+
+# insert embedding with error dimension
+statement error
+INSERT INTO test_insert_tensor VALUES (1, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
+
+statement ok
+INSERT INTO test_insert_tensor VALUES (1, [1,2,3,-4,5,6,7,8,9,10,11,-12,13,14,15,16,2,-3,-4,5,6,7,8,9,10,11,-12,13,14,-15,16,17]);
+
+query II
+SELECT * FROM test_insert_tensor;
+----
+0 [01110111],[11011011]
+1 [11101111],[11101111],[10011111],[11011011]
+
+statement ok
+DROP TABLE test_insert_tensor;
+
+statement ok
+CREATE TABLE test_insert_tensor (col1 INT, col2 TENSOR(BIT,8));
+
+statement ok
+INSERT INTO test_insert_tensor VALUES (0, [0.1,1.1,-2.1,3.1,4.1,5.1,-6.1,7.1,8.1,-9.1,10.1,11.1,-12.1,13.1,-14.1,15.1]);
+
+query II
+SELECT * FROM test_insert_tensor;
+----
+0 [11011101],[10110101]
+
+statement ok
+DROP TABLE test_insert_tensor;

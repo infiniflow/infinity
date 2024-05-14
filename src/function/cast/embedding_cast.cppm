@@ -33,6 +33,7 @@ import internal_types;
 import embedding_info;
 import knn_expr;
 import data_type;
+import default_values;
 
 namespace infinity {
 
@@ -123,7 +124,7 @@ struct EmbeddingTryCastToFixlen {
             std::fill_n(dst, (len + 7) / 8, 0);
             for (SizeT i = 0; i < len; ++i) {
                 if (source[i] > SourceElemType{}) {
-                    dst[i / 8] |= (1 << (i % 8));
+                    dst[i / 8] |= (u8(1) << (i % 8));
                 }
             }
             return true;
@@ -203,16 +204,31 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_e
         const auto [chunk_id, chunk_offset] = target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(source.ptr, source_size);
         target.chunk_id_ = chunk_id;
         target.chunk_offset_ = chunk_offset;
-    } else {
+    } else if constexpr (std::is_same_v<TargetValueType, BooleanT>) {
         static_assert(sizeof(bool) == 1);
-        SizeT target_bytes = std::is_same_v<TargetValueType, BooleanT> ? (source_embedding_dim + 7) / 8 : source_embedding_dim;
-        auto target_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(target_bytes);
-        if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceValueType *>(source.ptr), target_tmp_ptr.get(), source_embedding_dim)) {
+        const SizeT target_ptr_n = (source_embedding_dim + 7) / 8;
+        const auto target_size = target_ptr_n;
+        auto target_tmp_ptr = MakeUnique<u8[]>(target_size);
+        auto src_ptr = reinterpret_cast<const SourceValueType *>(source.ptr);
+        for (SizeT i = 0; i < source_embedding_dim; ++i) {
+            if (src_ptr[i] > SourceValueType{}) {
+                target_tmp_ptr[i / 8] |= (u8(1) << (i % 8));
+            }
+        }
+        const auto [chunk_id, chunk_offset] =
+            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
+        target.chunk_id_ = chunk_id;
+        target.chunk_offset_ = chunk_offset;
+    } else {
+        const auto target_size = source_embedding_dim * sizeof(TargetValueType);
+        auto target_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_embedding_dim);
+        if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceValueType *>(source.ptr),
+                                           reinterpret_cast<TargetValueType *>(target_tmp_ptr.get()),
+                                           source_embedding_dim)) {
             UnrecoverableError(fmt::format("Failed to cast from embedding with type {} to tensor with type {}",
                                            DataType::TypeToString<SourceValueType>(),
                                            DataType::TypeToString<TargetValueType>()));
         }
-        const auto target_size = source_embedding_dim * sizeof(TargetValueType);
         const auto [chunk_id, chunk_offset] =
             target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
         target.chunk_id_ = chunk_id;
@@ -270,6 +286,7 @@ void EmbeddingTryCastToTensor(const EmbeddingT &source,
     switch (dst_type) {
         case EmbeddingDataType::kElemBit: {
             EmbeddingTryCastToTensorImpl<BooleanT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
+            break;
         }
         case EmbeddingDataType::kElemInt8: {
             EmbeddingTryCastToTensorImpl<TinyIntT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
@@ -319,6 +336,11 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
     const auto target_tensor_num = source_embedding_dim / target_embedding_dim;
+    // estimate the size of target tensor
+    if (const auto target_tensor_bytes = target_tensor_num * target_embedding_info->Size(); target_tensor_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+        // TODO: better error message: tensor size overflow
+        RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
+    }
     target.embedding_num_ = target_tensor_num;
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kTensorHeap) {
         UnrecoverableError(fmt::format("Tensor column vector should use kTensorHeap VectorBuffer."));

@@ -250,7 +250,7 @@ private:
         std::fill_n(data_ptr, bit_bytes, 0);
         for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
             if (const auto value = DataType::StringToValue<float>(ele_str_view); value > 0.0f) {
-                const u8 mask = 1 << (i % 8);
+                const u8 mask = u8(1) << (i % 8);
                 data_ptr[i / 8] |= mask;
             }
             ++i;
@@ -283,7 +283,7 @@ private:
         auto tmp_data = MakeUnique<u8[]>(bit_bytes);
         for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
             if (const auto value = DataType::StringToValue<float>(ele_str_view); value > 0.0f) {
-                const u8 mask = 1 << (i % 8);
+                const u8 mask = u8(1) << (i % 8);
                 tmp_data[i / 8] |= mask;
             }
             ++i;
