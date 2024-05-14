@@ -59,14 +59,14 @@ public:
 
     [[nodiscard]] inline PhysicalSink *GetSinkNode() const { return sink_.get(); }
 
-    [[nodiscard]] inline PlanFragment *GetParent() const { return parent_; }
+    [[nodiscard]] inline Vector<PlanFragment *> GetParents() const { return parents_; }
 
-    inline void AddChild(UniquePtr<PlanFragment> child_fragment) {
-        child_fragment->parent_ = this;
+    inline void AddChild(SharedPtr<PlanFragment> child_fragment) {
+        child_fragment->parents_.emplace_back(this);
         children_.emplace_back(std::move(child_fragment));
     }
 
-    inline Vector<UniquePtr<PlanFragment>> &Children() { return children_; }
+    inline Vector<SharedPtr<PlanFragment>> &Children() { return children_; }
 
     inline bool HasChild() { return !children_.empty(); }
 
@@ -80,7 +80,9 @@ public:
 
     SharedPtr<DataTable> GetResult();
 
-    void WaitForFinish() { context_->WaitForFinish(); }
+    static void AddNext(SharedPtr<PlanFragment> root, PlanFragment *next);
+
+    SizeT GetStartFragments(Vector<PlanFragment *> &leaf_fragments);
 
 private:
     u64 fragment_id_{};
@@ -91,9 +93,9 @@ private:
 
     UniquePtr<PhysicalSource> source_{};
 
-    PlanFragment *parent_{};
+    Vector<PlanFragment *> parents_{};
 
-    Vector<UniquePtr<PlanFragment>> children_{};
+    Vector<SharedPtr<PlanFragment>> children_{};
 
     UniquePtr<FragmentContext> context_{};
 

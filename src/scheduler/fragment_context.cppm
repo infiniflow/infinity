@@ -142,9 +142,8 @@ public:
         return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize;
     }
 
-    void WaitForFinish() { notifier_->Wait(); }
-
     inline SharedPtr<DataTable> GetResult() {
+        notifier_->Wait();
         if (notifier_->error_fragment_ctx() != nullptr) {
             return notifier_->error_fragment_ctx()->GetResultInternal();
         }

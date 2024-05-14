@@ -98,24 +98,6 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
     return min_workload_worker_id;
 }
 
-SizeT TaskScheduler::GetStartFragments(PlanFragment *plan_fragment, Vector<PlanFragment *> &leaf_fragments) {
-    SizeT all_fragment_n = 0;
-    std::function<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) -> void {
-        all_fragment_n += root->GetContext()->Tasks().size();
-        if (root->Children().empty()) {
-            leaf_fragments.emplace_back(root);
-            return;
-        }
-        for (auto &child : root->Children()) {
-            TraversePlanFragmentTree(child.get());
-        }
-    };
-    // Traverse the tree to get all leaf fragments
-    TraversePlanFragmentTree(plan_fragment);
-
-    return all_fragment_n;
-}
-
 void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
         UnrecoverableError("Scheduler isn't initialized");
@@ -159,7 +141,7 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
     }
 
     Vector<PlanFragment *> start_fragments;
-    SizeT task_n = GetStartFragments(plan_fragment, start_fragments);
+    SizeT task_n = plan_fragment->GetStartFragments(start_fragments);
     plan_fragment->GetContext()->notifier()->SetTaskN(task_n);
     for (auto *sub_fragment : start_fragments) {
         auto &tasks = sub_fragment->GetContext()->Tasks();
