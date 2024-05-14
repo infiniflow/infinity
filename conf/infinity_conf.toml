@@ -47,7 +47,7 @@ wal_compact_threshold            = "1GB"
 # flush_at_once: write and flush log each commit
 # only_write: write log, OS control when to flush the log, default
 # flush_per_second: logs are written after each commit and flushed to disk per second.
-flush_option                   = "only_write"
+wal_flush                   = "only_write"
 
 [resource]
 resource_dir          = "/var/infinity/resource"
