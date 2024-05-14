@@ -125,7 +125,7 @@ private:
 
     inline void RecordQueryProfiler(const StatementType &type) {
         if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-            GetTxn()->GetCatalog()->AppendProfilerRecord(query_profiler_);
+            GetTxn()->GetCatalog()->AppendProfileRecord(query_profiler_);
         }
     }
 

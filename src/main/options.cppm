@@ -147,7 +147,7 @@ export enum class GlobalOptionIndex {
 export struct GlobalOptions {
     GlobalOptions();
     Status AddOption(UniquePtr<BaseOption> option);
-    GlobalOptionIndex GetOptionIndex(const String &option_name);
+    GlobalOptionIndex GetOptionIndex(const String &option_name) const;
     Tuple<BaseOption *, Status> GetOptionByName(const String &option_name);
     BaseOption *GetOptionByIndex(GlobalOptionIndex option_index);
 

@@ -34,13 +34,13 @@ void VarUtil::InitVariablesMap() {
     global_name_map_["total_commit_count"] = GlobalVariable::kTotalCommitCount;
     global_name_map_["total_rollback_count"] = GlobalVariable::kTotalRollbackCount;
     global_name_map_["active_wal_filename"] = GlobalVariable::kActiveWALFilename;
+    global_name_map_["profile_record_capacity"] = GlobalVariable::kProfileRecordCapacity;
 
     session_name_map_["query_count"] = SessionVariable::kQueryCount;
     session_name_map_["total_commit_count"] = SessionVariable::kTotalCommitCount;
     session_name_map_["total_rollback_count"] = SessionVariable::kTotalRollbackCount;
     session_name_map_["connected_timestamp"] = SessionVariable::kConnectedTime;
     session_name_map_["enable_profile"] = SessionVariable::kEnableProfile;
-    session_name_map_["profile_record_capacity"] = SessionVariable::kProfileRecordCapacity;
 }
 
 HashMap<String, GlobalVariable> VarUtil::global_name_map_;

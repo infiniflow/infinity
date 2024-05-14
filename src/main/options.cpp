@@ -83,7 +83,7 @@ Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {
     return Status::OK();
 }
 
-GlobalOptionIndex GlobalOptions::GetOptionIndex(const String &option_name) {
+GlobalOptionIndex GlobalOptions::GetOptionIndex(const String &option_name) const {
     auto iter = name2index_.find(option_name);
     if(iter == name2index_.end()) {
         return GlobalOptionIndex::kInvalid;

@@ -99,9 +99,7 @@ Status Status::InvalidLogLevel(const String &log_level) {
     return Status(ErrorCode::kInvalidLogLevel, MakeUnique<String>(fmt::format("Invalid log level: {}.", log_level)));
 }
 
-Status Status::InvalidConfig(const String &detailed_info) {
-    return Status(ErrorCode::kInvalidConfig, MakeUnique<String>(detailed_info));
-}
+Status Status::InvalidConfig(const String &detailed_info) { return Status(ErrorCode::kInvalidConfig, MakeUnique<String>(detailed_info)); }
 
 // 2. Auth error
 Status Status::WrongPasswd(const String &user_name) {
@@ -363,6 +361,10 @@ Status Status::BlockNotExist(const BlockID &block_id) {
 
 Status Status::AggregateFunctionWithEmptyArgs() {
     return Status(ErrorCode::kAggregateFunctionWithEmptyArgs, MakeUnique<String>("Aggregate function with empty arguments"));
+}
+
+Status Status::InvalidCommand(const String &detailed_error) {
+    return Status(ErrorCode::kInvalidCommand, MakeUnique<String>(fmt::format("Invalid command: {}", detailed_error)));
 }
 
 // 4. TXN fail
