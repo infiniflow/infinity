@@ -71,11 +71,15 @@ public:
 
     QueryResult SetVariable(const String &variable_name, const String &variable_value, SetScope scope);
 
+    QueryResult SetConfig(const String &config_name, const String &config_value);
+
     QueryResult ShowVariable(const String &variable_name, SetScope scope);
 
     QueryResult ShowVariables(SetScope scope);
 
     QueryResult ShowConfig(const String &config_name);
+
+    QueryResult ShowConfigs();
 
     // For embedded sqllogictest
     QueryResult Query(const String &query_text);
