@@ -27,6 +27,7 @@ import bitmask;
 import selection;
 import default_values;
 import value;
+import status;
 import third_party;
 import infinity_exception;
 import fix_heap;
@@ -261,15 +262,17 @@ private:
     void AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
         auto &[embedding_num, chunk_id, chunk_offset] = ((TensorT *)data_ptr_)[dst_off];
         const auto total_elememt_count = ele_str_views.size();
-        const auto tensor_embedding_num = total_elememt_count / unit_embedding_dim;
-        embedding_num = tensor_embedding_num;
+        const auto input_bytes = total_elememt_count * sizeof(T);
+        if (input_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+            RecoverableError(Status::SyntaxError("Tensor size exceeds the limit."));
+        }
+        embedding_num = total_elememt_count / unit_embedding_dim;
         auto tmp_data = MakeUniqueForOverwrite<T[]>(total_elememt_count);
         for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
             T value = DataType::StringToValue<T>(ele_str_view);
             tmp_data[i] = value;
             ++i;
         }
-        const auto input_bytes = total_elememt_count * sizeof(T);
         std::tie(chunk_id, chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), input_bytes);
     }
 
@@ -277,9 +280,11 @@ private:
     void AppendTensor<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
         auto &[embedding_num, chunk_id, chunk_offset] = ((TensorT *)data_ptr_)[dst_off];
         const auto total_elememt_count = ele_str_views.size();
-        const auto tensor_embedding_num = total_elememt_count / unit_embedding_dim;
-        embedding_num = tensor_embedding_num;
+        embedding_num = total_elememt_count / unit_embedding_dim;
         const auto bit_bytes = (total_elememt_count + 7) / 8;
+        if (bit_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+            RecoverableError(Status::SyntaxError("Tensor size exceeds the limit."));
+        }
         auto tmp_data = MakeUnique<u8[]>(bit_bytes);
         for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
             if (const auto value = DataType::StringToValue<float>(ele_str_view); value > 0.0f) {

@@ -225,7 +225,11 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); bytes % len != 0) {
-        UnrecoverableError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding size={}", bytes, len));
+        RecoverableError(Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding size={}", bytes, len)));
+    }
+    if (bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+        RecoverableError(Status::SyntaxError(
+            fmt::format("Value::MakeTensor(bytes={}) is larger than the maximum tensor size={}", bytes, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE)));
     }
     SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>();
     embedding_value_info->data_.resize(bytes);

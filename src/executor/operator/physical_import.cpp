@@ -57,6 +57,7 @@ import column_def;
 import constant_expr;
 import wal_entry;
 
+import value;
 import catalog;
 import catalog_delta_entry;
 import build_fast_rough_filter_task;
@@ -518,6 +519,44 @@ void PhysicalImport::CSVRowHandler(void *context) {
     parser_context->block_entry_ = std::move(block_entry);
 }
 
+template <typename T>
+void AppendJsonTensorToColumn(const nlohmann::json &line_json,
+                              const String &column_name,
+                              ColumnVector &column_vector,
+                              EmbeddingInfo *embedding_info) {
+    Vector<T> &&embedding = line_json[column_name].get<Vector<T>>();
+    if (embedding.size() % embedding_info->Dimension() != 0) {
+        RecoverableError(Status::ImportFileFormatError(
+            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension())));
+    }
+    const auto input_bytes = embedding.size() * sizeof(T);
+    const Value embedding_value =
+        Value::MakeTensor(reinterpret_cast<const_ptr_t>(embedding.data()), input_bytes, column_vector.data_type()->type_info());
+    column_vector.AppendValue(embedding_value);
+}
+
+template <>
+void AppendJsonTensorToColumn<bool>(const nlohmann::json &line_json,
+                                    const String &column_name,
+                                    ColumnVector &column_vector,
+                                    EmbeddingInfo *embedding_info) {
+    Vector<float> &&embedding = line_json[column_name].get<Vector<float>>();
+    if (embedding.size() % embedding_info->Dimension() != 0) {
+        RecoverableError(Status::ImportFileFormatError(
+            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension())));
+    }
+    const auto input_bytes = (embedding.size() + 7) / 8;
+    auto input_data = MakeUnique<u8[]>(input_bytes);
+    for (SizeT i = 0; i < embedding.size(); ++i) {
+        if (embedding[i] > 0) {
+            input_data[i / 8] |= u8(1) << (i % 8);
+        }
+    }
+    const Value embedding_value =
+        Value::MakeTensor(reinterpret_cast<const_ptr_t>(input_data.get()), input_bytes, column_vector.data_type()->type_info());
+    column_vector.AppendValue(embedding_value);
+}
+
 void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors) {
     for (SizeT i = 0; auto &column_vector : column_vectors) {
         const ColumnDef *column_def = table_entry_->GetColumnDefByID(i++);
@@ -596,6 +635,44 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemDouble: {
                             Vector<double> &&embedding = line_json[column_def->name_].get<Vector<double>>();
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Not implement: Embedding type.");
+                        }
+                    }
+                    break;
+                }
+                case kTensor: {
+                    auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
+                    // SizeT dim = embedding_info->Dimension();
+                    switch (embedding_info->Type()) {
+                        case kElemBit: {
+                            AppendJsonTensorToColumn<bool>(line_json, column_def->name_, column_vector, embedding_info);
+                            break;
+                        }
+                        case kElemInt8: {
+                            AppendJsonTensorToColumn<i8>(line_json, column_def->name_, column_vector, embedding_info);
+                            break;
+                        }
+                        case kElemInt16: {
+                            AppendJsonTensorToColumn<i16>(line_json, column_def->name_, column_vector, embedding_info);
+                            break;
+                        }
+                        case kElemInt32: {
+                            AppendJsonTensorToColumn<i32>(line_json, column_def->name_, column_vector, embedding_info);
+                            break;
+                        }
+                        case kElemInt64: {
+                            AppendJsonTensorToColumn<i64>(line_json, column_def->name_, column_vector, embedding_info);
+                            break;
+                        }
+                        case kElemFloat: {
+                            AppendJsonTensorToColumn<float>(line_json, column_def->name_, column_vector, embedding_info);
+                            break;
+                        }
+                        case kElemDouble: {
+                            AppendJsonTensorToColumn<double>(line_json, column_def->name_, column_vector, embedding_info);
                             break;
                         }
                         default: {

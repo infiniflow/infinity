@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace infinity {
 
@@ -58,6 +59,14 @@ struct Varchar {
         InlineVarchar short_;
         VectorVarchar vector_;
     };
+
+    // only for unit test
+    [[nodiscard]] std::string ToString() const {
+        if (IsInlined()) {
+            return std::string{short_.data_, static_cast<size_t>(length_)};
+        }
+        return std::string{vector_.prefix_, static_cast<size_t>(VARCHAR_PREFIX_LENGTH)};
+    }
 };
 
 #pragma pack()

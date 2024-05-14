@@ -15,31 +15,11 @@
 #include "unit_test/base_test.h"
 #include "parser/type/complex/varchar.h"
 
-//import infinity_exception;
-//
-//import global_resource_usage;
-//import third_party;
-//
-//import logger;
-//import stl;
-//import infinity_context;
-
 class VarcharTest : public BaseTest {};
 
 TEST_F(VarcharTest, structure_check) {
     using namespace infinity;
-    EXPECT_EQ(sizeof(ValueVarchar), 13u);
     EXPECT_EQ(sizeof(InlineVarchar), 13u);
     EXPECT_EQ(sizeof(VectorVarchar), 13u);
     EXPECT_EQ(sizeof(Varchar), 16u);
-}
-
-TEST_F(VarcharTest, value_varchar) {
-    using namespace infinity;
-    Varchar value_varchar;
-    EXPECT_TRUE(value_varchar.IsValue());
-    value_varchar.SetValue();
-    EXPECT_TRUE(value_varchar.IsValue());
-    value_varchar.SetColumnVector();
-    EXPECT_FALSE(value_varchar.IsValue());
 }

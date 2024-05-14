@@ -115,10 +115,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + std::to_string(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        column_vector.AppendByPtr((ptr_t)(&varchar_value));
-
+        column_vector.AppendByStringView(s, '\0');
         Value vx = column_vector.GetValue(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
@@ -380,9 +377,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hellohellohello" + std::to_string(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        column_vector.AppendByPtr((ptr_t)(&varchar_value));
+        column_vector.AppendByStringView(s, '\0');
 
         Value vx = column_vector.GetValue(i);
         const String &s2 = vx.GetVarchar();
