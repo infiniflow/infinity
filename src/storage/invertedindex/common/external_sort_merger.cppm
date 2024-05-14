@@ -16,10 +16,14 @@ module;
 
 #include <filesystem>
 #include <queue>
+#include <cstring>
+
 export module external_sort_merger;
 
 import stl;
 import loser_tree;
+import mmap;
+import infinity_exception;
 
 namespace infinity {
 
@@ -272,6 +276,8 @@ class SortMerger {
     void Merge();
 
     void Output(FILE *f, u32 idx);
+
+    // void Init(MmapIO &io_stream);
 
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);

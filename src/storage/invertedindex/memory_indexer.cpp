@@ -27,7 +27,8 @@ module;
 #include <cassert>
 #include <filesystem>
 #include <iostream>
-#include <string.h>
+#include <cstring>
+
 module memory_indexer;
 
 import stl;
@@ -54,9 +55,12 @@ import logger;
 import file_system;
 import file_system_type;
 import vector_with_lock;
+import infinity_exception;
+import mmap;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
+#define USE_MMAP
 
 bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {
     int ret = strcmp(lhs.c_str(), rhs.c_str());
@@ -81,6 +85,8 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
+    spill_buffer_size_ = MAX_TUPLE_LENGTH * 2;
+    spill_buffer_ = MakeUnique<char_t[]>(spill_buffer_size_);
 }
 
 MemoryIndexer::~MemoryIndexer() {
@@ -177,7 +183,8 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     SizeT num = inverters.size();
     if (num > 0) {
         for (auto &inverter : inverters) {
-            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
+            // inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
+            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_, spill_buffer_, spill_buffer_size_);
             num_runs_++;
         }
     }
@@ -368,9 +375,21 @@ void MemoryIndexer::OfflineDump() {
     SortMerger<TermTuple, u32> *merger = new SortMerger<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     merger->Run();
     delete merger;
+#ifdef USE_MMAP
+    u8 *data_ptr = nullptr;
+    SizeT data_len = (SizeT)-1;
+    auto rc = MmapFile(spill_full_path_, data_ptr, data_len);
+    if (rc < 0) {
+        throw UnrecoverableException("MmapFile failed");
+    }
+    SizeT idx = 0;
+    u64 count = ReadU64LE(data_ptr + idx);
+    idx += sizeof(u64);
+#else
     FILE *f = fopen(spill_full_path_.c_str(), "r");
     u64 count;
     fread((char *)&count, sizeof(u64), 1, f);
+#endif
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -392,16 +411,30 @@ void MemoryIndexer::OfflineDump() {
     UniquePtr<PostingWriter> posting;
 
     for (u64 i = 0; i < count; ++i) {
+#ifdef USE_MMAP
+        record_length = ReadU32LE(data_ptr + idx);
+        idx += sizeof(u32);
+#else
         fread(&record_length, sizeof(u32), 1, f);
+#endif
         if (record_length >= MAX_TUPLE_LENGTH) {
+#ifdef USE_MMAP
+            idx += record_length;
+#else
             // rubbish tuple, abandoned
             char *buffer = new char[record_length];
             fread(buffer, record_length, 1, f);
             // TermTuple tuple(buffer, record_length);
             delete[] buffer;
+#endif
             continue;
         }
+#ifdef USE_MMAP
+        memcpy(buf, data_ptr + idx, record_length);
+        idx += record_length;
+#else
         fread(buf, record_length, 1, f);
+#endif
         TermTuple tuple(buf, record_length);
         if (tuple.term_ != last_term) {
             assert(last_term < tuple.term_);
@@ -431,6 +464,9 @@ void MemoryIndexer::OfflineDump() {
         posting->AddPosition(tuple.term_pos_);
         // printf(" pos-%u", tuple.term_pos_);
     }
+#ifdef USE_MMAP
+    MunmapFile(data_ptr, data_len);
+#endif
     if (last_doc_id != INVALID_DOCID) {
         posting->EndDocument(last_doc_id, 0);
         // printf(" EndDocument3-%u\n", last_doc_id);

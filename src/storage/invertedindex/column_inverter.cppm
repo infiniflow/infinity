@@ -73,6 +73,8 @@ public:
 
     void SpillSortResults(FILE *spill_file, u64 &tuple_count);
 
+    void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<char_t[]>& spill_buffer, SizeT spill_buf_size);
+
 private:
     using TermBuffer = Vector<char>;
     using PosInfoVec = Vector<PosInfo>;

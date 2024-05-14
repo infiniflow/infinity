@@ -31,7 +31,9 @@ namespace infinity {
             assert(false);                                                                                                                           \
         }                                                                                                                                            \
     }
+
 #define USE_LOSER_TREE
+// #define USE_MMAP_IO
 
 template <typename KeyType, typename LenType>
 SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32 bs, u32 output_num)
@@ -221,6 +223,123 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         size_micro_run_[i] = pos;
     }
 }
+#ifdef USE_MMAP_IO
+template <typename KeyType, typename LenType>
+void SortMerger<KeyType, LenType>::Init(MmapIO &io_stream) {
+    // initialize three buffers
+    NewBuffer();
+
+    // initiate output buffers
+    out_buf_size_[0] = 0;
+    sub_out_buf_[0] = out_buf_;
+    out_buf_full_[0] = false;
+    for (u32 i = 1; i < OUT_BUF_NUM_; ++i) {
+        sub_out_buf_[i] = sub_out_buf_[i - 1] + OUT_BUF_SIZE_ / OUT_BUF_NUM_;
+        out_buf_size_[i] = 0;
+        out_buf_full_[i] = false;
+    }
+    out_buf_in_idx_ = 0;
+    out_buf_out_idx_ = 0;
+
+    // initiate the microrun buffer
+    micro_buf_[0] = run_buf_;
+    for (u32 i = 1; i < MAX_GROUP_SIZE_; ++i) {
+        micro_buf_[i] = micro_buf_[i - 1] + PRE_BUF_SIZE_;
+    }
+
+    group_size_ = 0;
+    u64 next_run_pos = 0;
+    for (u32 i = 0; i < MAX_GROUP_SIZE_ && (u64)io_stream.Tell() < FILE_LEN_; ++i, ++group_size_) {
+        // get the size of run
+        io_stream.ReadU32(size_run_[i]);
+        // get the records number of a run
+        io_stream.ReadU32(num_run_[i]);
+        io_stream.ReadU64(next_run_pos);
+
+        run_addr_[i] = io_stream.Tell();
+
+        // loading size of a microrun
+        u32 s = size_run_[i] > PRE_BUF_SIZE_ ? PRE_BUF_SIZE_ : size_run_[i];
+        size_t ret = io_stream.ReadBuf(micro_buf_[i], s);
+        size_micro_run_[i] = ret;
+        size_loaded_run_[i] = ret;
+        run_curr_addr_[i] = io_stream.Tell();
+        // std::cout << "num_run_[" << i << "] " << num_run_[i] << " size_run_ " << size_run_[i] << " size_micro_run " << size_micro_run_[i]
+        //           << std::endl;
+
+        /// it is not needed for compression, validation will be made within IOStream in that case
+        // if a record can fit in microrun buffer
+        bool flag = false;
+        while (*(LenType *)(micro_buf_[i]) + sizeof(LenType) > s) {
+            size_micro_run_[i] = 0;
+            --count_;
+            // LOG_WARN("[Warning]: A record is too long, it will be ignored");
+
+            io_stream.Seek(*(LenType *)(micro_buf_[i]) + sizeof(LenType) - s);
+            // io_stream.Seek(*(LenType *)(micro_buf_[i]) + sizeof(LenType) - s, SEEK_CUR);
+
+            if (io_stream.Tell() - run_addr_[i] >= (u64)size_run_[i]) {
+                flag = true;
+                break;
+            }
+
+            s = (u32)((u64)size_run_[i] - (io_stream.Tell() - run_addr_[i]) > PRE_BUF_SIZE_ ? PRE_BUF_SIZE_
+                                                                                            : (u64)size_run_[i] - (io_stream.Tell() - run_addr_[i]));
+            size_micro_run_[i] = s;
+            io_stream.Read(micro_buf_[i], s);
+        }
+
+#ifdef USE_LOSER_TREE
+        if (flag) {
+            merge_loser_tree_->InsertStart(nullptr, static_cast<LoserTree<u64>::Source>(i), true);
+            continue;
+        }
+        auto key = KeyAddr(micro_buf_[i], -1, i);
+        merge_loser_tree_->InsertStart(&key, static_cast<LoserTree<u64>::Source>(i), false);
+#else
+        if (flag) {
+            continue;
+        }
+        merge_heap_.push(KeyAddr(micro_buf_[i], -1, i));
+#endif
+        micro_run_idx_[i] = 1;
+        micro_run_pos_[i] = KeyAddr(micro_buf_[i], -1, i).LEN() + sizeof(LenType);
+        num_micro_run_[i] = 0;
+
+        io_stream.Seek(next_run_pos);
+    }
+#ifdef USE_LOSER_TREE
+    merge_loser_tree_->Init();
+#endif
+    // initialize predict heap and records number of every microrun
+    for (u32 i = 0; i < group_size_; ++i) {
+        u32 pos = 0;
+        u32 last_pos = -1;
+        assert(i < MAX_GROUP_SIZE_);
+        if (size_micro_run_[i] <= 0)
+            continue;
+        while (pos + sizeof(LenType) <= size_micro_run_[i]) {
+            LenType len = *(LenType *)(micro_buf_[i] + pos);
+            if (pos + sizeof(LenType) + len <= size_micro_run_[i]) {
+                num_micro_run_[i]++;
+                last_pos = pos;
+                pos += sizeof(LenType) + len;
+            } else {
+                break;
+            }
+        }
+        // std::cout << "len " << len << " size_micro_run_[" << i << "] " << size_micro_run_[i] << std::endl;
+        assert(last_pos != (u32)-1); // buffer too small that can't hold one record
+        assert(last_pos + sizeof(LenType) <= size_micro_run_[i]);
+        assert(pos <= size_micro_run_[i]);
+        LenType len = (LenType)(pos - last_pos);
+        char *tmp = (char *)malloc(len);
+        memcpy(tmp, micro_buf_[i] + last_pos, len);
+        pre_heap_.push(KeyAddr(tmp, run_addr_[i] + pos, i));
+        size_micro_run_[i] = pos;
+    }
+}
+#endif
 
 template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Predict(DirectIO &io_stream) {
@@ -413,6 +532,12 @@ void SortMerger<KeyType, LenType>::Output(FILE *f, u32 idx) {
 
 template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Run() {
+#ifdef USE_MMAP_IO
+    MMappedIO io_stream(filenm_);
+    FILE_LEN_ = io_stream.DataLen();
+    io_stream.ReadU64(count_);
+    Init(io_stream);
+#else
     FILE *f = fopen(filenm_.c_str(), "r");
 
     DirectIO io_stream(f);
@@ -423,6 +548,8 @@ void SortMerger<KeyType, LenType>::Run() {
     Init(io_stream);
 
     Thread predict_thread(std::bind(&self_t::Predict, this, io_stream));
+#endif
+
     Thread merge_thread(std::bind(&self_t::Merge, this));
 
     FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
@@ -433,15 +560,17 @@ void SortMerger<KeyType, LenType>::Run() {
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
         out_thread[i] = new Thread(std::bind(&self_t::Output, this, out_f, i));
     }
-
+#ifndef USE_MMAP_IO
     predict_thread.join();
+#endif
     merge_thread.join();
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
         out_thread[i]->join();
         delete out_thread[i];
     }
-
+#ifndef USE_MMAP_IO
     fclose(f);
+#endif
     fclose(out_f);
 
     if (std::filesystem::exists(filenm_))
