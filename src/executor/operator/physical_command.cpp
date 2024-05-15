@@ -82,7 +82,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             return true;
                         }
                         case GlobalVariable::kInvalid: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("Unknown global variable: {}", set_command->var_name())));
+                            RecoverableError(Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name())));
                         }
                         default: {
                             RecoverableError(Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name())));
