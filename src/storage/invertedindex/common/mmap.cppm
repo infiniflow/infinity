@@ -74,7 +74,7 @@ export struct MmapReader {
     }
 
     SizeT ReadBuf(char* buf, SizeT len) {
-        if (idx_ + len < data_len_) {
+        if (idx_ + len <= data_len_) {
             memcpy(buf, data_ptr_ + idx_, len);
             idx_ += len;
             return len;

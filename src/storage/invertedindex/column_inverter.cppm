@@ -27,6 +27,7 @@ import string_ref;
 import internal_types;
 import posting_writer;
 import vector_with_lock;
+import buf_writer;
 
 namespace infinity {
 
@@ -73,7 +74,10 @@ public:
 
     void SpillSortResults(FILE *spill_file, u64 &tuple_count);
 
+    // fast
     void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<char_t[]>& spill_buffer, SizeT spill_buf_size);
+
+    void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter>& buf_writer);
 
 private:
     using TermBuffer = Vector<char>;

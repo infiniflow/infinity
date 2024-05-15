@@ -30,6 +30,7 @@ import skiplist;
 import internal_types;
 import map_with_lock;
 import vector_with_lock;
+import buf_writer;
 
 namespace infinity {
 
@@ -159,5 +160,6 @@ private:
     // spill file write buf
     UniquePtr<char_t[]> spill_buffer_{};
     SizeT spill_buffer_size_{0};
+    UniquePtr<BufWriter> buf_writer_;
 };
 } // namespace infinity
