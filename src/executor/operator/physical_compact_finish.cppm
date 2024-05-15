@@ -26,6 +26,7 @@ import data_type;
 import infinity_exception;
 import base_table_ref;
 import compact_state_data;
+import compact_statement;
 
 namespace infinity {
 
@@ -35,11 +36,12 @@ public:
                                    UniquePtr<PhysicalOperator> left,
                                    UniquePtr<PhysicalOperator> right,
                                    SharedPtr<BaseTableRef> base_table_ref,
+                                   CompactStatementType compact_type,
                                    SharedPtr<Vector<String>> output_names,
                                    SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                    SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kCompactFinish, std::move(left), std::move(right), id, load_metas), base_table_ref_(base_table_ref),
-          output_names_(output_names), output_types_(output_types) {}
+          compact_type_(compact_type), output_names_(output_names), output_types_(output_types) {}
 
     ~PhysicalCompactFinish() override = default;
 
@@ -63,6 +65,7 @@ private:
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_;
+    CompactStatementType compact_type_;
 
 private:
     SharedPtr<Vector<String>> output_names_{};

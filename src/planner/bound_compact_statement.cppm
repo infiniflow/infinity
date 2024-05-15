@@ -28,25 +28,26 @@ import bind_context;
 import logger;
 import third_party;
 import table_entry;
+import compact_statement;
 
 namespace infinity {
 
 export struct BoundCompactStatement final {
 public:
-    BoundCompactStatement(SharedPtr<BindContext> bind_context, SharedPtr<BaseTableRef> base_table_ref)
-        : bind_context_(std::move(bind_context)), base_table_ref_(base_table_ref) {}
+    BoundCompactStatement(SharedPtr<BindContext> bind_context, SharedPtr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
+        : bind_context_(std::move(bind_context)), base_table_ref_(base_table_ref), compact_type_(compact_type) {}
 
     Vector<SharedPtr<LogicalNode>> BuildPlans(QueryContext *query_context) {
         Vector<SharedPtr<LogicalNode>> res;
         const SharedPtr<BindContext> &bind_context = this->bind_context_;
 
-        auto compact_node = MakeShared<LogicalCompact>(bind_context->GetNewLogicalNodeId(), base_table_ref_);
+        auto compact_node = MakeShared<LogicalCompact>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
         auto &index_index = base_table_ref_->index_index_;
         if (!index_index->IsEmpty()) {
             if (index_index->index_snapshots_.size() == 1) {
                 auto compact_index_node = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref_);
                 compact_index_node->set_left_node(compact_node);
-                auto compact_finish_node = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_);
+                auto compact_finish_node = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
                 compact_finish_node->set_left_node(compact_index_node);
                 res.emplace_back(compact_finish_node);
             } else {
@@ -69,13 +70,13 @@ public:
                 auto base_table_ref2 = MakeShared<BaseTableRef>(base_table_ref_->table_entry_ptr_, base_table_ref_->block_index_, index_index2);
                 auto compact_index_node1 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref1);
                 auto compact_index_node2 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref2);
-                auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_);
+                auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
                 compact_finish->set_left_node(compact_index_node1);
                 compact_finish->set_right_node(compact_index_node2);
                 res.emplace_back(compact_finish);
             }
         } else {
-            auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_);
+            auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
             compact_finish->set_left_node(compact_node);
             res.emplace_back(compact_finish);
         }
@@ -86,6 +87,7 @@ private:
     SharedPtr<BindContext> bind_context_{};
 
     SharedPtr<BaseTableRef> base_table_ref_{};
+    CompactStatementType compact_type_;
 };
 
 } // namespace infinity

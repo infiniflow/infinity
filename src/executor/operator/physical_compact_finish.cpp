@@ -58,7 +58,14 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
         }
         segment_data.emplace_back(compact_segment_data.new_segment_, compact_segment_data.old_segments_);
     }
-    txn->Compact(table_entry, std::move(segment_data), CompactSegmentsTaskType::kCompactTable);
+
+    CompactSegmentsTaskType task_type;
+    if (compact_type_ == CompactStatementType::kManual) {
+        task_type = CompactSegmentsTaskType::kCompactTable;
+    } else {
+        task_type = CompactSegmentsTaskType::kCompactPickedSegments;
+    }
+    txn->Compact(table_entry, std::move(segment_data), task_type);
     String db_name = *table_entry->GetDBName();
     String table_name = *table_entry->GetTableName();
     txn->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(segment_infos), std::move(old_segment_ids)));

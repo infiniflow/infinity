@@ -21,11 +21,13 @@ import compact_segments_task;
 import txn;
 import bg_task;
 import blocking_queue;
+import base_statement;
 
 namespace infinity {
 
 class Catalog;
 class TxnManager;
+class SessionManager;
 
 export class CompactionProcessor {
 public:
@@ -38,7 +40,9 @@ public:
     void Submit(SharedPtr<BGTask> bg_task);
 
 private:
-    Vector<UniquePtr<CompactSegmentsTask>> ScanForCompact();
+    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
+
+    void DoCompact();
 
     void ScanAndOptimize();
 
@@ -51,9 +55,7 @@ private:
 
     Catalog *catalog_{};
     TxnManager *txn_mgr_{};
-
-    // atomic_bool stop_{false};
-    // std::chrono::seconds interval_{};
+    SessionManager *session_mgr_{};
 };
 
 } // namespace infinity

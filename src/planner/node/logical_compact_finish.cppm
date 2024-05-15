@@ -22,13 +22,14 @@ import logical_node_type;
 import column_binding;
 import data_type;
 import base_table_ref;
+import compact_statement;
 
 namespace infinity {
 
 export class LogicalCompactFinish : public LogicalNode {
 public:
-    LogicalCompactFinish(u64 node_id, SharedPtr<BaseTableRef> base_table_ref)
-        : LogicalNode(node_id, LogicalNodeType::kCompactFinish), base_table_ref_(base_table_ref) {}
+    LogicalCompactFinish(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
+        : LogicalNode(node_id, LogicalNodeType::kCompactFinish), base_table_ref_(base_table_ref), compact_type_(compact_type) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -42,6 +43,7 @@ public:
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_;
+    CompactStatementType compact_type_;
 };
 
 } // namespace infinity

@@ -79,16 +79,28 @@ private:
 };
 
 void PhysicalCompact::Init() {
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
-    if (!table_entry->CompactPrepare()) {
-        LOG_WARN(fmt::format("Table {} is not compactable.", *table_entry->GetTableName()));
-        return;
-    }
-    GreedyCompactableSegmentsGenerator generator(base_table_ref_.get(), DEFAULT_SEGMENT_CAPACITY);
-    while (true) {
-        Vector<SegmentEntry *> compactible_segments = generator.generate();
-        if (compactible_segments.empty()) {
-            break;
+    if (compact_type_ == CompactStatementType::kManual) {
+        TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+        if (!table_entry->CompactPrepare()) {
+            LOG_WARN(fmt::format("Table {} is not compactable.", *table_entry->GetTableName()));
+            return;
+        }
+        GreedyCompactableSegmentsGenerator generator(base_table_ref_.get(), DEFAULT_SEGMENT_CAPACITY);
+        while (true) {
+            Vector<SegmentEntry *> compactible_segments = generator.generate();
+            if (compactible_segments.empty()) {
+                break;
+            }
+            compactible_segments_group_.push_back(compactible_segments);
+        }
+    } else {
+        Vector<SegmentEntry *> compactible_segments;
+        const auto &block_index = *base_table_ref_->block_index_;
+        for (const auto &[segment_id, segment_snapshot] : block_index.segment_block_index_) {
+            SegmentEntry *segment_entry = segment_snapshot.segment_entry_;
+            if (segment_entry->status() == SegmentStatus::kSealed) {
+                compactible_segments.push_back(segment_entry);
+            }
         }
         compactible_segments_group_.push_back(compactible_segments);
     }

@@ -44,6 +44,9 @@ import periodic_trigger_thread;
 import periodic_trigger;
 import log_file;
 
+import query_context;
+import infinity_context;
+
 namespace infinity {
 
 Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
@@ -110,7 +113,7 @@ void Storage::Init() {
     {
         periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-        if (enable_compaction && false) {
+        if (enable_compaction) {
             periodic_trigger_thread_->AddTrigger(MakeUnique<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get()));
         } else {
             LOG_WARN("Compact interval is not set, auto compact task will not be triggered");

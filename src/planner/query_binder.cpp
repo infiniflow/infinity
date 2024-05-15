@@ -1024,7 +1024,7 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
     TableEntry *table_entry = base_table_ref->table_entry_ptr_;
     base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
 
-    return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref);
+    return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);
 }
 
 } // namespace infinity

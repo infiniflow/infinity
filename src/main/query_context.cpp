@@ -50,6 +50,7 @@ import base_statement;
 import parser_result;
 import parser_assert;
 import plan_fragment;
+import bg_query_state;
 
 namespace infinity {
 
@@ -207,6 +208,65 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     //    profiler.End();
     //    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
     return query_result;
+}
+
+bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &state) {
+    QueryResult query_result;
+    try {
+        SharedPtr<BindContext> bind_context;
+        auto status = logical_planner_->Build(statement, bind_context);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        current_max_node_id_ = bind_context->GetNewLogicalNodeId();
+        state.logical_plans = logical_planner_->LogicalPlans();
+
+        for (auto &logical_plan : state.logical_plans) {
+            auto physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
+            state.physical_plans.push_back(std::move(physical_plan));
+        }
+
+        {
+            Vector<PhysicalOperator *> physical_plan_ptrs;
+            for (auto &physical_plan : state.physical_plans) {
+                physical_plan_ptrs.push_back(physical_plan.get());
+            }
+            state.plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
+        }
+
+        state.notifier = MakeUnique<Notifier>();
+        FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
+
+        scheduler_->Schedule(state.plan_fragment.get(), statement);
+    } catch (RecoverableException &e) {
+        this->RollbackTxn();
+        query_result.result_table_ = nullptr;
+        query_result.status_.Init(e.ErrorCode(), e.what());
+        return false;
+
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(e.what());
+        raise(SIGUSR1);
+    }
+    return true;
+}
+
+bool QueryContext::JoinBGStatement(BGQueryState &state) {
+    QueryResult query_result;
+    try {
+        query_result.result_table_ = state.plan_fragment->GetResult();
+        query_result.root_operator_type_ = state.logical_plans.back()->operator_type();
+        this->CommitTxn();
+    } catch (RecoverableException &e) {
+        this->RollbackTxn();
+        query_result.result_table_ = nullptr;
+        query_result.status_.Init(e.ErrorCode(), e.what());
+        return false;
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(e.what());
+        raise(SIGUSR1);
+    }
+    return true;
 }
 
 void QueryContext::BeginTxn() {

@@ -926,6 +926,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<Logica
     }
     return MakeUnique<PhysicalCompact>(logical_compact->node_id(),
                                        logical_compact->base_table_ref_,
+                                       logical_compact->compact_type_,
                                        logical_compact->GetOutputNames(),
                                        logical_compact->GetOutputTypes(),
                                        logical_operator->load_metas());
@@ -994,6 +995,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<
                                              std::move(left),
                                              std::move(right),
                                              logical_compact_finish->base_table_ref_,
+                                             logical_compact_finish->compact_type_,
                                              logical_compact_finish->GetOutputNames(),
                                              logical_compact_finish->GetOutputTypes(),
                                              logical_operator->load_metas());

@@ -78,6 +78,7 @@ SizeT PlanFragment::GetStartFragments(Vector<PlanFragment *> &leaf_fragments) {
         }
         if (!fragment->HasChild()) {
             leaf_fragments.emplace_back(fragment);
+            return;
         }
         for (auto &child : fragment->Children()) {
             TraversePlanFragmentGraph(child.get());

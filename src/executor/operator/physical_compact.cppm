@@ -25,6 +25,7 @@ import operator_state;
 import load_meta;
 import data_type;
 import segment_entry;
+import compact_statement;
 
 namespace infinity {
 
@@ -32,11 +33,12 @@ export class PhysicalCompact : public PhysicalOperator {
 public:
     PhysicalCompact(u64 id,
                     SharedPtr<BaseTableRef> base_table_ref,
+                    CompactStatementType compact_type,
                     SharedPtr<Vector<String>> output_names,
                     SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                     SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kCompact, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
-          output_names_(output_names), output_types_(output_types) {}
+          compact_type_(compact_type), output_names_(output_names), output_types_(output_types) {}
 
     ~PhysicalCompact() override = default;
 
@@ -54,6 +56,7 @@ public:
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_;
+    CompactStatementType compact_type_;
     Vector<Vector<SegmentEntry *>> compactible_segments_group_;
 
     SharedPtr<Vector<String>> output_names_{};
