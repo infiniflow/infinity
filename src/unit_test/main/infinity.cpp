@@ -331,7 +331,7 @@ TEST_F(InfinityTest, test2) {
     }
 
     {
-        QueryResult result = infinity->ShowVariable("profile_record_capacity", SetScope::kSession);
+        QueryResult result = infinity->ShowVariable("profile_record_capacity", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
