@@ -762,38 +762,6 @@ curl --request GET \
 }
 ```
 
-## Show variable
-
-Get a system variable.
-
-#### Request
-
-```
-curl --request GET \
-     --url localhost:23820/variables/{variable_name} \
-     --header 'accept: application/json'
-```
-
-#### Response
-
-- 200 Success.
-
-```
-{
-    "error_code": 0,
-    "query_count": 30
-}
-```
-
-- 500 Error.
-
-```
-{
-    "error_code": 3027,
-    "error_message": "No variable {variable_name}."
-}
-```
-
 ## Show segments
 
 Show all segments of a specified table.
@@ -985,5 +953,221 @@ curl --request GET \
 {
     "error_code": 3072,
     "error_message": "Block: {block_id} doesn't exist."
+}
+```
+
+## Show variables
+
+Get all global variables.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/variables \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code":0,
+    "active_txn_count":"1",
+    "active_wal_filename":"/var/infinity/wal/wal.log",
+    "buffer_object_count":"6",
+    "buffer_usage":"0B/4.00GB",
+    "current_timestamp":"16774",
+    "delta_log_count":"1",
+    "next_transaction_id":"6",
+    "profile_record_capacity":"128",
+    "query_count":"0",
+    "schedule_policy":"round robin",
+    "session_count":"1",
+    "total_commit_count":"0",
+    "total_rollback_count":"0",
+    "unused_buffer_object":"0"
+}
+```
+
+## Show variable
+
+Get a global variable.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/variables/{variable_name} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code": 0,
+    "buffer_object_count":"6"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3027,
+    "error_message": "No such system variable {variable_name}."
+}
+```
+
+## Set a variable
+
+Set a variable with value.
+
+#### Request
+
+```
+curl --request POST \
+     --url localhost:23820/variables/{variable_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' { "profile_record_capacity" : 120 } '
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code": 0
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3076,
+    "error_message": "Invalid command: unknown global variable {variable_name}"
+}
+```
+
+## Show configs
+
+Get all configs.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/configs \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "buffer_manager_size":"4294967296",
+    "cleanup_interval":"10",
+    "client_port":"23817",
+    "compact_interval":"10",
+    "connection_pool_size":"256",
+    "cpu_limit":"16",
+    "data_dir":"/var/infinity/data",
+    "delta_checkpoint_interval":"5",
+    "delta_checkpoint_threshold":"67108864",
+    "error_code":0,
+    "full_checkpoint_interval":"30",
+    "http_port":"23820",
+    "log_dir":"/var/infinity/log",
+    "log_file_max_size":"1073741824",
+    "log_file_rotate_count":"8",
+    "log_filename":"infinity.log",
+    "log_level":"Info",
+    "log_to_stdout":"False",
+    "mem_index_capacity":"1048576",
+    "optimize_interval":"10",
+    "postgres_port":"5432",
+    "resource_dir":"/var/infinity/resource",
+    "server_address":"0.0.0.0",
+    "temp_dir":"/var/infinity/tmp",
+    "time_zone":"UTC+8",
+    "version":"0.2.0",
+    "wal_compact_threshold":"1073741824",
+    "wal_dir":"/var/infinity/wal",
+    "wal_flush":"FlushAtOnce"
+}
+```
+
+## Show config
+
+Get a config.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/configs/{config_name} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code": 0,
+    "version":"0.2.0"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 1008,
+    "error_message": "Attempt to get option: {config_name} which doesn't exist."
+}
+```
+
+## Set a config
+
+Set a config with value.
+
+#### Request
+
+```
+curl --request POST \
+     --url localhost:23820/configs/{config_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' { "log_level" : "trace" } '
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code": 0
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3028,
+    "error_message": "log level value range is trace, debug, info, warning, error, critical"
 }
 ```
