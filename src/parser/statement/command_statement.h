@@ -81,6 +81,18 @@ public:
     SetCmd(SetScope scope, SetVarType value_type, const char *var_name, const char *value_str)
         : CommandInfo(CommandType::kSet), scope_(scope), var_name_(var_name), value_type_(value_type), value_str_(value_str) {}
 
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, bool value_bool)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_bool_(value_bool) {}
+
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, int64_t value_int)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_int_(value_int) {}
+
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, double value_double)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_double_(value_double) {}
+
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, std::string value_str)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_str_(std::move(value_str)) {}
+
     ~SetCmd() final = default;
 
     [[nodiscard]] std::string ToString() const final;

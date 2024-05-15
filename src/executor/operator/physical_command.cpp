@@ -97,31 +97,37 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case GlobalOptionIndex::kLogLevel: {
                             if (set_command->value_str() == "trace") {
                                 SetLogLevel(LogLevel::kTrace);
+                                config->SetLogLevel(LogLevel::kTrace);
                                 return true;
                             }
 
                             if (set_command->value_str() == "debug") {
                                 SetLogLevel(LogLevel::kDebug);
+                                config->SetLogLevel(LogLevel::kDebug);
                                 return true;
                             }
 
                             if (set_command->value_str() == "info") {
                                 SetLogLevel(LogLevel::kInfo);
+                                config->SetLogLevel(LogLevel::kInfo);
                                 return true;
                             }
 
                             if (set_command->value_str() == "warning") {
                                 SetLogLevel(LogLevel::kWarning);
+                                config->SetLogLevel(LogLevel::kWarning);
                                 return true;
                             }
 
                             if (set_command->value_str() == "error") {
                                 SetLogLevel(LogLevel::kError);
+                                config->SetLogLevel(LogLevel::kError);
                                 return true;
                             }
 
                             if (set_command->value_str() == "critical") {
                                 SetLogLevel(LogLevel::kCritical);
+                                config->SetLogLevel(LogLevel::kCritical);
                                 return true;
                             }
 

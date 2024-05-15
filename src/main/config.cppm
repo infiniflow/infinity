@@ -57,6 +57,7 @@ public:
     i64 LogFileMaxSize();
     i64 LogFileRotateCount();
 
+    void SetLogLevel(LogLevel level);
     LogLevel GetLogLevel();
 
     // Storage
@@ -106,6 +107,7 @@ private:
     static u64 GetAvailableMem();
 
 private:
+    std::mutex mutex_;
     GlobalOptions global_options_;
 };
 

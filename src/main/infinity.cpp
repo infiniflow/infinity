@@ -199,7 +199,7 @@ QueryResult Infinity::Flush() {
     return result;
 }
 
-QueryResult Infinity::SetVariableOrConfig(const String &name, const String &value, SetScope scope) {
+QueryResult Infinity::SetVariableOrConfig(const String &name, bool value, SetScope scope) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -208,22 +208,49 @@ QueryResult Infinity::SetVariableOrConfig(const String &name, const String &valu
                             InfinityContext::instance().session_manager());
 
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    switch(scope) {
-        case SetScope::kGlobal: {
-//            command_statement->command_info_ = MakeUnique<SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
-            break;
-        }
-        case SetScope::kSession: {
-//            command_statement->command_info_ = MakeUnique<SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
-            break;
-        }
-        case SetScope::kConfig: {
-            break;
-        }
-        default: {
-            UnrecoverableError("Invalid set scope.");
-        }
-    }
+    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kBool, name, value);
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
+QueryResult Infinity::SetVariableOrConfig(const String &name, i64 value, SetScope scope) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kInteger, name, value);
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
+QueryResult Infinity::SetVariableOrConfig(const String &name, double value, SetScope scope) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kDouble, name, value);
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
+QueryResult Infinity::SetVariableOrConfig(const String &name, String value, SetScope scope) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeUnique<SetCmd>(scope, SetVarType::kDouble, name, value);
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
