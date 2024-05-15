@@ -1438,18 +1438,24 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->ShowVariables(variable_name, SetScope::kGlobal);
+        auto result = infinity->ShowConfigs();
 
         nlohmann::json json_response;
         HTTPStatus http_status;
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-//            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-//            Value value = data_block->GetValue(0, 0);
-//            const String &variable_value = value.ToString();
-//            json_response[variable_name] = variable_value;
-
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
+            auto row_count = data_block->row_count();
+            for (int row = 0; row < row_count; ++row) {
+                // config name
+                Value name_value = data_block->GetValue(0, row);
+                const String& config_name = name_value.ToString();
+                // config value
+                Value value = data_block->GetValue(1, row);
+                const String &config_value = value.ToString();
+                json_response[config_name] = config_value;
+            }
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
@@ -1466,18 +1472,18 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->ShowVariables(variable_name, SetScope::kGlobal);
+        auto config_name = request->getPathVariable("config_name");
+        auto result = infinity->ShowConfig(config_name);
 
         nlohmann::json json_response;
         HTTPStatus http_status;
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-//            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-//            Value value = data_block->GetValue(0, 0);
-//            const String &variable_value = value.ToString();
-//            json_response[variable_name] = variable_value;
-
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+            Value value = data_block->GetValue(0, 0);
+            const String &variable_value = value.ToString();
+            json_response[config_name] = variable_value;
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();
@@ -1494,18 +1500,24 @@ public:
         auto infinity = Infinity::RemoteConnect();
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
-        auto result = infinity->ShowVariables(variable_name, SetScope::kGlobal);
+        auto result = infinity->ShowVariables(SetScope::kGlobal);
 
         nlohmann::json json_response;
         HTTPStatus http_status;
 
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-//            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-//            Value value = data_block->GetValue(0, 0);
-//            const String &variable_value = value.ToString();
-//            json_response[variable_name] = variable_value;
-
+            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the variables output data only included in one data block
+            auto row_count = data_block->row_count();
+            for (int row = 0; row < row_count; ++row) {
+                // variable name
+                Value name_value = data_block->GetValue(0, row);
+                const String& config_name = name_value.ToString();
+                // variable value
+                Value value = data_block->GetValue(1, row);
+                const String &config_value = value.ToString();
+                json_response[config_name] = config_value;
+            }
             http_status = HTTPStatus::CODE_200;
         } else {
             json_response["error_code"] = result.ErrorCode();

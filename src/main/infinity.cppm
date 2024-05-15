@@ -69,9 +69,7 @@ public:
 
     QueryResult Flush();
 
-    QueryResult SetVariable(const String &variable_name, const String &variable_value, SetScope scope);
-
-    QueryResult SetConfig(const String &config_name, const String &config_value);
+    QueryResult SetVariableOrConfig(const String &name, const String &value, SetScope scope);
 
     QueryResult ShowVariable(const String &variable_name, SetScope scope);
 

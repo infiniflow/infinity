@@ -199,7 +199,7 @@ QueryResult Infinity::Flush() {
     return result;
 }
 
-QueryResult Infinity::SetVariableOrConfig(const String &variable_name, const String &variable_value, SetScope scope) {
+QueryResult Infinity::SetVariableOrConfig(const String &name, const String &value, SetScope scope) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
