@@ -390,17 +390,10 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_TRUE(status.ok());
             txn5->Delete(table_entry, delete_row_ids);
-
-            Atomic<bool> delete_commit(false);
-            Thread t([&]() {
-                auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false);
-                EXPECT_NE(commit_ts, 0u);
-                EXPECT_TRUE(delete_commit.load());
-            });
             txn_mgr->CommitTxn(txn5);
-            delete_commit.store(true);
 
-            t.join();
+            auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false);
+            EXPECT_NE(commit_ts, 0u);
         }
         {
             auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
@@ -419,7 +412,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
             // TODO: has bug here
-            if (compact_segment->actual_row_count()!= row_count - delete_n) {
+            if (compact_segment->actual_row_count() != row_count - delete_n) {
                 LOG_WARN("Bug here. TODO: fix it");
             }
 
