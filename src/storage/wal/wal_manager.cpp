@@ -36,7 +36,7 @@ import extra_ddl_info;
 
 import infinity_exception;
 import block_column_entry;
-import compact_segments_task;
+import compact_state_data;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
 import column_def;
@@ -765,7 +765,9 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
         if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
-        segment_entry->SetNoDelete();
+        if (!segment_entry->SetNoDelete()) {
+            UnrecoverableError("Assert: Replay segment should be compactable.");
+        }
         segment_entry->SetDeprecated(commit_ts);
     }
 }

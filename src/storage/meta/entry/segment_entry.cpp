@@ -39,7 +39,7 @@ import txn_store;
 import segment_iter;
 import catalog_delta_entry;
 import status;
-import compact_segments_task;
+
 import compact_state_data;
 import cleanup_scanner;
 import background_process;
@@ -152,20 +152,7 @@ void SegmentEntry::UpdateBlockReplay(SharedPtr<BlockEntry> new_block, String blo
     block_entries_[block_id]->UpdateBlockReplay(new_block, std::move(block_filter_binary_data));
 }
 
-bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
-    std::unique_lock lock(rw_locker_);
-    if (status_ == SegmentStatus::kUnsealed) {
-        UnrecoverableError("Assert: Compactable segment should be sealed.");
-    }
-    if (status_ != SegmentStatus::kSealed) {
-        return false;
-    }
-    compact_task_ = compact_task;
-    status_ = SegmentStatus::kCompacting;
-    return true;
-}
-
-bool SegmentEntry::TrySetCompacting1(CompactStateData *compact_state_data) {
+bool SegmentEntry::TrySetCompacting(CompactStateData *compact_state_data) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kSealed) {
         return false;
@@ -175,18 +162,22 @@ bool SegmentEntry::TrySetCompacting1(CompactStateData *compact_state_data) {
     return true;
 }
 
-void SegmentEntry::SetNoDelete() {
+bool SegmentEntry::SetNoDelete() {
     std::unique_lock lock(rw_locker_);
-    if (status_ != SegmentStatus::kCompacting) {
+    if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
         UnrecoverableError("Assert: kNoDelete is only allowed to set on compacting segment.");
     }
     status_ = SegmentStatus::kNoDelete;
-    no_delete_complete_cv_.wait(lock, [this] { return delete_txns_.empty(); });
-    if (compact_task_ != nullptr) {
-        compact_task_ = nullptr;
-    } else {
-        compact_state_data_ = nullptr; 
+    if (!delete_txns_.empty()) {
+        std::stringstream ss;
+        for (auto txn_id : delete_txns_) {
+            ss << txn_id << " ";
+        }
+        LOG_WARN(fmt::format("Segment {} cannot set no delete, because has delete txns: {}", segment_id_, ss.str()));
+        return false;
     }
+    compact_state_data_ = nullptr;
+    return true;
 }
 
 void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
@@ -390,7 +381,7 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
         if (status_ == SegmentStatus::kDeprecated) {
             UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
         }
-        if (compact_task_ != nullptr || compact_state_data_ != nullptr) {
+        if (compact_state_data_ != nullptr) {
             if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
                 UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
             }
@@ -401,18 +392,9 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
                     segment_offsets.push_back(segment_offset);
                 }
             }
-            if (compact_task_ != nullptr) {
-                compact_task_->AddToDelete(segment_id_, std::move(segment_offsets));
-            } else {
-                compact_state_data_->AddToDelete(segment_id_, segment_offsets);
-            }
+            compact_state_data_->AddToDelete(segment_id_, segment_offsets);
         }
-        {
-            delete_txns_.erase(txn_id);
-            if (delete_txns_.empty()) { // == 0 when replay
-                no_delete_complete_cv_.notify_one();
-            }
-        }
+        delete_txns_.erase(txn_id);
     }
     return delete_row_n;
 }

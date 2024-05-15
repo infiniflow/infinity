@@ -33,6 +33,8 @@ import query_context;
 import infinity_context;
 import compact_statement;
 import session;
+import compilation_config;
+import defer_op;
 
 namespace infinity {
 
@@ -85,6 +87,51 @@ void CompactionProcessor::Stop() {
 
 void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
+void CompactionProcessor::DoCompact() {
+    Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
+    bool success = false;
+    DeferFn defer_fn([&] {
+        if (!success) {
+            txn_mgr_->RollBackTxn(scan_txn);
+        }
+    });
+
+    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> statements = this->ScanForCompact(scan_txn);
+    Vector<Pair<BGQueryContextWrapper, BGQueryState>> wrappers;
+    for (const auto &[statement, txn] : statements) {
+        BGQueryContextWrapper wrapper(txn, session_mgr_);
+        BGQueryState state;
+        bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
+        if (res) {
+            wrappers.emplace_back(std::move(wrapper), std::move(state));
+        }
+    }
+    for (auto &[wrapper, query_state] : wrappers) {
+        TxnTimeStamp commit_ts = 0;
+        wrapper.query_context_->JoinBGStatement(query_state, commit_ts);
+    }
+    txn_mgr_->CommitTxn(scan_txn);
+    success = true;
+}
+
+TxnTimeStamp
+CompactionProcessor::ManualDoCompact(const String &schema_name, const String &table_name, bool rollback, Optional<std::function<void()>> mid_func) {
+    TxnTimeStamp commit_ts = 0;
+
+    auto statement = MakeUnique<ManualCompactStatement>(schema_name, table_name);
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ManualCompact"));
+    BGQueryContextWrapper wrapper(txn, session_mgr_);
+    BGQueryState state;
+    bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
+    if (mid_func) {
+        mid_func.value()();
+    }
+    if (res) {
+        wrapper.query_context_->JoinBGStatement(state, commit_ts, rollback);
+    }
+    return commit_ts;
+}
+
 Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompact(Txn *scan_txn) {
 
     Vector<Pair<UniquePtr<BaseStatement>, Txn *>> compaction_tasks;
@@ -109,26 +156,6 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
     }
 
     return compaction_tasks;
-}
-
-void CompactionProcessor::DoCompact() {
-    Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
-
-    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> statements = this->ScanForCompact(scan_txn);
-    Vector<Pair<BGQueryContextWrapper, BGQueryState>> wrappers;
-    for (const auto &[statement, txn] : statements) {
-        BGQueryContextWrapper wrapper(txn, session_mgr_);
-        BGQueryState state;
-        bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
-        if (res) {
-            wrappers.emplace_back(std::move(wrapper), std::move(state));
-        }
-    }
-    for (auto &[wrapper, query_state] : wrappers) {
-        wrapper.query_context_->JoinBGStatement(query_state);
-    }
-
-    txn_mgr_->CommitTxn(scan_txn);
 }
 
 void CompactionProcessor::ScanAndOptimize() {

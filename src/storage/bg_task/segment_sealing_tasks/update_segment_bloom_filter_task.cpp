@@ -28,7 +28,7 @@ import logger;
 import wal_entry;
 import third_party;
 import build_fast_rough_filter_task;
-import compact_segments_task;
+
 import catalog_delta_entry;
 
 namespace infinity {

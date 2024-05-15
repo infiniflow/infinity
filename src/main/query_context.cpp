@@ -251,16 +251,21 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
     return true;
 }
 
-bool QueryContext::JoinBGStatement(BGQueryState &state) {
+bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback) {
     QueryResult query_result;
+    if (rollback) {
+        query_result.result_table_ = state.plan_fragment->GetResult();
+        this->RollbackTxn();
+        return false;
+    }
     try {
         query_result.result_table_ = state.plan_fragment->GetResult();
         query_result.root_operator_type_ = state.logical_plans.back()->operator_type();
-        this->CommitTxn();
+        commit_ts = this->CommitTxn();
     } catch (RecoverableException &e) {
-        this->RollbackTxn();
         query_result.result_table_ = nullptr;
         query_result.status_.Init(e.ErrorCode(), e.what());
+        this->RollbackTxn();
         return false;
     } catch (UnrecoverableException &e) {
         LOG_CRITICAL(e.what());
@@ -276,12 +281,13 @@ void QueryContext::BeginTxn() {
     }
 }
 
-void QueryContext::CommitTxn() {
+TxnTimeStamp QueryContext::CommitTxn() {
     Txn *txn = session_ptr_->GetTxn();
-    storage_->txn_manager()->CommitTxn(txn);
+    TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseCommittedTxnCount();
     storage_->txn_manager()->IncreaseCommittedTxnCount();
+    return commit_ts;
 }
 
 void QueryContext::RollbackTxn() {

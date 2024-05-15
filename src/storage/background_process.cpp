@@ -20,7 +20,7 @@ module background_process;
 
 import stl;
 import bg_task;
-import compact_segments_task;
+
 import update_segment_bloom_filter_task;
 import logger;
 import blocking_queue;

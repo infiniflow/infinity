@@ -34,7 +34,7 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import compact_segments_task;
+
 import index_base;
 import index_base;
 import third_party;
@@ -51,6 +51,7 @@ import infinity_exception;
 import default_values;
 import block_index;
 import wal_manager;
+import compaction_process;
 
 using namespace infinity;
 
@@ -704,6 +705,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
 
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_manager = storage->buffer_manager();
+    CompactionProcessor *compaction_processor = storage->compaction_processor();
     TxnManager *txn_mgr = storage->txn_manager();
 
     Vector<SharedPtr<ColumnDef>> columns;
@@ -730,18 +732,8 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
     {
-        // add compact
-        auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-        auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
-        EXPECT_NE(table_entry, nullptr);
-
-        {
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-            compact_task->Execute();
-        }
-        // rollback
-        txn_mgr->RollBackTxn(txn4);
+        auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, true);
+        EXPECT_EQ(commit_ts, 0u);
     }
 
     {
@@ -1104,6 +1096,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         InfinityContext::instance().Init(config_path);
         Storage *storage = InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
+        CompactionProcessor *compaction_processor = storage->compaction_processor();
 
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
@@ -1225,18 +1218,8 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
             this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
             {
-
-                auto txn_cpt = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-                auto [table_entry, status] = txn_cpt->GetTableByName(*db_name, *table_name);
-                EXPECT_NE(table_entry, nullptr);
-
-                {
-                    auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn_cpt);
-                    compact_task->Execute();
-                }
-
-                last_commit_ts = txn_mgr->CommitTxn(txn_cpt);
+                last_commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+                EXPECT_NE(last_commit_ts, 0u);
             }
 
             {

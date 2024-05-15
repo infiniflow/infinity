@@ -46,7 +46,7 @@ import catalog_delta_entry;
 import bg_task;
 import background_process;
 import base_table_ref;
-import compact_segments_task;
+import compact_statement;
 import default_values;
 import chunk_index_entry;
 
@@ -120,7 +120,7 @@ Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool c
 }
 
 Status
-Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
+Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type) {
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);

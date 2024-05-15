@@ -34,7 +34,7 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import compact_segments_task;
+
 import index_base;
 import index_base;
 import third_party;
@@ -52,6 +52,7 @@ import default_values;
 import global_resource_usage;
 import infinity;
 import background_process;
+import compaction_process;
 import wal_manager;
 
 using namespace infinity;
@@ -162,6 +163,7 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     BufferManager *buffer_manager = storage->buffer_manager();
     TxnManager *txn_mgr = storage->txn_manager();
     TxnTimeStamp last_commit_ts = 0;
+    CompactionProcessor *compaction_processor = storage->compaction_processor();
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -186,16 +188,8 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
 
     { // add compact
-        auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-        auto [table_entry, status] = txn4->GetTableByName(*db_name, *table_name);
-        EXPECT_NE(table_entry, nullptr);
-
-        {
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-            compact_task->Execute();
-        }
-        txn_mgr->CommitTxn(txn4);
+        auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+        EXPECT_NE(commit_ts, 0u);
     }
 
     {

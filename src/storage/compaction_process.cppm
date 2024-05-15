@@ -17,7 +17,7 @@ module;
 export module compaction_process;
 
 import stl;
-import compact_segments_task;
+
 import txn;
 import bg_task;
 import blocking_queue;
@@ -39,10 +39,15 @@ public:
 
     void Submit(SharedPtr<BGTask> bg_task);
 
+    void DoCompact();
+
+    TxnTimeStamp ManualDoCompact(const String &schema_name,
+                                 const String &table_name,
+                                 bool rollback,
+                                 Optional<std::function<void()>> mid_func = None); // false unit test
+
 private:
     Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
-
-    void DoCompact();
 
     void ScanAndOptimize();
 

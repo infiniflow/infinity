@@ -61,7 +61,7 @@ public:
 private:
     void SaveSegmentData(QueryContext *query_context, const CompactStateData *compact_state_data);
 
-    void ApplyDeletes(QueryContext *query_context, const CompactStateData *compact_state_data);
+    bool ApplyDeletes(QueryContext *query_context, const CompactStateData *compact_state_data);
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_;

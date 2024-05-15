@@ -36,7 +36,6 @@ namespace infinity {
 class TxnTableStore;
 struct TxnSegmentStore;
 struct TableEntry;
-class CompactSegmentsTask;
 class BlockEntryIter;
 class CompactStateData;
 
@@ -100,11 +99,9 @@ public:
 
     bool SetSealed();
 
-    bool TrySetCompacting(CompactSegmentsTask *compact_task);
+    bool TrySetCompacting(CompactStateData *compact_state_data);
 
-    bool TrySetCompacting1(CompactStateData *compact_state_data);
-
-    void SetNoDelete();
+    bool SetNoDelete();
 
     void SetDeprecated(TxnTimeStamp deprecate_ts);
 
@@ -237,11 +234,9 @@ private:
     // check if a value must not exist in the segment
     FastRoughFilter fast_rough_filter_;
 
-    CompactSegmentsTask *compact_task_{};
     CompactStateData *compact_state_data_{};
     SegmentStatus status_;
 
-    std::condition_variable_any no_delete_complete_cv_{};
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 
 public:

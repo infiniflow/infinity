@@ -120,7 +120,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     const auto &compactible_segments = compact_segment_data.old_segments_;
 
     for (auto *compactible_segment : compactible_segments) {
-        if (!compactible_segment->TrySetCompacting1(compact_state_data)) {
+        if (!compactible_segment->TrySetCompacting(compact_state_data)) {
             UnrecoverableError("Segment should be compactible.");
         }
     }

@@ -34,7 +34,7 @@ import defer_op;
 import config;
 import status;
 import infinity_exception;
-import compact_segments_task;
+
 import variables;
 
 namespace infinity {

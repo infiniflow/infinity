@@ -26,6 +26,7 @@ struct SegmentEntry;
 enum class CompactStatementType {
     kManual,
     kAuto,
+    kInvalid
 };
 
 class CompactStatement : public BaseStatement {

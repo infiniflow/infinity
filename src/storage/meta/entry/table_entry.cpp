@@ -44,7 +44,7 @@ import column_def;
 import data_type;
 import default_values;
 import DBT_compaction_alg;
-import compact_segments_task;
+import compact_statement;
 import local_file_system;
 import build_fast_rough_filter_task;
 import block_entry;
@@ -453,7 +453,7 @@ Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferMan
 }
 
 Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
-    if (compact_store.task_type_ == CompactSegmentsTaskType::kInvalid) {
+    if (compact_store.type_ == CompactStatementType::kInvalid) {
         return Status::OK();
     }
 
@@ -504,13 +504,13 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         return Status::OK();
     }
 
-    switch (compact_store.task_type_) {
-        case CompactSegmentsTaskType::kCompactPickedSegments: {
+    switch (compact_store.type_) {
+        case CompactStatementType::kAuto: {
             compaction_alg_->CommitCompact(txn_id);
             LOG_TRACE(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
             break;
         }
-        case CompactSegmentsTaskType::kCompactTable: {
+        case CompactStatementType::kManual: {
             //  reinitialize compaction_alg_ with new segments and enable it
             LOG_TRACE(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
             compaction_alg_->Enable({});
@@ -553,12 +553,12 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
         }
     }
     if (compaction_alg_.get() != nullptr) {
-        switch (compact_store.task_type_) {
-            case CompactSegmentsTaskType::kCompactPickedSegments: {
+        switch (compact_store.type_) {
+            case CompactStatementType::kAuto: {
                 compaction_alg_->RollbackCompact(txn_id);
                 break;
             }
-            case CompactSegmentsTaskType::kCompactTable: {
+            case CompactStatementType::kManual: {
                 Vector<SegmentEntry *> old_segments;
                 for (const auto &[_, old_segs] : compact_store.compact_data_) {
                     old_segments.insert(old_segments.end(), old_segs.begin(), old_segs.end());
@@ -836,7 +836,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
             case IndexType::kHnsw:
             case IndexType::kSecondary: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
-                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                auto segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
+                for (auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {
                     SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
                     if (segment_entry != nullptr) {
                         auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);

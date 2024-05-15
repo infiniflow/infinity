@@ -68,7 +68,7 @@ public:
 
     bool ExecuteBGStatement(BaseStatement *statement, BGQueryState &state);
 
-    bool JoinBGStatement(BGQueryState &state);
+    bool JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback = false);
 
     inline void set_current_schema(const String &current_schema) { session_ptr_->set_current_schema(current_schema); }
 
@@ -90,7 +90,7 @@ public:
 
     void BeginTxn();
 
-    void CommitTxn();
+    TxnTimeStamp CommitTxn();
 
     void RollbackTxn();
 
