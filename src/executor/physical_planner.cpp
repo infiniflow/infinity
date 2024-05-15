@@ -76,6 +76,7 @@ import physical_compact_index_prepare;
 import physical_compact_index_do;
 import physical_compact_finish;
 import physical_match;
+import physical_tensor_maxsim_scan;
 import physical_fusion;
 import physical_create_index_prepare;
 import physical_create_index_do;
@@ -119,6 +120,7 @@ import logical_compact;
 import logical_compact_index;
 import logical_compact_finish;
 import logical_match;
+import logical_tensor_maxsim_scan;
 import logical_fusion;
 
 import value;
@@ -214,6 +216,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kMatch: {
             result = BuildMatch(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kTensorMaxSimScan: {
+            result = BuildTensorMaxSimScan(logical_operator);
             break;
         }
         case LogicalNodeType::kFusion: {
@@ -861,6 +867,16 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
                                      logical_match->common_query_filter_,
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTensorMaxSimScan(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalTensorMaxSimScan> logical_maxsim = static_pointer_cast<LogicalTensorMaxSimScan>(logical_operator);
+    return MakeUnique<PhysicalTensorMaxSimScan>(logical_maxsim->node_id(),
+                                                logical_maxsim->base_table_ref_,
+                                                logical_maxsim->tensor_maxsim_expression_,
+                                                logical_maxsim->common_query_filter_,
+                                                logical_maxsim->TableIndex(),
+                                                logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {
