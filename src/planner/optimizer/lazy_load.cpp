@@ -27,6 +27,7 @@ import logical_table_scan;
 import logical_index_scan;
 import logical_knn_scan;
 import logical_match;
+import logical_tensor_maxsim_scan;
 import base_table_ref;
 import load_meta;
 
@@ -53,6 +54,11 @@ Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
             auto &match = static_cast<LogicalMatch &>(op);
 
             return match.base_table_ref_.get();
+        }
+        case LogicalNodeType::kTensorMaxSimScan: {
+            auto &maxsim = static_cast<LogicalTensorMaxSimScan &>(op);
+
+            return maxsim.base_table_ref_.get();
         }
         default: {
             return None;
@@ -116,6 +122,22 @@ Vector<SizeT> LoadedColumn(const Vector<LoadMeta> *load_metas, BaseTableRef *tab
 
 SharedPtr<BaseExpression> CleanScan::VisitReplace(const SharedPtr<ColumnExpression> &expression) { return expression; }
 
+template <typename LogicalNodeSubType>
+inline void CleanScanVisitBaseTableRefNode(LogicalNode &op, SharedPtr<Vector<LoadMeta>> &last_op_load_metas_, Vector<SizeT> &scan_table_indexes_) {
+    auto &node = static_cast<LogicalNodeSubType &>(op);
+    // node base table ref has two parts:
+    // 1. the columns used by next operator
+    // 2. the columns used by filter expression in node
+    auto &node_load_metas = *node.load_metas();
+    Vector<LoadMeta> node_columns = std::move(node_load_metas);
+    node_load_metas.clear(); // need to set load_metas of node to empty vector
+    auto &last_op_load_metas = *last_op_load_metas_;
+    node_columns.insert(node_columns.end(), last_op_load_metas.begin(), last_op_load_metas.end());
+    Vector<SizeT> project_idxs = LoadedColumn(&node_columns, node.base_table_ref_.get());
+    scan_table_indexes_.push_back(node.base_table_ref_->table_index_);
+    node.base_table_ref_->RetainColumnByIndices(project_idxs);
+}
+
 void CleanScan::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
@@ -123,44 +145,26 @@ void CleanScan::VisitNode(LogicalNode &op) {
             Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
-            table_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
+            table_scan.base_table_ref_->RetainColumnByIndices(project_idxs);
             table_scan.add_row_id_ = true;
-            break;
-        }
-        case LogicalNodeType::kKnnScan: {
-            auto &knn_scan = static_cast<LogicalKnnScan &>(op);
-            // KnnScan base table ref has two parts:
-            // 1. the columns used by next operator
-            // 2. the columns used by filter expression in knn
-            auto &knn_load_metas = *knn_scan.load_metas();
-            Vector<LoadMeta> knn_scan_columns = std::move(knn_load_metas);
-            knn_load_metas.clear(); // need to set load_metas of KnnScan to empty vector
-            auto &last_op_load_metas = *last_op_load_metas_;
-            knn_scan_columns.insert(knn_scan_columns.end(), last_op_load_metas.begin(), last_op_load_metas.end());
-            Vector<SizeT> project_idxs = LoadedColumn(&knn_scan_columns, knn_scan.base_table_ref_.get());
-            scan_table_indexes_.push_back(knn_scan.base_table_ref_->table_index_);
-            knn_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             break;
         }
         case LogicalNodeType::kIndexScan: {
             auto &index_scan = static_cast<LogicalIndexScan &>(op);
             Vector<SizeT> project_idxs; // empty output
-            index_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
+            index_scan.base_table_ref_->RetainColumnByIndices(project_idxs);
+            break;
+        }
+        case LogicalNodeType::kKnnScan: {
+            CleanScanVisitBaseTableRefNode<LogicalKnnScan>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
         case LogicalNodeType::kMatch: {
-            auto &match = static_cast<LogicalMatch &>(op);
-            // Match base table ref has two parts:
-            // 1. the columns used by next operator
-            // 2. the columns used by filter expression in match
-            auto &match_load_metas = *match.load_metas();
-            Vector<LoadMeta> match_columns = std::move(match_load_metas);
-            match_load_metas.clear(); // need to set load_metas of Match to empty vector
-            auto &last_op_load_metas = *last_op_load_metas_;
-            match_columns.insert(match_columns.end(), last_op_load_metas.begin(), last_op_load_metas.end());
-            Vector<SizeT> project_idxs = LoadedColumn(&match_columns, match.base_table_ref_.get());
-            scan_table_indexes_.push_back(match.base_table_ref_->table_index_);
-            match.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
+            CleanScanVisitBaseTableRefNode<LogicalMatch>(op, last_op_load_metas_, scan_table_indexes_);
+            break;
+        }
+        case LogicalNodeType::kTensorMaxSimScan: {
+            CleanScanVisitBaseTableRefNode<LogicalTensorMaxSimScan>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
         case LogicalNodeType::kLimit:
