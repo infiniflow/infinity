@@ -391,8 +391,9 @@ Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, T
 Status Catalog::CommitWrite(TableEntry *table_entry,
                             TransactionID txn_id,
                             TxnTimeStamp commit_ts,
-                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
-    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores);
+                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                            const DeleteState *delete_state) {
+    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores, delete_state);
 }
 
 Status Catalog::RollbackWrite(TableEntry *table_entry, TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores) {

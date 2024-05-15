@@ -162,7 +162,10 @@ public:
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
-    Status CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores);
+    Status CommitWrite(TransactionID txn_id,
+                       TxnTimeStamp commit_ts,
+                       const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                       const DeleteState *delete_state);
 
     Status RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores);
 

@@ -373,29 +373,6 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
         }
     }
     this->DecreaseRemainRow(delete_row_n);
-    {
-        std::unique_lock w_lock(rw_locker_);
-        if (this->first_delete_ts_ == UNCOMMIT_TS) {
-            this->first_delete_ts_ = commit_ts;
-        }
-        if (status_ == SegmentStatus::kDeprecated) {
-            UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
-        }
-        if (compact_state_data_ != nullptr) {
-            if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
-                UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
-            }
-            Vector<SegmentOffset> segment_offsets;
-            for (const auto &[block_id, delete_rows] : block_row_hashmap) {
-                for (BlockOffset block_offset : delete_rows) {
-                    SegmentOffset segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset;
-                    segment_offsets.push_back(segment_offset);
-                }
-            }
-            compact_state_data_->AddToDelete(segment_id_, segment_offsets);
-        }
-        delete_txns_.erase(txn_id);
-    }
     return delete_row_n;
 }
 
@@ -405,8 +382,40 @@ void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
     }
 }
 
-void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnSegmentStore &segment_store) {
+void SegmentEntry::CommitSegment(TransactionID txn_id,
+                                 TxnTimeStamp commit_ts,
+                                 const TxnSegmentStore &segment_store,
+                                 const DeleteState *delete_state) {
     std::unique_lock w_lock(rw_locker_);
+    if (status_ == SegmentStatus::kDeprecated) {
+        UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
+    }
+
+    if (delete_state != nullptr) {
+        auto iter = delete_state->rows_.find(segment_id_);
+        if (iter != delete_state->rows_.end()) {
+            const auto &block_row_hashmap = iter->second;
+            if (this->first_delete_ts_ == UNCOMMIT_TS) {
+                this->first_delete_ts_ = commit_ts;
+            }
+            delete_txns_.erase(txn_id);
+
+            if (compact_state_data_ != nullptr) {
+                if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
+                    UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
+                }
+                Vector<SegmentOffset> segment_offsets;
+                for (const auto &[block_id, block_offsets] : block_row_hashmap) {
+                    for (auto block_offset : block_offsets) {
+                        segment_offsets.push_back(block_id * DEFAULT_BLOCK_CAPACITY + block_offset);
+                    }
+                }
+                compact_state_data_->AddToDelete(segment_id_, segment_offsets);
+                LOG_INFO(fmt::format("Append {} rows to to_delete_list in compact list", segment_offsets.size()));
+            }
+        }
+    }
+
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
         UnrecoverableError(fmt::format("SegmentEntry commit_ts {} is less than max_row_ts {}", commit_ts, max_row_ts_));

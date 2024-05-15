@@ -361,9 +361,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     LOG_INFO(fmt::format("Open new wal file {}", wal_path_));
 }
 
-String WalManager::GetWalFilename() const {
-    return wal_path_;
-}
+String WalManager::GetWalFilename() const { return wal_path_; }
 
 /*****************************************************************************
  * REPLAY WAL FILE
@@ -746,7 +744,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
     Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->delete_state_);
-    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), &table_store->delete_state_);
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -787,7 +785,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
 
     fake_txn->FakeCommit(commit_ts);
     Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), true);
-    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), nullptr);
 }
 
 // // TMP deprecated

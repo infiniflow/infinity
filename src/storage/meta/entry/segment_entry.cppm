@@ -189,7 +189,7 @@ public:
 
     void CommitFlushed(TxnTimeStamp commit_ts);
 
-    void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnSegmentStore &segment_store);
+    void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnSegmentStore &segment_store, const DeleteState *delete_state);
 
     void RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries);
 

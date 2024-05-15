@@ -349,7 +349,7 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
-    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_);
+    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_, &delete_state_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
         txn_index_store->Commit(txn_id, commit_ts);
