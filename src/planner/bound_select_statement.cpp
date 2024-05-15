@@ -43,6 +43,7 @@ import logical_project;
 import logical_filter;
 import logical_table_scan;
 import logical_knn_scan;
+import logical_tensor_maxsim_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
@@ -142,11 +143,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         return root;
     } else {
         SharedPtr<LogicalNode> root = nullptr;
-        SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size();
+        SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->tensor_maxsim_exprs_.size();
         if (num_children <= 0) {
-            UnrecoverableError("SEARCH shall have at least one MATCH or KNN expression");
+            UnrecoverableError("SEARCH shall have at least one MATCH or KNN or MAXSIM expression");
         } else if (num_children >= 3) {
-            UnrecoverableError("SEARCH shall have at max two MATCH or KNN expression");
+            UnrecoverableError("SEARCH shall have at max two MATCH or KNN or MAXSIM expression");
         }
 
         // FIXME: need check if there is subquery inside the where conditions
@@ -164,6 +165,16 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             matchNode->filter_expression_ = filter_expr;
             matchNode->common_query_filter_ = common_query_filter;
             match_knn_nodes.push_back(std::move(matchNode));
+        }
+        for (auto &tensor_maxsim_expr : search_expr_->tensor_maxsim_exprs_) {
+            if (table_ref_ptr_->type() != TableRefType::kTable) {
+                UnrecoverableError("Not base table reference");
+            }
+            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+            auto maxsimNode = MakeShared<LogicalTensorMaxSimScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, tensor_maxsim_expr);
+            maxsimNode->filter_expression_ = filter_expr;
+            maxsimNode->common_query_filter_ = common_query_filter;
+            match_knn_nodes.push_back(std::move(maxsimNode));
         }
 
         bind_context->GenerateTableIndex();

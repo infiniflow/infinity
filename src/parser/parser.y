@@ -376,7 +376,7 @@ struct SQL_LTYPE {
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
 %token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
-%token SEARCH MATCH QUERY FUSION
+%token SEARCH MATCH MAXSIM QUERY FUSION
 
 %token NUMBER
 
@@ -419,7 +419,7 @@ struct SQL_LTYPE {
 %type <set_operator_t>          set_operator
 %type <explain_type_t>          explain_type
 
-%type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr knn_expr
+%type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr knn_expr tensor_maxsim_expr
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
 %type <expr_t>                  match_expr query_expr fusion_expr search_clause
@@ -437,7 +437,7 @@ struct SQL_LTYPE {
 %type <copy_option_array> copy_option_list
 %type <copy_option_t>     copy_option
 
-%type <str_value>         file_path
+%type <str_value>         file_path optional_maxsim_option
 
 %type <bool_value>        if_not_exists if_exists distinct
 
@@ -1918,8 +1918,129 @@ operand: '(' expr ')' {
 | cast_expr
 | knn_expr
 | match_expr
+| tensor_maxsim_expr
 | query_expr
 | fusion_expr
+
+optional_maxsim_option : ',' STRING {
+    $$ = $2;
+}
+| {
+    $$ = nullptr;
+}
+
+tensor_maxsim_expr : MAXSIM '(' column_expr ',' array_expr ',' STRING optional_maxsim_option ')' {
+    infinity::TensorMaxSimExpr* maxsim_expr = new infinity::TensorMaxSimExpr();
+    $$ = maxsim_expr;
+    // MAXSIM search column
+    maxsim_expr->column_expr_ = $3;
+    // MAXSIM options
+    if ($8) {
+        maxsim_expr->options_text_ = $8;
+        free($8);
+    }
+    // MAXSIM query tensor
+    ParserHelper::ToLower($7);
+    if(strcmp($7, "float") == 0) {
+        maxsim_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemFloat;
+        if(!($5->double_array_.empty())) {
+            maxsim_expr->dimension_ = $5->double_array_.size();
+            maxsim_expr->embedding_data_ptr_ = new float[maxsim_expr->dimension_];
+            for(long i = 0; i < maxsim_expr->dimension_; ++ i) {
+                ((float*)(maxsim_expr->embedding_data_ptr_))[i] = $5->double_array_[i];
+            }
+        }
+        if(!($5->long_array_.empty())) {
+            maxsim_expr->dimension_ = $5->long_array_.size();
+            maxsim_expr->embedding_data_ptr_ = new float[maxsim_expr->dimension_];
+            for(long i = 0; i < maxsim_expr->dimension_; ++ i) {
+                ((float*)(maxsim_expr->embedding_data_ptr_))[i] = $5->long_array_[i];
+            }
+        }
+        free($7);
+        delete $5;
+    } else if(strcmp($7, "tinyint") == 0) {
+        maxsim_expr->dimension_ = $5->long_array_.size();
+        maxsim_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt8;
+        maxsim_expr->embedding_data_ptr_ = new char[maxsim_expr->dimension_];
+        for(long i = 0; i < maxsim_expr->dimension_; ++ i) {
+            ((char*)maxsim_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
+        }
+        free($7);
+        delete $5;
+    } else if(strcmp($7, "smallint") == 0) {
+        maxsim_expr->dimension_ = $5->long_array_.size();
+        maxsim_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt16;
+        maxsim_expr->embedding_data_ptr_ = new short int[maxsim_expr->dimension_];
+        for(long i = 0; i < maxsim_expr->dimension_; ++ i) {
+            ((short int*)maxsim_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
+        }
+        free($7);
+        delete $5;
+    } else if(strcmp($7, "integer") == 0) {
+        maxsim_expr->dimension_ = $5->long_array_.size();
+        maxsim_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt32;
+        maxsim_expr->embedding_data_ptr_ = new int[maxsim_expr->dimension_];
+        for(long i = 0; i < maxsim_expr->dimension_; ++ i) {
+            ((int*)maxsim_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
+        }
+        free($7);
+        delete $5;
+    } else if(strcmp($7, "bigint") == 0) {
+        maxsim_expr->dimension_ = $5->long_array_.size();
+        maxsim_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt64;
+        maxsim_expr->embedding_data_ptr_ = new long[maxsim_expr->dimension_];
+        memcpy(maxsim_expr->embedding_data_ptr_, (void*)$5->long_array_.data(), maxsim_expr->dimension_ * sizeof(long));
+        free($7);
+        delete $5;
+    } else if(strcmp($7, "bit") == 0) {
+        maxsim_expr->dimension_ = $5->long_array_.size();
+        if(maxsim_expr->dimension_ % 8 == 0) {
+            maxsim_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemBit;
+            long embedding_size = maxsim_expr->dimension_ / 8;
+            uint8_t *data_ptr = new uint8_t[embedding_size];
+            maxsim_expr->embedding_data_ptr_ = data_ptr;
+            for(long i = 0; i < embedding_size; ++ i) {
+                uint8_t embedding_unit = 0;
+                for(long bit_idx = 0; bit_idx < 8; ++ bit_idx) {
+                    double val = $5->long_array_[i * 8 + bit_idx];
+                    if (val != 0 && val != 1) {
+                        free($7);
+                        delete $5;
+                        delete $$;
+                        yyerror(&yyloc, scanner, result, "Invalid bit embedding type data");
+                        YYERROR;
+                    }
+                    if(val == 1) {
+                        embedding_unit |= (uint8_t(1) << bit_idx);
+                    }
+                }
+                data_ptr[i] = embedding_unit;
+            }
+            free($7);
+            delete $5;
+        } else {
+            free($7);
+            delete $5;
+            delete $$;
+            yyerror(&yyloc, scanner, result, "tensor data type is bit which length should be aligned with 8");
+            YYERROR;
+        }
+    } else if(strcmp($7, "double") == 0) {
+        maxsim_expr->dimension_ = $5->double_array_.size();
+        maxsim_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemDouble;
+        maxsim_expr->embedding_data_ptr_ = new double[maxsim_expr->dimension_];
+        memcpy(maxsim_expr->embedding_data_ptr_, (void*)$5->double_array_.data(), maxsim_expr->dimension_ * sizeof(double));
+        free($7);
+        delete $5;
+    } else {
+        free($7);
+        delete $5;
+        delete $$;
+        yyerror(&yyloc, scanner, result, "Invalid tensor data type");
+        YYERROR;
+    }
+}
 
 knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list {
     infinity::KnnExpr* knn_expr = new infinity::KnnExpr();
@@ -2146,6 +2267,10 @@ sub_search_array : knn_expr {
     $$ = new std::vector<infinity::ParsedExpr*>();
     $$->emplace_back($1);
 }
+| tensor_maxsim_expr {
+    $$ = new std::vector<infinity::ParsedExpr*>();
+    $$->emplace_back($1);
+}
 | query_expr {
     $$ = new std::vector<infinity::ParsedExpr*>();
     $$->emplace_back($1);
@@ -2159,6 +2284,10 @@ sub_search_array : knn_expr {
     $$ = $1;
 }
 | sub_search_array ',' match_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+}
+| sub_search_array ',' tensor_maxsim_expr {
     $1->emplace_back($3);
     $$ = $1;
 }

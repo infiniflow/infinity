@@ -14,8 +14,9 @@
 
 module;
 
-import stl;
+export module expression_binder;
 
+import stl;
 import function;
 import bind_context;
 import base_expression;
@@ -29,11 +30,10 @@ import function_expr;
 import case_expr;
 import in_expr;
 import knn_expr;
+import tensor_maxsim_expr;
 import search_expr;
 import subquery_expr;
 import cast_expr;
-
-export module expression_binder;
 
 namespace infinity {
 
@@ -73,6 +73,8 @@ public:
     virtual SharedPtr<BaseExpression> BuildInExpr(const InExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+
+    virtual SharedPtr<BaseExpression> BuildTensorMaxSimExpr(const TensorMaxSimExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual SharedPtr<BaseExpression> BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 

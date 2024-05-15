@@ -33,7 +33,7 @@ namespace infinity {
 
 export class LogicalTensorMaxSimScan final : public LogicalNode {
 public:
-    explicit LogicalTensorMaxSimScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref);
+    explicit LogicalTensorMaxSimScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr);
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const override;
 
@@ -53,7 +53,7 @@ public:
 
     SharedPtr<BaseTableRef> base_table_ref_{};
 
-    SharedPtr<TensorMaxSimExpression> tensor_maxsim_expression_{};
+    SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr_{};
 
     SharedPtr<BaseExpression> filter_expression_{};
 

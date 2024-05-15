@@ -67,6 +67,7 @@ import physical_merge_top;
 import physical_merge_sort;
 import physical_merge_knn;
 import physical_match;
+import physical_tensor_maxsim_scan;
 import physical_fusion;
 import physical_merge_aggregate;
 import status;
@@ -273,6 +274,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kMatch: {
             Explain((PhysicalMatch *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kTensorMaxSimScan: {
+            Explain((PhysicalTensorMaxSimScan *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kFusion: {
@@ -2030,7 +2035,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = match_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in merge knn node.");
+        UnrecoverableError("No column in Match node.");
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += match_node->GetOutputNames()->at(idx) + ", ";
@@ -2041,6 +2046,71 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
 
     if (match_node->left() != nullptr) {
         UnrecoverableError("Match node have children nodes.");
+    }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalTensorMaxSimScan *tensor_maxsim_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> TensorMaxSimScan ";
+    } else {
+        explain_header_str = "TensorMaxSimScan ";
+    }
+    explain_header_str += "(" + std::to_string(tensor_maxsim_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    // Table alias and name
+    String table_name = String(intent_size, ' ') + " - table name: " + tensor_maxsim_node->TableAlias() + "(";
+
+    table_name += *tensor_maxsim_node->table_collection_ptr()->GetDBName() + ".";
+    table_name += *tensor_maxsim_node->table_collection_ptr()->GetTableName() + ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(tensor_maxsim_node->table_index());
+    result->emplace_back(MakeShared<String>(table_index));
+
+    String tensor_maxsim_expression =
+        String(intent_size, ' ') + " - TensorMaxSimScan expression: " + tensor_maxsim_node->tensor_maxsim_expr()->ToString();
+    result->emplace_back(MakeShared<String>(std::move(tensor_maxsim_expression)));
+
+    // filter expression
+    if (const CommonQueryFilter *filter = tensor_maxsim_node->common_query_filter(); filter) {
+        {
+            String filter_str = String(intent_size, ' ') + " - filter for secondary index: ";
+            if (const auto *filter_expr = filter->secondary_index_filter_qualified_.get(); filter_expr) {
+                ExplainLogicalPlan::Explain(filter_expr, filter_str);
+            } else {
+                filter_str += "None";
+            }
+            result->emplace_back(MakeShared<String>(filter_str));
+        }
+        {
+            String filter_str = String(intent_size, ' ') + " - filter except secondary index: ";
+            if (const auto *filter_expr = filter->filter_leftover_.get(); filter_expr) {
+                ExplainLogicalPlan::Explain(filter_expr, filter_str);
+            } else {
+                filter_str += "None";
+            }
+            result->emplace_back(MakeShared<String>(filter_str));
+        }
+    }
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = tensor_maxsim_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        UnrecoverableError("No column in PhysicalTensorMaxSimScan node.");
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += tensor_maxsim_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += tensor_maxsim_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+
+    if (tensor_maxsim_node->left() != nullptr) {
+        UnrecoverableError("PhysicalTensorMaxSimScan node have children nodes.");
     }
 }
 

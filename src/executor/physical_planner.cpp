@@ -873,7 +873,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTensorMaxSimScan(const SharedP
     SharedPtr<LogicalTensorMaxSimScan> logical_maxsim = static_pointer_cast<LogicalTensorMaxSimScan>(logical_operator);
     return MakeUnique<PhysicalTensorMaxSimScan>(logical_maxsim->node_id(),
                                                 logical_maxsim->base_table_ref_,
-                                                logical_maxsim->tensor_maxsim_expression_,
+                                                logical_maxsim->tensor_maxsim_expr_,
                                                 logical_maxsim->common_query_filter_,
                                                 logical_maxsim->TableIndex(),
                                                 logical_operator->load_metas());

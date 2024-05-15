@@ -17,28 +17,34 @@ module;
 module tensor_maxsim_expression;
 import stl;
 import expression_type;
-import knn_expr;
+import internal_types;
 import third_party;
-import statement_common;
+import base_expression;
+import column_expression;
 
 namespace infinity {
 
-TensorMaxSimExpression::TensorMaxSimExpression(const String &tensor_column_name,
-                                               EmbeddingDataType embedding_data_type,
+TensorMaxSimExpression::TensorMaxSimExpression(Vector<SharedPtr<BaseExpression>> search_column,
+                                               const EmbeddingDataType embedding_data_type,
                                                const u32 dimension,
                                                EmbeddingT query_embedding,
+                                               const u32 tensor_basic_embedding_dimension,
                                                const String &options_text)
-    : BaseExpression(ExpressionType::kTensorMaxSim, Vector<SharedPtr<BaseExpression>>()), tensor_column_name_(tensor_column_name),
-      embedding_data_type_(embedding_data_type), dimension_(dimension), query_embedding_(std::move(query_embedding)), options_text_(options_text) {}
+    : BaseExpression(ExpressionType::kTensorMaxSim, std::move(search_column)), embedding_data_type_(embedding_data_type), dimension_(dimension),
+      query_embedding_(std::move(query_embedding)), tensor_basic_embedding_dimension_(tensor_basic_embedding_dimension), options_text_(options_text) {
+    column_expr_ = static_cast<ColumnExpression *>(arguments_[0].get());
+}
 
 String TensorMaxSimExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
-    return fmt::format("TensorMaxSim({}, [{}], {})",
-                       tensor_column_name_,
-                       EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
-                       options_text_);
+    auto tensor_str =
+        TensorT::Tensor2String(query_embedding_.ptr, embedding_data_type_, tensor_basic_embedding_dimension_, num_of_embedding_in_query_tensor_);
+    if (options_text_.empty()) {
+        return fmt::format("TensorMaxSim({}, [{}])", column_expr_->Name(), std::move(tensor_str));
+    }
+    return fmt::format("TensorMaxSim({}, [{}], '{}')", column_expr_->Name(), std::move(tensor_str), options_text_);
 }
 
 } // namespace infinity

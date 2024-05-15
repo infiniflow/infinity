@@ -31,8 +31,11 @@ import explain_logical_plan;
 
 namespace infinity {
 
-LogicalTensorMaxSimScan::LogicalTensorMaxSimScan(const u64 node_id, SharedPtr<BaseTableRef> base_table_ref)
-    : LogicalNode(node_id, LogicalNodeType::kTensorMaxSimScan), base_table_ref_(std::move(base_table_ref)) {}
+LogicalTensorMaxSimScan::LogicalTensorMaxSimScan(const u64 node_id,
+                                                 SharedPtr<BaseTableRef> base_table_ref,
+                                                 SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr)
+    : LogicalNode(node_id, LogicalNodeType::kTensorMaxSimScan), base_table_ref_(std::move(base_table_ref)),
+      tensor_maxsim_expr_(std::move(tensor_maxsim_expr)) {}
 
 Vector<ColumnBinding> LogicalTensorMaxSimScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;
@@ -63,7 +66,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalTensorMaxSimScan::GetOutputTypes()
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(tensor_maxsim_expression_->Type()));
+    result_types->emplace_back(MakeShared<DataType>(tensor_maxsim_expr_->Type()));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;
 }
@@ -104,7 +107,7 @@ String LogicalTensorMaxSimScan::ToString(i64 &space) const {
     ss << table_index << std::endl;
 
     String match_info = String(space, ' ');
-    match_info += " - tensor maxsim expression: " + tensor_maxsim_expression_->ToString();
+    match_info += " - tensor maxsim expression: " + tensor_maxsim_expr_->ToString();
     ss << match_info << std::endl;
 
     // filter expression

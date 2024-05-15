@@ -120,6 +120,7 @@ LOG             { return LOG; }
 LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
+MAXSIM          { return MAXSIM; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }

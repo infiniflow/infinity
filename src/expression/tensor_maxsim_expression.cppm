@@ -22,25 +22,29 @@ import logical_type;
 import knn_expr;
 import internal_types;
 import base_expression;
+import column_expression;
 
 namespace infinity {
 
-export class TensorMaxSimExpression : public BaseExpression {
+export class TensorMaxSimExpression final : public BaseExpression {
 public:
-    TensorMaxSimExpression(const String &tensor_column_name,
+    TensorMaxSimExpression(Vector<SharedPtr<BaseExpression>> search_column,
                            EmbeddingDataType embedding_data_type,
                            u32 dimension,
                            EmbeddingT query_embedding,
+                           u32 tensor_basic_embedding_dimension,
                            const String &options_text);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
     String ToString() const override;
 
-    String tensor_column_name_;
+    const ColumnExpression *column_expr_ = nullptr;
     const EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
-    const u32 dimension_{0};
-    const EmbeddingT query_embedding_;
+    const u32 dimension_{0};                     // num of total elements in the tensor (num of embedding * dimension of single embedding)
+    const EmbeddingT query_embedding_;           // treat the query tensor as an embedding here
+    const u32 tensor_basic_embedding_dimension_; // dimension of single embedding in the tensor column
+    const u32 num_of_embedding_in_query_tensor_ = dimension_ / tensor_basic_embedding_dimension_;
     String options_text_;
 };
 
