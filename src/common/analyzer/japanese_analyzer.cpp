@@ -14,8 +14,6 @@
 
 module;
 
-#include "string_utils.h"
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
@@ -24,7 +22,7 @@ module;
 
 #include <cstring>
 #include <filesystem>
-
+#include <iostream>
 import stl;
 import term;
 import analyzer;
@@ -51,6 +49,7 @@ private:
             knowledge_ = jma::JMA_Factory::instance()->createKnowledge();
             // load system dictioanry files
             knowledge_->setSystemDict(knowledge_path);
+            std::cout << "knowledge_path " << knowledge_path << std::endl;
 
             if (knowledge_->loadDict() == 0) {
                 String msg = "Failed to load JMA knowledge from path: ";

@@ -52,11 +52,8 @@ protected:
 
     bool NextToken() override {
         while (DoNext()) {
-            native_token_ = sentence_->getLexicon(list_index_, lexicon_index_);
-            native_token_len_ = std::strlen(native_token_);
-
-            // if (native_token_len_ > term_ustring_buffer_limit_)
-            //     continue;
+            token_ = sentence_->getLexicon(list_index_, lexicon_index_);
+            len_ = std::strlen(token_);
 
             morpheme_ = sentence_->getPOS(list_index_, lexicon_index_);
             is_index_ = true; // sentence_->isIndexWord(list_index_, lexicon_index_);
