@@ -32,6 +32,8 @@ public:
 
     ~JapaneseAnalyzer();
 
+    Status Load();
+
     void SetIndexMode();
 
     void SetLabelMode();
@@ -91,7 +93,7 @@ private:
     }
 
 private:
-    String dict_path_;
+    String knowledge_path_;
 
     jma::Knowledge *knowledge_{nullptr};
 

@@ -28,6 +28,7 @@ import term;
 import analyzer;
 import common_analyzer;
 import logger;
+import status;
 
 module japanese_analyzer;
 
@@ -49,14 +50,12 @@ private:
             knowledge_ = jma::JMA_Factory::instance()->createKnowledge();
             // load system dictioanry files
             knowledge_->setSystemDict(knowledge_path);
-            std::cout << "knowledge_path " << knowledge_path << std::endl;
 
             if (knowledge_->loadDict() == 0) {
                 String msg = "Failed to load JMA knowledge from path: ";
                 msg.append(knowledge_path);
                 throw std::logic_error(msg);
             }
-            std::cout << "finish!" << std::endl;
         }
     }
     ~JMAKnowledge() { delete knowledge_; }
@@ -76,16 +75,8 @@ JapaneseAnalyzer::JapaneseAnalyzer(const String &base_path) {
     analyzer_ = factory->createAnalyzer();
     fs::path root(base_path);
     fs::path knowledge_path(root / KNOWLEDGE_PATH);
-    knowledge_ = JMAKnowledge::instance(knowledge_path.string().c_str()).knowledge_;
-
-    analyzer_->setKnowledge(knowledge_);
+    knowledge_path_ = knowledge_path.string();
     sentence_ = new jma::Sentence();
-    fl_morp_ = analyzer_->getCodeFromStr(JAPANESE_FL);
-    sc_morp_ = analyzer_->getCodeFromStr(JAPANESE_SC);
-    analyzer_->setOption(jma::Analyzer::OPTION_TYPE_POS_FORMAT_ALPHABET, 1);
-
-    SetCaseSensitive(false);
-    SetIndexMode(); // Index mode is set by default
 }
 
 JapaneseAnalyzer::JapaneseAnalyzer(const JapaneseAnalyzer &other) : knowledge_(other.knowledge_) {
@@ -107,11 +98,24 @@ JapaneseAnalyzer::~JapaneseAnalyzer() {
     delete sentence_;
 }
 
-void JapaneseAnalyzer::SetIndexMode() {
-    if (analyzer_ == nullptr) {
-        throw std::logic_error("JapaneseAnalyzer::SetIndexMode() is call with analyzer_ nullptr");
+Status JapaneseAnalyzer::Load() {
+    try {
+        knowledge_ = JMAKnowledge::instance(knowledge_path_.c_str()).knowledge_;
+    } catch (std::logic_error) {
+        return Status::InvalidAnalyzerFile("Failed to load JMA analyzer");
     }
+    analyzer_->setKnowledge(knowledge_);
+    fl_morp_ = analyzer_->getCodeFromStr(JAPANESE_FL);
+    sc_morp_ = analyzer_->getCodeFromStr(JAPANESE_SC);
+    analyzer_->setOption(jma::Analyzer::OPTION_TYPE_POS_FORMAT_ALPHABET, 1);
 
+    SetCaseSensitive(false);
+    SetIndexMode(); // Index mode is set by default
+
+    return Status::OK();
+}
+
+void JapaneseAnalyzer::SetIndexMode() {
     analyzer_->setOption(jma::Analyzer::OPTION_TYPE_NBEST, 1);
     analyzer_->setOption(jma::Analyzer::OPTION_TYPE_DECOMPOSE_USER_NOUN, 0);
     analyzer_->setOption(jma::Analyzer::OPTION_TYPE_COMPOUND_MORPHOLOGY, 0);
@@ -120,10 +124,6 @@ void JapaneseAnalyzer::SetIndexMode() {
 }
 
 void JapaneseAnalyzer::SetLabelMode() {
-    if (analyzer_ == nullptr) {
-        throw std::logic_error("JapaneseAnalyzer::SetLabelMode() is call with analyzer_ nullptr");
-    }
-
     analyzer_->setOption(jma::Analyzer::OPTION_TYPE_NBEST, 1);
     analyzer_->setOption(jma::Analyzer::OPTION_TYPE_COMPOUND_MORPHOLOGY, 1);
     analyzer_->setOption(jma::Analyzer::OPTION_TYPE_DECOMPOSE_USER_NOUN, 1);
