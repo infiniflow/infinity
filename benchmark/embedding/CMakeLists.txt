@@ -29,6 +29,7 @@ target_link_libraries(
         fastpfor
         atomic.a
         lz4.a
+        jma
 )
 
 if(ENABLE_JEMALLOC)
