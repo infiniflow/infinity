@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Aug 12, 2010
  */
 
 #include "char_table.h"

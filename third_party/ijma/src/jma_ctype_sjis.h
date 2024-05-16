@@ -2,7 +2,6 @@
  * \file jma_ctype_sjis.h
  * \brief encoding for the SHIFT-JIS
  *
- * \date Jun 25, 2009
  * \author vernkin
  */
 

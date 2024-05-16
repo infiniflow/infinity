@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Jun 12, 2009
  */
 
 #ifndef JMA_KNOWLEDGE_H

@@ -2,7 +2,6 @@
  * \brief JMA_CType gives the character type information.
  * \author Jun Jiang
  * \version 0.1
- * \date Mar 10, 2009
  */
 
 #include "jma_ctype.h"

@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Sep 11, 2009
  */
 
 #ifndef JMA_POS_TABLE_H

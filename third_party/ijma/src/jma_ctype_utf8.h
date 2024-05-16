@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Jul 16, 2009
  */
 
 #ifndef JMA_CTYPE_UTF8_H_

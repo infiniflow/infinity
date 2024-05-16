@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Sep 11, 2009
  */
 
 #include "pos_table.h"

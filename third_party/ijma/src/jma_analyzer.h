@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Mar 2, 2009
  */
 
 #ifndef JMA_CRF_ANALYZER_H

@@ -2,7 +2,6 @@
  * \brief Tokenizer tokenizes a raw input string in specific encoding to a sequence of characters.
  * \author Vernkin
  * \version 0.1
- * \date Jun 25, 2009
  */
 
 #ifndef JMA_TOKENIZER_H

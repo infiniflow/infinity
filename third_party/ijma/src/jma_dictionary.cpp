@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Aug 02, 2010
  */
 
 #include "jma_dictionary.h"

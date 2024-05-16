@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Sep 03, 2010
  */
 
 #ifndef JMA_FILE_UTILS_H

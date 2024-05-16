@@ -3,7 +3,6 @@
  *
  * \author Jun Jiang
  * \version 0.1
- * \date Aug 26, 2010
  */
 
 #ifndef IJMA_H
