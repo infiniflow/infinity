@@ -86,8 +86,10 @@ TEST_F(ColumnInverterTest, Invert) {
     Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-    ColumnInverter inverter1("standard", provider, column_lengths_);
-    ColumnInverter inverter2("standard", provider, column_lengths_);
+    ColumnInverter inverter1(provider, column_lengths_);
+    inverter1.InitAnalyzer("standard");
+    ColumnInverter inverter2(provider, column_lengths_);
+    inverter2.InitAnalyzer("standard");
     inverter1.InvertColumn(column, 0, 3, 0);
     inverter2.InvertColumn(column, 3, 2, 3);
 
