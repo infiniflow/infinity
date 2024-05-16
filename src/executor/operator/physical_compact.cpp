@@ -81,6 +81,7 @@ private:
 void PhysicalCompact::Init() {
     if (compact_type_ == CompactStatementType::kManual) {
         TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+        LOG_INFO(fmt::format("Manual compact {} start", *table_entry->GetTableName()));
         if (!table_entry->CompactPrepare()) {
             LOG_WARN(fmt::format("Table {} is not compactable.", *table_entry->GetTableName()));
             return;
@@ -94,6 +95,8 @@ void PhysicalCompact::Init() {
             compactible_segments_group_.push_back(compactible_segments);
         }
     } else {
+        TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+        LOG_INFO(fmt::format("Auto compact {} start", *table_entry->GetTableName()));
         Vector<SegmentEntry *> compactible_segments;
         const auto &block_index = *base_table_ref_->block_index_;
         for (const auto &[segment_id, segment_snapshot] : block_index.segment_block_index_) {

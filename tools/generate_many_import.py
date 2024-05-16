@@ -57,23 +57,26 @@ def generate(generate_if_exists: bool, copy_dir: str):
             slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("COMPACT TABLE {};\n".format(table_name))
         slt_file.write("\n")
 
-        # # The delete will throw exception when compacting, so add this to wait for sometime
-        # slt_file.write("statement ok\n")
-        # slt_file.write("SELECT * FROM {};\n".format(table_name))
-        # slt_file.write("\n")
+        for v in range(max_v):
+            slt_file.write("statement ok\n")
+            slt_file.write("DELETE FROM {} WHERE c1 = {};\n".format(table_name, v))
+            slt_file.write("\n")
 
-        # for v in range(max_v):
-        #     slt_file.write("statement ok\n")
-        #     slt_file.write("DELETE FROM {} WHERE c1 = {};\n".format(table_name, v))
-        #     slt_file.write("\n")
+        slt_file.write("statement ok\n")
+        slt_file.write("COMPACT TABLE {};\n".format(table_name))
+        slt_file.write("\n")
 
-        # slt_file.write("query I\n")
-        # slt_file.write("SELECT * FROM {};\n".format(table_name))
-        # slt_file.write("----\n")
-        # slt_file.write("\n")
+        slt_file.write("query I\n")
+        slt_file.write("SELECT * FROM {};\n".format(table_name))
+        slt_file.write("----\n")
+        slt_file.write("\n")
+
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
 
 
 if __name__ == "__main__":

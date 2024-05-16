@@ -69,8 +69,8 @@ BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
 }
 
 void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot) {
-    index_snapshots_vec_.emplace_back(index_snapshot.get());
-    index_snapshots_.emplace(std::move(index_name), std::move(index_snapshot));
+    index_snapshots_vec_.push_back(index_snapshot.get());
+    index_snapshots_.emplace(std::move(index_name), index_snapshot);
 }
 
 void IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {

@@ -1000,6 +1000,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
+        if (segment_entry->commit_ts_ > max_commit_ts) {
+            continue;
+        }
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
         checkpoint_row_count += segment_entry->checkpoint_row_count();
     }
@@ -1143,23 +1146,6 @@ bool TableEntry::CompactPrepare() const {
     }
     compaction_alg_->Disable(); // wait for current compaction to finish
     return true;
-}
-
-Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
-    if (!this->CompactPrepare()) {
-        return {};
-    }
-    Vector<SegmentEntry *> result;
-    std::shared_lock lock(this->rw_locker_);
-    for (const auto &[segment_id, segment] : this->segment_map_) {
-        auto status = segment->status();
-        if (status == SegmentStatus::kSealed) {
-            result.emplace_back(segment.get());
-        } else if (status == SegmentStatus::kCompacting || status == SegmentStatus::kNoDelete) {
-            UnrecoverableError("Segment should not be compacting or no delete when picking manually");
-        }
-    }
-    return result;
 }
 
 void TableEntry::PickCleanup(CleanupScanner *scanner) {
