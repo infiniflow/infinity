@@ -18,21 +18,47 @@ import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
-
+import cleanup_scanner;
+import buffer_manager;
 
 export module bg_task;
 
 namespace infinity {
 
 export enum class BGTaskType {
-    kTryCheckpoint,   // Periodically triggered by timer
-    kForceCheckpoint, // Manually triggered by PhysicalFlush
     kStopProcessor,
-    kCatalogDeltaOpsMerge, // Merge
-    kCompactSegments,
+    kAddDeltaEntry,
+    kCheckpoint,
+    kForceCheckpoint, // Manually triggered by PhysicalFlush
+    kNotifyCompact,
+    kNotifyOptimize,
     kCleanup,
+    kUpdateSegmentBloomFilterData, // Not used
     kInvalid
 };
+
+export String BGTaskTypeToString(BGTaskType type) {
+    switch (type) {
+        case BGTaskType::kStopProcessor:
+            return "StopProcessor";
+        case BGTaskType::kForceCheckpoint:
+            return "ForceCheckpoint";
+        case BGTaskType::kAddDeltaEntry:
+            return "AddDeltaEntry";
+        case BGTaskType::kCheckpoint:
+            return "Checkpoint";
+        case BGTaskType::kNotifyCompact:
+            return "NotifyCompact";
+        case BGTaskType::kNotifyOptimize:
+            return "NotifyOptimize";
+        case BGTaskType::kCleanup:
+            return "Cleanup";
+        case BGTaskType::kUpdateSegmentBloomFilterData:
+            return "UpdateSegmentBloomFilterData";
+        default:
+            return "Invalid";
+    }
+}
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
@@ -74,38 +100,81 @@ export struct StopProcessorTask final : public BGTask {
     String ToString() const final { return "Stop Task"; }
 };
 
-export struct TryCheckpointTask final : public BGTask {
-    explicit TryCheckpointTask(bool async) : BGTask(BGTaskType::kTryCheckpoint, async) {}
+export struct AddDeltaEntryTask final : public BGTask {
+    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size)
+        : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)), wal_size_(wal_size) {}
 
-    ~TryCheckpointTask() = default;
+    String ToString() const final { return "Add Delta Entry Task"; }
 
-    String ToString() const final { return "Checkpoint Task"; }
+    UniquePtr<CatalogDeltaEntry> delta_entry_{};
+    i64 wal_size_{};
 };
 
-export struct ForceCheckpointTask final : public BGTask {
-    explicit ForceCheckpointTask(Txn *txn) : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn) {}
-    explicit ForceCheckpointTask(Txn *txn, bool is_full_checkpoint)
-        : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(is_full_checkpoint) {}
+export struct CheckpointTaskBase : public BGTask {
+    CheckpointTaskBase(BGTaskType type, bool async) : BGTask(type, async) {}
+};
+
+export struct CheckpointTask final : public CheckpointTaskBase {
+    CheckpointTask(bool full_checkpoint) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
+
+    String ToString() const final { return "Checkpoint Task"; }
+    bool is_full_checkpoint_{};
+};
+
+export struct ForceCheckpointTask final : public CheckpointTaskBase {
+    explicit ForceCheckpointTask(Txn *txn, bool full_checkpoint = true)
+        : CheckpointTaskBase(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(full_checkpoint) {}
 
     ~ForceCheckpointTask() = default;
 
-    String ToString() const final { return "Force Checkpoint Task"; }
+    String ToString() const override { return "Force Checkpoint Task"; }
 
     Txn *txn_{};
-    bool is_full_checkpoint_{true};
+    bool is_full_checkpoint_{};
 };
 
-export struct CatalogDeltaOpsMergeTask final : public BGTask {
+export class CleanupTask final : public BGTask {
+public:
+    // Try clean up is async task?
+    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
+        : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
-    explicit CatalogDeltaOpsMergeTask(UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry, Catalog *catalog)
-        : BGTask(BGTaskType::kCatalogDeltaOpsMerge, true), local_catalog_delta_entry_(std::move(local_catalog_delta_entry)), catalog_(catalog) {}
+public:
+    ~CleanupTask() override = default;
 
-    ~CatalogDeltaOpsMergeTask() = default;
+    String ToString() const override { return "CleanupTask"; }
 
-    String ToString() const final { return "Catalog delta operation merge task"; }
+    void Execute() {
+        CleanupScanner scanner(catalog_, visible_ts_, buffer_mgr_);
+        scanner.Scan();
+        // FIXME(sys): This is a blocking call, should it be async?
+        std::move(scanner).Cleanup();
+    }
 
-    UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry_{};
-    Catalog *catalog_{};
+private:
+    Catalog *const catalog_;
+
+    const TxnTimeStamp visible_ts_;
+
+    BufferManager *buffer_mgr_;
+};
+
+export class NotifyCompactTask final : public BGTask {
+public:
+    NotifyCompactTask() : BGTask(BGTaskType::kNotifyCompact, true) {}
+
+    ~NotifyCompactTask() override = default;
+
+    String ToString() const override { return "NotifyCompactTask"; }
+};
+
+export class NotifyOptimizeTask final : public BGTask {
+public:
+    NotifyOptimizeTask() : BGTask(BGTaskType::kNotifyOptimize, true) {}
+
+    ~NotifyOptimizeTask() override = default;
+
+    String ToString() const override { return "NotifyOptimizeTask"; }
 };
 
 } // namespace infinity

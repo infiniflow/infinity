@@ -27,6 +27,9 @@ namespace infinity {
 
 export enum class ShowType {
     kInvalid,
+    kShowDatabase,
+    kShowTable,
+    kShowIndex,
     kShowDatabases,
     kShowTables,
     kShowViews,
@@ -35,9 +38,15 @@ export enum class ShowType {
     kShowProfiles,
     kShowIndexes,
     kShowSegments,
-    kShowSessionStatus,
-    kShowGlobalStatus,
-    kShowVar,
+    kShowSegment,
+    kShowBlocks,
+    kShowBlock,
+    kShowBlockColumn,
+    kShowSessionVariable,
+    kShowSessionVariables,
+    kShowGlobalVariable,
+    kShowGlobalVariables,
+    kShowConfig,
 };
 
 export String ToString(ShowType type);
@@ -50,9 +59,11 @@ public:
                          String object_name,
                          u64 table_index,
                          Optional<u32> segment_id = None,
-                         Optional<u16> block_id = None)
+                         Optional<u16> block_id = None,
+                         Optional<u32> column_id = None,
+                         Optional<String> index_name = None)
         : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
-          table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
+          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), column_id_(column_id), index_name_(index_name) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -76,6 +87,10 @@ public:
 
     [[nodiscard]] inline const Optional<u16> block_id() const { return block_id_; }
 
+    [[nodiscard]] inline const Optional<u32> column_id() const { return column_id_; }
+
+    [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String schema_name_;
@@ -83,6 +98,8 @@ private:
     u64 table_index_{};
     Optional<u32> segment_id_{};
     Optional<u16> block_id_{};
+    Optional<u64> column_id_{};
+    Optional<String> index_name_{};
 };
 
 } // namespace infinity

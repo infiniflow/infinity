@@ -20,7 +20,7 @@ import stl;
 import logger;
 import infinity_exception;
 import background_process;
-import cleanup_task;
+import bg_task;
 import catalog;
 import txn_manager;
 import third_party;
@@ -28,17 +28,39 @@ import third_party;
 namespace infinity {
 
 void CleanupPeriodicTrigger::Trigger() {
-    TxnTimeStamp visible_ts = txn_mgr_->GetMinUncommitTs();
-    if (visible_ts == last_visible_ts_) {
-        LOG_TRACE(fmt::format("No need to cleanup visible timestamp: {}", visible_ts));
-        return;
-    } else if (visible_ts < last_visible_ts_) {
+    TxnTimeStamp visible_ts = txn_mgr_->GetCleanupScanTS();
+    // if (visible_ts == last_visible_ts_) {
+    //     LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
+    //     return;
+    // }
+    if (visible_ts < last_visible_ts_) {
         UnrecoverableException("The visible timestamp is not monotonic.");
         return;
     }
     last_visible_ts_ = visible_ts;
-    LOG_INFO(fmt::format("Cleanup visible timestamp: {}", visible_ts));
-    bg_processor_->Submit(MakeShared<CleanupTask>(catalog_, visible_ts));
+    LOG_TRACE(fmt::format("Cleanup visible timestamp: {}", visible_ts));
+
+    auto buffer_mgr = txn_mgr_->GetBufferMgr();
+    auto cleanup_task = MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr);
+    bg_processor_->Submit(std::move(cleanup_task));
+}
+
+void CheckpointPeriodicTrigger::Trigger() {
+    auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
+    LOG_INFO(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+    if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
+        LOG_TRACE(fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+    }
+}
+
+void CompactSegmentPeriodicTrigger::Trigger() {
+    auto compact_task = MakeShared<NotifyCompactTask>();
+    compact_processor_->Submit(std::move(compact_task));
+}
+
+void OptimizeIndexPeriodicTrigger::Trigger() {
+    auto optimize_task = MakeShared<NotifyOptimizeTask>();
+    compact_processor_->Submit(std::move(optimize_task));
 }
 
 } // namespace infinity

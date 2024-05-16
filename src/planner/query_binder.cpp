@@ -71,6 +71,7 @@ import data_type;
 import logical_type;
 import base_entry;
 import view_entry;
+import txn;
 
 namespace infinity {
 
@@ -402,7 +403,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
     auto [table_entry, status] = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
     if (!status.ok()) {
-        RecoverableError(Status::SyntaxError(status.message()));
+        RecoverableError(status);
     }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
@@ -425,10 +426,9 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         columns.emplace_back(idx);
     }
 
-//    TransactionID txn_id = query_context->GetTxn()->TxnID();
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+    Txn *txn = query_context->GetTxn();
 
-    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);
@@ -443,7 +443,7 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     BaseEntry *base_view_entry{nullptr};
     Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
     if (!status.ok()) {
-        RecoverableError(Status::SyntaxError(status.message()));
+        RecoverableError(status);
     }
 
     ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
@@ -952,6 +952,9 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+        if(where_expr->Type().type() != LogicalType::kBoolean) {
+            RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
+        }
         bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
     return bound_delete_statement;
@@ -971,6 +974,9 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+        if(where_expr->Type().type() != LogicalType::kBoolean) {
+            RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
+        }
         bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
     if (statement.update_expr_array_ == nullptr) {

@@ -65,9 +65,6 @@ struct ToDeleteInfo {
 };
 
 export struct CompactSegmentsTaskState {
-    // default copy construct of table ref
-    CompactSegmentsTaskState() {}
-
     RowIDRemapper remapper_;
 
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
@@ -79,24 +76,27 @@ export struct CompactSegmentsTaskState {
 export enum class CompactSegmentsTaskType : i8 {
     kCompactTable,
     kCompactPickedSegments,
+    kInvalid,
 };
 
-export class CompactSegmentsTask final : public BGTask {
+export class CompactSegmentsTask final {
 public:
-    static SharedPtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn);
+    static UniquePtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn);
 
-    static SharedPtr<CompactSegmentsTask> MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn);
+    static UniquePtr<CompactSegmentsTask> MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn);
 
     explicit CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type);
 
 public:
-    ~CompactSegmentsTask() override = default;
-
-    String ToString() const override { return "Compact segments task"; }
-
-    void BeginTxn() { txn_->Begin(); }
-
-    void CommitTxn() { txn_->txn_mgr()->CommitTxn(txn_); };
+    bool TryCommitTxn() {
+        try {
+            txn_->txn_mgr()->CommitTxn(txn_);
+            return true;
+        } catch (const RecoverableException &e) {
+            txn_->txn_mgr()->RollBackTxn(txn_);
+            return false;
+        }
+    }
 
     void Execute();
 
@@ -107,22 +107,27 @@ public:
 
     // these functions are called by unit test. Do not use them directly.
 public:
-    CompactSegmentsTaskState CompactSegments();
+    void CompactSegments(CompactSegmentsTaskState &state);
 
-    void CreateNewIndex(BaseTableRef *table_ref);
+    void CreateNewIndex(CompactSegmentsTaskState &state);
 
     // Save new segment, set no_delete_ts, add compact wal cmd
-    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+    void SaveSegmentsData(CompactSegmentsTaskState &state);
 
     // Apply the delete op commit in process of compacting
-    void ApplyDeletes(const RowIDRemapper &remapper, const Vector<SegmentEntry *> &old_segments);
+    void ApplyDeletes(CompactSegmentsTaskState &state);
+
+public:
+    // Getter
+    const String &table_name() const;
 
 private:
-    SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments);
+    SharedPtr<SegmentEntry> CompactSegmentsToOne(CompactSegmentsTaskState &state, const Vector<SegmentEntry *> &segments);
 
 private:
-    CompactSegmentsTaskType task_type_;
+    const CompactSegmentsTaskType task_type_;
     TableEntry *table_entry_;
+    TxnTimeStamp commit_ts_;
     Vector<SegmentEntry *> segments_;
 
     Txn *const txn_;

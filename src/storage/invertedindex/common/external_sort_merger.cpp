@@ -143,6 +143,8 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         size_micro_run_[i] = ret;
         size_loaded_run_[i] = ret;
         run_curr_addr_[i] = io_stream.Tell();
+        // std::cout << "num_run_[" << i << "] " << num_run_[i] << " size_run_ " << size_run_[i] << " size_micro_run " << size_micro_run_[i]
+        //           << std::endl;
 
         /// it is not needed for compression, validation will be made within IOStream in that case
         // if a record can fit in microrun buffer
@@ -180,25 +182,27 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         u32 pos = 0;
         u32 last_pos = -1;
         assert(i < MAX_GROUP_SIZE_);
-        while (size_micro_run_[i]) {
+        if (size_micro_run_[i] <= 0)
+            continue;
+        while (pos + sizeof(LenType) <= size_micro_run_[i]) {
             LenType len = *(LenType *)(micro_buf_[i] + pos);
-            if (pos + sizeof(LenType) + len > size_micro_run_[i]) {
-                assert(last_pos != (u32)-1); // buffer too small that can't hold one record
-
-                len = *(LenType *)(micro_buf_[i] + last_pos) + sizeof(LenType);
-                char *tmp = (char *)malloc(len);
-                memcpy(tmp, micro_buf_[i] + last_pos, len);
-
-                pre_heap_.push(KeyAddr(tmp, run_addr_[i] + pos, i));
-                //
-                size_micro_run_[i] = pos;
+            if (pos + sizeof(LenType) + len <= size_micro_run_[i]) {
+                num_micro_run_[i]++;
+                last_pos = pos;
+                pos += sizeof(LenType) + len;
+            } else {
                 break;
             }
-
-            num_micro_run_[i]++;
-            last_pos = pos;
-            pos += sizeof(LenType) + len;
         }
+        // std::cout << "len " << len << " size_micro_run_[" << i << "] " << size_micro_run_[i] << std::endl;
+        assert(last_pos != (u32)-1); // buffer too small that can't hold one record
+        assert(last_pos + sizeof(LenType) <= size_micro_run_[i]);
+        assert(pos <= size_micro_run_[i]);
+        LenType len = (LenType)(pos - last_pos);
+        char *tmp = (char *)malloc(len);
+        memcpy(tmp, micro_buf_[i] + last_pos, len);
+        pre_heap_.push(KeyAddr(tmp, run_addr_[i] + pos, i));
+        size_micro_run_[i] = pos;
     }
 }
 
@@ -236,6 +240,15 @@ void SortMerger<KeyType, LenType>::Predict(DirectIO &io_stream) {
         u32 last_pos = -1;
         pre_buf_num_ = 0;
         while (1) {
+            if (pos + sizeof(LenType) > s) {
+                // the last record of this microrun
+                IASSERT(last_pos != (u32)-1); // buffer too small that can't hold one record
+                LenType len = *(LenType *)(pre_buf_ + last_pos) + sizeof(LenType);
+                char *tmp = (char *)malloc(len);
+                memcpy(tmp, pre_buf_ + last_pos, len);
+                pre_heap_.push(KeyAddr(tmp, addr + (u64)pos, idx));
+                break;
+            }
             LenType len = *(LenType *)(pre_buf_ + pos);
             if (pos + sizeof(LenType) + len > s) {
                 // the last record of this microrun
@@ -407,5 +420,5 @@ void SortMerger<KeyType, LenType>::Run() {
 }
 
 template class SortMerger<u32, u8>;
-template class SortMerger<TermTuple, u16>;
+template class SortMerger<TermTuple, u32>;
 } // namespace infinity

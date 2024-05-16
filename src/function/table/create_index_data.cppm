@@ -19,6 +19,8 @@ export module create_index_data;
 import stl;
 import segment_entry;
 import block_index;
+import third_party;
+import infinity_exception;
 
 namespace infinity {
 
@@ -26,7 +28,10 @@ export struct CreateIndexSharedData {
     explicit CreateIndexSharedData(BlockIndex *block_index) {
         SizeT segment_count = block_index->segments_.size();
         for (SizeT i = 0; i < segment_count; ++i) {
-            create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
+            auto [iter, insert_ok] = create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
+            if (!insert_ok) {
+                UnrecoverableError(fmt::format("Duplicate segment id: %u", block_index->segments_[i]->segment_id()));
+            }
         }
     }
 

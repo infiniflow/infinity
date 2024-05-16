@@ -45,22 +45,17 @@ import block_entry;
 using namespace infinity;
 
 class CompactTaskTest : public BaseTest {
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
-
-    void TearDown() override { system("tree  /tmp/infinity"); }
-
 protected:
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"));
 
-            auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, true);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 
             while (segment_size > 0) {
@@ -80,8 +75,7 @@ protected:
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
             }
-            auto txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
             txn_mgr->CommitTxn(txn);
         }
     }
@@ -90,8 +84,11 @@ protected:
 TEST_F(CompactTaskTest, compact_to_single_segment) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -109,11 +106,10 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -122,10 +118,9 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
         { // add compact
-            auto txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -134,22 +129,22 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             }
             txn_mgr->CommitTxn(txn4);
         }
+
         {
-            auto txn5 = txn_mgr->CreateTxn();
-            txn5->Begin();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             size_t test_segment_n = segment_sizes.size();
             size_t row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
             for (size_t i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
                 EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
             EXPECT_EQ(compact_segment->actual_row_count(), row_count);
@@ -157,15 +152,20 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(CompactTaskTest, compact_to_two_segment) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -183,11 +183,10 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -198,10 +197,9 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
         { // add compact
-            auto txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -211,22 +209,21 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto txn5 = txn_mgr->CreateTxn();
-            txn5->Begin();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
 
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
                 EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
             int cnt = 0;
             for (int i = test_segment_n; i < test_segment_n + 2; ++i) {
-                auto *compact_segment = table_entry->GetSegmentByID(i, begin_ts);
+                auto compact_segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
                 EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
                 cnt += compact_segment->actual_row_count();
@@ -236,15 +233,20 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(CompactTaskTest, compact_with_delete) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -262,11 +264,10 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -276,10 +277,9 @@ TEST_F(CompactTaskTest, compact_with_delete) {
 
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
-        int delete_n = 0;
+        SizeT delete_n = 0;
         {
-            auto txn3 = txn_mgr->CreateTxn();
-            txn3->Begin();
+            auto txn3 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
             Vector<RowID> delete_row_ids;
             for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -295,16 +295,18 @@ TEST_F(CompactTaskTest, compact_with_delete) {
                 }
                 delete_n += offsets.size();
             }
-            txn3->Delete("default", table_name, delete_row_ids);
+
+            auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            EXPECT_TRUE(status.ok());
+            txn3->Delete(table_entry, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
 
         { // add compact
-            auto txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -314,19 +316,18 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto txn5 = txn_mgr->CreateTxn();
-            txn5->Begin();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
                 EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
@@ -335,15 +336,20 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(CompactTaskTest, delete_in_compact_process) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -361,24 +367,22 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
         }
         Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
-        int row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
+        SizeT row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
         int delete_n = 0;
         {
-            auto txn3 = txn_mgr->CreateTxn();
-            txn3->Begin();
+            auto txn3 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
             Vector<RowID> delete_row_ids;
             for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -394,25 +398,27 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                 }
                 delete_n += offsets.size();
             }
-            txn3->Delete("default", table_name, delete_row_ids);
+
+            auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            EXPECT_TRUE(status.ok());
+            txn3->Delete(table_entry, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
 
         { // add compact
-            auto txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-                auto state = compact_task->CompactSegments();
+                CompactSegmentsTaskState state;
+                compact_task->CompactSegments(state);
 
                 {
-                    auto txn5 = txn_mgr->CreateTxn();
-                    txn5->Begin();
+                    auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
                     Vector<RowID> delete_row_ids;
                     for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -429,30 +435,31 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                         delete_n += offsets.size();
                     }
 
-                    txn5->Delete("default", table_name, delete_row_ids);
+                    auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
+                    EXPECT_TRUE(status.ok());
+                    txn5->Delete(table_entry, delete_row_ids);
                     txn_mgr->CommitTxn(txn5);
                 }
 
-                compact_task->SaveSegmentsData(std::move(state.segment_data_));
-                compact_task->ApplyDeletes(state.remapper_, state.old_segments_);
+                compact_task->SaveSegmentsData(state);
+                compact_task->ApplyDeletes(state);
             }
 
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto txn5 = txn_mgr->CreateTxn();
-            txn5->Begin();
+            auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
                 EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
@@ -461,7 +468,9 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
@@ -470,8 +479,11 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -489,11 +501,10 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
         }
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -503,10 +514,9 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
-        int delete_n = 0;
+        SizeT delete_n = 0;
         {
-            auto txn3 = txn_mgr->CreateTxn();
-            txn3->Begin();
+            auto txn3 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
             Vector<RowID> delete_row_ids;
             for (int i = 0; i < (int)segment_sizes.size(); ++i) {
@@ -522,23 +532,25 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 }
                 delete_n += offsets.size();
             }
-            txn3->Delete("default", table_name, delete_row_ids);
+            auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            EXPECT_TRUE(status.ok());
+            txn3->Delete(table_entry, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
 
         { // add compact
-            auto compact_txn = txn_mgr->CreateTxn();
-            compact_txn->Begin();
+            auto compact_txn = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
-            auto [table_entry, status] = compact_txn->GetTableEntry("default", table_name);
+            auto [table_entry, status] = compact_txn->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             Vector<RowID> delete_row_ids2;
             {
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
 
-                auto state = compact_task->CompactSegments();
+                CompactSegmentsTaskState state;
+                compact_task->CompactSegments(state);
 
                 Vector<RowID> delete_row_ids;
 
@@ -567,20 +579,23 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     delete_row_n2 += offsets2.size();
                 }
 
-                auto delete_txn2 = txn_mgr->CreateTxn();
-                delete_txn2->Begin();
-                delete_txn2->Delete("default", table_name, delete_row_ids2);
+                auto delete_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
+                auto [table_entry, status] = delete_txn2->GetTableByName("default_db", table_name);
+                EXPECT_TRUE(status.ok());
+                delete_txn2->Delete(table_entry, delete_row_ids2);
                 {
-                    auto delete_txn1 = txn_mgr->CreateTxn();
-                    delete_txn1->Begin();
+                    auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
-                    delete_txn1->Delete("default", table_name, delete_row_ids);
+                    auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
+                    EXPECT_TRUE(status.ok());
+
+                    delete_txn1->Delete(table_entry, delete_row_ids);
                     txn_mgr->CommitTxn(delete_txn1);
 
                     delete_n += delete_row_n1;
                 }
 
-                compact_task->SaveSegmentsData(std::move(state.segment_data_));
+                compact_task->SaveSegmentsData(state);
                 {
                     Thread t([&]() {
                         // std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -589,14 +604,15 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     });
                     t.join();
                 }
-                compact_task->ApplyDeletes(state.remapper_, state.old_segments_);
+                compact_task->ApplyDeletes(state);
             }
             txn_mgr->CommitTxn(compact_txn);
             {
-                auto txn5 = txn_mgr->CreateTxn();
-                txn5->Begin();
+                auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
                 try {
-                    txn5->Delete("default", table_name, delete_row_ids2);
+                    auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
+                    EXPECT_TRUE(status.ok());
+                    txn5->Delete(table_entry, delete_row_ids2);
                     ASSERT_EQ(0, 1);
                 } catch (const RecoverableException &e) {
                     EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
@@ -605,19 +621,18 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
 
             {
-                auto txn5 = txn_mgr->CreateTxn();
-                txn5->Begin();
+                auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
                 TxnTimeStamp begin_ts = txn5->BeginTS();
-                auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+                auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
                 EXPECT_NE(table_entry, nullptr);
 
                 int test_segment_n = segment_sizes.size();
                 for (int i = 0; i < test_segment_n; ++i) {
-                    auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                    auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                     EXPECT_NE(segment_entry, nullptr);
                     EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
                 }
-                auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+                auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
                 EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
@@ -627,6 +642,119 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
+}
+
+TEST_F(CompactTaskTest, compact_not_exist_table) {
+#ifdef INFINITY_DEBUG
+    infinity::GlobalResourceUsage::Init();
+#endif
+    std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
+    infinity::InfinityContext::instance().Init(config_path);
+
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    BufferManager *buffer_mgr = storage->buffer_manager();
+    TxnManager *txn_mgr = storage->txn_manager();
+
+    auto ExpectRollback = [&](Txn *txn) {
+        try {
+            txn_mgr->CommitTxn(txn);
+            FAIL();
+        } catch (const RecoverableException &e) {
+            EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnConflict);
+        } catch (...) {
+            FAIL();
+        }
+    };
+
+    String table_name = "tb1";
+    SharedPtr<TableDef> tbl1_def = nullptr;
+    {
+        Vector<SharedPtr<ColumnDef>> columns;
+        i64 column_id = 0;
+        HashSet<ConstraintType> constraints;
+        auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+        columns.emplace_back(column_def_ptr);
+        tbl1_def = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);
+    }
+    {
+        // create table
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+
+        Status status = txn->CreateTable("default_db", tbl1_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+
+        txn_mgr->CommitTxn(txn);
+    }
+    {
+        Vector<SizeT> segment_sizes{1, 10, 100};
+        this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_mgr);
+    }
+    {
+        auto *compact_txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto [table_entry, status] = compact_txn->GetTableByName("default_db", table_name);
+        ASSERT_TRUE(status.ok());
+
+        { // drop tb1
+            auto drop_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+            auto status = drop_txn->DropTableCollectionByName("default_db", table_name, ConflictType::kError);
+            ASSERT_TRUE(status.ok());
+            txn_mgr->CommitTxn(drop_txn);
+        }
+
+        auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
+
+        compact_task->Execute();
+
+        ExpectRollback(compact_txn);
+    }
+
+    //------------------------------------------
+
+    {
+        // create table
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
+
+        Status status = txn->CreateTable("default_db", tbl1_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+
+        txn_mgr->CommitTxn(txn);
+    }
+    {
+        Vector<SizeT> segment_sizes{1, 10, 100};
+        this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_mgr);
+    }
+    {
+        auto *compact_txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto [table_entry, status] = compact_txn->GetTableByName("default_db", table_name);
+        ASSERT_TRUE(status.ok());
+
+        { // drop tb1
+            auto drop_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+            auto status = drop_txn->DropTableCollectionByName("default_db", table_name, ConflictType::kError);
+            ASSERT_TRUE(status.ok());
+            txn_mgr->CommitTxn(drop_txn);
+        }
+        { // create table with same name
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+
+            Status status = txn->CreateTable("default_db", tbl1_def, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+
+            txn_mgr->CommitTxn(txn);
+        }
+        auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
+        compact_task->Execute();
+
+        ExpectRollback(compact_txn);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+    infinity::GlobalResourceUsage::UnInit();
+#endif
 }

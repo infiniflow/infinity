@@ -91,6 +91,9 @@ String LogicalCommand::ToString(i64 &space) const {
                     ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_str();
                     break;
                 }
+                case SetVarType::kInvalid: {
+                    UnrecoverableError("Invalid variable type.");
+                }
             }
             break;
         }
@@ -101,7 +104,7 @@ String LogicalCommand::ToString(i64 &space) const {
         }
         case CommandType::kCompactTable: {
             CompactTable *compact_table_info = (CompactTable *)(command_info_.get());
-            ss << String(space, ' ') << arrow_str << "Compact table: " << compact_table_info->table_name();
+            ss << String(space, ' ') << arrow_str << "Compact table: " << compact_table_info->schema_name_ << " " << compact_table_info->table_name_;
             break;
         }
         case CommandType::kInvalid: {

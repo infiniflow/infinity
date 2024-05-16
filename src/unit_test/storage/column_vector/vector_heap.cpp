@@ -24,6 +24,7 @@ import stl;
 import global_resource_usage;
 import infinity_context;
 import default_values;
+import vector_heap_chunk;
 
 class VectorHeapTest : public BaseTest {};
 #if 0
@@ -117,7 +118,7 @@ TEST_F(VectorHeapTest, fix_heap1) {
             data.push_back(j % 26 + 'a');
         }
         auto [last_chunk_id, last_chunk_offset] = vector_heap_mgr_.AppendToHeap(data.c_str(), allocate_size);
-        EXPECT_EQ(last_chunk_id, total_size / DEFAULT_FIXLEN_CHUNK_SIZE);
+        EXPECT_EQ(last_chunk_id, ChunkId(total_size / DEFAULT_FIXLEN_CHUNK_SIZE));
         EXPECT_EQ(last_chunk_offset, total_size % DEFAULT_FIXLEN_CHUNK_SIZE);
 
         String buffer;
@@ -148,7 +149,7 @@ TEST_F(VectorHeapTest, fix_heap2) {
             data.push_back(j % 26 + 'a');
         }
         auto [last_chunk_id, last_chunk_offset] = vector_heap_mgr_.AppendToHeap(data.c_str(), allocate_size);
-        EXPECT_EQ(last_chunk_id, total_size / DEFAULT_FIXLEN_CHUNK_SIZE);
+        EXPECT_EQ(last_chunk_id, ChunkId(total_size / DEFAULT_FIXLEN_CHUNK_SIZE));
         EXPECT_EQ(last_chunk_offset, total_size % DEFAULT_FIXLEN_CHUNK_SIZE);
 
         String buffer;

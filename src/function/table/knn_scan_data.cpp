@@ -18,7 +18,6 @@ module knn_scan_data;
 
 import stl;
 
-
 import infinity_exception;
 import third_party;
 import knn_flat_ip;
@@ -41,6 +40,7 @@ import base_expression;
 import expression_state;
 import internal_types;
 import data_type;
+import status;
 
 namespace infinity {
 
@@ -56,14 +56,14 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
             break;
         }
         default: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport(fmt::format("KnnDistanceType: {} is not support.", (i32)dist_type)));
         }
     }
 }
 
 // --------------------------------------------
 
-KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData* shared_data, u32 current_parallel_idx)
+KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx)
     : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx) {
     switch (knn_scan_shared_data_->elem_type_) {
         case EmbeddingDataType::kElemFloat: {
@@ -71,7 +71,8 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData* shared_data, u32 cur
             break;
         }
         default: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport(
+                fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_))));
         }
     }
 }
@@ -99,13 +100,6 @@ void KnnScanFunctionData::Init() {
     }
 
     knn_distance_ = MakeUnique<KnnDistance1<DataType>>(knn_scan_shared_data_->knn_distance_type_);
-
-    if (knn_scan_shared_data_->filter_expression_) {
-        filter_state_ = ExpressionState::CreateState(knn_scan_shared_data_->filter_expression_);
-        db_for_filter_ = MakeUnique<DataBlock>();
-        db_for_filter_->Init(*(knn_scan_shared_data_->table_ref_->column_types_));                         // default capacity
-        bool_column_ = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean)); // default capacity
-    }
 }
 
 } // namespace infinity

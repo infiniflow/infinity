@@ -38,6 +38,7 @@ import logical_insert;
 import logical_update;
 import logical_knn_scan;
 import logical_index_scan;
+import logical_match;
 
 import aggregate_expression;
 import between_expression;
@@ -136,8 +137,15 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kKnnScan: {
             auto &node = (LogicalKnnScan &)op;
-            if (node.filter_expression_) {
-                VisitExpression(node.filter_expression_);
+            if (node.common_query_filter_ and node.common_query_filter_->filter_leftover_) {
+                VisitExpression(node.common_query_filter_->filter_leftover_);
+            }
+            break;
+        }
+        case LogicalNodeType::kMatch: {
+            auto &node = (LogicalMatch &)op;
+            if (node.common_query_filter_ and node.common_query_filter_->filter_leftover_) {
+                VisitExpression(node.common_query_filter_->filter_leftover_);
             }
             break;
         }

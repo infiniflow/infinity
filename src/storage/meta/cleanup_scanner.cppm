@@ -17,7 +17,7 @@ module;
 export module cleanup_scanner;
 
 import stl;
-// import meta_entry_interface;
+import buffer_manager;
 
 namespace infinity {
 
@@ -27,25 +27,26 @@ class MetaInterface;
 
 export class CleanupScanner {
 public:
-    CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts);
+    CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr);
 
     void Scan();
 
     void Cleanup() &&;
 
-    void AddMeta(UniquePtr<MetaInterface> meta);
-
     void AddEntry(SharedPtr<EntryInterface> entry);
 
     TxnTimeStamp visible_ts() const { return visible_ts_; }
 
+    static void CleanupDir(const String &dir);
+
 private:
     Catalog *const catalog_;
+
     const TxnTimeStamp visible_ts_;
 
+    BufferManager *buffer_mgr_;
+    
     Vector<SharedPtr<EntryInterface>> entries_;
-
-    Vector<UniquePtr<MetaInterface>> metas_;
 };
 
 } // namespace infinity

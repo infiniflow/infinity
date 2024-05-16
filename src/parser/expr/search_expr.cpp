@@ -11,7 +11,7 @@ namespace infinity {
 
 SearchExpr::~SearchExpr() {
     if (exprs_ != nullptr) {
-        for (auto& expr : *exprs_) {
+        for (auto &expr : *exprs_) {
             delete expr;
             expr = nullptr;
         }
@@ -48,29 +48,37 @@ std::string SearchExpr::ToString() const {
 void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
     exprs_ = exprs;
     for (ParsedExpr *expr : *exprs) {
-        switch (expr->type_) {
-            case ParsedExprType::kKnn:
-                knn_exprs_.push_back(dynamic_cast<KnnExpr *>(expr));
-                break;
-            case ParsedExprType::kMatch:
-                match_exprs_.push_back(dynamic_cast<MatchExpr *>(expr));
-                break;
-            case ParsedExprType::kFusion:
-                if (fusion_expr_ != nullptr) {
-                    ParserError("More than one FUSION expr");
-                }
-                fusion_expr_ = dynamic_cast<FusionExpr *>(expr);
-                break;
-            default:
-                ParserError("Invalid expr type for SEARCH");
-        }
+        AddExpr(expr);
     }
+    Validate();
+}
+
+void SearchExpr::Validate() const {
     size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size();
     if (num_sub_expr <= 0) {
         ParserError("Need at least one KNN/MATCH/QUERY expression");
     } else if (num_sub_expr >= 2) {
         if (fusion_expr_ == nullptr)
             ParserError("Need FUSION expr since there are multiple KNN/MATCH/QUERY expressions");
+    }
+}
+
+void SearchExpr::AddExpr(infinity::ParsedExpr *expr) {
+    switch (expr->type_) {
+        case ParsedExprType::kKnn:
+            knn_exprs_.push_back(static_cast<KnnExpr *>(expr));
+            break;
+        case ParsedExprType::kMatch:
+            match_exprs_.push_back(static_cast<MatchExpr *>(expr));
+            break;
+        case ParsedExprType::kFusion:
+            if (fusion_expr_ != nullptr) {
+                ParserError("More than one FUSION expr");
+            }
+            fusion_expr_ = static_cast<FusionExpr *>(expr);
+            break;
+        default:
+            ParserError("Invalid expr type for SEARCH");
     }
 }
 

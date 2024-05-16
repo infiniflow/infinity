@@ -35,18 +35,30 @@ struct TableEntry;
 struct SegmentEntry;
 
 export struct BlockColumnEntry : public BaseEntry {
+public:
     friend struct BlockEntry;
+
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const ColumnID column_id, const BlockEntry *block_entry);
 
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref);
 
     static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
 
-    static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager);
+    static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry,
+                                                                 ColumnID column_id,
+                                                                 BufferManager *buffer_manager,
+                                                                 i32 next_outline_idx,
+                                                                 u64 last_chunk_offset,
+                                                                 TxnTimeStamp commit_ts);
 
     nlohmann::json Serialize();
 
     static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
+
+    void CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
     // Getter
@@ -79,10 +91,14 @@ public:
         return outline_buffers_.size();
     }
 
+    u64 LastChunkOff() const { return last_chunk_offset_; }
+
+    void SetLastChunkOff(u64 offset) { last_chunk_offset_ = offset; }
+
 public:
     void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
 
-    static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
+    static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
     void Cleanup();
 
@@ -97,6 +113,7 @@ private:
 
     mutable std::shared_mutex mutex_{};
     Vector<BufferObj *> outline_buffers_{};
+    u64 last_chunk_offset_{};
 };
 
 } // namespace infinity

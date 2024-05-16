@@ -59,6 +59,7 @@ export {
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
     // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
+    constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 512UL * 1024UL * 4UL;
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows
@@ -67,10 +68,8 @@ export {
     constexpr u32 INVALID_SEGMENT_ID = std::numeric_limits<u32>::max();
 
     // queue related constants, TODO: double check the necessary
-    constexpr SizeT DEFAULT_READER_PREPARE_QUEUE_SIZE = 1024;
-    constexpr SizeT DEFAULT_WRITER_PREPARE_QUEUE_SIZE = 1024;
-    constexpr SizeT DEFAULT_READER_COMMIT_QUEUE_SIZE = 1024;
-    constexpr SizeT DEFAULT_WRITER_COMMIT_QUEUE_SIZE = 1024;
+    constexpr SizeT BG_GROUND_TASK_QUEUE_SIZE = 65536;
+    constexpr SizeT EXECUTOR_TASK_QUEUE_SIZE = 1024;
     constexpr SizeT DEFAULT_BLOCKING_QUEUE_SIZE = 1024;
 
     // transaction related constants
@@ -88,18 +87,52 @@ export {
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
-    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024 * 1024;
-    constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 60;          // 60 seconds
-    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 20;         // 20 seconds
-    constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
+    constexpr SizeT MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
+    constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
+    constexpr String DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr SizeT MAX_CLEANUP_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr SizeT MIN_COMPACT_INTERVAL_SEC = 0; // 0 means disable the function
+    constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
+    constexpr String DEFAULT_COMPACT_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr SizeT MAX_COMPACT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr SizeT MIN_OPTIMIZE_INTERVAL_SEC = 1;
+    constexpr SizeT DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
+    constexpr String DEFAULT_OPTIMIZE_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr SizeT MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr SizeT MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;           // 1 Block
+    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 128 * DEFAULT_BLOCK_CAPACITY; // 128 * 8192 = 1M rows
+    constexpr SizeT MAX_MEMINDEX_CAPACITY = DEFAULT_SEGMENT_CAPACITY;         // 1 Segment
+
+    constexpr i64 MIN_WAL_FILE_SIZE_THRESHOLD = 1024;                                    // 1KB
+    constexpr i64 DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * 1024l * 1024l * 1024l;           // 1GB
+    constexpr String DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR = "1GB";           // 1GB
+    constexpr i64 MAX_WAL_FILE_SIZE_THRESHOLD = 1024l * DEFAULT_WAL_FILE_SIZE_THRESHOLD; // 1TB
+
+    constexpr i64 MIN_FULL_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable full checkpoint
+    constexpr i64 DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC = 30; // 30 seconds
+    constexpr String DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
+    constexpr i64 MAX_FULL_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr i64 MIN_DELTA_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable delta checkpoint
+    constexpr i64 DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC = 5; // 5 seconds
+    constexpr String DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR = "5s"; // 5 seconds
+    constexpr i64 MAX_DELTA_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
+
+    constexpr i64 MIN_CHECKPOINT_INTERVAL_WAL_BYTES = 1024; // 1K
+    constexpr i64 DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024l * 1024l; // 64 MB
+    constexpr String DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR = "64MB"; // 64 MB
+    constexpr i64 MAX_CHECKPOINT_INTERVAL_WAL_BYTES = 1024l * 1024l * 1024l; // 1GB
+
+
     constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
-    constexpr std::string_view WAL_FILE_PREFIX = "wal.log.";
+    constexpr std::string_view WAL_FILE_PREFIX = "wal.log";
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
 
-    constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 1;
-
     constexpr std::string_view SYSTEM_DB_NAME = "system";
-    constexpr std::string_view DEFAULT_DB_NAME = "default";
+    constexpr std::string_view DEFAULT_DB_NAME = "default_db";
     constexpr std::string_view SYSTEM_CONFIG_TABLE_NAME = "config";
     constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 
@@ -115,7 +148,70 @@ export {
     constexpr SizeT DBT_COMPACTION_M = 4;
     constexpr SizeT DBT_COMPACTION_C = 4;
     constexpr SizeT DBT_COMPACTION_S = DEFAULT_BLOCK_CAPACITY;
+
+    // default query option parameter
+    constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 10;
+
+    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
+    constexpr String DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
+
+    constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
+    constexpr String DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
+
+    // config name
+    constexpr std::string_view VERSION_OPTION_NAME = "version";
+    constexpr std::string_view TIME_ZONE_OPTION_NAME = "time_zone";
+    constexpr std::string_view TIME_ZONE_BIAS_OPTION_NAME = "time_zone_bias";
+    constexpr std::string_view CPU_LIMIT_OPTION_NAME = "cpu_limit";
+    constexpr std::string_view SERVER_ADDRESS_OPTION_NAME = "server_address";
+
+    constexpr std::string_view POSTGRES_PORT_OPTION_NAME = "postgres_port";
+    constexpr std::string_view HTTP_PORT_OPTION_NAME = "http_port";
+    constexpr std::string_view CLIENT_PORT_OPTION_NAME = "client_port";
+    constexpr std::string_view CONNECTION_POOL_SIZE_OPTION_NAME = "connection_pool_size";
+    constexpr std::string_view LOG_FILENAME_OPTION_NAME = "log_filename";
+
+    constexpr std::string_view LOG_DIR_OPTION_NAME = "log_dir";
+    constexpr std::string_view LOG_TO_STDOUT_OPTION_NAME = "log_to_stdout";
+    constexpr std::string_view LOG_FILE_MAX_SIZE_OPTION_NAME = "log_file_max_size";
+    constexpr std::string_view LOG_FILE_ROTATE_COUNT_OPTION_NAME = "log_file_rotate_count";
+    constexpr std::string_view LOG_LEVEL_OPTION_NAME = "log_level";
+
+    constexpr std::string_view DATA_DIR_OPTION_NAME = "data_dir";
+    constexpr std::string_view CLEANUP_INTERVAL_OPTION_NAME = "cleanup_interval";
+    constexpr std::string_view COMPACT_INTERVAL_OPTION_NAME = "compact_interval";
+    constexpr std::string_view OPTIMIZE_INTERVAL_OPTION_NAME = "optimize_interval";
+    constexpr std::string_view MEM_INDEX_CAPACITY_OPTION_NAME = "mem_index_capacity";
+
+    constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
+    constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
+    constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
+    constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
+    constexpr std::string_view FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";
+
+    constexpr std::string_view DELTA_CHECKPOINT_INTERVAL_OPTION_NAME = "delta_checkpoint_interval";
+    constexpr std::string_view DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME = "delta_checkpoint_threshold";
+    constexpr std::string_view WAL_FLUSH_OPTION_NAME = "wal_flush";
+    constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
+
+    // Variable name
+    constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";        // global and session
+    constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";    // global
+    constexpr std::string_view BUFFER_USAGE_VAR_NAME = "buffer_usage";    // global
+    constexpr std::string_view SCHEDULE_POLICY_VAR_NAME = "schedule_policy";    // global
+    constexpr std::string_view DELTA_LOG_COUNT_VAR_NAME = "delta_log_count";    // global
+    constexpr std::string_view NEXT_TXN_ID_VAR_NAME = "next_transaction_id";    // global
+    constexpr std::string_view BUFFER_OBJECT_COUNT_VAR_NAME = "buffer_object_count";    // global
+    constexpr std::string_view UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME = "unused_buffer_object";    // global
+    constexpr std::string_view ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";    // global
+    constexpr std::string_view CURRENT_TS_VAR_NAME = "current_timestamp";    // global
+    constexpr std::string_view TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count"; // global and session
+    constexpr std::string_view CONNECTED_TS_VAR_NAME = "connected_timestamp"; // session
+    constexpr std::string_view CATALOG_VERSION_VAR_NAME = "catalog_version";   // global
+    constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
+    constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "enable_profile";  // session
+    constexpr std::string_view PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity";  // session
+
 }
 
-// constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
 } // namespace infinity

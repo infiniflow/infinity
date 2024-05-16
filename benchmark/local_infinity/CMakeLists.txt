@@ -11,9 +11,8 @@ target_link_libraries(
     sql_parser
     onnxruntime_mlas
     zsv_parser
-    iresearch
     newpfor
-    vespalib
+    fastpfor
     lz4.a
     atomic.a
     c++.a
@@ -34,9 +33,8 @@ target_link_libraries(
     sql_parser
     onnxruntime_mlas
     zsv_parser
-    iresearch
     newpfor
-    vespalib
+    fastpfor
     lz4.a
     atomic.a
     c++.a
@@ -55,9 +53,8 @@ target_link_libraries(
     sql_parser
     onnxruntime_mlas
     zsv_parser
-    iresearch
     newpfor
-    vespalib
+    fastpfor
     lz4.a
     atomic.a
     c++.a
@@ -66,43 +63,54 @@ target_link_libraries(
 # ########################################
 # fulltext
 # import benchmark
-add_executable(fulltext_import_benchmark
-    ./fulltext/fulltext_import_benchmark.cpp
+add_executable(fulltext_benchmark
+    ./fulltext/fulltext_benchmark.cpp
 )
 
-target_include_directories(fulltext_import_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(fulltext_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
-    fulltext_import_benchmark
+    fulltext_benchmark
     infinity_core
     benchmark_profiler
     sql_parser
     onnxruntime_mlas
     zsv_parser
-    iresearch
     newpfor
-    vespalib
+    fastpfor
     lz4.a
     atomic.a
     c++.a
 )
 
-# query benchmark
-add_executable(fulltext_query_benchmark
-    ./fulltext/fulltext_query_benchmark.cpp
-)
+if(ENABLE_JEMALLOC)
+    target_link_libraries(infinity_benchmark jemalloc.a)
+    target_link_libraries(knn_import_benchmark jemalloc.a)
+    target_link_libraries(knn_query_benchmark jemalloc.a)
+    target_link_libraries(fulltext_benchmark jemalloc.a)
+endif()
 
-target_include_directories(fulltext_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-    fulltext_query_benchmark
-    infinity_core
-    benchmark_profiler
-    sql_parser
-    onnxruntime_mlas
-    zsv_parser
-    iresearch
-    newpfor
-    vespalib
-    lz4.a
-    atomic.a
-    c++.a
-)
+# add_definitions(-march=native)
+# add_definitions(-msse4.2 -mfma)
+# add_definitions(-mavx2 -mf16c -mpopcnt)
+
+# execute_process(COMMAND grep -q avx2 /proc/cpuinfo  
+#                 RESULT_VARIABLE SUPPORT_AVX2  
+#                 OUTPUT_QUIET  
+#                 ERROR_QUIET)  
+
+# execute_process(COMMAND grep -q avx512 /proc/cpuinfo  
+# RESULT_VARIABLE SUPPORT_AVX512  
+# OUTPUT_QUIET  
+# ERROR_QUIET)
+
+# if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
+#         message("Compiled by AVX2 or AVX512")
+#         target_compile_options(infinity_benchmark PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+#         target_compile_options(knn_import_benchmark PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+#         target_compile_options(knn_query_benchmark PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-march=native)
+# else()
+#         message("Compiled by SSE")
+#         target_compile_options(infinity_benchmark PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+#         target_compile_options(knn_import_benchmark PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+#         target_compile_options(knn_query_benchmark PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+# endif()

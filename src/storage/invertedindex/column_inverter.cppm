@@ -14,38 +14,46 @@
 
 module;
 
+#include <cstdio>
+
 export module column_inverter;
 
 import stl;
 import analyzer;
 
 import column_vector;
-import memory_pool;
-import pool_allocator;
 import term;
 import string_ref;
 import internal_types;
+import posting_writer;
+import vector_with_lock;
 
 namespace infinity {
 
-class MemoryIndexer;
 export class ColumnInverter {
 public:
-    ColumnInverter(MemoryIndexer &memory_indexer);
+    ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider, VectorWithLock<u32> &column_lengths);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
+    ~ColumnInverter();
 
-    void InvertColumn(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin);
+    SizeT InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
 
-    void InvertColumn(u32 doc_id, const String &val);
+    void SortForOfflineDump();
 
     void Merge(ColumnInverter &rhs);
+
+    static void Merge(Vector<SharedPtr<ColumnInverter>> &inverters);
 
     void Sort();
 
     void GeneratePosting();
+
+    u32 GetDocCount() { return doc_count_; }
+
+    u32 GetMerged() { return merged_; }
 
     struct PosInfo {
         u32 term_num_{0};
@@ -63,10 +71,12 @@ public:
         }
     };
 
+    void SpillSortResults(FILE *spill_file, u64 &tuple_count);
+
 private:
-    using TermBuffer = Vector<char, PoolAllocator<char>>;
-    using PosInfoVec = Vector<PosInfo, PoolAllocator<PosInfo>>;
-    using U32Vec = Vector<u32, PoolAllocator<u32>>;
+    using TermBuffer = Vector<char>;
+    using PosInfoVec = Vector<PosInfo>;
+    using U32Vec = Vector<u32>;
 
     struct CompareTermRef {
         const char *const term_buffer_;
@@ -77,6 +87,8 @@ private:
 
         bool operator()(const u32 lhs, const u32 rhs) const;
     };
+
+    SizeT InvertColumn(u32 doc_id, const String &val);
 
     const char *GetTermFromRef(u32 term_ref) const { return &terms_[term_ref << 2]; }
 
@@ -96,13 +108,17 @@ private:
 
     void SortTerms();
 
-    MemoryIndexer &memory_indexer_;
-    Analyzer *analyzer_{nullptr};
-    bool jieba_specialize_{false};
-    PoolAllocator<char> alloc_;
+    void MergePrepare();
+
+    UniquePtr<Analyzer> analyzer_{nullptr};
+    u32 begin_doc_id_{0};
+    u32 doc_count_{0};
+    u32 merged_{1};
     TermBuffer terms_;
     PosInfoVec positions_;
     U32Vec term_refs_;
     Vector<Pair<u32, UniquePtr<TermList>>> terms_per_doc_;
+    PostingWriterProvider posting_writer_provider_{};
+    VectorWithLock<u32> &column_lengths_;
 };
 } // namespace infinity

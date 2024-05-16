@@ -52,7 +52,7 @@ TEST_F(SelectionTest, test1) {
     for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         EXPECT_EQ(s1.Get(i), 2 * i);
     }
-    EXPECT_EQ(s1.Size(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(s1.Size(), (u64)DEFAULT_VECTOR_SIZE);
     for (SizeT i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         s1[i] = 3 * i;
     }

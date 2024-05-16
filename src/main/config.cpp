@@ -14,12 +14,13 @@
 
 module;
 
-#include <bits/chrono.h>
-#include <cctype>
+// #include <bits/chrono.h>
+// #include <cctype>
+#include <string>
 #include <unistd.h>
 
 module config;
-//
+
 import third_party;
 import stl;
 import boost;
@@ -29,6 +30,9 @@ import logger;
 import local_file_system;
 import utility;
 import status;
+import options;
+import command_statement;
+import infinity_exception;
 
 namespace infinity {
 
@@ -44,7 +48,7 @@ void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_z
     parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, String::npos));
 }
 
-Status Config::ParseByteSize(const String &byte_size_str, u64 &byte_size) {
+Status Config::ParseByteSize(const String &byte_size_str, i64 &byte_size) {
 
     HashMap<String, u64> byte_unit = {{"kb", 1024ul}, {"mb", 1024ul * 1024ul}, {"gb", 1024ul * 1024ul * 1024ul}};
     if (byte_size_str.empty()) {
@@ -68,7 +72,7 @@ Status Config::ParseByteSize(const String &byte_size_str, u64 &byte_size) {
     }
 }
 
-Status Config::ParseTimeInfo(const String &time_info, u64 &time_seconds) {
+Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
     if (time_info.empty()) {
         return Status::EmptyConfigParameter();
     }
@@ -115,68 +119,9 @@ Status Config::ParseTimeInfo(const String &time_info, u64 &time_seconds) {
 
 Status Config::Init(const SharedPtr<String> &config_path) {
 
-    SystemVariables::InitVariablesMap();
-
-    SharedPtr<String> result;
-
-    // Default general config
-    String default_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
-
-    String default_time_zone = "UTC";
-    i32 default_time_zone_bias = 8;
-
-    // Default system config
-    u64 default_total_cpu_number = Thread::hardware_concurrency();
-    u64 default_total_memory_size = GetAvailableMem();
-    u64 default_query_cpu_limit = default_total_cpu_number;
-    u64 default_query_memory_limit = default_total_memory_size;
-
-    // Default profiler config
-    bool default_enable_profiler = false;
-    u64 default_profile_record_capacity = 100;
-
-    // Default network config
-    String default_listen_address = "0.0.0.0";
-    u32 default_pg_port = 5432;
-    u32 default_http_port = 8088;
-    u32 default_sdk_port = 23817;
-    i32 default_connection_limit = 128;
-
-    // Default log config
-    SharedPtr<String> default_log_filename = MakeShared<String>("infinity.log");
-    SharedPtr<String> default_log_dir = MakeShared<String>("/tmp/infinity/log");
-    bool default_log_to_stdout = false;
-    u64 default_log_max_size = 1024lu * 1024lu * 1024lu; // 1Gib
-    u64 default_log_file_rotate_count = 10;
-
-    // Set the log level before performance test of DB
-    LogLevel default_log_level = LogLevel::kInfo;
-
-    // Default storage config
-    SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
-    u64 default_row_size = 8192lu;
-    u64 default_storage_capacity = 64 * 1024lu * 1024lu * 1024lu; // 64Gib
-    u64 default_garbage_collection_interval = 0;                  // real-time
-    double default_garbage_collection_storage_ratio = 0;          // disable the function
-
-    // Default buffer config
-    u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
-    SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
-
-    // Default wal config
-    u64 wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
-    // Attention: this phase full checkpoint interval is used for testing,
-    //            it should be set to a larger value in production environment.
-    u64 full_checkpoint_interval_sec = FULL_CHECKPOINT_INTERVAL_SEC;
-    u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
-    u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
-    SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
-
-    // Default resource config
-    String default_resource_dict_path = String("/tmp/infinity/resource");
-    u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
-
     LocalFileSystem fs;
+
+    toml::table config_toml{};
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
         if (config_path.get() == nullptr) {
             fmt::print("No config file is given, use default configs.\n");
@@ -186,357 +131,1576 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             }
         }
 
-        // General
-        {
-            system_option_.version = default_version;
-            system_option_.time_zone = default_time_zone;
-            system_option_.time_zone_bias = default_time_zone_bias;
+        Status status;
+
+        // Version
+        String current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
+        UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
+        status = global_options_.AddOption(std::move(version_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // System
-        {
-            system_option_.worker_cpu_limit = default_total_cpu_number;
-            system_option_.total_memory_size = default_total_memory_size;
-            system_option_.query_cpu_limit = default_query_cpu_limit;
-            system_option_.query_memory_limit = default_query_memory_limit;
+        // Timezone
+        String time_zone_str = "UTC";
+        UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>(TIME_ZONE_OPTION_NAME, time_zone_str);
+        status = global_options_.AddOption(std::move(time_zone_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // Profiler
-        {
-            system_option_.enable_profiler = default_enable_profiler;
-            system_option_.profile_record_capacity = default_profile_record_capacity;
+        // Timezone Bias
+        i64 time_zone_bias = 8;
+        UniquePtr<IntegerOption> time_zone_bias_option = MakeUnique<IntegerOption>(TIME_ZONE_BIAS_OPTION_NAME, time_zone_bias, 12, -12);
+        status = global_options_.AddOption(std::move(time_zone_bias_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // Network
-        {
-            system_option_.listen_address = default_listen_address;
-            system_option_.pg_port = default_pg_port;
-            system_option_.http_port = default_http_port;
-            system_option_.sdk_port = default_sdk_port;
-            system_option_.connection_limit_ = default_connection_limit;
+        // CPU limit
+        UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>(CPU_LIMIT_OPTION_NAME, Thread::hardware_concurrency(), 16384, 1);
+        status = global_options_.AddOption(std::move(cpu_limit_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // Log
-        {
-            system_option_.log_filename = default_log_filename;
-            system_option_.log_dir = default_log_dir;
-            system_option_.log_file_path = MakeShared<String>(fmt::format("{}/{}", *system_option_.log_dir, *system_option_.log_filename));
-            system_option_.log_to_stdout = default_log_to_stdout;
-            system_option_.log_max_size = default_log_max_size; // 1Gib
-            system_option_.log_file_rotate_count = default_log_file_rotate_count;
-            system_option_.log_level = default_log_level;
+        // Server address
+        String server_address_str = "0.0.0.0";
+        UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address_str);
+        status = global_options_.AddOption(std::move(server_address_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // Storage
-        {
-            system_option_.data_dir = MakeShared<String>(*default_data_dir);
-            system_option_.default_row_size = default_row_size;
-            system_option_.storage_capacity_ = default_storage_capacity;
-            system_option_.garbage_collection_interval_ = default_garbage_collection_interval;
-            system_option_.garbage_collection_storage_ratio_ = default_garbage_collection_storage_ratio;
+        // Postgres port
+        i64 pg_port = 5432;
+        UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
+        status = global_options_.AddOption(std::move(pg_port_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // Buffer
-        {
-            system_option_.buffer_pool_size = default_buffer_pool_size; // 4Gib
-            system_option_.temp_dir = MakeShared<String>(*default_temp_dir);
+        // HTTP port
+        i64 http_port = 23820;
+        UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
+        status = global_options_.AddOption(std::move(http_port_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // Wal
-        {
-            system_option_.wal_dir = MakeShared<String>(*default_wal_dir);
-            system_option_.wal_size_threshold_ = wal_size_threshold;
-            system_option_.full_checkpoint_interval_sec_ = full_checkpoint_interval_sec;
-            system_option_.delta_checkpoint_interval_sec_ = delta_checkpoint_interval_sec;
-            system_option_.delta_checkpoint_interval_wal_bytes_ = delta_checkpoint_interval_wal_bytes;
+        // RPC Client port
+        i64 rpc_client_port = 23817;
+        UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
+        status = global_options_.AddOption(std::move(client_port_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
 
-        // Resource
-        {
-            system_option_.resource_dict_path_ = default_resource_dict_path;
-            system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
+        // Client pool size
+        i64 connection_pool_size = 256;
+        UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
+        status = global_options_.AddOption(std::move(connection_pool_size_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
         }
+
+        // Log file name
+        String log_filename = "infinity.log";
+        UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>(LOG_FILENAME_OPTION_NAME, log_filename);
+        status = global_options_.AddOption(std::move(log_file_name_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Log dir
+        String log_dir = "/var/infinity/log";
+        UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_dir);
+        status = global_options_.AddOption(std::move(log_dir_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Log To Stdout
+        bool log_to_stdout = false;
+        UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
+        status = global_options_.AddOption(std::move(log_to_stdout_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Log File Max Size
+        i64 log_file_max_size = 1024lu * 1024lu * 1024lu;
+        UniquePtr<IntegerOption> log_file_max_size_option =
+            MakeUnique<IntegerOption>(LOG_FILE_MAX_SIZE_OPTION_NAME, log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
+        status = global_options_.AddOption(std::move(log_file_max_size_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Log File Rotate count
+        i64 log_file_rotate_count = 8;
+        UniquePtr<IntegerOption> log_file_rotate_count_option = MakeUnique<IntegerOption>(LOG_FILE_ROTATE_COUNT_OPTION_NAME, log_file_rotate_count, 65536, 1);
+        status = global_options_.AddOption(std::move(log_file_rotate_count_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Log Level
+        LogLevel log_level = LogLevel::kInfo;
+        UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
+        status = global_options_.AddOption(std::move(log_level_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Data Dir
+        String data_dir = "/var/infinity/data";
+        UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
+        status = global_options_.AddOption(std::move(data_dir_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Cleanup Interval
+        i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
+        UniquePtr<IntegerOption> cleanup_interval_option =
+            MakeUnique<IntegerOption>(CLEANUP_INTERVAL_OPTION_NAME, cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
+        status = global_options_.AddOption(std::move(cleanup_interval_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Compact Interval
+        i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
+        UniquePtr<IntegerOption> compact_interval_option =
+            MakeUnique<IntegerOption>(COMPACT_INTERVAL_OPTION_NAME, compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+        status = global_options_.AddOption(std::move(compact_interval_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Optimize Index Interval
+        i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
+        UniquePtr<IntegerOption> optimize_interval_option =
+            MakeUnique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME, optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+        status = global_options_.AddOption(std::move(optimize_interval_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Mem Index Capacity
+        i64 mem_index_capacity = DEFAULT_MEMINDEX_CAPACITY;
+        UniquePtr<IntegerOption> mem_index_capacity_option =
+            MakeUnique<IntegerOption>(MEM_INDEX_CAPACITY_OPTION_NAME, mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
+        status = global_options_.AddOption(std::move(mem_index_capacity_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Buffer Manager Size
+        i64 buffer_manager_size = DEFAULT_BUFFER_MANAGER_SIZE;
+        UniquePtr<IntegerOption> buffer_manager_size_option =
+            MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
+        status = global_options_.AddOption(std::move(buffer_manager_size_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Temp Dir
+        String temp_dir = "/var/infinity/tmp";
+        UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
+        status = global_options_.AddOption(std::move(temp_dir_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // WAL Dir
+        String wal_dir = "/var/infinity/wal";
+        UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
+        status = global_options_.AddOption(std::move(wal_dir_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // WAL Compact Threshold
+        i64 wal_compact_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
+        UniquePtr<IntegerOption> wal_compact_threshold_option =
+            MakeUnique<IntegerOption>(WAL_COMPACT_THRESHOLD_OPTION_NAME, wal_compact_threshold, MAX_WAL_FILE_SIZE_THRESHOLD, MIN_WAL_FILE_SIZE_THRESHOLD);
+        status = global_options_.AddOption(std::move(wal_compact_threshold_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Full Checkpoint Interval
+        i64 full_checkpoint_interval = DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC;
+        UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(FULL_CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                             full_checkpoint_interval,
+                                                                                             MAX_FULL_CHECKPOINT_INTERVAL_SEC,
+                                                                                             MIN_FULL_CHECKPOINT_INTERVAL_SEC);
+        status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Delta Checkpoint Interval
+        i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
+        UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                              delta_checkpoint_interval,
+                                                                                              MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
+                                                                                              MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
+        status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Delta Checkpoint Threshold
+        i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
+        UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
+                                                                                               delta_checkpoint_threshold,
+                                                                                               MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
+                                                                                               MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
+        status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Flush Method At Commit
+        FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
+        UniquePtr<FlushOption> wal_flush_option = MakeUnique<FlushOption>(WAL_FLUSH_OPTION_NAME, flush_option_type);
+        status = global_options_.AddOption(std::move(wal_flush_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
+        // Resource Dir
+        String resource_dir = "/var/infinity/resource";
+        UniquePtr<StringOption> resource_dir_option = MakeUnique<StringOption>("resource_dir", resource_dir);
+        status = global_options_.AddOption(std::move(resource_dir_option));
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+
     } else {
-        fmt::print("Read config from: {}\n", *config_path);
-        toml::table config = toml::parse_file(*config_path);
+        config_toml = toml::parse_file(*config_path);
+
         // General
         {
-            auto general_config = config["general"];
+            if (config_toml.contains("general")) {
 
-            String infinity_version = general_config["version"].value_or("invalid");
-            if (!IsEqual(default_version, infinity_version)) {
-                return Status::MismatchVersion(infinity_version, default_version);
-            }
-            system_option_.version = infinity_version;
+                auto general_config = config_toml["general"];
+                auto general_config_table = general_config.as_table();
+                for (auto &elem : *general_config_table) {
 
-            String time_zone_str = general_config["timezone"].value_or("invalid");
-            if (IsEqual(time_zone_str, "invalid")) {
-                return Status::InvalidTimezone(time_zone_str);
-            }
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    if (option_index == GlobalOptionIndex::kInvalid) {
+                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'general' field", var_name));
+                    }
 
-            try {
-                ParseTimeZoneStr(time_zone_str, system_option_.time_zone, system_option_.time_zone_bias);
-            } catch (...) {
-                return Status::InvalidTimezone(time_zone_str);
-            }
-        }
+                    switch (option_index) {
+                        case GlobalOptionIndex::kVersion: {
+                            // Version
+                            String invalid_str = "invalid";
+                            String version_str;
+                            if (elem.second.is_string()) {
+                                version_str = elem.second.value_or("invalid");
+                                ToLower(version_str);
 
-        // System
-        {
-            auto system_config = config["system"];
-            system_option_.worker_cpu_limit = system_config["worker_cpu_limit"].value_or(default_total_cpu_number);
-            if (system_option_.worker_cpu_limit == 0) {
-                system_option_.worker_cpu_limit = default_total_cpu_number;
-            }
+                                if (IsEqual(version_str, invalid_str)) {
+                                    return Status::InvalidConfig("Invalid version field");
+                                } else {
+                                    String current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
+                                    if (IsEqual(version_str, current_version)) {
+                                        UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
+                                        Status status = global_options_.AddOption(std::move(version_option));
+                                        if (!status.ok()) {
+                                            UnrecoverableError(status.message());
+                                        }
+                                    } else {
+                                        Status::MismatchVersion(version_str, current_version);
+                                    }
+                                }
+                            } else {
+                                return Status::InvalidConfig("'version' field isn't string.");
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kTimeZone: {
+                            // Timezone
+                            if (elem.second.is_string()) {
+                                String time_zone_str = general_config[TIME_ZONE_OPTION_NAME].value_or("invalid");
+                                ToLower(time_zone_str);
+                                if (time_zone_str == "invalid") {
+                                    return Status::InvalidTimezone(time_zone_str);
+                                } else {
+                                    String time_zone;
+                                    i32 time_zone_bias = 0;
+                                    try {
+                                        ParseTimeZoneStr(time_zone_str, time_zone, time_zone_bias);
+                                    } catch (...) {
+                                        return Status::InvalidTimezone(time_zone_str);
+                                    }
 
-            if (system_config["total_memory_size"].as_integer() != 0) {
-                i64 total_memory_size_int = system_config["total_memory_size"].value_or(default_total_memory_size);
-                if (total_memory_size_int <= 0) {
-                    system_option_.total_memory_size = default_total_memory_size;
-                } else {
-                    system_option_.total_memory_size = total_memory_size_int;
+                                    // Timezone
+                                    UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>(TIME_ZONE_OPTION_NAME, time_zone);
+                                    Status status = global_options_.AddOption(std::move(time_zone_option));
+                                    if (!status.ok()) {
+                                        UnrecoverableError(status.message());
+                                    }
+
+                                    // Timezone Bias
+                                    UniquePtr<IntegerOption> time_zone_bias_option =
+                                        MakeUnique<IntegerOption>(TIME_ZONE_BIAS_OPTION_NAME, time_zone_bias, 12, -12);
+                                    if (!time_zone_bias_option->Validate()) {
+                                        return Status::InvalidConfig(fmt::format("Invalid timezone bias: {}", time_zone_bias));
+                                    }
+                                    status = global_options_.AddOption(std::move(time_zone_bias_option));
+                                    if (!status.ok()) {
+                                        UnrecoverableError(status.message());
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kWorkerCPULimit: {
+                            i64 total_cpu_number = Thread::hardware_concurrency();
+
+                            if (elem.second.is_integer()) {
+                                total_cpu_number = elem.second.value_or(total_cpu_number);
+                            } else {
+                                return Status::InvalidConfig("'cpu_limit' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>(CPU_LIMIT_OPTION_NAME, total_cpu_number, 16384, 1);
+                            if (!cpu_limit_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid cpu limit: {}", total_cpu_number));
+                            }
+                            Status status = global_options_.AddOption(std::move(cpu_limit_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'general' field", var_name));
+                        }
+                    }
                 }
-            } else {
-                String total_memory_size_str = system_config["total_memory_size"].value_or("8GB");
-                Status status = ParseByteSize(total_memory_size_str, system_option_.total_memory_size);
-                if (!status.ok()) {
-                    return status;
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kVersion) == nullptr) {
+                    // Version
+                    UnrecoverableError("Missing version field");
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone) == nullptr) {
+                    // Time zone
+                    UnrecoverableError("Missing time zone field");
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZoneBias) == nullptr) {
+                    // Time zone bias
+                    UnrecoverableError("Missing time zone field");
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kWorkerCPULimit) == nullptr) {
+                    // CPU limit
+                    UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>(CPU_LIMIT_OPTION_NAME, Thread::hardware_concurrency(), 16384, 1);
+                    Status status = global_options_.AddOption(std::move(cpu_limit_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
                 }
             }
-
-            if (system_option_.total_memory_size > default_total_memory_size) {
-                system_option_.total_memory_size = default_total_memory_size;
-            }
-
-            system_option_.query_cpu_limit = system_config["query_cpu_limit"].value_or(default_query_cpu_limit);
-            if (system_option_.query_cpu_limit == 0) {
-                system_option_.query_cpu_limit = default_query_cpu_limit;
-            }
-
-            system_option_.query_memory_limit = system_config["query_memory_limit"].value_or(default_query_memory_limit);
-            if (system_option_.query_memory_limit == 0) {
-                system_option_.query_memory_limit = default_query_memory_limit;
-            }
-
-            if (system_config["query_memory_limit"].as_integer() != 0) {
-                i64 query_memory_size_int = system_config["query_memory_limit"].value_or(default_query_memory_limit);
-                if (query_memory_size_int <= 0) {
-                    system_option_.query_memory_limit = default_query_memory_limit;
-                } else {
-                    system_option_.query_memory_limit = query_memory_size_int;
-                }
-            } else {
-                String query_memory_limit_str = system_config["query_memory_limit"].value_or("4MB");
-                Status status = ParseByteSize(query_memory_limit_str, system_option_.query_memory_limit);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-
-            if (system_option_.query_memory_limit > default_query_memory_limit) {
-                system_option_.query_memory_limit = default_query_memory_limit;
-            }
-        }
-
-        // Profiler
-        {
-            auto profiler_config = config["profiler"];
-            system_option_.enable_profiler = profiler_config["enable"].value_or(default_enable_profiler);
-            system_option_.profile_record_capacity = profiler_config["profile_record_capacity"].value_or(default_profile_record_capacity);
         }
 
         // Network
         {
-            auto network_config = config["network"];
-            system_option_.listen_address = network_config["listen_address"].value_or(default_listen_address);
+            if (config_toml.contains("network")) {
+                auto network_config = config_toml["network"];
+                auto network_config_table = network_config.as_table();
+                for(auto& elem: *network_config_table) {
 
-            // Validate the address format
-            boost::system::error_code error;
-            boost::asio::ip::make_address(system_option_.listen_address, error);
-            if (error) {
-                return Status::InvalidIPAddr(system_option_.listen_address);
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    if(option_index == GlobalOptionIndex::kInvalid) {
+                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'network' field", var_name));
+                    }
+
+                    switch(option_index) {
+                        case GlobalOptionIndex::kServerAddress: {
+                            // Server address
+                            String server_address = "0.0.0.0";
+                            if(elem.second.is_string()) {
+                                server_address = elem.second.value_or(server_address);
+                            } else {
+                                return Status::InvalidConfig("'server_address' field isn't string.");
+                            }
+
+                            // Validate the address format
+                            boost::system::error_code error;
+                            boost::asio::ip::make_address(server_address, error);
+                            if (error) {
+                                return Status::InvalidIPAddr(server_address);
+                            }
+
+                            UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address);
+                            Status status = global_options_.AddOption(std::move(server_address_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPostgresPort: {
+                            // Postgres port
+                            i64 pg_port = 5432;
+                            if (elem.second.is_integer()) {
+                                pg_port = elem.second.value_or(pg_port);
+                            } else {
+                                return Status::InvalidConfig("'postgres_port' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
+                            if (!pg_port_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid postgres port: {}", pg_port));
+                            }
+                            Status status = global_options_.AddOption(std::move(pg_port_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kHTTPPort: {
+                            // HTTP port
+                            i64 http_port = 23820;
+                            if (elem.second.is_integer()) {
+                                http_port = elem.second.value_or(http_port);
+                            } else {
+                                return Status::InvalidConfig("'http_port' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
+                            if (!http_port_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid HTTP port: {}", http_port));
+                            }
+                            Status status = global_options_.AddOption(std::move(http_port_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kClientPort: {
+                            // RPC Client port
+                            i64 rpc_client_port = 23817;
+                            if (elem.second.is_integer()) {
+                                rpc_client_port = elem.second.value_or(rpc_client_port);
+                            } else {
+                                return Status::InvalidConfig("'client_port' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
+                            if (!client_port_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid client RPC port: {}", rpc_client_port));
+                            }
+                            Status status = global_options_.AddOption(std::move(client_port_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kConnectionPoolSize: {
+                            // Client pool size
+                            i64 connection_pool_size = 256;
+                            if (elem.second.is_integer()) {
+                                connection_pool_size = elem.second.value_or(connection_pool_size);
+                            } else {
+                                return Status::InvalidConfig("'connection_pool_size' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> connection_pool_size_option =
+                                MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
+                            if (!connection_pool_size_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid connection pool size: {}", connection_pool_size));
+                            }
+
+                            Status status = global_options_.AddOption(std::move(connection_pool_size_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'network' field", var_name));
+                        }
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kServerAddress) == nullptr) {
+                    // Server address
+                    String server_address_str = "0.0.0.0";
+                    UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address_str);
+                    Status status = global_options_.AddOption(std::move(server_address_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kPostgresPort) == nullptr) {
+                    // Postgres port
+                    i64 pg_port = 5432;
+                    UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
+                    Status status = global_options_.AddOption(std::move(pg_port_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kHTTPPort) == nullptr) {
+                    // HTTP port
+                    i64 http_port = 23820;
+                    UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
+                    Status status = global_options_.AddOption(std::move(http_port_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kClientPort) == nullptr) {
+                    // RPC Client port
+                    i64 rpc_client_port = 23817;
+                    UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
+                    Status status = global_options_.AddOption(std::move(client_port_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kConnectionPoolSize) == nullptr) {
+                    // Client pool size
+                    i64 connection_pool_size = 256;
+                    UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
+                    Status status = global_options_.AddOption(std::move(connection_pool_size_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+            } else {
+                return Status::InvalidConfig("No 'network' section in configure file.");
             }
-
-            system_option_.pg_port = network_config["pg_port"].value_or(default_pg_port);
-            system_option_.http_port = network_config["http_port"].value_or(default_http_port);
-            system_option_.sdk_port = network_config["sdk_port"].value_or(default_sdk_port);
-            system_option_.connection_limit_ = network_config["connection_limit"].value_or(default_connection_limit);
         }
 
         // Log
         {
-            auto log_config = config["log"];
-            system_option_.log_filename = MakeShared<String>(log_config["log_filename"].value_or(*default_log_filename));
-            system_option_.log_dir = MakeShared<String>(log_config["log_dir"].value_or(*default_log_dir));
+            if (config_toml.contains("log")) {
 
-            String log_file_path = fmt::format("{}/{}", *system_option_.log_dir, *system_option_.log_filename);
-            system_option_.log_file_path = MakeShared<String>(log_file_path);
-            system_option_.log_to_stdout = log_config["log_to_stdout"].value_or(default_log_to_stdout);
+                auto log_config = config_toml["log"];
+                auto log_config_table = log_config.as_table();
+                for(auto& elem: *log_config_table) {
 
-            String log_max_size_str = log_config["log_max_size"].value_or("1GB");
-            Status status = ParseByteSize(log_max_size_str, system_option_.log_max_size);
-            if (!status.ok()) {
-                return status;
-            }
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    if(option_index == GlobalOptionIndex::kInvalid) {
+                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'log' field", var_name));
+                    }
 
-            system_option_.log_file_rotate_count = log_config["log_file_rotate_count"].value_or(default_log_file_rotate_count);
+                    switch(option_index) {
+                        case GlobalOptionIndex::kLogFileName: {
+                            // Log file name
+                            String log_filename = "infinity.log";
+                            if (elem.second.is_string()) {
+                                log_filename = elem.second.value_or(log_filename);
+                            } else {
+                                return Status::InvalidConfig("'log_filename' field isn't string.");
+                            }
 
-            String log_level = log_config["log_level"].value_or("default");
-            if (IsEqual(log_level, "trace")) {
-                system_option_.log_level = LogLevel::kTrace;
-            } else if (IsEqual(log_level, "info")) {
-                system_option_.log_level = LogLevel::kInfo;
-            } else if (IsEqual(log_level, "warning")) {
-                system_option_.log_level = LogLevel::kWarning;
-            } else if (IsEqual(log_level, "error")) {
-                system_option_.log_level = LogLevel::kError;
-            } else if (IsEqual(log_level, "critical")) {
-                system_option_.log_level = LogLevel::kFatal;
-            } else if (IsEqual(log_level, "default")) {
-                system_option_.log_level = default_log_level;
+                            UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>(LOG_FILENAME_OPTION_NAME, log_filename);
+                            Status status = global_options_.AddOption(std::move(log_file_name_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kLogDir: {
+                            // Log dir
+                            String log_filename = "/var/infinity/log";
+                            if (elem.second.is_string()) {
+                                log_filename = elem.second.value_or(log_filename);
+                            } else {
+                                return Status::InvalidConfig("'log_dir' field isn't string.");
+                            }
+
+                            UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_filename);
+                            Status status = global_options_.AddOption(std::move(log_dir_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kLogToStdout: {
+                            // Log To Stdout
+                            bool log_to_stdout = false;
+                            if (elem.second.is_boolean()) {
+                                log_to_stdout = elem.second.value_or(log_to_stdout);
+                            } else {
+                                return Status::InvalidConfig("'log_to_stdout' field isn't boolean.");
+                            }
+
+                            UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
+                            Status status = global_options_.AddOption(std::move(log_to_stdout_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kLogFileMaxSize: {
+                            // Log File Max Size
+                            i64 log_file_max_size = DEFAULT_LOG_FILE_SIZE;
+                            if (elem.second.is_string()) {
+                                String log_file_max_size_str = elem.second.value_or(DEFAULT_LOG_FILE_SIZE_STR);
+                                auto res = ParseByteSize(log_file_max_size_str, log_file_max_size);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'log_file_max_size' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> log_file_max_size_option =
+                                MakeUnique<IntegerOption>(LOG_FILE_MAX_SIZE_OPTION_NAME, log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
+
+                            if (!log_file_max_size_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid max log file size: {}", log_file_max_size));
+                            }
+                            Status status = global_options_.AddOption(std::move(log_file_max_size_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kLogFileRotateCount: {
+                            // Log File Rotate count
+                            i64 log_file_rotate_count = 8;
+                            if (elem.second.is_integer()) {
+                                log_file_rotate_count = elem.second.value_or(log_file_rotate_count);
+                            } else {
+                                return Status::InvalidConfig("'log_file_rotate_count' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> log_file_rotate_count_option =
+                                MakeUnique<IntegerOption>(LOG_FILE_ROTATE_COUNT_OPTION_NAME, log_file_rotate_count, 65536, 1);
+
+                            if (!log_file_rotate_count_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid log file rotate count: {}", log_file_rotate_count));
+                            }
+                            Status status = global_options_.AddOption(std::move(log_file_rotate_count_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kLogLevel: {
+                            // Log Level
+                            LogLevel log_level = LogLevel::kInfo;
+                            if(elem.second.is_string()) {
+                                String log_level_str = elem.second.value_or("info");
+                                ToLower(log_level_str);
+                                if (IsEqual(log_level_str, "trace")) {
+                                    log_level = LogLevel::kTrace;
+                                } else if (IsEqual(log_level_str, "debug")) {
+                                    log_level = LogLevel::kDebug;
+                                } else if (IsEqual(log_level_str, "info")) {
+                                    log_level = LogLevel::kInfo;
+                                } else if (IsEqual(log_level_str, "warning")) {
+                                    log_level = LogLevel::kWarning;
+                                } else if (IsEqual(log_level_str, "error")) {
+                                    log_level = LogLevel::kError;
+                                } else if (IsEqual(log_level_str, "critical")) {
+                                    log_level = LogLevel::kCritical;
+                                } else {
+                                    return Status::InvalidLogLevel(log_level_str);
+                                }
+                            } else {
+                                return Status::InvalidConfig("'log_level' field isn't string.");
+                            }
+
+                            UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
+                            Status status = global_options_.AddOption(std::move(log_level_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));
+                        }
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogFileName) == nullptr) {
+                    // Log file name
+                    String log_filename = "infinity.log";
+                    UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>(LOG_FILENAME_OPTION_NAME, log_filename);
+                    Status status = global_options_.AddOption(std::move(log_file_name_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogDir) == nullptr) {
+                    // Log dir
+                    String log_dir = "/var/infinity/log";
+                    UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_dir);
+                    Status status = global_options_.AddOption(std::move(log_dir_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogToStdout) == nullptr) {
+                    // Log To Stdout
+                    bool log_to_stdout = false;
+                    UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
+                    Status status = global_options_.AddOption(std::move(log_to_stdout_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogFileMaxSize) == nullptr) {
+                    // Log File Max Size
+                    i64 log_file_max_size = 1024lu * 1024lu * 1024lu;
+                    UniquePtr<IntegerOption> log_file_max_size_option =
+                        MakeUnique<IntegerOption>(LOG_FILE_MAX_SIZE_OPTION_NAME, log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
+                    Status status = global_options_.AddOption(std::move(log_file_max_size_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogFileRotateCount) == nullptr) {
+                    // Log File Rotate count
+                    i64 log_file_rotate_count = 8;
+                    UniquePtr<IntegerOption> log_file_rotate_count_option = MakeUnique<IntegerOption>(LOG_FILE_ROTATE_COUNT_OPTION_NAME, log_file_rotate_count, 65536, 1);
+                    Status status = global_options_.AddOption(std::move(log_file_rotate_count_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel) == nullptr) {
+                    // Log Level
+                    LogLevel log_level = LogLevel::kInfo;
+                    UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
+                    Status status = global_options_.AddOption(std::move(log_level_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
             } else {
-                return Status::InvalidLogLevel(log_level);
+                return Status::InvalidConfig("No 'Log' section in configure file.");
             }
         }
 
         // Storage
         {
-            auto storage_config = config["storage"];
-            system_option_.data_dir = MakeShared<String>(storage_config["data_dir"].value_or(*default_data_dir));
-            system_option_.default_row_size = storage_config["default_row_size"].value_or(default_row_size);
-            String storage_capacity_str = storage_config["storage_capacity"].value_or("64GB");
-            Status status = ParseByteSize(storage_capacity_str, system_option_.storage_capacity_);
-            if (!status.ok()) {
-                return status;
-            }
+            if (config_toml.contains("storage")) {
+                auto storage_config = config_toml["storage"];
+                auto storage_config_table = storage_config.as_table();
+                for(auto& elem: *storage_config_table) {
 
-            String garbage_collection_interval_str = storage_config["garbage_collection_interval"].value_or("60s");
-            Status parse_status = ParseTimeInfo(garbage_collection_interval_str, system_option_.garbage_collection_interval_);
-            if (!parse_status.ok()) {
-                return parse_status;
-            }
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    if(option_index == GlobalOptionIndex::kInvalid) {
+                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
+                    }
 
-            system_option_.garbage_collection_storage_ratio_ =
-                storage_config["garbage_collection_storage_ratio"].value_or(default_garbage_collection_storage_ratio);
+                    switch(option_index) {
+                        case GlobalOptionIndex::kDataDir: {
+                            // Data Dir
+                            String data_dir = "/var/infinity/data";
+                            if(elem.second.is_string()) {
+                                data_dir = elem.second.value_or(data_dir);
+                            } else {
+                                return Status::InvalidConfig("'data_dir' field isn't string.");
+                            }
+
+                            UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
+                            Status status = global_options_.AddOption(std::move(data_dir_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kCleanupInterval: {
+                            // Cleanup Interval
+                            i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
+                            if(elem.second.is_string()) {
+                                String cleanup_interval_str = elem.second.value_or(DEFAULT_CLEANUP_INTERVAL_SEC_STR);
+                                auto res = ParseTimeInfo(cleanup_interval_str, cleanup_interval);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'cleanup_interval' field isn't string, such as \"1m\".");
+                            }
+
+                            UniquePtr<IntegerOption> cleanup_interval_option =
+                                MakeUnique<IntegerOption>(CLEANUP_INTERVAL_OPTION_NAME, cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
+                            if (!cleanup_interval_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid cleanup interval: {}", cleanup_interval));
+                            }
+                            Status status = global_options_.AddOption(std::move(cleanup_interval_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kCompactInterval: {
+                            // Compact Interval
+                            i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
+                            if(elem.second.is_string()) {
+                                String compact_interval_str = elem.second.value_or(DEFAULT_COMPACT_INTERVAL_SEC_STR);
+                                auto res = ParseTimeInfo(compact_interval_str, compact_interval);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'compact_interval' field isn't string, such as \"1m\".");
+                            }
+
+                            UniquePtr<IntegerOption> compact_interval_option =
+                                MakeUnique<IntegerOption>(COMPACT_INTERVAL_OPTION_NAME, compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+                            if (!compact_interval_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid compact interval: {}", compact_interval));
+                            }
+                            Status status = global_options_.AddOption(std::move(compact_interval_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kOptimizeIndexInterval: {
+                            // Optimize Index Interval
+                            i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
+                            if(elem.second.is_string()) {
+                                String optimize_index_interval_str = elem.second.value_or(DEFAULT_OPTIMIZE_INTERVAL_SEC_STR);
+                                auto res = ParseTimeInfo(optimize_index_interval_str, optimize_index_interval);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'optimize_interval' field isn't string, such as \"1m\".");
+                            }
+
+                            UniquePtr<IntegerOption> optimize_interval_option =
+                                MakeUnique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME, optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+                            if (!optimize_interval_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid optimize interval: {}", optimize_index_interval));
+                            }
+                            Status status = global_options_.AddOption(std::move(optimize_interval_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kMemIndexCapacity: {
+                            // Mem Index Capacity
+                            i64 mem_index_capacity = DEFAULT_MEMINDEX_CAPACITY;
+                            if(elem.second.is_integer()) {
+                                mem_index_capacity = elem.second.value_or(mem_index_capacity);
+                            } else {
+                                return Status::InvalidConfig("'mem_index_capacity' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> mem_index_capacity_option =
+                                MakeUnique<IntegerOption>(MEM_INDEX_CAPACITY_OPTION_NAME, mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
+                            if (!mem_index_capacity_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid memory index capacity: {}", mem_index_capacity));
+                            }
+                            Status status = global_options_.AddOption(std::move(mem_index_capacity_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
+                        }
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kDataDir) == nullptr) {
+                    // Data Dir
+                    String data_dir = "/var/infinity/data";
+                    UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
+                    Status status = global_options_.AddOption(std::move(data_dir_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kCleanupInterval) == nullptr) {
+                    // Cleanup Interval
+                    i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
+                    UniquePtr<IntegerOption> cleanup_interval_option =
+                        MakeUnique<IntegerOption>(CLEANUP_INTERVAL_OPTION_NAME, cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
+                    Status status = global_options_.AddOption(std::move(cleanup_interval_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kCompactInterval) == nullptr) {
+                    // Compact Interval
+                    i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
+                    UniquePtr<IntegerOption> compact_interval_option =
+                        MakeUnique<IntegerOption>(COMPACT_INTERVAL_OPTION_NAME, compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+                    Status status = global_options_.AddOption(std::move(compact_interval_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kOptimizeIndexInterval) == nullptr) {
+                    // Optimize Index Interval
+                    i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
+                    UniquePtr<IntegerOption> optimize_interval_option =
+                        MakeUnique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME, optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
+                    Status status = global_options_.AddOption(std::move(optimize_interval_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kMemIndexCapacity) == nullptr) {
+                    // Mem Index Capacity
+                    i64 mem_index_capacity = DEFAULT_MEMINDEX_CAPACITY;
+                    UniquePtr<IntegerOption> mem_index_capacity_option =
+                        MakeUnique<IntegerOption>(MEM_INDEX_CAPACITY_OPTION_NAME, mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
+                    Status status = global_options_.AddOption(std::move(mem_index_capacity_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+            } else {
+                return Status::InvalidConfig("No 'storage' section in configure file.");
+            }
         }
 
         // Buffer
         {
-            auto buffer_config = config["buffer"];
-            String buffer_pool_size_str = buffer_config["buffer_pool_size"].value_or("4GB");
-            Status status = ParseByteSize(buffer_pool_size_str, system_option_.buffer_pool_size);
-            if (!status.ok()) {
-                return status;
-            }
+            if (config_toml.contains("buffer")) {
+                auto buffer_config = config_toml["buffer"];
+                auto buffer_config_table = buffer_config.as_table();
+                for(auto& elem: *buffer_config_table) {
 
-            system_option_.temp_dir = MakeShared<String>(buffer_config["temp_dir"].value_or("invalid"));
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    if(option_index == GlobalOptionIndex::kInvalid) {
+                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));
+                    }
+
+                    switch(option_index) {
+                        case GlobalOptionIndex::kBufferManagerSize: {
+                            i64 buffer_manager_size = DEFAULT_BUFFER_MANAGER_SIZE;
+                            if(elem.second.is_string()) {
+                                String buffer_manager_size_str = elem.second.value_or(DEFAULT_BUFFER_MANAGER_SIZE_STR);
+                                auto res = ParseByteSize(buffer_manager_size_str, buffer_manager_size);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'buffer_manager_size' field isn't string, such as \"4GB\"");
+                            }
+                            UniquePtr<IntegerOption> buffer_manager_size_option =
+                                MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
+                            if (!buffer_manager_size_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid buffer manager size: {}", buffer_manager_size));
+                            }
+                            global_options_.AddOption(std::move(buffer_manager_size_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kTempDir: {
+                            String temp_dir = "/var/infinity/tmp";
+                            if (elem.second.is_string()) {
+                                temp_dir = elem.second.value_or(temp_dir);
+                            } else {
+                                return Status::InvalidConfig("'temp_dir' field isn't string.");
+                            }
+
+                            UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
+                            global_options_.AddOption(std::move(temp_dir_option));
+                            break;
+                        }
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));
+                        }
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kBufferManagerSize) == nullptr) {
+                    // Buffer Manager Size
+                    i64 buffer_manager_size = DEFAULT_BUFFER_MANAGER_SIZE;
+                    UniquePtr<IntegerOption> buffer_manager_size_option =
+                        MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
+                    Status status = global_options_.AddOption(std::move(buffer_manager_size_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kTempDir) == nullptr) {
+                    // Temp Dir
+                    String temp_dir = "/var/infinity/tmp";
+                    UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
+                    Status status = global_options_.AddOption(std::move(temp_dir_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+            } else {
+                return Status::InvalidConfig("No 'buffer' section in configure file.");
+            }
         }
 
-        // Wal
+        // WAL
         {
-            auto wal_config = config["wal"];
-            system_option_.wal_dir = MakeShared<String>(wal_config["wal_dir"].value_or(*default_wal_dir));
-            system_option_.full_checkpoint_interval_sec_ = wal_config["full_checkpoint_interval_sec"].value_or(full_checkpoint_interval_sec);
-            system_option_.delta_checkpoint_interval_sec_ = wal_config["delta_checkpoint_interval_sec"].value_or(delta_checkpoint_interval_sec);
-            system_option_.delta_checkpoint_interval_wal_bytes_ =
-                wal_config["delta_checkpoint_interval_wal_bytes"].value_or(delta_checkpoint_interval_wal_bytes);
-            auto wal_file_size_threshold_str = wal_config["wal_file_size_threshold"].value_or("10KB");
-            Status status = ParseByteSize(wal_file_size_threshold_str, system_option_.wal_size_threshold_);
-            if (!status.ok()) {
-                return status;
+            if (config_toml.contains("wal")) {
+                auto wal_config = config_toml["wal"];
+
+                auto wal_config_table = wal_config.as_table();
+                for(auto& elem: *wal_config_table) {
+
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    if(option_index == GlobalOptionIndex::kInvalid) {
+                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'wal' field", var_name));
+                    }
+
+                    switch(option_index) {
+                        case GlobalOptionIndex::kWALDir: {
+                            // WAL Dir
+                            String wal_dir = "/var/infinity/wal";
+
+                            if (elem.second.is_string()) {
+                                wal_dir = elem.second.value_or(wal_dir);
+                            } else {
+                                return Status::InvalidConfig("'wal_dir' field isn't string.");
+                            }
+
+                            UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
+                            Status status = global_options_.AddOption(std::move(wal_dir_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kWALCompactThreshold: {
+                            // WAL Compact Threshold
+                            i64 wal_compact_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
+
+                            if (elem.second.is_string()) {
+                                String wal_compact_threshold_str = elem.second.value_or(DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR);
+                                auto res = ParseByteSize(wal_compact_threshold_str, wal_compact_threshold);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'wal_dir' field isn't string.");
+                            }
+
+                            UniquePtr<IntegerOption> wal_compact_threshold_option = MakeUnique<IntegerOption>(WAL_COMPACT_THRESHOLD_OPTION_NAME,
+                                                                                                              wal_compact_threshold,
+                                                                                                              MAX_WAL_FILE_SIZE_THRESHOLD,
+                                                                                                              MIN_WAL_FILE_SIZE_THRESHOLD);
+                            if (!wal_compact_threshold_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid WAL compact threshold: {}", wal_compact_threshold));
+                            }
+                            Status status = global_options_.AddOption(std::move(wal_compact_threshold_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kFullCheckpointInterval: {
+                            // Full Checkpoint Interval
+                            i64 full_checkpoint_interval = DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC;
+                            if (elem.second.is_string()) {
+                                String full_checkpoint_interval_str = elem.second.value_or(DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR);
+                                auto res = ParseTimeInfo(full_checkpoint_interval_str, full_checkpoint_interval);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'full_checkpoint_interval' field isn't string, such as \"30s\".");
+                            }
+
+                            UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(FULL_CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                                                 full_checkpoint_interval,
+                                                                                                                 MAX_FULL_CHECKPOINT_INTERVAL_SEC,
+                                                                                                                 MIN_FULL_CHECKPOINT_INTERVAL_SEC);
+                            if (!full_checkpoint_interval_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid full checkpoint interval: {}", full_checkpoint_interval));
+                            }
+
+                            Status status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kDeltaCheckpointInterval: {
+                            // Delta Checkpoint Interval
+                            i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
+                            if (elem.second.is_string()) {
+                                String delta_checkpoint_interval_str = elem.second.value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR);
+                                auto res = ParseTimeInfo(delta_checkpoint_interval_str, delta_checkpoint_interval);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'delta_checkpoint_interval' field isn't string, such as \"30s\".");
+                            }
+
+                            UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                                                  delta_checkpoint_interval,
+                                                                                                                  MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
+                                                                                                                  MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
+                            if (!delta_checkpoint_interval_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid delta checkpoint interval: {}", delta_checkpoint_interval));
+                            }
+
+                            Status status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
+                            if (!status.ok()) {
+                                return status;
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kDeltaCheckpointThreshold: {
+                            // Delta Checkpoint Threshold
+                            i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
+                            if (elem.second.is_string()) {
+                                String delta_checkpoint_threshold_str = elem.second.value_or(DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR);
+                                auto res = ParseByteSize(delta_checkpoint_threshold_str, delta_checkpoint_threshold);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'delta_checkpoint_threshold' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
+                                                                                                                   delta_checkpoint_threshold,
+                                                                                                                   MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
+                                                                                                                   MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
+                            if (!delta_checkpoint_threshold_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid delta checkpoint interval: {}", delta_checkpoint_threshold));
+                            }
+
+                            Status status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
+                            if (!status.ok()) {
+                                return status;
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kFlushMethodAtCommit: {
+                            // Flush Method At Commit
+                            FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
+                            if (elem.second.is_string()) {
+                                String flush_option_str = elem.second.value_or("flush_at_once");
+                                ToLower(flush_option_str);
+                                if (IsEqual(flush_option_str, "flush_at_once")) {
+                                    flush_option_type = FlushOptionType::kFlushAtOnce;
+                                } else if (IsEqual(flush_option_str, "only_write")) {
+                                    flush_option_type = FlushOptionType::kFlushAtOnce;
+                                } else if (IsEqual(flush_option_str, "flush_per_second")) {
+                                    flush_option_type = FlushOptionType::kFlushAtOnce;
+                                } else {
+                                    return Status::InvalidConfig(fmt::format("Unsupported flush option: {}", flush_option_str));
+                                }
+                            } else {
+                                return Status::InvalidConfig("'flush_option' field isn't string.");
+                            }
+
+                            UniquePtr<FlushOption> flush_option = MakeUnique<FlushOption>(WAL_FLUSH_OPTION_NAME, flush_option_type);
+                            Status status = global_options_.AddOption(std::move(flush_option));
+                            if (!status.ok()) {
+                                return status;
+                            }
+                            break;
+                        }
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'wal' field", var_name));
+                        }
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kWALDir) == nullptr) {
+                    // WAL Dir
+                    String wal_dir = "/var/infinity/wal";
+                    UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
+                    Status status = global_options_.AddOption(std::move(wal_dir_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kWALCompactThreshold) == nullptr) {
+                    // WAL Compact Threshold
+                    i64 wal_compact_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
+                    UniquePtr<IntegerOption> wal_compact_threshold_option =
+                        MakeUnique<IntegerOption>(WAL_COMPACT_THRESHOLD_OPTION_NAME, wal_compact_threshold, MAX_WAL_FILE_SIZE_THRESHOLD, MIN_WAL_FILE_SIZE_THRESHOLD);
+                    Status status = global_options_.AddOption(std::move(wal_compact_threshold_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kFullCheckpointInterval) == nullptr) {
+                    // Full Checkpoint Interval
+                    i64 full_checkpoint_interval = DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC;
+                    UniquePtr<IntegerOption> full_checkpoint_interval_option = MakeUnique<IntegerOption>(FULL_CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                                         full_checkpoint_interval,
+                                                                                                         MAX_FULL_CHECKPOINT_INTERVAL_SEC,
+                                                                                                         MIN_FULL_CHECKPOINT_INTERVAL_SEC);
+                    Status status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointInterval) == nullptr) {
+                    // Delta Checkpoint Interval
+                    i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
+                    UniquePtr<IntegerOption> delta_checkpoint_interval_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_INTERVAL_OPTION_NAME,
+                                                                                                          delta_checkpoint_interval,
+                                                                                                          MAX_DELTA_CHECKPOINT_INTERVAL_SEC,
+                                                                                                          MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
+                    Status status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointThreshold) == nullptr) {
+                    // Delta Checkpoint Threshold
+                    i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
+                    UniquePtr<IntegerOption> delta_checkpoint_threshold_option = MakeUnique<IntegerOption>(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME,
+                                                                                                           delta_checkpoint_threshold,
+                                                                                                           MAX_CHECKPOINT_INTERVAL_WAL_BYTES,
+                                                                                                           MIN_CHECKPOINT_INTERVAL_WAL_BYTES);
+                    Status status = global_options_.AddOption(std::move(delta_checkpoint_threshold_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit) == nullptr) {
+                    // Flush Method At Commit
+                    FlushOptionType flush_option_type = FlushOptionType::kFlushAtOnce;
+                    UniquePtr<FlushOption> wal_flush_option = MakeUnique<FlushOption>(WAL_FLUSH_OPTION_NAME, flush_option_type);
+                    Status status = global_options_.AddOption(std::move(wal_flush_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+            } else {
+                return Status::InvalidConfig("No 'wal' section in configure file.");
             }
         }
 
         // Resource
         {
-            auto resource_config = config["resource"];
-            system_option_.resource_dict_path_ = resource_config["dictionary_dir"].value_or(default_resource_dict_path);
-            system_option_.cleanup_interval_ = std::chrono::seconds(resource_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
+            if (config_toml.contains("resource")) {
+                auto resource_config = config_toml["resource"];
+                auto resource_config_table = resource_config.as_table();
+                for(auto& elem: *resource_config_table) {
+
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    if(option_index == GlobalOptionIndex::kInvalid) {
+                        return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'resource' field", var_name));
+                    }
+
+                    switch(option_index) {
+                        case GlobalOptionIndex::kResourcePath: {
+                            // Resource Dir
+                            String resource_dir = "/var/infinity/resource";
+                            if(elem.second.is_string()) {
+                                resource_dir = elem.second.value_or(resource_dir);
+                            } else {
+                                return Status::InvalidConfig("'resource_dir' field isn't string.");
+                            }
+
+                            UniquePtr<StringOption> resource_dir_option = MakeUnique<StringOption>("resource_dir", resource_dir);
+                            Status status = global_options_.AddOption(std::move(resource_dir_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'resource' field", var_name));
+                        }
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kResourcePath) == nullptr) {
+                    // Resource Dir
+                    String resource_dir = "/var/infinity/resource";
+                    UniquePtr<StringOption> resource_dir_option = MakeUnique<StringOption>("resource_dir", resource_dir);
+                    Status status = global_options_.AddOption(std::move(resource_dir_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+            } else {
+                return Status::InvalidConfig("No 'resource' section in configure file.");
+            }
         }
     }
 
     return Status::OK();
 }
 
-void Config::PrintAll() const {
-    fmt::print("Infinity system parameters: \n");
+// General
+String Config::Version() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kVersion);
+}
+
+String Config::TimeZone() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kTimeZone);
+}
+
+i64 Config::TimeZoneBias() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kTimeZoneBias);
+}
+
+// inline void set_worker_cpu_number(u64 new_cpu_limit) { system_option_.worker_cpu_limit = new_cpu_limit; }
+
+i64 Config::CPULimit() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kWorkerCPULimit);
+}
+
+// Network
+String Config::ServerAddress() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kServerAddress);
+}
+
+i64 Config::PostgresPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPostgresPort);
+}
+
+i64 Config::HTTPPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kHTTPPort);
+}
+
+i64 Config::ClientPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kClientPort);
+}
+
+i64 Config::ConnectionPoolSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kConnectionPoolSize);
+}
+
+// Log
+String Config::LogFileName() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kLogFileName);
+}
+
+String Config::LogDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kLogDir);
+}
+
+String Config::LogFilePath() {
+    return fmt::format("{}/{}", global_options_.GetStringValue(GlobalOptionIndex::kLogDir), global_options_.GetStringValue(GlobalOptionIndex::kLogFileName));
+}
+
+bool Config::LogToStdout() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetBoolValue(GlobalOptionIndex::kLogToStdout);
+}
+
+i64 Config::LogFileMaxSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kLogFileMaxSize);
+}
+
+i64 Config::LogFileRotateCount() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kLogFileRotateCount);
+}
+
+void Config::SetLogLevel(LogLevel level) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
+    if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
+        UnrecoverableError("Attempt to fetch log level value from log level data type option");
+    }
+    LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
+    log_level_option->value_ = level;
+    return ;
+}
+
+LogLevel Config::GetLogLevel() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
+    if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
+        UnrecoverableError("Attempt to fetch log level value from log level data type option");
+    }
+    LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
+    return log_level_option->value_;
+}
+
+// Storage
+String Config::DataDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kDataDir);
+}
+
+i64 Config::CleanupInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kCleanupInterval);
+}
+
+i64 Config::CompactInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kCompactInterval);
+}
+
+i64 Config::OptimizeIndexInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kOptimizeIndexInterval);
+}
+
+i64 Config::MemIndexCapacity() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
+}
+
+// Buffer
+i64 Config::BufferManagerSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kBufferManagerSize);
+}
+
+String Config::TempDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kTempDir);
+}
+
+// WAL
+String Config::WALDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kWALDir);
+}
+
+i64 Config::WALCompactThreshold() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kWALCompactThreshold);
+}
+
+i64 Config::FullCheckpointInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kFullCheckpointInterval);
+}
+
+i64 Config::DeltaCheckpointInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointInterval);
+}
+
+i64 Config::DeltaCheckpointThreshold() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointThreshold);
+}
+
+FlushOptionType Config::FlushMethodAtCommit() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit);
+    if (base_option->data_type_ != BaseOptionDataType::kFlush) {
+        UnrecoverableError("Attempt to fetch flush option value from flush option data type option");
+    }
+    FlushOption *flush_option = static_cast<FlushOption *>(base_option);
+    return flush_option->value_;
+}
+
+// Resource
+String Config::ResourcePath() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kResourcePath);
+}
+
+//// Profiler
+// bool enable_profiler() const { return system_option_.enable_profiler; }
+//
+// SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
+
+Tuple<BaseOption *, Status> Config::GetConfigByName(const String &name) {
+    return global_options_.GetOptionByName(name);
+}
+
+void Config::PrintAll() {
+    fmt::print("Infinity system configs: \n");
 
     // General
-    fmt::print(" - version: {}\n", system_option_.version);
-    fmt::print(" - timezone: {}{}\n", system_option_.time_zone, system_option_.time_zone_bias);
+    fmt::print(" - version: {}\n", Version());
+    fmt::print(" - timezone: {}{}\n", TimeZone(), TimeZoneBias());
+    fmt::print(" - cpu_limit: {}\n", CPULimit());
 
-    // System
-    fmt::print(" - worker_cpu_limit: {}\n", system_option_.worker_cpu_limit);
-    fmt::print(" - total_memory_size: {}\n", Utility::FormatByteSize(system_option_.total_memory_size));
-    fmt::print(" - query_cpu_limit: {}\n", system_option_.query_cpu_limit);
-    fmt::print(" - query_memory_limit: {}\n", Utility::FormatByteSize(system_option_.query_memory_limit));
-
-    // Profiler
-    fmt::print(" - enable_profiler: {}\n", system_option_.enable_profiler);
-    fmt::print(" - profile_record_capacity: {}\n", system_option_.profile_record_capacity);
+    //    // Profiler
+    //    fmt::print(" - enable_profiler: {}\n", system_option_.enable_profiler);
+    //    fmt::print(" - profile_record_capacity: {}\n", system_option_.profile_record_capacity);
 
     // Network
-    fmt::print(" - listen address: {}\n", system_option_.listen_address);
-    fmt::print(" - postgres port: {}\n", system_option_.pg_port);
-    fmt::print(" - http port: {}\n", system_option_.http_port);
-    fmt::print(" - sdk port: {}\n", system_option_.sdk_port);
-    fmt::print(" - connection limit: {}\n", system_option_.connection_limit_);
+    fmt::print(" - server address: {}\n", ServerAddress());
+    fmt::print(" - postgres port: {}\n", PostgresPort());
+    fmt::print(" - http port: {}\n", HTTPPort());
+    fmt::print(" - rpc client port: {}\n", ClientPort());
+    fmt::print(" - connection pool size: {}\n", ConnectionPoolSize());
 
     // Log
-    fmt::print(" - log_file_path: {}\n", system_option_.log_file_path->c_str());
-    fmt::print(" - log_to_stdout: {}\n", system_option_.log_to_stdout);
-    fmt::print(" - log_max_size: {}\n", Utility::FormatByteSize(system_option_.log_max_size));
-    fmt::print(" - log_file_rotate_count: {}\n", system_option_.log_file_rotate_count);
-    fmt::print(" - log_level: {}\n", LogLevel2Str(system_option_.log_level));
+    fmt::print(" - log_filename: {}\n", LogFileName());
+    fmt::print(" - log_dir: {}\n", LogDir());
+    fmt::print(" - log_file_path: {}\n", LogFilePath());
+    fmt::print(" - log_to_stdout: {}\n", LogToStdout());
+    fmt::print(" - log_file_max_size: {}\n", Utility::FormatByteSize(LogFileMaxSize()));
+    fmt::print(" - log_file_rotate_count: {}\n", LogFileRotateCount());
+    fmt::print(" - log_level: {}\n", LogLevel2Str(LogLevel()));
 
     // Storage
-    fmt::print(" - data_dir: {}\n", system_option_.data_dir->c_str());
-    fmt::print(" - default_row_size: {}\n", system_option_.default_row_size);
-    fmt::print(" - storage_capacity: {}\n", Utility::FormatByteSize(system_option_.storage_capacity_));
-    fmt::print(" - garbage_collection_interval: {}\n", Utility::FormatTimeInfo(system_option_.garbage_collection_interval_));
-    fmt::print(" - garbage_collection_storage_ratio: {}\n", system_option_.garbage_collection_storage_ratio_);
+    fmt::print(" - data_dir: {}\n", DataDir());
+    fmt::print(" - cleanup_interval: {}\n", Utility::FormatTimeInfo(CleanupInterval()));
+    fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));
+    fmt::print(" - optimize_index_interval: {}\n", Utility::FormatTimeInfo(OptimizeIndexInterval()));
+    fmt::print(" - memindex_capacity: {}\n", Utility::FormatByteSize(MemIndexCapacity()));
 
-    // Buffer
-    fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));
-    fmt::print(" - temp_dir: {}\n", system_option_.temp_dir->c_str());
+    // Buffer manager
+    fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(BufferManagerSize()));
+    fmt::print(" - temp_dir: {}\n", TempDir());
 
-    // Wal
-    fmt::print(" - full_checkpoint_interval_sec: {}\n", system_option_.full_checkpoint_interval_sec_);
-    fmt::print(" - full_checkpoint_txn_interval: {}\n", system_option_.full_checkpoint_txn_interval_);
-    fmt::print(" - delta_checkpoint_interval_sec: {}\n", system_option_.delta_checkpoint_interval_sec_);
-    fmt::print(" - delta_checkpoint_interval_wal_bytes: {}\n", system_option_.delta_checkpoint_interval_wal_bytes_);
-    fmt::print(" - wal_size_threshold: {}\n", Utility::FormatByteSize(system_option_.wal_size_threshold_));
-    fmt::print(" - wal_dir: {}\n", system_option_.wal_dir->c_str());
+    // WAL
+    fmt::print(" - wal_dir: {}\n", WALDir());
+    fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(WALCompactThreshold()));
+    fmt::print(" - full_checkpoint_interval: {}\n", Utility::FormatTimeInfo(FullCheckpointInterval()));
+    fmt::print(" - delta_checkpoint_interval: {}\n", Utility::FormatTimeInfo(DeltaCheckpointInterval()));
+    fmt::print(" - delta_checkpoint_threshold: {}\n", Utility::FormatByteSize(DeltaCheckpointThreshold()));
+    fmt::print(" - flush_method_at_commit: {}\n", FlushOptionTypeToString(FlushMethodAtCommit()));
 
-    // Resource
-    fmt::print(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());
-}
-
-void SystemVariables::InitVariablesMap() {
-    map_["query_count"] = SysVar::kQueryCount;
-    map_["session_count"] = SysVar::kSessionCount;
-    map_["buffer_pool_usage"] = SysVar::kBufferPoolUsage;
-    map_["version"] = SysVar::kVersion;
-    map_["query_memory_limit"] = SysVar::kQueryMemoryLimit;
-    map_["query_cpu_limit"] = SysVar::kQueryCpuLimit;
-    map_["log_level"] = SysVar::kLogLevel;
-    map_["schedule_policy"] = SysVar::kSchedulePolicy;
-    map_["listen_address"] = SysVar::kListenAddress;
-    map_["sql_port"] = SysVar::kSQLPort;
-    map_["sdk_port"] = SysVar::kSDKPort;
-    map_["http_api_port"] = SysVar::kHttpAPIPort;
-    map_["data_url"] = SysVar::kDataURL;
-    map_["time_zone"] = SysVar::kTimezone;
-}
-
-HashMap<String, SysVar> SystemVariables::map_;
-
-SysVar SystemVariables::GetSysVarEnumByName(const String &var_name) {
-    auto it = map_.find(var_name);
-    if (it != map_.end()) {
-        return it->second;
-    }
-    return SysVar::kInvalid;
+    // Resource dir
+    fmt::print(" - wal_dir: {}\n", ResourcePath());
 }
 
 } // namespace infinity

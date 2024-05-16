@@ -3,21 +3,22 @@ module;
 export module in_doc_pos_state;
 
 import stl;
-import pos_list_format_option;
+import position_list_format_option;
 import index_defines;
+import internal_types;
 
 namespace infinity {
 
 class PositionListDecoder;
 export class InDocPositionState {
 public:
-    InDocPositionState(const PositionListFormatOption &option = PositionListFormatOption())
-        : pos_decoder_(nullptr), record_offset_(0), offset_in_record_(0), total_position_count_(0) {}
+    InDocPositionState(const PositionListFormatOption &option)
+        : pos_decoder_(nullptr), record_offset_(0), offset_in_record_(0), total_position_count_(0), option_(option) {}
     virtual ~InDocPositionState() = default;
 
-    void SetDocId(docid_t doc_id) { doc_id_ = doc_id; }
+    void SetRowID(RowID row_id) { row_id_ = row_id; }
 
-    docid_t GetDocId() const { return doc_id_; }
+    RowID GetRowID() const { return row_id_; }
 
     void SetTermFreq(tf_t tf) { tf_ = tf; }
 
@@ -45,7 +46,7 @@ public:
 
 public:
     tf_t tf_;
-    docid_t doc_id_;
+    RowID row_id_;
     u32 seeked_doc_count_;
     PositionListDecoder *pos_decoder_{nullptr};
     i32 record_offset_;

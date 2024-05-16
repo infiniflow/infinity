@@ -8,33 +8,36 @@ import file_writer;
 import posting_decoder;
 import posting_merger;
 import posting_list_format;
-import bitmap;
 import index_defines;
 import term_meta;
-import segment;
-import index_config;
+import index_full_text;
 import column_index_iterator;
 import segment_term_posting;
 import local_file_system;
+import internal_types;
+import vector_with_lock;
 
 namespace infinity {
 export class ColumnIndexMerger {
 public:
-    ColumnIndexMerger(const InvertedIndexConfig &index_config, u64 column_id, MemoryPool *memory_pool, RecyclePool *buffer_pool);
+    ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool);
     ~ColumnIndexMerger();
 
-    void Merge(const Vector<Segment> &source_segments, const Segment &target_segment);
+    void Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name);
 
 private:
-    SharedPtr<PostingMerger> CreatePostingMerger(const Segment &target_segment);
+    SharedPtr<PostingMerger> CreatePostingMerger();
 
-    void MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings, const Segment &target_segment);
+    void MergeTerm(const String &term, TermMeta &term_meta, const Vector<SegmentTermPosting *> &merging_term_postings, const RowID &merge_base_rowid);
 
-    InvertedIndexConfig index_config_;
-    u64 column_id_;
+    String index_dir_;
+    optionflag_t flag_;
     MemoryPool *memory_pool_{nullptr};
     RecyclePool *buffer_pool_{nullptr};
-    SharedPtr<FileWriter> posting_file_;
+    SharedPtr<FileWriter> posting_file_writer_;
     LocalFileSystem fs_;
+
+    // for column length info
+    VectorWithLock<u32> column_lengths_;
 };
 } // namespace infinity

@@ -29,6 +29,25 @@ T bit_cast(const U &u) {
 }
 } // namespace detail
 
+#if defined(__ARM_NEON)
+template <typename Dest, typename Src>
+Dest memcpy_cast(const Src& src)
+{
+    static_assert(sizeof(Dest) == sizeof(Src), "Sizes of types do not match");
+    
+    Dest dest;
+    const char* srcPtr = reinterpret_cast<const char*>(&src);
+    char* destPtr = reinterpret_cast<char*>(&dest);
+    
+    for (size_t i = 0; i < sizeof(Dest); i++)
+    {
+        destPtr[i] = srcPtr[i];
+    }
+    
+    return dest;
+}
+#endif
+
 struct float16_t {
     uint16_t raw;
 

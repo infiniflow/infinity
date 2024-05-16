@@ -35,22 +35,38 @@ private:
     const Bitmask &bitmask_;
 };
 
+export class AppendFilter final : public FilterBase<SegmentOffset> {
+public:
+    AppendFilter(SegmentOffset max_segment_offset) : max_segment_offset_(max_segment_offset) {}
+
+    bool operator()(const SegmentOffset &segment_offset) const final { return segment_offset <= max_segment_offset_; }
+
+private:
+    const SegmentOffset max_segment_offset_;
+};
+
 export class DeleteFilter final : public FilterBase<SegmentOffset> {
 public:
-    explicit DeleteFilter(const SegmentEntry *segment, TxnTimeStamp query_ts) : segment_(segment), query_ts_(query_ts) {}
+    explicit DeleteFilter(const SegmentEntry *segment, TxnTimeStamp query_ts, SegmentOffset max_segment_offset)
+        : segment_(segment), query_ts_(query_ts), max_segment_offset_(max_segment_offset) {}
 
-    bool operator()(const SegmentOffset &segment_offset) const final { return segment_->CheckRowVisible(segment_offset, query_ts_); }
+    bool operator()(const SegmentOffset &segment_offset) const final {
+        bool check_append = max_segment_offset_ == 0;
+        return segment_offset <= max_segment_offset_ && segment_->CheckRowVisible(segment_offset, query_ts_, check_append);
+    }
 
 private:
     const SegmentEntry *const segment_;
 
     const TxnTimeStamp query_ts_;
+
+    const SegmentOffset max_segment_offset_;
 };
 
 export class DeleteWithBitmaskFilter final : public FilterBase<SegmentOffset> {
 public:
     explicit DeleteWithBitmaskFilter(const Bitmask &bitmask, const SegmentEntry *segment, TxnTimeStamp query_ts)
-        : bitmask_filter_(bitmask), delete_filter_(segment, query_ts) {}
+        : bitmask_filter_(bitmask), delete_filter_(segment, query_ts, 0) {}
 
     bool operator()(const SegmentOffset &segment_offset) const final { return bitmask_filter_(segment_offset) && delete_filter_(segment_offset); }
 

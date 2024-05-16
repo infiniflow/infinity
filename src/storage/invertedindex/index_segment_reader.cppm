@@ -18,7 +18,6 @@ import stl;
 import memory_pool;
 import segment_posting;
 import index_defines;
-import segment;
 export module index_segment_reader;
 
 namespace infinity {
@@ -27,7 +26,8 @@ public:
     IndexSegmentReader();
     virtual ~IndexSegmentReader() {}
 
-    virtual bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const = 0;
+    // fetch_position is only valid in DiskIndexSegmentReader
+    virtual bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const = 0;
 };
 
 } // namespace infinity

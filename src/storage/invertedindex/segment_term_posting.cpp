@@ -5,15 +5,16 @@ module segment_term_posting;
 import stl;
 import file_writer;
 import index_defines;
-import index_config;
 import posting_decoder;
 import term_meta;
-import segment;
 import column_index_iterator;
 
 namespace infinity {
 
-SegmentTermPosting::SegmentTermPosting(segmentid_t segment_id, docid_t base_doc) : segment_id_(segment_id), base_doc_id_(base_doc) {}
+SegmentTermPosting::SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag)
+    : base_row_id_(base_row_id) {
+    column_index_iterator_ = MakeShared<ColumnIndexIterator>(index_dir, base_name, flag);
+}
 
 bool SegmentTermPosting::HasNext() {
     if (column_index_iterator_->Next(term_, posting_decoder_)) {
@@ -22,8 +23,19 @@ bool SegmentTermPosting::HasNext() {
     return false;
 }
 
-SegmentTermPostingQueue::SegmentTermPostingQueue(const InvertedIndexConfig &index_config, u64 column_id)
-    : index_config_(index_config), column_id_(column_id) {}
+SegmentTermPostingQueue::SegmentTermPostingQueue(const String &index_dir,
+                                                 const Vector<String> &base_names,
+                                                 const Vector<RowID> &base_rowids,
+                                                 optionflag_t flag)
+    : index_dir_(index_dir), base_names_(base_names), base_rowids_(base_rowids) {
+    for (u32 i = 0; i < base_names.size(); ++i) {
+        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(index_dir, base_names[i], base_rowids[i], flag);
+        if (segment_term_posting->HasNext()) {
+            segment_term_postings_.push(segment_term_posting);
+        } else
+            delete segment_term_posting;
+    }
+}
 
 SegmentTermPostingQueue::~SegmentTermPostingQueue() {
     while (!segment_term_postings_.empty()) {
@@ -34,23 +46,6 @@ SegmentTermPostingQueue::~SegmentTermPostingQueue() {
     for (u32 i = 0; i < merging_term_postings_.size(); ++i) {
         delete merging_term_postings_[i];
     }
-}
-
-void SegmentTermPostingQueue::Init(const Vector<Segment> &segments) {
-    for (u32 i = 0; i < segments.size(); ++i) {
-        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(segments[i].GetSegmentId(), 0);
-        segment_term_posting->column_index_iterator_ = CreateIndexIterator(segments[i].GetSegmentId());
-        if (segment_term_posting->HasNext()) {
-            segment_term_postings_.push(segment_term_posting);
-        } else
-            delete segment_term_posting;
-    }
-}
-
-SharedPtr<ColumnIndexIterator> SegmentTermPostingQueue::CreateIndexIterator(segmentid_t segment_id) {
-    SharedPtr<ColumnIndexIterator> index_iterator = MakeShared<ColumnIndexIterator>(index_config_, column_id_);
-    index_iterator->Init(segment_id);
-    return index_iterator;
 }
 
 const Vector<SegmentTermPosting *> &SegmentTermPostingQueue::GetCurrentMerging(String &term) {
@@ -70,7 +65,6 @@ const Vector<SegmentTermPosting *> &SegmentTermPostingQueue::GetCurrentMerging(S
 void SegmentTermPostingQueue::MoveToNextTerm() {
     for (u32 i = 0; i < merging_term_postings_.size(); ++i) {
         SegmentTermPosting *term_posting = merging_term_postings_[i];
-        merging_term_postings_[i] = nullptr;
         if (term_posting->HasNext()) {
             segment_term_postings_.push(term_posting);
         } else {

@@ -30,14 +30,28 @@ struct SecondaryIndexApproxPos {
     SizeT upper_bound_{}; ///< The upper bound of the range.
 };
 
+template <typename T>
+struct PGMT;
+
+template <typename T>
+    requires std::is_integral_v<T> || std::is_same_v<T, float>
+struct PGMT<T> {
+    using type = PGMIndex<T, 64, 4, float>;
+};
+
+template <typename T>
+    requires std::is_same_v<T, double>
+struct PGMT<T> {
+    using type = PGMIndex<T, 64, 4, double>;
+};
+
 template <typename IndexValueType>
-using PGMIndexType = PGMIndex<IndexValueType, 8>;
+using PGMIndexType = PGMT<IndexValueType>::type;
 
 // PGMIndex member objects:
 // size_t n;                           ///< The number of elements this index was built on.
 // K first_key;                        ///< The smallest element. K is the type of key.
 // std::vector<Segment> segments;      ///< The segments composing the index.
-// std::vector<size_t> levels_sizes;   ///< The number of segment in each level, in reverse order.
 // std::vector<size_t> levels_offsets; ///< The starting position of each level in segments[], in reverse order.
 
 // Segment member objects:
@@ -76,13 +90,6 @@ public:
             file_handler.Read(this->segments.data(), save_size * sizeof(typename decltype(this->segments)::value_type));
         }
         {
-            // load std::vector<size_t> levels_sizes
-            u32 save_levels_sizes_size;
-            file_handler.Read(&save_levels_sizes_size, sizeof(save_levels_sizes_size));
-            this->levels_sizes.resize(save_levels_sizes_size);
-            file_handler.Read(this->levels_sizes.data(), save_levels_sizes_size * sizeof(typename decltype(this->levels_sizes)::value_type));
-        }
-        {
             // load std::vector<size_t> levels_offsets
             u32 save_levels_offsets_size;
             file_handler.Read(&save_levels_offsets_size, sizeof(save_levels_offsets_size));
@@ -107,12 +114,6 @@ public:
             u32 save_size = this->segments.size();
             file_handler.Write(&save_size, sizeof(save_size));
             file_handler.Write(this->segments.data(), save_size * sizeof(typename decltype(this->segments)::value_type));
-        }
-        {
-            // save std::vector<size_t> levels_sizes
-            u32 save_levels_sizes_size = this->levels_sizes.size();
-            file_handler.Write(&save_levels_sizes_size, sizeof(save_levels_sizes_size));
-            file_handler.Write(this->levels_sizes.data(), save_levels_sizes_size * sizeof(typename decltype(this->levels_sizes)::value_type));
         }
         {
             // save std::vector<size_t> levels_offsets
@@ -144,16 +145,16 @@ class SecondaryPGMIndexTemplate final : public SecondaryPGMIndex {
 public:
     SecondaryPGMIndexTemplate() = default;
 
-    ~SecondaryPGMIndexTemplate() override final = default;
+    ~SecondaryPGMIndexTemplate() final = default;
 
-    void SaveIndex(FileHandler &file_handler) const override final {
+    void SaveIndex(FileHandler &file_handler) const final {
         if (!initialized_) {
             UnrecoverableError("Not initialized yet.");
         }
         pgm_index_->Save(file_handler);
     }
 
-    void LoadIndex(FileHandler &file_handler) override final {
+    void LoadIndex(FileHandler &file_handler) final {
         if (initialized_) {
             UnrecoverableError("Already initialized.");
         }
@@ -162,7 +163,7 @@ public:
         initialized_ = true;
     }
 
-    void BuildIndex(SizeT data_cnt, const void *data_ptr) override final {
+    void BuildIndex(SizeT data_cnt, const void *data_ptr) final {
         if (initialized_) {
             UnrecoverableError("Already initialized.");
         }
@@ -171,7 +172,7 @@ public:
         initialized_ = true;
     }
 
-    SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const override final {
+    SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const final {
         if (!initialized_) {
             UnrecoverableError("Not initialized yet.");
         }

@@ -11,7 +11,31 @@ add_subdirectory(parser)
 ### Infinity
 
 ### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
-add_definitions(-march=native)
+
+# add_definitions(-march=native)
+# add_definitions(-msse4.2 -mfma)
+# add_definitions(-mavx2 -mf16c -mpopcnt)
+
+execute_process(COMMAND grep -q fma /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_FMA
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_SSE42
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+execute_process(COMMAND grep -q avx2 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX2  
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
+execute_process(COMMAND grep -q avx512 /proc/cpuinfo
+                RESULT_VARIABLE SUPPORT_AVX512
+                OUTPUT_QUIET
+                ERROR_QUIET)
+
 
 file(GLOB_RECURSE
         main_cpp
@@ -186,23 +210,44 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external/frozen/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/highway")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/vespalib")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
 
-target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+if (NOT SUPPORT_FMA EQUAL 0)
+        message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
+endif()
+
+if (NOT SUPPORT_SSE42 EQUAL 0)
+        message(FATAL_ERROR "This project requires the processor support sse4_2 instructions.")
+endif()
+
+if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
+        message("Compiled by AVX2 or AVX512")
+        add_definitions(-march=native)
+        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+else()
+        message("Compiled by SSE")
+        add_definitions(-msse4.2 -mfma)
+        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+endif()
+
 
 add_executable(infinity
         ${main_cpp}
         ${network_cpp}
+        network/http_server.cppm
+        network/http_server.cpp
+        network/http/http_search.cppm
+        network/http/http_search.cpp
+        network/infinity_thrift_service.cpp
+        network/infinity_thrift_service.cppm
 )
 
 target_sources(infinity
@@ -211,6 +256,8 @@ target_sources(infinity
         ${network_cppm}
 )
 
+add_dependencies(infinity oatpp)
+
 target_link_libraries(infinity
         infinity_core
         sql_parser
@@ -218,20 +265,23 @@ target_link_libraries(infinity
         zsv_parser
         roaring
         newpfor
-        openfst
-#        iresearch
-
+        fastpfor
         thrift.a
         thriftnb.a
-        iresearch
         lz4.a
         atomic.a
         event.a
-        vespalib
         c++.a
 #        profiler
+        oatpp.a
 )
+
+if(ENABLE_JEMALLOC)
+    target_link_libraries(infinity jemalloc.a)
+endif()
+
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -342,11 +392,9 @@ target_link_libraries(unit_test
         zsv_parser
         roaring
         newpfor
-        openfst
-        iresearch
+        fastpfor
         lz4.a
         atomic.a
-#        profiler
         thrift.a
         vespalib
         c++.a
@@ -370,21 +418,20 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlo
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
-add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
+add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/storage/knnindex/knn_hnsw/test_hnsw.cpp")
 
 target_link_libraries(test_hnsw
     infinity_core
     c++.a
 )
 
-add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
+add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask.cpp")
 
 target_link_directories(test_hnsw_bitmask PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
@@ -408,3 +455,15 @@ target_link_libraries(test_hnsw_bitmask
     c++.a
     #        profiler
 )
+
+# target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
+        message("Compiled by AVX2 or AVX512")
+        add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
+        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+else()
+        message("Compiled by SSE")
+        add_definitions(-msse4.2 -mfma)
+        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+endif()
+

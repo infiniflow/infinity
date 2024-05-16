@@ -676,6 +676,24 @@ inline void NewPForDeltaCompressor::PackException(uint32_t* dest, size_t excepti
     }
 }
 
+#if defined(__aarch64__)
+#include <arm_neon.h>
+inline uint32_t NewPForDeltaCompressor::HighBitIdx(uint32_t value)
+{
+    int r = 0;
+
+    if (value != 0)
+    {
+        uint32x2_t v = vdup_n_u32(value);
+        r = 31 - __builtin_clz(vget_lane_u32(v, 1));
+
+        if (r == -1)
+            r = 31 - __builtin_clz(vget_lane_u32(v, 0));
+    }
+
+    return static_cast<uint32_t>(r + 1);
+}
+#else
 inline uint32_t NewPForDeltaCompressor::HighBitIdx(uint32_t value)
 {
     int r = 0;
@@ -686,6 +704,7 @@ inline uint32_t NewPForDeltaCompressor::HighBitIdx(uint32_t value)
             : "rm"(value), "rm"(-1));
     return (uint32_t)(r + 1);
 }
+#endif
 
 template <typename T>
 inline size_t NewPForDeltaCompressor::S9Encode(uint32_t* dest, size_t destLen, T* src, size_t srcLen)

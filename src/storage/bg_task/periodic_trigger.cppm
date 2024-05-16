@@ -18,8 +18,10 @@ export module periodic_trigger;
 
 import stl;
 import background_process;
+import compaction_process;
 import catalog;
 import txn_manager;
+import wal_manager;
 
 namespace infinity {
 
@@ -60,6 +62,40 @@ private:
     TxnManager *const txn_mgr_{};
 
     TxnTimeStamp last_visible_ts_{0};
+};
+
+export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
+public:
+    explicit CheckpointPeriodicTrigger(std::chrono::milliseconds interval, WalManager *wal_mgr, bool full_checkpoint)
+        : PeriodicTrigger(interval), wal_mgr_(wal_mgr), is_full_checkpoint_(full_checkpoint) {}
+
+    virtual void Trigger() override;
+
+private:
+    WalManager *const wal_mgr_{};
+    bool is_full_checkpoint_{};
+};
+
+export class CompactSegmentPeriodicTrigger final : public PeriodicTrigger {
+public:
+    explicit CompactSegmentPeriodicTrigger(std::chrono::seconds interval, CompactionProcessor *compact_processor)
+        : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
+
+    virtual void Trigger() override;
+
+private:
+    CompactionProcessor *const compact_processor_{};
+};
+
+export class OptimizeIndexPeriodicTrigger final : public PeriodicTrigger {
+public:
+    explicit OptimizeIndexPeriodicTrigger(std::chrono::seconds interval, CompactionProcessor *compact_processor)
+        : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
+
+    virtual void Trigger() override;
+
+private:
+    CompactionProcessor *const compact_processor_{};
 };
 
 } // namespace infinity

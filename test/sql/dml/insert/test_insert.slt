@@ -1,0 +1,71 @@
+# name: test/sql/dml/insert/test_insert.slt
+# description: Test insert
+# group: [dml, insert]
+
+statement ok
+DROP TABLE IF EXISTS products;
+
+# Parse only support
+statement ok
+CREATE TABLE products (product_no integer, price integer, description varchar);
+
+# insert data
+query I
+INSERT INTO products VALUES (1, 2, 'a');
+----
+
+query II
+SELECT * FROM products;
+----
+1 2 a
+
+query II
+SELECT count(*) FROM products;
+----
+1
+
+query I
+INSERT INTO products VALUES (3, 4, 'abcdef'), (5, 6, 'abcdefghijklmnopqrstuvwxyz');
+----
+
+query II rowsort
+SELECT * FROM products;
+----
+1 2 a
+3 4 abcdef
+5 6 abcdefghijklmnopqrstuvwxyz
+
+query II
+SELECT count(*) FROM products;
+----
+3
+
+# Clean up
+statement ok
+DROP TABLE products;
+
+statement ok
+DROP TABLE IF EXISTS date1;
+
+statement ok
+CREATE TABLE date1 (d DATE);
+
+statement ok
+INSERT INTO date1 VALUES (DATE '1970-1-1');
+
+query I
+SELECT * FROM date1;
+----
+1970-01-01
+
+statement ok
+INSERT INTO date1 VALUES (DATE '2222/11/11');
+
+query I
+SELECT * FROM date1;
+----
+1970-01-01
+2222-11-11
+
+statement ok
+DROP TABLE date1;

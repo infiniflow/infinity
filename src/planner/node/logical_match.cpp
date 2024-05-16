@@ -29,6 +29,7 @@ import third_party;
 
 import logical_type;
 import internal_types;
+import explain_logical_plan;
 
 namespace infinity {
 
@@ -105,6 +106,35 @@ String LogicalMatch::ToString(i64 &space) const {
     String match_info = String(space, ' ');
     match_info += " - match info: " + match_expr_->ToString();
     ss << match_info << std::endl;
+
+    // filter expression
+    if (filter_expression_.get() != nullptr) {
+        ss << String(space, ' ');
+        ss << " - filter: ";
+        String filter_str;
+        ExplainLogicalPlan::Explain(filter_expression_.get(), filter_str);
+        ss << filter_str << '\n';
+        if (common_query_filter_) {
+            ss << String(space, ' ');
+            ss << " - filter for secondary index: ";
+            if (common_query_filter_->secondary_index_filter_qualified_) {
+                String filter_str;
+                ExplainLogicalPlan::Explain(common_query_filter_->secondary_index_filter_qualified_.get(), filter_str);
+                ss << filter_str << '\n';
+            } else {
+                ss << "None\n";
+            }
+            ss << String(space, ' ');
+            ss << " - filter except secondary index: ";
+            if (common_query_filter_->filter_leftover_) {
+                String filter_str;
+                ExplainLogicalPlan::Explain(common_query_filter_->filter_leftover_.get(), filter_str);
+                ss << filter_str << '\n';
+            } else {
+                ss << "None\n";
+            }
+        }
+    }
 
     // Output columns
     String output_columns = String(space, ' ');

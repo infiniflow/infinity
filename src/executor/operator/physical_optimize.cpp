@@ -28,53 +28,34 @@ import table_def;
 import third_party;
 import status;
 import logger;
-import iresearch_datastore;
 import base_table_ref;
-import fulltext_index_entry;
+import table_index_meta;
+import table_entry;
 
 namespace infinity {
 
 void PhysicalOptimize::Init() {}
 
 bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    switch (optimize_type_) {
-        case OptimizeType::kIRS: {
-            OptimizeIndex(query_context, operator_state);
-            break;
-        }
-    }
+    OptimizeIndex(query_context, operator_state);
     operator_state->SetComplete();
     return true;
 }
 
 void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState *operator_state) {
     // Get tables from catalog
+    LOG_INFO(fmt::format("OptimizeIndex {}.{} begin", db_name_, table_name_));
     auto txn = query_context->GetTxn();
-    TransactionID txn_id = txn->TxnID();
-    LOG_INFO(fmt::format("OptimizeIndex {} {}", db_name_, object_name_));
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
-    auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, table_status] = txn->GetTableByName(db_name_, table_name_);
 
-    if(!table_status.ok()) {
+    if (!table_status.ok()) {
         operator_state->status_ = table_status;
         RecoverableError(table_status);
-        return ;
+        return;
     }
 
-    SharedPtr<FulltextIndexEntry> fulltext_index_entry;
-    for (auto &[index_name, table_index_meta] : table_entry->index_meta_map()) {
-        auto [table_index_entry, index_status] = table_index_meta->GetEntry(txn_id, begin_ts);
-        if (!index_status.ok()) {
-            operator_state->status_ = index_status;
-            RecoverableError(index_status);
-        }
-        fulltext_index_entry = table_index_entry->fulltext_index_entry();
-    }
-    if (fulltext_index_entry) {
-        LOG_INFO(fmt::format("ScheduleOptimize"));
-        fulltext_index_entry->irs_index_->ScheduleOptimize();
-    }
-    LOG_TRACE("Optimize index");
+    table_entry->OptimizeIndex(txn);
+    LOG_INFO(fmt::format("OptimizeIndex {}.{} end", db_name_, table_name_));
 }
 
 } // namespace infinity

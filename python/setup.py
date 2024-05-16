@@ -15,4 +15,4 @@
 import setuptools
 
 if __name__ == "__main__":
-    setuptools.setup()
+    setuptools.setup(packages=['infinity', 'infinity.remote_thrift', 'infinity.remote_thrift.infinity_thrift_rpc'])

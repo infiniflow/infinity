@@ -17,11 +17,14 @@ module;
 #include "ctpl_stl.h"
 #include <algorithm>
 #include <atomic>
+#include <bit>
+#include <cassert>
 #include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <source_location>
@@ -38,6 +41,7 @@ module;
 #include <set>
 #include <shared_mutex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -56,7 +60,7 @@ export namespace std {
     // using std::stringstream;
     using std::forward;
     using std::move;
-
+    using std::exchange;
     using std::swap;
 
     using std::max;
@@ -67,11 +71,15 @@ export namespace std {
     using std::errc;
 
     using std::stoi;
+    using std::stol;
+    using std::stoll;
     using std::strtol;
     using std::strtof;
     using std::strtod;
 
+    using std::bit_cast;
     using std::memcpy;
+    using std::strcmp;
     using std::memset;
     using std::memcmp;
     using std::strlen;
@@ -82,6 +90,7 @@ export namespace std {
     using std::is_same;
     using std::fill;
     using std::lower_bound;
+    using std::upper_bound;
 
     using std::condition_variable;
     using std::condition_variable_any;
@@ -97,27 +106,38 @@ export namespace std {
     using std::shared_lock;
     using std::shared_mutex;
     using std::unique_lock;
+    using std::scoped_lock;
 
-    using std::forward_list;
-    using std::isalpha;
-    using std::isalnum;
-    using std::pow;
-    using std::log2;
-    using std::sqrt;
-    using std::floor;
-    using std::nearbyint;
-    using std::isnan;
-    using std::isinf;
-    using std::fmod;
+    using std::defer_lock;
+    using std::adopt_lock;
+    using std::try_to_lock;
+
+    using std::binary_search;
     using std::fabs;
     using std::fill_n;
-    using std::transform;
-    using std::sort;
-    using std::make_heap;
-    using std::pop_heap;
-    using std::reverse;
-    using std::remove_if;
     using std::find;
+    using std::floor;
+    using std::ceil;
+    using std::fmod;
+    using std::forward_list;
+    using std::isalnum;
+    using std::isalpha;
+    using std::isinf;
+    using std::isnan;
+    using std::log2;
+    using std::make_heap;
+    using std::nearbyint;
+    using std::pop_heap;
+    using std::pow;
+    using std::remove_if;
+    using std::reverse;
+    using std::sort;
+    using std::unique;
+    using std::reduce;
+    using std::accumulate;
+    using std::sqrt;
+    using std::transform;
+    using std::copy_n;
 
     namespace ranges {
 
@@ -172,12 +192,19 @@ export namespace std {
     using std::dynamic_pointer_cast;
 
     namespace filesystem {
-        using std::filesystem::file_size;
+    using std::filesystem::canonical;
+    using std::filesystem::copy;
+    using std::filesystem::exists;
+    using std::filesystem::file_size;
+    using std::filesystem::path;
+    using std::filesystem::remove;
+    using std::filesystem::remove_all;
     }
 
-    using std::mt19937;
-    using std::uniform_real_distribution;
     using std::iota;
+    using std::mt19937;
+    using std::random_device;
+    using std::uniform_real_distribution;
 
     using std::exception;
     using std::unordered_set;
@@ -189,6 +216,7 @@ export namespace std {
     using std::streamsize;
 
     using std::variant;
+    using std::variant_size_v;
     using std::holds_alternative;
     using std::get;
     using std::visit;
@@ -196,10 +224,21 @@ export namespace std {
     using std::is_integral_v;
     using std::is_floating_point_v;
     using std::common_type_t;
+    using std::underlying_type_t;
 
     using std::function;
     using std::monostate;
     using std::thread;
+
+    using std::is_same_v;
+    using std::priority_queue;
+
+    using std::begin;
+    using std::end;
+
+    using std::time_t;
+    using std::asctime;
+    using std::localtime;
 } // namespace std
 
 namespace infinity {
@@ -267,8 +306,6 @@ namespace infinity {
 
     using NoneType = std::nullopt_t;
 
-    using StdOfStream = std::ofstream;
-
     // String
 
     using String = std::basic_string<char>;
@@ -333,6 +370,7 @@ namespace infinity {
     using const_ptr_t = const char *;
     using char_t = char;
     using SizeT = u64;
+    using uintptr_t = std::uintptr_t;
 
     // Transactions
     using TxnTimeStamp = uint64_t;
@@ -340,6 +378,7 @@ namespace infinity {
 
     // Entry
     using SegmentID = uint32_t;
+    using ChunkID = uint32_t;
     using BlockID = uint16_t;
     using ColumnID = uint64_t;
 
@@ -352,6 +391,11 @@ namespace infinity {
 
     using Thread = std::thread;
 
+    // template< class Rep, class Period >
+    // void SleepFor(const std::chrono::duration<Rep, Period>& sleep_duration) {
+    //     std::this_thread::sleep_for(sleep_duration);
+    // }
+
     using atomic_u32 = std::atomic_uint32_t;
     using atomic_u64 = std::atomic_uint64_t;
     using ai64 = std::atomic_int64_t;
@@ -362,10 +406,15 @@ namespace infinity {
     template<typename T>
     using Atomic = std::atomic<T>;
 
-    // Smart ptr
+    using std::atomic_compare_exchange_strong;
+    using std::atomic_store;
 
+    // Smart ptr
     template<typename T>
     using SharedPtr = std::shared_ptr<T>;
+
+    template<typename T>
+    using WeakPtr = std::weak_ptr<T>;
 
     template<typename T, typename... Args>
     inline SharedPtr<T> MakeShared(Args &&...args) {

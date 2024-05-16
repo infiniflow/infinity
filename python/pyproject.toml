@@ -1,17 +1,17 @@
 [project]
 name = "infinity_sdk"
-version = "0.1.0-dev7"
+version = "0.2.0.dev1"
 dependencies = [
-    "sqlglot==11.7.1",
-    "pydantic",
-    "thrift",
-    "setuptools",
-    "pytest",
-    "pandas",
-    "numpy",
-    "pyarrow",
-    "openpyxl",
-    "polars"
+    "sqlglot~=11.7.1",
+    "pydantic~=2.7.1",
+    "thrift~=0.20.0",
+    "setuptools~=69.5.1",
+    "pytest~=8.2.0",
+    "pandas~=2.2.2",
+    "numpy~=1.26.4",
+    "pyarrow~=16.0.0",
+    "polars~=0.20.23",
+    "openpyxl~=3.1.2"
 ]
 description = "infinity"
 readme = "README.md"
@@ -20,3 +20,25 @@ requires-python = ">=3.10"
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers =[
+    "L0",
+    "L1",
+    "L2",
+    "L3",
+    "complex",
+    "slow",
+    "nightly",
+]
+
+
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::ResourceWarning",
+#    "ignore::thrift.transport.TTransport",
+    # note the use of single quote below to denote "raw" strings in TOML
+    'ignore:function ham\(\) is deprecated:DeprecationWarning',
+]

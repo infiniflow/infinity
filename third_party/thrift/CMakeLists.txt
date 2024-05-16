@@ -17,7 +17,7 @@
 # under the License.
 #
 
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.5)
 
 if(POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)  # package version behavior added in cmake 3.0
@@ -28,14 +28,14 @@ endif()
 
 # PACKAGE_VERSION is used by cpack scripts currently
 # Both thrift_VERSION and PACKAGE_VERSION should be the same for now
-set(thrift_VERSION "0.19.0")
+set(thrift_VERSION "0.20.0")
 set(PACKAGE_VERSION ${thrift_VERSION})
 
 project("thrift" VERSION ${PACKAGE_VERSION})
 message(STATUS "Configuring ${CMAKE_PROJECT_NAME} ${thrift_VERSION}")
 
 
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/build_cmake/cmake")
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Some default settings
 include(DefineCMakeDefaults)
@@ -56,9 +56,6 @@ include(ConfigureChecks)
 # Generate the ThriftConfig.cmake module
 include(GenerateConfigModule)
 
-# Packaging
-include(CPackConfig)
-
 # Dependencies
 include(BoostMacros)
 find_package(Threads)
@@ -73,6 +70,6 @@ if(BUILD_PYTHON)
 endif()
 
 # Create the uninstall target
-add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${PROJECT_SOURCE_DIR}/build/cmake/uninstall.cmake")
+add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${PROJECT_SOURCE_DIR}/cmake/uninstall.cmake")
 
 PRINT_CONFIG_SUMMARY()

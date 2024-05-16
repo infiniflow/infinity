@@ -12,19 +12,28 @@ import in_doc_state_keeper;
 import segment_posting;
 import index_defines;
 import posting_list_format;
+import internal_types;
+import posting_writer;
 
 namespace infinity {
 export class MultiPostingDecoder {
 public:
-    MultiPostingDecoder(InDocPositionState *state, MemoryPool *pool);
+    MultiPostingDecoder(const PostingFormatOption &format_option, InDocPositionState *state, MemoryPool *pool)
+        : format_option_(format_option), session_pool_(pool), in_doc_state_keeper_(state, pool) {}
 
     ~MultiPostingDecoder();
 
-    void Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings);
+    void Init(SharedPtr<Vector<SegmentPosting>> &seg_postings);
 
     inline void MoveToCurrentDocPosition(ttf_t current_ttf) { in_doc_state_keeper_.MoveToDoc(current_ttf); }
 
-    bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
+    bool SkipTo(RowID start_row_id, RowID &prev_last_row_id, RowID &lowest_possible_doc_id, RowID &last_row_id, ttf_t &current_ttf);
+
+    // u32: block max tf
+    // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
+    Pair<u32, u16> GetBlockMaxInfo() const;
+
+    bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer);
 
     bool DecodeCurrentTFBuffer(tf_t *tf_buffer);
 
@@ -32,52 +41,60 @@ public:
 
     InDocPositionIterator *GetInDocPositionIterator() { return in_doc_pos_iterator_; }
 
-    const PostingFormatOption &GetPostingFormatOption() const { return cur_segment_format_option_; }
-
     u32 InnerGetSeekedDocCount() const { return index_decoder_->InnerGetSeekedDocCount(); }
 
 private:
-    bool DecodeDocBufferInOneSegment(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
+    bool SkipInOneSegment(RowID start_row_id, RowID &prev_last_row_id, RowID &lowest_possible_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
 
     IndexDecoder *CreateIndexDecoder(u32 doc_list_begin_pos);
 
-    inline docid_t GetSegmentBaseDocId(u32 seg_cursor) {
+    inline RowID GetSegmentBaseRowId(u32 seg_cursor) {
         if (seg_cursor >= segment_count_) {
-            return INVALID_DOCID;
+            return INVALID_ROWID;
         }
-        return (*seg_postings_)[seg_cursor].GetBaseDocId();
+        return (*seg_postings_)[seg_cursor].GetBaseRowId();
     }
 
-    inline u32 LocateSegment(u32 start_seg_cursor, docid_t start_doc_id) {
-        docid_t cur_seg_base_doc_id = GetSegmentBaseDocId(start_seg_cursor);
-        if (cur_seg_base_doc_id == INVALID_DOCID) {
+    inline u32 LocateSegment(u32 start_seg_cursor, RowID start_row_id) {
+        RowID cur_seg_base_row_id = GetSegmentBaseRowId(start_seg_cursor);
+        if (cur_seg_base_row_id == INVALID_ROWID) {
             return start_seg_cursor;
         }
 
         u32 cur_seg_cursor = start_seg_cursor;
-        docid_t next_seg_base_doc_id = GetSegmentBaseDocId(cur_seg_cursor + 1);
-        while (next_seg_base_doc_id != INVALID_DOCID && start_doc_id >= next_seg_base_doc_id) {
+        RowID next_seg_base_row_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
+        while (next_seg_base_row_id != INVALID_ROWID && start_row_id >= next_seg_base_row_id) {
             ++cur_seg_cursor;
-            next_seg_base_doc_id = GetSegmentBaseDocId(cur_seg_cursor + 1);
+            next_seg_base_row_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
         }
         return cur_seg_cursor;
     }
 
-    bool MoveToSegment(docid_t start_doc_id);
+    bool MoveToSegment(RowID start_row_id);
+
+    bool MemSegMoveToSegment(const SharedPtr<PostingWriter> &posting_writer);
+
+    bool DiskSegMoveToSegment(SegmentPosting &cur_segment_posting);
+
+    IndexDecoder *CreateDocIndexDecoder(u32 doc_list_begin_pos);
 
 private:
-    PostingFormatOption cur_segment_format_option_;
-    docid_t base_doc_id_;
-    bool need_decode_tf_;
-    bool need_decode_doc_payload_;
-    IndexDecoder *index_decoder_;
-    u32 segment_cursor_;
-    u32 segment_count_;
+    PostingFormatOption format_option_;
+    bool need_decode_doc_id_ = false;
+    bool need_decode_tf_ = false;
+    bool need_decode_doc_payload_ = false;
+    RowID base_row_id_ = 0;
+    IndexDecoder *index_decoder_ = nullptr;
+    u32 segment_cursor_ = 0;
+    u32 segment_count_ = 0;
 
     SharedPtr<Vector<SegmentPosting>> seg_postings_;
     ByteSliceReader doc_list_reader_;
     MemoryPool *session_pool_;
-    InDocPositionIterator *in_doc_pos_iterator_;
+    InDocPositionIterator *in_doc_pos_iterator_ = nullptr;
     InDocStateKeeper in_doc_state_keeper_;
+private:
+    ByteSliceReader doc_reader_;
+    ByteSliceReader pos_reader_;
 };
 } // namespace infinity

@@ -23,66 +23,76 @@ namespace infinity {
 export class GlobalResourceUsage {
 public:
     static inline void Init() {
-#ifdef INFINITY_DEBUG
         if (initialized_) {
             return;
         }
         object_count_ = 0;
         raw_memory_count_ = 0;
         initialized_ = true;
-#endif
     }
 
     static inline void UnInit() {
-#ifdef INFINITY_DEBUG
         if (initialized_) {
             object_count_ = 0;
             raw_memory_count_ = 0;
             initialized_ = false;
         }
-#endif
     }
 
-    static inline void IncrObjectCount() {
-#ifdef INFINITY_DEBUG
+    static inline void IncrObjectCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(object_mutex_);
+        ++object_map_[key];
         ++object_count_;
-#endif
     }
 
-    static void DecrObjectCount() {
-#ifdef INFINITY_DEBUG
+    static void DecrObjectCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(object_mutex_);
+        --object_map_[key];
         --object_count_;
-#endif
     }
 
     static i64 GetObjectCount() {
-#ifdef INFINITY_DEBUG
+        std::unique_lock<std::mutex> unique_locker(object_mutex_);
         return object_count_;
-#endif
     }
 
-    static void IncrRawMemCount() {
-#ifdef INFINITY_DEBUG
+    static i64 GetObjectCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(object_mutex_);
+        return object_map_[key];
+    }
+
+    static void IncrRawMemCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
         ++raw_memory_count_;
-#endif
+        ++raw_memory_map_[key];
     }
 
-    static void DecrRawMemCount() {
-#ifdef INFINITY_DEBUG
+    static void DecrRawMemCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
         --raw_memory_count_;
-#endif
+        --raw_memory_map_[key];
     }
 
     static i64 GetRawMemoryCount() {
-#ifdef INFINITY_DEBUG
+        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
         return raw_memory_count_;
-#endif
+    }
+
+    static i64 GetRawMemoryCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
+        return raw_memory_map_[key];
     }
 
 private:
     static atomic_bool initialized_;
-    static ai64 object_count_;
-    static ai64 raw_memory_count_;
+
+    static std::mutex object_mutex_;
+    static i64 object_count_;
+    static HashMap<String, i64> object_map_;
+
+    static std::mutex raw_memory_mutex_;
+    static i64 raw_memory_count_;
+    static HashMap<String, i64> raw_memory_map_;
 };
 
 } // namespace infinity

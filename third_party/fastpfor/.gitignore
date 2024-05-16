@@ -1,0 +1,15 @@
+*.o
+*.lo
+.DS_Store
+/msvc/.vs
+/msvc/Debug
+/msvc/Release
+/msvc/x64/Debug
+/msvc/x64/Release
+/msvc/msvc.build
+*.suo
+*.VC.db
+*.VC.opendb
+*.vcxproj.user
+/fastpfor.pc
+/FastPFORConfig.cmake

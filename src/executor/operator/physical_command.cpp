@@ -35,6 +35,7 @@ import config;
 import status;
 import infinity_exception;
 import compact_segments_task;
+import variables;
 
 namespace infinity {
 
@@ -50,71 +51,103 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kSet: {
             SetCmd *set_command = (SetCmd *)(command_info_.get());
-            if (set_command->var_name() == enable_profiling_name) {
-                if (set_command->value_type() != SetVarType::kBool) {
-                    RecoverableError(Status::DataTypeMismatch("Boolean", set_command->value_type_str()));
+            switch(set_command->scope()) {
+                case SetScope::kSession: {
+                    SessionVariable session_var = VarUtil::GetSessionVarByName(set_command->var_name());
+                    switch(session_var) {
+                        case SessionVariable::kEnableProfile: {
+                            if (set_command->value_type() != SetVarType::kBool) {
+                                RecoverableError(Status::DataTypeMismatch("Boolean", set_command->value_type_str()));
+                            }
+                            query_context->current_session()->SessionVariables()->enable_profile_ = set_command->value_bool();
+                            return true;
+                        }
+                        case SessionVariable::kInvalid: {
+                            RecoverableError(Status::InvalidCommand(fmt::format("Unknown session variable: {}", set_command->var_name())));
+                        }
+                        default: {
+                            RecoverableError(Status::InvalidCommand(fmt::format("Session variable: {} is read-only", set_command->var_name())));
+                        }
+                    }
+                    break;
                 }
-                query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
-                return true;
-            }
-
-            if (set_command->var_name() == profile_history_capacity_name) {
-                if (set_command->value_type() != SetVarType::kInteger) {
-                    RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
+                case SetScope::kGlobal: {
+                    GlobalVariable global_var = VarUtil::GetGlobalVarByName(set_command->var_name());
+                    switch(global_var) {
+                        case GlobalVariable::kProfileRecordCapacity: {
+                            if (set_command->value_type() != SetVarType::kInteger) {
+                                RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
+                            }
+                            query_context->storage()->catalog()->ResizeProfileHistory(set_command->value_int());
+                            return true;
+                        }
+                        case GlobalVariable::kInvalid: {
+                            RecoverableError(Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name())));
+                        }
+                        default: {
+                            RecoverableError(Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name())));
+                        }
+                    }
+                    break;
                 }
-                query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
-                return true;
-            }
+                case SetScope::kConfig: {
+                    Config* config = query_context->global_config();
+                    GlobalOptionIndex config_index = config->GetOptionIndex(set_command->var_name());
+                    switch(config_index) {
+                        case GlobalOptionIndex::kLogLevel: {
+                            if (set_command->value_str() == "trace") {
+                                SetLogLevel(LogLevel::kTrace);
+                                config->SetLogLevel(LogLevel::kTrace);
+                                return true;
+                            }
 
-            if (set_command->var_name() == log_level) {
-                if (set_command->value_type() != SetVarType::kString) {
-                    RecoverableError(Status::DataTypeMismatch("String", set_command->value_type_str()));
+                            if (set_command->value_str() == "debug") {
+                                SetLogLevel(LogLevel::kDebug);
+                                config->SetLogLevel(LogLevel::kDebug);
+                                return true;
+                            }
+
+                            if (set_command->value_str() == "info") {
+                                SetLogLevel(LogLevel::kInfo);
+                                config->SetLogLevel(LogLevel::kInfo);
+                                return true;
+                            }
+
+                            if (set_command->value_str() == "warning") {
+                                SetLogLevel(LogLevel::kWarning);
+                                config->SetLogLevel(LogLevel::kWarning);
+                                return true;
+                            }
+
+                            if (set_command->value_str() == "error") {
+                                SetLogLevel(LogLevel::kError);
+                                config->SetLogLevel(LogLevel::kError);
+                                return true;
+                            }
+
+                            if (set_command->value_str() == "critical") {
+                                SetLogLevel(LogLevel::kCritical);
+                                config->SetLogLevel(LogLevel::kCritical);
+                                return true;
+                            }
+
+                            RecoverableError(Status::SetInvalidVarValue("log level", "trace, debug, info, warning, error, critical"));
+                            break;
+                        }
+                        case GlobalOptionIndex::kInvalid: {
+                            RecoverableError(Status::InvalidCommand(fmt::format("Unknown config: {}", set_command->var_name())));
+                            break;
+                        }
+                        default: {
+                            RecoverableError(Status::InvalidCommand(fmt::format("Config {} is read-only", set_command->var_name())));
+                            break;
+                        }
+                    }
+                    break;
                 }
-
-                if (set_command->scope() != SetScope::kGlobal) {
-                    RecoverableError(Status::SyntaxError(fmt::format("log_level is a global config parameter.", set_command->var_name())));
+                default: {
+                    RecoverableError(Status::InvalidCommand("Invalid set command scope, neither session nor global"));
                 }
-
-                if (set_command->value_str() == "trace") {
-                    SetLogLevel(LogLevel::kTrace);
-                    return true;
-                }
-
-                if (set_command->value_str() == "info") {
-                    SetLogLevel(LogLevel::kInfo);
-                    return true;
-                }
-
-                if (set_command->value_str() == "warning") {
-                    SetLogLevel(LogLevel::kWarning);
-                    return true;
-                }
-
-                if (set_command->value_str() == "error") {
-                    SetLogLevel(LogLevel::kError);
-                    return true;
-                }
-
-                if (set_command->value_str() == "fatal") {
-                    SetLogLevel(LogLevel::kFatal);
-                    return true;
-                }
-
-                RecoverableError(Status::SetInvalidVarValue("log level", "trace, info, warning, error, fatal"));
-                return true;
-            }
-
-            if (set_command->var_name() == worker_cpu_limit) {
-                if (set_command->value_type() != SetVarType::kInteger) {
-                    RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
-                }
-
-                if (set_command->scope() != SetScope::kGlobal) {
-                    RecoverableError(Status::SyntaxError(fmt::format("cpu_count is a global config parameter.", set_command->var_name())));
-                }
-
-                RecoverableError(Status::ReadOnlySysVar(set_command->var_name()));
-                return true;
             }
 
             { UnrecoverableError(fmt::format("Unknown command: {}", set_command->var_name())); }
@@ -122,7 +155,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kExport: {
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
-            auto profiler_record = query_context->current_session()->GetProfilerRecord(export_command->file_no());
+            auto profiler_record = query_context->current_session()->GetProfileRecord(export_command->file_no());
             if (profiler_record == nullptr) {
                 RecoverableError(Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no())));
             }

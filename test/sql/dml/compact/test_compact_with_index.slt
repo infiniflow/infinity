@@ -5,11 +5,11 @@ statement ok
 CREATE TABLE test_compact_with_index (c1 INT, c2 EMBEDDING(FLOAT, 4));
 
 query I
-COPY test_compact_with_index FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 query I
-COPY test_compact_with_index FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 statement ok
@@ -34,7 +34,7 @@ SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'flo
 6
 
 query I
-COPY test_compact_with_index FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 query I
@@ -54,3 +54,6 @@ SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'flo
 8
 8
 8
+
+statement ok
+DROP TABLE test_compact_with_index;

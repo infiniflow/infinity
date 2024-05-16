@@ -22,20 +22,12 @@ import base_expression;
 import infinity_exception;
 import secondary_index_data;
 import secondary_index_scan_middle_expression;
+import filter_expression_push_down_helper;
 import internal_types;
 import third_party;
+import filter_value_type_classification;
 
 namespace infinity {
-
-// for std::visit
-export template <class... Fs>
-struct Overload : Fs... {
-    using Fs::operator()...;
-};
-
-// explicit deduction guide
-export template <class... Fs>
-Overload(Fs...) -> Overload<Fs...>;
 
 // The range will only monotonically shrink
 // MergeAnd is meaningful: reduce the search range
@@ -134,10 +126,7 @@ export class FilterExecuteSingleRange {
     FilterIntervalRange interval_range_;
 
     inline void SetIntervalToEmpty() {
-        std::visit(Overload{[]<typename T>(FilterIntervalRangeT<T> &interval) { interval.SetAlwaysFalse(); },
-                            [](const std::monostate &empty) {
-                                UnrecoverableError("FilterExecuteSingleRange::SetIntervalToEmpty(): class member interval_range_ not initialized!");
-                            }},
+        std::visit(Overload{[]<typename T>(FilterIntervalRangeT<T> &interval) { interval.SetAlwaysFalse(); }, [](const std::monostate &empty) {}},
                    interval_range_);
     }
 

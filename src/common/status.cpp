@@ -69,6 +69,8 @@ void Status::AppendMessage(const String &msg) {
 
 // Error functions
 
+Status Status::Ignore() { return Status(ErrorCode::kIgnore); }
+
 // 1. Config error
 Status Status::InvalidTimeInfo(const String &time_info) {
     return Status(ErrorCode::kInvalidTimeInfo, MakeUnique<String>(fmt::format("Invalid time info format: {}", time_info)));
@@ -96,6 +98,8 @@ Status Status::InvalidIPAddr(const String &ip_addr) {
 Status Status::InvalidLogLevel(const String &log_level) {
     return Status(ErrorCode::kInvalidLogLevel, MakeUnique<String>(fmt::format("Invalid log level: {}.", log_level)));
 }
+
+Status Status::InvalidConfig(const String &detailed_info) { return Status(ErrorCode::kInvalidConfig, MakeUnique<String>(detailed_info)); }
 
 // 2. Auth error
 Status Status::WrongPasswd(const String &user_name) {
@@ -336,6 +340,33 @@ Status Status::MultipleFunctionMatched(const String &function, const String &fun
 
 Status Status::InsertWithoutValues() { return Status(ErrorCode::kInsertWithoutValues, MakeUnique<String>("Insert into table without any values")); }
 
+Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, MakeUnique<String>("invalid conflict type")); }
+
+Status Status::InvalidJsonFormat(const String &error_message) {
+    return Status(ErrorCode::kInvalidJsonFormat, MakeUnique<String>(fmt::format("Invalid format json: {}", error_message)));
+}
+
+Status Status::DuplicateColumnName(const String &column_name) {
+    return Status(ErrorCode::kDuplicateColumnName, MakeUnique<String>(fmt::format("Duplicated column name: {}", column_name)));
+}
+
+Status Status::InvalidExpression(const String &expr_str) { return Status(ErrorCode::kInvalidExpression, MakeUnique<String>(expr_str)); }
+
+Status Status::SegmentNotExist(const SegmentID &segment_id) {
+    return Status(ErrorCode::kSegmentNotExist, MakeUnique<String>(fmt::format("Segment: {} doesn't exist", segment_id)));
+}
+Status Status::BlockNotExist(const BlockID &block_id) {
+    return Status(ErrorCode::kBlockNotExist, MakeUnique<String>(fmt::format("Block: {} doesn't exist", block_id)));
+}
+
+Status Status::AggregateFunctionWithEmptyArgs() {
+    return Status(ErrorCode::kAggregateFunctionWithEmptyArgs, MakeUnique<String>("Aggregate function with empty arguments"));
+}
+
+Status Status::InvalidCommand(const String &detailed_error) {
+    return Status(ErrorCode::kInvalidCommand, MakeUnique<String>(fmt::format("Invalid command: {}", detailed_error)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
@@ -425,6 +456,18 @@ Status Status::UnexpectedError(const String &detailed_info) {
     return Status(ErrorCode::kUnexpectedError, MakeUnique<String>(fmt::format("Unexpected error: {}", detailed_info)));
 }
 
+Status Status::ParserError(const String &detailed_info) {
+    return Status(ErrorCode::kParserError, MakeUnique<String>(fmt::format("Parser error: {}", detailed_info)));
+}
+
+Status Status::MmapFileError(const String &detailed_info) {
+    return Status(ErrorCode::kMmapFileError, MakeUnique<String>(fmt::format("mmap error: {}", detailed_info)));
+}
+
+Status Status::MunmapFileError(const String &detailed_info) {
+    return Status(ErrorCode::kMunmapFileError, MakeUnique<String>(fmt::format("munmap error: {}", detailed_info)));
+}
+
 Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }
@@ -432,6 +475,8 @@ Status Status::ColumnCountMismatch(const String &detailed_info) {
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
+
+Status Status::DuplicateEntry() { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>("Duplicate entry")); }
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
 

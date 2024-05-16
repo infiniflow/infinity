@@ -36,12 +36,6 @@ import index_hnsw;
 import default_values;
 import txn_store;
 import base_table_ref;
-import hnsw_common;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
-import lvq_store;
-import plain_store;
 import extra_ddl_info;
 
 namespace infinity {
@@ -60,13 +54,23 @@ void PhysicalCreateIndexPrepare::Init() {}
 
 bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    auto result = txn->CreateIndexDef(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_);
-    auto *table_index_entry = std::get<0>(result);
-    auto status = std::get<1>(result);
-    if (!status.ok() || table_index_entry == nullptr) {
+    auto *table_entry = base_table_ref_->table_entry_ptr_;
+    auto [table_index_entry, status] = txn->CreateIndexDef(table_entry, index_def_ptr_, conflict_type_);
+    if (!status.ok()) {
         operator_state->status_ = status;
     } else {
-        txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
+        auto status = txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+            return true;
+        }
+        if (!prepare_) {
+            auto status = txn->CreateIndexFinish(table_entry, table_index_entry);
+            if (!status.ok()) {
+                operator_state->status_ = status;
+                return true;
+            }
+        }
     }
     operator_state->SetComplete();
     return true;

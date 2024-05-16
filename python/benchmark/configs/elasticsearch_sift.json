@@ -1,0 +1,35 @@
+{
+    "name": "elasticsearch_sift_1m",
+    "app": "elasticsearch",
+    "app_path": "servers/elasticsearch/",
+    "connection_url": "http://localhost:9200",
+    "data_path": "datasets/sift/sift-128-euclidean.hdf5",
+    "data_link": "http://ann-benchmarks.com/sift-128-euclidean.hdf5",
+    "insert_batch_size": 8192,
+    "vector_name": "embeddings", 
+    "query_path": "datasets/sift/sift-128-euclidean.hdf5",
+    "topK": 100,
+    "mode": "vector",
+    "index": {
+      "settings": {
+          "index.store.preload": [ "vec", "vex", "vem"],
+          "index.number_of_shards": 1,
+          "index.number_of_replicas": 0
+      },
+      "mappings": {
+        "properties": {
+          "embeddings": {
+            "type": "dense_vector",
+            "element_type": "float",
+            "dims" : 128,
+            "index" : true,
+            "similarity": "l2_norm",
+            "index_options": {
+              "type": "hnsw"
+            }
+          }
+        }
+      }
+    },
+    "ground_truth_path": "datasets/sift/sift-128-euclidean.hdf5"
+}

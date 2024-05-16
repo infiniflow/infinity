@@ -23,9 +23,17 @@ namespace infinity {
 
 struct BlockEntry;
 struct SegmentEntry;
+class Txn;
 
 export struct BlockIndex {
-    void Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, bool check_ts = true);
+private:
+    struct BlocksInfo {
+        HashMap<BlockID, BlockEntry *> block_map_;
+        SegmentOffset segment_offset_ = 0;
+    };
+
+public:
+    void Insert(SegmentEntry *segment_entry, Txn *txn);
 
     void Reserve(SizeT n);
 
@@ -35,10 +43,14 @@ export struct BlockIndex {
 
     BlockEntry *GetBlockEntry(u32 segment_id, u16 block_id) const;
 
+    SegmentOffset GetSegmentOffset(SegmentID segment_id) const;
+
     Vector<SegmentEntry *> segments_;
     HashMap<SegmentID, SegmentEntry *> segment_index_;
-    HashMap<SegmentID, HashMap<BlockID, BlockEntry *>> segment_block_index_;
     Vector<GlobalBlockID> global_blocks_;
+
+private:
+    HashMap<SegmentID, BlocksInfo> segment_block_index_;
 };
 
 } // namespace infinity

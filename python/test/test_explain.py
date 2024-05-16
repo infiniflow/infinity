@@ -18,9 +18,11 @@ import pytest
 from common import common_values
 import infinity
 from infinity.table import ExplainType
+from infinity.common import ConflictType
+from test_sdkbase import TestSdk
 
 
-class TestExplain:
+class TestExplain(TestSdk):
 
     def test_explain_default(self):
         """
@@ -33,10 +35,10 @@ class TestExplain:
             # Fragment = 7
         """
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_explain_default", True)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_explain_default", ConflictType.Ignore)
         table = db_obj.create_table("test_explain_default", {
-            "c1": "varchar, primary key", "c2": "float"}, None)
+            "c1": {"type": "varchar", "constraints": ["primary key"]}, "c2": {"type": "float"}}, ConflictType.Error)
         assert table
 
         table.insert({"c1": "hello", "c2": 1.0})
@@ -68,3 +70,5 @@ class TestExplain:
             with pytest.raises(Exception, match=r".*Not implement*"):
                 res = table.output(["*"]).explain(ExplainType.Analyze)
                 print(res)
+
+        db_obj.drop_table("test_explain_default", ConflictType.Error)

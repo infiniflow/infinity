@@ -34,17 +34,21 @@ import bg_task;
 
 class BGProcessTest : public BaseTest {
     void SetUp() override {
-        system("rm -rf /tmp/infinity");
+        RemoveDbDirs();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
         BaseTest::TearDown();
     }
 };
@@ -52,7 +56,7 @@ class BGProcessTest : public BaseTest {
 TEST_F(BGProcessTest, test1) {
     using namespace infinity;
 
-    BGTaskProcessor processor(infinity::InfinityContext::instance().storage()->wal_manager());
+    BGTaskProcessor processor(infinity::InfinityContext::instance().storage()->wal_manager(), nullptr);
 
     processor.Start();
 

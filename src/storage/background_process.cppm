@@ -23,9 +23,11 @@ export module background_process;
 
 namespace infinity {
 
+class Catalog;
+
 export class BGTaskProcessor {
 public:
-    explicit BGTaskProcessor(WalManager* wal_manager);
+    explicit BGTaskProcessor(WalManager *wal_manager, Catalog *catalog);
     void Start();
     void Stop();
 
@@ -34,11 +36,15 @@ public:
 
 private:
     void Process();
+    void CompactProcess();
 
+private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_;
+
     Thread processor_thread_{};
 
-    WalManager* wal_manager_{};
+    WalManager *wal_manager_{};
+    Catalog *catalog_{};
 };
 
-}
+} // namespace infinity

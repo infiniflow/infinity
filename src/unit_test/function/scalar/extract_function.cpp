@@ -44,7 +44,7 @@ class ExtractFunctionTest : public BaseTest {};
 TEST_F(ExtractFunctionTest, extract_year_test) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
 
     RegisterExtractFunction(catalog_ptr);
 
@@ -66,12 +66,12 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             DateT date_value;
             std::stringstream ss;
             ss << i + 1 << "-1-1";
@@ -80,7 +80,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDate);
             std::stringstream ss;
@@ -93,7 +93,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i + 1);
@@ -118,12 +118,12 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             DateT date_value;
             std::stringstream ss;
             ss << i + 1 << "-" << i % 12 + 1 << "-1";
@@ -137,7 +137,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i % 12 + 1);
@@ -162,12 +162,12 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             DateT date_value;
             std::stringstream ss;
             ss << "1-1"
@@ -182,7 +182,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
             EXPECT_EQ(v.value_.big_int, i % 28 + 1);

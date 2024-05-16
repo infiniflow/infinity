@@ -63,6 +63,7 @@ import physical_merge_sort;
 import physical_merge_knn;
 import physical_match;
 import physical_fusion;
+import physical_merge_aggregate;
 
 export module explain_physical_plan;
 
@@ -172,7 +173,10 @@ public:
     static void Explain(const PhysicalMergeKnn *merge_knn_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
     static void Explain(const PhysicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+ 
+    static void Explain(const PhysicalMergeAggregate *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 };
 
 } // namespace infinity

@@ -24,6 +24,8 @@ i64 FileHandler::Read(void *data, u64 nbytes) { return file_system_.Read(*this, 
 
 i64 FileHandler::Write(const void *data, u64 nbytes) { return file_system_.Write(*this, data, nbytes); }
 
+void FileHandler::Rename(const String &old_name, const String &new_name) { return file_system_.Rename(old_name, new_name); }
+
 void FileHandler::Sync() { return file_system_.SyncFile(*this); }
 
 void FileHandler::Close() { return file_system_.Close(*this); }

@@ -41,7 +41,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("----\n")
         slt_file.write("\n")
         slt_file.write("query I\n")
-        slt_file.write("SELECT * FROM {} order by c1, c2;\n".format(table_name))
+        slt_file.write(
+            "SELECT * FROM {} order by c1, c2;\n".format(table_name))
         slt_file.write("----\n")
 
         random_integers = np.random.randint(low=1, high=row_n, size=row_n)
@@ -73,7 +74,7 @@ if __name__ == "__main__":
         "-c",
         "--copy",
         type=str,
-        default="/tmp/infinity/test_data",
+        default="/var/infinity/test_data",
         dest="copy_dir",
     )
     args = parser.parse_args()

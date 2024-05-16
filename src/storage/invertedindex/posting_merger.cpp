@@ -7,22 +7,24 @@ import memory_pool;
 import file_writer;
 import doc_list_encoder;
 import inmem_posting_decoder;
-import pos_list_encoder;
+import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import posting_writer;
+import vector_with_lock;
 import posting_decoder;
 import term_meta;
 import column_index_iterator;
 import segment_term_posting;
+import internal_types;
+import third_party;
 
 namespace infinity {
 
 class DocMerger {
 public:
-    DocMerger(const PostingFormatOption &format_option, PostingDecoder *posting_decoder);
-
-    ~DocMerger();
+    DocMerger(const PostingFormatOption &format_option, PostingDecoder *posting_decoder)
+        : format_option_(format_option), posting_decoder_(posting_decoder) {}
 
     docid_t CurrentDoc() const { return doc_id_; }
 
@@ -52,11 +54,6 @@ private:
     PostingFormatOption format_option_;
     PostingDecoder *posting_decoder_{nullptr};
 };
-
-DocMerger::DocMerger(const PostingFormatOption &format_option, PostingDecoder *posting_decoder)
-    : format_option_(format_option), posting_decoder_(posting_decoder) {}
-
-DocMerger::~DocMerger() {}
 
 void DocMerger::Merge(docid_t doc_id, PostingWriter *posting_writer) {
     tf_t tf = MergePosition(doc_id, posting_writer);
@@ -93,9 +90,6 @@ tf_t DocMerger::MergePosition(docid_t doc_id, PostingWriter *posting_writer) {
         if (format_option_.HasTfList() && tf >= tf_list_buf_[last_doc_buf_cursor_]) {
             break;
         }
-        if (format_option_.HasTfBitmap() && posting_decoder_->IsDocEnd(pos_index_)) {
-            break;
-        }
     }
     return tf;
 }
@@ -121,9 +115,12 @@ bool DocMerger::HasNext() {
 
 class PostingDumper {
 public:
-    PostingDumper(MemoryPool *memory_pool, RecyclePool *buffer_pool, const PostingFormatOption &format_option, const Segment &target_segment)
-        : format_option_(format_option), target_segment_(target_segment) {
-        posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option);
+    PostingDumper(MemoryPool *memory_pool,
+                  RecyclePool *buffer_pool,
+                  const PostingFormatOption &format_option,
+                  VectorWithLock<u32> &column_length_array)
+        : format_option_(format_option), column_lengths_(column_length_array) {
+        posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option, column_lengths_);
     }
 
     ~PostingDumper() {}
@@ -143,7 +140,8 @@ public:
 private:
     PostingFormatOption format_option_;
     SharedPtr<PostingWriter> posting_writer_;
-    Segment target_segment_;
+    // for column length info
+    VectorWithLock<u32> &column_lengths_;
 };
 
 class SortedPosting {
@@ -154,9 +152,9 @@ public:
 
     bool Next() {
         bool ret = doc_merger_.HasNext();
-        if (!ret)
-            return false;
-        current_doc_id_ = doc_merger_.CurrentDoc();
+        if (ret) {
+            current_doc_id_ = doc_merger_.CurrentDoc();
+        }
         return ret;
     }
 
@@ -166,50 +164,36 @@ public:
             return;
         }
         SharedPtr<PostingWriter> posting_writer = pos_dumper->GetPostingWriter();
-        doc_merger_.Merge(current_doc_id_, posting_writer.get());
+        doc_merger_.Merge(base_doc_id_ + current_doc_id_, posting_writer.get());
     }
-
-    docid_t GetCurrentDocID() const { return current_doc_id_; }
 
 private:
     PostingFormatOption format_option_;
-    docid_t base_doc_id_;
-    segmentid_t current_segment_{INVALID_SEGMENTID};
+    docid_t base_doc_id_{0};
     docid_t current_doc_id_{INVALID_DOCID};
     DocMerger doc_merger_;
 };
 
-struct SortedPostingComparator {
-    bool operator()(const SortedPosting *lhs, const SortedPosting *rhs) { return lhs->GetCurrentDocID() > rhs->GetCurrentDocID(); }
-};
-
-using PriorityQueue = Heap<SortedPosting *, SortedPostingComparator>;
-
-PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, const Segment &target_segment)
-    : memory_pool_(memory_pool), buffer_pool_(buffer_pool) {
-    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, target_segment);
+PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, optionflag_t flag, VectorWithLock<u32> &column_length_array)
+    : memory_pool_(memory_pool), buffer_pool_(buffer_pool), format_option_(flag), column_lengths_(column_length_array) {
+    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, column_lengths_);
 }
 
 PostingMerger::~PostingMerger() {}
 
-void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_postings) {
-    PriorityQueue queue;
+void PostingMerger::Merge(const Vector<SegmentTermPosting *>& segment_term_postings, const RowID& merge_base_rowid) {
+    // segment_term_postings is already sorted by base_row_id
     for (u32 i = 0; i < segment_term_postings.size(); ++i) {
         SegmentTermPosting *term_posting = segment_term_postings[i];
-        u64 base_doc_id = term_posting->GetBaesDocId();
+        RowID base_row_id = term_posting->GetBaseRowId();
+        u32 base_doc_id = base_row_id - merge_base_rowid;
         PostingDecoder *decoder = term_posting->GetPostingDecoder();
-        SortedPosting *sorted_posting = new SortedPosting(format_option_, base_doc_id, decoder);
-        queue.push(sorted_posting);
+        SortedPosting sorted_posting(format_option_, base_doc_id, decoder);
+        while (sorted_posting.Next()) {
+            sorted_posting.Merge(posting_dumper_);
+        }
     }
 
-    while (!queue.empty()) {
-        SortedPosting *sorted_posting = queue.top();
-        queue.pop();
-        while (sorted_posting->Next()) {
-            sorted_posting->Merge(posting_dumper_);
-        }
-        delete sorted_posting;
-    }
     posting_dumper_->EndSegment();
 }
 

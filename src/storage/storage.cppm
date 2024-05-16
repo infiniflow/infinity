@@ -21,7 +21,9 @@ import txn_manager;
 import buffer_manager;
 import wal_manager;
 import background_process;
+import compaction_process;
 import periodic_trigger_thread;
+import log_file;
 
 export module storage;
 
@@ -29,7 +31,7 @@ namespace infinity {
 
 export class Storage {
 public:
-    explicit Storage(const Config *config_ptr);
+    explicit Storage(Config *config_ptr);
 
     [[nodiscard]] inline Catalog *catalog() noexcept { return new_catalog_.get(); }
 
@@ -45,17 +47,20 @@ public:
 
     void UnInit();
 
-    void AttachCatalog(const Vector<String> &catalog_files);
+    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
     void InitNewCatalog();
 
+    Config *config() const { return config_ptr_; }
+
 private:
-    const Config *config_ptr_{};
+    Config *config_ptr_{};
     UniquePtr<Catalog> new_catalog_{};
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
+    UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
 };
 

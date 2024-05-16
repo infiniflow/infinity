@@ -28,6 +28,18 @@ import local_file_system;
 
 namespace infinity {
 
+void CreateField::SaveToFile(FileHandler &file_handler) const {
+    file_handler.Write(&create_ts_, sizeof(create_ts_));
+    file_handler.Write(&row_count_, sizeof(row_count_));
+}
+
+CreateField CreateField::LoadFromFile(FileHandler &file_handler) {
+    CreateField create_field;
+    file_handler.Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
+    file_handler.Read(&create_field.row_count_, sizeof(create_field.row_count_));
+    return create_field;
+}
+
 bool BlockVersion::operator==(const BlockVersion &rhs) const {
     if (this->created_.size() != rhs.created_.size() || this->deleted_.size() != rhs.deleted_.size())
         return false;
@@ -42,73 +54,76 @@ bool BlockVersion::operator==(const BlockVersion &rhs) const {
     return true;
 }
 
-i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
-    if (created_.empty())
-        return 0;
-    i64 idx = created_.size() - 1;
-    for (; idx >= 0; idx--) {
-        if (created_[idx].create_ts_ <= begin_ts)
-            break;
+i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
+    // use binary search find the last create_field that has create_ts_ <= check_ts
+    auto iter =
+        std::upper_bound(created_.begin(), created_.end(), begin_ts, [](TxnTimeStamp ts, const CreateField &field) { return ts < field.create_ts_; });
+    if (iter == created_.begin()) {
+        return false;
     }
-    if (idx < 0)
-        return 0;
-    return created_[idx].row_count_;
+    --iter;
+    return iter->row_count_;
 }
 
-void BlockVersion::LoadFromFile(const String &version_path) {
-    std::ifstream ifs(version_path);
-    if (!ifs.is_open()) {
-        LOG_WARN(fmt::format("Failed to open block_version file: {}", version_path));
-        // load the block_version file not exist return and create version
-        return;
+void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, FileHandler &file_handler) const {
+    BlockOffset create_size = created_.size();
+    while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
+        --create_size;
     }
-    int buf_len = std::filesystem::file_size(version_path);
-    Vector<char> buf(buf_len);
-    ifs.read(buf.data(), buf_len);
-    ifs.close();
-    char *ptr = buf.data();
-    i32 created_size = ReadBufAdv<i32>(ptr);
-    i32 deleted_size = ReadBufAdv<i32>(ptr);
-    created_.resize(created_size);
-    deleted_.resize(deleted_size);
-    std::memcpy(created_.data(), ptr, created_size * sizeof(CreateField));
-    ptr += created_size * sizeof(CreateField);
-    std::memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
-    ptr += deleted_.size() * sizeof(TxnTimeStamp);
-    if (ptr - buf.data() != buf_len) {
-        UnrecoverableError(fmt::format("Failed to load block_version file: {}", version_path));
+
+    file_handler.Write(&create_size, sizeof(create_size));
+    for (SizeT j = 0; j < create_size; ++j) {
+        created_[j].SaveToFile(file_handler);
+    }
+
+    BlockOffset capacity = deleted_.size();
+    file_handler.Write(&capacity, sizeof(capacity));
+    TxnTimeStamp dump_ts = 0;
+    for (const auto &ts : deleted_) {
+        if (ts <= checkpoint_ts) {
+            file_handler.Write(&ts, sizeof(ts));
+        } else {
+            file_handler.Write(&dump_ts, sizeof(dump_ts));
+        }
     }
 }
 
-void BlockVersion::SaveToFile(const String &version_path) {
-    i32 exp_size = sizeof(i32) + created_.size() * sizeof(CreateField);
-    exp_size += sizeof(i32) + deleted_.size() * sizeof(TxnTimeStamp);
-    Vector<char> buf(exp_size, 0);
-    char *ptr = buf.data();
-    WriteBufAdv<i32>(ptr, i32(created_.size()));
-    WriteBufAdv<i32>(ptr, i32(deleted_.size()));
-    std::memcpy(ptr, created_.data(), created_.size() * sizeof(CreateField));
-    ptr += created_.size() * sizeof(CreateField);
-    std::memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
-    ptr += deleted_.size() * sizeof(TxnTimeStamp);
-    if (ptr - buf.data() != exp_size) {
-        UnrecoverableError(fmt::format("Failed to save block_version file: {}", version_path));
+void BlockVersion::SpillToFile(FileHandler &file_handler) const {
+    BlockOffset create_size = created_.size();
+    file_handler.Write(&create_size, sizeof(create_size));
+    for (const auto &create : created_) {
+        create.SaveToFile(file_handler);
     }
-    std::ofstream ofs = std::ofstream(version_path, std::ios::trunc | std::ios::binary);
-    if (!ofs.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open block_version file: {}", version_path));
-    }
-    ofs.write(buf.data(), ptr - buf.data());
-    ofs.flush();
-    ofs.close();
+
+    BlockOffset capacity = deleted_.size();
+    file_handler.Write(&capacity, sizeof(capacity));
+    file_handler.Write(deleted_.data(), capacity * sizeof(TxnTimeStamp));
 }
 
-void BlockVersion::Cleanup(const String &version_path) {
-    LocalFileSystem fs;
+UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
+    auto block_version = MakeUnique<BlockVersion>();
 
-    if (fs.Exists(version_path)) {
-        fs.DeleteFile(version_path);
+    BlockOffset create_size;
+    file_handler.Read(&create_size, sizeof(create_size));
+    block_version->created_.reserve(create_size);
+    for (BlockOffset i = 0; i < create_size; i++) {
+        block_version->created_.push_back(CreateField::LoadFromFile(file_handler));
     }
+    BlockOffset capacity;
+    file_handler.Read(&capacity, sizeof(capacity));
+    block_version->deleted_.resize(capacity);
+    for (BlockOffset i = 0; i < capacity; i++) {
+        file_handler.Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
+    }
+    return block_version;
 }
+
+// void BlockVersion::Cleanup(const String &version_path) {
+//     LocalFileSystem fs;
+
+//     if (fs.Exists(version_path)) {
+//         fs.DeleteFile(version_path);
+//     }
+// }
 
 } // namespace infinity

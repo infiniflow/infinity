@@ -23,6 +23,8 @@ import data_type;
 import serialize;
 import internal_types;
 import infinity_exception;
+import parsed_expr;
+import constant_expr;
 
 namespace infinity {
 
@@ -64,25 +66,8 @@ bool TableDef::operator==(const TableDef &other) const {
         // Compare each column
         const ColumnDef &cd1 = *(this->columns_[i]);
         const ColumnDef &cd2 = *(other.columns_[i]);
-        if (cd1.type_ != cd2.type_ || cd1.id_ != cd2.id_ || cd1.column_type_.get() == nullptr || cd2.column_type_.get() == nullptr ||
-            *(cd1.column_type_) != *(cd2.column_type_) || !IsEqual(cd1.name_, cd2.name_) || cd1.constraints_.size() != cd2.constraints_.size())
+        if (cd1 != cd2) {
             return false;
-        // Convert HashSet to Set
-        Set<ConstraintType> constraints1, constraints2;
-        for (auto &cons : cd1.constraints_) {
-            constraints1.insert(cons);
-        }
-        for (auto &cons : cd2.constraints_) {
-            constraints2.insert(cons);
-        }
-        Set<ConstraintType>::iterator it1 = constraints1.begin();
-        Set<ConstraintType>::iterator it2 = constraints2.begin();
-        for (u32 j = 0; j < constraints1.size(); j++) {
-            if (*it1 != *it2) {
-                return false;
-            }
-            it1++;
-            it2++;
         }
     }
     return true;
@@ -102,6 +87,8 @@ i32 TableDef::GetSizeInBytes() const {
         size += sizeof(i32) + cd.name_.length();
         size += sizeof(i32);
         size += cd.constraints_.size() * sizeof(ConstraintType);
+        size += (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->GetSizeInBytes();
+        size += sizeof(u8); // build_bloom_filter_
     }
     return size;
 }
@@ -120,6 +107,9 @@ void TableDef::WriteAdv(char *&ptr) const {
         for (const auto &cons : cd.constraints_) {
             WriteBufAdv(ptr, cons);
         }
+        (dynamic_cast<ConstantExpr *>(cd.default_expr_.get()))->WriteAdv(ptr);
+        u8 bf = cd.build_bloom_filter_ ? 1 : 0;
+        WriteBufAdv(ptr, bf);
     }
     return;
 }
@@ -147,7 +137,10 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
             ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
             constraints.insert(ct);
         }
-        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints);
+        SharedPtr<ParsedExpr> default_expr = ConstantExpr::ReadAdv(ptr, maxbytes);
+        SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints, default_expr);
+        u8 bf = ReadBufAdv<u8>(ptr);
+        cd->build_bloom_filter_ = bf;
         columns.push_back(cd);
     }
     maxbytes = ptr_end - ptr;

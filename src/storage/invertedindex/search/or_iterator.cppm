@@ -17,12 +17,12 @@ module;
 export module or_iterator;
 
 import stl;
-import posting_iterator;
 import index_defines;
-import index_config;
 import doc_iterator;
 import multi_query_iterator;
 import priority_queue;
+import internal_types;
+
 namespace infinity {
 
 export class OrIterator : public MultiQueryDocIterator {
@@ -36,26 +36,25 @@ public:
     };
 
     struct DocIteratorEntry {
-        docid_t doc_id_{INVALID_DOCID};
+        RowID doc_id_{INVALID_ROWID};
         u32 entry_id_{0};
     };
 
     OrIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    virtual ~OrIterator();
-
     bool IsOr() const override { return true; }
 
-    void DoSeek(docid_t doc_id) override;
+    void DoSeek(RowID doc_id) override;
 
-    u32 GetDF() const override;
+    u32 GetDF() const override { return or_iterator_df_; }
 
 private:
     DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }
 
-    void AdjustDown() {
+    const DocIterator *GetDocIterator(u32 i) const { return children_[i].get(); }
+
+    void AdjustDown(u32 idx) {
         DocIteratorEntry *heap = iterator_heap_.data();
-        u32 idx = 1;
         u32 min = idx;
         do {
             idx = min;
@@ -74,6 +73,7 @@ private:
     }
 
     Vector<DocIteratorEntry> iterator_heap_;
-    u32 count_{0};
+    u32 count_{};
+    u32 or_iterator_df_{};
 };
 } // namespace infinity

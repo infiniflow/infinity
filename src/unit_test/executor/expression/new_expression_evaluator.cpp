@@ -50,7 +50,7 @@ class ExpressionEvaluatorTest : public BaseTest {};
 
 TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
     RegisterAddFunction(catalog_ptr);
 
     String op = "+";
@@ -86,7 +86,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, data_type, "c1", HashSet<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), {col_def});
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), {col_def});
     SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
@@ -105,7 +105,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
         expr_evaluator.Init(input_data_block.get());
         expr_evaluator.Execute(func_expr, expr_state, output_column_vector);
         // blocks_column[0] == output_column_vector
-        EXPECT_EQ(output_column_vector->Size(), 0);
+        EXPECT_EQ(output_column_vector->Size(), 0u);
     }
 
     {
@@ -143,14 +143,14 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
         for (SizeT row_id = 0; row_id < row_count; ++row_id) {
             Value value = output_column_vector->GetValue(row_id);
-            EXPECT_EQ(value.value_.big_int, row_id + 1);
+            EXPECT_EQ(value.value_.big_int, (i64)(row_id + 1));
         }
     }
 }
 
 TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     using namespace infinity;
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
     RegisterSubtractFunction(catalog_ptr);
 
     String op = "-";
@@ -185,7 +185,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     ExpressionEvaluator expr_evaluator;
 
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "c1", HashSet<ConstraintType>());
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), {col_def});
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("t1"), {col_def});
     SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
@@ -205,7 +205,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
         expr_evaluator.Init(input_data_block.get());
         expr_evaluator.Execute(func_expr, expr_state, output_column_vector);
         // blocks_column[0] == output_column_vector
-        EXPECT_EQ(output_column_vector->Size(), 0);
+        EXPECT_EQ(output_column_vector->Size(), 0u);
     }
 
     {
@@ -243,7 +243,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
 
         for (SizeT row_id = 0; row_id < row_count; ++row_id) {
             Value value = output_column_vector->GetValue(row_id);
-            EXPECT_EQ(value.value_.big_int, row_count - row_id);
+            EXPECT_EQ((u64)value.value_.big_int, row_count - row_id);
         }
     }
 }

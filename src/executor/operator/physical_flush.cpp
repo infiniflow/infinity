@@ -24,6 +24,7 @@ import physical_operator_type;
 import operator_state;
 import logger;
 import bg_task;
+import third_party;
 
 module physical_flush;
 
@@ -51,9 +52,13 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
 }
 
 void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
-    // Generate the result
-    SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn());
-    query_context->storage()->bg_processor()->Submit(force_ckp_task);
+    // full checkpoint here
+    auto force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn(), true /*is_full_checkpoint*/);
+    auto *wal_mgr = query_context->storage()->wal_manager();
+    if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
+        LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));
+        return ;
+    }
     force_ckp_task->Wait();
     LOG_TRACE("Flushed data");
 }

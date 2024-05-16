@@ -3,11 +3,11 @@ module;
 import stl;
 import memory_pool;
 import file_writer;
-import buffered_byte_slice;
-import buffered_skiplist_writer;
+import file_reader;
+import posting_byte_slice;
+import skiplist_writer;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
-import position_bitmap_writer;
 import index_defines;
 
 export module doc_list_encoder;
@@ -40,9 +40,11 @@ public:
 
     void AddPosition();
 
-    void EndDocument(docid_t doc_id, docpayload_t doc_payload);
+    void EndDocument(docid_t doc_id, u32 doc_len, docpayload_t doc_payload);
 
-    void Dump(const SharedPtr<FileWriter> &file);
+    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
+
+    void Load(const SharedPtr<FileReader> &file);
 
     u32 GetDumpLength();
 
@@ -50,10 +52,10 @@ public:
 
     InMemDocListDecoder *GetInMemDocListDecoder(MemoryPool *session_pool) const;
 
-    BufferedByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
+    PostingByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
 
 private:
-    void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf);
+    void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf, u32 doc_len);
 
     void FlushDocListBuffer();
 
@@ -62,7 +64,7 @@ private:
     void AddSkipListItem(u32 item_size);
 
 private:
-    BufferedByteSlice doc_list_buffer_;
+    PostingByteSlice doc_list_buffer_;
     bool own_doc_list_format_;
     DocListFormatOption format_option_;
     DocListFormat *doc_list_format_;
@@ -72,9 +74,11 @@ private:
     tf_t current_tf_;
     tf_t total_tf_;
     df_t df_;
+    // for skip list block
+    tf_t block_max_tf_ = 0;
+    float block_max_percentage_ = 0.0f;
 
-    PositionBitmapWriter *tf_bitmap_writer_{nullptr};
-    BufferedSkipListWriter *doc_skiplist_writer_{nullptr};
+    UniquePtr<SkipListWriter> doc_skiplist_writer_;
     MemoryPool *byte_slice_pool_{nullptr};
     friend class InMemDocListDecoderTest;
 };

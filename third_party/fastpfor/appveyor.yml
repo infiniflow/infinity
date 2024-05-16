@@ -1,0 +1,24 @@
+version: '{build}'
+branches:
+  only:
+  - master
+image:
+    - Visual Studio 2017
+clone_folder: c:\projects\fastpfor
+
+platform:
+- x64
+
+environment:
+  matrix:
+    - GENERATOR: "Visual Studio 15 2017 Win64" # x64 build
+    - GENERATOR: "Visual Studio 15 2017" # x86 build
+
+build_script:
+  - mkdir build
+  - cd build
+  - ps: cmake -G "$env:GENERATOR" ..
+  - cmake --build . --config Release
+
+test_script:
+  - ctest --verbose

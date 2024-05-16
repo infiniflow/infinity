@@ -14,21 +14,26 @@
 import os
 
 import pandas as pd
+import pytest
 from numpy import dtype
 
 from common import common_values
 import infinity
 import infinity.index as index
-
 from infinity.errors import ErrorCode
+from infinity.common import ConflictType
+from utils import copy_data
+from test_sdkbase import TestSdk
+
+test_csv_file = "embedding_int_dim3.csv"
 
 
-class TestCase:
-
+class TestCase(TestSdk):
     def test_version(self):
         print(infinity.__version__)
 
     def test_connection(self):
+
         """
         target: test connect and disconnect server ok
         method: connect server
@@ -49,14 +54,15 @@ class TestCase:
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         assert infinity_obj
 
-        try:
+        db_name = ""
+        with pytest.raises(Exception,
+                           match=f"DB name '{db_name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores"):
             db = infinity_obj.create_database("")
-        except Exception as e:
-            print(e)
-
         assert infinity_obj.disconnect()
 
-    def test_basic(self):
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_basic(self, check_data):
         """
         target: test basic operation
         method:
@@ -79,23 +85,29 @@ class TestCase:
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
 
+            res = infinity_obj.list_databases()
+            assert res.error_code == ErrorCode.OK
+            for db_name in res.db_names:
+                if db_name != "default_db":
+                    infinity_obj.drop_database(db_name, ConflictType.Error)
+
             # infinity
-            db_obj = infinity_obj.create_database("my_db")
+            db_obj = infinity_obj.create_database("my_db", ConflictType.Error)
             assert db_obj is not None
 
             res = infinity_obj.list_databases()
             assert res.error_code == ErrorCode.OK
 
             for db in res.db_names:
-                assert db in ['my_db', 'default']
+                assert db in ['my_db', "default_db"]
 
-            res = infinity_obj.drop_database("my_db")
+            res = infinity_obj.drop_database("my_db", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
-            db_obj = infinity_obj.get_database("default")
-            db_obj.drop_table("my_table1", if_exists=True)
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table("my_table1", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table1", {"c1": "int, primary key"}, None)
+                "my_table1", {"c1": {"type": "int", "constraints": ["primary key"]}}, ConflictType.Error)
             assert table_obj is not None
 
             res = db_obj.list_tables()
@@ -105,9 +117,9 @@ class TestCase:
             assert res.error_code == ErrorCode.OK
 
             # index
-            db_obj.drop_table("my_table2", if_exists=True)
+            db_obj.drop_table("my_table2", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table2", {"c1": "vector,1024,float"}, None)
+                "my_table2", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
             assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table2")
@@ -117,7 +129,7 @@ class TestCase:
                                          [index.IndexInfo("c1",
                                                           index.IndexType.IVFFlat,
                                                           [index.InitParameter("centroids_count", "128"),
-                                                           index.InitParameter("metric", "l2")])], None)
+                                                           index.InitParameter("metric", "l2")])], ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
             res = table_obj.drop_index("my_index")
@@ -127,9 +139,10 @@ class TestCase:
             assert res.error_code == ErrorCode.OK
 
             # insert
-            db_obj.drop_table("my_table3", if_exists=True)
+            db_obj.drop_table("my_table3", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table3", {"c1": "int, primary key", "c2": "float"}, None)
+                "my_table3", {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
+                ConflictType.Error)
             assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table3")
@@ -154,18 +167,19 @@ class TestCase:
             assert res.error_code == ErrorCode.OK
 
             # import
-            db_obj.drop_table("my_table4", if_exists=True)
+            db_obj.drop_table("my_table4", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
+                "my_table4", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
             assert table_obj is not None
             table_obj = db_obj.get_table("my_table4")
             assert table_obj
 
-            test_dir = "/tmp/infinity/test_data/"
-            test_csv_dir = test_dir + "embedding_int_dim3.csv"
-            assert os.path.exists(test_csv_dir)
+            if not check_data:
+                copy_data(test_csv_file)
 
-            res = table_obj.import_data(test_csv_dir, None)
+            assert os.path.exists(common_values.TEST_TMP_DIR + test_csv_file)
+
+            res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file)
             assert res.error_code == ErrorCode.OK
 
             # search

@@ -27,6 +27,8 @@ public:
     explicit RecoverableException(Status status) : status_(std::move(status)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return status_.message(); }
 
+    RecoverableException(const RecoverableException &other) : status_(other.status_.clone()) {}
+
     inline ErrorCode ErrorCode() const { return status_.code(); }
 
     inline std::string_view ErrorMessage() const { return status_.message(); }

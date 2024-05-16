@@ -16,7 +16,6 @@ module;
 
 #include <filesystem>
 #include <queue>
-
 export module external_sort_merger;
 
 import stl;
@@ -53,6 +52,7 @@ export struct TermTuple {
     u32 term_pos_;
     int Compare(const TermTuple &rhs) const {
         int ret = term_.compare(rhs.term_);
+
         if (ret == 0) {
             if (doc_id_ != rhs.doc_id_) {
                 if (doc_id_ < rhs.doc_id_)
@@ -74,11 +74,11 @@ export struct TermTuple {
 
     bool operator==(const TermTuple &other) const { return Compare(other) == 0; }
 
-    bool operator>(const TermTuple &other) const { return Compare(other) < 0; }
+    bool operator>(const TermTuple &other) const { return Compare(other) > 0; }
 
-    bool operator<(const TermTuple &other) const { return Compare(other) > 0; }
+    bool operator<(const TermTuple &other) const { return Compare(other) < 0; }
 
-    TermTuple(char *p, u16 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
+    TermTuple(char *p, u32 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
         doc_id_ = *((u32 *)(p + term_.size() + 1));
         term_pos_ = *((u32 *)(p + term_.size() + 1 + sizeof(doc_id_)));
     }
@@ -160,23 +160,6 @@ struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyTy
             return 1;
         else
             return -1;
-
-        LenType len1 = LEN() / sizeof(KeyType);
-        LenType len2 = p.LEN() / sizeof(KeyType);
-
-        for (LenType i = 1; i < len1 && i < len2; ++i) {
-            if (((KeyType *)(data + sizeof(LenType)))[i] > ((KeyType *)(p.data + sizeof(LenType)))[i])
-                return 1;
-            if (((KeyType *)(data + sizeof(LenType)))[i] < ((KeyType *)(p.data + sizeof(LenType)))[i])
-                return -1;
-        }
-
-        if (len1 == len2)
-            return 0;
-
-        if (len1 > len2)
-            return 1;
-        return -1;
     }
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
@@ -185,6 +168,44 @@ struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyTy
 
     bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
 };
+
+template <typename LenType>
+struct KeyAddress<TermTuple, LenType> {
+    char *data{nullptr};
+    u64 addr;
+    u32 idx;
+
+    KeyAddress(char *p, u64 ad, u32 i) {
+        data = p;
+        addr = ad;
+        idx = i;
+    }
+
+    KeyAddress() {
+        data = nullptr;
+        addr = -1;
+        idx = -1;
+    }
+
+    TermTuple KEY() { return TermTuple(data + sizeof(LenType), LEN()); }
+    TermTuple KEY() const { return TermTuple(data + sizeof(LenType), LEN()); }
+    LenType LEN() const { return *(LenType *)data; }
+    u64 &ADDR() { return addr; }
+    u64 ADDR() const { return addr; }
+    u32 IDX() const { return idx; }
+    u32 &IDX() { return idx; }
+
+    int Compare(const KeyAddress &p) const {
+        return KEY().Compare(p.KEY());
+    }
+
+    bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
+
+    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+
+    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+};
+
 
 export template <typename KeyType, typename LenType>
 class SortMerger {

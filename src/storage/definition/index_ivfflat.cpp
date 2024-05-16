@@ -14,6 +14,7 @@
 
 module;
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -73,13 +74,19 @@ void IndexIVFFlat::WriteAdv(char *&ptr) const {
 }
 
 SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&, int32_t) {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 
 String IndexIVFFlat::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << centroids_count_ << ", " << MetricTypeToString(metric_type_);
+    return ss.str();
+}
+
+String IndexIVFFlat::BuildOtherParamsString() const {
+    std::stringstream ss;
+    ss << "metric = " << MetricTypeToString(metric_type_) << ", centroids_count = " << centroids_count_;
     return ss.str();
 }
 
@@ -91,7 +98,7 @@ nlohmann::json IndexIVFFlat::Serialize() const {
 }
 
 SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const nlohmann::json &) {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 
@@ -103,7 +110,7 @@ void IndexIVFFlat::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_ta
         RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
         RecoverableError(Status::InvalidIndexDefinition(
-            fmt::format("Invalid parameter for IVFFlat index: column name: {}, data type not supported: {}.", column_name, data_type->ToString())));
+            fmt::format("Attempt to create IVFFLAT index on column: {}, data type: {}.", column_name, data_type->ToString())));
     }
 }
 

@@ -403,7 +403,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
+//    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -448,6 +448,8 @@ export struct SinkState {
     [[nodiscard]] inline SinkStateType state_type() const { return state_type_; }
 
     inline bool Error() const { return !status_.ok(); }
+
+    bool Ignore() const { return status_.code() == ErrorCode::kIgnore; }
 
     u64 fragment_id_{};
     u64 task_id_{};

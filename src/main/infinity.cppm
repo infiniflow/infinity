@@ -21,11 +21,17 @@ import resource_manager;
 import task_scheduler;
 import storage;
 import status;
-import database;
 import query_result;
 import query_options;
 import infinity_context;
 import session;
+import parsed_expr;
+import search_expr;
+import column_def;
+import create_index_info;
+import update_statement;
+import explain_statement;
+import command_statement;
 
 namespace infinity {
 
@@ -35,15 +41,17 @@ public:
 
     ~Infinity() = default;
 
-    static SharedPtr<Infinity> RemoteConnect();
-
     u64 GetSessionId();
-
-    void RemoteDisconnect();
 
     static void LocalInit(const String &path);
 
     static void LocalUnInit();
+
+    // Infinity API
+public:
+    static SharedPtr<Infinity> RemoteConnect();
+
+    void RemoteDisconnect();
 
     static SharedPtr<Infinity> LocalConnect();
 
@@ -55,14 +63,93 @@ public:
 
     QueryResult ListDatabases();
 
-    Tuple<UniquePtr<Database>, Status> GetDatabase(const String &db_name);
+    QueryResult GetDatabase(const String &db_name);
+
+    QueryResult ShowDatabase(const String &db_name);
 
     QueryResult Flush();
 
-    QueryResult ShowVariable(const String& variable_name);
+    QueryResult SetVariableOrConfig(const String &name, bool value, SetScope scope);
+
+    QueryResult SetVariableOrConfig(const String &name, i64 value, SetScope scope);
+
+    QueryResult SetVariableOrConfig(const String &name, double value, SetScope scope);
+
+    QueryResult SetVariableOrConfig(const String &name, String value, SetScope scope);
+
+    QueryResult ShowVariable(const String &variable_name, SetScope scope);
+
+    QueryResult ShowVariables(SetScope scope);
+
+    QueryResult ShowConfig(const String &config_name);
+
+    QueryResult ShowConfigs();
 
     // For embedded sqllogictest
-    QueryResult Query(const String& query_text);
+    QueryResult Query(const String &query_text);
+
+    // Database related functions
+    QueryResult CreateTable(const String &db_name,
+                            const String &table_name,
+                            Vector<ColumnDef *> column_defs,
+                            Vector<TableConstraint *> constraints,
+                            const CreateTableOptions &create_table_options);
+
+    QueryResult DropTable(const String &db_name, const String &table_name, const DropTableOptions &drop_table_options);
+
+    QueryResult ListTables(const String &db_name);
+
+    QueryResult ShowTable(const String &db_name, const String &table_name);
+
+    QueryResult ShowColumns(const String &db_name, const String &table_name);
+
+    QueryResult ListTableIndexes(const String &db_name, const String &table_name);
+
+    QueryResult ShowTables(const String &db_name);
+
+    QueryResult GetTable(const String &db_name, const String &table_name);
+
+    // Table related functions
+    QueryResult CreateIndex(const String &db_name,
+                            const String &table_name,
+                            const String &index_name,
+                            Vector<IndexInfo *> *index_info_list,
+                            const CreateIndexOptions &create_index_options);
+
+    QueryResult DropIndex(const String &db_name, const String &table_name, const String &index_name, const DropIndexOptions &drop_index_option);
+
+    QueryResult ShowIndex(const String &db_name, const String &table_name, const String &index_name);
+
+    QueryResult ShowSegment(const String &db_name, const String &table_name, const SegmentID &segment_id);
+
+    QueryResult ShowSegments(const String &db_name, const String &table_name);
+
+    QueryResult ShowBlock(const String &db_name, const String &table_name, const SegmentID &segment_id, const BlockID &block_id);
+
+    QueryResult ShowBlocks(const String &db_name, const String &table_name, const SegmentID &segment_id);
+
+    QueryResult
+    ShowBlockColumn(const String &db_name, const String &table_name, const SegmentID &segment_id, const BlockID &block_id, const SizeT &column_id);
+
+    QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
+
+    QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
+
+    QueryResult Delete(const String &db_name, const String &table_name, ParsedExpr *filter);
+
+    QueryResult Update(const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list);
+
+    QueryResult Explain(const String &db_name,
+                        const String &table_name,
+                        ExplainType explain_type,
+                        SearchExpr *search_expr,
+                        ParsedExpr *filter,
+                        Vector<ParsedExpr *> *output_columns);
+
+    QueryResult
+    Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
+
+    QueryResult Optimize(const String &db_name, const String &table_name);
 
 private:
     SharedPtr<BaseSession> session_{};

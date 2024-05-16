@@ -43,7 +43,7 @@ TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
         EXPECT_NE(bitmask_buffer.data_ptr_, nullptr);
 
         BitmaskBuffer bitmask_buffer1;
-        EXPECT_EQ(bitmask_buffer1.count_, 0);
+        EXPECT_EQ(bitmask_buffer1.count_, 0u);
         EXPECT_EQ(bitmask_buffer1.data_ptr_, nullptr);
         bitmask_buffer1.Initialize(bitmask_buffer.data_ptr_.get(), bit_count);
         EXPECT_EQ(bitmask_buffer1.count_, bit_count);

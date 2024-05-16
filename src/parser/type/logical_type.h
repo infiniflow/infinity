@@ -93,10 +93,16 @@ enum LogicalType : int8_t {
     // only used in heterogeneous type
     kMissing,
 
+    // tensor type * 1
+    // now only support 2D tensor
+    // dynamic dim * fixed dim (column property) * data type
+    kTensor,
+
     kInvalid,
 };
 
 extern const char *LogicalType2Str(LogicalType logical_type);
+extern LogicalType Str2LogicalType(const std::string &string);
 
 extern int64_t LogicalTypeWidth(LogicalType logical_type);
 

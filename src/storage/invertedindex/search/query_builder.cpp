@@ -14,41 +14,83 @@
 
 module;
 
-#include "query_tree_builder.h"
-
+#include <iostream>
+#include <vector>
 module query_builder;
 
 import stl;
 import memory_pool;
 import doc_iterator;
-import term_queries;
 import column_index_reader;
-import query_visitor;
-import indexer;
 import match_data;
-import index_config;
+import table_entry;
+import segment_index_entry;
+import internal_types;
+import index_base;
+import infinity_exception;
+import query_node;
+import base_table_ref;
+import segment_entry;
+import blockmax_term_doc_iterator;
+import logger;
+import third_party;
 
 namespace infinity {
 
-QueryBuilder::QueryBuilder(Indexer *indexer) : indexer_(indexer) {
-    const Vector<u64> &column_ids = indexer_->GetColumnIDs();
-    for (u32 i = 0; i < column_ids.size(); ++i) {
-        UniquePtr<ColumnIndexReader> column_index_reader = MakeUnique<ColumnIndexReader>(column_ids[i], indexer_);
-        column_index_reader->Open(indexer_->GetIndexConfig());
-        index_reader_.column_index_readers_[column_ids[i]] = std::move(column_index_reader);
+QueryBuilder::QueryBuilder(Txn *txn, SharedPtr<BaseTableRef> &base_table_ref)
+    : table_entry_(base_table_ref->table_entry_ptr_), index_reader_(table_entry_->GetFullTextIndexReader(txn)) {
+    u64 total_row_count = 0;
+    for (SegmentEntry *segment_entry : base_table_ref->block_index_->segments_) {
+        total_row_count += segment_entry->row_count();
     }
-    index_reader_.session_pool_ = MakeShared<MemoryPool>();
-    // TODO get num of docs
-    scorer_ = MakeUnique<Scorer>(0);
+
+    scorer_.Init(total_row_count, &index_reader_);
 }
 
 QueryBuilder::~QueryBuilder() {}
 
-UniquePtr<DocIterator> QueryBuilder::CreateSearch(QueryContext &context) {
-    QueryVisitor visitor;
-    context.query_tree_->Accept(visitor);
-    UniquePtr<TermQuery> root = visitor.Build();
-    root = TermQuery::Optimize(std::move(root));
-    return root->CreateSearch(index_reader_, scorer_.get());
+UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
+    // Optimize the query tree.
+    if (!context.optimized_query_tree_) {
+        context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    }
+    // Create the iterator from the query tree.
+    UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "DocIterator:\n";
+        if (result) {
+            result->PrintTree(oss);
+        } else {
+            oss << "Empty tree!\n";
+        }
+        LOG_TRACE(std::move(oss).str());
+    }
+#endif
+    return result;
 }
+
+UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullTextQueryContext &context) {
+    // Optimize the query tree.
+    if (!context.optimized_query_tree_) {
+        context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    }
+    // Create the iterator from the query tree.
+    UniquePtr<EarlyTerminateIterator> result = context.optimized_query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_);
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "EarlyTerminateIterator:\n";
+        if (result) {
+            result->PrintTree(oss);
+        } else {
+            oss << "Empty tree!\n";
+        }
+        LOG_TRACE(std::move(oss).str());
+    }
+#endif
+    return result;
+}
+
 } // namespace infinity

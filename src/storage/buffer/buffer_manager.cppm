@@ -16,7 +16,7 @@ module;
 
 import stl;
 import file_worker;
-import specific_concurrent_queue;
+// import specific_concurrent_queue;
 
 export module buffer_manager;
 
@@ -26,18 +26,18 @@ class BufferObj;
 
 export class BufferManager {
 public:
-    explicit BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir);
+    explicit BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir);
+
+    ~BufferManager();
 
 public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
-    BufferObj *Allocate(UniquePtr<FileWorker> file_worker);
+    BufferObj *AllocateBufferObject(UniquePtr<FileWorker> file_worker);
 
     // Get an existing BufferHandle from memory or disk.
-    BufferObj *Get(UniquePtr<FileWorker> file_worker);
+    BufferObj *GetBufferObject(UniquePtr<FileWorker> file_worker);
 
-    bool Cleanup(const String &file_path);
-
-    SharedPtr<String> BaseDir() const { return base_dir_; }
+    SharedPtr<String> GetDataDir() const { return data_dir_; }
 
     SharedPtr<String> GetTempDir() const { return temp_dir_; }
 
@@ -46,27 +46,60 @@ public:
         return memory_limit_;
     }
 
-    u64 memory_usage() const {
-        return current_memory_size_.load();
+    u64 memory_usage() { return current_memory_size_; }
+
+    SizeT WaitingGCObjectCount() {
+        std::unique_lock lock(gc_locker_);
+        return gc_map_.size();
     }
+
+    SizeT BufferedObjectCount();
+
+    void RemoveClean();
 
 private:
     friend class BufferObj;
 
     // BufferHandle calls it, before allocate memory. It will start GC if necessary.
-    void RequestSpace(SizeT need_size, BufferObj *buffer_obj);
+    void RequestSpace(SizeT need_size);
 
     // BufferHandle calls it, after unload.
-    void PushGCQueue(BufferObj *buffer_handle);
+    void PushGCQueue(BufferObj *buffer_obj);
+
+    bool RemoveFromGCQueue(BufferObj *buffer_obj);
+
+    void AddToCleanList(BufferObj *buffer_obj, bool do_free);
+
+    void AddTemp(BufferObj *buffer_obj);
+
+    void RemoveTemp(BufferObj *buffer_obj);
+
+    void MoveTemp(BufferObj *buffer_obj);
 
 private:
-    std::shared_mutex rw_locker_{};
+    bool RemoveFromGCQueueInner(BufferObj *buffer_obj);
 
-    SharedPtr<String> base_dir_;
+private:
+    SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
-    atomic_u64 current_memory_size_{}; // TODO: need to be atomic
+
+    Atomic<u64> current_memory_size_{};
+
+    std::mutex w_locker_{};
     HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
-    SpecificConcurrentQueue<BufferObj *> gc_queue_{};
+
+    std::mutex gc_locker_{};
+    using GCListIter = List<BufferObj *>::iterator;
+    HashMap<BufferObj *, GCListIter> gc_map_{};
+    List<BufferObj *> gc_list_{};
+
+    std::mutex clean_locker_{};
+    Vector<BufferObj *> clean_list_{};
+
+    std::mutex temp_locker_{};
+    HashSet<BufferObj *> temp_set_;
+    HashSet<BufferObj *> clean_temp_set_;
 };
+
 } // namespace infinity

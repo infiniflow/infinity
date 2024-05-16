@@ -37,17 +37,21 @@ import base_entry;
 class CatalogTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
         BaseTest::TearDown();
     }
 };
@@ -61,12 +65,11 @@ TEST_F(CatalogTest, simple_test1) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->CreateTxn();
-    txn1->Begin();
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
     // start txn2
-    auto *txn2 = txn_mgr->CreateTxn();
-    txn2->Begin();
+    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+
     HashMap<String, BaseEntry *> databases;
 
     // create db in empty catalog should be success
@@ -93,7 +96,7 @@ TEST_F(CatalogTest, simple_test1) {
     {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(base_entry, databases["db1"]);
+        EXPECT_EQ(base_entry.get(), databases["db1"]);
         // remove this entry
         databases.erase("db1");
 
@@ -120,12 +123,10 @@ TEST_F(CatalogTest, simple_test2) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->CreateTxn();
-    txn1->Begin();
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
     // start txn2
-    auto *txn2 = txn_mgr->CreateTxn();
-    txn2->Begin();
+    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
 
     // create db in empty catalog should be success
     {
@@ -146,8 +147,7 @@ TEST_F(CatalogTest, simple_test2) {
 
     txn_mgr->CommitTxn(txn2);
 
-    auto *txn3 = txn_mgr->CreateTxn();
-    txn3->Begin();
+    auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
 
     // should be visible to txn3
     {
@@ -174,10 +174,8 @@ TEST_F(CatalogTest, concurrent_test) {
 
     for (int loop = 0; loop < 1; ++loop) {
         // start txn1 && txn2
-        auto *txn1 = txn_mgr->CreateTxn();
-        txn1->Begin();
-        auto *txn2 = txn_mgr->CreateTxn();
-        txn2->Begin();
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+        auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
 
         auto write_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
@@ -197,10 +195,8 @@ TEST_F(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn2);
 
         // start txn3 && txn4
-        auto *txn3 = txn_mgr->CreateTxn();
-        txn3->Begin();
-        auto *txn4 = txn_mgr->CreateTxn();
-        txn4->Begin();
+        auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+        auto *txn4 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
 
         auto read_routine = [&](Txn *txn) {
             for (int db_id = 0; db_id < 1000; ++db_id) {
@@ -221,10 +217,8 @@ TEST_F(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn4);
 
         // start txn5 && txn6
-        auto *txn5 = txn_mgr->CreateTxn();
-        txn5->Begin();
-        auto *txn6 = txn_mgr->CreateTxn();
-        txn6->Begin();
+        auto *txn5 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
+        auto *txn6 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
 
         auto drop_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
@@ -243,8 +237,7 @@ TEST_F(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn6);
 
         // start txn7
-        auto *txn7 = txn_mgr->CreateTxn();
-        txn7->Begin();
+        auto *txn7 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
 
         // check all has been dropped
         for (int db_id = 0; db_id < 1000; ++db_id) {
@@ -252,5 +245,6 @@ TEST_F(CatalogTest, concurrent_test) {
             auto [db_entry, status] = catalog->Catalog::GetDatabase(db_name, txn7->TxnID(), txn7->BeginTS());
             EXPECT_TRUE(!status.ok());
         }
+        txn_mgr->CommitTxn(txn7);
     }
 }

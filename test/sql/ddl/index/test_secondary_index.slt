@@ -5,13 +5,13 @@ statement ok
 CREATE TABLE test_secondary_index (c1 integer, c2 boolean);
 
 statement ok
-COPY test_secondary_index FROM '/tmp/infinity/test_data/test_big_top.csv' WITH ( DELIMITER ',' );
+COPY test_secondary_index FROM '/var/infinity/test_data/test_big_top.csv' WITH ( DELIMITER ',' );
 
 statement ok
 CREATE INDEX idx_c1 ON test_secondary_index (c1);
 
 statement ok
-DESCRIBE INDEX test_secondary_index;
+SHOW TABLE test_secondary_index INDEX idx_c1;
 
 # need regex match
 #query I
@@ -22,10 +22,9 @@ DESCRIBE INDEX test_secondary_index;
 statement ok
 DROP INDEX idx_c1 ON test_secondary_index;
 
-#empty now
-query II
-DESCRIBE INDEX test_secondary_index;
-----
+#no such index
+statement error
+SHOW TABLE test_secondary_index INDEX idx_c1;
 
 statement ok
 DROP TABLE test_secondary_index;

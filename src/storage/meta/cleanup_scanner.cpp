@@ -21,23 +21,43 @@ module cleanup_scanner;
 import stl;
 import catalog;
 import base_entry;
+import local_file_system;
+import infinity_exception;
+import status;
+import logger;
+import third_party;
 
 namespace infinity {
 
-CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
-
-void CleanupScanner::AddMeta(UniquePtr<MetaInterface> meta) { metas_.emplace_back(std::move(meta)); }
+CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, BufferManager *buffer_mgr)
+    : catalog_(catalog), visible_ts_(visible_ts), buffer_mgr_(buffer_mgr) {}
 
 void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
 
-void CleanupScanner::Scan() { catalog_->PickCleanup(this); }
+void CleanupScanner::Scan() {
+    LOG_TRACE(fmt::format("CleanupScanner: Start scanning, ts: {}", visible_ts_));
+    catalog_->PickCleanup(this);
+}
 
 void CleanupScanner::Cleanup() && {
     for (auto &entry : entries_) {
         std::move(*entry).Cleanup();
     }
-    for (auto &meta : metas_) {
-        std::move(*meta).Cleanup();
+    buffer_mgr_->RemoveClean();
+}
+
+void CleanupScanner::CleanupDir(const String &dir) {
+    LocalFileSystem fs;
+    try {
+        fs.DeleteDirectory(dir);
+    } catch (const RecoverableException &e) {
+        if (e.ErrorCode() == ErrorCode::kDirNotFound) {
+            // this happen when delta checkpoint records "drop table/db/...", and cleanup is called.
+            // then restart the system, table entry will be created but no directory will be found
+            LOG_INFO(fmt::format("Cleanup: Dir {} not found. Skip", dir));
+        } else {
+            throw;
+        }
     }
 }
 

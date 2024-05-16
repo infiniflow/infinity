@@ -26,11 +26,10 @@ struct TimeType {
 
     TimeType() = default;
 
-    explicit TimeType(int32_t time_value) : value(time_value){};
+    explicit constexpr TimeType(int32_t time_value) : value(time_value){};
 
     inline int32_t GetValue() const { return value; }
 
-    // keep compatible with iresearch
     operator int32_t() const { return value; }
 
     inline void FromString(const std::string_view &time_str) { FromString(time_str.data(), time_str.size()); }
@@ -69,7 +68,6 @@ private:
     static bool IsTimeValid(int32_t hour, int32_t minute, int32_t second);
 
 public:
-    // used in iresearch, need to be public
     // value means the number of seconds since midnight in the range 0 to 86399
     int32_t value{};
 };

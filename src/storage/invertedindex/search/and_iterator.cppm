@@ -19,6 +19,7 @@ export module and_iterator;
 import stl;
 import index_defines;
 import multi_query_iterator;
+import internal_types;
 
 namespace infinity {
 
@@ -26,15 +27,14 @@ export class AndIterator : public MultiQueryDocIterator {
 public:
     AndIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    virtual ~AndIterator();
-
     bool IsAnd() const override { return true; }
 
-    void DoSeek(docid_t doc_id) override;
+    void DoSeek(RowID doc_id) override;
 
-    u32 GetDF() const override;
+    u32 GetDF() const override { return and_iterator_df_; }
 
 private:
     Vector<DocIterator *> sorted_iterators_;
+    u32 and_iterator_df_{};
 };
 } // namespace infinity

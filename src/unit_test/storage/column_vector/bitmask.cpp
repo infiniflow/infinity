@@ -91,7 +91,7 @@ TEST_F(BitmaskTest, bitmask_a) {
     }
 
     EXPECT_EQ(bitmask1.CountFalse(), bit_count);
-    EXPECT_EQ(bitmask1.CountTrue(), 0);
+    EXPECT_EQ(bitmask1.CountTrue(), 0u);
 
     // test SetAllTrue
     bitmask1.SetAllTrue();
@@ -102,7 +102,7 @@ TEST_F(BitmaskTest, bitmask_a) {
 
     // test CountTrue() and CountFalse()
     EXPECT_EQ(bitmask1.CountTrue(), bit_count);
-    EXPECT_EQ(bitmask1.CountFalse(), 0);
+    EXPECT_EQ(bitmask1.CountFalse(), 0u);
 
     for (size_t i = 0; i < bit_count; ++i) {
         bitmask1.Set(i, i % 2 == 0);
@@ -158,7 +158,7 @@ TEST_F(BitmaskTest, bitmask_a) {
         }
     }
     bitmask2.Merge(bitmask3);
-    EXPECT_EQ(bitmask2.CountTrue(), 0);
+    EXPECT_EQ(bitmask2.CountTrue(), 0u);
 }
 
 TEST_F(BitmaskTest, bitmask_b) {

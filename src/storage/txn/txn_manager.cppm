@@ -24,26 +24,32 @@ import wal_entry;
 
 namespace infinity {
 
-using PutWalEntryFn = std::function<void(SharedPtr<WalEntry>)>;
-
 class BGTaskProcessor;
 struct Catalog;
+class WalManager;
+class CatalogDeltaEntry;
+
 export class TxnManager {
 public:
     explicit TxnManager(Catalog *catalog,
                         BufferManager *buffer_mgr,
                         BGTaskProcessor *task_processor,
-                        PutWalEntryFn put_wal_entry_fn,
+                        WalManager *wal_mgr,
                         TransactionID start_txn_id,
-                        TxnTimeStamp start_ts);
+                        TxnTimeStamp start_ts,
+                        bool enable_compaction);
 
     ~TxnManager() { Stop(); }
 
-    Txn *CreateTxn();
+    Txn *BeginTxn(UniquePtr<String> txn_text);
 
     Txn *GetTxn(TransactionID txn_id);
 
+    SharedPtr<Txn> GetTxnPtr(TransactionID txn_id);
+
     TxnState GetTxnState(TransactionID txn_id);
+
+    bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     inline void Lock() { rw_locker_.lock(); }
 
@@ -51,13 +57,21 @@ public:
 
     BufferManager *GetBufferMgr() const { return buffer_mgr_; }
 
+    Catalog *GetCatalog() const { return catalog_; }
+
     BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
 
-    TxnTimeStamp GetTimestamp(bool prepare_wal = false);
+    TxnTimeStamp GetCommitTimeStampR(Txn *txn);
+
+    TxnTimeStamp GetCommitTimeStampW(Txn *txn);
+
+    bool CheckConflict(Txn *txn);
 
     void Invalidate(TxnTimeStamp commit_ts);
 
-    void PutWalEntry(SharedPtr<WalEntry> entry);
+    void SendToWAL(Txn *txn);
+
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     void Start();
 
@@ -69,10 +83,28 @@ public:
 
     void RollBackTxn(Txn *txn);
 
-    TxnTimeStamp GetMinUncommitTs();
+    SizeT ActiveTxnCount();
+
+    TxnTimeStamp CurrentTS() const;
+
+    TxnTimeStamp GetCleanupScanTS();
+
+    void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
+
+    u64 total_committed_txn_count() const { return total_committed_txn_count_; }
+
+    void IncreaseRollbackedTxnCount() { ++total_rollbacked_txn_count_; }
+
+    u64 total_rollbacked_txn_count() const { return total_rollbacked_txn_count_; }
 
 private:
-    TransactionID GetNewTxnID();
+    void FinishTxn(Txn *txn);
+
+public:
+
+    bool enable_compaction() const { return enable_compaction_; }
+
+    u64 NextSequence() { return ++sequence_; }
 
 private:
     Catalog *catalog_{};
@@ -80,18 +112,23 @@ private:
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
-    // PutWalEntry function
-    PutWalEntryFn put_wal_entry_{};
+    WalManager *wal_mgr_;
 
-    TransactionID start_txn_id_{};
-    // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
-    std::mutex mutex_;
-    TxnTimeStamp start_ts_{};        // The next txn ts
-    Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
+    Deque<WeakPtr<Txn>> beginned_txns_;                // sorted by begin ts
+    HashSet<Txn *> finishing_txns_;                    // the txns for conflict check
+    Deque<Pair<TxnTimeStamp, Txn *>> finished_txns_;   // sorted by finished ts
+    Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
-    Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
+    Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
+
     // For stop the txn manager
     atomic_bool is_running_{false};
+    bool enable_compaction_{};
+
+    u64 sequence_{};
+
+    Atomic<u64> total_committed_txn_count_{0};
+    Atomic<u64> total_rollbacked_txn_count_{0};
 };
 
 } // namespace infinity

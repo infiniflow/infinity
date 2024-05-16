@@ -290,16 +290,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
                 ColumnExpr *col_expr = (ColumnExpr *)(*expr.arguments_)[0];
                 if (col_expr->star_) {
-                    delete (*expr.arguments_)[0];
-                    auto constant_exp = new ConstantExpr(LiteralType::kInteger);
-                    // catulate row count
                     String &table_name = bind_context_ptr->table_names_[0];
                     TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-                    constant_exp->integer_value_ = table_entry->row_count();
-                    (*expr.arguments_)[0] = constant_exp;
-                    auto &expr_rewrite = (FunctionExpr &)expr;
-                    expr_rewrite.func_name_ = "COUNT_STAR";
-                    return ExpressionBinder::BuildFuncExpr(expr_rewrite, bind_context_ptr, depth, true);
+                    col_expr->names_.clear();
+                    col_expr->names_.emplace_back(table_entry->GetColumnDefByID(0)->name_);
                 }
             }
         }
@@ -453,6 +447,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     // Bind query column
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
         UnrecoverableError("Knn expression expect a column expression");
+    }
+    if (parsed_knn_expr.topn_ <= 0) {
+        String topn = std::to_string(parsed_knn_expr.topn_);
+        RecoverableError(Status::InvalidParameterValue("topn", topn, "topn should be greater than 0"));
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     TypeInfo *type_info = expr_ptr->Type().type_info().get();

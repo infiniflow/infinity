@@ -2,6 +2,9 @@ statement ok
 DROP TABLE IF EXISTS simple_agg;
 
 statement ok
+DROP TABLE IF EXISTS simple_agg_with_modify;
+
+statement ok
 CREATE TABLE simple_agg (c1 INTEGER , c2 FLOAT);
 
 # insert data
@@ -68,11 +71,6 @@ query III
 SELECT MAX(c1)+SUM(c2) FROM simple_agg;
 ----
 9.000000
-
-query III
-SELECT MAX(c1)*SUM(c2) FROM simple_agg;
-----
-18.000000
 
 query III
 SELECT MAX(c1)*SUM(c2) FROM simple_agg;
@@ -183,11 +181,6 @@ SELECT MAX(c1)*SUM(c2) FROM simple_agg;
 18
 
 query III
-SELECT MAX(c1)*SUM(c2) FROM simple_agg;
-----
-18
-
-query III
 SELECT MAX(c1)-SUM(c2) FROM simple_agg;
 ----
 -3
@@ -213,6 +206,213 @@ SELECT COUNT(*) FROM simple_agg;
 ----
 3
 
+
 statement ok
 DROP TABLE simple_agg;
 
+
+statement ok
+CREATE TABLE simple_agg_with_modify (c1 BIGINT , c2 FLOAT);
+
+# insert data
+query I
+INSERT INTO simple_agg_with_modify VALUES (1,1.0),(2,2.0),(3,3.0), (4,4.0);
+----
+
+query I
+SELECT SUM(c1) FROM simple_agg_with_modify
+----
+10
+
+query II
+SELECT SUM(c2) FROM simple_agg_with_modify
+----
+10.000000
+
+query I
+SELECT AVG(c1) FROM simple_agg_with_modify
+----
+2.500000
+
+query II
+SELECT AVG(c2) FROM simple_agg_with_modify
+----
+2.500000
+
+query I
+SELECT MIN(c1) FROM simple_agg_with_modify
+----
+1
+
+query II
+SELECT MIN(c2) FROM simple_agg_with_modify
+----
+1.000000
+
+query I
+SELECT MAX(c1) FROM simple_agg_with_modify
+----
+4
+
+query II
+SELECT MAX(c2) FROM simple_agg_with_modify
+----
+4.000000
+
+query I
+SELECT COUNT(c1) FROM simple_agg_with_modify
+----
+4
+
+query III
+SELECT SUM(c1)+SUM(c1) FROM simple_agg_with_modify;
+----
+20
+
+query III
+SELECT MAX(c1)+SUM(c1) FROM simple_agg_with_modify;
+----
+14
+
+query III
+SELECT MAX(c1)+SUM(c2) FROM simple_agg_with_modify;
+----
+14.000000
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg_with_modify;
+----
+40.000000
+
+query III
+SELECT MAX(c1)-SUM(c2) FROM simple_agg_with_modify;
+----
+-6.000000
+
+query III
+SELECT MAX(c1)/SUM(c2) FROM simple_agg_with_modify;
+----
+0.400000
+
+query III
+SELECT MAX(c1)/AVG(c2) FROM simple_agg_with_modify;
+----
+1.600000
+
+query III
+SELECT MAX(c1)*AVG(c2) FROM simple_agg_with_modify;
+----
+10.000000
+
+query IIII
+SELECT COUNT(*) FROM simple_agg_with_modify;
+----
+4
+
+# insert data
+query I
+INSERT INTO simple_agg_with_modify VALUES (10,8.0),(-2,1.0),(6,9.0), (15,7.0);
+----
+
+query I
+SELECT SUM(c1) FROM simple_agg_with_modify
+----
+39
+
+query II
+SELECT SUM(c2) FROM simple_agg_with_modify
+----
+35.000000
+
+query I
+SELECT AVG(c1) FROM simple_agg_with_modify
+----
+4.875000
+
+query II
+SELECT AVG(c2) FROM simple_agg_with_modify
+----
+4.375000
+
+query I
+SELECT MIN(c1) FROM simple_agg_with_modify
+----
+-2
+
+query II
+SELECT MIN(c2) FROM simple_agg_with_modify
+----
+1.000000
+
+query I
+SELECT MAX(c1) FROM simple_agg_with_modify
+----
+15
+
+query II
+SELECT MAX(c2) FROM simple_agg_with_modify
+----
+9.000000
+
+query I
+SELECT COUNT(c1) FROM simple_agg_with_modify
+----
+8
+
+query III
+SELECT SUM(c1)+SUM(c1) FROM simple_agg_with_modify;
+----
+78
+
+query III
+SELECT MAX(c1)+SUM(c1) FROM simple_agg_with_modify;
+----
+54
+
+query III
+SELECT MAX(c1)+SUM(c2) FROM simple_agg_with_modify;
+----
+50.000000
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg_with_modify;
+----
+525.000000
+
+query III
+SELECT MAX(c1)-SUM(c2) FROM simple_agg_with_modify;
+----
+-20.000000
+
+query III
+SELECT MAX(c1)/SUM(c2) FROM simple_agg_with_modify;
+----
+0.428571
+
+query III
+SELECT MAX(c1)/AVG(c2) FROM simple_agg_with_modify;
+----
+3.428571
+
+query III
+SELECT MAX(c1)*AVG(c2) FROM simple_agg_with_modify;
+----
+65.625000
+
+query IIII
+SELECT COUNT(*) FROM simple_agg_with_modify;
+----
+8
+
+# delete data
+statement ok
+DELETE FROM simple_agg_with_modify WHERE c1 = 15;
+
+query IIII
+SELECT COUNT(*) FROM simple_agg_with_modify;
+----
+7
+
+
+statement ok
+DROP TABLE simple_agg_with_modify;

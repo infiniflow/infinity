@@ -139,14 +139,17 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
     task_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
 
-    for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
-        column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
-    }
     if (explain_type_ == ExplainType::kPipeline) {
         AlignParagraphs(*this->texts_, *this->task_texts_);
-
+        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+            column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
+        }
         for (SizeT idx = 0; idx < this->task_texts_->size(); ++idx) {
             task_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->task_texts_)[idx]));
+        }
+    } else {
+        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+            column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
         }
     }
 

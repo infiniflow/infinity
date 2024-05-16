@@ -36,6 +36,7 @@ public:
 
 protected:
     inline void Parse(const String &input) { jieba_->CutForSearch(input, cut_words_, true); }
+    bool IsJiebaSpecialize() override { return true; }
     int AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) override;
 
 private:

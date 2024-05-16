@@ -13,96 +13,148 @@
 # limitations under the License.
 
 from thrift.protocol import TBinaryProtocol
+from thrift.protocol import TCompactProtocol
 from thrift.transport import TSocket
+from thrift.transport.TTransport import TTransportException
 
 from infinity import URI
-from infinity.infinity import ShowVariable
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.errors import ErrorCode
 
 
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
-        match uri.port:
-            case 9070:
-                self.transport = TTransport.TFramedTransport(
-                    TSocket.TSocket(uri.ip, uri.port))  # async
-            case _:
-                self.transport = TTransport.TBufferedTransport(
-                    TSocket.TSocket(uri.ip, uri.port))  # sync
+        self.uri = uri
+        self.transport = None
+        self.reconnect()
+
+    def reconnect(self):
+        if self.transport is not None:
+            self.transport.close()
+            self.transport = None
+        # self.transport = TTransport.TFramedTransport(TSocket.TSocket(self.uri.ip, self.uri.port))  # async
+        self.transport = TTransport.TBufferedTransport(
+            TSocket.TSocket(self.uri.ip, self.uri.port))  # sync
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
+        # self.protocol = TCompactProtocol.TCompactProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()
         res = self.client.Connect()
         self.session_id = res.session_id
 
-    def create_database(self, db_name: str):
+    def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
                                                                 db_name=db_name,
-                                                                option=None))
+                                                                create_option=CreateOption(
+                                                                    conflict_type=conflict_type)))
 
-    def drop_database(self, db_name: str):
+    def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropDatabase(DropDatabaseRequest(session_id=self.session_id,
-                                                            db_name=db_name))
+                                                            db_name=db_name,
+                                                            drop_option=DropOption(conflict_type=conflict_type)))
 
     def list_databases(self):
         return self.client.ListDatabase(ListDatabaseRequest(session_id=self.session_id))
 
-    def describe_database(self, db_name: str):
-        return self.client.DescribeDatabase(DescribeDatabaseRequest(session_id=self.session_id,
-                                                                    db_name=db_name))
+    def show_database(self, db_name: str):
+        return self.client.ShowDatabase(ShowDatabaseRequest(session_id=self.session_id,
+                                                            db_name=db_name))
 
     def get_database(self, db_name: str):
         return self.client.GetDatabase(GetDatabaseRequest(session_id=self.session_id,
                                                           db_name=db_name))
 
-    def create_table(self, db_name: str, table_name: str, column_defs, option):
+    def create_table(self, db_name: str, table_name: str, column_defs,
+                     conflict_type: CreateConflict = CreateConflict.Error, properties: list = None):
         return self.client.CreateTable(CreateTableRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
                                                           column_defs=column_defs,
-                                                          option=option))
+                                                          create_option=CreateOption(conflict_type=conflict_type,
+                                                                                     properties=properties)))
 
-    def drop_table(self, db_name: str, table_name: str, if_exists: bool):
+    def drop_table(self, db_name: str, table_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropTable(DropTableRequest(session_id=self.session_id,
                                                       db_name=db_name,
                                                       table_name=table_name,
-                                                      options=DropTableOptions(conflict_type=ConflictType.Ignore if if_exists else ConflictType.Error,)))
+                                                      drop_option=DropOption(conflict_type=conflict_type)))
 
     def list_tables(self, db_name: str):
         return self.client.ListTable(ListTableRequest(session_id=self.session_id,
                                                       db_name=db_name))
 
-    def describe_table(self, db_name: str, table_name: str):
-        return self.client.DescribeTable(DescribeTableRequest(session_id=self.session_id,
-                                                              db_name=db_name,
-                                                              table_name=table_name))
+    def show_table(self, db_name: str, table_name: str):
+        return self.client.ShowTable(ShowTableRequest(session_id=self.session_id,
+                                                      db_name=db_name,
+                                                      table_name=table_name))
+
+    def show_columns(self, db_name: str, table_name: str):
+        return self.client.ShowColumns(ShowColumnsRequest(session_id=self.session_id,
+                                                          db_name=db_name,
+                                                          table_name=table_name))
 
     def get_table(self, db_name: str, table_name: str):
         return self.client.GetTable(GetTableRequest(session_id=self.session_id,
                                                     db_name=db_name,
                                                     table_name=table_name))
 
-    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list, option):
+    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list,
+                     conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateIndex(CreateIndexRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
                                                           index_name=index_name,
                                                           index_info_list=index_info_list,
-                                                          option=option))
+                                                          create_option=CreateOption(conflict_type=conflict_type)))
 
-    def drop_index(self, db_name: str, table_name: str, index_name: str):
+    def drop_index(self, db_name: str, table_name: str, index_name: str,
+                   conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropIndex(DropIndexRequest(session_id=self.session_id,
+                                                      db_name=db_name,
+                                                      table_name=table_name,
+                                                      index_name=index_name,
+                                                      drop_option=DropOption(conflict_type=conflict_type)))
+
+    def show_index(self, db_name: str, table_name: str, index_name: str):
+        return self.client.ShowIndex(ShowIndexRequest(session_id=self.session_id,
                                                       db_name=db_name,
                                                       table_name=table_name,
                                                       index_name=index_name))
 
+    def list_indexes(self, db_name: str, table_name: str):
+        return self.client.ListIndex(ListIndexRequest(session_id=self.session_id,
+                                                      db_name=db_name,
+                                                      table_name=table_name))
+
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
-        return self.client.Insert(InsertRequest(session_id=self.session_id,
-                                                db_name=db_name,
-                                                table_name=table_name,
-                                                column_names=column_names,
-                                                fields=fields))
+        retry = 0
+        inner_ex = None
+        while retry <= 2:
+            try:
+                res = self.client.Insert(InsertRequest(session_id=self.session_id,
+                                                       db_name=db_name,
+                                                       table_name=table_name,
+                                                       column_names=column_names,
+                                                       fields=fields))
+                return res
+            except TTransportException as ex:
+                #import traceback
+                #traceback.print_exc()
+                self.reconnect()
+                inner_ex = ex
+                retry += 1
+            except Exception as ex:
+                inner_ex = ex
+        return CommonResponse(ErrorCode.TOO_MANY_CONNECTIONS, "insert failed with exception: " + str(inner_ex))
+
+    # Can be used in compact mode
+    # def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
+    #     return self.client.Insert(InsertRequest(session_id=self.session_id,
+    #                                             db_name=db_name,
+    #                                             table_name=table_name,
+    #                                             column_names=column_names,
+    #                                             fields=fields))
 
     def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
         return self.client.Import(ImportRequest(session_id=self.session_id,
@@ -152,23 +204,37 @@ class ThriftInfinityClient:
                                                 update_expr_array=update_expr_array))
 
     def disconnect(self):
-        res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
+        res = None
+        try:
+            res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
+        except Exception:
+            pass
         self.transport.close()
         return res
 
-    def upload(self, db_name: str, table_name: str, file_name: str, data, index: int, is_last: bool, total_size: int):
-        return self.client.UploadFileChunk(FileChunk(session_id=self.session_id,
-                                                     db_name=db_name,
-                                                     table_name=table_name,
-                                                     file_name=file_name,
-                                                     index=index,
-                                                     data=data,
-                                                     is_last=is_last,
-                                                     total_size=total_size))
-
-    def show_variable(self, variable: ShowVariable):
-        return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,
-                                                            variable_name=str(variable.value)))
-
     def show_tables(self, db_name: str):
         return self.client.ShowTables(ShowTablesRequest(session_id=self.session_id, db_name=db_name))
+
+    def show_segments(self, db_name: str, table_name: str):
+        return self.client.ShowSegments(
+            ShowSegmentsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))
+
+    def show_segment(self, db_name: str, table_name: str, segment_id: int):
+        return self.client.ShowSegment(
+            ShowSegmentRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                               segment_id=segment_id))
+
+    def show_blocks(self, db_name: str, table_name: str, segment_id: int):
+        return self.client.ShowBlocks(
+            ShowBlocksRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                              segment_id=segment_id))
+
+    def show_block(self, db_name: str, table_name: str, segment_id: int, block_id: int):
+        return self.client.ShowBlock(
+            ShowBlockRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                             segment_id=segment_id, block_id=block_id))
+
+    def show_block_column(self, db_name: str, table_name: str, segment_id: int, block_id: int, column_id: int):
+        return self.client.ShowBlockColumn(
+            ShowBlockColumnRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                                   segment_id=segment_id, block_id=block_id, column_id=column_id))

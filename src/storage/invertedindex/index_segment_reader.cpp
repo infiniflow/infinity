@@ -20,7 +20,6 @@ import stl;
 import memory_pool;
 import segment_posting;
 import index_defines;
-import segment;
 
 namespace infinity {
 IndexSegmentReader::IndexSegmentReader() {}

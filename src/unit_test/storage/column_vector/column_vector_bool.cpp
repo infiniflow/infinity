@@ -45,7 +45,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
-    EXPECT_EQ(column_vector.data_type_size_, 1);
+    EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kCompactBit);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -87,11 +87,11 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
     }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE);
 
     column_vector.Reset();
-    EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), 0u);
+    EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.data(), nullptr);
@@ -106,11 +106,11 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     column_vector.Initialize();
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kCompactBit), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
-    EXPECT_EQ(column_vector.data_type_size_, 1);
+    EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kCompactBit);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -151,11 +151,11 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
-    EXPECT_EQ(column_vector.data_type_size_, 1);
+    EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -181,8 +181,8 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     }
 
     column_vector.Reset();
-    EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), 0u);
+    EXPECT_EQ(column_vector.Size(), 0u);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
@@ -193,11 +193,11 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
-    EXPECT_EQ(column_vector.data_type_size_, 1);
+    EXPECT_EQ(column_vector.data_type_size_, 1u);
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -275,7 +275,7 @@ TEST_F(ColumnVectorBoolTest, bool_column_slice_init) {
     i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
-    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < count; ++i) {

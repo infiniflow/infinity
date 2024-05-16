@@ -5,7 +5,7 @@ statement ok
 CREATE TABLE test_compact_import_delete (c1 INT, c2 EMBEDDING(int, 3));
 
 query I
-COPY test_compact_import_delete FROM '/tmp/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+COPY test_compact_import_delete FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
 ----
 
 query I
@@ -13,7 +13,7 @@ INSERT INTO test_compact_import_delete VALUES (13, [14,15,16]), (17, [18,19,20])
 ----
 
 query I
-COPY test_compact_import_delete FROM '/tmp/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+COPY test_compact_import_delete FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
 ----
 
 query I
@@ -51,3 +51,6 @@ SELECT * FROM test_compact_import_delete;
 5 6,7,8
 9 10,11,12
 9 10,11,12
+
+statement ok
+DROP TABLE test_compact_import_delete;

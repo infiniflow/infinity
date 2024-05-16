@@ -23,6 +23,7 @@ import infinity_exception;
 import search_top_k;
 import index_base;
 import vector_distance;
+import logger;
 
 namespace infinity {
 
@@ -75,7 +76,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
                                      u32 min_points_per_centroid = 32,
                                      u32 max_points_per_centroid = 256) {
     constexpr int default_iteration_max = 10;
-    if (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
+    if (metric != MetricType::kMetricL2 && metric != MetricType::kMetricInnerProduct) {
         UnrecoverableError("metric type not implemented");
     }
     if (dimension <= 0 || vector_count <= 0) {
@@ -114,10 +115,10 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
     // If input vectors are too many, randomly choose some vectors to train.
     {
         if (u32 min_num = min_points_per_centroid * partition_num; vector_count < min_num) {
-            // warning : too few vectors, less than min_points_per_centroid * partition_num
+            LOG_TRACE("GetKMeansCentroids: warning : too few vectors, less than min_points_per_centroid * partition_num");
         }
         if (u32 max_num = max_points_per_centroid * partition_num; vector_count > max_num) {
-            // warning : too many vectors, more than max_points_per_centroid * partition_num
+            LOG_TRACE("GetKMeansCentroids: warning : too many vectors, more than max_points_per_centroid * partition_num");
             training_data_num = max_num;
             // generate random training data
             {
@@ -160,7 +161,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
             }
         }
         // normalize centroids if inner product metric is used
-        if (metric == MetricType::kMerticInnerProduct) {
+        if (metric == MetricType::kMetricInnerProduct) {
             NormalizeCentroids(dimension, partition_num, centroids);
         }
     }
@@ -211,7 +212,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
             }
             // For L2 metric, divide the count. If there is no vector in a partition, the centroid of this partition will not be updated.
             // For IP metric, normalize centroids.
-            if (metric == MetricType::kMerticL2) {
+            if (metric == MetricType::kMetricL2) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     if (auto cnt = partition_element_count[i]; cnt > 0) {
                         f32 inv = 1.0f / (f32)cnt;
@@ -220,7 +221,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
                         }
                     }
                 }
-            } else if (metric == MetricType::kMerticInnerProduct) {
+            } else if (metric == MetricType::kMetricInnerProduct) {
                 NormalizeCentroids(dimension, partition_num, centroids);
             }
         }
@@ -259,7 +260,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
         }
 
         // TODO:stop condition?
-        if (metric == MetricType::kMerticL2 && this_iter_distance >= previous_total_distance)
+        if (metric == MetricType::kMetricL2 && this_iter_distance >= previous_total_distance)
             break;
         previous_total_distance = this_iter_distance;
 

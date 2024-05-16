@@ -20,37 +20,42 @@ import posting_list_format;
 import posting_writer;
 import term_meta;
 import index_defines;
+import internal_types;
+import file_reader;
+import memory_pool;
+import file_system;
+
 export module segment_posting;
 
 namespace infinity {
 
 export class SegmentPosting {
 public:
-    SegmentPosting(const PostingFormatOption &posting_option = OPTION_FLAG_ALL);
-    ~SegmentPosting() {}
-
-    bool operator==(const SegmentPosting &seg_posting) const {
-        return /*(slice_list_ == seg_posting.slice_list_) && */ (term_meta_ == seg_posting.term_meta_) &&
-               /*(posting_option_ == seg_posting.posting_option_) */ (base_doc_id_ == seg_posting.base_doc_id_) &&
-               (doc_count_ == seg_posting.doc_count_) && (posting_writer_ == seg_posting.posting_writer_);
-    }
+    SegmentPosting(){};
+    ~SegmentPosting(){};
 
     // for on disk segment posting
-    void Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count, TermMeta &term_meta);
+    void Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
+    void Init(SharedPtr<ByteSliceList> doc_slice_list,
+              SharedPtr<ByteSliceList> pos_slice_list,
+              RowID base_row_id,
+              u64 doc_count,
+              TermMeta &term_meta,
+              u64 pos_begin,
+              u64 pos_size,
+              const SharedPtr<FileReader> &posting_reader,
+              MemoryPool *session_pool);
     // for in memory segment posting
-    void Init(docid_t base_doc_id, PostingWriter *posting_writer);
+    void Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer);
 
-    docid_t GetBaseDocId() const { return base_doc_id_; }
-    void SetBaseDocId(docid_t base_doc_id) { base_doc_id_ = base_doc_id; }
+    RowID GetBaseRowId() const { return base_row_id_; }
+    void SetBaseRowId(RowID base_row_id) { base_row_id_ = base_row_id; }
 
     u32 GetDocCount() const { return doc_count_; }
     void SetDocCount(const u32 doc_count) { doc_count_ = doc_count; }
 
-    const PostingFormatOption &GetPostingFormatOption() const { return posting_option_; }
-    void SetPostingFormatOption(const PostingFormatOption &option) { posting_option_ = option; }
-
-    const PostingWriter *GetInMemPostingWriter() const { return posting_writer_; }
-    bool IsInMemorySegment() const { return posting_writer_ != nullptr; }
+    const SharedPtr<PostingWriter> &GetInMemPostingWriter() const { return posting_writer_; }
+    bool IsInMemorySegment() const { return posting_writer_.get(); }
 
     void GetInMemTermMeta(TermMeta &tm) {
         df_t df = posting_writer_->GetDF();
@@ -63,12 +68,24 @@ public:
 
     const SharedPtr<ByteSliceList> &GetSliceListPtr() const { return slice_list_; }
 
+    const SharedPtr<ByteSliceList> &GetDocSliceListPtr() const { return doc_slice_list_; }
+
+    const SharedPtr<ByteSliceList> &GetPosSliceListPtr();
+
 private:
-    SharedPtr<ByteSliceList> slice_list_;
-    u32 base_doc_id_;
-    u32 doc_count_;
+    SharedPtr<ByteSliceList> slice_list_{nullptr};
+    SharedPtr<ByteSliceList> doc_slice_list_{nullptr};
+    SharedPtr<ByteSliceList> pos_slice_list_{nullptr};
+    RowID base_row_id_ = INVALID_ROWID;
+    u32 doc_count_ = 0;
     TermMeta term_meta_;
-    PostingWriter *posting_writer_;
-    PostingFormatOption posting_option_;
+    SharedPtr<PostingWriter> posting_writer_{nullptr};
+    SharedPtr<FileReader> posting_reader_{nullptr};
+    FileSystem* fs_ = nullptr;
+    String* path_ = nullptr;
+    u64 pos_begin_ = 0;
+    u64 pos_size_ = 0;
+    u64 doc_start_ = 0;
+    MemoryPool *session_pool_;
 };
 } // namespace infinity

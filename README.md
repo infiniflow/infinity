@@ -1,7 +1,7 @@
-
 <div align="center">
-  <img width="187" src="https://user-images.githubusercontent.com/93570324/234292265-889228a8-7a68-4e2d-b891-f75262410af1.png"/>
+  <img width="187" src="https://github.com/infiniflow/infinity/assets/7248/015e1f02-1f7f-4b09-a0c2-9d261cd4858b"/>
 </div>
+
 
 <p align="center">
     <b>The AI-native database built for LLM applications, providing incredibly fast full-text and vector search</b>
@@ -30,9 +30,9 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 ### ⚡️ Incredibly fast
 
 - Achieves 0.1 milliseconds query latency on million-scale vector datasets.
-- Up to 10K QPS on million-scale vector datasets.
+- Up to 15K QPS on million-scale vector datasets.
 
-> See the [Benchmark report](./docs/benchmark.md) for more information.
+> See the [Benchmark report](./docs/references/benchmark.md) for more information.
 
 
 ### 🔮 Fused search
@@ -45,7 +45,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### 🎁 Ease-of-use
 
-- Intuitive Python API. See the [Python API](docs/pysdk_api_reference.md)
+- Intuitive Python API. See the [Python API](docs/references/pysdk_api_reference.md)
 - A single-binary architecture with no dependencies, making deployment a breeze.
 
 ## 🎮 Get Started
@@ -55,8 +55,9 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 #### Deploy Infinity using Docker on Linux x86_64 and MacOS x86_64
 
 ```bash
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 docker pull infiniflow/infinity:nightly
-docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity:nightly
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
 ```
 
 #### Deploy Infinity using binary package on Linux x86_64
@@ -65,25 +66,25 @@ You can download the binary package (deb, rpm, or tgz) for your respective host 
 
 Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-sudo rpm -i infinity-0.1.0-dev-x86_64.rpm
+sudo rpm -i infinity-0.2.0-dev-x86_64.rpm
 sudo systemctl start infinity
 ```
 
 Ubuntu/Debian
 ```bash
-sudo dpkg -i infinity-0.1.0-dev-x86_64.deb
+sudo dpkg -i infinity-0.2.0-dev-x86_64.deb
 sudo systemctl start infinity
 ```
 #### 🛠️ Build from Source
 
-See [Build from Source](docs/build_from_source.md).
+See [Build from Source](docs/getstarted/build_from_source.md).
 
 ### Install Infinity's Python client
 
 `infinity-sdk` requires Python 3.10+.
 
 ```bash
-pip3 install infinity-sdk
+pip3 install infinity-sdk==0.2.0.dev1
 ```
 
 ### Import necessary modules
@@ -92,6 +93,7 @@ pip3 install infinity-sdk
 import infinity
 import infinity.index as index
 from infinity.common import REMOTE_HOST
+from infinity.common import ConflictType
 ```
 
 
@@ -106,7 +108,7 @@ infinity_obj = infinity.connect(REMOTE_HOST)
 ### Get a database
 
 ```python
-db = infinity_obj.get_database("default")
+db = infinity_obj.get_database("default_db")
 ```
 
 
@@ -114,9 +116,14 @@ db = infinity_obj.get_database("default")
 
 ```python
 # Drop my_table if it already exists
-db.drop_table("my_table", if_exists=True)
+db.drop_table("my_table", ConflictType.Ignore)
 # Create a table named "my_table"
-table = db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"}, None)
+table = db.create_table(
+          "my_table", {
+            "num": {"type": "integer"}, 
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"}
+          })
 ```
 
 
@@ -135,7 +142,7 @@ res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_
 print(res)
 ```
 
-> 💡 For more information about the Python API, see the [Python API Reference](docs/pysdk_api_reference.md).
+> 💡 For more information about the Python API, see the [Python API Reference](docs/references/pysdk_api_reference.md).
 
 
 ## 📜 Roadmap

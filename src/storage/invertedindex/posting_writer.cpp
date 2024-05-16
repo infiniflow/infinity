@@ -3,34 +3,38 @@ module;
 import stl;
 import memory_pool;
 import file_writer;
+import file_reader;
 import doc_list_encoder;
 import inmem_posting_decoder;
-import inmem_pos_list_decoder;
+import inmem_position_list_decoder;
 import inmem_doc_list_decoder;
-import pos_list_encoder;
+import position_list_encoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
+import vector_with_lock;
+
 module posting_writer;
 
 namespace infinity {
 
-PostingWriter::PostingWriter(MemoryPool *byte_slice_pool, RecyclePool *buffer_pool, PostingFormatOption posting_option)
+PostingWriter::PostingWriter(MemoryPool *byte_slice_pool,
+                             RecyclePool *buffer_pool,
+                             PostingFormatOption posting_option,
+                             VectorWithLock<u32> &column_lengths)
     : byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), posting_option_(posting_option),
-      posting_format_(new PostingFormat(posting_option)) {
+      posting_format_(new PostingFormat(posting_option)), column_lengths_(column_lengths) {
     if (posting_option.HasPositionList()) {
-        position_list_encoder_ = new PositionListEncoder(posting_option_.GetPosListFormatOption(),
-                                                         byte_slice_pool_,
-                                                         buffer_pool_,
-                                                         posting_format_->GetPositionListFormat());
+        position_list_encoder_ = new PositionListEncoder(posting_option_, byte_slice_pool_, buffer_pool_, posting_format_->GetPositionListFormat());
     }
-    if (posting_option.HasTfBitmap()) {
-        doc_list_encoder_ =
-            new DocListEncoder(posting_option_.GetDocListFormatOption(), byte_slice_pool_, buffer_pool_, posting_format_->GetDocListFormat());
-    }
+    doc_list_encoder_ =
+        new DocListEncoder(posting_option_.GetDocListFormatOption(), byte_slice_pool_, buffer_pool_, posting_format_->GetDocListFormat());
 }
 
 PostingWriter::~PostingWriter() {
+    if (posting_format_) {
+        delete posting_format_;
+    }
     if (position_list_encoder_) {
         delete position_list_encoder_;
     }
@@ -40,7 +44,8 @@ PostingWriter::~PostingWriter() {
 }
 
 void PostingWriter::EndDocument(docid_t doc_id, docpayload_t doc_payload) {
-    doc_list_encoder_->EndDocument(doc_id, doc_payload);
+    u32 doc_len = GetDocColumnLength(doc_id);
+    doc_list_encoder_->EndDocument(doc_id, doc_len, doc_payload);
     if (position_list_encoder_) {
         position_list_encoder_->EndDocument();
     }
@@ -54,13 +59,23 @@ tf_t PostingWriter::GetCurrentTF() const { return doc_list_encoder_->GetCurrentT
 
 void PostingWriter::SetCurrentTF(tf_t tf) { doc_list_encoder_->SetCurrentTF(tf); }
 
-void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta) {
-    term_meta.doc_start_ = file_writer->GetFileSize();
-    doc_list_encoder_->Dump(file_writer);
+void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta, bool spill) {
+    term_meta.doc_freq_ = GetDF();
+    term_meta.total_tf_ = GetTotalTF();
+    term_meta.payload_ = 0;
+    term_meta.doc_start_ = file_writer->TotalWrittenBytes();
+    doc_list_encoder_->Dump(file_writer, spill);
     if (position_list_encoder_) {
-        term_meta.pos_start_ = file_writer->GetFileSize();
-        position_list_encoder_->Dump(file_writer);
-        term_meta.pos_end_ = file_writer->GetFileSize();
+        term_meta.pos_start_ = file_writer->TotalWrittenBytes();
+        position_list_encoder_->Dump(file_writer, spill);
+        term_meta.pos_end_ = file_writer->TotalWrittenBytes();
+    }
+}
+
+void PostingWriter::Load(const SharedPtr<FileReader> &file_reader) {
+    doc_list_encoder_->Load(file_reader);
+    if (position_list_encoder_) {
+        position_list_encoder_->Load(file_reader);
     }
 }
 
@@ -79,7 +94,12 @@ void PostingWriter::EndSegment() {
     }
 }
 
-void PostingWriter::AddPosition(pos_t pos) {}
+void PostingWriter::AddPosition(pos_t pos) {
+    doc_list_encoder_->AddPosition();
+    if (position_list_encoder_) {
+        position_list_encoder_->AddPosition(pos);
+    }
+}
 
 InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder(MemoryPool *session_pool) const {
     InMemPostingDecoder *posting_decoder =

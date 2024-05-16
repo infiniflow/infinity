@@ -25,17 +25,29 @@ import infinity_exception;
 
 namespace infinity {
 
-export using ChunkId = u64;
+export using ChunkId = i64;
+export constexpr ChunkId INVALID_CHUNK_ID = -1;
 
 export struct VectorHeapChunk {
 public:
-    explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
+#endif
+    }
 
-    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUniqueForOverwrite<char[]>(capacity)) { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUniqueForOverwrite<char[]>(capacity)) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
+#endif
+    }
 
     VectorHeapChunk(const VectorHeapChunk &) = delete;
 
     VectorHeapChunk(VectorHeapChunk &&other) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("VectorHeapChunk");
+#endif
         if (std::holds_alternative<UniquePtr<char[]>>(other.ptr_)) {
             ptr_ = std::move(std::get<UniquePtr<char[]>>(other.ptr_));
         } else {
@@ -47,7 +59,11 @@ public:
 
     VectorHeapChunk &operator=(VectorHeapChunk &&) = delete;
 
-    ~VectorHeapChunk() { GlobalResourceUsage::DecrObjectCount(); }
+    ~VectorHeapChunk() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("VectorHeapChunk");
+#endif
+    }
 
     const char *GetPtr() const { // Pattern Matching here
         if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {

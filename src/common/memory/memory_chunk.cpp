@@ -35,7 +35,7 @@ MemoryChunk *ChunkAllocator::Allocate(SizeT num_bytes) {
     if (next_chunk && alloc_size <= chunk_size_) {
         current_chunk_ = next_chunk;
     } else {
-        const auto allocated_chunk = static_cast<void *>(new char[alloc_size]{});
+        const auto allocated_chunk = static_cast<void *>(new char[alloc_size]);
         if (!allocated_chunk) {
             return nullptr;
         }

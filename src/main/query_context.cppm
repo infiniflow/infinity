@@ -71,7 +71,7 @@ public:
 
     [[nodiscard]] inline u64 cpu_number_limit() const { return cpu_number_limit_; }
 
-    [[nodiscard]] inline bool is_enable_profiling() const { return session_ptr_->options()->enable_profiling_; }
+    [[nodiscard]] inline bool is_enable_profiling() const { return session_ptr_->SessionVariables()->enable_profile_; }
 
     [[nodiscard]] inline u64 memory_size_limit() const { return memory_size_limit_; }
 
@@ -83,14 +83,11 @@ public:
 
     inline u64 GetNextNodeID() { return ++current_max_node_id_; }
 
-    void CreateTxn();
-
     void BeginTxn();
 
     void CommitTxn();
 
     void RollbackTxn();
-
 
 
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
@@ -128,7 +125,7 @@ private:
 
     inline void RecordQueryProfiler(const StatementType &type) {
         if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-            GetTxn()->GetCatalog()->AppendProfilerRecord(query_profiler_);
+            GetTxn()->GetCatalog()->AppendProfileRecord(query_profiler_);
         }
     }
 
@@ -164,7 +161,7 @@ private:
     Storage *storage_{};
     BaseSession *session_ptr_{};
     ResourceManager *resource_manager_{};
-    SessionManager* session_manager_{};
+    SessionManager *session_manager_{};
 
     u64 catalog_version_{};
 

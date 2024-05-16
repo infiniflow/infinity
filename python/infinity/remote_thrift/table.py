@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
+import inspect
 import os
 import numpy as np
 from abc import ABC
@@ -24,8 +26,9 @@ from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
-from infinity.remote_thrift.utils import traverse_conditions, check_valid_name, select_res_to_polars
+from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
 from infinity.table import Table, ExplainType
+from infinity.common import ConflictType
 
 
 class RemoteTable(Table, ABC):
@@ -36,8 +39,25 @@ class RemoteTable(Table, ABC):
         self._table_name = table_name
         self.query_builder = InfinityThriftQueryBuilder(table=self)
 
-    def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
-        check_valid_name(index_name, "Index")
+    def params_type_check(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            sig = inspect.signature(func)
+            params = sig.parameters
+            for arg, param in zip(args, params.values()):
+                if param.annotation is not param.empty and not isinstance(arg, param.annotation):
+                    raise TypeError(f"TypeError: Argument {param.name} must be {param.annotation}")
+            for kwarg, value in kwargs.items():
+                if params[kwarg].annotation is not params[kwarg].empty and not isinstance(value,
+                                                                                          params[kwarg].annotation):
+                    raise TypeError(f"TypeError: Argument {kwarg} must be {params[kwarg].annotation}")
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    @name_validity_check("index_name", "Index")
+    def create_index(self, index_name: str, index_infos: list[IndexInfo],
+                     conflict_type: ConflictType = ConflictType.Error):
         index_name = index_name.strip()
 
         index_info_list_to_use: list[ttypes.IndexInfo] = []
@@ -50,21 +70,92 @@ class RemoteTable(Table, ABC):
 
             index_info_list_to_use.append(index_info_to_use)
 
+        create_index_conflict: ttypes.CreateConflict
+        if conflict_type == ConflictType.Error:
+            create_index_conflict = ttypes.CreateConflict.Error
+        elif conflict_type == ConflictType.Ignore:
+            create_index_conflict = ttypes.CreateConflict.Ignore
+        elif conflict_type == ConflictType.Replace:
+            create_index_conflict = ttypes.CreateConflict.Replace
+        else:
+            raise Exception(f"ERROR:3066, Invalid conflict type")
+
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
                                       index_name=index_name,
                                       index_info_list=index_info_list_to_use,
-                                      option=options)
+                                      conflict_type=create_index_conflict)
 
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def drop_index(self, index_name: str):
-        check_valid_name(index_name, "Index")
+    @name_validity_check("index_name", "Index")
+    def drop_index(self, index_name: str, conflict_type: ConflictType = ConflictType.Error):
+        drop_index_conflict: ttypes.DropConflict
+        if conflict_type == ConflictType.Error:
+            drop_index_conflict = ttypes.DropConflict.Error
+        elif conflict_type == ConflictType.Ignore:
+            drop_index_conflict = ttypes.DropConflict.Ignore
+        else:
+            raise Exception(f"ERROR:3066, invalid conflict type")
+
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
-                                    index_name=index_name)
+                                    index_name=index_name, conflict_type=drop_index_conflict)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    @name_validity_check("index_name", "Index")
+    def show_index(self, index_name: str):
+        res = self._conn.show_index(db_name=self._db_name, table_name=self._table_name, index_name=index_name)
+
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def list_indexes(self):
+        res = self._conn.list_indexes(db_name=self._db_name, table_name=self._table_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_segments(self):
+        res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
+        if res.error_code == ErrorCode.OK:
+            return select_res_to_polars(res)
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_segment(self, segment_id: int):
+        res = self._conn.show_segment(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_blocks(self, segment_id: int):
+        res = self._conn.show_blocks(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
+        if res.error_code == ErrorCode.OK:
+            return select_res_to_polars(res)
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_block(self, segment_id: int, block_id: int):
+        res = self._conn.show_block(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
+                                    block_id=block_id)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_block_column(self, segment_id: int, block_id: int, column_id: int):
+        res = self._conn.show_block_column(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
+                                           block_id=block_id, column_id=column_id)
         if res.error_code == ErrorCode.OK:
             return res
         else:
@@ -122,53 +213,42 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def import_data(self, file_path: str, options=None):
-
+    def import_data(self, file_path: str, import_options: {} = None):
         options = ttypes.ImportOption()
-
-        total_size = os.path.getsize(file_path)
-        chunk_size = 1024 * 1024 * 10  # 10MB
-        file_name = os.path.basename(file_path)
-        if file_name.endswith('.csv'):
-            options.copy_file_type = ttypes.CopyFileType.CSV
-            options.delimiter = ","
-        elif file_name.endswith('.json'):
-            options.copy_file_type = ttypes.CopyFileType.JSON
-        elif file_name.endswith('.jsonl'):
-            options.copy_file_type = ttypes.CopyFileType.JSONL
-        elif file_name.endswith('.fvecs'):
-            options.copy_file_type = ttypes.CopyFileType.FVECS
-
-        with open(file_path, 'rb') as f:
-            file_data = f.read()
-            num_chunks = len(file_data) // chunk_size + 1
-
-            for index in range(num_chunks):
-                start = index * chunk_size
-                end = min((index + 1) * chunk_size, len(file_data))
-                chunk_data = file_data[start:end]
-                is_last = (index == num_chunks - 1)
-                res = self._conn.upload(db_name=self._db_name,
-                                        table_name=self._table_name,
-                                        file_name=file_name,
-                                        data=chunk_data,
-                                        index=index,
-                                        is_last=is_last,
-                                        total_size=total_size)
-                match res:
-                    case None:
-                        raise Exception("upload failed")
-                    case _:
-                        if res.error_code != ErrorCode.OK:
-                            raise Exception(f"ERROR:{res.error_code} upload failed: {res.error_msg}")
-                        if res.error_msg:
-                            raise Exception(f"upload failed: {res.error_msg}")
-                        if res.can_skip:
-                            break
+        options.has_header = False
+        options.delimiter = ','
+        options.copy_file_type = ttypes.CopyFileType.CSV
+        if import_options != None:
+            for k, v in import_options.items():
+                key = k.lower()
+                if key == 'file_type':
+                    file_type = v.lower()
+                    if file_type == 'csv':
+                        options.copy_file_type = ttypes.CopyFileType.CSV
+                    elif file_type == 'json':
+                        options.copy_file_type = ttypes.CopyFileType.JSON
+                    elif file_type == 'jsonl':
+                        options.copy_file_type = ttypes.CopyFileType.JSONL
+                    elif file_type == 'fvecs':
+                        options.copy_file_type = ttypes.CopyFileType.FVECS
+                    else:
+                        raise Exception("Unrecognized import file type")
+                elif key == 'delimiter':
+                    delimiter = v.lower()
+                    if len(delimiter) != 1:
+                        raise Exception("Unrecognized import file delimiter")
+                    options.delimiter = delimiter[0]
+                elif key == 'header':
+                    if isinstance(v, bool):
+                        options.has_header = v
+                    else:
+                        raise Exception("Boolean value is expected in header field")
+                else:
+                    raise Exception("Unknown import parameter")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
-                                     file_name=file_name,
+                                     file_name=file_path,
                                      import_options=options)
         if res.error_code == ErrorCode.OK:
             return res
@@ -188,7 +268,8 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
+    def update(self, cond: Optional[str],
+               data: Optional[list[dict[str, Union[str, int, float, list[Union[int, float]]]]]]):
         # {"c1": 1, "c2": 1.1}
         match cond:
             case None:
@@ -212,6 +293,13 @@ class RemoteTable(Table, ABC):
                         elif isinstance(value, float) or isinstance(value, np.float32):
                             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
                                                                       f64_value=value)
+                        elif isinstance(value, list):
+                            if isinstance(value[0], int):
+                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
+                                                                          i64_array_value=value)
+                            elif isinstance(value[0], float):
+                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
+                                                                          f64_array_value=value)
                         else:
                             raise Exception("Invalid constant expression")
 
@@ -231,15 +319,17 @@ class RemoteTable(Table, ABC):
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int):
+            topn: int, knn_params: {} = None):
         self.query_builder.knn(
-            vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
+            vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
+    @params_type_check
     def match(self, fields: str, matching_text: str, options_text: str = ''):
         self.query_builder.match(fields, matching_text, options_text)
         return self
 
+    @params_type_check
     def fusion(self, method: str, options_text: str = ''):
         self.query_builder.fusion(method, options_text)
         return self

@@ -61,9 +61,11 @@ private:
 enum class SetScope {
     kSession,
     kGlobal,
+    kConfig,
+    kInvalid,
 };
 
-enum class SetVarType { kBool, kInteger, kDouble, kString };
+enum class SetVarType { kBool, kInteger, kDouble, kString, kInvalid };
 
 class SetCmd final : public CommandInfo {
 public:
@@ -78,6 +80,18 @@ public:
 
     SetCmd(SetScope scope, SetVarType value_type, const char *var_name, const char *value_str)
         : CommandInfo(CommandType::kSet), scope_(scope), var_name_(var_name), value_type_(value_type), value_str_(value_str) {}
+
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, bool value_bool)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_bool_(value_bool) {}
+
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, int64_t value_int)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_int_(value_int) {}
+
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, double value_double)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_double_(value_double) {}
+
+    SetCmd(SetScope scope, SetVarType value_type, std::string var_name, std::string value_str)
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(std::move(var_name)), value_type_(value_type), value_str_(std::move(value_str)) {}
 
     ~SetCmd() final = default;
 
@@ -99,6 +113,9 @@ public:
             }
             case SetVarType::kString: {
                 return "String";
+            }
+            case SetVarType::kInvalid: {
+                return "Invalid";
             }
         };
     }
@@ -160,16 +177,11 @@ public:
     explicit CompactTable(std::string &&schema_name, std::string &&table_name)
         : CommandInfo(CommandType::kCompactTable), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
-    explicit CompactTable(std::string &&table_name)
-        : CommandInfo(CommandType::kCompactTable), schema_name_("default"), table_name_(std::move(table_name)) {}
+    explicit CompactTable(std::string &&table_name) : CommandInfo(CommandType::kCompactTable), table_name_(std::move(table_name)) {}
 
     std::string ToString() const final;
 
-    const std::string &schema_name() const { return schema_name_; }
-
-    const std::string &table_name() const { return table_name_; }
-
-private:
+public:
     std::string schema_name_{};
 
     std::string table_name_;

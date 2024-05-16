@@ -156,6 +156,22 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+        if (read_offset == 0) {
+            // new block, check FastRoughFilter
+            const auto &fast_rough_filter = *current_block_entry->GetFastRoughFilter();
+            if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
+                // skip this block
+                LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
+                                      block_ids_idx,
+                                      block_ids->size()));
+                ++block_ids_idx;
+                continue;
+            } else {
+                LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
+                                      block_ids_idx,
+                                      block_ids->size()));
+            }
+        }
         auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
         if (row_begin == row_end) {
             // we have read all data from current block, move to next block

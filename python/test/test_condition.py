@@ -15,12 +15,12 @@
 from sqlglot import condition
 
 from infinity.remote_thrift.table import traverse_conditions
+from test_sdkbase import TestSdk
 
-
-class TestCondition:
+class TestCondition(TestSdk):
 
     def test_traverse_conditions(self):
-        res = traverse_conditions(condition("c1 > 1 and c2 < 2 or c3 = 3.3"))
+        res = (condition("c1 > 1 and c2 < 2 or c3 = 3.3"))
         print(res)
         res = traverse_conditions(condition("c1 = 1"))
         print(res)

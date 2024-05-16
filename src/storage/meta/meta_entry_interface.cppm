@@ -30,7 +30,9 @@ public:
 
     virtual bool PickCleanup(CleanupScanner *scanner) = 0;
 
-    virtual void Cleanup() && = 0;
+    virtual void Cleanup() = 0;
+
+    virtual bool Empty() = 0;
 };
 
 export template <typename Meta>
@@ -40,7 +42,7 @@ export class EntryInterface {
 public:
     virtual ~EntryInterface() = default;
 
-    virtual void Cleanup() && = 0;
+    virtual void Cleanup() = 0;
 
     virtual void PickCleanup(CleanupScanner *scanner) = 0;
 };

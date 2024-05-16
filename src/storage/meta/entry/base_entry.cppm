@@ -14,23 +14,28 @@
 
 module;
 
+#include <cassert>
+
 export module base_entry;
 
 import stl;
 import default_values;
+import txn;
+import txn_manager;
+import infinity_exception;
+import third_party;
+import txn_state;
 
 namespace infinity {
 
 class Catalog;
 
 export enum class EntryType : i8 {
-    kDummy,
     kDatabase,
     kTable,
     kTableIndex,
-    kColumnIndex,
-    kIRSIndex,
-    kSegmentColumnIndex,
+    kSegmentIndex,
+    kChunkIndex,
     kView,
     kColumn,
     kSegment,
@@ -39,15 +44,10 @@ export enum class EntryType : i8 {
 };
 
 export struct BaseEntry {
-    explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
-        if (entry_type == EntryType::kDummy) {
-            commit_ts_ = 0;
-            deleted_ = true;
-        }
-    }
+    explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
+        : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {}
 
     virtual ~BaseEntry() = default;
-    virtual void MergeFrom(BaseEntry &) {}
 
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 
@@ -55,20 +55,48 @@ export struct BaseEntry {
 
 public:
     // Reserved
-    inline void Commit(TxnTimeStamp commit_ts) { commit_ts_.store(commit_ts); }
+    inline void Commit(TxnTimeStamp commit_ts) {
+        assert(!Committed() || commit_ts_ == commit_ts);
+        assert(commit_ts != UNCOMMIT_TS);
+        commit_ts_.store(commit_ts);
+    }
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
+    bool Deleted() const { return deleted_; }
+
+    const String &encode() const { return *encode_; }
+
+    SharedPtr<String> encode_ptr() const { return encode_; }
+
+    // return if this entry is visible to the `txn`
+    virtual bool CheckVisible(Txn *txn) const {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) { 
+            return true;
+        }
+        TxnManager *txn_mgr = txn->txn_mgr();
+        if (txn_mgr == nullptr) { // when replay
+            UnrecoverableError(fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
+                                           begin_ts,
+                                           commit_ts_,
+                                           txn->TxnID(),
+                                           txn_id_));
+        }
+        // Check if the entry is in committing process, because commit_ts of the base_entry is set in the Txn::CommitBottom
+        return txn_mgr->CheckIfCommitting(txn_id_, begin_ts);
+    }
+
 public:
-    atomic_u64 txn_id_{0};
+    TransactionID txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-    bool deleted_{false};
+    const bool deleted_;
 
-    EntryType entry_type_{EntryType::kDummy};
+    const EntryType entry_type_;
+
+private:
+    SharedPtr<String> encode_;
 };
-
-// Merge two reverse-ordered list inplace.
-export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
 
 } // namespace infinity

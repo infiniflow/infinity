@@ -81,8 +81,12 @@ test/sql/**/*big*.slt
 test/sql/**/*fvecs*.slt
 test/data/csv/test_sort.csv
 test/data/csv/*big*.csv
+test/data/csv/*9_commas.csv
 test/data/fvecs/*big*.fvecs
 test/data/fvecs/test.fvecs
+test/data/fvecs/pysdk_test.fvecs
+test/data/csv/pysdk_test_import_with_different_size.csv
+invalid/*
 
 benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h
@@ -117,3 +121,6 @@ callgrind.out.*
 
 # ignore vscode clangd cache file
 .cache/
+
+# ignore all benchmark datasets
+python/benchmark/datasets/

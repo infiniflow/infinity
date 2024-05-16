@@ -30,6 +30,7 @@ import load_meta;
 import infinity_exception;
 import internal_types;
 import data_type;
+import common_query_filter;
 
 namespace infinity {
 
@@ -38,6 +39,7 @@ public:
     explicit PhysicalMatch(u64 id,
                            SharedPtr<BaseTableRef> base_table_ref,
                            SharedPtr<MatchExpression> match_expr,
+                           const SharedPtr<CommonQueryFilter> &common_query_filter,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas);
 
@@ -68,11 +70,20 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline MatchExpression* match_expr() const { return match_expr_.get(); }
+    [[nodiscard]] inline MatchExpression *match_expr() const { return match_expr_.get(); }
+
+    [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
+
 private:
-    u64 table_index_{};
-    SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<MatchExpression> match_expr_{};
+    u64 table_index_ = 0;
+    SharedPtr<BaseTableRef> base_table_ref_;
+    SharedPtr<MatchExpression> match_expr_;
+
+    // for filter
+    SharedPtr<CommonQueryFilter> common_query_filter_;
+
+    bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
+    bool ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state);
 };
 
 } // namespace infinity

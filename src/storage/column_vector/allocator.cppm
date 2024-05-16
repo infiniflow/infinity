@@ -24,13 +24,17 @@ namespace infinity {
 export class Allocator {
 public:
     static ptr_t allocate(SizeT bytes) {
-        GlobalResourceUsage::IncrRawMemCount();
-        return new char[bytes]{};
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrRawMemCount("Allocator");
+#endif
+        return new char[bytes];
     }
 
     static void deallocate(ptr_t ptr) {
         delete[] ptr;
-        GlobalResourceUsage::DecrRawMemCount();
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrRawMemCount("Allocator");
+#endif
     }
 };
 

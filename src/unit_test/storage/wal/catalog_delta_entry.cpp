@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "type/complex/row_id.h"
 #include "unit_test/base_test.h"
-
 
 import infinity_exception;
 import index_base;
@@ -22,114 +22,485 @@ import third_party;
 import stl;
 import catalog_delta_entry;
 import column_def;
+import segment_entry;
+import index_secondary;
+import infinity_context;
+import data_type;
+import logical_type;
 
 class CatalogDeltaEntryTest : public BaseTest {};
 
 using namespace infinity;
 
+TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
+    std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
+    InfinityContext::instance().Init(config_path);
+
+    auto db_name = String("db_test");
+    auto db_dir = MakeShared<String>("data");
+    auto table_name = String("table_test");
+    auto table_entry_dir = MakeShared<String>("data/db_test/table_test");
+    Vector<SharedPtr<ColumnDef>> column_defs{};
+    {
+        auto column_def1 =
+            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        auto column_def2 =
+            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        column_defs.push_back(column_def1);
+        column_defs.push_back(column_def2);
+    }
+    SegmentID segment_id = 0;
+    BlockID block_id = 0;
+    ColumnID column_id = 0;
+    auto index_name = MakeShared<String>("index_test");
+    auto index_dir = MakeShared<String>("data/db_test/table_test/0/0/index_test");
+    auto index_base = IndexSecondary::Make(index_name, "file_name", Vector<String>{"col1", "col2"});
+    String segment_filter_binary_data = "abcde";
+    String block_filter_binary_data = "abcde";
+    String base_name = "chunk1";
+    RowID base_rowid = RowID::FromUint64(8192U);
+    u32 row_count = 123;
+
+    UniquePtr<char[]> buffer;
+    i32 buffer_size = 0;
+    UniquePtr<CatalogDeltaEntry> catalog_delta_entry1;
+    {
+        catalog_delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+        {
+            auto op = MakeUnique<AddDBEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}", db_name));
+            op->db_entry_dir_ = db_dir;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddTableEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}", db_name, table_name));
+            op->table_entry_dir_ = table_entry_dir;
+            op->column_defs_ = column_defs;
+            op->row_count_ = 0;
+            op->unsealed_id_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddSegmentEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", db_name, table_name, segment_id));
+            op->status_ = SegmentStatus::kUnsealed;
+            op->column_count_ = op->row_count_ = op->actual_row_count_ = op->row_capacity_ = 0;
+            op->min_row_ts_ = op->max_row_ts_ = op->deprecate_ts_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddBlockEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", db_name, table_name, segment_id, block_id));
+            op->row_capacity_ = op->row_count_ = op->min_row_ts_ = op->max_row_ts_ = op->checkpoint_ts_ = op->checkpoint_row_count_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddColumnEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}#{}", db_name, table_name, segment_id, block_id, column_id));
+            op->next_outline_idx_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddTableIndexEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", db_name, table_name, *index_name));
+            op->index_dir_ = index_dir;
+            op->index_base_ = index_base;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddSegmentIndexEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", db_name, table_name, *index_name, segment_id));
+            op->min_ts_ = op->max_ts_ = 0;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddChunkIndexEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}#{}", db_name, table_name, *index_name, segment_id, base_name));
+            op->base_name_ = base_name;
+            op->base_rowid_ = base_rowid;
+            op->row_count_ = row_count;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddSegmentEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", db_name, table_name, segment_id));
+            op->segment_filter_binary_data_ = segment_filter_binary_data;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+        {
+            auto op = MakeUnique<AddBlockEntryOp>();
+            op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", db_name, table_name, segment_id, block_id));
+            op->block_filter_binary_data_ = block_filter_binary_data;
+            catalog_delta_entry1->operations().push_back(std::move(op));
+        }
+
+        buffer_size = catalog_delta_entry1->GetSizeInBytes();
+        buffer = MakeUnique<char[]>(buffer_size);
+        auto *ptr = buffer.get();
+        catalog_delta_entry1->WriteAdv(ptr);
+        EXPECT_EQ(ptr - buffer.get(), buffer_size);
+    }
+
+    {
+        char *ptr = buffer.get();
+        auto catalog_delta_entry2 = CatalogDeltaEntry::ReadAdv(ptr, buffer_size);
+
+        size_t op_size = catalog_delta_entry1->operations().size();
+        EXPECT_EQ(op_size, catalog_delta_entry2->operations().size());
+        for (size_t i = 0; i < op_size; ++i) {
+            const auto &op1 = *catalog_delta_entry1->operations()[i];
+            const auto &op2 = *catalog_delta_entry2->operations()[i];
+            EXPECT_EQ(op1, op2);
+        }
+    }
+    infinity::InfinityContext::instance().UnInit();
+}
+
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
+    std::shared_ptr<std::string> config_path = nullptr;
+    RemoveDbDirs();
+    InfinityContext::instance().Init(config_path);
+
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto local_catalog_delta_entry = std::make_unique<CatalogDeltaEntry>();
-    local_catalog_delta_entry->set_txn_id(1);
-    local_catalog_delta_entry->set_commit_ts(1);
+    //    local_catalog_delta_entry->set_txn_ids({1});
+    //    local_catalog_delta_entry->set_commit_ts(1);
+    local_catalog_delta_entry->SaveState(1, 1, 1);
 
-    String db_name{"db_test"};
-    String db_dir{"data"};
-    String table_name{"table_test"};
-    String table_entry_dir{"data/db_test/table_test"};
+    auto db_name = MakeShared<String>("db_test");
+    auto db_dir = MakeShared<String>("data");
+    auto table_name = MakeShared<String>("table_test");
+    auto table_entry_dir = MakeShared<String>("data/db_test/table_test");
     SegmentID segment_id = 0;
-    String segment_dir{"data/db_test/table_test/0"};
     BlockID block_id = 0;
-    String block_dir{"data/db_test/table_test/0/0"};
     ColumnID column_id = 0;
-    String index_name{"index_test"};
-    String index_dir{"data/db_test/table_test/0/0/index_test"};
-    String col_index_dir{"data/db_test/table_test/0/0/index_test"};
+    auto index_name = MakeShared<String>("index_test");
+    auto index_dir = MakeShared<String>("data/db_test/table_test/0/0/index_test");
     Vector<SharedPtr<ColumnDef>> column_defs{};
     SharedPtr<IndexBase> index_base{nullptr};
 
-    // db meta
-    auto op1 = MakeUnique<AddDBMetaOp>(1, false, 0, 0, db_name, db_dir);
-    auto op1_same_name = MakeUnique<AddDBMetaOp>(1, false, 0, 0, db_name, db_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op1));
-    local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    {
+        auto op1 = MakeUnique<AddDBEntryOp>();
+        auto op2 = MakeUnique<AddDBEntryOp>();
+        auto op1_same_name = MakeUnique<AddDBEntryOp>();
 
-    // db entry
-    auto op2 = MakeUnique<AddDBEntryOp>(2, false, 0, 0, db_name, db_dir);
-    auto op3 = MakeUnique<AddDBEntryOp>(3, true, 0, 0, db_name, db_dir);
-    auto op2_same_name = MakeUnique<AddDBEntryOp>(2, false, 0, 0, db_name, db_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op2));
-    local_catalog_delta_entry->operations().push_back(std::move(op3));
-    local_catalog_delta_entry->operations().push_back(std::move(op2_same_name));
+        auto encode = MakeShared<String>(fmt::format("#{}", *db_name));
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
 
-    // table meta
-    auto op4 = MakeUnique<AddTableMetaOp>(4, false, 0, 0, db_name, table_name, db_dir);
-    auto op4_same_name = MakeUnique<AddTableMetaOp>(4, false, 0, 0, db_name, table_name, db_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op4));
-    local_catalog_delta_entry->operations().push_back(std::move(op4_same_name));
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kDelete;
 
-    // table entry
-    auto op5 = MakeUnique<AddTableEntryOp>(5, false, 0, 0, db_name, table_name, table_entry_dir, column_defs);
-    auto op6 = MakeUnique<AddTableEntryOp>(6, true, 0, 0, db_name, table_name, table_entry_dir, column_defs);
-    auto op5_same_name = MakeUnique<AddTableEntryOp>(5, 0, 0, false, db_name, table_name, table_entry_dir, column_defs);
-    local_catalog_delta_entry->operations().push_back(std::move(op5));
-    local_catalog_delta_entry->operations().push_back(std::move(op6));
-    local_catalog_delta_entry->operations().push_back(std::move(op5_same_name));
+        op1_same_name->db_entry_dir_ = op2->db_entry_dir_ = op1->db_entry_dir_ = db_dir;
 
-    // segment entry
-    auto op7 = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, segment_dir, 0, 0, 0, 0, 0, 0);
-    auto op7_same_name = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, segment_dir, 0, 0, 0, 0, 0, 0);
-    local_catalog_delta_entry->operations().push_back(std::move(op7));
-    local_catalog_delta_entry->operations().push_back(std::move(op7_same_name));
+        auto op1_copy = MakeUnique<AddDBEntryOp>(*op1);
+        op1_copy->merge_flag_ = MergeFlag::kUpdate;
 
-    // block entry
-    auto op8 = MakeUnique<AddBlockEntryOp>(8, false, 0, 0, db_name, table_name, segment_id, block_id, block_dir);
-    auto op8_same_name = MakeUnique<AddBlockEntryOp>(8, false, 0, 0, db_name, table_name, segment_id, block_id, block_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op8));
-    local_catalog_delta_entry->operations().push_back(std::move(op8_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddTableEntryOp>();
+        auto op2 = MakeUnique<AddTableEntryOp>();
+        auto op1_same_name = MakeUnique<AddTableEntryOp>();
 
-    // column entry
-    auto op9 = MakeUnique<AddColumnEntryOp>(9, false, 0, 0, db_name, table_name, segment_id, block_id, column_id);
-    auto op9_same_name = MakeUnique<AddColumnEntryOp>(9, false, 0, 0, db_name, table_name, segment_id, block_id, column_id);
-    local_catalog_delta_entry->operations().push_back(std::move(op9));
-    local_catalog_delta_entry->operations().push_back(std::move(op9_same_name));
+        auto encode = MakeShared<String>(fmt::format("#{}#{}", *db_name, *table_name));
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
 
-    // index meta
-    auto op10 = MakeUnique<AddIndexMetaOp>(10, false, 0, 0, db_name, table_name, index_name);
-    auto op10_same_name = MakeUnique<AddIndexMetaOp>(10, false, 0, 0, db_name, table_name, index_name);
-    local_catalog_delta_entry->operations().push_back(std::move(op10));
-    local_catalog_delta_entry->operations().push_back(std::move(op10_same_name));
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kDelete;
 
-    // table index entry
-    auto op11 = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
-    auto op11_same_name = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
-    local_catalog_delta_entry->operations().push_back(std::move(op11));
-    local_catalog_delta_entry->operations().push_back(std::move(op11_same_name));
+        op1_same_name->table_entry_dir_ = op2->table_entry_dir_ = op1->table_entry_dir_ = table_entry_dir;
+        op1_same_name->column_defs_ = op2->column_defs_ = op1->column_defs_ = column_defs;
 
-    // irs index entry
-    auto op12 = MakeUnique<AddFulltextIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name, index_dir);
-    auto op12_same_name = MakeUnique<AddFulltextIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name, index_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op12));
-    local_catalog_delta_entry->operations().push_back(std::move(op12_same_name));
+        auto op1_copy = MakeUnique<AddTableEntryOp>(*op1);
+        op1_copy->merge_flag_ = MergeFlag::kUpdate;
 
-    // column index entry
-    auto op13 = MakeUnique<AddColumnIndexEntryOp>(13, false, 0, 0, db_name, table_name, index_name, col_index_dir, column_id, index_base);
-    auto op13_same_name = MakeUnique<AddColumnIndexEntryOp>(13, false, 0, 0, db_name, table_name, index_name, col_index_dir, column_id, index_base);
-    local_catalog_delta_entry->operations().push_back(std::move(op13));
-    local_catalog_delta_entry->operations().push_back(std::move(op13_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddSegmentEntryOp>();
+        auto op2 = MakeUnique<AddSegmentEntryOp>();
+        auto op1_same_name = MakeUnique<AddSegmentEntryOp>();
 
-    // segment column index entry
-    auto op14 = MakeUnique<AddSegmentColumnIndexEntryOp>(14, false, 0, 0, db_name, table_name, index_name, column_id, segment_id, 0, 14);
-    auto op14_same_name = MakeUnique<AddSegmentColumnIndexEntryOp>(14, false, 0, 0, db_name, table_name, index_name, column_id, segment_id, 1, 14);
-    local_catalog_delta_entry->operations().push_back(std::move(op14));
-    local_catalog_delta_entry->operations().push_back(std::move(op14_same_name));
+        auto encode = MakeShared<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id));
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
 
-    EXPECT_EQ(local_catalog_delta_entry->operations().size(), 26);
+        op1->status_ = SegmentStatus::kSealed;
+        op1->column_count_ = op1->row_count_ = op1->actual_row_count_ = op1->row_capacity_ = 0;
+        op1->min_row_ts_ = op1->max_row_ts_ = op1->deprecate_ts_ = 0;
+
+        op1_same_name->status_ = SegmentStatus::kSealed;
+        op1_same_name->column_count_ = op1_same_name->row_count_ = op1_same_name->actual_row_count_ = op1_same_name->row_capacity_ = 0;
+        op1_same_name->min_row_ts_ = op1_same_name->max_row_ts_ = op1_same_name->deprecate_ts_ = 0;
+
+        op2->status_ = SegmentStatus::kDeprecated;
+        op2->column_count_ = op2->row_count_ = op2->actual_row_count_ = op2->row_capacity_ = 0;
+        op2->min_row_ts_ = op2->max_row_ts_ = op2->deprecate_ts_ = 0;
+
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kUpdate;
+
+        auto op1_copy = MakeUnique<AddSegmentEntryOp>(*op1);
+        op1_copy->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddBlockEntryOp>();
+        auto op1_same_name = MakeUnique<AddBlockEntryOp>();
+
+        auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id));
+        op1_same_name->encode_ = op1->encode_ = encode;
+
+        op1->row_capacity_ = op1->row_count_ = op1->min_row_ts_ = op1->max_row_ts_ = op1->checkpoint_ts_ = op1->checkpoint_row_count_ = 0;
+
+        op1_same_name->row_capacity_ = op1_same_name->row_count_ = op1_same_name->min_row_ts_ = op1_same_name->max_row_ts_ =
+            op1_same_name->checkpoint_ts_ = op1_same_name->checkpoint_row_count_ = 0;
+
+        op1->merge_flag_ = MergeFlag::kNew;
+        op1_same_name->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    }
+    {
+        auto op1 = MakeUnique<AddColumnEntryOp>();
+        auto op1_same_name = MakeUnique<AddColumnEntryOp>();
+
+        auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id, column_id));
+        op1_same_name->encode_ = op1->encode_ = encode;
+
+        op1_same_name->next_outline_idx_ = op1->next_outline_idx_ = 0;
+
+        op1->merge_flag_ = MergeFlag::kNew;
+        op1_same_name->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    }
+    {
+        auto op1 = MakeUnique<AddTableIndexEntryOp>();
+        auto op2 = MakeUnique<AddTableIndexEntryOp>();
+        auto op1_same_name = MakeUnique<AddTableIndexEntryOp>();
+
+        auto encode = MakeShared<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, *index_name));
+        op1_same_name->encode_ = op2->encode_ = op1->encode_ = encode;
+
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kDelete;
+
+        op1_same_name->index_dir_ = op2->index_dir_ = op1->index_dir_ = index_dir;
+        op1_same_name->index_base_ = op2->index_base_ = op1->index_base_ = index_base;
+
+        op1_same_name->merge_flag_ = op1->merge_flag_ = MergeFlag::kNew;
+        op2->merge_flag_ = MergeFlag::kDelete;
+
+        auto op1_copy = MakeUnique<AddTableIndexEntryOp>(*op1);
+        op1_copy->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op2));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_copy));
+    }
+    {
+        auto op1 = MakeUnique<AddSegmentIndexEntryOp>();
+        auto op1_same_name = MakeUnique<AddSegmentIndexEntryOp>();
+
+        auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}", *db_name, *table_name, *index_name, segment_id));
+        op1_same_name->encode_ = op1->encode_ = encode;
+
+        op1->min_ts_ = op1->max_ts_ = 0;
+        op1_same_name->min_ts_ = op1_same_name->max_ts_ = 0;
+
+        op1->merge_flag_ = MergeFlag::kNew;
+        op1_same_name->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+        local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    }
+    {
+        auto op1 = MakeUnique<AddSegmentEntryOp>();
+
+        op1->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id));
+
+        op1->segment_filter_binary_data_ = "abcde";
+
+        op1->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+    }
+    {
+        auto op1 = MakeUnique<AddBlockEntryOp>();
+
+        op1->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id));
+
+        op1->block_filter_binary_data_ = "abcde";
+
+        op1->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op1));
+    }
+    {
+        auto op = MakeUnique<AddSegmentEntryOp>();
+
+        op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}", *db_name, *table_name, segment_id));
+
+        op->status_ = SegmentStatus::kDeprecated;
+        op->column_count_ = op->row_count_ = op->actual_row_count_ = op->row_capacity_ = 0;
+        op->min_row_ts_ = op->max_row_ts_ = op->deprecate_ts_ = 0;
+
+        op->merge_flag_ = MergeFlag::kUpdate;
+
+        local_catalog_delta_entry->operations().push_back(std::move(op));
+    }
+
     // merge
-    global_catalog_delta_entry->Merge(std::move(local_catalog_delta_entry));
+    global_catalog_delta_entry->ReplayDeltaEntry(std::move(local_catalog_delta_entry));
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 26);
-    // check member
-    EXPECT_EQ(global_catalog_delta_entry->txn_id(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->commit_ts(), 1);
+    EXPECT_EQ(global_catalog_delta_entry->OpSize(), 5u);
+
+    infinity::InfinityContext::instance().UnInit();
+}
+
+TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
+    auto db_name = MakeShared<String>("db_test");
+    auto db_dir = MakeShared<String>("data");
+    auto table_name = MakeShared<String>("table_test");
+    auto table_entry_dir = MakeShared<String>("data/db_test/table_test");
+
+    auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
+    auto AddDBEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag, TxnTimeStamp commit_ts) {
+        auto op1 = MakeUnique<AddDBEntryOp>();
+        op1->encode_ = MakeUnique<String>(fmt::format("#{}", *db_name));
+
+        op1->db_entry_dir_ = db_dir;
+        op1->merge_flag_ = merge_flag;
+        op1->commit_ts_ = commit_ts;
+        delta_entry->operations().push_back(std::move(op1));
+    };
+    auto AddTableEntry = [&](CatalogDeltaEntry *delta_entry, MergeFlag merge_flag, TxnTimeStamp commit_ts) {
+        auto op1 = MakeUnique<AddTableEntryOp>();
+        op1->encode_ = MakeUnique<String>(fmt::format("#{}#{}", *db_name, *table_name));
+
+        op1->table_entry_dir_ = table_entry_dir;
+        op1->merge_flag_ = merge_flag;
+        op1->commit_ts_ = commit_ts;
+        delta_entry->operations().push_back(std::move(op1));
+    };
+    {
+        TxnTimeStamp commit_ts = 1;
+        auto delta_entry = std::make_unique<CatalogDeltaEntry>();
+        delta_entry->set_txn_ids({1});
+        delta_entry->set_commit_ts(commit_ts);
+        AddDBEntry(delta_entry.get(), MergeFlag::kNew, commit_ts);
+        AddDBEntry(delta_entry.get(), MergeFlag::kUpdate, commit_ts);
+        global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry));
+
+        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
+        EXPECT_EQ(merged_entry->operations().size(), 1u);
+    }
+    {
+        TxnTimeStamp commit_ts = 2;
+        auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+        delta_entry1->set_txn_ids({1});
+        delta_entry1->set_commit_ts(commit_ts);
+        AddDBEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
+        AddDBEntry(delta_entry1.get(), MergeFlag::kUpdate, commit_ts);
+        global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
+
+        auto delta_entry2 = std::make_unique<CatalogDeltaEntry>();
+        delta_entry2->set_txn_ids({2});
+        delta_entry2->set_commit_ts(commit_ts);
+        AddDBEntry(delta_entry2.get(), MergeFlag::kDelete, commit_ts);
+        AddDBEntry(delta_entry2.get(), MergeFlag::kNew, commit_ts);
+        global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry2));
+
+        auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
+        EXPECT_EQ(merged_entry->operations().size(), 1u);
+    }
+    {
+        Vector<UniquePtr<CatalogDeltaEntry>> merged_entries;
+        {
+            TxnTimeStamp commit_ts = 3;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({1});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kUpdate, commit_ts);
+            global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
+
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+            merged_entries.push_back(std::move(merged_entry));
+        }
+        {
+            TxnTimeStamp commit_ts = 4;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({2});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kDelete, commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
+            global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+            merged_entries.push_back(std::move(merged_entry));
+        }
+        {
+            auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
+            for (auto &entry : merged_entries) {
+                global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
+            }
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(5);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+        }
+    }
+    {
+        Vector<UniquePtr<CatalogDeltaEntry>> merged_entries;
+        {
+            TxnTimeStamp commit_ts = 5;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({1});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kUpdate, commit_ts);
+            AddTableEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
+            AddTableEntry(delta_entry1.get(), MergeFlag::kUpdate, commit_ts);
+            global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 2u);
+            merged_entries.push_back(std::move(merged_entry));
+        }
+        {
+            TxnTimeStamp commit_ts = 6;
+            auto delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+            delta_entry1->set_txn_ids({2});
+            delta_entry1->set_commit_ts(commit_ts);
+            AddTableEntry(delta_entry1.get(), MergeFlag::kUpdate, commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kDelete, commit_ts);
+            AddDBEntry(delta_entry1.get(), MergeFlag::kNew, commit_ts);
+            global_catalog_delta_entry->ReplayDeltaEntry(std::move(delta_entry1));
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(commit_ts);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+            merged_entries.push_back(std::move(merged_entry));
+        }
+        {
+            auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
+            for (auto &entry : merged_entries) {
+                global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
+            }
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(7);
+            EXPECT_EQ(merged_entry->operations().size(), 1u);
+        }
+    }
 }

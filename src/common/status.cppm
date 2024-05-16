@@ -24,6 +24,7 @@ namespace infinity {
 export enum class ErrorCode : long {
 
     kOk = 0, // success
+    kIgnore = 1,
 
     // 1. config error,
     kInvalidTimeInfo = 1001,
@@ -33,6 +34,7 @@ export enum class ErrorCode : long {
     kInvalidByteSize = 1005,
     kInvalidIPAddr = 1006,
     kInvalidLogLevel = 1007,
+    kInvalidConfig = 1008,
 
     // 2. Auth error
     kWrongPasswd = 2001,
@@ -104,6 +106,17 @@ export enum class ErrorCode : long {
     kInvalidFilterExpression = 3063,
     kMultipleFunctionMatched = 3064,
     kInsertWithoutValues = 3065,
+    kInvalidConflictType = 3066,
+    kInvalidJsonFormat = 3067,
+    kDuplicateColumnName = 3068,
+    kInvalidExpression = 3069,
+    kSegmentNotExist = 3070,
+    kAggregateFunctionWithEmptyArgs = 3071,
+    kBlockNotExist = 3072,
+    kInvalidTopKType = 3073,
+    kInvalidCreateOption = 3074,
+    kInvalidDropOption = 3075,
+    kInvalidCommand = 3076,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -133,17 +146,22 @@ export enum class ErrorCode : long {
     kDirNotFound = 7009,
     kDataIOError = 7010,
     kUnexpectedError = 7011,
+    kParserError = 7012,
+    kMmapFileError = 7013,
+    kMunmapFileError = 7014,
 
     // 8. meta error
     kInvalidEntry = 8001,
-    kNotFoundEntry = 8002,
-    kEmptyEntryList = 8003,
+    kDuplicateEntry = 8002,
+    kNotFoundEntry = 8003,
+    kEmptyEntryList = 8004,
 };
 
 export class Status {
 public:
     // 0. Success
     static Status OK() { return {}; }
+    static Status Ignore();
 
     // 1. Config error
     static Status InvalidTimeInfo(const String &time_info);
@@ -157,6 +175,7 @@ public:
     static Status InvalidByteSize(const String &byte_size);
     static Status InvalidIPAddr(const String &ip_addr);
     static Status InvalidLogLevel(const String &log_level);
+    static Status InvalidConfig(const String &detailed_info);
 
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);
@@ -221,9 +240,17 @@ public:
     static Status InvalidIndexType();
     static Status InvalidIndexParam(const String &param_name);
     static Status LackIndexParam();
-    static Status InvalidFilterExpression(const String& expr);
-    static Status MultipleFunctionMatched(const String& function, const String& matched_functions);
+    static Status InvalidFilterExpression(const String &expr);
+    static Status MultipleFunctionMatched(const String &function, const String &matched_functions);
     static Status InsertWithoutValues();
+    static Status InvalidConflictType();
+    static Status InvalidJsonFormat(const String& invalid_json);
+    static Status DuplicateColumnName(const String& column_name);
+    static Status InvalidExpression(const String& expr_str);
+    static Status SegmentNotExist(const SegmentID &segment_id);
+    static Status BlockNotExist(const BlockID &block_id);
+    static Status AggregateFunctionWithEmptyArgs();
+    static Status InvalidCommand(const String& detailed_error);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -253,10 +280,14 @@ public:
     static Status DirNotFound(const String &path);
     static Status DataIOError(const String &detailed_info);
     static Status UnexpectedError(const String &detailed_info);
+    static Status ParserError(const String &detailed_info);
+    static Status MmapFileError(const String &detailed_info);
+    static Status MunmapFileError(const String &detailed_info);
 
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
+    static Status DuplicateEntry();
     static Status EmptyEntryList();
 
 public:
@@ -299,7 +330,7 @@ public:
 
     void AppendMessage(const String &msg);
 
-    inline Status clone() { return Status{code_, MakeUnique<String>(*msg_)}; }
+    inline Status clone() const { return Status{code_, MakeUnique<String>(*msg_)}; }
 
     ErrorCode code_{ErrorCode::kOk};
     UniquePtr<String> msg_{};

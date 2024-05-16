@@ -20,6 +20,9 @@
 namespace infinity {
 
 enum class ShowStmtType {
+    kDatabase,
+    kTable,
+    kIndex,
     kDatabases,
     kColumns,
     kTables,
@@ -29,9 +32,15 @@ enum class ShowStmtType {
     kConfigs,
     kProfiles,
     kSegments,
-    kSessionStatus,
-    kGlobalStatus,
-    kVar,
+    kSegment,
+    kBlocks,
+    kBlock,
+    kBlockColumn,
+    kSessionVariable,
+    kSessionVariables,
+    kGlobalVariable,
+    kGlobalVariables,
+    kConfig,
 };
 
 class ShowStatement : public BaseStatement {
@@ -43,8 +52,10 @@ public:
     ShowStmtType show_type_{ShowStmtType::kTables};
     std::string schema_name_{};
     std::string table_name_{};
+    std::optional<std::string> index_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
+    std::optional<u_int64_t> column_id_{};
     std::string var_name_{};
 };
 

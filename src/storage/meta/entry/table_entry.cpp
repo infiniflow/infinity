@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <stdexcept>
 #include <string>
 
@@ -34,7 +35,6 @@ import status;
 import infinity_exception;
 import index_ivfflat;
 import txn_manager;
-import iresearch_datastore;
 import index_base;
 import index_full_text;
 import catalog_delta_entry;
@@ -46,59 +46,106 @@ import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
+import build_fast_rough_filter_task;
+import block_entry;
+import segment_index_entry;
+import chunk_index_entry;
+import cleanup_scanner;
+import column_index_merger;
+import parsed_expr;
+import constant_expr;
+import infinity_context;
 
 namespace infinity {
 
-TableEntry::TableEntry() : BaseEntry(EntryType::kDummy) {}
+Vector<std::string_view> TableEntry::DecodeIndex(std::string_view encode) {
+    SizeT delimiter_i = encode.rfind('#');
+    if (delimiter_i == String::npos) {
+        UnrecoverableError(fmt::format("Invalid table entry encode: {}", encode));
+    }
+    auto decodes = DBEntry::DecodeIndex(encode.substr(0, delimiter_i));
+    decodes.push_back(encode.substr(delimiter_i + 1));
+    return decodes;
+}
 
-TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
-                       SharedPtr<String> table_collection_name,
+String TableEntry::EncodeIndex(const String &table_name, TableMeta *table_meta) {
+    if (table_meta == nullptr) {
+        return ""; // unit test
+    }
+    return fmt::format("{}#{}", table_meta->db_entry()->encode(), table_name);
+}
+
+TableEntry::TableEntry(bool is_delete,
+                       const SharedPtr<String> &table_entry_dir,
+                       SharedPtr<String> table_name,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
                        TransactionID txn_id,
-                       TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable), table_meta_(table_meta),
-      table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
-      table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
+                       TxnTimeStamp begin_ts,
+                       SegmentID unsealed_id,
+                       SegmentID next_segment_id)
+    : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
+      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type),
+      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
+    begin_ts_ = begin_ts;
+    txn_id_ = txn_id;
+
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         column_name2column_id_[columns[idx]->name()] = idx;
     }
 
-    begin_ts_ = begin_ts;
-    txn_id_ = txn_id;
-
-    // SetCompactionAlg(nullptr);
-    SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
-    Vector<SegmentEntry *> segments = this->PickCompactSegments();
-    compaction_alg_->Enable(segments);
+    // this->SetCompactionAlg(nullptr);
+    if (!is_delete) {
+        this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
+        compaction_alg_->Enable({});
+    }
 }
 
-SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,
-                                                SharedPtr<String> table_collection_name,
+SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
+                                                const SharedPtr<String> &db_entry_dir,
+                                                SharedPtr<String> table_name,
                                                 const Vector<SharedPtr<ColumnDef>> &columns,
                                                 TableEntryType table_entry_type,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
-
-    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
-    return table_entry;
+    SharedPtr<String> table_entry_dir = is_delete ? MakeShared<String>("deleted") : TableEntry::DetermineTableDir(*db_entry_dir, *table_name);
+    return MakeShared<TableEntry>(is_delete,
+                                  std::move(table_entry_dir),
+                                  std::move(table_name),
+                                  columns,
+                                  table_entry_type,
+                                  table_meta,
+                                  txn_id,
+                                  begin_ts,
+                                  INVALID_SEGMENT_ID,
+                                  0 /*next_segment_id*/);
 }
 
-SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
-                                                      SharedPtr<String> db_entry_dir,
-                                                      SharedPtr<String> table_name,
-                                                      Vector<SharedPtr<ColumnDef>> &column_defs,
-                                                      TableEntryType table_entry_type,
-                                                      TransactionID txn_id,
-                                                      TxnTimeStamp begin_ts,
-                                                      TxnTimeStamp commit_ts,
-                                                      bool is_delete,
-                                                      SizeT row_count) {
-    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
-    table_entry->deleted_ = is_delete;
+SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
+                                                   TableMeta *table_meta,
+                                                   SharedPtr<String> table_entry_dir,
+                                                   SharedPtr<String> table_name,
+                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                   TableEntryType table_entry_type,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnTimeStamp commit_ts,
+                                                   SizeT row_count,
+                                                   SegmentID unsealed_id,
+                                                   SegmentID next_segment_id) noexcept {
+    auto table_entry = MakeShared<TableEntry>(is_delete,
+                                              std::move(table_entry_dir),
+                                              std::move(table_name),
+                                              column_defs,
+                                              table_entry_type,
+                                              table_meta,
+                                              txn_id,
+                                              begin_ts,
+                                              unsealed_id,
+                                              next_segment_id);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
     table_entry->row_count_.store(row_count);
@@ -110,112 +157,148 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts,
-                                                         TxnManager *txn_mgr,
-                                                         bool is_replay,
-                                                         String replay_table_index_dir) {
+                                                         TxnManager *txn_mgr) {
     if (index_base->index_name_->empty()) {
         // Index name shouldn't be empty
         UnrecoverableError("Attempt to create no name index.");
     }
+    LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
+    auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
 
-    TableIndexMeta *table_index_meta{nullptr};
-
-    // TODO: lock granularity can be narrowed.
-    this->rw_locker().lock_shared();
-    if (auto iter = this->index_meta_map().find(*index_base->index_name_); iter != this->index_meta_map().end()) {
-        table_index_meta = iter->second.get();
-    }
-    this->rw_locker().unlock_shared();
-
-    if (table_index_meta == nullptr) {
-
-        UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_);
-
-        {
-            if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddIndexMetaOp>(new_table_index_meta.get(), begin_ts);
-                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-            }
-        }
-
-        table_index_meta = new_table_index_meta.get();
-
-        this->rw_locker().lock();
-
-        if (auto iter = this->index_meta_map().find(*index_base->index_name_); iter != this->index_meta_map().end()) {
-            table_index_meta = iter->second.get();
-        } else {
-
-            this->index_meta_map()[*index_base->index_name_] = std::move(new_table_index_meta);
-        }
-        this->rw_locker().unlock();
-    }
+    auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta));
 
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
-    return table_index_meta->CreateTableIndexEntry(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
+    return table_index_meta->CreateTableIndexEntry(std::move(r_lock), index_base, table_entry_dir_, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Tuple<TableIndexEntry *, Status>
+Tuple<SharedPtr<TableIndexEntry>, Status>
 TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    this->rw_locker().lock_shared();
-
-    TableIndexMeta *index_meta{nullptr};
-    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
-        index_meta = iter->second.get();
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, conflict_type);
+    if (!status.ok()) {
+        return {nullptr, status};
     }
-    this->rw_locker().unlock_shared();
-    if (index_meta == nullptr) {
-        switch (conflict_type) {
-
-            case ConflictType::kIgnore: {
-                return {nullptr, Status::OK()};
-            }
-            case ConflictType::kError: {
-                String error_message = fmt::format("Attempt to drop not existed index entry {}", index_name);
-                LOG_TRACE(error_message);
-                return {nullptr, Status(ErrorCode::kIndexNotExist, error_message.c_str())};
-            }
-            default: {
-                UnrecoverableError("Invalid conflict type.");
-            }
-        }
-        UnrecoverableError("Should not reach here.");
-    }
-    LOG_TRACE(fmt::format("Drop index entry {}", index_name));
-    return index_meta->DropTableIndexEntry(conflict_type, txn_id, begin_ts, txn_mgr);
+    SharedPtr<String> index_name_ptr = index_meta->index_name();
+    return index_meta->DropTableIndexEntry(std::move(r_lock), conflict_type, index_name_ptr, txn_id, begin_ts, txn_mgr);
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
-        return iter->second->GetEntry(txn_id, begin_ts);
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        return {nullptr, status};
     }
-    UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
-    LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+    return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr) {
-    this->rw_locker().lock_shared();
-
-    TableIndexMeta *table_index_meta{nullptr};
-    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
-        table_index_meta = iter->second.get();
+Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        return {nullptr, status};
     }
-    this->rw_locker().unlock_shared();
+    return index_meta->GetTableIndexInfo(std::move(r_lock), txn_id, begin_ts);
+}
 
+void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
-    table_index_meta->DeleteNewEntry(txn_id, txn_mgr);
+    return index_meta->DeleteEntry(txn_id);
 }
 
-void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
-                                      Map<String, String> &column2analyzer) {
+/// replay
+void TableEntry::UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry) {
+    txn_id_ = table_entry->txn_id_;
+    begin_ts_ = table_entry->begin_ts_;
+    commit_ts_.store(table_entry->commit_ts_);
+    row_count_ = table_entry->row_count();
+    unsealed_id_ = table_entry->unsealed_id();
+    next_segment_id_ = table_entry->next_segment_id();
+}
+
+TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_name,
+                                               std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                               TransactionID txn_id,
+                                               TxnTimeStamp begin_ts) {
+    auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_name); };
+    auto *index_meta = index_meta_map_.GetMetaNoLock(*index_name, std::move(init_index_meta));
+    return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+void TableEntry::UpdateIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    index_meta->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
+}
+
+void TableEntry::DropIndexReplay(const String &index_name,
+                                 std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                 TransactionID txn_id,
+                                 TxnTimeStamp begin_ts) {
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return index_meta->GetEntryReplay(txn_id, begin_ts);
+}
+
+void TableEntry::AddSegmentReplayWalImport(SharedPtr<SegmentEntry> segment_entry) {
+    this->AddSegmentReplayWal(segment_entry);
+    row_count_ += segment_entry->actual_row_count();
+}
+
+void TableEntry::AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry) { this->AddSegmentReplayWal(segment_entry); }
+
+void TableEntry::AddSegmentReplayWal(SharedPtr<SegmentEntry> new_segment) {
+    SegmentID segment_id = new_segment->segment_id();
+    segment_map_[segment_id] = new_segment;
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegment(new_segment.get());
+    }
+    next_segment_id_++;
+}
+
+void TableEntry::AddSegmentReplay(SharedPtr<SegmentEntry> new_segment) {
+    SegmentID segment_id = new_segment->segment_id();
+
+    auto [iter, insert_ok] = segment_map_.emplace(segment_id, new_segment);
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("Segment {} already exists.", segment_id));
+    }
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegment(new_segment.get());
+    }
+    if (segment_id == unsealed_id_) {
+        unsealed_segment_ = std::move(new_segment);
+    }
+}
+
+void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String segment_filter_binary_data) {
+    SegmentID segment_id = new_segment->segment_id();
+
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
+        UnrecoverableError(fmt::format("Segment {} not found.", segment_id));
+    }
+    iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
+}
+
+void TableEntry::GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer) {
     column2analyzer.clear();
-    for (auto &[_, table_index_meta] : this->index_meta_map()) {
-        auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
         if (status.ok()) {
-            fulltext_index_entry = table_index_entry->fulltext_index_entry();
             const IndexBase *index_base = table_index_entry->index_base();
             if (index_base->index_type_ != IndexType::kFullText)
                 continue;
@@ -223,16 +306,69 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
             for (auto &column_name : index_full_text->column_names_) {
                 column2analyzer[column_name] = index_full_text->analyzer_;
             }
-            if (!column2analyzer.empty()) {
-                // iresearch requires there is exactly one full index per table.
+        }
+    }
+}
+
+void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
+    {
+        std::unique_lock lock(this->rw_locker_);
+        SegmentID segment_id = segment_entry->segment_id();
+        auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
+        if (!insert_ok) {
+            UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+        }
+    }
+    // Populate index entirely for the segment
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, txn->BeginTS());
+        if (!status.ok())
+            continue;
+        const IndexBase *index_base = table_index_entry->index_base();
+        switch (index_base->index_type_) {
+            case IndexType::kFullText:
+            case IndexType::kSecondary:
+            case IndexType::kHnsw: {
+                // support realtime index
                 break;
+            }
+            default: {
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                LOG_WARN(*err_msg);
+                continue;
+            }
+        }
+        PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
+        SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
+        if (segment_index_entry.get() != nullptr) {
+            Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
+            txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            for (auto &chunk_index_entry : chunk_index_entries) {
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
             }
         }
     }
 }
 
-void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
-    if (this->deleted_) {
+void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
+    std::unique_lock lock(this->rw_locker_);
+    SegmentID segment_id = segment_entry->segment_id();
+    auto [_, insert_ok] = this->segment_map_.emplace(segment_id, std::move(segment_entry));
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+    }
+}
+
+void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr, bool is_replay) {
+    SizeT row_count = 0;
+
+    // Read-only no lock needed.
+    if (this->Deleted()) {
         UnrecoverableError("table is deleted");
         return;
     }
@@ -240,74 +376,69 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Txn *txn = txn_store_ptr->txn_;
     if (append_state_ptr->Finished()) {
+        // Import update row count
+        if (append_state_ptr->blocks_.empty()) {
+            for (auto &segment : txn_store_ptr->flushed_segments()) {
+                this->row_count_ += segment->row_count();
+            }
+        }
         LOG_TRACE("No append is done.");
         return;
     }
 
     while (!append_state_ptr->Finished()) {
         {
-            std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker()); // prevent another read conflict with this append operation
-            if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
+            std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_); // prevent another read conflict with this append operation
+            if (unsealed_segment_.get() == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
-                if (unsealed_segment_ != nullptr) {
-                    unsealed_segment_->SetSealed();
+                if (unsealed_segment_.get() != nullptr) {
+                    // The segment is full, need to be set sealed.
+                    txn_store_ptr->AddSealedSegment(unsealed_segment_.get());
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
 
-                this->segment_map_.emplace(new_segment_id, new_segment);
-                this->unsealed_segment_ = new_segment.get();
+                this->unsealed_segment_ = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn);
+                // FIXME: Why not use new_segment_id directly?
+                unsealed_id_ = unsealed_segment_->segment_id();
+                this->segment_map_.emplace(new_segment_id, this->unsealed_segment_);
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
-        // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
+        u64 actual_appended = unsealed_segment_->AppendData(txn_id, commit_ts, append_state_ptr, buffer_mgr, txn);
+
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
+        row_count += actual_appended;
     }
+
+    // Needn't inserting into MemIndex since MemIndexRecover is responsible for recovering MemIndex
+    if (!is_replay) {
+        // Realtime index insertion.
+        MemIndexInsert(txn, append_state_ptr->append_ranges_);
+    }
+
+    this->row_count_ += row_count;
 }
 
-void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
-    for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
-        for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
-            for (auto &[segment_id, segment_column_index] : segment_index_map) {
-                table_index_entry->CommitCreateIndex(column_id, segment_id, segment_column_index, is_replay);
-            }
-        }
-        if (table_index_entry->fulltext_index_entry().get() != nullptr) {
-            table_index_entry->CommitCreateIndex(table_index_entry->fulltext_index_entry());
-        }
-    }
-}
+Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state) {
+    SizeT row_count = 0;
 
-Status TableEntry::Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
+    TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
+    Txn *txn = txn_store_ptr->txn_;
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         SegmentID segment_id = to_delete_seg_rows.first;
-        SegmentEntry *segment_entry = GetSegmentByID(segment_id, commit_ts);
-        if (segment_entry == nullptr) {
+        SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, commit_ts);
+        if (!segment_entry) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap);
-    }
-    return Status::OK();
-}
+        SizeT delete_row_n = segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
 
-void TableEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
-    SizeT row_count = 0;
-    for (const auto &range : append_state_ptr->append_ranges_) {
-        LOG_TRACE(fmt::format("Commit, segment: {}, block: {} start offset: {}, count: {}",
-                              range.segment_id_,
-                              range.block_id_,
-                              range.start_offset_,
-                              range.row_count_));
-        SegmentEntry *segment_ptr = this->segment_map_[range.segment_id_].get();
-        segment_ptr->CommitAppend(txn_id, commit_ts, range.block_id_, range.start_offset_, range.row_count_);
-        row_count += range.row_count_;
+        row_count += delete_row_n;
     }
-    this->row_count_ += row_count;
+    this->row_count_ -= row_count;
+    return Status::OK();
 }
 
 void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
@@ -316,53 +447,73 @@ void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, vo
     UnrecoverableError("TableEntry::RollbackAppend");
 }
 
-void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &delete_state) {
-    SizeT row_count = 0;
-    for (const auto &to_delete_seg_rows : delete_state.rows_) {
-        u32 segment_id = to_delete_seg_rows.first;
-        SegmentEntry *segment = GetSegmentByID(segment_id, commit_ts);
-        if (segment == nullptr) {
-            UnrecoverableError(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
-        }
-        const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        segment->CommitDelete(txn_id, commit_ts, block_row_hashmap);
-        row_count += block_row_hashmap.size();
-    }
-    this->row_count_ -= row_count;
-}
-
 Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferManager *) {
     UnrecoverableError("TableEntry::RollbackDelete");
     return Status::OK();
 }
 
-Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
-    if (compact_store.segment_data_.empty()) {
+Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
+    if (compact_store.task_type_ == CompactSegmentsTaskType::kInvalid) {
         return Status::OK();
     }
-    for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
-        std::unique_lock lock(this->rw_locker());
-        for (const auto &old_segment : old_segments) {
-            old_segment->SetDeprecated(commit_ts);
+
+    {
+        // {
+        //     String ss = "Compact commit: " + *this->GetTableName();
+        //     for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+        //         auto *new_segment = segment_store.segment_entry_;
+        //         ss += ", new segment: " + std::to_string(new_segment->segment_id()) + ", old segment: ";
+        //         for (const auto *old_segment : old_segments) {
+        //             ss += std::to_string(old_segment->segment_id_) + " ";
+        //         }
+        //     }
+        //     LOG_INFO(ss);
+        // }
+        std::unique_lock lock(this->rw_locker_);
+        for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+
+            auto *segment_entry = segment_store.segment_entry_;
+
+            segment_entry->CommitSegment(txn_id, commit_ts, segment_store);
+
+            for (const auto &old_segment : old_segments) {
+                // old_segment->TrySetDeprecated(commit_ts);
+                old_segment->SetDeprecated(commit_ts);
+            }
         }
-        ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
+
+    // Update fulltext ts so that TableIndexReaderCache::GetIndexReader will update the cache
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, commit_ts);
+        if (!status.ok())
+            continue;
+        const IndexBase *index_base = table_index_entry->index_base();
+        switch (index_base->index_type_) {
+            case IndexType::kFullText: {
+                table_index_entry->UpdateFulltextSegmentTs(commit_ts);
+                break;
+            }
+            default: {
+            }
+        }
+    }
+
     if (compaction_alg_.get() == nullptr) {
         return Status::OK();
     }
 
-    Vector<SegmentEntry *> new_segments;
-    std::transform(compact_store.segment_data_.begin(), compact_store.segment_data_.end(), std::back_inserter(new_segments), [](const auto &pair) {
-        return pair.first.get();
-    });
     switch (compact_store.task_type_) {
         case CompactSegmentsTaskType::kCompactPickedSegments: {
-            compaction_alg_->CommitCompact(new_segments, txn_id);
+            compaction_alg_->CommitCompact(txn_id);
+            LOG_TRACE(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
             break;
         }
         case CompactSegmentsTaskType::kCompactTable: {
             //  reinitialize compaction_alg_ with new segments and enable it
-            compaction_alg_->Enable(new_segments);
+            LOG_TRACE(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
+            compaction_alg_->Enable({});
             break;
         }
         default: {
@@ -373,140 +524,447 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
 }
 
 Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
-    if (compact_store.segment_data_.empty()) {
+    if (compact_store.compact_data_.empty()) {
         return Status::OK();
     }
-    for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
-        std::unique_lock lock(this->rw_locker());
-        for (const auto &old_segment : old_segments) {
-            old_segment->RollbackCompact();
+    {
+        for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+            SharedPtr<SegmentEntry> segment;
+
+            auto *segment_entry = segment_store.segment_entry_;
+            segment_entry->RollbackBlocks(commit_ts, segment_store.block_entries_);
+            if (segment_entry->Committed()) {
+                UnrecoverableError(fmt::format("RollbackCompact: segment {} is committed", segment_entry->segment_id()));
+            }
+            {
+                std::unique_lock lock(this->rw_locker_);
+                if (auto iter = segment_map_.find(segment_entry->segment_id()); iter != segment_map_.end()) {
+                    segment = std::move(iter->second);
+                    segment_map_.erase(iter);
+                } else {
+                    UnrecoverableError(fmt::format("RollbackCompact: segment {} not found", segment_entry->segment_id()));
+                }
+
+                for (auto *old_segment : old_segments) {
+                    old_segment->RollbackCompact();
+                }
+            }
+            segment->Cleanup();
         }
     }
-    if (compaction_alg_.get() == nullptr) {
-        return Status::OK();
+    if (compaction_alg_.get() != nullptr) {
+        switch (compact_store.task_type_) {
+            case CompactSegmentsTaskType::kCompactPickedSegments: {
+                compaction_alg_->RollbackCompact(txn_id);
+                break;
+            }
+            case CompactSegmentsTaskType::kCompactTable: {
+                Vector<SegmentEntry *> old_segments;
+                for (const auto &[_, old_segs] : compact_store.compact_data_) {
+                    old_segments.insert(old_segments.end(), old_segs.begin(), old_segs.end());
+                }
+                compaction_alg_->Enable(old_segments);
+                break;
+            }
+            default: {
+                UnrecoverableError("Invalid compact task type");
+            }
+        }
     }
 
-    switch (compact_store.task_type_) {
-        case CompactSegmentsTaskType::kCompactPickedSegments: {
-            compaction_alg_->RollbackCompact(txn_id);
-            break;
-        }
-        case CompactSegmentsTaskType::kCompactTable: {
-            Vector<SegmentEntry *> new_segments;
-            std::transform(compact_store.segment_data_.begin(),
-                           compact_store.segment_data_.end(),
-                           std::back_inserter(new_segments),
-                           [](const auto &pair) { return pair.first.get(); });
-            compaction_alg_->Enable(new_segments);
-            break;
-        }
-        default: {
-            UnrecoverableError("Invalid compact task type");
+    return Status::OK();
+}
+
+Status TableEntry::CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
+    for (const auto &[segment_id, segment_store] : segment_stores) {
+        auto *segment_entry = segment_store.segment_entry_;
+        segment_entry->CommitSegment(txn_id, commit_ts, segment_store);
+    }
+    return Status::OK();
+}
+
+Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores) {
+    for (auto &segment_store : segment_stores) {
+        auto *segment_entry = segment_store.segment_entry_;
+        segment_entry->RollbackBlocks(commit_ts, segment_store.block_entries_);
+
+        if (!segment_entry->Committed()) {
+            SharedPtr<SegmentEntry> segment;
+            {
+                std::unique_lock w_lock(this->rw_locker_);
+                if (auto iter = segment_map_.find(segment_entry->segment_id()); iter != segment_map_.end()) {
+                    segment = std::move(iter->second);
+                    segment_map_.erase(iter);
+                } else {
+                    UnrecoverableError(fmt::format("RollbackWrite: segment {} not found", segment_entry->segment_id()));
+                }
+            }
+            segment->Cleanup();
         }
     }
     return Status::OK();
 }
 
-Status TableEntry::CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock) {
-    ImportSegment(commit_ts, segment, call_with_lock);
-    row_count_ += segment->row_count();
-    return Status::OK();
-}
-
-Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock) {
-    if (this->deleted_) {
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
-        return Status(ErrorCode::kTableNotExist, std::move(err_msg));
+void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
+    Map<SegmentID, Vector<AppendRange>> seg_append_ranges;
+    SizeT num_ranges = append_ranges.size();
+    for (SizeT i = 0; i < num_ranges; i++) {
+        AppendRange &range = append_ranges[i];
+        seg_append_ranges[range.segment_id_].push_back(range);
     }
-
-    segment->min_row_ts_ = commit_ts;
-    // FIXME: max_row_ts is set when the segment is deprecated
-
-    for (auto &block_entry : segment->block_entries_) {
-        block_entry->min_row_ts_ = commit_ts;
-        block_entry->max_row_ts_ = commit_ts;
-        // ATTENTION: Do not modify the block_entry checkpoint_ts_
-        block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count());
-    }
-
-    std::unique_lock<std::shared_mutex> rw_locker;
-    if (!call_with_lock) {
-        rw_locker = std::unique_lock(this->rw_locker());
-    }
-    this->segment_map_.emplace(segment->segment_id_, std::move(segment));
-    return Status::OK();
-}
-
-SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
-    try {
-        std::shared_lock lock(this->rw_locker());
-        auto *segment = segment_map_.at(segment_id).get();
-        if ( // TODO: read deprecate segment is allowed
-             // segment->deprecate_ts() < ts ||
-            segment->min_row_ts() > ts) {
-            return nullptr;
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (!status.ok())
+            continue;
+        const IndexBase *index_base = table_index_entry->index_base();
+        switch (index_base->index_type_) {
+            case IndexType::kHnsw:
+            case IndexType::kFullText:
+            case IndexType::kSecondary: {
+                for (auto &[seg_id, ranges] : seg_append_ranges) {
+                    MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
+                }
+                break;
+            }
+            default: {
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                LOG_WARN(*err_msg);
+            }
         }
-        return segment;
-    } catch (const std::out_of_range &e) {
+    }
+}
+
+void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges) {
+    const IndexBase *index_base = table_index_entry->index_base();
+
+    SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(seg_id, MAX_TIMESTAMP);
+    SharedPtr<SegmentIndexEntry> segment_index_entry;
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+    bool created = table_index_entry->GetOrCreateSegment(seg_id, txn, segment_index_entry);
+    if (created) {
+        Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
+        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+
+        if (index_base->index_type_ == IndexType::kFullText) {
+            table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+        }
+    }
+    table_index_entry->last_segment_ = segment_index_entry;
+    Vector<SharedPtr<BlockEntry>> block_entries;
+    SizeT num_ranges = append_ranges.size();
+    SizeT dump_idx = SizeT(-1);
+    // Determine the last sealed BlockEntry
+    for (SizeT i = 0; i < num_ranges; i++) {
+        AppendRange &range = append_ranges[i];
+        SharedPtr<BlockEntry> block_entry = segment_entry->GetBlockEntryByID(range.block_id_);
+        block_entries.push_back(block_entry);
+        if (block_entry->GetAvailableCapacity() <= 0)
+            dump_idx = i;
+    }
+    for (SizeT i = 0; i < num_ranges; i++) {
+        AppendRange &range = append_ranges[i];
+        SharedPtr<BlockEntry> block_entry = block_entries[i];
+        segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
+        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->MemIndexCapacity()) {
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
+            if (chunk_index_entry.get() != nullptr) {
+                chunk_index_entry->Commit(txn->CommitTS());
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+
+                if (index_base->index_type_ == IndexType::kFullText) {
+                    table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+                }
+            }
+        }
+    }
+}
+
+void TableEntry::MemIndexDump(Txn *txn, bool spill) {
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (!status.ok())
+            continue;
+        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
+        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn_index_store, spill);
+        if (chunk_index_entry.get() != nullptr) {
+            chunk_index_entry->Commit(txn->CommitTS());
+            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+            table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+        }
+    }
+}
+
+void TableEntry::MemIndexCommit() {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
+        if (status.ok()) {
+            table_index_entry->MemIndexCommit();
+        }
+    }
+}
+
+void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
+        if (!status.ok())
+            continue;
+        for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+            SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, segment_index_entry->max_ts());
+            assert(segment_entry.get() != nullptr);
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+
+            // Determine block entries need to insert into MemIndexer
+            Vector<AppendRange> append_ranges;
+            Vector<SharedPtr<BlockEntry>> &block_entries = segment_entry->block_entries();
+            if (chunk_index_entries.empty()) {
+                for (SizeT i = 0; i < block_entries.size(); i++) {
+                    append_ranges.emplace_back(segment_id, i, 0, block_entries[i]->row_count());
+                }
+            } else {
+                SizeT block_capacity = block_entries[0]->row_capacity();
+                SharedPtr<ChunkIndexEntry> &chunk_index_entry = chunk_index_entries.back();
+                RowID base_rowid = chunk_index_entry->base_rowid_ + chunk_index_entry->row_count_;
+                SizeT block_id = base_rowid.segment_offset_ / block_capacity;
+                assert(block_id <= block_entries.size());
+                if (block_id >= block_entries.size())
+                    continue;
+                SizeT start_offset = base_rowid.segment_offset_ % block_capacity;
+                SizeT last_block_row_count = block_entries[block_id]->row_count();
+                assert(last_block_row_count >= start_offset);
+                SizeT row_count = last_block_row_count - start_offset;
+                if (row_count == 0)
+                    continue;
+                append_ranges.emplace_back(segment_id, block_id, start_offset, row_count);
+                for (SizeT i = block_id + 1; i < block_entries.size(); i++) {
+                    assert(block_entries[i - 1]->row_capacity() == block_capacity);
+                    if (block_entries[i - 1]->GetAvailableCapacity() > 0) {
+                        LOG_ERROR(fmt::format("MemIndexRecover got a non-full BlockEntry. block_id {}, row_count {}, block_entries {}",
+                                              block_entries[i - 1]->block_id(),
+                                              block_entries[i - 1]->row_count(),
+                                              block_entries.size()));
+                    }
+                    append_ranges.emplace_back(segment_id, i, 0, block_entries[i]->row_count());
+                }
+            }
+
+            // Insert block entries into MemIndexer
+            SizeT num_ranges = append_ranges.size();
+            for (SizeT i = 0; i < num_ranges; i++) {
+                AppendRange &range = append_ranges[i];
+                segment_index_entry->MemIndexInsert(block_entries[range.block_id_],
+                                                    range.start_offset_,
+                                                    range.row_count_,
+                                                    segment_index_entry->max_ts(),
+                                                    buffer_manager);
+            }
+            if (segment_id == unsealed_id_) {
+                table_index_entry->last_segment_ = segment_index_entry;
+            } else {
+                segment_index_entry->MemIndexDump();
+            }
+        }
+    }
+}
+
+void TableEntry::OptimizeIndex(Txn *txn) {
+    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (!status.ok()) {
+            continue;
+        }
+        const IndexBase *index_base = table_index_entry->index_base();
+        switch (index_base->index_type_) {
+            case IndexType::kFullText: {
+                const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+                    Vector<ChunkIndexEntry *> old_chunks;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn->BeginTS());
+                    if (chunk_index_entries.size() <= 1) {
+                        continue;
+                    }
+
+                    String msg("merging");
+                    Vector<String> base_names;
+                    Vector<RowID> base_rowids;
+                    RowID base_rowid = chunk_index_entries[0]->base_rowid_;
+                    u32 total_row_count = 0;
+                    for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
+                        auto &chunk_index_entry = chunk_index_entries[i];
+                        assert(chunk_index_entry->base_rowid_ == chunk_index_entries[0]->base_rowid_ + total_row_count);
+                        msg += " " + chunk_index_entry->base_name_;
+                        base_names.push_back(chunk_index_entry->base_name_);
+                        base_rowids.push_back(chunk_index_entry->base_rowid_);
+                        total_row_count += chunk_index_entry->row_count_;
+                    }
+                    String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
+                    msg += " -> " + dst_base_name;
+                    LOG_INFO(msg);
+                    ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
+                                                          index_fulltext->flag_,
+                                                          &table_index_entry->GetFulltextByteSlicePool(),
+                                                          &table_index_entry->GetFulltextBufferPool());
+                    column_index_merger.Merge(base_names, base_rowids, dst_base_name);
+
+                    for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
+                        auto &chunk_index_entry = chunk_index_entries[i];
+                        txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+                        old_chunks.push_back(chunk_index_entry.get());
+                    }
+                    SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
+                                                                                                                dst_base_name,
+                                                                                                                base_rowid,
+                                                                                                                total_row_count,
+                                                                                                                txn->buffer_mgr());
+                    txn_table_store->AddChunkIndexStore(table_index_entry, merged_chunk_index_entry.get());
+                    segment_index_entry->ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+                    // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
+                    TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
+                    table_index_entry->UpdateFulltextSegmentTs(ts);
+                }
+                break;
+            }
+            case IndexType::kHnsw:
+            case IndexType::kSecondary: {
+                TxnTimeStamp begin_ts = txn->BeginTS();
+                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                    SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
+                    if (segment_entry != nullptr) {
+                        auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);
+                        if (merged_chunk_entry != nullptr) {
+                            merged_chunk_entry->SaveIndexFile();
+                        }
+                    }
+                }
+                break;
+            }
+            default: {
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                LOG_WARN(*err_msg);
+            }
+        }
+    }
+}
+
+SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
+    std::shared_lock lock(this->rw_locker_);
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
         return nullptr;
     }
+    const auto &segment = iter->second;
+    if (segment->min_row_ts() > ts) {
+        return nullptr;
+    }
+    return segment;
 }
 
-Tuple<SizeT, SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
+SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID seg_id, Txn *txn) const {
+    std::shared_lock lock(this->rw_locker_);
+    auto iter = segment_map_.find(seg_id);
+    if (iter == segment_map_.end()) {
+        return nullptr;
+    }
+    const auto &segment = iter->second;
+    if (!segment->CheckVisible(txn)) {
+        return nullptr;
+    }
+    return segment;
+}
+
+Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     auto iter = this->segment_map_.find(seg_id);
     if (iter != this->segment_map_.end()) {
-        return {iter->second->row_count(), iter->second->actual_row_count(), Status::OK()};
+        return {iter->second->row_count(), Status::OK()};
     } else {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No segment id: {}.", seg_id));
         LOG_ERROR(*err_msg);
         UnrecoverableError(*err_msg);
-        return {0, 0, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
+        return {0, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
     }
 }
 
 const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_name_ptr(); }
 
-SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
+String TableEntry::GetPathNameTail() const {
+    SizeT delimiter_i = table_entry_dir_->rfind('/');
+    if (delimiter_i == String::npos) {
+        return *table_entry_dir_;
+    }
+    return table_entry_dir_->substr(delimiter_i + 1);
+}
+
+SharedPtr<BlockIndex> TableEntry::GetBlockIndex(Txn *txn) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
-    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker());
+    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     result->Reserve(this->segment_map_.size());
 
     // Add segment that is not deprecated
     for (const auto &segment_pair : this->segment_map_) {
-        result->Insert(segment_pair.second.get(), begin_ts);
+        result->Insert(segment_pair.second.get(), txn);
     }
 
     return result;
 }
 
-nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
+    for (auto &[segment_id, block_offsets_map] : delete_state.rows_) {
+        auto *segment_entry = GetSegmentByID(segment_id, txn).get();
+        if (segment_entry == nullptr) {
+            return false;
+        }
+        if (!segment_entry->CheckDeleteVisible(block_offsets_map, txn)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
     Vector<SegmentEntry *> segment_candidates;
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
+    SizeT checkpoint_row_count = 0;
     {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["table_entry_dir"] = *this->table_entry_dir_;
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;
-        json_res["row_count"] = this->row_count_.load();
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
-        json_res["txn_id"] = this->txn_id_.load();
+        json_res["txn_id"] = this->txn_id_;
         json_res["deleted"] = this->deleted_;
-        for (const auto &column_def : this->columns_) {
-            nlohmann::json column_def_json;
-            column_def_json["column_type"] = column_def->type()->Serialize();
-            column_def_json["column_id"] = column_def->id();
-            column_def_json["column_name"] = column_def->name();
+        if (!this->deleted_) {
+            json_res["table_entry_dir"] = *this->table_entry_dir_;
+            for (const auto &column_def : this->columns_) {
+                nlohmann::json column_def_json;
+                column_def_json["column_type"] = column_def->type()->Serialize();
+                column_def_json["column_id"] = column_def->id();
+                column_def_json["column_name"] = column_def->name();
 
-            for (const auto &column_constraint : column_def->constraints_) {
-                column_def_json["constraints"].emplace_back(column_constraint);
+                for (const auto &column_constraint : column_def->constraints_) {
+                    column_def_json["constraints"].emplace_back(column_constraint);
+                }
+
+                if (column_def->has_default_value()) {
+                    auto default_expr = dynamic_pointer_cast<ConstantExpr>(column_def->default_expr_);
+                    column_def_json["default"] = default_expr->Serialize();
+                }
+
+                json_res["column_definition"].emplace_back(column_def_json);
             }
-
-            json_res["column_definition"].emplace_back(column_def_json);
         }
         u32 next_segment_id = this->next_segment_id_;
         json_res["next_segment_id"] = next_segment_id;
@@ -526,8 +984,11 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
-        json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts, is_full_checkpoint));
+        json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
+        checkpoint_row_count += segment_entry->checkpoint_row_count();
     }
+    json_res["row_count"] = checkpoint_row_count;
+    json_res["unsealed_id"] = unsealed_id_;
 
     // Serialize indexes
     SizeT table_index_count = table_index_meta_candidates.size();
@@ -542,16 +1003,16 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 }
 
 UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr) {
-    SharedPtr<String> table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_entry_json["table_name"]);
     TableEntryType table_entry_type = table_entry_json["table_entry_type"];
-    u64 row_count = table_entry_json["row_count"];
 
     bool deleted = table_entry_json["deleted"];
 
     Vector<SharedPtr<ColumnDef>> columns;
-
-    if (table_entry_json.contains("column_definition")) {
+    u64 row_count = 0;
+    SharedPtr<String> table_entry_dir;
+    if (!deleted) {
+        table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
             SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
             i64 column_id = column_def_json["column_id"];
@@ -565,34 +1026,43 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
                 }
             }
 
-            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
+            SharedPtr<ParsedExpr> default_expr = nullptr;
+            if (column_def_json.contains("default")) {
+                default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+            }
+
+            SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, default_expr);
             columns.emplace_back(column_def);
         }
+        row_count = table_entry_json["row_count"];
     }
 
     TransactionID txn_id = table_entry_json["txn_id"];
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
+    SegmentID unsealed_id = table_entry_json["unsealed_id"];
+    SegmentID next_segment_id = table_entry_json["next_segment_id"];
 
-    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+    UniquePtr<TableEntry> table_entry = MakeUnique<
+        TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
     table_entry->row_count_ = row_count;
-    table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
 
     if (table_entry_json.contains("segments")) {
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
         }
+        // here the unsealed_segment_ may be nullptr
+        if (table_entry->segment_map_.find(unsealed_id) != table_entry->segment_map_.end()) {
+            table_entry->unsealed_segment_ = table_entry->segment_map_.at(unsealed_id);
+        }
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
-    table_entry->deleted_ = deleted;
 
     if (table_entry->deleted_) {
         if (!table_entry->segment_map_.empty()) {
             UnrecoverableError("deleted table should have no segment");
         }
-    } else if (!table_entry->segment_map_.empty() && table_entry->segment_map_[0].get() == nullptr) {
-        UnrecoverableError("table segment 0 should be valid");
     }
 
     if (table_entry_json.contains("table_indexes")) {
@@ -615,52 +1085,13 @@ u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     return it->second;
 }
 
-void TableEntry::MergeFrom(BaseEntry &other) {
-    auto table_entry2 = dynamic_cast<TableEntry *>(&other);
-    if (table_entry2 == nullptr) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    // // No locking here since only the load stage needs MergeFrom.
-    if (*this->table_name_ != *table_entry2->table_name_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_name_ match");
-    }
-    if (*this->table_entry_dir_ != *table_entry2->table_entry_dir_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
-    }
-    if (this->table_entry_type_ != table_entry2->table_entry_type_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
-    }
-
-    this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
-    this->row_count_.store(std::max(this->row_count_, table_entry2->row_count_));
-
-    for (auto &[seg_id, sgement_entry2] : table_entry2->segment_map_) {
-        auto it = this->segment_map_.find(seg_id);
-        if (it == this->segment_map_.end()) {
-            sgement_entry2->table_entry_ = this;
-            this->segment_map_.emplace(seg_id, sgement_entry2);
-        } else {
-            it->second->MergeFrom(*sgement_entry2.get());
-        }
-    }
-
-    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map()) {
-        auto it = this->index_meta_map().find(index_name);
-        if (it == this->index_meta_map().end()) {
-            this->index_meta_map().emplace(index_name, std::move(table_index_meta));
-        } else {
-            it->second->MergeFrom(*table_index_meta.get());
-        }
-    }
-}
-
 bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id) {
     HashMap<SegmentID, Vector<SegmentOffset>> delete_row_map;
     for (const auto row_id : delete_row_ids) {
         delete_row_map[row_id.segment_id_].emplace_back(row_id.segment_offset_);
     }
     Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> check_segments;
-    std::shared_lock lock(this->rw_locker());
+    std::shared_lock lock(this->rw_locker_);
     for (const auto &[segment_id, segment_offsets] : delete_row_map) {
         check_segments.emplace_back(this->segment_map_.at(segment_id).get(), std::move(segment_offsets));
     }
@@ -668,18 +1099,25 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), txn_id);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
+void TableEntry::AddSegmentToCompactionAlg(SegmentEntry *segment_entry) {
     if (compaction_alg_.get() == nullptr) {
-        return None;
+        return;
     }
-    return compaction_alg_->AddSegment(new_segment, generate_txn);
+    compaction_alg_->AddSegment(segment_entry);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
+void TableEntry::AddDeleteToCompactionAlg(SegmentID segment_id) {
+    if (compaction_alg_.get() == nullptr) {
+        return;
+    }
+    compaction_alg_->DeleteInSegment(segment_id);
+}
+
+Optional<CompactionInfo> TableEntry::CheckCompaction(std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }
-    return compaction_alg_->DeleteInSegment(segment_id, generate_txn);
+    return compaction_alg_->CheckCompaction(generate_txn);
 }
 
 Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
@@ -687,7 +1125,7 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
         compaction_alg_->Disable(); // wait for current compaction to finish
     }
     Vector<SegmentEntry *> result;
-    std::shared_lock lock(this->rw_locker());
+    std::shared_lock lock(this->rw_locker_);
     for (const auto &[segment_id, segment] : this->segment_map_) {
         auto status = segment->status();
         if (status == SegmentStatus::kSealed) {
@@ -700,31 +1138,48 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
 }
 
 void TableEntry::PickCleanup(CleanupScanner *scanner) {
-    // index_meta_map_.PickCleanup(scanner); FIXME(sys): implement it
-    { // FIXME(sys)
-        std::unique_lock lock(this->rw_locker());
+    index_meta_map_.PickCleanup(scanner);
+    Vector<SegmentID> cleanup_segment_ids;
+    {
+        std::unique_lock lock(this->rw_locker_);
         TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
-            SharedPtr<SegmentEntry> &segment = iter->second;
+            SegmentEntry *segment = iter->second.get();
+            // If segment is visible by txn, txn.begin_ts < segment.deprecate_ts
+            // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
+            // So the used segment will not be cleaned up.
             if (segment->CheckDeprecate(visible_ts)) {
-                scanner->AddEntry(std::move(segment));
+                cleanup_segment_ids.push_back(iter->first);
+                scanner->AddEntry(std::move(iter->second));
                 iter = segment_map_.erase(iter);
             } else {
                 ++iter;
             }
         }
     }
-}
-
-void TableEntry::Cleanup() && {
-    for (auto &[segment_id, segment] : segment_map_) {
-        std::move(*segment).Cleanup();
+    std::sort(cleanup_segment_ids.begin(), cleanup_segment_ids.end());
+    {
+        auto map_guard = index_meta_map_.GetMetaMap();
+        for (auto &[_, table_index_meta] : *map_guard) {
+            table_index_meta->PickCleanupBySegments(cleanup_segment_ids, scanner);
+        }
     }
-    std::move(index_meta_map_).Cleanup();
-
-    LocalFileSystem fs;
-    // FIXME(sys): delete all index cache in buffer_manager.
-    // fs.DeleteDirectory(*table_entry_dir_);
 }
+
+void TableEntry::Cleanup() {
+    if (this->deleted_) {
+        return;
+    }
+    for (auto &[segment_id, segment] : segment_map_) {
+        segment->Cleanup();
+    }
+    index_meta_map_.Cleanup();
+
+    LOG_TRACE(fmt::format("Cleaning up dir: {}", *table_entry_dir_));
+    CleanupScanner::CleanupDir(*table_entry_dir_);
+    LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
+}
+
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
 
 } // namespace infinity

@@ -28,6 +28,7 @@ export enum class BufferStatus {
     kLoaded,
     kUnloaded,
     kFreed,
+    kClean,
     kNew,
 };
 
@@ -36,6 +37,23 @@ export enum class BufferType {
     kEphemeral,
     kTemp,
 };
+
+export String BufferStatusToString(BufferStatus status) {
+    switch (status) {
+        case BufferStatus::kLoaded:
+            return "Loaded";
+        case BufferStatus::kUnloaded:
+            return "Unloaded";
+        case BufferStatus::kFreed:
+            return "Freed";
+        case BufferStatus::kNew:
+            return "New";
+        case BufferStatus::kClean:
+            return "Clean";
+        default:
+            return "Invalid";
+    }
+}
 
 export class BufferObj {
 public:
@@ -52,25 +70,28 @@ public:
     BufferHandle Load();
 
     // called by BufferMgr in GC process.
-    // return true if is freed.
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();
 
-    void Sync();
+    void PickForCleanup();
 
-    void CloseFile();
+    void CleanupFile() const;
 
-    void Cleanup();
+    void CleanupTempFile() const;
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
 
+    FileWorker *file_worker() { return file_worker_.get(); }
+
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.
     friend class BufferHandle;
+
+    void LoadInner();
 
     // called when BufferHandle needs mutable pointer.
     void GetMutPointer();
@@ -78,17 +99,20 @@ private:
     // called when BufferHandle destructs, to decrease rc_ by 1.
     void UnloadInner();
 
-    // check the invalid state
-    void CheckState() const;
-
 public:
     // interface for unit test
-    BufferStatus status() const { return status_; }
+    BufferStatus status() const {
+        std::unique_lock<std::mutex> locker(w_locker_);
+        return status_;
+    }
     BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
 
+    // check the invalid state, only used in tests.
+    void CheckState() const;
+
 protected:
-    std::shared_mutex rw_locker_{};
+    mutable std::mutex w_locker_{};
 
     BufferManager *buffer_mgr_;
 

@@ -1,7 +1,5 @@
 #include "match_expr.h"
 #include "parser_assert.h"
-#include "query_driver.h"
-#include "search/filter.hpp"
 #include "search_options.h"
 #include "spdlog/fmt/fmt.h"
 

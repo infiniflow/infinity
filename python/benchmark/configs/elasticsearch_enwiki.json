@@ -1,0 +1,35 @@
+{
+  "name": "elasticsearch_enwiki",
+  "app": "elasticsearch",
+  "app_path": "servers/elasticsearch/",
+  "connection_url": "http://localhost:9200",
+  "data_path": "datasets/enwiki/enwiki.csv",
+  "insert_batch_size": 8192,
+  "query_path": "datasets/enwiki/operations.txt",
+  "mode": "fulltext",
+  "topK": 10,
+  "index": {
+    "settings": {
+      "index.number_of_shards": 5,
+      "index.number_of_replicas": 0,
+      "index.requests.cache.enable": false
+    },
+    "mappings": {
+      "_source": {
+        "enabled": true
+      },
+      "dynamic": "strict",
+      "properties": {
+        "doctitle": {
+          "type": "text"
+        },
+        "docdate": {
+          "type": "text"
+        },
+        "body": {
+          "type": "text"
+        }
+      }
+    }
+  }
+}

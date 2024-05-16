@@ -10,55 +10,89 @@ CREATE TABLE enwiki(doctitle varchar, docdate varchar, body varchar);
 
 # copy data from csv file
 query I
-COPY enwiki FROM '/tmp/infinity/test_data/enwiki_9999.csv' WITH ( DELIMITER '\t' );
+COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
+
+statement error
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH (analyzer=jieba);
+
+statement error
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH (analyzer=ngram);
 
 statement ok
-CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(ANALYZER=segmentation);
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT;
 
-query TTT
-SELECT doctitle, docdate, body FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3;block_max=compare');
 ----
-Avicenna 29-APR-2012 07:47:29.000  [[saliva]]tion, [[Somnolence|sleepiness]] | [[insomnia]], [[wakefulness]] |- | Physical signs | high [[pulse]] rate, lassitude | [[flaccid]] joints | [[diarrhea]], [[eye puffiness|swollen eyelids]], rough skin, acquired [[habit (psychology)|habit]] | rough skin, acquired habit |- | Foods & medicines | [http://www.thefreedictionary.com/calefacient calefacients] harmful, [http://www.thefreedictionary.com/Infrigidate infrigidants] beneficial | [http://www.thefreedictionary.com/Infrigidate infrigidants] harmful, [http://www.thefreedictionary.com/calefacient calefacients] beneficial | [[moisture|moist]] articles harmful | [[wikt:dry|dry]] regimen harmful, [[humectant]]s beneficial |- | Relation to weather | worse in summer | worse in winter | | bad in autumn |}  ===Physical Exercise: the Key to Health=== {{Refimprove section|please provide publication information|date=June 2010}} '''The Canon of Medicine: Volume 1 of 5; Part 4 of 5: The Preservation of Health '''  Of Ibn Sina's Canon of Medicine which is written
-Alkali metal 30-APR-2012 05:35:44.000  royale des Sciences| title = Sur la Base de Sel Marine| last = du Monceau|first = H. L. D.| pages = 65–68| language = French}}</ref> The exact chemical composition of potassium and sodium compounds, and the status as chemical element of potassium and sodium, was not known then, and thus [[Antoine Lavoisier]] did include the alkali in his list of chemical elements in 1789.<ref name="weeks">{{cite journal|doi = 10.1021/ed009p1035|title = The discovery of the elements. IX. Three alkali metals: Potassium, sodium, and lithium|year = 1932|last1 = Weeks|first1 = Mary Elvira|journal = Journal of Chemical Education|volume = 9|issue = 6|pages = 1035|bibcode = 1932JChEd...9.1035W}}</ref><ref name="disco">{{cite journal|jstor = 228541|pages = 247–258|last1 = Siegfried|first1 = R.|title = The Discovery of Potassium and Sodium, and the Problem of the Chemical Elements|volume = 54|issue = 2|journal = Isis|year = 1963|doi = 10.1086/349704}}</ref> Pure potassium was first isolated in 1807 in England by Sir [[Humphry
-Atom 20-APR-2012 03:53:14.000  beam of light energy in a narrow frequency band.<ref name=watkins_sjsu/>  ===Valence and bonding behavior=== {{Main|Valence (chemistry)|Chemical bond}}  The outermost electron shell of an atom in its uncombined state is known as the valence shell, and the electrons in that shell are called [[valence electron]]s. The number of valence electrons determines the [[chemical bond|bonding]] behavior with other atoms. Atoms tend to [[Chemical reaction|chemically react]] with each other in a manner that fills (or empties) their outer valence shells.<ref name=reusch20070716/> For example, a transfer of a single electron between atoms is a useful approximation for bonds that form between atoms with one-electron more than a filled shell, and others that are one-electron short of a full shell, such as occurs in the compound [[sodium chloride]] and other chemical ionic salts. However, many elements display multiple valences, or tendencies to share differing numbers of electrons in different compounds. Thus, [[chemical
+Anarchism 30-APR-2012 03:25:17.000 0 21.620300
 
-query TTT
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
+# only phrase
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', '\"social customs\"', 'topn=3;block_max=compare');
 ----
-Avicenna 29-APR-2012 07:47:29.000 9893 6.723495
-Alkali metal 30-APR-2012 05:35:44.000 2681 4.617455
-Atom 20-APR-2012 03:53:14.000 7207 4.617455
+Anarchism 30-APR-2012 03:25:17.000 6 20.881144
 
-query TTT
-SELECT doctitle, docdate, body FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3'), FUSION('rrf');
+# phrase and term
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle,body^5', '\"social customs\" harmful', 'topn=3');
 ----
-Avicenna 29-APR-2012 07:47:29.000  [[saliva]]tion, [[Somnolence|sleepiness]] | [[insomnia]], [[wakefulness]] |- | Physical signs | high [[pulse]] rate, lassitude | [[flaccid]] joints | [[diarrhea]], [[eye puffiness|swollen eyelids]], rough skin, acquired [[habit (psychology)|habit]] | rough skin, acquired habit |- | Foods & medicines | [http://www.thefreedictionary.com/calefacient calefacients] harmful, [http://www.thefreedictionary.com/Infrigidate infrigidants] beneficial | [http://www.thefreedictionary.com/Infrigidate infrigidants] harmful, [http://www.thefreedictionary.com/calefacient calefacients] beneficial | [[moisture|moist]] articles harmful | [[wikt:dry|dry]] regimen harmful, [[humectant]]s beneficial |- | Relation to weather | worse in summer | worse in winter | | bad in autumn |}  ===Physical Exercise: the Key to Health=== {{Refimprove section|please provide publication information|date=June 2010}} '''The Canon of Medicine: Volume 1 of 5; Part 4 of 5: The Preservation of Health '''  Of Ibn Sina's Canon of Medicine which is written
-Alkali metal 30-APR-2012 05:35:44.000  royale des Sciences| title = Sur la Base de Sel Marine| last = du Monceau|first = H. L. D.| pages = 65–68| language = French}}</ref> The exact chemical composition of potassium and sodium compounds, and the status as chemical element of potassium and sodium, was not known then, and thus [[Antoine Lavoisier]] did include the alkali in his list of chemical elements in 1789.<ref name="weeks">{{cite journal|doi = 10.1021/ed009p1035|title = The discovery of the elements. IX. Three alkali metals: Potassium, sodium, and lithium|year = 1932|last1 = Weeks|first1 = Mary Elvira|journal = Journal of Chemical Education|volume = 9|issue = 6|pages = 1035|bibcode = 1932JChEd...9.1035W}}</ref><ref name="disco">{{cite journal|jstor = 228541|pages = 247–258|last1 = Siegfried|first1 = R.|title = The Discovery of Potassium and Sodium, and the Problem of the Chemical Elements|volume = 54|issue = 2|journal = Isis|year = 1963|doi = 10.1086/349704}}</ref> Pure potassium was first isolated in 1807 in England by Sir [[Humphry
-Atom 20-APR-2012 03:53:14.000  beam of light energy in a narrow frequency band.<ref name=watkins_sjsu/>  ===Valence and bonding behavior=== {{Main|Valence (chemistry)|Chemical bond}}  The outermost electron shell of an atom in its uncombined state is known as the valence shell, and the electrons in that shell are called [[valence electron]]s. The number of valence electrons determines the [[chemical bond|bonding]] behavior with other atoms. Atoms tend to [[Chemical reaction|chemically react]] with each other in a manner that fills (or empties) their outer valence shells.<ref name=reusch20070716/> For example, a transfer of a single electron between atoms is a useful approximation for bonds that form between atoms with one-electron more than a filled shell, and others that are one-electron short of a full shell, such as occurs in the compound [[sodium chloride]] and other chemical ionic salts. However, many elements display multiple valences, or tendencies to share differing numbers of electrons in different compounds. Thus, [[chemical
+Anarchism 30-APR-2012 03:25:17.000 0 21.620300
+Anarchism 30-APR-2012 03:25:17.000 6 20.881144
 
-query TTT
-SELECT doctitle, docdate, body FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3'), MATCH('doctitle^2,body^5', 'society', 'topn=3'), FUSION('rrf');
+# copy data from csv file
+query I
+COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
-Avicenna 29-APR-2012 07:47:29.000  [[saliva]]tion, [[Somnolence|sleepiness]] | [[insomnia]], [[wakefulness]] |- | Physical signs | high [[pulse]] rate, lassitude | [[flaccid]] joints | [[diarrhea]], [[eye puffiness|swollen eyelids]], rough skin, acquired [[habit (psychology)|habit]] | rough skin, acquired habit |- | Foods & medicines | [http://www.thefreedictionary.com/calefacient calefacients] harmful, [http://www.thefreedictionary.com/Infrigidate infrigidants] beneficial | [http://www.thefreedictionary.com/Infrigidate infrigidants] harmful, [http://www.thefreedictionary.com/calefacient calefacients] beneficial | [[moisture|moist]] articles harmful | [[wikt:dry|dry]] regimen harmful, [[humectant]]s beneficial |- | Relation to weather | worse in summer | worse in winter | | bad in autumn |}  ===Physical Exercise: the Key to Health=== {{Refimprove section|please provide publication information|date=June 2010}} '''The Canon of Medicine: Volume 1 of 5; Part 4 of 5: The Preservation of Health '''  Of Ibn Sina's Canon of Medicine which is written
-Anarcho-capitalism 24-APR-2012 15:46:17.000  [http://www.mises.org/story/1787 ''Authentic German Liberalism of the 19th Century''] Ecole Polytechnique, [http://www.crea.polytechnique.fr/index.htm Centre de Recherce en Epistemologie Appliquee], Unité associée au CNRS</ref> Unlike the liberalism of Locke, which saw the state as evolving from society, the anti-state liberals saw a fundamental conflict between the voluntary interactions of people&nbsp;– society&nbsp;– and the institutions of force&nbsp;– the State.  This ''society versus state'' idea was expressed in various ways: natural society vs. artificial society, liberty vs. authority, society of contract vs. society of authority, and industrial society vs. militant society, just to name a few.<ref name="Molinari-1849"/> The anti-state liberal tradition in Europe and the United States continued after Molinari in the early writings of [[Herbert Spencer]], as well as in thinkers such as [[Paul Émile de Puydt]] and [[Auberon Herbert]].  Ulrike Heider, in discussing the "anarcho-capitalists
-Alkali metal 30-APR-2012 05:35:44.000  royale des Sciences| title = Sur la Base de Sel Marine| last = du Monceau|first = H. L. D.| pages = 65–68| language = French}}</ref> The exact chemical composition of potassium and sodium compounds, and the status as chemical element of potassium and sodium, was not known then, and thus [[Antoine Lavoisier]] did include the alkali in his list of chemical elements in 1789.<ref name="weeks">{{cite journal|doi = 10.1021/ed009p1035|title = The discovery of the elements. IX. Three alkali metals: Potassium, sodium, and lithium|year = 1932|last1 = Weeks|first1 = Mary Elvira|journal = Journal of Chemical Education|volume = 9|issue = 6|pages = 1035|bibcode = 1932JChEd...9.1035W}}</ref><ref name="disco">{{cite journal|jstor = 228541|pages = 247–258|last1 = Siegfried|first1 = R.|title = The Discovery of Potassium and Sodium, and the Problem of the Chemical Elements|volume = 54|issue = 2|journal = Isis|year = 1963|doi = 10.1086/349704}}</ref> Pure potassium was first isolated in 1807 in England by Sir [[Humphry
-Alvin Toffler 25-APR-2012 18:37:38.000  “The Second Wave Society is industrial and based on [[mass production]], [[mass distribution]], [[mass consumption]], [[mass education]], [[mass media]], mass [[recreation]], mass [[entertainment]], and [[weapons of mass destruction]]. You combine those things with [[standardization]], [[centralization]], concentration, and synchronization, and you wind up with a style of [[organization]] we call [[bureaucracy]].” * '''Third Wave''' is the [[post-industrial society]]. Toffler would also add that since the late 1950s most countries are moving away from a Second Wave Society into what he would call a Third Wave Society. He coined lots of words to describe it and mentions names invented by him ([[super-industrial society]]) and other people (like the [[Information Age]], [[Space Age]], [[Electronic computer|Electronic]] Era, [[Global Village]], [[technetronic]] age, scientific-technological revolution), which to various degrees predicted demassification, diversity, knowledge-based production, and the
-Atom 20-APR-2012 03:53:14.000  beam of light energy in a narrow frequency band.<ref name=watkins_sjsu/>  ===Valence and bonding behavior=== {{Main|Valence (chemistry)|Chemical bond}}  The outermost electron shell of an atom in its uncombined state is known as the valence shell, and the electrons in that shell are called [[valence electron]]s. The number of valence electrons determines the [[chemical bond|bonding]] behavior with other atoms. Atoms tend to [[Chemical reaction|chemically react]] with each other in a manner that fills (or empties) their outer valence shells.<ref name=reusch20070716/> For example, a transfer of a single electron between atoms is a useful approximation for bonds that form between atoms with one-electron more than a filled shell, and others that are one-electron short of a full shell, such as occurs in the compound [[sodium chloride]] and other chemical ionic salts. However, many elements display multiple valences, or tendencies to share differing numbers of electrons in different compounds. Thus, [[chemical
-Astronomer 17-APR-2012 19:09:32.000  York]]|ref=harv|postscript=<!--None-->|isbn=0300159110 }} * {{Cite journal|last=Kennedy|first=E.S.|title=A Survey of Islamic Astronomical Tables; Transactions of the American Philosophical Society| year=1956|location=[[Philadelphia]]| publisher=[[American Philosophical Society]]|volume=46|issue=2|ref=harv|postscript=<!--None-->}} * {{Cite encyclopedia   | last = Toomer   | first = Gerald   | title = Al-Khwārizmī, Abu Jaʿfar Muḥammad ibn Mūsā   | encyclopedia = [[Dictionary of Scientific Biography]]   | volume = 7   | editor = Gillispie, Charles Coulston   | publisher = Charles Scribner's Sons   | location = New York   | year = 1990   | isbn = 0-684-16962-2   | ref=harv  }}  ==External links== * [http://www.aas.org American Astronomical Society] * [http://www.iau.org International Astronomical Union] * [http://www.astrosociety.org Astronomical Society of the Pacific]  [[Category:Astronomy| ]] [[Category:Astronomers| ]] [[Category:Science occupations]]  [[als:Astronom]] [[ar:عالم فلك]]
 
-query TTT
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3'), MATCH('body^5', 'society', 'topn=3'), FUSION('rrf');
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3;block_max=compare');
 ----
-Avicenna 29-APR-2012 07:47:29.000 9893 0.016393
-Anarcho-capitalism 24-APR-2012 15:46:17.000 8781 0.016393
-Alkali metal 30-APR-2012 05:35:44.000 2681 0.016129
-Alvin Toffler 25-APR-2012 18:37:38.000 7533 0.016129
-Atom 20-APR-2012 03:53:14.000 7207 0.015873
-Astronomer 17-APR-2012 19:09:32.000 1326 0.015873
+Anarchism 30-APR-2012 03:25:17.000 0 22.533094
+Anarchism 30-APR-2012 03:25:17.000 4294967296 22.533094
+
+# copy data from csv file
+query I
+COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+----
+
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 25.498550
+Anarchism 30-APR-2012 03:25:17.000 4294967296 25.498550
+Anarchism 30-APR-2012 03:25:17.000 8589934592 25.498550
+
+# Anarchism 30-APR-2012 03:25:17.000 4294967296 50.997108
+# Anarchism 30-APR-2012 03:25:17.000 0 50.997105
+# Anarchism 30-APR-2012 03:25:17.000 8589934592 50.997105
+
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 25.498550
+Anarchism 30-APR-2012 03:25:17.000 4294967296 25.498550
+Anarchism 30-APR-2012 03:25:17.000 8589934592 25.498550
+
+# Anarchism 30-APR-2012 03:25:17.000 4294967296 50.997108
+# Anarchism 30-APR-2012 03:25:17.000 0 50.997105
+# Anarchism 30-APR-2012 03:25:17.000 8589934592 50.997105
+
+statement ok
+CREATE INDEX ft_index2 ON enwiki(doctitle) USING FULLTEXT;
+
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 25.500229
+Anarchism 30-APR-2012 03:25:17.000 4294967296 25.500229
+Anarchism 30-APR-2012 03:25:17.000 8589934592 25.500229
+
+# Anarchism 30-APR-2012 03:25:17.000 0 51.000462
+# Anarchism 30-APR-2012 03:25:17.000 4294967296 51.000462
+# Anarchism 30-APR-2012 03:25:17.000 8589934592 51.000458
+
 
 # Clean up
 statement ok
 DROP TABLE enwiki;
-
-

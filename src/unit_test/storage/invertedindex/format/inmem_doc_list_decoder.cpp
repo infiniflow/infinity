@@ -4,12 +4,13 @@
 import stl;
 import memory_pool;
 import index_defines;
-import buffered_byte_slice;
+import posting_byte_slice;
 import inmem_doc_list_decoder;
 import doc_list_format_option;
 import doc_list_encoder;
 
 using namespace infinity;
+constexpr u32 default_document_legnth = 10;
 
 class InMemDocListDecoderTest : public BaseTest {
 public:
@@ -26,12 +27,15 @@ public:
         doc_list_encoder_ = new DocListEncoder(doc_list_format_option, byte_slice_pool_, buffer_pool_);
 
         for (SizeT i = 0; i < 128; ++i) {
-            doc_list_encoder_->EndDocument(i, 0);
+            doc_list_encoder_->AddPosition();
+            doc_list_encoder_->EndDocument(i, default_document_legnth, 0);
         }
         for (SizeT i = 128; i < 256; ++i) {
-            doc_list_encoder_->EndDocument(i * 2, 0);
+            doc_list_encoder_->AddPosition();
+            doc_list_encoder_->EndDocument(i * 2, default_document_legnth, 0);
         }
-        doc_list_encoder_->EndDocument(1000, 0);
+        doc_list_encoder_->AddPosition();
+        doc_list_encoder_->EndDocument(1000, default_document_legnth, 0);
     }
     void TearDown() override {
         doc_list_encoder_ptr_.reset();
@@ -46,8 +50,8 @@ protected:
     void TestDecodeWithOptionFlag(const optionflag_t flag, SizeT doc_num, docid_t *docids, tf_t *tfs, docpayload_t *doc_payloads) {
         DocListFormatOption doc_list_format_option(flag);
         DocListFormat doc_list_format(doc_list_format_option);
-        BufferedByteSlice *posting_buffer =
-            new (byte_slice_pool_->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice *posting_buffer =
+            new (byte_slice_pool_->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(byte_slice_pool_, buffer_pool_);
         posting_buffer->Init(&doc_list_format);
 
         docid_t prev_doc_id = 0;
@@ -64,14 +68,16 @@ protected:
             posting_buffer->EndPushBack();
         }
 
-        InMemDocListDecoder doc_list_decoder(byte_slice_pool_);
+        InMemDocListDecoder doc_list_decoder(byte_slice_pool_, doc_list_format_option);
         doc_list_decoder.Init(2, nullptr, posting_buffer);
 
-        docid_t first_doc_id = 0;
+        docid_t prev_last_doc_id = 0;
         docid_t last_doc_id = 0;
         ttf_t current_ttf = 0;
         docid_t doc_buffer[1024];
-        ASSERT_TRUE(doc_list_decoder.DecodeDocBuffer(0, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+        ASSERT_TRUE(doc_list_decoder.DecodeSkipList(0, prev_last_doc_id, last_doc_id, current_ttf));
+        ASSERT_TRUE(doc_list_decoder.DecodeCurrentDocIDBuffer(doc_buffer));
+        docid_t first_doc_id = prev_last_doc_id + doc_buffer[0];
 
         ASSERT_EQ(docids[0], first_doc_id);
         ASSERT_EQ(docids[doc_num - 1], last_doc_id);
@@ -111,7 +117,7 @@ protected:
             doc_list_encoder_ptr_->AddPosition();
             doc_list_encoder_ptr_->AddPosition();
             // tf = 2
-            doc_list_encoder_ptr_->EndDocument(i, i * 2);
+            doc_list_encoder_ptr_->EndDocument(i, default_document_legnth, i * 2);
         }
 
         if (need_flush) {
@@ -124,39 +130,44 @@ protected:
     void TestDecode(const uint32_t doc_count, bool need_flush = false, bool need_tf = false) {
         InMemDocListDecoder *decoder = CreateDecoder(doc_count, need_flush, need_tf);
 
-        docid_t doc_buffer[doc_count];
-        docpayload_t doc_payload[doc_count];
-        tf_t tf_buffer[doc_count];
+        Vector<docid_t> doc_buffer(doc_count);
+        Vector<docpayload_t> doc_payload(doc_count);
+        Vector<tf_t> tf_buffer(doc_count);
 
+        docid_t prev_last_doc_id = 0;
         docid_t first_doc_id = 0;
         docid_t last_doc_id = 0;
         ttf_t ttf;
 
         uint32_t i = 0;
         for (; i < doc_count / MAX_DOC_PER_RECORD; ++i) {
-            ASSERT_TRUE(decoder->DecodeDocBuffer(i * MAX_DOC_PER_RECORD, doc_buffer + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
+            ASSERT_TRUE(decoder->DecodeSkipList(i * MAX_DOC_PER_RECORD, prev_last_doc_id, last_doc_id, ttf));
+            ASSERT_TRUE(decoder->DecodeCurrentDocIDBuffer(doc_buffer.data() + i * MAX_DOC_PER_RECORD));
+            first_doc_id = prev_last_doc_id + doc_buffer[i * MAX_DOC_PER_RECORD];
             ASSERT_EQ((docid_t)(i * MAX_DOC_PER_RECORD), first_doc_id);
             ASSERT_EQ((docid_t)((i + 1) * MAX_DOC_PER_RECORD - 1), last_doc_id);
             ASSERT_EQ(i * MAX_DOC_PER_RECORD, decoder->GetSeekedDocCount());
             ttf_t expect_ttf = need_tf ? 2 * i * MAX_DOC_PER_RECORD : 0;
             ASSERT_EQ(expect_ttf, ttf);
             if (need_tf) {
-                decoder->DecodeCurrentTFBuffer(tf_buffer + i * MAX_DOC_PER_RECORD);
+                decoder->DecodeCurrentTFBuffer(tf_buffer.data() + i * MAX_DOC_PER_RECORD);
             }
-            decoder->DecodeCurrentDocPayloadBuffer(doc_payload + i * MAX_DOC_PER_RECORD);
+            decoder->DecodeCurrentDocPayloadBuffer(doc_payload.data() + i * MAX_DOC_PER_RECORD);
         }
 
         if (doc_count % MAX_DOC_PER_RECORD > 0) {
-            ASSERT_TRUE(decoder->DecodeDocBuffer(i * MAX_DOC_PER_RECORD, doc_buffer + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
+            ASSERT_TRUE(decoder->DecodeSkipList(i * MAX_DOC_PER_RECORD, prev_last_doc_id, last_doc_id, ttf));
+            ASSERT_TRUE(decoder->DecodeCurrentDocIDBuffer(doc_buffer.data() + i * MAX_DOC_PER_RECORD));
+            first_doc_id = prev_last_doc_id + doc_buffer[i * MAX_DOC_PER_RECORD];
             ASSERT_EQ(i * MAX_DOC_PER_RECORD, decoder->GetSeekedDocCount());
             ASSERT_EQ((docid_t)(i * MAX_DOC_PER_RECORD), first_doc_id);
             ASSERT_EQ((docid_t)(doc_count - 1), last_doc_id);
             ttf_t expect_ttf = need_tf ? 2 * i * MAX_DOC_PER_RECORD : 0;
             ASSERT_EQ(expect_ttf, ttf);
             if (need_tf) {
-                decoder->DecodeCurrentTFBuffer(tf_buffer + i * MAX_DOC_PER_RECORD);
+                decoder->DecodeCurrentTFBuffer(tf_buffer.data() + i * MAX_DOC_PER_RECORD);
             }
-            decoder->DecodeCurrentDocPayloadBuffer(doc_payload + i * MAX_DOC_PER_RECORD);
+            decoder->DecodeCurrentDocPayloadBuffer(doc_payload.data() + i * MAX_DOC_PER_RECORD);
         }
 
         docid_t pre_doc_id = 0;
@@ -169,7 +180,7 @@ protected:
             }
         }
 
-        ASSERT_TRUE(!decoder->DecodeDocBuffer(last_doc_id + 1, doc_buffer + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
+        ASSERT_TRUE(!decoder->DecodeSkipList(last_doc_id + 1, prev_last_doc_id, last_doc_id, ttf));
         decoder->~InMemDocListDecoder();
         byte_slice_pool_->Deallocate((void *)decoder, sizeof(InMemDocListDecoder));
     }
@@ -188,7 +199,7 @@ TEST_F(InMemDocListDecoderTest, test1) {
 
     DocListFormatOption option(OPTION_FLAG_NONE);
     DocListFormat doc_list_format(option);
-    BufferedByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(byte_slice_pool_, buffer_pool_);
+    PostingByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(byte_slice_pool_, buffer_pool_);
     posting_buffer->Init(&doc_list_format);
 
     docid_t doc1 = 1;
@@ -198,14 +209,17 @@ TEST_F(InMemDocListDecoderTest, test1) {
     posting_buffer->PushBack(0, doc2 - doc1);
     posting_buffer->EndPushBack();
 
-    InMemDocListDecoder doc_list_decoder(byte_slice_pool_);
+    InMemDocListDecoder doc_list_decoder(byte_slice_pool_, option);
     doc_list_decoder.Init(2, nullptr, posting_buffer);
 
+    docid_t prev_last_doc_id = 0;
     docid_t first_doc_id = 0;
     docid_t last_doc_id = 0;
     ttf_t current_ttf = 0;
     docid_t doc_buffer[1024];
-    ASSERT_TRUE(doc_list_decoder.DecodeDocBuffer(0, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder.DecodeSkipList(0, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder.DecodeCurrentDocIDBuffer(doc_buffer));
+    first_doc_id = prev_last_doc_id + doc_buffer[0];
 
     ASSERT_EQ(doc1, first_doc_id);
     ASSERT_EQ(doc2, last_doc_id);
@@ -213,7 +227,7 @@ TEST_F(InMemDocListDecoderTest, test1) {
     ASSERT_EQ(doc1, doc_buffer[0]);
     ASSERT_EQ(doc2 - doc1, doc_buffer[1]);
 
-    ASSERT_TRUE(!doc_list_decoder.DecodeDocBuffer(doc2, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(!doc_list_decoder.DecodeSkipList(doc2, prev_last_doc_id, last_doc_id, current_ttf));
 }
 
 TEST_F(InMemDocListDecoderTest, test2) {
@@ -222,7 +236,7 @@ TEST_F(InMemDocListDecoderTest, test2) {
     DocListFormatOption option(OPTION_FLAG_NONE);
     DocListFormat doc_list_format(option);
 
-    BufferedByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(byte_slice_pool_, buffer_pool_);
+    PostingByteSlice *posting_buffer = new (byte_slice_pool_->Allocate(sizeof(PostingByteSlice))) PostingByteSlice(byte_slice_pool_, buffer_pool_);
 
     posting_buffer->Init(&doc_list_format);
 
@@ -232,14 +246,17 @@ TEST_F(InMemDocListDecoderTest, test2) {
     }
     posting_buffer->Flush();
 
-    InMemDocListDecoder doc_list_decoder(byte_slice_pool_);
+    InMemDocListDecoder doc_list_decoder(byte_slice_pool_, option);
     doc_list_decoder.Init(2, nullptr, posting_buffer);
 
+    docid_t prev_last_doc_id = 0;
     docid_t first_doc_id = 0;
     docid_t last_doc_id = 0;
     ttf_t current_ttf = 0;
     docid_t doc_buffer[1024];
-    ASSERT_TRUE(doc_list_decoder.DecodeDocBuffer(0, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder.DecodeSkipList(0, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder.DecodeCurrentDocIDBuffer(doc_buffer));
+    first_doc_id = prev_last_doc_id + doc_buffer[0];
 
     ASSERT_EQ((u32)0, first_doc_id);
     ASSERT_EQ((u32)8128, last_doc_id);
@@ -248,23 +265,24 @@ TEST_F(InMemDocListDecoderTest, test2) {
     ASSERT_EQ((u32)1, doc_buffer[1]);
     ASSERT_EQ((u32)2, doc_buffer[2]);
 
-    ASSERT_TRUE(!doc_list_decoder.DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(!doc_list_decoder.DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 
     posting_buffer->PushBack(0, 128);
     posting_buffer->EndPushBack();
 
     // without skiplist, we only decode one time
-    ASSERT_TRUE(!doc_list_decoder.DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(!doc_list_decoder.DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 
     posting_buffer->Flush();
 
     // without skiplist, we only decode one time
-    ASSERT_TRUE(!doc_list_decoder.DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(!doc_list_decoder.DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 }
 
 TEST_F(InMemDocListDecoderTest, test3) {
     using namespace infinity;
 
+    docid_t prev_last_doc_id = 0;
     docid_t first_doc_id = 0;
     docid_t last_doc_id = 0;
     ttf_t current_ttf = 0;
@@ -272,7 +290,9 @@ TEST_F(InMemDocListDecoderTest, test3) {
 
     doc_list_decoder_ = doc_list_encoder_->GetInMemDocListDecoder(byte_slice_pool_);
 
-    ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(256, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeSkipList(256, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeCurrentDocIDBuffer(doc_buffer));
+    first_doc_id = prev_last_doc_id + doc_buffer[0];
 
     ASSERT_EQ((u32)256, first_doc_id);
     ASSERT_EQ((u32)510, last_doc_id);
@@ -280,14 +300,16 @@ TEST_F(InMemDocListDecoderTest, test3) {
     ASSERT_EQ((u32)129, doc_buffer[0]);
     ASSERT_EQ((u32)2, doc_buffer[1]);
 
-    ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeSkipList(1000, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeCurrentDocIDBuffer(doc_buffer));
+    first_doc_id = prev_last_doc_id + doc_buffer[0];
 
     ASSERT_EQ((u32)1000, first_doc_id);
     ASSERT_EQ((u32)1000, last_doc_id);
     ASSERT_EQ((ttf_t)0, current_ttf);
     ASSERT_EQ((u32)490, doc_buffer[0]);
 
-    ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(!doc_list_decoder_->DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 
     doc_list_decoder_->~InMemDocListDecoder();
     byte_slice_pool_->Deallocate((void *)doc_list_decoder_, sizeof(InMemDocListDecoder));
@@ -296,20 +318,25 @@ TEST_F(InMemDocListDecoderTest, test3) {
 TEST_F(InMemDocListDecoderTest, test4) {
     using namespace infinity;
 
+    docid_t prev_last_doc_id = 0;
     docid_t first_doc_id = 0;
     docid_t last_doc_id = 0;
     ttf_t current_ttf = 0;
     docid_t doc_buffer[MAX_DOC_PER_RECORD];
 
-    doc_list_encoder_->EndDocument(1001, 0);
-    doc_list_encoder_->EndDocument(1002, 0);
+    doc_list_encoder_->AddPosition();
+    doc_list_encoder_->EndDocument(1001, default_document_legnth, 0);
+    doc_list_encoder_->AddPosition();
+    doc_list_encoder_->EndDocument(1002, default_document_legnth, 0);
 
-    BufferedByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
+    PostingByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
     posting_buffer->Flush();
 
     doc_list_decoder_ = doc_list_encoder_->GetInMemDocListDecoder(byte_slice_pool_);
 
-    ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeSkipList(1000, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeCurrentDocIDBuffer(doc_buffer));
+    first_doc_id = prev_last_doc_id + doc_buffer[0];
 
     ASSERT_EQ((u32)1000, first_doc_id);
     ASSERT_EQ((u32)1002, last_doc_id);
@@ -318,7 +345,7 @@ TEST_F(InMemDocListDecoderTest, test4) {
     ASSERT_EQ((u32)1, doc_buffer[1]);
     ASSERT_EQ((u32)1, doc_buffer[2]);
 
-    ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(!doc_list_decoder_->DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 
     doc_list_decoder_->~InMemDocListDecoder();
     byte_slice_pool_->Deallocate((void *)doc_list_decoder_, sizeof(InMemDocListDecoder));
@@ -327,12 +354,13 @@ TEST_F(InMemDocListDecoderTest, test4) {
 TEST_F(InMemDocListDecoderTest, test5) {
     using namespace infinity;
 
+    docid_t prev_last_doc_id = 0;
     docid_t first_doc_id = 0;
     docid_t last_doc_id = 0;
     ttf_t current_ttf = 0;
     docid_t doc_buffer[MAX_DOC_PER_RECORD];
 
-    BufferedByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
+    PostingByteSlice *posting_buffer = doc_list_encoder_->GetDocListBuffer();
 
     for (docid_t i = 0; i < 300; ++i) {
         posting_buffer->PushBack(0, i);
@@ -343,7 +371,9 @@ TEST_F(InMemDocListDecoderTest, test5) {
     }
     doc_list_decoder_ = doc_list_encoder_->GetInMemDocListDecoder(byte_slice_pool_);
 
-    ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeSkipList(1000, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeCurrentDocIDBuffer(doc_buffer));
+    first_doc_id = prev_last_doc_id + doc_buffer[0];
 
     ASSERT_EQ((u32)1000, first_doc_id);
     ASSERT_EQ((u32)9001, last_doc_id);
@@ -353,7 +383,7 @@ TEST_F(InMemDocListDecoderTest, test5) {
     ASSERT_EQ((u32)1, doc_buffer[2]);
     ASSERT_EQ((u32)2, doc_buffer[3]);
 
-    ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(!doc_list_decoder_->DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 
     doc_list_decoder_->~InMemDocListDecoder();
     byte_slice_pool_->Deallocate((void *)doc_list_decoder_, sizeof(InMemDocListDecoder));

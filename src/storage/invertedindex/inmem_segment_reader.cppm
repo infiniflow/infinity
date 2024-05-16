@@ -22,21 +22,20 @@ import segment_posting;
 import index_segment_reader;
 import index_defines;
 import posting_writer;
-import column_indexer;
 import memory_indexer;
+import internal_types;
 
 namespace infinity {
 export class InMemIndexSegmentReader : public IndexSegmentReader {
 public:
-    InMemIndexSegmentReader(MemoryIndexer *column_indexer);
+    InMemIndexSegmentReader(MemoryIndexer *memory_indexer);
     virtual ~InMemIndexSegmentReader() = default;
 
-    bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
+    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const override;
 
 private:
-    PostingWriter *GetPostingWriter(const String &term) const;
-
-    MemoryIndexer::PostingTable *posting_table_{nullptr};
+    SharedPtr<MemoryIndexer::PostingTable> posting_table_;
+    RowID base_row_id_{INVALID_ROWID};
 };
 
 } // namespace infinity

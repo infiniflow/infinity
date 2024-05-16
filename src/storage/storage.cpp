@@ -37,55 +37,72 @@ import txn;
 import infinity_exception;
 import status;
 import background_process;
+import compaction_process;
 import status;
 import bg_task;
 import periodic_trigger_thread;
 import periodic_trigger;
+import log_file;
 
 namespace infinity {
 
-Storage::Storage(const Config *config_ptr) : config_ptr_(config_ptr) {}
+Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}
 
 void Storage::Init() {
-    // Check the data dir to get latest catalog file.
-    String catalog_dir = String(*config_ptr_->data_dir()) + "/" + String(CATALOG_FILE_DIR);
-
     // Construct buffer manager
-    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->buffer_pool_size(), config_ptr_->data_dir(), config_ptr_->temp_dir());
+    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            MakeShared<String>(config_ptr_->DataDir()),
+                                            MakeShared<String>(config_ptr_->TempDir()));
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
-                                      Path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
-                                      config_ptr_->wal_size_threshold(),
-                                      config_ptr_->full_checkpoint_interval_sec(),
-                                      config_ptr_->delta_checkpoint_interval_sec(),
-                                      config_ptr_->delta_checkpoint_interval_wal_bytes());
+                                      config_ptr_->WALDir(),
+                                      config_ptr_->WALCompactThreshold(),
+                                      config_ptr_->DeltaCheckpointThreshold(),
+                                      config_ptr_->FlushMethodAtCommit());
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
     TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
 
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get());
+    BuiltinFunctions builtin_functions(new_catalog_);
+    builtin_functions.Init();
+    // Catalog finish init here.
+
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
     // Construct txn manager
+    std::chrono::seconds compact_interval = static_cast<std::chrono::seconds>(config_ptr_->CompactInterval());
+    bool enable_compaction = compact_interval.count() > 0;
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
                                       bg_processor_.get(),
-                                      std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
-                                      new_catalog_->next_txn_id_,
-                                      system_start_ts);
+                                      wal_mgr_.get(),
+                                      new_catalog_->next_txn_id(),
+                                      system_start_ts,
+                                      enable_compaction);
+
+    std::chrono::seconds optimize_interval = static_cast<std::chrono::seconds>(config_ptr_->OptimizeIndexInterval());
+    bool enable_optimize = optimize_interval.count() > 0;
+
+    if (enable_compaction || enable_optimize) {
+        compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
+    } else {
+        LOG_WARN("Compact interval is not set, auto compact is disable");
+    }
 
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    new_catalog_->MemIndexRecover(buffer_mgr_.get());
+
     bg_processor_->Start();
+    if (compact_processor_.get() != nullptr) {
+        compact_processor_->Start();
+    }
 
-    BuiltinFunctions builtin_functions(new_catalog_);
-    builtin_functions.Init();
-
-    auto txn = txn_mgr_->CreateTxn();
-    txn->Begin();
-    SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn);
+    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
+    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true);
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
     txn_mgr_->CommitTxn(txn);
@@ -93,12 +110,39 @@ void Storage::Init() {
     {
         periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-        std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();
+        if (enable_compaction) {
+            periodic_trigger_thread_->AddTrigger(MakeUnique<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get()));
+        } else {
+            LOG_WARN("Compact interval is not set, auto compact task will not be triggered");
+        }
+        if (enable_optimize) {
+            periodic_trigger_thread_->AddTrigger(MakeUnique<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get()));
+        } else {
+            LOG_WARN("Optimize interval is not set, auto optimize task will not be triggered");
+        }
+
+        std::chrono::seconds cleanup_interval = static_cast<std::chrono::seconds>(config_ptr_->CleanupInterval());
         if (cleanup_interval.count() > 0) {
             periodic_trigger_thread_->AddTrigger(
                 MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
         } else {
             LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
+        }
+
+        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval();
+        if (full_checkpoint_interval_sec > 0) {
+            periodic_trigger_thread_->AddTrigger(
+                MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(full_checkpoint_interval_sec), wal_mgr_.get(), true));
+        } else {
+            LOG_WARN("Full checkpoint interval is not set, auto full checkpoint task will NOT be triggered");
+        }
+
+        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval();
+        if (delta_checkpoint_interval_sec > 0) {
+            periodic_trigger_thread_->AddTrigger(
+                MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(delta_checkpoint_interval_sec), wal_mgr_.get(), false));
+        } else {
+            LOG_WARN("Delta checkpoint interval is not set, auto delta checkpoint task will NOT be triggered");
         }
 
         periodic_trigger_thread_->Start();
@@ -108,39 +152,33 @@ void Storage::Init() {
 void Storage::UnInit() {
     fmt::print("Shutdown storage ...\n");
     periodic_trigger_thread_->Stop();
+    if (compact_processor_.get() != nullptr) {
+        compact_processor_->Stop();
+    }
     bg_processor_->Stop();
-
     wal_mgr_->Stop();
 
     txn_mgr_.reset();
+    if (compact_processor_.get() != nullptr) {
+        compact_processor_.reset();
+    }
     bg_processor_.reset();
     wal_mgr_.reset();
-
-    // Buffer Manager need to be destroyed before catalog. since buffer manage hold the raw pointer owned by catalog:
-    // such as index definition and index base of IndexFileWorker
-    buffer_mgr_.reset();
     new_catalog_.reset();
-
+    buffer_mgr_.reset();
     config_ptr_ = nullptr;
     fmt::print("Shutdown storage successfully\n");
 }
 
-void Storage::AttachCatalog(const Vector<String> &catalog_files) {
-    LOG_INFO(fmt::format("Attach catalogs from {} files", catalog_files.size()));
-    for (const auto &catalog_file : catalog_files) {
-        LOG_TRACE(fmt::format("Catalog file: {}", catalog_file.c_str()));
-    }
-    new_catalog_ = Catalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
+void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
+    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
 void Storage::InitNewCatalog() {
     LOG_INFO("Init new catalog");
-    String catalog_dir = String(*config_ptr_->data_dir()) + "/" + String(CATALOG_FILE_DIR);
-    LocalFileSystem fs;
-    if (!fs.Exists(catalog_dir)) {
-        fs.CreateDirectory(catalog_dir);
-    }
-    new_catalog_ = MakeUnique<Catalog>(MakeShared<String>(catalog_dir), true);
+    auto data_dir = config_ptr_->DataDir();
+    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
+    new_catalog_ = Catalog::NewCatalog(std::move(data_dir_ptr), true);
 }
 
 } // namespace infinity

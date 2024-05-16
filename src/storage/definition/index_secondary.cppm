@@ -36,6 +36,8 @@ public:
 
     ~IndexSecondary() final = default;
 
+    virtual String BuildOtherParamsString() const override;
+
     static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 };
 

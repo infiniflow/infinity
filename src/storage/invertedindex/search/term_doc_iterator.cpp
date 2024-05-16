@@ -14,20 +14,22 @@
 
 module;
 
+#include <iostream>
 module term_doc_iterator;
 
 import stl;
-import memory_pool;
-import posting_iterator;
-import bitmap;
-import index_defines;
-import term_meta;
-import doc_iterator;
+
 namespace infinity {
-TermDocIterator::TermDocIterator(PostingIterator *iter, u64 column_id) : column_id_(column_id), iter_(iter) {}
 
-TermDocIterator::~TermDocIterator() {}
-
-void TermDocIterator::DoSeek(docid_t doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
+void TermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << "TermDocIterator";
+    os << " (weight: " << weight_ << ")";
+    os << " (column: " << *column_name_ptr_ << ")";
+    os << " (term: " << *term_ptr_ << ")";
+    os << " (doc_freq: " << GetDF() << ")";
+    os << '\n';
+}
 
 } // namespace infinity

@@ -94,8 +94,6 @@ TEST_F(IndexBaseTest, full_text_readwrite) {
 
     Vector<String> columns{"col1", "col2"};
     Vector<InitParameter *> parameters;
-    parameters.emplace_back(new InitParameter("analyzer", "jieba"));
-
     auto index_base = IndexFullText::Make(MakeShared<String>("idx1"), "tbl1_idx1", columns, parameters);
     std::cout << "index_base: " << index_base->ToString() << std::endl;
 

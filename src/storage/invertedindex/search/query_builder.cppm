@@ -18,31 +18,41 @@ export module query_builder;
 
 import stl;
 import doc_iterator;
-import term_queries;
 import column_index_reader;
-import indexer;
 import match_data;
-import index_config;
+import table_entry;
+import internal_types;
+import default_values;
+import base_table_ref;
 
 namespace infinity {
 
-class QueryNode;
-export struct QueryContext {
+class Txn;
+struct QueryNode;
+export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_;
+    UniquePtr<QueryNode> optimized_query_tree_;
 };
+
+class EarlyTerminateIterator;
 
 export class QueryBuilder {
 public:
-    QueryBuilder(Indexer *indexer);
+    QueryBuilder(Txn *txn, SharedPtr<BaseTableRef> &base_table_ref);
 
     ~QueryBuilder();
 
-    UniquePtr<DocIterator> CreateSearch(QueryContext &context);
+    const Map<String, String> &GetColumn2Analyzer() { return index_reader_.GetColumn2Analyzer(); }
+
+    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
+
+    UniquePtr<EarlyTerminateIterator> CreateEarlyTerminateSearch(FullTextQueryContext &context);
+
+    inline float Score(RowID doc_id) { return scorer_.Score(doc_id); }
 
 private:
-    Indexer *indexer_{nullptr};
-    Vector<u64> column_ids_;
+    TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
-    UniquePtr<Scorer> scorer_;
+    Scorer scorer_;
 };
 } // namespace infinity

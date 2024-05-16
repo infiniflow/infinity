@@ -93,8 +93,6 @@ private:
 export template <typename DataType, bool CheckTS = true>
 class OneColumnIterator {
 public:
-    using LabelType = SegmentOffset;
-
     OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts)
         : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts) {}
 

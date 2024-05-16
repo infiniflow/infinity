@@ -21,38 +21,39 @@ import segment_posting;
 import index_segment_reader;
 import posting_iterator;
 import index_defines;
-import index_config;
-import segment;
-import disk_index_segment_reader;
-import inmem_index_segment_reader;
+import memory_indexer;
+import internal_types;
+import segment_index_entry;
+import chunk_index_entry;
+
 export module column_index_reader;
 
 namespace infinity {
-class Indexer;
+struct TableEntry;
+class BlockMaxTermDocIterator;
+class Txn;
 
 export class ColumnIndexReader {
 public:
-    ColumnIndexReader(u64 column_id, Indexer *indexer);
-    virtual ~ColumnIndexReader() = default;
+    void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
-    void Open(const InvertedIndexConfig &index_config);
+    UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool, bool fetch_position = true);
 
-    PostingIterator *Lookup(const String &term, MemoryPool *session_pool);
+    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, MemoryPool *session_pool, float weight, bool fetch_position = true);
 
-    bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
+    float GetAvgColumnLength() const;
 
+    optionflag_t GetOptionFlag() const { return flag_; }
 private:
-    SharedPtr<DiskIndexSegmentReader> CreateDiskSegmentReader(const Segment &segment);
-
-    SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(Segment &segment);
-
-private:
-    u64 column_id_;
-    String root_dir_;
-    InvertedIndexConfig index_config_;
-    Indexer *indexer_;
+    optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
-    Vector<docid_t> base_doc_ids_;
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_;
+
+public:
+    // for loading column length files
+    String index_dir_;
+    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_;
+    SharedPtr<MemoryIndexer> memory_indexer_{nullptr};
 };
 
 namespace detail {
@@ -63,10 +64,28 @@ struct Hash {
 } // namespace detail
 
 export struct IndexReader {
-    ColumnIndexReader *GetColumnIndexReader(u64 column_id) { return column_index_readers_[column_id].get(); }
+    ColumnIndexReader *GetColumnIndexReader(u64 column_id) const { return (*column_index_readers_)[column_id].get(); }
+    const Map<String, String> &GetColumn2Analyzer() const { return *column2analyzer_; }
 
-    FlatHashMap<u64, UniquePtr<ColumnIndexReader>, detail::Hash<u64>> column_index_readers_;
+    SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> column_index_readers_;
+    SharedPtr<Map<String, String>> column2analyzer_;
     SharedPtr<MemoryPool> session_pool_;
+};
+
+export class TableIndexReaderCache {
+public:
+    void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
+
+    IndexReader GetIndexReader(Txn *txn, TableEntry *table_entry_ptr);
+
+private:
+    std::mutex mutex_;
+    TxnTimeStamp first_known_update_ts_ = 0;
+    TxnTimeStamp last_known_update_ts_ = 0;
+    TxnTimeStamp cache_ts_ = 0;
+    FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts_;
+    SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> cache_column_readers_;
+    SharedPtr<Map<String, String>> column2analyzer_;
 };
 
 } // namespace infinity

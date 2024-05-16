@@ -23,7 +23,7 @@ import global_block_id;
 import knn_distance; // delete this
 import block_index;
 import block_column_entry;
-import segment_column_index_entry;
+import segment_index_entry;
 import merge_knn;
 import bitmask;
 import data_block;
@@ -39,9 +39,8 @@ namespace infinity {
 export class KnnScanSharedData {
 public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
-                      SharedPtr<BaseExpression> filter_expression,
                       UniquePtr<Vector<BlockColumnEntry *>> block_column_entries,
-                      UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries,
+                      UniquePtr<Vector<SegmentIndexEntry *>> index_entries,
                       Vector<InitParameter> opt_params,
                       i64 topk,
                       i64 dimension,
@@ -49,17 +48,15 @@ public:
                       void *query_embedding,
                       EmbeddingDataType elem_type,
                       KnnDistanceType knn_distance_type)
-        : table_ref_(table_ref), filter_expression_(filter_expression), block_column_entries_(std::move(block_column_entries)),
-          index_entries_(std::move(index_entries)), opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension),
-          query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
+        : table_ref_(table_ref), block_column_entries_(std::move(block_column_entries)), index_entries_(std::move(index_entries)),
+          opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension), query_count_(query_embedding_count),
+          query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
 
-    const SharedPtr<BaseExpression> filter_expression_{};
-
     const UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
-    const UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries_{};
+    const UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
 
     const Vector<InitParameter> opt_params_{};
     const i64 topk_;
@@ -90,9 +87,8 @@ public:
         return res;
     }
 
-    Vector <DataType>
-    Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim, Bitmask &bitmask) {
-        Vector <DataType> res(data_count);
+    Vector<DataType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim, Bitmask &bitmask) {
+        Vector<DataType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             if (bitmask.IsTrue(i)) {
                 res[i] = dist_func_(query, datas + i * dim, dim);
@@ -114,7 +110,7 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type);
 
 export class KnnScanFunctionData final : public TableFunctionData {
 public:
-    KnnScanFunctionData(KnnScanSharedData* shared_data, u32 current_parallel_idx);
+    KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx);
 
     ~KnnScanFunctionData() final = default;
 
@@ -123,7 +119,7 @@ private:
     void Init();
 
 public:
-    KnnScanSharedData* knn_scan_shared_data_;
+    KnnScanSharedData *knn_scan_shared_data_;
     const u32 task_id_;
 
     UniquePtr<MergeKnnBase> merge_knn_base_{};

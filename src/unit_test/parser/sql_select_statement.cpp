@@ -105,7 +105,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(select_statement->having_expr_, nullptr);
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kConstant);
             auto *const_expr = (ConstantExpr *)(*select_statement->select_list_)[0];
             EXPECT_EQ(const_expr->date_value_, nullptr);
@@ -144,13 +144,13 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(select_statement->having_expr_, nullptr);
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 3);
+            EXPECT_EQ(select_statement->select_list_->size(), 3u);
 
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
                 auto *col0_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
                 EXPECT_EQ(col0_expr->star_, false);
-                EXPECT_EQ(col0_expr->names_.size(), 1);
+                EXPECT_EQ(col0_expr->names_.size(), 1u);
                 EXPECT_EQ(col0_expr->names_[0], "a");
             }
             {
@@ -158,10 +158,10 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *col1_expr = (FunctionExpr *)(*select_statement->select_list_)[1];
                 EXPECT_EQ(col1_expr->func_name_, "sum");
                 auto &args = *col1_expr->arguments_;
-                EXPECT_EQ(args.size(), 1);
+                EXPECT_EQ(args.size(), 1u);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kColumn);
                 auto *arg_expr = (ColumnExpr *)args[0];
-                EXPECT_EQ(arg_expr->names_.size(), 1);
+                EXPECT_EQ(arg_expr->names_.size(), 1u);
                 EXPECT_EQ(arg_expr->names_[0], "b");
             }
             {
@@ -169,11 +169,11 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *col1_expr = (FunctionExpr *)(*select_statement->select_list_)[2];
                 EXPECT_EQ(col1_expr->func_name_, "function");
                 auto &args = *col1_expr->arguments_;
-                EXPECT_EQ(args.size(), 2);
+                EXPECT_EQ(args.size(), 2u);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kColumn);
                 {
                     auto *arg_expr = (ColumnExpr *)args[0];
-                    EXPECT_EQ(arg_expr->names_.size(), 1);
+                    EXPECT_EQ(arg_expr->names_.size(), 1u);
                     EXPECT_EQ(arg_expr->names_[0], "c");
                 }
 
@@ -181,13 +181,13 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 {
                     auto *arg_expr = (FunctionExpr *)args[1];
                     EXPECT_EQ(arg_expr->func_name_, "nested");
-                    EXPECT_EQ(arg_expr->arguments_->size(), 1);
+                    EXPECT_EQ(arg_expr->arguments_->size(), 1u);
 
                     auto &func_args = *arg_expr->arguments_;
-                    EXPECT_EQ(func_args.size(), 1);
+                    EXPECT_EQ(func_args.size(), 1u);
                     EXPECT_EQ(func_args[0]->type_, ParsedExprType::kColumn);
                     auto *func_arg_expr = (ColumnExpr *)func_args[0];
-                    EXPECT_EQ(func_arg_expr->names_.size(), 1);
+                    EXPECT_EQ(func_arg_expr->names_.size(), 1u);
                     EXPECT_EQ(func_arg_expr->names_[0], "d");
                 }
             }
@@ -221,11 +221,11 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(select_statement->having_expr_, nullptr);
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
             auto *col_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
             EXPECT_EQ(col_expr->star_, true);
-            EXPECT_EQ(col_expr->names_.size(), 0);
+            EXPECT_EQ(col_expr->names_.size(), 0u);
         }
 
         result->Reset();
@@ -247,14 +247,14 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             EXPECT_EQ(select_statement->having_expr_, nullptr);
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 5);
+            EXPECT_EQ(select_statement->select_list_->size(), 5u);
 
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kFunction);
                 auto *col0_expr = (FunctionExpr *)(*select_statement->select_list_)[0];
                 EXPECT_EQ(col0_expr->func_name_, "-");
                 auto &args = *col0_expr->arguments_;
-                EXPECT_EQ(args.size(), 2);
+                EXPECT_EQ(args.size(), 2u);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kConstant);
                 auto *arg0_expr = (ConstantExpr *)args[0];
                 EXPECT_EQ(arg0_expr->integer_value_, 10);
@@ -269,7 +269,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *col0_expr = (FunctionExpr *)(*select_statement->select_list_)[1];
                 EXPECT_EQ(col0_expr->func_name_, "+");
                 auto &args = *col0_expr->arguments_;
-                EXPECT_EQ(args.size(), 2);
+                EXPECT_EQ(args.size(), 2u);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kConstant);
                 auto *arg0_expr = (ConstantExpr *)args[0];
                 EXPECT_EQ(arg0_expr->integer_value_, 10);
@@ -284,7 +284,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *col0_expr = (FunctionExpr *)(*select_statement->select_list_)[2];
                 EXPECT_EQ(col0_expr->func_name_, "+");
                 auto &args = *col0_expr->arguments_;
-                EXPECT_EQ(args.size(), 2);
+                EXPECT_EQ(args.size(), 2u);
                 EXPECT_EQ(args[0]->type_, ParsedExprType::kConstant);
                 auto *arg0_expr = (ConstantExpr *)args[0];
                 EXPECT_EQ(arg0_expr->integer_value_, 10);
@@ -334,7 +334,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto &arg_expr = (*select_statement->group_by_list_)[0];
                 EXPECT_EQ(arg_expr->type_, ParsedExprType::kColumn);
                 auto *column_arg_expr = (ColumnExpr *)arg_expr;
-                EXPECT_EQ(column_arg_expr->names_.size(), 1);
+                EXPECT_EQ(column_arg_expr->names_.size(), 1u);
                 EXPECT_EQ(column_arg_expr->names_[0], "a");
             }
 
@@ -344,17 +344,17 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *having_expr = (FunctionExpr *)select_statement->having_expr_;
                 EXPECT_EQ(having_expr->func_name_, "<");
 
-                EXPECT_EQ(having_expr->arguments_->size(), 2);
+                EXPECT_EQ(having_expr->arguments_->size(), 2u);
                 auto child0_args = (*having_expr->arguments_)[0];
                 auto child1_args = (*having_expr->arguments_)[1];
                 EXPECT_EQ(child0_args->type_, ParsedExprType::kFunction);
                 auto *child0_function_expr = (FunctionExpr *)child0_args;
                 EXPECT_EQ(child0_function_expr->func_name_, "avg");
-                EXPECT_EQ(child0_function_expr->arguments_->size(), 1);
+                EXPECT_EQ(child0_function_expr->arguments_->size(), 1u);
                 auto child0_function_arg_expr = (*child0_function_expr->arguments_)[0];
                 EXPECT_EQ(child0_function_arg_expr->type_, ParsedExprType::kColumn);
                 auto *child0_function_arg_col_expr = (ColumnExpr *)child0_function_arg_expr;
-                EXPECT_EQ(child0_function_arg_col_expr->names_.size(), 1);
+                EXPECT_EQ(child0_function_arg_col_expr->names_.size(), 1u);
                 EXPECT_EQ(child0_function_arg_col_expr->names_[0], "b");
 
                 EXPECT_EQ(child1_args->type_, ParsedExprType::kConstant);
@@ -364,20 +364,20 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 2);
+            EXPECT_EQ(select_statement->select_list_->size(), 2u);
             EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
             auto *col_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
             EXPECT_EQ(col_expr->star_, false);
-            EXPECT_EQ(col_expr->names_.size(), 1);
+            EXPECT_EQ(col_expr->names_.size(), 1u);
 
             EXPECT_EQ((*select_statement->select_list_)[1]->type_, ParsedExprType::kFunction);
             auto *func_expr = (FunctionExpr *)(*select_statement->select_list_)[1];
             EXPECT_EQ(func_expr->func_name_, "avg");
-            EXPECT_EQ(func_expr->arguments_->size(), 1);
+            EXPECT_EQ(func_expr->arguments_->size(), 1u);
             auto func_arg_expr = (*func_expr->arguments_)[0];
             EXPECT_EQ(func_arg_expr->type_, ParsedExprType::kColumn);
             auto *func_arg_col_expr = (ColumnExpr *)func_arg_expr;
-            EXPECT_EQ(func_arg_col_expr->names_.size(), 1);
+            EXPECT_EQ(func_arg_col_expr->names_.size(), 1u);
             EXPECT_EQ(func_arg_col_expr->names_[0], "b");
         }
         result->Reset();
@@ -430,7 +430,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 2);
+            EXPECT_EQ(select_statement->select_list_->size(), 2u);
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kFunction);
                 auto *func_expr = (FunctionExpr *)(*select_statement->select_list_)[0];
@@ -471,7 +471,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 2);
+            EXPECT_EQ(select_statement->select_list_->size(), 2u);
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
                 auto *col_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
@@ -485,7 +485,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             }
 
             EXPECT_NE(select_statement->order_by_list, nullptr);
-            EXPECT_EQ(select_statement->order_by_list->size(), 2);
+            EXPECT_EQ(select_statement->order_by_list->size(), 2u);
             {
                 EXPECT_EQ((*select_statement->order_by_list)[0]->type_, OrderType::kAsc);
                 EXPECT_EQ((*select_statement->order_by_list)[0]->expr_->type_, ParsedExprType::kColumn);
@@ -524,7 +524,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 2);
+            EXPECT_EQ(select_statement->select_list_->size(), 2u);
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
                 auto *col_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
@@ -588,11 +588,11 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
                 auto *col_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
-                EXPECT_EQ(col_expr->names_.size(), 0);
+                EXPECT_EQ(col_expr->names_.size(), 0u);
                 EXPECT_EQ(col_expr->star_, true);
             }
 
@@ -636,7 +636,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                         EXPECT_EQ((*subquery_select->select_list_)[0]->type_, ParsedExprType::kColumn);
                         auto *subquery_col_expr = (ColumnExpr *)(*subquery_select->select_list_)[0];
                         EXPECT_EQ(subquery_col_expr->star_, true);
-                        EXPECT_EQ(subquery_col_expr->names_.size(), 0);
+                        EXPECT_EQ(subquery_col_expr->names_.size(), 0u);
                     }
                     {
                         auto *table_ref_ptr = (TableReference *)(subquery_select->table_ref_);
@@ -676,7 +676,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kFunction);
                 auto *func_expr = (FunctionExpr *)(*select_statement->select_list_)[0];
@@ -733,7 +733,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kCase);
 
@@ -802,7 +802,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             {
                 EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kCase);
 
@@ -929,7 +929,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             SubqueryReference *t2 = (SubqueryReference *)(cross1->tables_[1]);
             EXPECT_STREQ(t2->alias_->alias_, "t2");
             SelectStatement *t2_select = (SelectStatement *)(t2->select_statement_);
-            EXPECT_EQ(t2_select->select_list_->size(), 1);
+            EXPECT_EQ(t2_select->select_list_->size(), 1u);
             {
                 EXPECT_EQ((*t2_select->select_list_)[0]->type_, ParsedExprType::kColumn);
                 auto *col_expr = (ColumnExpr *)(*t2_select->select_list_)[0];
@@ -943,7 +943,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
             SubqueryReference *t3 = (SubqueryReference *)(cross1->tables_[2]);
             EXPECT_STREQ(t3->alias_->alias_, "t3");
             SelectStatement *t3_select = (SelectStatement *)(t3->select_statement_);
-            EXPECT_EQ(t3_select->select_list_->size(), 1);
+            EXPECT_EQ(t3_select->select_list_->size(), 1u);
             {
                 EXPECT_EQ((*t3_select->select_list_)[0]->type_, ParsedExprType::kColumn);
                 auto *col_expr = (ColumnExpr *)(*t3_select->select_list_)[0];
@@ -1403,7 +1403,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(select_statement->search_expr_->type_, ParsedExprType::kSearch);
     auto *search_expr = (SearchExpr *)(select_statement->search_expr_);
 
-    EXPECT_EQ(search_expr->match_exprs_.size(), 4);
+    EXPECT_EQ(search_expr->match_exprs_.size(), 4u);
     auto *match_expr0 = (MatchExpr *)(search_expr->match_exprs_[0]);
     EXPECT_EQ(match_expr0->fields_, String("author^2,name^5"));
     EXPECT_EQ(match_expr0->matching_text_, String("frank dune"));
@@ -1418,7 +1418,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     auto *query_expr1 = (MatchExpr *)(search_expr->match_exprs_[3]);
     EXPECT_EQ(query_expr1->matching_text_, String(R"##(_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~))##"));
 
-    EXPECT_EQ(search_expr->knn_exprs_.size(), 6);
+    EXPECT_EQ(search_expr->knn_exprs_.size(), 6u);
     auto *knn_expr0 = (KnnExpr *)(search_expr->knn_exprs_[0]);
     EXPECT_EQ(knn_expr0->distance_type_, KnnDistanceType::kL2);
     auto *knn0_col_expr = (ColumnExpr *)(knn_expr0->column_expr_);

@@ -103,6 +103,53 @@ public:
         }
     }
 
+    [[nodiscard]] inline bool SupportMinMaxFilter() const {
+        switch (type_) {
+            case kTinyInt:
+            case kSmallInt:
+            case kInteger:
+            case kBigInt:
+            case kHugeInt:
+            case kFloat:
+            case kDouble:
+            case kVarchar:
+            case kDate:
+            case kTime:
+            case kDateTime:
+            case kTimestamp: {
+                return true;
+            }
+            default: {
+                return false;
+            }
+        }
+    }
+
+    [[nodiscard]] inline bool SupportBloomFilter() const {
+        // 1. convert to u64
+        // 2. remove duplicate
+        // 3. build BinaryFuse filter
+        switch (type_) {
+            case kBoolean:
+            case kTinyInt:
+            case kSmallInt:
+            case kInteger:
+            case kBigInt:
+            case kHugeInt:
+            case kDecimal:
+            case kVarchar:
+            case kDate:
+            case kTime:
+            case kDateTime:
+            case kTimestamp: {
+                return true;
+            }
+            default: {
+                return false;
+            }
+        }
+    }
+
     inline void Reset() {
         type_ = LogicalType::kInvalid;
         type_info_.reset();
@@ -112,6 +159,7 @@ public:
     nlohmann::json Serialize();
 
     static std::shared_ptr<DataType> Deserialize(const nlohmann::json &data_type_json);
+    static std::shared_ptr<DataType> StringDeserialize(const std::string &data_type_string);
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     [[nodiscard]] int32_t GetSizeInBytes() const;
@@ -237,6 +285,9 @@ std::string DataType::TypeToString<RowID>();
 
 template <>
 std::string DataType::TypeToString<MixedT>();
+
+template <>
+std::string DataType::TypeToString<TensorT>();
 
 template <>
 BooleanT DataType::StringToValue<BooleanT>(const std::string_view &str_view);

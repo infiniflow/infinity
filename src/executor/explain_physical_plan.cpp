@@ -68,6 +68,7 @@ import physical_merge_sort;
 import physical_merge_knn;
 import physical_match;
 import physical_fusion;
+import physical_merge_aggregate;
 import status;
 import physical_operator_type;
 
@@ -84,7 +85,7 @@ import extra_ddl_info;
 import column_def;
 import statement_common;
 import flush_statement;
-
+import common_query_filter;
 import table_entry;
 
 namespace infinity {
@@ -276,6 +277,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kFusion: {
             Explain((PhysicalFusion *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMergeAggregate: {
+            Explain((PhysicalMergeAggregate *)op, result, intent_size);
             break;
         }
         default: {
@@ -807,10 +812,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     result->emplace_back(MakeShared<String>(query_embedding));
 
     // filter expression
-    BaseExpression *filter_expr = knn_scan_node->filter_expression_.get();
-    if (filter_expr != nullptr) {
+    if (knn_scan_node->common_query_filter_ and knn_scan_node->common_query_filter_->original_filter_) {
         String filter_str = String(intent_size, ' ') + " - filter: ";
-        ExplainLogicalPlan::Explain(filter_expr, filter_str);
+        ExplainLogicalPlan::Explain(knn_scan_node->common_query_filter_->original_filter_.get(), filter_str);
         result->emplace_back(MakeShared<String>(filter_str));
     }
 
@@ -1097,6 +1101,60 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node, Share
 
 void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (show_node->scan_type()) {
+        case ShowType::kShowDatabase: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW DATABASE ";
+            } else {
+                show_str = "SHOW DATABASE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowTable: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW TABLES ";
+            } else {
+                show_str = "SHOW TABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowIndex: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW TABLES ";
+            } else {
+                show_str = "SHOW TABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kShowTables: {
             String show_str;
             if (intent_size != 0) {
@@ -1136,7 +1194,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
-            String show_column_db_str = String(intent_size, ' ') + " - schema: ";
+            String show_column_db_str = String(intent_size, ' ') + " - database: ";
             show_column_db_str += show_node->db_name();
             result->emplace_back(MakeShared<String>(show_column_db_str));
 
@@ -1158,7 +1216,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
-            String show_column_db_str = String(intent_size, ' ') + " - schema: ";
+            String show_column_db_str = String(intent_size, ' ') + " - database: ";
             show_column_db_str += show_node->db_name();
             result->emplace_back(MakeShared<String>(show_column_db_str));
 
@@ -1239,17 +1297,90 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [path, size]";
+            output_columns_str += " - output columns: [id, status, size]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSessionStatus: {
+        case ShowType::kShowSegment: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW SESSION STATUS ";
+                show_str += "-> SHOW SEGMENT ";
             } else {
-                show_str = "SHOW SESSION STATUS ";
+                show_str = "SHOW SEGMENT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str +=
+                " - output columns: [id, status, dir, size, block_count, row_capacity, row_count, actual_row_count, room, column_count]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowBlocks: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW BLOCKS ";
+            } else {
+                show_str = "SHOW BLOCKS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [id, size, row_count]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowBlock: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW BLOCK ";
+            } else {
+                show_str = "SHOW BLOCK ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [id, path, size, row_capacity, row_count, checkpoint_row_count, column_count, checkpoint_ts]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowBlockColumn: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW BLOCK COLUMN ";
+            } else {
+                show_str = "SHOW BLOCK COLUMN ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [id, path, size, row_capacity, row_count, checkpoint_row_count, column_count, checkpoint_ts]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowSessionVariable: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW SESSION VARIABLE ";
+            } else {
+                show_str = "SHOW SESSION VARIABLE ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1261,13 +1392,13 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowGlobalStatus: {
+        case ShowType::kShowSessionVariables: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW GLOBAL STATUS ";
+                show_str += "-> SHOW SESSION VARIABLES ";
             } else {
-                show_str = "SHOW GLOBAL STATUS ";
+                show_str = "SHOW SESSION VARIABLES ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1279,13 +1410,49 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowVar: {
+        case ShowType::kShowGlobalVariable: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW VARIABLE ";
+                show_str += "-> SHOW GLOBAL VARIABLE ";
             } else {
-                show_str = "SHOW VARIABLE ";
+                show_str = "SHOW GLOBAL VARIABLE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowGlobalVariables: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW GLOBAL VARIABLES ";
+            } else {
+                show_str = "SHOW GLOBAL VARIABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowConfig: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW CONFIG ";
+            } else {
+                show_str = "SHOW CONFIG ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1837,6 +2004,28 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     String match_expression = String(intent_size, ' ') + " - match expression: " + match_node->match_expr()->ToString();
     result->emplace_back(MakeShared<String>(match_expression));
 
+    // filter expression
+    if (const CommonQueryFilter *filter = match_node->common_query_filter(); filter) {
+        {
+            String filter_str = String(intent_size, ' ') + " - filter for secondary index: ";
+            if (const auto *filter_expr = filter->secondary_index_filter_qualified_.get(); filter_expr) {
+                ExplainLogicalPlan::Explain(filter_expr, filter_str);
+            } else {
+                filter_str += "None";
+            }
+            result->emplace_back(MakeShared<String>(filter_str));
+        }
+        {
+            String filter_str = String(intent_size, ' ') + " - filter except secondary index: ";
+            if (const auto *filter_expr = filter->filter_leftover_.get(); filter_expr) {
+                ExplainLogicalPlan::Explain(filter_expr, filter_str);
+            } else {
+                filter_str += "None";
+            }
+            result->emplace_back(MakeShared<String>(filter_str));
+        }
+    }
+
     // Output columns
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = match_node->GetOutputNames()->size();
@@ -1879,6 +2068,30 @@ void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node, SharedPtr<V
         output_columns += fusion_node->GetOutputNames()->at(idx) + ", ";
     }
     output_columns += fusion_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> Merge aggregate ";
+    } else {
+        explain_header_str = "Merge aggregate ";
+    }
+    explain_header_str += "(" + std::to_string(merge_aggregate_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = merge_aggregate_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        UnrecoverableError("No column in merge aggregate node.");
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += merge_aggregate_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += merge_aggregate_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 }

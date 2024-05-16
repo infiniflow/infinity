@@ -78,7 +78,6 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
         UnrecoverableError(parsed_result->error_message_);
     }
 
-    query_context_ptr->CreateTxn();
     query_context_ptr->BeginTxn();
 
     //    LogicalPlanner logical_planner(query_context_ptr.get());
@@ -94,7 +93,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     SharedPtr<LogicalNode> logical_plan = query_context_ptr->logical_planner()->LogicalPlan();
 
     // Apply optimized rule to the logical plan
-    query_context_ptr->optimizer()->optimize(logical_plan);
+    query_context_ptr->optimizer()->optimize(logical_plan, statement->Type());
 
     // Build physical plan
     SharedPtr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(logical_plan);
@@ -108,7 +107,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get(), notifier.get());
 
     // Schedule the query tasks
-    query_context_ptr->scheduler()->Schedule(plan_fragment.get());
+    query_context_ptr->scheduler()->Schedule(plan_fragment.get(), statement);
 
     // Initialize query result
     QueryResult query_result;

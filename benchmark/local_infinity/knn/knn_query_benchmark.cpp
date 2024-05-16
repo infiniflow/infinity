@@ -24,8 +24,6 @@
 import compilation_config;
 
 import infinity;
-import database;
-import table;
 
 import profiler;
 import local_file_system;
@@ -65,19 +63,19 @@ std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &di
 }
 
 template <typename Function>
-inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn, const std::string &table_name) {
-    std::cout << "threadId = " << threadId << " [" << id_begin << ", " << id_end << ")" << std::endl;
+inline void LoopFor(size_t id_begin, size_t id_end, size_t thread_id, Function fn, const std::string &db_name, const std::string &table_name) {
+    std::cout << "thread_id = " << thread_id << " [" << id_begin << ", " << id_end << ")" << std::endl;
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
-    auto [ data_base, status1 ] = infinity->GetDatabase("default");
-    auto [ table, status2 ] = data_base->GetTable(table_name);
-    std::shared_ptr<Table> shared_table(std::move(table));
+    //    auto [data_base, status1] = infinity->GetDatabase("default_db");
+    //    auto [table, status2] = data_base->GetTable(table_name);
+    //    std::shared_ptr<Table> shared_table(std::move(table));
     for (auto id = id_begin; id < id_end; ++id) {
-        fn(id, shared_table, threadId);
+        fn(id, thread_id, infinity.get(), db_name, table_name);
     }
 }
 
 template <typename Function>
-inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn, const std::string &table_name) {
+inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn, const std::string &db_name, const std::string &table_name) {
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
@@ -85,12 +83,13 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     threads.reserve(numThreads);
     size_t avg_cnt = (end - start) / numThreads;
     size_t extra_cnt = (end - start) % numThreads;
-    for (size_t id_begin = start, threadId = 0; threadId < numThreads; ++threadId) {
-        size_t id_end = id_begin + avg_cnt + (threadId < extra_cnt);
-        threads.emplace_back([id_begin, id_end, threadId, fn, table_name] { LoopFor(id_begin, id_end, threadId, fn, table_name); });
+    for (size_t id_begin = start, thread_id = 0; thread_id < numThreads; ++thread_id) {
+        size_t id_end = id_begin + avg_cnt + (thread_id < extra_cnt);
+        threads.emplace_back(
+            [id_begin, id_end, thread_id, fn, db_name, table_name] { LoopFor(id_begin, id_end, thread_id, fn, db_name, table_name); });
         id_begin = id_end;
     }
-    for(auto& thread: threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
 }
@@ -98,7 +97,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
 int main(int argc, char *argv[]) {
     if (argc < 3) {
         std::cout << "query gist/sift ef=? , with optional test_data_path (default to /infinity/test/data in docker) and optional infinity path "
-                     "(default to /tmp/infinity)"
+                     "(default to /var/infinity)"
                   << std::endl;
         return 1;
     }
@@ -116,7 +115,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Please input total_times:" << std::endl;
     std::cin >> total_times;
 
-    std::string path = "/tmp/infinity";
+    std::string path = "/var/infinity";
     if (argc >= 5) {
         path = std::string(argv[4]);
     }
@@ -138,6 +137,7 @@ int main(int argc, char *argv[]) {
     size_t dimension = 0;
     int64_t topk = 100;
 
+    std::string db_name = "default_db";
     std::string table_name;
     if (sift) {
         dimension = 128;
@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
         for (auto &v : query_results) {
             v.reserve(100);
         }
-        auto query_function = [&](size_t query_idx, std::shared_ptr<Table> &table, size_t threadId) {
+        auto query_function = [&](size_t query_idx, size_t thread_id, Infinity *infinity, const std::string &db_name, const std::string &table_name) {
             KnnExpr *knn_expr = new KnnExpr();
             knn_expr->dimension_ = dimension;
             knn_expr->distance_type_ = KnnDistanceType::kL2;
@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
             auto select_rowid_expr = new FunctionExpr();
             select_rowid_expr->func_name_ = "row_id";
             output_columns->emplace_back(select_rowid_expr);
-            auto result = table->Search(search_expr, nullptr, output_columns);
+            auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
             {
                 auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
                 auto &column = *cv[0];
@@ -241,7 +241,7 @@ int main(int argc, char *argv[]) {
         };
         BaseProfiler profiler("ParallelFor");
         profiler.Begin();
-        ParallelFor(0, query_count, thread_num, query_function, table_name);
+        ParallelFor(0, query_count, thread_num, query_function, db_name, table_name);
         profiler.End();
         // skip 2 warm up loops
         if (times >= 2) {

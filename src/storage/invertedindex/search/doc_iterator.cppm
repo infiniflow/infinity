@@ -18,39 +18,55 @@ export module doc_iterator;
 
 import stl;
 import memory_pool;
-import posting_iterator;
 import index_defines;
-import segment;
-import index_config;
-import match_data;
+import internal_types;
+
 namespace infinity {
+
+export enum class DocIteratorType : u8 {
+    kInvalidIterator,
+    kTermIterator,
+    kPhraseIterator,
+    kMultiQueryIterator
+};
+
 export class DocIterator {
 public:
     DocIterator() = default;
 
     virtual ~DocIterator() = default;
 
-    virtual void AddIterator(DocIterator *iter) = 0;
-
-    virtual docid_t Doc() { return doc_id_; }
+    RowID Doc() { return doc_id_; }
 
     // Check if the given doc id is a hit. If it is a hit, the
     // current doc id of this iterator is set to the given id,
-    // If it is not a hit, the current doc id is either unchanged,
-    // or set to the next hit
-    bool Seek(docid_t doc_id) {
-        if (doc_id > doc_id_)
+    // If it is not a hit, find the first doc id which is not less
+    // than the give doc id. If there is no such a doc id,
+    // INVALID_DOCID will be returned
+    bool Seek(RowID doc_id) {
+        if (doc_id > doc_id_) {
             DoSeek(doc_id);
+        }
         return doc_id == doc_id_;
     }
 
-    virtual void DoSeek(docid_t doc_id) = 0;
+    // for term iter
+    void PrepareFirstDoc();
+
+    RowID Next() {
+        DoSeek(doc_id_ + 1);
+        return doc_id_;
+    }
+
+    virtual void DoSeek(RowID doc_id) = 0;
 
     virtual u32 GetDF() const = 0;
 
-    virtual bool GetTermMatchData(TermColumnMatchData &match_data, docid_t doc_id) { return false; }
+    // print the query tree, for debugging
+    virtual void PrintTree(std::ostream &os, const String &prefix = "", bool is_final = true) const = 0;
 
+    virtual DocIteratorType GetType() const { return DocIteratorType::kInvalidIterator; }
 protected:
-    docid_t doc_id_;
+    RowID doc_id_{INVALID_ROWID};
 };
 } // namespace infinity

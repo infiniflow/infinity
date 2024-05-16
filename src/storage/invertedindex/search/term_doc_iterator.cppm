@@ -19,37 +19,54 @@ export module term_doc_iterator;
 import stl;
 import memory_pool;
 import posting_iterator;
-import bitmap;
 import index_defines;
 import term_meta;
-import segment;
-import index_config;
 import doc_iterator;
 import match_data;
+import internal_types;
+import doc_iterator;
+import third_party;
+
 namespace infinity {
-export class TermDocIterator : public DocIterator {
+export class TermDocIterator final : public DocIterator {
 public:
-    TermDocIterator(PostingIterator *iter, u64 column_id);
+    TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight)
+        : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
+        doc_freq_ = iter_->GetDocFreq();
+        term_freq_ = 0;
+    }
 
-    virtual ~TermDocIterator();
+    void DoSeek(RowID doc_id) override { doc_id_ = iter_->SeekDoc(doc_id); }
 
-    void AddIterator(DocIterator *iter) override {}
+    u32 GetDF() const override { return doc_freq_; }
 
-    void DoSeek(docid_t doc_id) override;
-
-    u32 GetDF() const override { return iter_->GetTermMeta()->GetDocFreq(); }
-
-    bool GetTermMatchData(TermColumnMatchData &match_data, docid_t doc_id) override {
+    bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) {
         if (doc_id == doc_id_) {
             match_data.doc_id_ = doc_id_;
             iter_->GetTermMatchData(match_data);
+            term_freq_ += match_data.tf_;
             return true;
         }
         return false;
     }
 
+    float GetWeight() const { return weight_; }
+
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+
+    DocIteratorType GetType() const override { return DocIteratorType::kTermIterator; }
+
+    u64 GetTermFreq() const { return term_freq_; }
+
+    // debug info
+    const String *term_ptr_ = nullptr;
+    const String *column_name_ptr_ = nullptr;
+
 private:
     u64 column_id_;
-    PostingIterator *iter_ = nullptr;
+    UniquePtr<PostingIterator> iter_;
+    u32 doc_freq_;
+    float weight_;
+    u64 term_freq_;
 };
 } // namespace infinity

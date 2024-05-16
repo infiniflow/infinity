@@ -43,7 +43,7 @@ class OrFunctionsTest : public BaseTest {};
 TEST_F(OrFunctionsTest, or_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
 
     RegisterOrFunction(catalog_ptr);
 

@@ -5,13 +5,13 @@ module in_doc_pos_iterator;
 import stl;
 import index_defines;
 import in_doc_pos_state;
-import pos_list_format_option;
-import pos_list_decoder;
+import position_list_format_option;
+import position_list_decoder;
 
 namespace infinity {
-InDocPositionIterator::InDocPositionIterator(PositionListFormatOption option)
+InDocPositionIterator::InDocPositionIterator(const PositionListFormatOption &option)
     : current_pos_(-1), visited_pos_in_buffer_(-1), visited_pos_in_doc_(-1), pos_count_in_buffer_(0), offset_in_record_(0), total_pos_count_(0),
-      current_field_id_(-1), option_(option) {}
+      current_field_id_(-1), option_(option), state_(option) {}
 
 void InDocPositionIterator::Init(const InDocPositionState &state) {
     PositionListDecoder *pos_decoder = state.GetPositionListDecoder();

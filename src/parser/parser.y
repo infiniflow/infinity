@@ -362,18 +362,18 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT COMPACT
-%token EXCEPT FLUSH USE OPTIMIZE
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT
+%token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
-%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT
-%token PRIMARY KEY UNIQUE NULLABLE IS
+%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TENSOR
+%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
-%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS PROFILES STATUS VAR
+%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
 %token SEARCH MATCH QUERY FUSION
 
 %token NUMBER
@@ -420,7 +420,7 @@ struct SQL_LTYPE {
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
 %type <expr_t>                  match_expr query_expr fusion_expr search_clause
-%type <const_expr_t>            constant_expr interval_expr
+%type <const_expr_t>            constant_expr interval_expr default_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
 %type <expr_array_list_t>       expr_array_list
@@ -440,7 +440,7 @@ struct SQL_LTYPE {
 
 %type <index_param_t> index_param
 %type <index_param_list_t> index_param_list
-%type <with_index_param_list_t> with_index_param_list
+%type <with_index_param_list_t> with_index_param_list optional_table_properties_list
 
 %type <index_info_list_t> index_info_list
 
@@ -549,7 +549,8 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
 }
 
 /* CREATE TABLE table_name ( column list ); */
-| CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
+/* CREATE TABLE table_name ( column list ) PROPERTIES ("p1"="111", "p2"="xxx", ...); */
+| CREATE TABLE if_not_exists table_name '(' table_element_array ')' optional_table_properties_list {
     $$ = new infinity::CreateStatement();
     std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
@@ -568,6 +569,11 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
         }
     }
     delete $6;
+
+    if ($8 != nullptr) {
+        create_table_info->properties_ = std::move(*$8);
+        delete $8;
+    }
 
     $$->create_info_ = create_table_info;
     $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
@@ -655,7 +661,7 @@ table_element : table_column {
 
 
 table_column :
-IDENTIFIER column_type {
+IDENTIFIER column_type default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
         case infinity::LogicalType::kDecimal: {
@@ -671,6 +677,7 @@ IDENTIFIER column_type {
 //            type_info_ptr = infinity::BitmapInfo::Make($2.width);
 //            break;
 //        }
+        case infinity::LogicalType::kTensor:
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
@@ -679,7 +686,9 @@ IDENTIFIER column_type {
             break;
         }
     }
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr);
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($3);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, std::move(default_expr));
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -690,7 +699,7 @@ IDENTIFIER column_type {
     }
     */
 };
-| IDENTIFIER column_type column_constraints {
+| IDENTIFIER column_type column_constraints default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch($2.logical_type_) {
         case infinity::LogicalType::kDecimal: {
@@ -709,7 +718,9 @@ IDENTIFIER column_type {
             break;
         }
     }
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr);
+
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
+    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, default_expr);
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
@@ -761,6 +772,14 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | EMBEDDING '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt64}; }
 | EMBEDDING '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat}; }
 | EMBEDDING '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemDouble}; }
+| TENSOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemBit}; }
+| TENSOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt8}; }
+| TENSOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt16}; }
+| TENSOR '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt32}; }
+| TENSOR '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt32}; }
+| TENSOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt64}; }
+| TENSOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemFloat}; }
+| TENSOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemDouble}; }
 | VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBit}; }
 | VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt8}; }
 | VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt16}; }
@@ -813,6 +832,14 @@ column_constraint : PRIMARY KEY {
 | NOT NULLABLE {
     $$ = infinity::ConstraintType::kNotNull;
 };
+
+default_expr : DEFAULT constant_expr {
+    $$ = $2;
+}
+| /* empty default value */ {
+    $$ = nullptr;
+};
+
 
 table_constraint : PRIMARY KEY '(' identifier_array ')' {
     $$ = new infinity::TableConstraint();
@@ -1507,73 +1534,128 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kConfigs;
 }
-| SHOW PROFILES {
+| SHOW CONFIG IDENTIFIER {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kProfiles;
-}
-| SHOW SESSION STATUS {
-    $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kSessionStatus;
-}
-| SHOW GLOBAL STATUS {
-    $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kGlobalStatus;
-}
-| SHOW VAR IDENTIFIER {
-    $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kVar;
+    $$->show_type_ = infinity::ShowStmtType::kConfig;
     ParserHelper::ToLower($3);
     $$->var_name_ = std::string($3);
     free($3);
 }
-| DESCRIBE table_name {
+| SHOW PROFILES {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kProfiles;
+}
+| SHOW SESSION VARIABLES {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kSessionVariables;
+}
+| SHOW GLOBAL VARIABLES {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kGlobalVariables;
+}
+| SHOW SESSION VARIABLE IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kSessionVariable;
+    $$->var_name_ = std::string($4);
+    free($4);
+}
+| SHOW GLOBAL VARIABLE IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kGlobalVariable;
+    $$->var_name_ = std::string($4);
+    free($4);
+}
+| SHOW DATABASE IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kDatabase;
+    $$->schema_name_ = $3;
+    free($3);
+}
+| SHOW TABLE table_name {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kTable;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
+}
+| SHOW TABLE table_name COLUMNS {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kColumns;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
 }
-| DESCRIBE table_name SEGMENTS {
+| SHOW TABLE table_name SEGMENTS {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kSegments;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
 }
-| DESCRIBE table_name SEGMENT LONG_VALUE {
+| SHOW TABLE table_name SEGMENT LONG_VALUE {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kSegments;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    $$->show_type_ = infinity::ShowStmtType::kSegment;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    $$->segment_id_ = $4;
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->segment_id_ = $5;
+    delete $3;
 }
-| DESCRIBE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE {
+| SHOW TABLE table_name SEGMENT LONG_VALUE BLOCKS {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kSegments;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    $$->show_type_ = infinity::ShowStmtType::kBlocks;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    $$->segment_id_ = $4;
-    $$->block_id_ = $6;
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->segment_id_ = $5;
+    delete $3;
 }
-| DESCRIBE INDEX table_name {
+| SHOW TABLE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kBlock;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->segment_id_ = $5;
+    $$->block_id_ = $7;
+    delete $3;
+}
+| SHOW TABLE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMN LONG_VALUE {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kBlockColumn;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->segment_id_ = $5;
+    $$->block_id_ = $7;
+    $$->column_id_ = $9;
+    delete $3;
+}
+| SHOW TABLE table_name INDEXES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kIndexes;
     if($3->schema_name_ptr_ != nullptr) {
@@ -1583,6 +1665,20 @@ show_statement: SHOW DATABASES {
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
+};
+| SHOW TABLE table_name INDEX IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kIndex;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
+
+    $$->index_name_ = $5;
+    free($5);
 };
 
 /*
@@ -1606,7 +1702,6 @@ flush_statement: FLUSH DATA {
  */
 optimize_statement: OPTIMIZE table_name {
     $$ = new infinity::OptimizeStatement();
-    $$->type_ = infinity::OptimizeType::kIRS;
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
         free($2->schema_name_ptr_);
@@ -1642,7 +1737,7 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, false);
     free($3);
 }
-| SET SESSION IDENTIFIER STRING {
+| SET SESSION IDENTIFIER IDENTIFIER {
     ParserHelper::ToLower($3);
     ParserHelper::ToLower($4);
     $$ = new infinity::CommandStatement();
@@ -1674,7 +1769,7 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
     free($3);
 }
-| SET GLOBAL IDENTIFIER STRING {
+| SET GLOBAL IDENTIFIER IDENTIFIER {
     ParserHelper::ToLower($3);
     ParserHelper::ToLower($4);
     $$ = new infinity::CommandStatement();
@@ -1692,6 +1787,38 @@ command_statement: USE IDENTIFIER {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kDouble, $3, $4);
+    free($3);
+}
+| SET CONFIG IDENTIFIER ON {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kBool, $3, true);
+    free($3);
+}
+| SET CONFIG IDENTIFIER OFF {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kBool, $3, false);
+    free($3);
+}
+| SET CONFIG IDENTIFIER IDENTIFIER {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kString, $3, $4);
+    free($3);
+    free($4);
+}
+| SET CONFIG IDENTIFIER LONG_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kInteger, $3, $4);
+    free($3);
+}
+| SET CONFIG IDENTIFIER DOUBLE_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kDouble, $3, $4);
     free($3);
 }
 | COMPACT TABLE table_name {
@@ -1767,7 +1894,7 @@ expr : operand
 | conjunction_expr;
 
 operand: '(' expr ')' {
-   $$ = $2;
+    $$ = $2;
 }
 | '(' select_without_paren ')' {
     infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
@@ -1841,7 +1968,7 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
     } else if(strcmp($7, "tinyint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
         knn_expr->dimension_ = $5->long_array_.size();
         knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt8;
-        knn_expr->embedding_data_ptr_ = new char[knn_expr->dimension_]{};
+        knn_expr->embedding_data_ptr_ = new char[knn_expr->dimension_];
 
         for(long i = 0; i < knn_expr->dimension_; ++ i) {
             ((char*)knn_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
@@ -1887,7 +2014,7 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
         if(knn_expr->dimension_ % 8 == 0) {
             knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemBit;
             long embedding_size = knn_expr->dimension_ / 8;
-            knn_expr->embedding_data_ptr_ = new char[embedding_size]{};
+            knn_expr->embedding_data_ptr_ = new char[embedding_size];
 
             for(long i = 0; i < embedding_size; ++ i) {
                 char embedding_unit = 0;
@@ -2655,6 +2782,13 @@ with_index_param_list : WITH '(' index_param_list ')' {
 }
 | {
     $$ = new std::vector<infinity::InitParameter*>();
+}
+
+optional_table_properties_list : PROPERTIES '(' index_param_list ')' {
+    $$ = $3;
+}
+| {
+    $$ = nullptr;
 }
 
 index_param_list : index_param {

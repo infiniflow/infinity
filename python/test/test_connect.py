@@ -17,8 +17,8 @@ from common import common_values
 import infinity
 from infinity.common import NetworkAddress
 
-
-class TestConnection:
+from test_sdkbase import TestSdk
+class TestConnection(TestSdk):
     def test_connect_and_disconnect_ok(self):
         """
         target: test connect and server ok
@@ -85,7 +85,7 @@ class TestConnection:
         infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-    @pytest.mark.skip(reason="Cost too much time")
+    @pytest.mark.slow
     def test_multiple_connect(self):
         """
         target: disconnect the infinity which is already disconnected.

@@ -23,28 +23,20 @@ import index_segment_reader;
 import index_defines;
 import posting_writer;
 import memory_indexer;
+import third_party;
 
 namespace infinity {
-InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *column_indexer) : posting_table_(column_indexer->GetPostingTable()) {}
+InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
+    : posting_table_(memory_indexer->GetPostingTable()), base_row_id_(memory_indexer->GetBaseRowId()) {}
 
-PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
-    MemoryIndexer::PostingTable::Iterator iter = posting_table_->find(term);
-    if (iter.valid())
-        return iter.getData().get();
-    else
-        return nullptr;
-}
-
-bool InMemIndexSegmentReader::GetSegmentPosting(const String &term,
-                                                docid_t base_doc_id,
-                                                SegmentPosting &seg_posting,
-                                                MemoryPool *session_pool) const {
-    PostingWriter *posting_writer = GetPostingWriter(term);
-    if (posting_writer == nullptr) {
-        return false;
+bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool,  bool fetch_position) const {
+    SharedPtr<PostingWriter> writer;
+    bool found = posting_table_->store_.Get(term, writer);
+    if (found) {
+        seg_posting.Init(base_row_id_, writer);
+        return true;
     }
-    seg_posting.Init(base_doc_id, posting_writer);
-    return true;
+    return false;
 }
 
 } // namespace infinity

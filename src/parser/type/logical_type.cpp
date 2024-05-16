@@ -13,7 +13,10 @@
 // limitations under the License.
 
 #include "type/logical_type.h"
-
+#include <memory>
+#include <string>
+#include <unordered_map>
+ 
 namespace infinity {
 
 static const char *type2name[] = {
@@ -67,7 +70,66 @@ static const char *type2name[] = {
     "Null",
     "Missing",
 
+    // tensor type
+    "Tensor",
+
     "Invalid",
+};
+
+std::unordered_map<std::string, LogicalType> name2type = {
+    // Bool
+    {"boolean", LogicalType::kBoolean }, 
+
+    {"tinyint", LogicalType::kTinyInt },
+    {"smallint" , LogicalType::kSmallInt },
+    {"integer" , LogicalType::kInteger },
+    {"bigint" , LogicalType::kBigInt },
+    {"hugeint" , LogicalType::kHugeInt },
+    {"decimal" , LogicalType::kDecimal },
+    {"float" , LogicalType::kFloat },
+    {"double" , LogicalType::kDouble },
+
+    // std::string
+    {"varchar" , LogicalType::kVarchar }, 
+
+    // Date and Time
+    {"date" , LogicalType::kDate }, 
+    {"time" , LogicalType::kTime },
+    { "datetime" , LogicalType::kDateTime },
+    { "timestamp" , LogicalType::kTimestamp },
+    { "interval" , LogicalType::kInterval },
+
+    // Nested types
+    {"array" , LogicalType::kArray }, 
+    {"tuple" , LogicalType::kTuple },
+
+    // Geography
+    { "point" , LogicalType::kPoint }, 
+    {"line" , LogicalType::kLine },
+    { "linesegment" , LogicalType::kLineSeg },
+    {"box" , LogicalType::kBox },
+
+    //    "Path",
+    //    "Polygon",
+    {"circle" , LogicalType::kCircle },
+
+    // Other
+    //    "Bitmap",
+    { "uuid" , LogicalType::kUuid },
+
+    //    "Blob",
+    { "embedding" , LogicalType::kEmbedding },
+    {"rowid" , LogicalType::kRowID },
+
+    // Heterogeneous/Mix type
+    { "heterogeneous" , LogicalType::kMixed }, 
+    { "null" , LogicalType::kNull },
+    { "missing" , LogicalType::kMissing },
+
+    // tensor
+    { "tensor" , LogicalType::kTensor },
+
+    { "invalid" , LogicalType::kInvalid },
 };
 
 static int64_t type_size[] = {
@@ -124,10 +186,23 @@ static int64_t type_size[] = {
     // only used in heterogeneous type
     0, // Null
     0, // Missing
+
+    // tensor type
+    8, // Tensor
+
     0, // Invalid
 };
 
 const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
+
+LogicalType Str2LogicalType(const std::string &str) {
+    auto iter = name2type.find(str);
+    if(iter != name2type.end()){
+        return iter->second;
+    } else {
+        return LogicalType::kInvalid;
+    }
+}
 
 int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[logical_type]; }
 

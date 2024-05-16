@@ -11,7 +11,7 @@ CREATE TABLE test_knn_hnsw_l2_filter(c1 INT, c2 EMBEDDING(FLOAT, 4));
 # 3. 0 + 0.1^2 + 0.1^2 + 0.2^2 = 0.06
 # 4. 0.1^2 + 0 + 0 + 0.1^2 = 0.02
 statement ok
-COPY test_knn_hnsw_l2_filter FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_knn_hnsw_l2_filter FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 
 # mertic l2 will order ascendingly. The query will return row 4, 3, 2
 query I
@@ -24,7 +24,7 @@ SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'flo
 # copy to create another new block
 # there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
 statement ok
-COPY test_knn_hnsw_l2_filter FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_knn_hnsw_l2_filter FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
@@ -66,7 +66,7 @@ SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'flo
 
 # copy to create another new block
 statement ok
-COPY test_knn_hnsw_l2_filter FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_knn_hnsw_l2_filter FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 
 # the query will return row 4 from block 1, 2 and 3
 query I
@@ -95,3 +95,6 @@ SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'flo
 2
 2
 2
+
+statement ok
+DROP TABLE test_knn_hnsw_l2_filter;

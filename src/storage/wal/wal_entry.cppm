@@ -28,6 +28,10 @@ import internal_types;
 
 namespace infinity {
 
+class BlockEntry;
+class SegmentEntry;
+enum class SegmentStatus;
+
 export enum class WalCommandType : i8 {
     INVALID = 0,
     // -----------------------------
@@ -47,6 +51,13 @@ export enum class WalCommandType : i8 {
     IMPORT = 20,
     APPEND = 21,
     DELETE = 22,
+
+    // -----------------------------
+    // SEGMENT STATUS
+    // -----------------------------
+    SET_SEGMENT_STATUS_SEALED = 31,
+    UPDATE_SEGMENT_BLOOM_FILTER_DATA = 32,
+
     // -----------------------------
     // Flush
     // -----------------------------
@@ -54,12 +65,38 @@ export enum class WalCommandType : i8 {
     COMPACT = 100,
 };
 
+export struct WalBlockInfo {
+    BlockID block_id_{};
+    u16 row_count_{};
+    u16 row_capacity_{};
+    Vector<Pair<i32, u64>> outline_infos_;
+
+    WalBlockInfo() = default;
+
+    explicit WalBlockInfo(BlockEntry *block_entry);
+
+    bool operator==(const WalBlockInfo &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalBlockInfo ReadBufferAdv(char *&ptr);
+
+    String ToString() const;
+};
+
 export struct WalSegmentInfo {
-    String segment_dir_{};
     SegmentID segment_id_{};
-    u16 block_entries_size_{};
-    u32 block_capacity_{};
-    u16 last_block_row_count_{};
+    u64 column_count_{0};
+    SizeT row_count_{0};
+    SizeT actual_row_count_{0};
+    SizeT row_capacity_{0};
+    Vector<WalBlockInfo> block_infos_;
+
+    WalSegmentInfo() = default;
+
+    explicit WalSegmentInfo(SegmentEntry *segment_entry);
 
     bool operator==(const WalSegmentInfo &other) const;
 
@@ -68,6 +105,8 @@ export struct WalSegmentInfo {
     void WriteBufferAdv(char *&buf) const;
 
     static WalSegmentInfo ReadBufferAdv(char *&ptr);
+
+    String ToString() const;
 };
 
 // WalCommandType -> String
@@ -89,17 +128,18 @@ export struct WalCmd {
 };
 
 export struct WalCmdCreateDatabase : public WalCmd {
-    explicit WalCmdCreateDatabase(String db_name) : db_name_(std::move(db_name)) {}
+    explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_DATABASE; }
     auto operator==(const WalCmd &other) const -> bool override {
         const auto *other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
-        return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_);
+        return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(db_dir_tail_, other_cmd->db_dir_tail_);
     }
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
 
     String db_name_{};
+    String db_dir_tail_{};
 };
 
 export struct WalCmdDropDatabase : public WalCmd {
@@ -117,7 +157,8 @@ export struct WalCmdDropDatabase : public WalCmd {
 };
 
 export struct WalCmdCreateTable : public WalCmd {
-    WalCmdCreateTable(String db_name, const SharedPtr<TableDef> &table_def) : db_name_(std::move(db_name)), table_def_(table_def) {}
+    WalCmdCreateTable(String db_name, String table_dir_tail, const SharedPtr<TableDef> &table_def)
+        : db_name_(std::move(db_name)), table_dir_tail_(std::move(table_dir_tail)), table_def_(table_def) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_TABLE; }
     bool operator==(const WalCmd &other) const override;
@@ -125,12 +166,13 @@ export struct WalCmdCreateTable : public WalCmd {
     void WriteAdv(char *&buf) const override;
 
     String db_name_{};
+    String table_dir_tail_{};
     SharedPtr<TableDef> table_def_{};
 };
 
 export struct WalCmdCreateIndex : public WalCmd {
-    WalCmdCreateIndex(String db_name, String table_name, String table_index_dir, SharedPtr<IndexBase> index_base)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), table_index_dir_(std::move(table_index_dir)),
+    WalCmdCreateIndex(String db_name, String table_name, String index_dir_tail_, SharedPtr<IndexBase> index_base)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_dir_tail_(std::move(index_dir_tail_)),
           index_base_(std::move(index_base)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_INDEX; }
@@ -143,7 +185,7 @@ export struct WalCmdCreateIndex : public WalCmd {
 
     String db_name_{};
     String table_name_{};
-    String table_index_dir_{};
+    String index_dir_tail_{};
     SharedPtr<IndexBase> index_base_{};
 };
 
@@ -190,7 +232,7 @@ export struct WalCmdImport : public WalCmd {
 
     String db_name_{};
     String table_name_{};
-    WalSegmentInfo segment_info_{};
+    WalSegmentInfo segment_info_;
 };
 
 export struct WalCmdAppend : public WalCmd {
@@ -219,6 +261,62 @@ export struct WalCmdDelete : public WalCmd {
     String db_name_{};
     String table_name_{};
     Vector<RowID> row_ids_{};
+};
+
+// used when append op turn an old unsealed segment full and sealed
+// will always have necessary minmax filter
+// may have user-defined bloom filter
+export struct WalCmdSetSegmentStatusSealed : public WalCmd {
+    WalCmdSetSegmentStatusSealed(String db_name,
+                                 String table_name,
+                                 SegmentID segment_id,
+                                 String segment_filter_binary_data,
+                                 Vector<Pair<BlockID, String>> block_filter_binary_data)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
+          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+
+    WalCommandType GetType() override { return WalCommandType::SET_SEGMENT_STATUS_SEALED; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    static WalCmdSetSegmentStatusSealed ReadBufferAdv(char *&ptr);
+
+    const String db_name_{};
+    const String table_name_{};
+    const SegmentID segment_id_{};
+    const String segment_filter_binary_data_{};
+    const Vector<Pair<BlockID, String>> block_filter_binary_data_{};
+};
+
+// used when user-defined bloom filter need to be updated
+export struct WalCmdUpdateSegmentBloomFilterData : public WalCmd {
+    WalCmdUpdateSegmentBloomFilterData(String db_name,
+                                       String table_name,
+                                       SegmentID segment_id,
+                                       String segment_filter_binary_data,
+                                       Vector<Pair<BlockID, String>> block_filter_binary_data)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
+          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+
+    WalCommandType GetType() override { return WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(char *&ptr);
+
+    const String db_name_{};
+    const String table_name_{};
+    const SegmentID segment_id_{};
+    const String segment_filter_binary_data_{};
+    const Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 };
 
 export struct WalCmdCheckpoint : public WalCmd {
@@ -265,7 +363,7 @@ export struct WalEntryHeader {
     u32 checksum_{}; // crc32 of the entry, including the header and the
     // payload. User shall populate it before writing to wal.
     i64 txn_id_{};    // txn id of the entry
-    i64 commit_ts_{}; // commit timestamp of the txn
+    TxnTimeStamp commit_ts_{}; // commit timestamp of the txn
 };
 
 export struct WalEntry : WalEntryHeader {
@@ -284,13 +382,10 @@ export struct WalEntry : WalEntryHeader {
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 
-    [[nodiscard]] Pair<i64, String> GetCheckpointInfo() const;
-
-    [[nodiscard]] bool IsCheckPoint() const;
-
-    [[nodiscard]] bool IsFullCheckPoint() const;
+    [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
 
     [[nodiscard]] String ToString() const;
+
 };
 
 export class WalEntryIterator {

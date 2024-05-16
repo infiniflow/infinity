@@ -541,7 +541,6 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
             serial_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              knn_scan_operator->filter_expression_,
                                               std::move(knn_scan_operator->block_column_entries_),
                                               std::move(knn_scan_operator->index_entries_),
                                               std::move(knn_expr->opt_params_),
@@ -557,7 +556,6 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
                 MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                              knn_scan_operator->filter_expression_,
                                               std::move(knn_scan_operator->block_column_entries_),
                                               std::move(knn_scan_operator->index_entries_),
                                               std::move(knn_expr->opt_params_),
@@ -630,6 +628,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kDelete: {
             UnrecoverableError(
                 fmt::format("{} shouldn't be the first operator of the fragment", PhysicalOperatorToString(first_operator->operator_type())));
+            break;
         }
         case PhysicalOperatorType::kMergeAggregate:
         case PhysicalOperatorType::kMergeHash:
@@ -671,6 +670,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kCrossProduct:
         case PhysicalOperatorType::kPreparedPlan: {
             UnrecoverableError(fmt::format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())));
+            break;
         }
         case PhysicalOperatorType::kTableScan: {
             if ((i64)tasks_.size() != parallel_count) {
@@ -762,7 +762,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             UnrecoverableError("Unexpected operator type");
         }
         case PhysicalOperatorType::kAggregate: {
-            if (fragment_type_ != FragmentType::kParallelStream) {
+            if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
@@ -1038,7 +1038,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case PhysicalOperatorType::kCreateIndexDo: {
             const auto *create_index_do_operator = static_cast<const PhysicalCreateIndexDo *>(first_operator);
-            auto _ = InitCreateIndexDoFragmentContext(create_index_do_operator, this);
+            InitCreateIndexDoFragmentContext(create_index_do_operator, this);
             parallel_count = std::max(parallel_count, 1l);
             break;
         }
@@ -1082,6 +1082,11 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         UnrecoverableError("There should be one sink state in serial materialized fragment");
     }
 
+    if (tasks_[0]->sink_state_->Ignore()) {
+        SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
+        result_table->SetResultMsg(MakeUnique<String>("Ignore error"));
+        return result_table;
+    }
     if (tasks_[0]->sink_state_->Error()) {
         RecoverableError(tasks_[0]->sink_state_->status_);
     }

@@ -27,17 +27,17 @@ static SharedPtr<spdlog::sinks::rotating_file_sink_mt> rotating_file_sinker = nu
 
 SharedPtr<spdlog::logger> infinity_logger = nullptr;
 
-void Logger::Initialize(const Config *config_ptr) {
+void Logger::Initialize(Config *config_ptr) {
     if (stdout_sinker.get() == nullptr) {
         stdout_sinker = MakeShared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
     }
 
-    SizeT log_max_size = config_ptr->log_max_size();
-    SizeT log_file_rotate_count = config_ptr->log_file_rotate_count();
+    SizeT log_file_max_size = config_ptr->LogFileMaxSize();
+    SizeT log_file_rotate_count = config_ptr->LogFileRotateCount();
 
     if (rotating_file_sinker.get() == nullptr) {
-        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(*config_ptr->log_file_path(),
-                                                                                log_max_size,
+        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(config_ptr->LogFilePath(),
+                                                                                log_file_max_size,
                                                                                 log_file_rotate_count); // NOLINT
     }
 
@@ -47,7 +47,7 @@ void Logger::Initialize(const Config *config_ptr) {
     infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
     spdlog::details::registry::instance().register_logger(infinity_logger);
 
-    SetLogLevel(config_ptr->log_level());
+    SetLogLevel(config_ptr->GetLogLevel());
 
     LOG_TRACE("Logger is initialized.");
 }

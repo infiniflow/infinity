@@ -19,7 +19,9 @@ from generate_compact import generate as generate8
 from generate_hnsw_with_delete import generate as generate9
 from generate_index_scan import generate as generate10
 from generate_many_import import generate as generate11
-
+from generate_big_point_query_test_fastroughfilter import generate as generate12
+from generate_many_import_drop import generate as generate13
+from generate_mem_hnsw import generate as generate14
 
 class SpinnerThread(threading.Thread):
     def __init__(self):
@@ -36,37 +38,7 @@ class SpinnerThread(threading.Thread):
         self.stop = True
 
 
-def python_sdk_test(python_test_dir: str, pytest_mark: str):
-    print("python test path is {}".format(python_test_dir))
-    # os.system(f"cd {python_test_dir}/test")
-    # check if infinity_sdk is installed
-    # uninstall first
-    os.system("pip uninstall infinity-sdk -y")
-    # install
-    os.system("cd python && python setup.py install")
-    # run test
-    print("start pysdk test...")
-    process = subprocess.Popen(
-        ["python", "-m", "pytest", '-m', pytest_mark, f'{python_test_dir}/test'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    def reader(pipe, func):
-        for line in iter(pipe.readline, ""):
-            func(line.strip())
-
-    threading.Thread(target=reader, args=[process.stdout, print]).start()
-    threading.Thread(target=reader, args=[process.stderr, print]).start()
-    process.wait()
-    if process.returncode != 0:
-        raise Exception(f"An error occurred: {process.stderr}")
-
-    print("pysdk test finished.")
-
-
-def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
+def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
     print("sqlllogictest-bin path is {}".format(sqllogictest_bin))
     print("slt_dir path is {}".format(slt_dir))
     print("data_dir path is {}".format(data_dir))
@@ -116,8 +88,7 @@ if __name__ == "__main__":
 
     test_dir = current_path + "/test/sql"
     data_dir = current_path + "/test/data"
-    copy_dir = "/tmp/infinity/test_data"
-    python_test_dir = current_path + "/python"
+    copy_dir = "/var/infinity/test_data"
 
     parser = argparse.ArgumentParser(description="SQL Logic Test For Infinity")
 
@@ -152,13 +123,6 @@ if __name__ == "__main__":
         dest="data",
     )
     parser.add_argument(
-        "-m",
-        "--pytest_mark",
-        type=str,
-        default='not complex and not slow',
-        dest="pytest_mark",
-    )
-    parser.add_argument(
         "-c",
         "--copy",
         type=str,
@@ -187,6 +151,9 @@ if __name__ == "__main__":
     generate9(args.generate_if_exists, args.copy)
     generate10(args.generate_if_exists, args.copy)
     generate11(args.generate_if_exists, args.copy)
+    generate12(args.generate_if_exists, args.copy)
+    generate13(args.generate_if_exists, args.copy)
+    generate14(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
     print("Start copying data...")
@@ -197,8 +164,7 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            python_sdk_test(python_test_dir, args.pytest_mark)
-            test_process(args.path, args.test, args.data, args.copy)
+            process_test(args.path, args.test, args.data, args.copy)
         except Exception as e:
             print(e)
             sys.exit(-1)

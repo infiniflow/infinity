@@ -35,22 +35,22 @@ namespace infinity {
 Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
-            auto table_scan = dynamic_cast<LogicalTableScan &>(op);
+            auto &table_scan = static_cast<LogicalTableScan &>(op);
 
             return table_scan.base_table_ref_.get();
         }
         case LogicalNodeType::kIndexScan: {
-            auto index_scan = dynamic_cast<LogicalIndexScan &>(op);
+            auto &index_scan = static_cast<LogicalIndexScan &>(op);
 
             return index_scan.base_table_ref_.get();
         }
         case LogicalNodeType::kKnnScan: {
-            auto knn_scan = dynamic_cast<LogicalKnnScan &>(op);
+            auto &knn_scan = static_cast<LogicalKnnScan &>(op);
 
             return knn_scan.base_table_ref_.get();
         }
         case LogicalNodeType::kMatch: {
-            auto match = dynamic_cast<LogicalMatch &>(op);
+            auto &match = static_cast<LogicalMatch &>(op);
 
             return match.base_table_ref_.get();
         }
@@ -119,7 +119,7 @@ SharedPtr<BaseExpression> CleanScan::VisitReplace(const SharedPtr<ColumnExpressi
 void CleanScan::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
-            auto table_scan = dynamic_cast<LogicalTableScan &>(op);
+            auto &table_scan = static_cast<LogicalTableScan &>(op);
             Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
@@ -128,7 +128,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             break;
         }
         case LogicalNodeType::kKnnScan: {
-            auto knn_scan = dynamic_cast<LogicalKnnScan &>(op);
+            auto &knn_scan = static_cast<LogicalKnnScan &>(op);
             // KnnScan base table ref has two parts:
             // 1. the columns used by next operator
             // 2. the columns used by filter expression in knn
@@ -143,15 +143,22 @@ void CleanScan::VisitNode(LogicalNode &op) {
             break;
         }
         case LogicalNodeType::kIndexScan: {
-            auto index_scan = dynamic_cast<LogicalIndexScan &>(op);
+            auto &index_scan = static_cast<LogicalIndexScan &>(op);
             Vector<SizeT> project_idxs; // empty output
             index_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             break;
         }
         case LogicalNodeType::kMatch: {
-            auto match = dynamic_cast<LogicalMatch &>(op);
-            Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
-
+            auto &match = static_cast<LogicalMatch &>(op);
+            // Match base table ref has two parts:
+            // 1. the columns used by next operator
+            // 2. the columns used by filter expression in match
+            auto &match_load_metas = *match.load_metas();
+            Vector<LoadMeta> match_columns = std::move(match_load_metas);
+            match_load_metas.clear(); // need to set load_metas of Match to empty vector
+            auto &last_op_load_metas = *last_op_load_metas_;
+            match_columns.insert(match_columns.end(), last_op_load_metas.begin(), last_op_load_metas.end());
+            Vector<SizeT> project_idxs = LoadedColumn(&match_columns, match.base_table_ref_.get());
             scan_table_indexes_.push_back(match.base_table_ref_->table_index_);
             match.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             break;

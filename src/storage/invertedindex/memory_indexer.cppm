@@ -14,103 +14,142 @@
 
 module;
 
+#include <cstdio>
+
 export module memory_indexer;
 import stl;
 import memory_pool;
-import segment_posting;
-import index_segment_reader;
-import posting_iterator;
 import index_defines;
-import index_config;
-import index_segment_reader;
 import posting_writer;
-import data_block;
-
 import column_vector;
-import analyzer;
 import column_inverter;
 import third_party;
 import internal_types;
 import ring;
-
-namespace vespalib::alloc {
-class MemoryPoolAllocator;
-}
+import skiplist;
+import internal_types;
+import map_with_lock;
+import vector_with_lock;
 
 namespace infinity {
-class ColumnIndexer;
+
 export class MemoryIndexer {
 public:
-    using TermKey = String;
-    using PostingPtr = SharedPtr<PostingWriter>;
-    using PostingTable = Btree<TermKey, PostingPtr>;
-
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
     };
 
-    enum IndexMode {
-        NEAR_REAL_TIME,
-        OFFLINE,
+    using PostingPtr = SharedPtr<PostingWriter>;
+    // using PostingTableStore = SkipList<String, PostingPtr, KeyComp>;
+    using PostingTableStore = MapWithLock<String, PostingPtr>;
+
+    struct PostingTable {
+        PostingTable();
+        PostingTableStore store_;
+        MemoryPool byte_slice_pool_;
+        RecyclePool buffer_pool_;
     };
 
-    MemoryIndexer(u64 column_id,
-                  const InvertedIndexConfig &index_config,
-                  SharedPtr<MemoryPool> byte_slice_pool,
-                  SharedPtr<RecyclePool> buffer_pool,
-                  ThreadPool &thread_pool);
+    MemoryIndexer(const String &index_dir,
+                  const String &base_name,
+                  RowID base_row_id,
+                  optionflag_t flag,
+                  const String &analyzer,
+                  MemoryPool &byte_slice_pool,
+                  RecyclePool &buffer_pool,
+                  ThreadPool &inverting_thread_pool,
+                  ThreadPool &commiting_thread_pool);
 
     ~MemoryIndexer();
 
-    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin);
+    // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
+    void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
-    void Commit();
+    // InsertGap insert some empty documents. This is for abnormal case.
+    void InsertGap(u32 row_count);
 
+    // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
+    void Commit(bool offline = false);
+
+    // CommitSync is for online case. It sort a batch of inverters, then generate posting for a batch of inverters.
+    // Returns the batch size of generated posting.
+    SizeT CommitSync(SizeT wait_if_empty_ms = 0);
+
+    // Dump is blocking and shall be called only once after inserting all documents.
+    // WARN: Don't reuse MemoryIndexer after calling Dump!
+    void Dump(bool offline = false, bool spill = false);
+
+    // A MemoryIndexer is allow to load iff it's empty or spilled.
+    void Load();
+
+    SizeT GetInflightTasks() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return inflight_tasks_;
+    }
+
+    String GetBaseName() const { return base_name_; }
+
+    RowID GetBaseRowId() const { return base_row_id_; }
+
+    u32 GetDocCount() const { return doc_count_; }
+
+    u32 GetColumnLengthSum() const { return column_length_sum_.load(); }
+
+    u32 GetColumnLength(u32 doc_id) { return column_lengths_.Get(doc_id); }
+
+    MemoryPool *GetPool() { return &byte_slice_pool_; }
+
+    SharedPtr<PostingTable> GetPostingTable() { return posting_table_; }
+
+    SharedPtr<PostingWriter> GetOrAddPosting(const String &term);
+
+    void Reset();
+
+private:
     void WaitInflightTasks() {
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
     }
 
-    void SetIndexMode(IndexMode index_mode);
+    // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
+    SizeT CommitOffline(SizeT wait_if_empty_ms = 0);
 
-    Analyzer *GetAnalyzer() { return analyzer_.get(); }
+    void OfflineDump();
 
-    bool IsJiebaSpecialize() { return jieba_specialize_; }
+    void FinalSpillFile();
 
-    MemoryPool *GetPool() { return byte_slice_pool_.get(); }
-
-    PostingTable *GetPostingTable() { return posting_store_.get(); }
-
-    PostingPtr GetOrAddPosting(const TermKey &term);
-
-    void ReclaimMemory();
-
-    void Reset();
+    void PrepareSpillFile();
 
 private:
-    void SetAnalyzer();
-
-private:
-    friend class ColumnIndexer;
-
-    IndexMode index_mode_{NEAR_REAL_TIME};
-    u64 column_id_;
-    InvertedIndexConfig index_config_;
-    SharedPtr<MemoryPool> byte_slice_pool_;
-    SharedPtr<RecyclePool> buffer_pool_;
-    SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator_;
-    GenerationHandler generation_handler_;
-    UniquePtr<PostingTable> posting_store_;
-    UniquePtr<Analyzer> analyzer_;
-    bool jieba_specialize_{false};
-
-    ThreadPool &thread_pool_;
+    String index_dir_;
+    String base_name_;
+    RowID base_row_id_{INVALID_ROWID};
+    optionflag_t flag_;
+    String analyzer_;
+    MemoryPool &byte_slice_pool_;
+    RecyclePool &buffer_pool_;
+    ThreadPool &inverting_thread_pool_;
+    ThreadPool &commiting_thread_pool_;
+    u32 doc_count_{0};
+    SharedPtr<PostingTable> posting_table_;
+    PostingPtr prepared_posting_{nullptr};
     Ring<SharedPtr<ColumnInverter>> ring_inverted_;
     Ring<SharedPtr<ColumnInverter>> ring_sorted_;
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};
-
     std::condition_variable cv_;
     std::mutex mutex_;
+    std::mutex mutex_commit_;
+
+    u32 num_runs_{0};                  // For offline index building
+    FILE *spill_file_handle_{nullptr}; // Temp file for offline external merge sort
+    String spill_full_path_;           // Path of spill file
+    u64 tuple_count_{0};               // Number of tuples for external merge sort
+
+    bool is_spilled_{false};
+
+    // for column length info
+    VectorWithLock<u32> column_lengths_;
+    Atomic<u32> column_length_sum_{0};
 };
 } // namespace infinity

@@ -15,16 +15,9 @@ body:
     value: "Please provide the following information to help us understand the issue."
 - type: input
   attributes:
-    label: Branch name
+    label: Version or Commit ID
     description: Enter the name of the branch where you encountered the issue.
-    placeholder: e.g., main
-  validations:
-    required: true
-- type: input
-  attributes:
-    label: Commit ID
-    description: Enter the commit ID associated with the issue.
-    placeholder: e.g., c3b2a1
+    placeholder: e.g., v0.1.0
   validations:
     required: true
 - type: textarea
@@ -41,8 +34,8 @@ body:
     required: false
 - type: textarea
   attributes:
-    label: Actual behavior
-    description: Describe what you encountered.
+    label: Actual behavior and How to reproduce it
+    description: Describe what you encountered and steps to reproduce what you encountered.
   validations:
     required: true
 - type: textarea
@@ -51,13 +44,6 @@ body:
     description: Describe what you expected.
   validations:
     required: false
-- type: textarea
-  attributes:
-    label: Steps to reproduce
-    description: Steps to reproduce what you encountered.
-    render: Markdown
-  validations:
-    required: true
 - type: textarea
   attributes:
     label: Additional information

@@ -159,15 +159,17 @@ private:
 
     [[nodiscard]] static inline std::string BitmapEmbedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
         // TODO:  This is for bitmap, and high-performance implementation is needed here.
-        std::stringstream ss;
         ParserAssert(dimension % 8 == 0, "Binary embedding dimension should be the times of 8.");
-
-        int64_t *array = (int64_t *)(embedding.ptr);
-
+        std::string str;
+        str.reserve(dimension);
+        auto *array = reinterpret_cast<const uint8_t *>(embedding.ptr);
         for (size_t i = 0; i < dimension / 8; ++i) {
-            ss << std::bitset<8>(array[i]);
+            const uint8_t byte = array[i];
+            for (size_t j = 0; j < 8; ++j) {
+                str.push_back((byte & (1 << j)) ? '1' : '0');
+            }
         }
-        return ss.str();
+        return str;
     }
 
 public:

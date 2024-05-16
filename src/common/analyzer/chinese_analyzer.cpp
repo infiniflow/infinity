@@ -15,7 +15,12 @@
 module;
 
 #include "string_utils.h"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
 #include <cppjieba/Jieba.hpp>
+#pragma clang diagnostic pop
 
 #include <cstring>
 #include <filesystem>
@@ -60,23 +65,23 @@ bool ChineseAnalyzer::Load() {
     fs::path stopwords_path(root / STOP_WORD_PATH);
 
     if (!fs::exists(dict_path)) {
-        LOG_INFO(fmt::format("Invalid jieba config {} dict for jieba_analyzer does not exist", dict_path.string()));
+        // LOG_INFO(fmt::format("Invalid jieba config {} dict for jieba_analyzer does not exist", dict_path.string()));
         return false;
     }
     if (!fs::exists(hmm_path)) {
-        LOG_INFO(fmt::format("Invalid jieba config {} hmm for jieba_analyzer does not exist", hmm_path.string()));
+        // LOG_INFO(fmt::format("Invalid jieba config {} hmm for jieba_analyzer does not exist", hmm_path.string()));
         return false;
     }
     if (!fs::exists(userdict_path)) {
-        LOG_INFO(fmt::format("Invalid jieba config {} user_dict for jieba_analyzer does not exist", userdict_path.string()));
+        // LOG_INFO(fmt::format("Invalid jieba config {} user_dict for jieba_analyzer does not exist", userdict_path.string()));
         return false;
     }
     if (!fs::exists(idf_path)) {
-        LOG_INFO(fmt::format("Invalid jieba config {} idf for jieba_analyzer does not exist", idf_path.string()));
+        // LOG_INFO(fmt::format("Invalid jieba config {} idf for jieba_analyzer does not exist", idf_path.string()));
         return false;
     }
     if (!fs::exists(stopwords_path)) {
-        LOG_INFO(fmt::format("Invalid jieba config {} stopword for jieba_analyzer does not exist", stopwords_path.string()));
+        // LOG_INFO(fmt::format("Invalid jieba config {} stopword for jieba_analyzer does not exist", stopwords_path.string()));
         return false;
     }
 

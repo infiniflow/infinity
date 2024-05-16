@@ -27,17 +27,21 @@ import sql_runner;
 class FragmentTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        BaseTest::RemoveDbDirs();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
         BaseTest::TearDown();
     }
 };
@@ -69,6 +73,12 @@ TEST_F(FragmentTest, test_build_fragment) {
     /// Show
     auto result7 = SQLRunner::Run("show tables", true);
     EXPECT_EQ(result7->definition_ptr_->column_count(), 8u);
-    auto result8 = SQLRunner::Run("describe t2", true);
-    EXPECT_EQ(result8->definition_ptr_->column_count(), 3u);
+    auto result8 = SQLRunner::Run("show table t2", true);
+    EXPECT_EQ(result8->definition_ptr_->column_count(), 2u);
+
+    /// DDL
+    auto result9 = SQLRunner::Run("drop table t3", true);
+    EXPECT_EQ(result9->definition_ptr_.get()->columns()[0]->name_, "OK");
+    auto result10 = SQLRunner::Run("drop table t2", true);
+    EXPECT_EQ(result9->definition_ptr_.get()->columns()[0]->name_, "OK");
 }

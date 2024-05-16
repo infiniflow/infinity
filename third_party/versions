@@ -12,3 +12,7 @@ mlas onnxruntime:v1.14.1
 cppjieba v5.1.0
 iresearch self-maintained
 thrift v0.19.0
+xor_singleheader v1.0.3
+base64 commit-id: d354224643b1b1343cf4944c5cd2ff94e33c3768
+oatpp commit-id: 17ef2a7f6c8a932498799b2a5ae5aab2869975c7
+PGM-index commit-id: f578e68414c60f9869c5611575143645f75e0ce1

@@ -25,6 +25,7 @@ import kmeans_partition;
 import infinity_exception;
 import logger;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -59,16 +60,17 @@ struct AnnIVFFlatIndexData {
         if (dimension != dimension_) {
             UnrecoverableError("Dimension not match");
         }
-        if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
+        if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                UnrecoverableError("Metric type not implemented");
+                RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
-                UnrecoverableError("Metric type not supported");
+                RecoverableError(Status::NotSupport("Metric type not supported"));
             }
             return;
         }
         if (vector_count == 0 or train_count == 0) {
             LOG_TRACE("AnnIVFFlatIndexData::BuildIndex(): Empty data, no need to build index");
+            loaded_ = true;
             return;
         }
 
@@ -88,7 +90,7 @@ struct AnnIVFFlatIndexData {
     // used when create index for a segment
     void BuildIndex(auto &&iter,
                     const u32 dimension,
-                    const u32 real_vector_count,
+                    const u32 full_row_count,
                     const u32 min_points_per_centroid = 32,
                     const u32 max_points_per_centroid = 256) {
         if (loaded_) {
@@ -97,16 +99,12 @@ struct AnnIVFFlatIndexData {
         if (dimension != dimension_) {
             UnrecoverableError("Dimension not match");
         }
-        if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
+        if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                UnrecoverableError("Metric type not implemented");
+                RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
-                UnrecoverableError("Metric type not supported");
+                RecoverableError(Status::NotSupport("Metric type not supported"));
             }
-            return;
-        }
-        if (real_vector_count == 0) {
-            LOG_TRACE("AnnIVFFlatIndexData::BuildIndex(): Empty data, no need to build index");
             return;
         }
 
@@ -114,10 +112,10 @@ struct AnnIVFFlatIndexData {
 
         // reserve space for vectors and ids
         Vector<VectorDataType> segment_column_data;
-        segment_column_data.reserve(real_vector_count * dimension);
+        segment_column_data.reserve(full_row_count * dimension);
         // offset without deleted rows
         Vector<SegmentOffset> segment_offset;
-        segment_offset.reserve(real_vector_count);
+        segment_offset.reserve(full_row_count);
 
         // record input data count
         u32 cnt = 0;
@@ -126,7 +124,7 @@ struct AnnIVFFlatIndexData {
             if (!pair_opt) {
                 break;
             }
-            if (cnt >= real_vector_count) {
+            if (cnt >= full_row_count) {
                 UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): segment row count more than expected");
             }
             auto &[val_ptr, offset] = pair_opt.value(); // val_ptr is const VectorDataType * type, offset is SegmentOffset type
@@ -137,15 +135,19 @@ struct AnnIVFFlatIndexData {
             // update cnt
             ++cnt;
         }
-        if (cnt != real_vector_count) {
-            UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): segment row count les than expected");
+        if (cnt < full_row_count) {
+            LOG_TRACE("AnnIVFFlatIndexData::BuildIndex(): segment has deleted rows");
+        }
+        if (cnt == 0) {
+            loaded_ = true;
+            return;
         }
 
         // step 2. train centroids
-        TrainCentroids(real_vector_count, segment_column_data.data(), min_points_per_centroid, max_points_per_centroid);
+        TrainCentroids(cnt, segment_column_data.data(), min_points_per_centroid, max_points_per_centroid);
 
-        // step 3. insert data to partitions
-        InsertData(real_vector_count, segment_column_data.data(), segment_offset.data());
+        // step 3. insert data to partitions, will update data_num_
+        InsertData(cnt, segment_column_data.data(), segment_offset.data());
 
         loaded_ = true;
     }
@@ -155,6 +157,13 @@ struct AnnIVFFlatIndexData {
                                const u32 min_points_per_centroid,
                                const u32 max_points_per_centroid) {
         u32 iteration_max = 0;
+        if (partition_num_ != 0 and partition_num_ > vector_count) {
+            LOG_TRACE(fmt::format("AnnIVFFlatIndexData::TrainCentroids(): non-zero partition_num_ = {}, more than vector_count = {}",
+                                  partition_num_,
+                                  vector_count));
+            partition_num_ = vector_count;
+            LOG_TRACE(fmt::format("AnnIVFFlatIndexData::TrainCentroids(): Update partition_num_ to {}", partition_num_));
+        }
         u32 real_partition_num = GetKMeansCentroids<CommonType>(metric_,
                                                                 dimension_,
                                                                 vector_count,
@@ -165,10 +174,10 @@ struct AnnIVFFlatIndexData {
                                                                 min_points_per_centroid,
                                                                 max_points_per_centroid);
         if (real_partition_num != partition_num_) {
-            LOG_INFO(fmt::format("AnnIVFFlatIndexData::BuildIndex(): After K-means partition, real_partition_num = %u, partition_num_ = %u",
-                                 real_partition_num,
-                                 partition_num_));
-            LOG_INFO(fmt::format("AnnIVFFlatIndexData::BuildIndex(): Update partition_num_ to %u", real_partition_num));
+            LOG_TRACE(fmt::format("AnnIVFFlatIndexData::BuildIndex(): After K-means partition, real_partition_num = %u, partition_num_ = %u",
+                                  real_partition_num,
+                                  partition_num_));
+            LOG_TRACE(fmt::format("AnnIVFFlatIndexData::BuildIndex(): Update partition_num_ to %u", real_partition_num));
             partition_num_ = real_partition_num;
         }
     }
@@ -216,13 +225,15 @@ struct AnnIVFFlatIndexData {
         file_handler.Write(&dimension_, sizeof(dimension_));
         file_handler.Write(&partition_num_, sizeof(partition_num_));
         file_handler.Write(&data_num_, sizeof(data_num_));
-        file_handler.Write(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
-        u32 vector_element_num;
-        for (u32 i = 0; i < partition_num_; ++i) {
-            vector_element_num = ids_[i].size();
-            file_handler.Write(&vector_element_num, sizeof(vector_element_num));
-            file_handler.Write(ids_[i].data(), sizeof(u32) * vector_element_num);
-            file_handler.Write(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+        if (!centroids_.empty()) {
+            file_handler.Write(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
+            u32 vector_element_num;
+            for (u32 i = 0; i < partition_num_; ++i) {
+                vector_element_num = ids_[i].size();
+                file_handler.Write(&vector_element_num, sizeof(vector_element_num));
+                file_handler.Write(ids_[i].data(), sizeof(u32) * vector_element_num);
+                file_handler.Write(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+            }
         }
     }
 

@@ -30,14 +30,19 @@ import block_index;
 import load_meta;
 import internal_types;
 import data_type;
+import fast_rough_filter;
 
 namespace infinity {
 
 export class PhysicalTableScan : public PhysicalOperator {
 public:
-    explicit PhysicalTableScan(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<Vector<LoadMeta>> load_metas, bool add_row_id = false)
+    explicit PhysicalTableScan(u64 id,
+                               SharedPtr<BaseTableRef> base_table_ref,
+                               UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
+                               SharedPtr<Vector<LoadMeta>> load_metas,
+                               bool add_row_id = false)
         : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
-          add_row_id_(add_row_id) {}
+          fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), add_row_id_(add_row_id) {}
 
     ~PhysicalTableScan() override = default;
 
@@ -78,6 +83,8 @@ private:
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_{};
+
+    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
 
     bool add_row_id_;
     mutable Vector<SizeT> column_ids_;

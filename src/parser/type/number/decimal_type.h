@@ -41,6 +41,8 @@ public:
         return std::string();
     }
 
+    [[nodiscard]] auto GetHash() const { return std::hash<int64_t>{}(upper) ^ std::hash<int64_t>{}(lower); }
+
     int64_t upper{0};
     int64_t lower{0};
 };

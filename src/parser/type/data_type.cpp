@@ -21,6 +21,10 @@
 #include "type/logical_type.h"
 #include "type/type_info.h"
 #include <charconv>
+#include <ctype.h>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h> 
 
 namespace infinity {
 
@@ -70,6 +74,10 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
             plain_type_ = true;
             break;
         }
+        case kTensor: {
+            plain_type_ = true;
+            break;
+        }
         case kInvalid:
             break;
     }
@@ -110,7 +118,7 @@ size_t DataType::Size() const {
     }
 
     // embedding, varchar data can get data here.
-    if (type_info_ != nullptr) {
+    if (type_info_ != nullptr and type_ != kTensor) {
         return type_info_->Size();
     }
 
@@ -175,6 +183,7 @@ int32_t DataType::GetSizeInBytes() const {
             case LogicalType::kDecimal:
                 size += sizeof(int64_t) * 2;
                 break;
+            case LogicalType::kTensor:
             case LogicalType::kEmbedding:
                 size += sizeof(EmbeddingDataType);
                 size += sizeof(int32_t);
@@ -216,6 +225,7 @@ void DataType::WriteAdv(char *&ptr) const {
             WriteBufAdv<int64_t>(ptr, scale);
             break;
         }
+        case LogicalType::kTensor:
         case LogicalType::kEmbedding: {
             const EmbeddingInfo *embedding_info = dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
             ParserAssert(embedding_info != nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
@@ -249,6 +259,7 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
             type_info = DecimalInfo::Make(precision, scale);
             break;
         }
+        case LogicalType::kTensor:
         case LogicalType::kEmbedding: {
             EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
             int32_t dimension = ReadBufAdv<int32_t>(ptr);
@@ -278,6 +289,7 @@ nlohmann::json DataType::Serialize() {
 
 std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
     LogicalType logical_type = data_type_json["data_type"];
+
     std::shared_ptr<TypeInfo> type_info{nullptr};
     if (data_type_json.contains("type_info")) {
         const nlohmann::json &type_info_json = data_type_json["type_info"];
@@ -287,14 +299,15 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
                 type_info = nullptr;
                 break;
             }
-//            case LogicalType::kBitmap: {
-//                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
-//                break;
-//            }
+                //            case LogicalType::kBitmap: {
+                //                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
+                //                break;
+                //            }
             case LogicalType::kDecimal: {
                 type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
                 break;
             }
+            case LogicalType::kTensor:
             case LogicalType::kEmbedding: {
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
                 break;
@@ -305,6 +318,27 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
         }
     }
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
+    return data_type;
+}
+
+std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_type_string) {
+    const LogicalType logical_type = Str2LogicalType(data_type_string);
+
+    switch (logical_type) {
+        case LogicalType::kArray:
+        case LogicalType::kDecimal:
+        case LogicalType::kEmbedding: {
+            return nullptr;
+        }
+            case LogicalType::kInvalid: {
+                ParserError("Invalid data type");
+            }
+            default: {
+                // There's no type_info for other types
+                break;
+            }
+    }
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, nullptr);
     return data_type;
 }
 
@@ -455,6 +489,11 @@ std::string DataType::TypeToString<MixedT>() {
 }
 
 template <>
+std::string DataType::TypeToString<TensorT>() {
+    return "Tensor";
+}
+
+template <>
 BooleanT DataType::StringToValue<BooleanT>(const std::string_view &str) {
     if (str.empty()) {
         return BooleanT{};
@@ -475,7 +514,11 @@ TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     }
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse TinyInt error"); // TODO: throw error here
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse tiny integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -486,7 +529,11 @@ SmallIntT DataType::StringToValue<SmallIntT>(const std::string_view &str) {
     }
     SmallIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse SmallInt error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse small integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -497,7 +544,11 @@ IntegerT DataType::StringToValue<IntegerT>(const std::string_view &str) {
     }
     IntegerT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse Integer error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -508,7 +559,11 @@ BigIntT DataType::StringToValue<BigIntT>(const std::string_view &str) {
     }
     BigIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse BigInt error");
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse big integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
     return value;
 }
 
@@ -520,12 +575,18 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
     FloatT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%a", &value);
-    ParserAssert(ret == str.size(), "Parse Float error");
+    ParserAssert(ret == str.size(), "Error: parse float error");
 #else
-    auto ret = std::sscanf(str.data(), "%a", &value);
+//    auto ret = std::sscanf(str.data(), "%a", &value);
 //    ParserAssert(ret == str.size(), "Parse Float error");
 //    auto res = std::from_chars(str.begin(), str.end(), value);
 //    ParserAssert(res.ptr == str.data() + str.size(), "Parse Float error");
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
 #endif
     return value;
 }
@@ -538,12 +599,18 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     DoubleT value{};
 #if defined(__APPLE__)
     auto ret = std::sscanf(str.data(), "%la", &value);
-    ParserAssert(ret == str.size(), "Parse Double error");
+    ParserAssert(ret == str.size(), "Error: parse double error");
 #else
-    auto ret = std::sscanf(str.data(), "%la", &value);
+//    auto ret = std::sscanf(str.data(), "%la", &value);
 //    ParserAssert(ret == str.size(), "Parse Double error");
 //    auto res = std::from_chars(str.begin(), str.end(), value);
 //    ParserAssert(res.ptr == str.data() + str.size(), "Parse Double error");
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
 #endif
     return value;
 }

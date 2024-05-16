@@ -20,29 +20,29 @@ import memory_pool;
 import segment_posting;
 import index_defines;
 import index_segment_reader;
-import index_config;
-import segment;
 import dict_reader;
 import file_reader;
 import posting_list_format;
 import local_file_system;
+import internal_types;
+import term_meta;
 
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {
 public:
-    DiskIndexSegmentReader(u64 column_id, const Segment &segment, const InvertedIndexConfig &index_config);
+    DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
+
     virtual ~DiskIndexSegmentReader();
 
-    bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
+    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const override;
 
 private:
-    u64 column_id_;
-    const Segment &segment_;
+    RowID base_row_id_{INVALID_ROWID};
     SharedPtr<DictionaryReader> dict_reader_;
-    SharedPtr<FileReader> posting_reader_;
-    docid_t base_doc_id_{INVALID_DOCID};
-    PostingFormatOption posting_format_option_;
-    LocalFileSystem fs_;
+    String posting_file_{};
+    u8 *data_ptr_{};
+    SizeT data_len_{};
+    LocalFileSystem fs_{};
 };
 
 } // namespace infinity

@@ -40,7 +40,7 @@ TEST_F(TableTest, test1) {
 
     SizeT column_count = 2;
     SizeT block_count = 3;
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
+    i64 row_count = DEFAULT_VECTOR_SIZE;
     Vector<SharedPtr<ColumnDef>> columns;
     Vector<SharedPtr<DataType>> column_types;
     columns.reserve(column_count);
@@ -59,7 +59,7 @@ TEST_F(TableTest, test1) {
     col_def = MakeShared<ColumnDef>(1, col_type, col_name, HashSet<ConstraintType>());
     columns.emplace_back(col_def);
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("order_by_table"), columns);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("order_by_table"), columns);
 
     SharedPtr<DataTable> order_by_table = DataTable::Make(table_def, TableType::kOrderBy);
 
@@ -68,7 +68,7 @@ TEST_F(TableTest, test1) {
         data_block->Init(column_types);
 
         // Column 1 & 2
-        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+        for (i64 row_id = 0; row_id < row_count; ++row_id) {
             Value v1 = Value::MakeBool(row_id % 2 == 0);
             data_block->column_vectors[0]->AppendValue(v1);
             Value v2 = Value::MakeBigInt(row_id);
@@ -84,19 +84,19 @@ TEST_F(TableTest, test1) {
         // Check Column1 data
         SharedPtr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors[0];
         EXPECT_EQ(column1->data_type()->type(), LogicalType::kBoolean);
-        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+        for (i64 row_id = 0; row_id < row_count; ++row_id) {
             EXPECT_EQ(column1->buffer_->GetCompactBit(row_id), row_id % 2 == 0);
         }
 
         // Check Column2 data
         SharedPtr<ColumnVector> column2 = order_by_table->GetDataBlockById(block_id)->column_vectors[1];
         EXPECT_EQ(column2->data_type()->type(), LogicalType::kBigInt);
-        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+        for (i64 row_id = 0; row_id < row_count; ++row_id) {
             EXPECT_EQ(((BigIntT *)column2->data())[row_id], row_id);
         }
 
         // Check offset
-        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+        for (i64 row_id = 0; row_id < row_count; ++row_id) {
             const RowID &row = (*offset_column_vector)[block_id * DEFAULT_VECTOR_SIZE + row_id];
             EXPECT_EQ(row.segment_id_, INVALID_SEGMENT_ID);
             EXPECT_EQ(row.segment_offset_, block_id * DEFAULT_VECTOR_SIZE + row_id);

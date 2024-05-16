@@ -9,11 +9,11 @@ CREATE TABLE test_delete_with_annivfflat (c1 INT, c2 EMBEDDING(FLOAT, 4));
 # 6, dist: 0.06
 # 8, dist: 0.02
 query I
-COPY test_delete_with_annivfflat FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_delete_with_annivfflat FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 query I
-COPY test_delete_with_annivfflat FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_delete_with_annivfflat FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 statement ok
@@ -47,7 +47,7 @@ SELECT c1 FROM test_delete_with_annivfflat SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 
 2
 
 query I
-COPY test_delete_with_annivfflat FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_delete_with_annivfflat FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 query I

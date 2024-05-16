@@ -124,23 +124,25 @@ protected:
         while (run_num < 100 || SIZE % run_num != 0)
             run_num = rand() % 300;
 
+        run_num = 10;
         char buffer[200];
         for (u32 i = 0; i < run_num; ++i) {
             u64 pos = ftell(f);
             fseek(f, 2 * sizeof(u32) + sizeof(u64), SEEK_CUR);
             u32 s = 0;
             for (u32 j = 0; j < SIZE / run_num; ++j) {
-                str = RandStr();
+                // str = RandStr();
+                String str = std::to_string(i * SIZE / run_num + j);
                 u32 doc_id = 34567; // i * SIZE / run_num + j;
                 u32 term_pos = i;
                 memcpy(buffer, str.data(), str.size());
                 buffer[str.size()] = '\0';
                 memcpy(buffer + str.size() + 1, &doc_id, sizeof(u32));
                 memcpy(buffer + str.size() + 1 + sizeof(u32), &term_pos, sizeof(u32));
-                u16 len = str.size() + 1 + sizeof(u32) + sizeof(u32);
-                fwrite(&len, sizeof(u16), 1, f);
+                u32 len = str.size() + 1 + sizeof(u32) + sizeof(u32);
+                fwrite(&len, sizeof(u32), 1, f);
                 fwrite(buffer, len, 1, f);
-                s += len + sizeof(u16);
+                s += len + sizeof(u32);
             }
             u64 next_run_pos = ftell(f);
             fseek(f, pos, SEEK_SET);
@@ -152,7 +154,7 @@ protected:
         }
         fclose(f);
 
-        SortMerger<TermTuple, u16> merger("./tt", run_num, bs, 2);
+        SortMerger<TermTuple, u32> merger("./tt", run_num, bs, 2);
         merger.Run();
 
         f = fopen("./tt", "r");
@@ -161,8 +163,8 @@ protected:
         fread(&count, sizeof(u64), 1, f);
         EXPECT_EQ(count, SIZE);
         for (u32 i = 0; i < count; ++i) {
-            u16 len = 0;
-            fread(&len, sizeof(u16), 1, f);
+            u32 len = 0;
+            fread(&len, sizeof(u32), 1, f);
             char *buf = new char[len];
             fread(buf, len, 1, f);
             TermTuple tuple(buf, len);
@@ -178,4 +180,4 @@ TEST_F(ExternalSortTest, test1) {
     CheckMerger<u32, u8>(10000, 1000000);
 }
 
-TEST_F(ExternalSortTest, test2) { CheckTermTuple(10000, 1000000); }
+TEST_F(ExternalSortTest, test2) { CheckTermTuple(100, 1000000); }

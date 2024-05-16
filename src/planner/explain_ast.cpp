@@ -119,7 +119,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(create_table));
             auto *table_info = (CreateTableInfo *)create_statement->create_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + table_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + table_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
@@ -155,7 +155,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(create_collection));
             auto *collection_info = (CreateCollectionInfo *)create_statement->create_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + collection_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + collection_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
@@ -175,7 +175,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     result->emplace_back(MakeShared<String>("INSERT: "));
     intent_size += 2;
-    String schema_name = String(intent_size, ' ') + "schema: " + insert_statement->schema_name_;
+    String schema_name = String(intent_size, ' ') + "database: " + insert_statement->schema_name_;
     result->emplace_back(MakeShared<String>(schema_name));
     String table_name = String(intent_size, ' ') + "table: " + insert_statement->table_name_;
     result->emplace_back(MakeShared<String>(table_name));
@@ -223,7 +223,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(drop_table));
             auto *table_info = (DropTableInfo *)drop_statement->drop_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + table_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + table_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
@@ -236,7 +236,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(drop_collection));
             auto *collection_info = (DropCollectionInfo *)drop_statement->drop_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + collection_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + collection_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
@@ -461,10 +461,37 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
 void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
 
     switch (show_statement->show_type_) {
+        case ShowStmtType::kDatabase: {
+            result->emplace_back(MakeShared<String>("SHOW DATABASE: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            break;
+        }
+        case ShowStmtType::kTable: {
+            result->emplace_back(MakeShared<String>("SHOW TABLE: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            break;
+        }
+        case ShowStmtType::kIndex: {
+            result->emplace_back(MakeShared<String>("SHOW INDEX: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String index_name = String(intent_size, ' ') + "index: " + show_statement->index_name_.value();
+            result->emplace_back(MakeShared<String>(index_name));
+            break;
+        }
         case ShowStmtType::kColumns: {
             result->emplace_back(MakeShared<String>("SHOW COLUMNS: "));
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
@@ -481,7 +508,7 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
         case ShowStmtType::kTables: {
             result->emplace_back(MakeShared<String>("SHOW TABLES: "));
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             break;
         }
@@ -493,10 +520,26 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW SEGMENTS: "));
             break;
         }
+        case ShowStmtType::kSegment: {
+            result->emplace_back(MakeShared<String>("SHOW SEGMENT: "));
+            break;
+        }
+        case ShowStmtType::kBlocks: {
+            result->emplace_back(MakeShared<String>("SHOW BLOCKS: "));
+            break;
+        }
+        case ShowStmtType::kBlock: {
+            result->emplace_back(MakeShared<String>("SHOW BLOCK: "));
+            break;
+        }
+        case ShowStmtType::kBlockColumn: {
+            result->emplace_back(MakeShared<String>("SHOW BLOCK COLUMN: "));
+            break;
+        }
         case ShowStmtType::kIndexes: {
             result->emplace_back(MakeShared<String>("SHOW INDEXES: "));
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             break;
         }
@@ -508,16 +551,24 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW PROFILES"));
             break;
         }
-        case ShowStmtType::kSessionStatus: {
-            result->emplace_back(MakeShared<String>("SHOW SESSION STATUS"));
+        case ShowStmtType::kSessionVariable: {
+            result->emplace_back(MakeShared<String>("SHOW SESSION VARIABLE"));
             break;
         }
-        case ShowStmtType::kGlobalStatus: {
-            result->emplace_back(MakeShared<String>("SHOW GLOBAL STATUS"));
+        case ShowStmtType::kSessionVariables: {
+            result->emplace_back(MakeShared<String>("SHOW SESSION VARIABLES"));
             break;
         }
-        case ShowStmtType::kVar: {
-            result->emplace_back(MakeShared<String>("SHOW VARIABLES"));
+        case ShowStmtType::kGlobalVariable: {
+            result->emplace_back(MakeShared<String>("SHOW GLOBAL VARIABLE"));
+            break;
+        }
+        case ShowStmtType::kGlobalVariables: {
+            result->emplace_back(MakeShared<String>("SHOW GLOBAL VARIABLES"));
+            break;
+        }
+        case ShowStmtType::kConfig: {
+            result->emplace_back(MakeShared<String>("SHOW CONFIG"));
             break;
         }
     }
@@ -538,11 +589,7 @@ void ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vec
 }
 
 void ExplainAST::BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
-    switch (optimize_statement->type_) {
-        case OptimizeType::kIRS:
-            result->emplace_back(MakeShared<String>("OPTIMIZE FULLTEXT"));
-            break;
-    }
+    result->emplace_back(MakeShared<String>("OPTIMIZE TSABLE"));
 }
 
 void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
@@ -554,7 +601,7 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
         result->emplace_back(MakeShared<String>("EXPORT DATA:"));
     }
 
-    SharedPtr<String> schema_name = MakeShared<String>(String(intent_size, ' ') + "schema: " + copy_statement->schema_name_);
+    SharedPtr<String> schema_name = MakeShared<String>(String(intent_size, ' ') + "database: " + copy_statement->schema_name_);
     result->emplace_back(schema_name);
 
     SharedPtr<String> table_name = MakeShared<String>(String(intent_size, ' ') + "table: " + copy_statement->table_name_);

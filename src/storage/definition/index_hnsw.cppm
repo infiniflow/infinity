@@ -66,6 +66,8 @@ public:
 
     virtual String ToString() const override;
 
+    virtual String BuildOtherParamsString() const override;
+
     virtual nlohmann::json Serialize() const override;
 
 public:

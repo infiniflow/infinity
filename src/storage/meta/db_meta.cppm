@@ -25,7 +25,7 @@ import extra_ddl_info;
 import db_entry;
 import base_entry;
 import txn_manager;
-
+import meta_info;
 import entry_list;
 
 import meta_entry_interface;
@@ -47,40 +47,55 @@ public:
 
     SharedPtr<String> ToString();
 
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<DBMeta> Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr);
-
-    void MergeFrom(DBMeta &other);
 
     SharedPtr<String> db_name() const { return db_name_; }
 
     SharedPtr<String> data_dir() const { return data_dir_; }
 
 private:
-    Tuple<DBEntry *, Status>
-    CreateNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
+    Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnManager *txn_mgr,
+                                            ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status>
-    DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
+    Tuple<SharedPtr<DBEntry>, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   ConflictType conflict_type = ConflictType::kError);
 
-    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
+    void DeleteNewEntry(TransactionID txn_id);
 
-    Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<DBEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    }
 
-    Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    // Used in initialization phase
-    static void AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry);
+    Tuple<DBEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryNolock(txn_id, begin_ts); }
+
+    // replay
+    void CreateEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    DBEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    //
 
 private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
 
 public:
-    void Cleanup() && override;
+    void Cleanup() override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
+
+    bool Empty() override { return db_entry_list_.Empty(); }
 
 private:
     EntryList<DBEntry> db_entry_list_{};

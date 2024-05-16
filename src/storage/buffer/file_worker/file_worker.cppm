@@ -37,8 +37,6 @@ public:
 
     void MoveFile();
 
-    void CleanupFile();
-
     virtual void AllocateInMemory() = 0;
 
     virtual void FreeInMemory() = 0;
@@ -55,12 +53,12 @@ public:
     // Get file path. As key of buffer handle.
     String GetFilePath() const { return fmt::format("{}/{}", *file_dir_, *file_name_); }
 
-    void Sync();
+    void CleanupFile() const;
 
-    void CloseFile();
+    void CleanupTempFile() const;
 
 protected:
-    virtual void WriteToFileImpl(bool &prepare_success) = 0;
+    virtual void WriteToFileImpl(bool to_spill, bool &prepare_success) = 0;
 
     virtual void ReadFromFileImpl() = 0;
 

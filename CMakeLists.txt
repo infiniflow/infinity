@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.1.0)
+project(infinity VERSION 0.2.0)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -99,21 +99,48 @@ endif ()
 
 message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 
-if (CLANG_VERSION_STRING VERSION_EQUAL 17)
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+
+    set(CMAKE_CXX_FLAGS "-Ofast -DNDEBUG")
+    set(CMAKE_C_FLAGS  "-Ofast -DNDEBUG")
+
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+
+    set(CMAKE_CXX_FLAGS "-O2 -g -DNDEBUG")
+    set(CMAKE_C_FLAGS  "-O2 -g -DNDEBUG")
+
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+
+    set(CMAKE_CXX_FLAGS "-O0 -g")
+    set(CMAKE_C_FLAGS "-O0 -g")
+
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking ")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-omit-frame-pointer")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=cfi -fno-omit-frame-pointer")
+    set(CMAKE_DEBUG_POSTFIX "")
+
 else ()
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
+    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
+endif ()
+
+if (CLANG_VERSION_STRING VERSION_EQUAL 17)
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
+else ()
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
 endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
 #add_definitions(-march=native)
+add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
     add_definitions(-mevex512)
 endif ()
 
 execute_process(
-        COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y $(realpath /boot/config-$(uname -r)) 2>/dev/null"
+        COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"
         OUTPUT_VARIABLE HAVE_EFFICIENT_UNALIGNED_ACCESS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 if("${HAVE_EFFICIENT_UNALIGNED_ACCESS}" STREQUAL "CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y")
@@ -126,6 +153,14 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
 
+# You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
+option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
+if(ENABLE_JEMALLOC AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    find_package(jemalloc REQUIRED)
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
+endif()
+
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
@@ -137,11 +172,11 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # Compile benchmark
 add_subdirectory(benchmark)
-
+add_subdirectory(client)
 
 # CPack settings
 set(CPACK_PACKAGE_NAME "infinity")
-set(CPACK_PACKAGE_VERSION "0.1.0-dev")
+set(CPACK_PACKAGE_VERSION "0.2.0-dev")
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM applications, offering incredibly fast vector and full-text search.")
@@ -157,6 +192,7 @@ set(CMAKE_INSTALL_PREFIX /usr)
 install(TARGETS infinity DESTINATION bin)
 install(FILES conf/infinity.service DESTINATION lib/systemd/system)
 install(FILES conf/infinity_conf.toml DESTINATION etc)
+install(DIRECTORY ../resource/jieba DESTINATION ../var/infinity/resource)
 
 # https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
 # Specify the post-install script for RPM

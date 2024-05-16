@@ -31,10 +31,16 @@ export struct VarHeapManager {
 
 public:
     inline explicit VarHeapManager(u64 chunk_size = MIN_VECTOR_CHUNK_SIZE) : current_chunk_size_(chunk_size) {
+#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount();
+#endif
     }
 
-    inline ~VarHeapManager() { GlobalResourceUsage::DecrObjectCount(); }
+    inline ~VarHeapManager() {
+#ifdef INFINITY_DEBUG
+GlobalResourceUsage::DecrObjectCount();
+#endif
+}
 
     // return value: start chunk id & chunk offset
     Pair<u64, u64> AppendToHeap(const char* data_ptr, SizeT nbytes);

@@ -14,11 +14,15 @@
 
 module;
 
+#include <cassert>
+#include <unistd.h>
+
 import stl;
 import file_system;
 import file_system_type;
 import status;
 import infinity_exception;
+import local_file_system;
 
 export module file_reader;
 
@@ -28,7 +32,7 @@ export class FileReader {
 public:
     explicit FileReader(FileSystem &fs, const String &path, SizeT buffer_size);
 
-    FileReader(const FileReader &other);
+    FileReader(const FileReader &other) = delete;
 
     FileSystem &fs_;
     String path_{};
@@ -56,13 +60,13 @@ public:
 
     void Read(char_t *buffer, SizeT read_size);
 
+    void ReadAt(i64 file_offset, char_t *buffer, SizeT read_size);
+
     bool Finished() const;
 
     u64 GetFilePointer() const;
 
     void Seek(const u64 pos);
-
-    FileReader *Clone();
 
 private:
     void ReFill();
@@ -76,7 +80,10 @@ inline void FileReader::ReFill() {
         buffer_length_ = file_size_ - buffer_start_;
     else
         buffer_length_ = buffer_size_;
-
+#ifndef NDEBUG
+    auto current_offset = lseek((dynamic_cast<LocalFileHandler *>(file_handler_.get()))->fd_, 0, SEEK_CUR);
+    assert(buffer_start_ == static_cast<SizeT>(current_offset));
+#endif
     already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_length_);
     if (already_read_size_ == 0) {
         RecoverableError(Status::DataCorrupted(file_handler_->path_.string()));

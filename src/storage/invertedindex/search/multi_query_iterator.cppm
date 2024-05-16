@@ -18,17 +18,20 @@ export module multi_query_iterator;
 
 import stl;
 import memory_pool;
-import posting_iterator;
 import index_defines;
-import segment;
-import index_config;
 import doc_iterator;
+import term_doc_iterator;
+
 namespace infinity {
 export class MultiQueryDocIterator : public DocIterator {
 public:
-    MultiQueryDocIterator() = default;
-
-    virtual ~MultiQueryDocIterator() = default;
+    explicit MultiQueryDocIterator(Vector<UniquePtr<DocIterator>> &&children) : children_(std::move(children)) {
+        for (u32 i = 0; i < children_.size(); ++i) {
+            if (auto term_doc_iter = dynamic_cast<TermDocIterator *>(children_[i].get()); term_doc_iter) {
+                term_doc_iter->DoSeek(0);
+            }
+        }
+    }
 
     virtual bool IsAnd() const { return false; }
 
@@ -36,12 +39,9 @@ public:
 
     virtual bool IsOr() const { return false; }
 
-    void AddIterator(DocIterator *iter) override {
-        UniquePtr<DocIterator> it(iter);
-        children_.push_back(std::move(it));
-    }
-
     const Vector<UniquePtr<DocIterator>> &GetChildren() { return children_; }
+
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 
 protected:
     Vector<UniquePtr<DocIterator>> children_;

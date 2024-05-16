@@ -24,143 +24,187 @@ import segment_entry;
 import infinity_exception;
 import txn;
 import compaction_alg;
+import third_party;
+import logger;
+import table_entry;
 
 namespace infinity {
 
-Vector<SegmentEntry *> SegmentLayer::SetAllCompacting(TransactionID txn_id) {
-    Vector<SegmentEntry *> ret = segments_;                         // copy here
-    compacting_segments_map_.emplace(txn_id, std::move(segments_)); // move makes segment_ empty
+void SegmentLayer::AddSegment(SegmentEntry *segment_entry) {
+    SegmentID segment_id = segment_entry->segment_id();
+    auto [iter, insert_ok] = segments_.emplace(segment_id, segment_entry);
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("SegmentID conflict: {}", segment_id));
+    }
+}
+
+void SegmentLayer::RemoveSegment(SegmentEntry *shrink_segment) {
+    SegmentID shrink_id = shrink_segment->segment_id();
+    SizeT remove_n = segments_.erase(shrink_id);
+    if (remove_n != 1) {
+        UnrecoverableError(fmt::format("Segment not found in layer: {}", shrink_id));
+    }
+}
+
+Vector<SegmentEntry *> SegmentLayer::PickCompacting(TransactionID txn_id, SizeT M) {
+    Vector<SegmentEntry *> ret;
+    SizeT pick_n = std::min(M, segments_.size());
+    for (SizeT i = 0; i < pick_n; ++i) {
+        auto iter = segments_.begin();
+        ret.push_back(iter->second);
+        segments_.erase(iter);
+    }
+    auto [iter, insert_ok] = compacting_segments_map_.emplace(txn_id, ret); // copy here
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("TransactionID conflict: {}", txn_id));
+    }
     return ret;
 }
 
-void SegmentLayer::SetOneCompacting(SegmentEntry *segment_entry, TransactionID txn_id) {
-    SegmentID segment_id = segment_entry->segment_id();
-    auto erase_begin = std::remove_if(segments_.begin(), segments_.end(), [&](SegmentEntry *segment) { return segment->segment_id() == segment_id; });
-    if (int find_n = segments_.end() - erase_begin; find_n != 1) {
-        UnrecoverableError("Segment not found in layer");
+void SegmentLayer::CommitCompact(TransactionID txn_id) {
+    SizeT remove_n = compacting_segments_map_.erase(txn_id);
+    if (remove_n != 1) {
+        UnrecoverableError(fmt::format("TransactionID not found in layer: {}", txn_id));
     }
-    segments_.erase(erase_begin, segments_.end());
-    compacting_segments_map_.emplace(txn_id, Vector<SegmentEntry *>{segment_entry});
 }
 
 void SegmentLayer::RollbackCompact(TransactionID txn_id) {
-    auto range = compacting_segments_map_.equal_range(txn_id);
-    for (auto iter = range.first; iter != range.second; ++iter) {
-        auto &compacting_segments = iter->second;
-        for (auto *rollback_segment : compacting_segments) {
-            AddSegmentInfo(rollback_segment);
+    if (auto iter = compacting_segments_map_.find(txn_id); iter != compacting_segments_map_.end()) {
+        for (auto *rollback_segment : iter->second) {
+            AddSegment(rollback_segment);
         }
+        compacting_segments_map_.erase(iter);
+    } else {
+        UnrecoverableError(fmt::format("TransactionID not found in layer: {}", txn_id));
     }
-    compacting_segments_map_.erase(txn_id);
 }
 
 SegmentEntry *SegmentLayer::FindSegment(SegmentID segment_id) {
-    SegmentEntry *segment = nullptr;
-    for (auto *segment : segments_) {
-        if (segment->segment_id() == segment_id) {
-            return segment;
+    if (auto iter = segments_.find(segment_id); iter != segments_.end()) {
+        return iter->second;
+    }
+    return nullptr;
+}
+
+Optional<CompactionInfo> DBTCompactionAlg::CheckCompaction(std::function<Txn *()> generate_txn) {
+    std::unique_lock lock(mtx_);
+
+    if (status_ == CompactionStatus::kDisable) {
+        return None;
+    }
+
+    int cur_layer_n = segment_layers_.size();
+    for (int layer = cur_layer_n - 1; layer >= 0; --layer) {
+        auto &segment_layer = segment_layers_[layer];
+        if (segment_layer.LayerSize() >= config_.m_) {
+            if (++running_task_n_ == 1) {
+                status_ = CompactionStatus::kRunning;
+            }
+            Txn *txn = generate_txn();
+            TransactionID txn_id = txn->TxnID();
+            Vector<SegmentEntry *> compact_segments = segment_layer.PickCompacting(txn_id, config_.m_);
+
+            txn_2_layer_.emplace(txn_id, layer);
+            return CompactionInfo(std::move(compact_segments), txn);
         }
     }
-    return segment;
+    return None;
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
+void DBTCompactionAlg::AddSegment(SegmentEntry *new_segment) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kEnable) {
-        // If is disable, manual compaction is going
-        // new segment will be add after manual compaction is committed/rollback
-        return None;
-    }
-
-    int layer = AddSegmentNoCheck(new_segment);
-    // Now: prohibit the top layer to merge
-    // TODO: merge the top layer if possible
-    if (layer == max_layer_ || segment_layers_[layer].LayerSize() < config_.m_) {
-        return None;
-    }
-    status_ = DBTStatus::kRunning; // Do have compaction
-
-    Txn *txn = generate_txn();
-    TransactionID txn_id = txn->TxnID();
-
-    Vector<SegmentEntry *> compact_segments = segment_layers_[layer].SetAllCompacting(txn_id);
-    AddSegmentToHigher(compact_segments, layer + 1, txn_id);
-
-    if (compact_segments.size() <= 1) {
-        UnrecoverableError("Algorithm bug.");
-    }
-    return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
+    AddSegmentInner(new_segment);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
+void DBTCompactionAlg::DeleteInSegment(SegmentID segment_id) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kEnable) {
-        // If is disable, manual compaction is going
-        return None;
-    }
-
     auto [shrink_segment, old_layer] = FindSegmentAndLayer(segment_id);
     if (shrink_segment == nullptr) {
-        return None; // this segment is compacting, ignore it
+        return; // this segment is compacting, ignore it
     }
+
     SegmentOffset new_row_cnt = shrink_segment->actual_row_count();
     int new_layer = config_.CalculateLayer(new_row_cnt);
-    if (old_layer == new_layer) {
-        return None;
+    if (new_layer == old_layer) {
+        return;
     }
-    status_ = DBTStatus::kRunning; // Do have compaction
-
-    if (new_layer >= old_layer) {
-        UnrecoverableError("Shrink segment has less rows than before");
+    if (new_layer > old_layer) {
+        UnrecoverableError("Shrink segment should has less rows than before");
     }
+    segment_layers_[old_layer].RemoveSegment(shrink_segment);
+    segment_layers_[new_layer].AddSegment(shrink_segment);
 
-    Txn *txn = generate_txn();
-    TransactionID txn_id = txn->TxnID();
-
-    SegmentLayer &old_segment_layer = segment_layers_[old_layer];
-    old_segment_layer.SetOneCompacting(shrink_segment, txn_id);
-
-    Vector<SegmentEntry *> compact_segments{shrink_segment};
-    AddSegmentToHigher(compact_segments, new_layer, txn_id);
-    lock.unlock();
-
-    if (compact_segments.size() == 1) {
-        this->CommitCompact(compact_segments, txn_id);
-        return MakePair(Vector<SegmentEntry *>(), std::move(txn));
-    } else if (compact_segments.empty()) {
-        UnrecoverableError("Algorithm bug.");
-    }
-    return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
+    // old_segment_layer.SetOneCompacting(shrink_segment, txn_id);
 }
 
-void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) {
+void DBTCompactionAlg::CommitCompact(TransactionID commit_txn_id) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kRunning) {
-        UnrecoverableError("Commit compact when compaction not running");
+    if (status_ != CompactionStatus::kRunning) {
+        UnrecoverableError(fmt::format("Wrong status of compaction alg: {}", (u8)status_));
     }
 
-    for (auto &segment_layer : segment_layers_) {
-        segment_layer.CommitCompact(commit_txn_id);
+    if (auto iter = txn_2_layer_.find(commit_txn_id); iter != txn_2_layer_.end()) {
+        segment_layers_[iter->second].CommitCompact(commit_txn_id);
+        txn_2_layer_.erase(iter);
+    } else {
+        UnrecoverableError(fmt::format("TransactionID not found in layer: {}", commit_txn_id));
     }
-    for (auto *new_segment : new_segments) {
-        AddSegmentNoCheck(new_segment);
+
+    if (--running_task_n_ == 0) {
+        status_ = CompactionStatus::kEnable;
+        cv_.notify_one();
     }
-    status_ = DBTStatus::kEnable;
 }
 
 void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kRunning) {
-        UnrecoverableError("Rollback compact when compaction not running");
+    if (status_ != CompactionStatus::kRunning) {
+        UnrecoverableError(fmt::format("Rollback compact when compaction not running, {}", (u8)status_));
     }
 
-    for (auto &segment_layer : segment_layers_) {
-        segment_layer.RollbackCompact(rollback_txn_id);
+    if (auto iter = txn_2_layer_.find(rollback_txn_id); iter != txn_2_layer_.end()) {
+        segment_layers_[iter->second].RollbackCompact(rollback_txn_id);
+        txn_2_layer_.erase(iter);
+    } else {
+        UnrecoverableError(fmt::format("TransactionID not found in layer: {}", rollback_txn_id));
     }
-    status_ = DBTStatus::kEnable;
+    if (--running_task_n_ == 0) {
+        status_ = CompactionStatus::kEnable;
+    }
 }
 
-int DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
+// Must be called when all segments are not compacting
+void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
+    std::unique_lock lock(mtx_);
+    if (status_ != CompactionStatus::kDisable) {
+        UnrecoverableError(fmt::format("Enable compaction when compaction not disable, {}", (u8)status_));
+    }
+    for (auto *segment_entry : segment_entries) {
+        this->AddSegmentInner(segment_entry);
+    }
+    if (running_task_n_ != 0) {
+        UnrecoverableError(fmt::format("Running task is not 0 when enable compaction, table dir: {}, table_ptr: {}",
+                                       *(table_entry_->TableEntryDir()),
+                                       (u64)table_entry_));
+    }
+    status_ = CompactionStatus::kEnable;
+    cv_.notify_one();
+}
+
+void DBTCompactionAlg::Disable() {
+    std::unique_lock lock(mtx_);
+    cv_.wait(lock, [this]() {
+        bool res = (status_ == CompactionStatus::kEnable);
+        if (!res) {
+            LOG_WARN(fmt::format("table {} is auto compacting now. wait", *(table_entry_->TableEntryDir())));
+        }
+        return res;
+    });
+    segment_layers_.clear();
+    status_ = CompactionStatus::kDisable;
+}
+
+int DBTCompactionAlg::AddSegmentInner(SegmentEntry *new_segment) {
     SegmentOffset new_row_cnt = new_segment->actual_row_count();
     int layer = config_.CalculateLayer(new_row_cnt);
     if (layer >= (int)segment_layers_.size()) {
@@ -168,23 +212,8 @@ int DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
     }
     SegmentLayer &segment_layer = segment_layers_[layer];
     // segment_layer_map_.emplace(new_segment->segment_id(), Pair<SegmentEntry *, int>{new_segment, layer});
-    segment_layer.AddSegmentInfo(new_segment);
+    segment_layer.AddSegment(new_segment);
     return layer;
-}
-
-void DBTCompactionAlg::AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id) {
-    while (true) {
-        if (layer >= (int)segment_layers_.size()) {
-            segment_layers_.emplace_back();
-        }
-        SegmentLayer &segment_layer = segment_layers_[layer];
-        if (segment_layer.LayerSize() + 1 < config_.m_) {
-            break;
-        }
-        auto compact_segments1 = segment_layer.SetAllCompacting(txn_id);
-        compact_segments.insert(compact_segments.end(), compact_segments1.begin(), compact_segments1.end());
-        ++layer;
-    }
 }
 
 // FIXME: use brute force to find the segment, for simple reason.
@@ -199,25 +228,6 @@ Pair<SegmentEntry *, int> DBTCompactionAlg::FindSegmentAndLayer(SegmentID segmen
     // the may happen because the segment is compacting. Ignore it
     // FIXME: do something
     return {nullptr, -1};
-}
-
-// Must be called when all segments are not compacting
-void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
-    std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kDisable) {
-        UnrecoverableError("Enable compaction when compaction not disable");
-    }
-    segment_layers_.clear();
-    for (auto *segment_entry : segment_entries) {
-        AddSegmentNoCheck(segment_entry);
-    }
-    status_ = DBTStatus::kEnable;
-}
-
-void DBTCompactionAlg::Disable() {
-    std::unique_lock lock(mtx_);
-    cv_.wait(lock, [this]() { return status_ != DBTStatus::kRunning; });
-    status_ = DBTStatus::kDisable;
 }
 
 } // namespace infinity

@@ -26,6 +26,7 @@ import extra_ddl_info;
 import entry_list;
 import meta_entry_interface;
 import cleanup_scanner;
+import meta_info;
 
 namespace infinity {
 
@@ -48,43 +49,56 @@ public:
     // Getter
     inline TableEntry *GetTableEntry() const { return table_entry_; }
 
-    Tuple<TableIndexEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
-
-    Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
-
-private:
-    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(const SharedPtr<IndexBase> &index_base,
+    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                           const SharedPtr<IndexBase> &index_base,
+                                                           const SharedPtr<String> &table_entry_dir,
                                                            ConflictType conflict_type,
                                                            TransactionID txn_id,
                                                            TxnTimeStamp begin_ts,
-                                                           TxnManager *txn_mgr,
-                                                           bool is_replay,
-                                                           String replay_table_index_dir);
+                                                           TxnManager *txn_mgr);
 
-    Tuple<TableIndexEntry *, Status>
-    DropTableIndexEntry(ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<SharedPtr<TableIndexEntry>, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                                  ConflictType conflict_type,
+                                                                  SharedPtr<String> index_name,
+                                                                  TransactionID txn_id,
+                                                                  TxnTimeStamp begin_ts,
+                                                                  TxnManager *txn_mgr);
 
+    Tuple<SharedPtr<TableIndexInfo>, Status>
+    GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<TableIndexEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    }
+
+    Tuple<TableIndexEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return index_entry_list_.GetEntryNolock(txn_id, begin_ts);
+    }
+
+    void DeleteEntry(TransactionID txn_id);
+
+    // replay
+    TableIndexEntry *CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts);
+
+    void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    void DropEntryReplay(std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
+
+    TableIndexEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+private:
     SharedPtr<String> ToString();
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableIndexMeta> Deserialize(const nlohmann::json &index_def_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
-    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
-
-    void MergeFrom(TableIndexMeta &other);
-
-    Tuple<TableIndexEntry *, Status> CreateTableIndexEntryInternal(const SharedPtr<IndexBase> &index_base,
-                                                                   TransactionID txn_id,
-                                                                   TxnTimeStamp begin_ts,
-                                                                   TxnManager *txn_mgr,
-                                                                   bool is_replay,
-                                                                   String replay_table_index_dir);
-
-    Tuple<TableIndexEntry *, Status> DropTableIndexEntryInternal(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
-
 public:
-    String index_name() const { return *index_name_; }
+    const SharedPtr<String> &index_name() const { return index_name_; }
 
 private:
     SharedPtr<String> index_name_{};
@@ -101,8 +115,12 @@ public:
     List<SharedPtr<TableIndexEntry>> &index_entry_list() { return index_entry_list_.entry_list_; }
 
 public:
-    void Cleanup() && override;
+    void Cleanup() override;
 
-    bool PickCleanup(CleanupScanner *scanner) override ;
+    bool PickCleanup(CleanupScanner *scanner) override;
+
+    void PickCleanupBySegments(const Vector<SegmentID> &segment_ids, CleanupScanner *scanner);
+
+    bool Empty() override { return index_entry_list_.Empty(); }
 };
 } // namespace infinity

@@ -12,21 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <tuple>
+
 module background_process;
 
 import stl;
 import bg_task;
 import compact_segments_task;
-import cleanup_task;
+import update_segment_bloom_filter_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
 import wal_manager;
+import catalog;
 import third_party;
+import buffer_manager;
 
 namespace infinity {
 
-BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager) : wal_manager_(wal_manager) {}
+BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, Catalog *catalog) : wal_manager_(wal_manager), catalog_(catalog) {}
 
 void BGTaskProcessor::Start() {
     processor_thread_ = Thread([this] { Process(); });
@@ -34,6 +40,7 @@ void BGTaskProcessor::Start() {
 }
 
 void BGTaskProcessor::Stop() {
+    LOG_INFO("Background processor is stopping.");
     SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
@@ -45,49 +52,61 @@ void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(st
 
 void BGTaskProcessor::Process() {
     bool running{true};
+    Deque<SharedPtr<BGTask>> tasks;
     while (running) {
-        SharedPtr<BGTask> bg_task = task_queue_.DequeueReturn();
+        task_queue_.DequeueBulk(tasks);
+        for (const auto &bg_task : tasks) {
+            switch (bg_task->type_) {
+                case BGTaskType::kStopProcessor: {
+                    LOG_INFO("Stop the background processor");
+                    running = false;
+                    break;
+                }
+                case BGTaskType::kForceCheckpoint: {
+                    LOG_TRACE("Force checkpoint in background");
+                    ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
+                    auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
+                    wal_manager_->Checkpoint(force_ckp_task, max_commit_ts, wal_size);
+                    LOG_TRACE("Force checkpoint in background done");
+                    break;
+                }
+                case BGTaskType::kAddDeltaEntry: {
+                    auto *task = static_cast<AddDeltaEntryTask *>(bg_task.get());
+                    catalog_->AddDeltaEntry(std::move(task->delta_entry_), task->wal_size_);
+                    break;
+                }
+                case BGTaskType::kCheckpoint: {
+                    LOG_TRACE("Checkpoint in background");
+                    auto *task = static_cast<CheckpointTask *>(bg_task.get());
+                    bool is_full_checkpoint = task->is_full_checkpoint_;
+                    auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
+                    wal_manager_->Checkpoint(is_full_checkpoint, max_commit_ts, wal_size);
+                    LOG_TRACE("Checkpoint in background done");
+                    break;
+                }
+                case BGTaskType::kCleanup: {
+                    LOG_TRACE("Cleanup in background");
+                    auto task = static_cast<CleanupTask *>(bg_task.get());
+                    task->Execute();
+                    LOG_TRACE("Cleanup in background done");
+                    break;
+                }
+                case BGTaskType::kUpdateSegmentBloomFilterData: {
+                    LOG_TRACE("Update segment bloom filter");
+                    auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());
+                    task->Execute();
+                    LOG_TRACE("Update segment bloom filter done");
+                    break;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
+                    break;
+                }
+            }
 
-        switch (bg_task->type_) {
-            case BGTaskType::kTryCheckpoint: {
-                wal_manager_->Checkpoint();
-                break;
-            }
-            case BGTaskType::kForceCheckpoint: {
-                ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
-                wal_manager_->Checkpoint(force_ckp_task);
-                break;
-            }
-            case BGTaskType::kStopProcessor: {
-                running = false;
-                break;
-            }
-            case BGTaskType::kCatalogDeltaOpsMerge: {
-                CatalogDeltaOpsMergeTask *task = static_cast<CatalogDeltaOpsMergeTask *>(bg_task.get());
-                auto &local_catalog_ops = task->local_catalog_delta_entry_;
-                auto *catalog = task->catalog_;
-                catalog->global_catalog_delta_entry_->Merge(std::move(local_catalog_ops));
-                break;
-            }
-            case BGTaskType::kCompactSegments: {
-                auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
-                task->BeginTxn();
-                task->Execute();
-                task->CommitTxn();
-                break;
-            }
-            case BGTaskType::kCleanup: {
-                auto task = static_cast<CleanupTask *>(bg_task.get());
-                task->Execute();
-                break;
-            }
-            case BGTaskType::kInvalid: {
-                UnrecoverableError("Invalid background task");
-                break;
-            }
+            bg_task->Complete();
         }
-
-        bg_task->Complete();
+        tasks.clear();
     }
 }
 

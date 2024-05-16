@@ -1219,6 +1219,60 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
 
 void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (show_node->scan_type()) {
+        case ShowType::kShowDatabase: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW DATABASE ";
+            } else {
+                show_str = "SHOW DATABASE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowTable: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW TABLES ";
+            } else {
+                show_str = "SHOW TABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowIndex: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW TABLES ";
+            } else {
+                show_str = "SHOW TABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kShowTables: {
             String show_str;
             if (intent_size != 0) {
@@ -1269,7 +1323,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             result->emplace_back(MakeShared<String>(show_str));
 
             String show_column_schema_str = String(intent_size, ' ');
-            show_column_schema_str += " - schema: ";
+            show_column_schema_str += " - database: ";
             show_column_schema_str += show_node->schema_name();
             result->emplace_back(MakeShared<String>(show_column_schema_str));
 
@@ -1382,53 +1436,116 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             }
 
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [path, size]";
+            output_columns_str += " - output columns: [id, status, size]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowSessionStatus: {
+        case ShowType::kShowSegment: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW SESSION STATUS ";
+                show_str += "-> SHOW SEGMENT ";
             } else {
-                show_str = "SHOW SESSION STATUS ";
+                show_str = "SHOW SEGMENT ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
+            String show_segment_str = String(intent_size, ' ');
+            show_segment_str += " - segment: " + std::to_string(*show_node->segment_id());
+            result->emplace_back(MakeShared<String>(show_segment_str));
+
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [name, value]";
+            output_columns_str +=
+                " - output columns: [id, status, dir, size, block_count, row_capacity, row_count, actual_row_count, room, column_count]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowGlobalStatus: {
+        case ShowType::kShowBlocks: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW GLOBAL STATUS ";
+                show_str += "-> SHOW BLOCKS ";
             } else {
-                show_str = "SHOW GLOBAL STATUS ";
+                show_str = "SHOW BLOCKS ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
+            if (show_node->segment_id().has_value()) {
+                String output_columns_str = String(intent_size, ' ');
+                output_columns_str += " - segment: " + std::to_string(*show_node->segment_id());
+                result->emplace_back(MakeShared<String>(output_columns_str));
+            }
+
             String output_columns_str = String(intent_size, ' ');
-            output_columns_str += " - output columns: [name, value]";
+            output_columns_str += " - output columns: [id, size, row_count]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        case ShowType::kShowVar: {
+        case ShowType::kShowBlock: {
             String show_str;
             if (intent_size != 0) {
                 show_str = String(intent_size - 2, ' ');
-                show_str += "-> SHOW VAR ";
+                show_str += "-> SHOW BLOCK ";
             } else {
-                show_str = "SHOW VAR ";
+                show_str = "SHOW BLOCK ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String show_segment_str = String(intent_size, ' ');
+            show_segment_str += " - segment: " + std::to_string(*show_node->segment_id());
+            result->emplace_back(MakeShared<String>(show_segment_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [id, path, size, row_capacity, row_count, checkpoint_row_count, column_count, checkpoint_ts]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowBlockColumn: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW BLOCK COLUMN";
+            } else {
+                show_str = "SHOW BLOCK COLUMN";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String show_segment_str = String(intent_size, ' ');
+            show_segment_str += " - segment: " + std::to_string(*show_node->segment_id());
+            result->emplace_back(MakeShared<String>(show_segment_str));
+
+            String show_block_str = String(intent_size, ' ');
+            show_block_str += " - block: " + std::to_string(*show_node->block_id());
+            result->emplace_back(MakeShared<String>(show_block_str));
+
+            String show_column_str = String(intent_size, ' ');
+            show_column_str += " - column: " + std::to_string(*show_node->column_id());
+            result->emplace_back(MakeShared<String>(show_column_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [id, path, size, row_capacity, row_count, checkpoint_row_count, column_count, checkpoint_ts]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowSessionVariable: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW SESSION VARIABLE ";
+            } else {
+                show_str = "SHOW SESSION VARIABLE ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1437,6 +1554,70 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
 
             String output_columns_str = String(intent_size, ' ');
             output_columns_str += fmt::format(" - variable: {}", show_node->object_name());
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowSessionVariables: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW SESSION VARIABLES ";
+            } else {
+                show_str = "SHOW SESSION VARIABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+            break;
+        }
+        case ShowType::kShowGlobalVariable: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW GLOBAL VARIABLE ";
+            } else {
+                show_str = "SHOW GLOBAL VARIABLE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += fmt::format(" - variable: {}", show_node->object_name());
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowGlobalVariables: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW GLOBAL VARIABLES ";
+            } else {
+                show_str = "SHOW GLOBAL VARIABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+            break;
+        }
+        case ShowType::kShowConfig: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW CONFIG ";
+            } else {
+                show_str = "SHOW CONFIG ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += fmt::format(" - config: {}", show_node->object_name());
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
@@ -1773,13 +1954,6 @@ void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr
         optimize_header_str = "OPTIMIZE ";
     }
 
-    switch (optimize_node->optimize_type()) {
-        case OptimizeType::kIRS:
-            optimize_header_str += "DATA (";
-            optimize_header_str += std::to_string(optimize_node->node_id());
-            optimize_header_str += ")";
-            break;
-    }
     result->emplace_back(MakeShared<String>(optimize_header_str));
 }
 

@@ -58,22 +58,36 @@ import block_entry;
 import block_column_entry;
 import table_index_entry;
 import base_entry;
-
-class WalReplayTest : public BaseTest {
-    void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
-
-    void TearDown() override {
-        system("tree  /tmp/infinity");
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
-    }
-};
+import compilation_config;
 
 using namespace infinity;
 
-TEST_F(WalReplayTest, WalReplayDatabase) {
+class WalReplayTest : public BaseTest {
+protected:
+    static std::shared_ptr<std::string> config_path() {
+        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
+    }
+
+    void SetUp() override {
+        RemoveDbDirs();
+        tree_cmd = "tree ";
+        tree_cmd += GetHomeDir();
+    }
+
+    void TearDown() override {
+        // system(tree_cmd.c_str());
+        RemoveDbDirs();
+    }
+
+    String tree_cmd;
+};
+
+TEST_F(WalReplayTest, wal_replay_database) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -81,87 +95,84 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         BGTaskProcessor *bg_processor = storage->bg_processor();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
             txn->CreateDatabase("db1", ConflictType::kIgnore);
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
             txn->CreateDatabase("db2", ConflictType::kIgnore);
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
             txn->CreateDatabase("db3", ConflictType::kIgnore);
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
             txn->CreateDatabase("db4", ConflictType::kIgnore);
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
             txn->CreateDatabase("db5", ConflictType::kIgnore);
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
             txn->DropDatabase("db1", ConflictType::kIgnore);
             txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
             Status status = txn->DropDatabase("db4", ConflictType::kError);
             EXPECT_EQ(status.ok(), true);
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
             Status status = txn->CreateDatabase("db1", ConflictType::kError);
             EXPECT_EQ(status.ok(), true);
             txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
-TEST_F(WalReplayTest, WalReplayTables) {
+TEST_F(WalReplayTest, wal_replay_tables) {
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -189,8 +200,10 @@ TEST_F(WalReplayTest, WalReplayTables) {
         }
     }
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -198,39 +211,34 @@ TEST_F(WalReplayTest, WalReplayTables) {
         BGTaskProcessor *bg_processor = storage->bg_processor();
 
         {
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
-            auto *txn2 = txn_mgr->CreateTxn();
-            txn2->Begin();
-            Status status2 = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl2"), columns);
+            auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status2 = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status2.ok());
             txn_mgr->CommitTxn(txn2);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->DropTableCollectionByName("default", "tbl2", ConflictType::kIgnore);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+            Status status = txn->DropTableCollectionByName("default_db", "tbl2", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
-            auto *txn3 = txn_mgr->CreateTxn();
-            txn3->Begin();
-            Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl3"), columns);
+            auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn3);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -238,45 +246,52 @@ TEST_F(WalReplayTest, WalReplayTables) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl2"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->DropTableCollectionByName("default", "tbl3", ConflictType::kIgnore);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+            Status status = txn->DropTableCollectionByName("default_db", "tbl3", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
-TEST_F(WalReplayTest, WalReplayAppend) {
+TEST_F(WalReplayTest, wal_replay_append) {
+    SizeT row_count = 2;
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -311,33 +326,29 @@ TEST_F(WalReplayTest, WalReplayAppend) {
         }
 
         {
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
-            auto *txn3 = txn_mgr->CreateTxn();
-            txn3->Begin();
-            Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl3"), columns);
+            auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn3->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn3);
         }
         {
-            auto tbl4_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl4"), columns);
-            auto *txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
-            Status status = txn4->CreateTable("default", std::move(tbl4_def), ConflictType::kIgnore);
+            auto tbl4_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl4"), columns);
+            auto *txn4 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn4->CreateTable("default_db", std::move(tbl4_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn4);
         }
         {
-            auto *txn5 = txn_mgr->CreateTxn();
+            auto *txn5 = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
             SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
-            SizeT row_count = 2;
 
             // Prepare the input data block
             Vector<SharedPtr<DataType>> column_types;
@@ -359,27 +370,31 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             }
             input_block->Finalize();
             EXPECT_EQ(input_block->Finalized(), true);
-            txn5->Begin();
-            txn5->Append("default", "tbl4", input_block);
+            auto [table_entry, status] = txn5->GetTableByName("default_db", "tbl4");
+            EXPECT_TRUE(status.ok());
+            txn5->Append(table_entry, input_block);
             txn_mgr->CommitTxn(txn5);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     // Restart the db instance
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -398,77 +413,65 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             }
         }
         {
-            auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl5"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl5"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-            Status status = txn->CreateTable("default", std::move(tbl5_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl5_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
         }
-        //        {
-        //            auto *txn = txn_mgr->CreateTxn();
-        //            txn->Begin();
-        //            Vector<ColumnID> column_ids{0, 1, 2};
-        //            UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
-        //
-        //            txn->GetMetaTableState(read_table_meta.get(), "default", "tbl4", column_ids);
-        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-        //
-        //            EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
-        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-        //            for (const auto &segment_pair : read_table_meta->segment_map_) {
-        //                EXPECT_EQ(segment_pair.first, 0);
-        //                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-        //                EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 1);
-        //                EXPECT_EQ(segment_pair.second.block_map_.size(), 1);
-        //                for (const auto &block_pair : segment_pair.second.block_map_) {
-        //                    //                    EXPECT_EQ(block_pair.first, 0);
-        //                    EXPECT_NE(block_pair.second.block_entry_, nullptr);
-        //
-        //                    EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(0));
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(1));
-        //                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(2));
-        //
-        //                    BlockColumnEntry *column0 = block_pair.second.column_data_map_.at(0).block_column_;
-        //                    BlockColumnEntry *column1 = block_pair.second.column_data_map_.at(1).block_column_;
-        //                    BlockColumnEntry *column2 = block_pair.second.column_data_map_.at(2).block_column_;
-        //
-        //                    SizeT row_count = block_pair.second.block_entry_->row_count_;
-        //                    ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_manager);
-        //                    i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_EQ(col0_ptr[row], (i8)(row));
-        //                    }
-        //
-        //                    ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_manager);
-        //                    i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_EQ(col1_ptr[row], (i64)(row));
-        //                    }
-        //
-        //                    ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_manager);
-        //                    f64 *col2_ptr = (f64 *)(col2_obj.GetAll());
-        //                    for (SizeT row = 0; row < row_count; ++row) {
-        //                        EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-        //                    }
-        //                }
-        //            }
-        //        }
+        {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
+            TxnTimeStamp begin_ts = txn->BeginTS();
+            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl4");
+            EXPECT_NE(table_entry, nullptr);
 
+            auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
+            EXPECT_NE(segment_entry, nullptr);
+            EXPECT_EQ(segment_entry->segment_id(), 0u);
+            EXPECT_EQ(segment_entry->row_count(), row_count);
+
+            auto *block_entry = segment_entry->GetBlockEntryByID(0).get();
+            EXPECT_EQ(block_entry->block_id(), 0u);
+            EXPECT_EQ(block_entry->row_count(), row_count);
+
+            BlockColumnEntry *column0 = block_entry->GetColumnBlockEntry(0);
+            BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
+            BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
+
+            ColumnVector col0 = column0->GetColumnVector(storage->buffer_manager());
+            ColumnVector col1 = column1->GetColumnVector(storage->buffer_manager());
+            ColumnVector col2 = column2->GetColumnVector(storage->buffer_manager());
+
+            for (SizeT i = 0; i < row_count; ++i) {
+                Value v0 = col0.GetValue(i);
+                EXPECT_EQ(v0.GetValue<TinyIntT>(), static_cast<i8>(i));
+
+                Value v1 = col1.GetValue(i);
+                EXPECT_EQ(v1.GetValue<BigIntT>(), static_cast<i64>(i));
+
+                Value v2 = col2.GetValue(i);
+                EXPECT_EQ(v2.GetValue<DoubleT>(), static_cast<f64>(i));
+            }
+
+            txn_mgr->CommitTxn(txn);
+        }
+#ifdef INFINITY_DEBUG
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
-TEST_F(WalReplayTest, WalReplayImport) {
+TEST_F(WalReplayTest, wal_replay_import) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -505,46 +508,41 @@ TEST_F(WalReplayTest, WalReplayImport) {
         int column_count = columns.size();
 
         {
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
-            auto *txn2 = txn_mgr->CreateTxn();
-            txn2->Begin();
-            Status status = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl2"), columns);
+            auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn2->CreateTable("default_db", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn2);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->CreateTxn();
-            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
-            txn->Begin();
-            Status status = txn->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl3"), columns);
+            Status status = txn->CreateTable("default_db", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn4->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = Catalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0u);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4, false);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4);
             EXPECT_EQ(segment_entry->segment_id(), 0u);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn4);
             // auto last_block_entry = segment_entry->GetLastEntry();
@@ -577,7 +575,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 auto column_type1 = block_column_entry0->column_type().get();
                 EXPECT_EQ(column_type1->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = columns_vector[0]->data_type_size_;
-                EXPECT_EQ(data_type_size, 1);
+                EXPECT_EQ(data_type_size, 1u);
                 block_column_entry0->Append(columns_vector[0].get(), 0, 1, buffer_manager);
             }
             {
@@ -585,7 +583,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 auto column_type2 = block_column_entry1->column_type().get();
                 EXPECT_EQ(column_type2->type(), LogicalType::kBigInt);
                 SizeT data_type_size = columns_vector[1]->data_type_size_;
-                EXPECT_EQ(data_type_size, 8);
+                EXPECT_EQ(data_type_size, 8u);
                 block_column_entry1->Append(columns_vector[1].get(), 0, 1, buffer_manager);
             }
             {
@@ -593,28 +591,31 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 auto column_type3 = block_column_entry2->column_type().get();
                 EXPECT_EQ(column_type3->type(), LogicalType::kDouble);
                 SizeT data_type_size = columns_vector[2]->data_type_size_;
-                EXPECT_EQ(data_type_size, 8);
+                EXPECT_EQ(data_type_size, 8u);
                 block_column_entry2->Append(columns_vector[2].get(), 0, 1, buffer_manager);
             }
 
             block_entry->IncreaseRowCount(1);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto txn_store = txn4->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn4, segment_entry);
             txn_mgr->CommitTxn(txn4);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     // Restart the db instance
-    system("tree  /tmp/infinity");
+    system(tree_cmd.c_str());
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -622,19 +623,18 @@ TEST_F(WalReplayTest, WalReplayImport) {
         BufferManager *buffer_manager = storage->buffer_manager();
 
         {
-            auto txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn->BeginTS();
 
             Vector<ColumnID> column_ids{0, 1, 2};
-            auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
-            auto *segment_entry = table_entry->GetSegmentByID(0, begin_ts);
+            auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
             EXPECT_NE(segment_entry, nullptr);
-            EXPECT_EQ(segment_entry->segment_id(), 0);
-            auto *block_entry = segment_entry->GetBlockEntryByID(0);
-            EXPECT_EQ(block_entry->block_id(), 0);
-            EXPECT_EQ(block_entry->row_count(), 1);
+            EXPECT_EQ(segment_entry->segment_id(), 0u);
+            auto *block_entry = segment_entry->GetBlockEntryByID(0).get();
+            EXPECT_EQ(block_entry->block_id(), 0u);
+            EXPECT_EQ(block_entry->row_count(), 1u);
 
             BlockColumnEntry *column0 = block_entry->GetColumnBlockEntry(0);
             BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
@@ -658,17 +658,22 @@ TEST_F(WalReplayTest, WalReplayImport) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
-TEST_F(WalReplayTest, WalReplayCompact) {
-    int test_segment_n = 2;
+// FIXME: The test case diverges from the original intent.
+TEST_F(WalReplayTest, wal_replay_compact) {
+    u64 test_segment_n = 2;
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -687,25 +692,23 @@ TEST_F(WalReplayTest, WalReplayCompact) {
         }
         int column_count = 1;
         { // create table
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
 
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn);
         }
 
-        for (int i = 0; i < test_segment_n; ++i) { // add 2 segments
-            auto txn2 = txn_mgr->CreateTxn();
-            txn2->Begin();
+        for (u64 i = 0; i < test_segment_n; ++i) { // add 2 segments
+            auto txn2 = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
 
-            auto [table_entry, status] = txn2->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn2->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2, true);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2);
             EXPECT_EQ(segment_entry->segment_id(), i);
 
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn2);
@@ -724,22 +727,20 @@ TEST_F(WalReplayTest, WalReplayCompact) {
                 auto column_type0 = block_column_entry0->column_type().get();
                 EXPECT_EQ(column_type0->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = column_vectors[0]->data_type_size_;
-                EXPECT_EQ(data_type_size, 1);
+                EXPECT_EQ(data_type_size, 1u);
                 block_column_entry0->Append(column_vectors[0].get(), 0, 1, buffer_manager);
                 block_entry->IncreaseRowCount(1);
             }
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto txn_store = txn2->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn2, segment_entry);
             txn_mgr->CommitTxn(txn2);
         }
 
         { // add compact
-            auto txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
+            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn4->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -749,45 +750,57 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             txn_mgr->CommitTxn(txn4);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     // Restart db instance
-    system("tree  /tmp/infinity");
+    system(tree_cmd.c_str());
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
             TxnTimeStamp begin_ts = txn->BeginTS();
 
-            auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn->GetTableByName("default_db", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
-            for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment = table_entry->GetSegmentByID(i, begin_ts);
+            for (u64 i = 0; i < test_segment_n; ++i) {
+                auto segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment, nullptr);
                 EXPECT_EQ(segment->status(), SegmentStatus::kDeprecated);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
-            EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);
+            EXPECT_EQ(compact_segment->row_count(), test_segment_n);
+
+            auto block_entry = compact_segment->GetBlockEntryByID(0).get();
+            EXPECT_NE(block_entry, nullptr);
+            EXPECT_EQ(block_entry->row_count(), test_segment_n);
+            txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
-TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
+TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -805,17 +818,15 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
                     MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
                 columns.emplace_back(column_def_ptr);
             }
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("test_annivfflat"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kError);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_annivfflat"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         // CreateIndex
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
             Vector<String> columns1{"col1"};
             Vector<InitParameter *> parameters1;
@@ -828,68 +839,71 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
                 delete init_parameter;
             }
 
-            const String &db_name = "default";
+            const String &db_name = "default_db";
             const String &table_name = "test_annivfflat";
             ConflictType conflict_type = ConflictType::kError;
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
                 auto result = txn->CreateIndexDef(table_entry, index_base_ivf, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
                 txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
+                txn->CreateIndexFinish(table_entry, table_index_entry);
             }
             txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system("tree  /tmp/infinity");
+    system(tree_cmd.c_str());
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("get index"));
             Vector<ColumnID> column_ids{0};
-            auto [table_entry, status] = txn->GetTableEntry("default", "test_annivfflat");
-            EXPECT_NE(table_entry, nullptr);
-            auto table_index_meta = table_entry->index_meta_map()["idx1"].get();
-            EXPECT_NE(table_index_meta, nullptr);
-            EXPECT_EQ(table_index_meta->index_name(), "idx1");
-            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
-            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
-            EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "idx1");
-            auto entry_back = table_index_meta->index_entry_list().back().get();
-            EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
+            auto [table_entry, status1] = txn->GetTableByName("default_db", "test_annivfflat");
+            EXPECT_TRUE(status1.ok());
+            auto [index_entry, status2] = table_entry->GetIndex("idx1", txn->TxnID(), txn->BeginTS());
+            ASSERT_TRUE(status2.ok());
+            EXPECT_EQ(*index_entry->index_base()->index_name_, "idx1");
             txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
-TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
+TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -908,17 +922,15 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
                     MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
                 columns.emplace_back(column_def_ptr);
             }
-            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("test_hnsw"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kError);
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("test_hnsw"), columns);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kError);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         // CreateIndex
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
 
             Vector<String> columns1{"col1"};
             Vector<InitParameter *> parameters1;
@@ -934,60 +946,64 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
                 delete init_parameter;
             }
 
-            const String &db_name = "default";
+            const String &db_name = "default_db";
             const String &table_name = "test_hnsw";
             ConflictType conflict_type = ConflictType::kError;
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
                 auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
                 txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
+                txn->CreateIndexFinish(table_entry, table_index_entry);
             }
             txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
-    system("tree  /tmp/infinity");
+    system(tree_cmd.c_str());
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
+#endif
+        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto txn = txn_mgr->CreateTxn();
-            txn->Begin();
+            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"));
             Vector<ColumnID> column_ids{0};
-            auto [table_entry, status] = txn->GetTableEntry("default", "test_hnsw");
+            auto [table_entry, status] = txn->GetTableByName("default_db", "test_hnsw");
             EXPECT_NE(table_entry, nullptr);
             auto table_index_meta = table_entry->index_meta_map()["hnsw_index"].get();
             EXPECT_NE(table_index_meta, nullptr);
-            EXPECT_EQ(table_index_meta->index_name(), "hnsw_index");
-            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
+            EXPECT_EQ(*table_index_meta->index_name(), "hnsw_index");
+            EXPECT_EQ(table_index_meta->index_entry_list().size(), 1u);
             auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
             EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "hnsw_index");
-            auto entry_back = table_index_meta->index_entry_list().back().get();
-            EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
             txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }

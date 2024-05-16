@@ -33,6 +33,7 @@ class Txn;
 export struct ViewEntry : public BaseEntry {
 public:
     explicit ViewEntry(const SharedPtr<String> &base_dir,
+                       bool deleted,
                        SharedPtr<CreateViewInfo> create_view_info,
                        SharedPtr<String> view_name,
                        SharedPtr<Vector<SharedPtr<DataType>>> column_types,
@@ -40,7 +41,7 @@ public:
                        ViewMeta *view_meta,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kView), create_view_info_(create_view_info), base_dir_(base_dir), view_name_(std::move(view_name)),
+        : BaseEntry(EntryType::kView, deleted, ""), create_view_info_(create_view_info), base_dir_(base_dir), view_name_(std::move(view_name)),
           column_types_(std::move(column_types)), column_names_(std::move(column_names)), view_meta_(view_meta) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;

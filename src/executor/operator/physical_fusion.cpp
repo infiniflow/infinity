@@ -83,7 +83,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
     Map<RowID, SizeT> rrf_map; // row_id to index of rrf_vec_
     Vector<u64> fragment_ids;
     SizeT fragment_idx = 0;
-    // 1 caclulate every doc's ranks
+    // 1 calculate every doc's ranks
     for (auto &[fragment_id, input_blocks] : fusion_operator_state->input_data_blocks_) {
         fragment_ids.push_back(fragment_id);
         SizeT base_rank = 1;
@@ -113,7 +113,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         fragment_idx++;
     }
 
-    // 2 caclulate every doc's score
+    // 2 calculate every doc's score
     for (auto &doc : rrf_vec) {
         doc.score = 0.0F;
         for (auto &rank : doc.ranks) {

@@ -2,7 +2,10 @@ name: tests
 
 on:
   push:
-    branches: [ main, libcxx ]
+    branches:
+      - 'main'
+      - '*.*.*'
+      - 'libcxx'
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -23,7 +26,7 @@ jobs:
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-    runs-on: [ "self-hosted" ]
+    runs-on: [ "self-hosted", "debug" ]
     steps:
       # https://github.com/hmarr/debug-action
       #- uses: hmarr/debug-action@v2
@@ -56,29 +59,63 @@ jobs:
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/test_main"
+        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
+
+      - name: Collect infinity unit test debug output
+        run: cat unittest_debug.log 2>/dev/null || true
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
 
-      - name: Start infinity debug version
+      - name: Start infinity pysdk & http_api debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
-      - name: pysdk & sqllogictest debug version
+      - name: pysdk test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
+
+      - name: parallel test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
+
+      - name: http_api test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
+
+      - name: Stop infinity pysdk & http_api debug
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: |
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
+
+      - name: Start infinity sqllogictest debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          # Run a command in the background
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+
+      - name: sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-      - name: Stop infinity debug
+      - name: Stop infinity sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-debug/src/infinity)
+        run: |
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
 
       - name: Collect infinity debug output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat debug.log 2>/dev/null || true
 
   release_tests:
@@ -119,28 +156,62 @@ jobs:
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/test_main"
+        run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
+      
+      - name: Collect infinity unit test release output
+        run: cat unittest_release.log 2>/dev/null || true
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
 
-      - name: Start infinity release version
+      - name: Start infinity pysdk & http_api release version
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+          # Run a command in the background
+           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
-      - name: pysdk & sqllogictest release version
+      - name: pysdk test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
+
+      - name: parallel test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
+
+      - name: http_api test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
+
+      - name: Stop infinity pysdk & http_api release
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: |
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
+
+      - name: Start infinity sqllogictest release version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+
+      - name: sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-      - name: Stop infinity release
+      - name: Stop infinity sqllogictest release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-release/src/infinity)
+        run: |
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
+          if [ $? -ne 0 ]; then
+            echo "Failed to kill infinity debug version"
+            exit 1
+          fi
 
       - name: Collect infinity release output
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat release.log 2>/dev/null || true
 
       - name: Prepare sift dataset

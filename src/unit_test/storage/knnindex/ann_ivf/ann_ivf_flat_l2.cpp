@@ -21,8 +21,30 @@ import ann_ivf_flat;
 import bitmask;
 import knn_expr;
 import internal_types;
+import infinity_context;
+import global_resource_usage;
 
-class AnnIVFFlatL2Test : public BaseTest {};
+class AnnIVFFlatL2Test : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+};
 
 TEST_F(AnnIVFFlatL2Test, test1) {
     using namespace infinity;

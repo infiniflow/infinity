@@ -24,16 +24,13 @@ import hnsw_common;
 import index_hnsw;
 
 import index_base;
-import dist_func_l2;
-import dist_func_ip;
-import lvq_store;
-import plain_store;
 import third_party;
 import logger;
 import logical_type;
 import embedding_info;
 import create_index_info;
 import internal_types;
+import abstract_hnsw;
 
 namespace infinity {
 HnswFileWorker::~HnswFileWorker() {
@@ -57,56 +54,15 @@ void HnswFileWorker::AllocateInMemory() {
     }
 
     SizeT dimension = GetDimension();
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
     SizeT M = index_hnsw->M_;
     SizeT ef_c = index_hnsw->ef_construction_;
-    auto AllocateData = [&](auto *hnsw_index) { data_ = static_cast<void *>(hnsw_index); };
-
-    switch (GetType()) {
+    EmbeddingDataType embedding_type = GetType();
+    switch (embedding_type) {
         case kElemFloat: {
-            switch (index_hnsw->encode_type_) {
-                case HnswEncodeType::kPlain: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
-                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
-                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid metric type");
-                        }
-                    }
-                    break;
-                }
-                case HnswEncodeType::kLVQ: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
-                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
-                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid metric type.");
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Invalid metric type");
-                }
-            }
+            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(nullptr, index_hnsw);
+            abstract_hnsw.Make(chunk_size_, max_chunk_num_, dimension, M, ef_c);
+            data_ = abstract_hnsw.RawPtr();
             break;
         }
         default: {
@@ -119,54 +75,12 @@ void HnswFileWorker::FreeInMemory() {
     if (!data_) {
         UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
-    auto FreeData = [&](auto *hnsw_index) { delete hnsw_index; };
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
     EmbeddingDataType embedding_type = GetType();
     switch (embedding_type) {
         case kElemFloat: {
-            switch (index_hnsw->encode_type_) {
-                case HnswEncodeType::kPlain: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
-                            FreeData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
-                            FreeData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid metric type");
-                        }
-                    }
-                    break;
-                }
-                case HnswEncodeType::kLVQ: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
-                            FreeData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
-                            FreeData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid metric type");
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Invalid metric type");
-                }
-            }
+            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(data_, index_hnsw);
+            abstract_hnsw.Free();
             break;
         }
         default: {
@@ -177,57 +91,16 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
+void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     if (!data_) {
         UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
-    auto SaveData = [&](auto *hnsw_index) { hnsw_index->Save(*file_handler_); };
-    switch (GetType()) {
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
+    EmbeddingDataType embedding_type = GetType();
+    switch (embedding_type) {
         case kElemFloat: {
-            switch (index_hnsw->encode_type_) {
-                case HnswEncodeType::kPlain: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
-                            SaveData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
-                            SaveData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid metric type");
-                        }
-                    }
-                    break;
-                }
-                case HnswEncodeType::kLVQ: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
-                            SaveData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
-                            SaveData(static_cast<Hnsw *>(data_));
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid metric type");
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Invalid metric type");
-                }
-            }
+            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(data_, index_hnsw);
+            abstract_hnsw.Save(*file_handler_);
             break;
         }
         default: {
@@ -239,53 +112,13 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
 
 void HnswFileWorker::ReadFromFileImpl() {
     // TODO!! not save index parameter in index file.
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
-    auto LoadData = [&](auto *hnsw_index) { data_ = static_cast<void *>(hnsw_index); };
-    switch (GetType()) {
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
+    EmbeddingDataType embedding_type = GetType();
+    switch (embedding_type) {
         case kElemFloat: {
-            switch (index_hnsw->encode_type_) {
-                case HnswEncodeType::kPlain: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
-                            LoadData(Hnsw::Load(*file_handler_, {}).release());
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
-                            LoadData(Hnsw::Load(*file_handler_, {}).release());
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Metric type");
-                        }
-                    }
-                    break;
-                }
-                case HnswEncodeType::kLVQ: {
-                    switch (index_hnsw->metric_type_) {
-                        case MetricType::kMerticInnerProduct: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
-                            LoadData(Hnsw::Load(*file_handler_, {}).release());
-                            break;
-                        }
-                        case MetricType::kMerticL2: {
-                            using Hnsw =
-                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
-                            LoadData(Hnsw::Load(*file_handler_, {}).release());
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Invalid metric type");
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Invalid metric type");
-                }
-            }
+            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(nullptr, index_hnsw);
+            abstract_hnsw.Load(*file_handler_);
+            data_ = abstract_hnsw.RawPtr();
             break;
         }
         default: {

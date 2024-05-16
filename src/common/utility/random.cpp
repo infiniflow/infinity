@@ -16,17 +16,22 @@ module;
 
 #include <cstdlib>
 
-import stl;
-
 module random;
 
+import stl;
+import third_party;
+import logger;
+import local_file_system;
+import default_values;
+
 namespace infinity {
+
 namespace {
 String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 }
 
-String RandomString(SizeT len, u32 seed) {
-    srand(seed);
+String RandomString(SizeT len) {
+    // LOG_WARN(fmt::format("Set seed: {}", seed));
     String ret(len, '\0');
     for (SizeT i = 0; i < len; i++) {
         SizeT rand_i = random() % available_chars.size();
@@ -34,4 +39,22 @@ String RandomString(SizeT len, u32 seed) {
     }
     return ret;
 }
+
+SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
+    LocalFileSystem fs;
+    String result;
+    int cnt = 0;
+    static bool initialized = false;
+    if (!initialized) {
+        initialized = true;
+        srand(std::time(nullptr));
+    }
+    do {
+        result = fmt::format("{}/{}_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN), name);
+        ++cnt;
+    } while (!fs.CreateDirectoryNoExp(result));
+    LOG_TRACE(fmt::format("Created directory {} in {} times", result, cnt));
+    return MakeShared<String>(std::move(result));
+}
+
 } // namespace infinity

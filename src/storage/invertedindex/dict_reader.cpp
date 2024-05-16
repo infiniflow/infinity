@@ -43,16 +43,20 @@ DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatO
 
 DictionaryReader::~DictionaryReader() {
     if (data_ptr_ != nullptr) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
         int rc = MunmapFile(data_ptr_, data_len_);
         assert(rc == 0);
+#pragma clang diagnostic pop
     }
 }
 
 bool DictionaryReader::Lookup(const String &key, TermMeta &term_meta) {
     u64 val;
     bool found = fst_->Get((u8 *)key.c_str(), key.length(), val);
-    if (!found)
+    if (!found) {
         return false;
+    }
     u8 *data_cursor = data_ptr_ + val;
     SizeT left_size = data_len_ - val;
     meta_loader_.Load(data_cursor, left_size, term_meta);

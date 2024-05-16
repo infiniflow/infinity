@@ -2,6 +2,9 @@
 # description: Test update
 # group: [dml, update]
 
+statement ok
+DROP TABLE IF EXISTS products;
+
 # Parse only support
 statement ok
 CREATE TABLE products (product_no integer, price integer);
@@ -60,7 +63,13 @@ statement ok
 DROP TABLE products;
 
 statement ok
+DROP TABLE IF EXISTS T2;
+
+statement ok
 CREATE TABLE T2 (c1 boolean, c2 boolean);
 
 statement error
 UPDATE t2 SET c1 = 1 WHERE c2 = true;
+
+statement ok
+DROP TABLE T2;

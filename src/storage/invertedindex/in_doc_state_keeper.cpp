@@ -6,12 +6,13 @@ import stl;
 import memory_pool;
 import byte_slice;
 import in_doc_pos_state;
-import pos_list_decoder;
+import position_list_decoder;
 import posting_decoder;
 import inmem_posting_decoder;
-import inmem_pos_list_decoder;
+import inmem_position_list_decoder;
 import index_defines;
-import pos_list_format_option;
+import posting_list_format;
+import third_party;
 
 namespace infinity {
 InDocStateKeeper::InDocStateKeeper(InDocPositionState *state, MemoryPool *session_pool) : state_(state), session_pool_(session_pool) {}
@@ -31,7 +32,7 @@ void InDocStateKeeper::MoveToDoc(ttf_t current_ttf) {
     decoder->SkipTo(current_ttf, state_);
 }
 
-void InDocStateKeeper::MoveToSegment(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_begin, const PositionListFormatOption &option) {
+void InDocStateKeeper::MoveToSegment(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_begin, const PostingFormatOption &option) {
     PositionListDecoder *decoder = session_pool_
                                        ? (new ((session_pool_)->Allocate(sizeof(PositionListDecoder))) PositionListDecoder(option, session_pool_))
                                        : new PositionListDecoder(option, session_pool_);
@@ -40,7 +41,7 @@ void InDocStateKeeper::MoveToSegment(ByteSlice *pos_list, tf_t total_tf, u32 pos
     state_->SetPositionListDecoder(decoder);
 }
 
-void InDocStateKeeper::MoveToSegment(ByteSliceList *pos_list, tf_t total_tf, u32 pos_list_begin, const PositionListFormatOption &option) {
+void InDocStateKeeper::MoveToSegment(ByteSliceList *pos_list, tf_t total_tf, u32 pos_list_begin, const PostingFormatOption &option) {
     PositionListDecoder *decoder = session_pool_
                                        ? (new ((session_pool_)->Allocate(sizeof(PositionListDecoder))) PositionListDecoder(option, session_pool_))
                                        : new PositionListDecoder(option, session_pool_);

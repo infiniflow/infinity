@@ -785,6 +785,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNo
                                     logical_show->table_index(),
                                     logical_show->segment_id(),
                                     logical_show->block_id(),
+                                    logical_show->column_id(),
+                                    logical_show->index_name(),
                                     logical_operator->load_metas());
 }
 
@@ -792,6 +794,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<Logi
     SharedPtr<LogicalTableScan> logical_table_scan = static_pointer_cast<LogicalTableScan>(logical_operator);
     return MakeUnique<PhysicalTableScan>(logical_operator->node_id(),
                                          logical_table_scan->base_table_ref_,
+                                         std::move(logical_table_scan->fast_rough_filter_evaluator_),
                                          logical_operator->load_metas(),
                                          logical_table_scan->add_row_id_);
 }
@@ -803,6 +806,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
                                          logical_index_scan->index_filter_qualified_,
                                          std::move(logical_index_scan->column_index_map_),
                                          std::move(logical_index_scan->filter_execute_command_),
+                                         std::move(logical_index_scan->fast_rough_filter_evaluator_),
                                          logical_operator->load_metas(),
                                          logical_index_scan->add_row_id_);
 }
@@ -835,6 +839,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
     return MakeUnique<PhysicalMatch>(logical_match->node_id(),
                                      logical_match->base_table_ref_,
                                      logical_match->match_expr_,
+                                     logical_match->common_query_filter_,
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas());
 }
@@ -863,7 +868,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
     UniquePtr<PhysicalKnnScan> knn_scan_op = MakeUnique<PhysicalKnnScan>(logical_knn_scan->node_id(),
                                                                          logical_knn_scan->base_table_ref_,
                                                                          logical_knn_scan->knn_expression_,
-                                                                         logical_knn_scan->filter_expression_,
+                                                                         logical_knn_scan->common_query_filter_,
                                                                          logical_knn_scan->GetOutputNames(),
                                                                          logical_knn_scan->GetOutputTypes(),
                                                                          logical_knn_scan->knn_table_index_,

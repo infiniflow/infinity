@@ -31,6 +31,10 @@ export struct Bitmask {
 public:
     Bitmask();
 
+    Bitmask(const Bitmask &) = delete;
+
+    Bitmask(Bitmask &&right);
+
     ~Bitmask();
 
     void Reset();
@@ -73,6 +77,7 @@ public:
 
     bool operator==(const Bitmask &other) const;
     bool operator!=(const Bitmask &other) const { return !(*this == other); }
+    Bitmask &operator=(Bitmask &&right);
 
     // Estimated serialized size in bytes
     i32 GetSizeInBytes() const;
@@ -80,6 +85,13 @@ public:
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
     static SharedPtr<Bitmask> ReadAdv(char *&ptr, i32 maxbytes);
+
+    // Swap two bitmasks, used when swap two std::variant<std::vector, Bitmask>
+    friend void swap(infinity::Bitmask &left, infinity::Bitmask &right) {
+        std::swap(left.data_ptr_, right.data_ptr_);
+        std::swap(left.buffer_ptr, right.buffer_ptr);
+        std::swap(left.count_, right.count_);
+    }
 
 private:
     u64 *data_ptr_{nullptr};

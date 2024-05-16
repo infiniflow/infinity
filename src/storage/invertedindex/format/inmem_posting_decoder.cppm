@@ -2,7 +2,7 @@ module;
 
 export module inmem_posting_decoder;
 import inmem_doc_list_decoder;
-import inmem_pos_list_decoder;
+import inmem_position_list_decoder;
 
 namespace infinity {
 

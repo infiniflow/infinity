@@ -21,22 +21,40 @@ import stl;
 import data_access_state;
 import status;
 import internal_types;
+import index_base;
+import extra_ddl_info;
 
 namespace infinity {
 
 class Txn;
+struct Catalog;
+struct DBEntry;
 struct TableIndexEntry;
-struct FulltextIndexEntry;
 struct TableEntry;
 struct SegmentEntry;
+struct BlockEntry;
 class DataBlock;
-class SegmentColumnIndexEntry;
+class SegmentIndexEntry;
+class ChunkIndexEntry;
 class BGTaskProcessor;
 class TxnManager;
 enum class CompactSegmentsTaskType;
+class CatalogDeltaEntry;
+class BufferManager;
 
-struct TxnSegmentIndexStore {
-    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_entry_map_{};
+export struct TxnSegmentStore {
+public:
+    static TxnSegmentStore AddSegmentStore(SegmentEntry *segment_entry);
+
+    explicit TxnSegmentStore(SegmentEntry *segment_entry);
+
+    TxnSegmentStore() = default;
+
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, Txn *txn, bool set_sealed) const;
+
+public:
+    SegmentEntry *const segment_entry_ = nullptr;
+    HashMap<BlockID, BlockEntry *> block_entries_;
 };
 
 export struct TxnIndexStore {
@@ -44,59 +62,142 @@ public:
     explicit TxnIndexStore(TableIndexEntry *table_index_entry);
     TxnIndexStore() = default;
 
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const;
+
+    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+
+    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
+
+public:
     TableIndexEntry *const table_index_entry_{};
 
-    //    Vector<ColumnIndexEntry*> column_index_entry_{};
-    //
-    FulltextIndexEntry *fulltext_index_entry_{};
+    HashMap<SegmentID, SegmentIndexEntry *> index_entry_map_{};
+    Vector<ChunkIndexEntry *> chunk_index_entries_{};
 
-    HashMap<u64, HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>> index_entry_map_{}; // column_id -> segment_id -> segment_column_index_entry
+    Vector<Tuple<SegmentIndexEntry *, ChunkIndexEntry *, Vector<ChunkIndexEntry *>>> optimize_data_;
 };
 
 export struct TxnCompactStore {
-    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
+    Vector<Pair<TxnSegmentStore, Vector<SegmentEntry *>>> compact_data_;
 
     CompactSegmentsTaskType task_type_;
+
+    TxnCompactStore();
+    TxnCompactStore(CompactSegmentsTaskType type);
 };
 
 export class TxnTableStore {
 public:
-    explicit inline TxnTableStore(TableEntry *table_entry, Txn *txn) : table_entry_(table_entry), txn_(txn) {}
+    explicit inline TxnTableStore(Txn *txn, TableEntry *table_entry) : txn_(txn), table_entry_(table_entry) {}
+
+    Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn);
 
     Tuple<UniquePtr<String>, Status> Append(const SharedPtr<DataBlock> &input_block);
 
-    Tuple<UniquePtr<String>, Status> Import(const SharedPtr<SegmentEntry> &segment);
+    void AddIndexStore(TableIndexEntry *table_index_entry);
 
-    Tuple<UniquePtr<String>, Status>
-    CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
+    void AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries);
+
+    void AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry);
+
+    TxnIndexStore *GetIndexStore(TableIndexEntry *table_index_entry);
+
+    void DropIndexStore(TableIndexEntry *table_index_entry);
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
     Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
                                              CompactSegmentsTaskType type);
 
-    void Scan(SharedPtr<DataBlock> &output_block);
+    void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 
-    void Rollback();
+    bool CheckConflict(const TxnTableStore *txn_table_store) const;
 
-    void PrepareCommit();
+    void PrepareCommit1();
 
-    void Commit() const;
+    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
-    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr);
+    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
+
+    void MaintainCompactionAlg() const;
+
+    void AddSegmentStore(SegmentEntry *segment_entry);
+
+    void AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry);
+
+    void AddSealedSegment(SegmentEntry *segment_entry);
+
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const;
+
+public: // Getter
+    const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
+
+    const HashMap<SegmentID, TxnSegmentStore> &txn_segments() const { return txn_segments_store_; }
+
+    const Vector<SegmentEntry *> &flushed_segments() const { return flushed_segments_; }
+
+private:
+    HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
+    Vector<SegmentEntry *> flushed_segments_{};
+    HashSet<SegmentEntry *> set_sealed_segments_{};
+
+    int ptr_seq_n_;
+    HashMap<TableIndexEntry *, int> txn_indexes_{};
+    HashMap<String, UniquePtr<TxnIndexStore>> txn_indexes_store_{};
+
+    TxnCompactStore compact_state_;
 
 public:
+    Txn *const txn_{};
     Vector<SharedPtr<DataBlock>> blocks_{};
-    Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{};
-    HashMap<String, TxnIndexStore> txn_indexes_store_{};
+
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
-    TxnCompactStore compact_state_{};
 
     SizeT current_block_id_{0};
 
     TableEntry *table_entry_{};
-    Txn *txn_{};
+};
+
+export class TxnStore {
+public:
+    TxnStore(Txn *txn, Catalog *catalog);
+
+    void AddDBStore(DBEntry *db_entry);
+
+    void DropDBStore(DBEntry *dropped_db_entry);
+
+    void AddTableStore(TableEntry *table_entry);
+
+    void DropTableStore(TableEntry *dropped_table_entry);
+
+    TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
+
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, TxnManager *txn_mgr) const;
+
+    void MaintainCompactionAlg() const;
+
+    bool CheckConflict(const TxnStore &txn_store);
+
+    void PrepareCommit1();
+
+    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+
+    void CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts);
+
+    void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
+
+    bool Empty() const;
+
+private:
+    // Txn store
+    Txn *txn_{}; // TODO: remove this
+    Catalog *catalog_{};
+    int ptr_seq_n_{};
+    HashMap<DBEntry *, int> txn_dbs_{};
+    HashMap<TableEntry *, int> txn_tables_{};
+    // Key: table name Value: TxnTableStore
+    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 };
 
 } // namespace infinity

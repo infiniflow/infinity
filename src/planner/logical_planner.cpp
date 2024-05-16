@@ -14,6 +14,8 @@
 
 module;
 
+#include <cassert>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -242,31 +244,20 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     for (SizeT idx = 0; idx < value_list_count; ++idx) {
         auto &value_list = value_list_array[idx];
         if (statement->columns_ != nullptr) {
-            SizeT statement_column_count = statement->columns_->size();
-            if (statement_column_count != value_list.size()) {
+            SizeT column_count = statement->columns_->size();
+            if (column_count != value_list.size()) {
                 RecoverableError(Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
                                                                  "input value count mismatch ({})",
-                                                                 statement_column_count,
+                                                                 column_count,
                                                                  value_list.size())));
             }
-
-            //        Value null_value = Value::MakeNullData();
-            //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
 
             SizeT table_column_count = table_entry->ColumnCount();
 
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
-            SizeT column_count = statement->columns_->size();
-
-            if (column_count != table_column_count) {
-                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                 "input value count mismatch ({})",
-                                                                 table_column_count,
-                                                                 column_count)));
-            }
-
+            Map<SizeT, bool> map;
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = statement->columns_->at(column_idx);
                 SizeT table_column_id = table_entry->GetColumnIdByName(column_name);
@@ -287,11 +278,55 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                         rewrite_value_list[column_idx] = value_list[column_idx];
                     }
                 }
+                map[table_column_id] = true;
+            }
+
+            for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
+                if (map.find(column_idx) != map.end()) {
+                    continue;
+                }
+
+                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                if (column_def->has_default_value()) {
+                    SharedPtr<BaseExpression> value_expr =
+                        bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
+                    value_list.emplace_back(value_expr);
+                } else {
+                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                     "input value count mismatch ({})",
+                                                                     table_column_count,
+                                                                     column_count)));
+                }
+
+                const SharedPtr<DataType> &table_column_type = column_def->column_type_;
+                auto &value = value_list.back();
+                DataType value_type = value->Type();
+                if (*table_column_type == value_type) {
+                    rewrite_value_list[column_idx] = value;
+                } else {
+                    if (LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
+                        BoundCastFunc cast = CastFunction::GetBoundFunc(value_type, *table_column_type);
+                        SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, value, *table_column_type);
+                        rewrite_value_list[column_idx] = cast_expr;
+                    } else {
+                        // LogicalType are same and type info is also OK.
+                        rewrite_value_list[column_idx] = value;
+                    }
+                }
             }
 
             value_list = rewrite_value_list;
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
+            for (SizeT column_idx = value_list.size(); column_idx < table_column_count; ++column_idx) {
+                auto column_def = table_entry->GetColumnDefByID(column_idx);
+                if (column_def->has_default_value()) {
+                    SharedPtr<BaseExpression> value_expr =
+                        bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
+                    value_list.emplace_back(value_expr);
+                }
+            }
+
             if (value_list.size() != table_column_count) {
                 RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
                                                                  "input value count mismatch ({})",
@@ -403,10 +438,33 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             }
         }
 
+        switch (create_table_info->column_defs_[idx]->type()->type()) {
+            case LogicalType::kBoolean:
+            case LogicalType::kTinyInt:
+            case LogicalType::kSmallInt:
+            case LogicalType::kInteger:
+            case LogicalType::kBigInt:
+            case LogicalType::kFloat:
+            case LogicalType::kDouble:
+            case LogicalType::kVarchar:
+            case LogicalType::kDate:
+            case LogicalType::kTime:
+            case LogicalType::kTimestamp:
+            case LogicalType::kDateTime:
+            case LogicalType::kEmbedding:
+            case LogicalType::kTensor: {
+                break;
+            }
+            default: {
+                return Status::NotSupport(fmt::format("Not supported data type: {}", create_table_info->column_defs_[idx]->type()->ToString()));
+            }
+        }
+
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 create_table_info->column_defs_[idx]->name(),
-                                                                create_table_info->column_defs_[idx]->constraints_);
+                                                                create_table_info->column_defs_[idx]->constraints_,
+                                                                std::move(create_table_info->column_defs_[idx]->default_expr_));
         columns.emplace_back(column_def);
     }
 
@@ -424,7 +482,46 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
         }
     }
 
-    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
+    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>(create_table_info->table_name_), columns);
+    for (HashSet<String> visited_param_names; auto *property_ptr : create_table_info->properties_) {
+        auto &[param_name, param_value] = *property_ptr;
+        if (auto [_, success] = visited_param_names.insert(param_name); !success) {
+            return Status::SyntaxError(fmt::format("Duplicate table property param name: {}", param_name));
+        }
+        if (param_name == "bloom_filter_columns") {
+            Vector<ColumnID> bloom_filter_columns;
+            // spilt the param_value string by ',', find corresponding column id and add to bloom_filter_columns
+            IStringStream column_name_stream(param_value);
+            String column_name;
+            while (std::getline(column_name_stream, column_name, ',')) {
+                // remove leading and trailing spaces
+                if (SizeT start = column_name.find_first_not_of(' '); start != String::npos) {
+                    column_name = column_name.substr(start);
+                }
+                if (SizeT end = column_name.find_last_not_of(' '); end != String::npos) {
+                    column_name = column_name.substr(0, end + 1);
+                }
+                // find column id by column name
+                if (SizeT column_id = table_def_ptr->GetColIdByName(column_name); column_id == static_cast<SizeT>(-1)) {
+                    return Status::SyntaxError(fmt::format("Column {} not found in table {}", column_name, *table_def_ptr->table_name()));
+                } else {
+                    bloom_filter_columns.push_back(column_id);
+                }
+            }
+            // remove duplicate column id
+            std::sort(bloom_filter_columns.begin(), bloom_filter_columns.end());
+            bloom_filter_columns.erase(std::unique(bloom_filter_columns.begin(), bloom_filter_columns.end()), bloom_filter_columns.end());
+            // check if bloom filter can be created for the column
+            for (Vector<SharedPtr<ColumnDef>> &columns = table_def_ptr->columns(); ColumnID column_id : bloom_filter_columns) {
+                if (auto &def = columns[column_id]; def->type()->SupportBloomFilter()) {
+                    def->build_bloom_filter_ = true;
+                } else {
+                    return Status::SyntaxError(
+                        fmt::format("Bloom filter can't be created for {} type column {}", def->type()->ToString(), def->name()));
+                }
+            }
+        }
+    }
 
     SharedPtr<LogicalNode> logical_create_table_operator = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                                                                     schema_name_ptr,
@@ -538,14 +635,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
-
-    if (index_name_map.contains(*index_name)) {
-        if (create_index_info->conflict_type_ == ConflictType::kError) {
-            RecoverableError(Status::DuplicateIndex(fmt::format("Duplicated index name: {}", *index_name)));
-        }
-    }
-
     if (create_index_info->index_info_list_->size() != 1) {
         RecoverableError(Status::InvalidIndexDefinition(
             fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size())));
@@ -554,6 +643,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<IndexBase> base_index_ptr{nullptr};
     switch (index_info->index_type_) {
         case IndexType::kFullText: {
+            assert(index_info->index_param_list_ != nullptr);
+            IndexFullText::ValidateColumnDataType(base_table_ref, index_info->column_name_);
             base_index_ptr = IndexFullText::Make(index_name,
                                                  fmt::format("{}_{}", create_index_info->table_name_, *index_name),
                                                  {index_info->column_name_},
@@ -561,6 +652,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             break;
         }
         case IndexType::kHnsw: {
+            assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
             IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexHnsw::Make(index_name,
@@ -570,6 +662,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             break;
         }
         case IndexType::kIVFFlat: {
+            assert(index_info->index_param_list_ != nullptr);
             IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexIVFFlat::Make(index_name,
                                                 fmt::format("{}_{}", create_index_info->table_name_, *index_name),
@@ -628,7 +721,7 @@ Status LogicalPlanner::BuildDropTable(const DropStatement *statement, SharedPtr<
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if (drop_table_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("default");
+        schema_name_ptr = MakeShared<String>("default_db");
     } else {
         schema_name_ptr = MakeShared<String>(drop_table_info->schema_name_);
     }
@@ -648,7 +741,7 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
 
     SharedPtr<String> schema_name_ptr{nullptr};
     if (drop_collection_info->schema_name_.empty()) {
-        schema_name_ptr = MakeShared<String>("default");
+        schema_name_ptr = MakeShared<String>("default_db");
     } else {
         schema_name_ptr = MakeShared<String>(drop_collection_info->schema_name_);
     }
@@ -855,9 +948,10 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCompactTable: {
             auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
+            BindSchemaName(compact_table->schema_name_);
 
             Txn *txn = query_context_ptr_->GetTxn();
-            auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name(), compact_table->table_name());
+            auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name_, compact_table->table_name_);
             if (!status.ok()) {
                 RecoverableError(status);
             }
@@ -877,6 +971,15 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
     switch (statement->show_type_) {
+        case ShowStmtType::kDatabase: {
+            return BuildShowDatabase(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kTable: {
+            return BuildShowTable(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kIndex: {
+            return BuildShowIndex(statement, bind_context_ptr);
+        }
         case ShowStmtType::kDatabases: {
             return BuildShowDatabases(statement, bind_context_ptr);
         }
@@ -902,14 +1005,32 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
         }
-        case ShowStmtType::kSessionStatus: {
-            return BuildShowSessionStatus(statement, bind_context_ptr);
+        case ShowStmtType::kSegment: {
+            return BuildShowSegment(statement, bind_context_ptr);
         }
-        case ShowStmtType::kGlobalStatus: {
-            return BuildShowGlobalStatus(statement, bind_context_ptr);
+        case ShowStmtType::kBlocks: {
+            return BuildShowBlocks(statement, bind_context_ptr);
         }
-        case ShowStmtType::kVar: {
-            return BuildShowVar(statement, bind_context_ptr);
+        case ShowStmtType::kBlock: {
+            return BuildShowBlock(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kBlockColumn: {
+            return BuildShowBlockColumn(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kSessionVariable: {
+            return BuildShowSessionVariable(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kSessionVariables: {
+            return BuildShowSessionVariables(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kGlobalVariable: {
+            return BuildShowGlobalVariable(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kGlobalVariables: {
+            return BuildShowGlobalVariables(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kConfig: {
+            return BuildShowConfig(statement, bind_context_ptr);
         }
         default: {
             UnrecoverableError("Unexpected show statement type.");
@@ -964,9 +1085,58 @@ Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedP
                                                                   ShowType::kShowSegments,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowSegment(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowSegment,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_);
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowBlocks(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowBlocks,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_);
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowBlock(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowBlock,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex(),
                                                                   statement->segment_id_,
                                                                   statement->block_id_);
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowBlockColumn(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowBlockColumn,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
+                                                                  statement->block_id_,
+                                                                  statement->column_id_);
 
     this->logical_plan_ = logical_show;
     return Status::OK();
@@ -997,6 +1167,41 @@ Status LogicalPlanner::BuildShowViews(const ShowStatement *, SharedPtr<BindConte
     return Status::OK();
 }
 
+Status LogicalPlanner::BuildShowDatabase(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    String object_name;
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowDatabase,
+                                                                  statement->schema_name_,
+                                                                  object_name,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowTable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowTable,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowIndex(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowIndex,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->index_name_);
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
 Status LogicalPlanner::BuildShowDatabases(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -1008,40 +1213,56 @@ Status LogicalPlanner::BuildShowDatabases(const ShowStatement *, SharedPtr<BindC
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildShowSessionStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildShowSessionVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                  ShowType::kShowSessionStatus,
-                                                                  query_context_ptr_->schema_name(),
-                                                                  statement->table_name_,
-                                                                  bind_context_ptr->GenerateTableIndex(),
-                                                                  statement->segment_id_,
-                                                                  statement->block_id_);
-
-    this->logical_plan_ = logical_show;
-    return Status::OK();
-}
-
-Status LogicalPlanner::BuildShowGlobalStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                  ShowType::kShowGlobalStatus,
-                                                                  query_context_ptr_->schema_name(),
-                                                                  statement->table_name_,
-                                                                  bind_context_ptr->GenerateTableIndex(),
-                                                                  statement->segment_id_,
-                                                                  statement->block_id_);
-
-    this->logical_plan_ = logical_show;
-    return Status::OK();
-}
-
-Status LogicalPlanner::BuildShowVar(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                  ShowType::kShowVar,
+                                                                  ShowType::kShowSessionVariable,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->var_name_,
-                                                                  bind_context_ptr->GenerateTableIndex(),
-                                                                  statement->segment_id_,
-                                                                  statement->block_id_);
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowSessionVariables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowSessionVariables,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowGlobalVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowGlobalVariable,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowGlobalVariables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowGlobalVariables,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowConfig(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowConfig,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
 
     this->logical_plan_ = logical_show;
     return Status::OK();
@@ -1082,14 +1303,9 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindCo
 
 Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
-    switch (statement->type()) {
-        case OptimizeType::kIRS: {
-            SharedPtr<LogicalNode> logical_optimize =
-                MakeShared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(), query_context_ptr_->schema_name(), statement->table_name_);
-            this->logical_plan_ = logical_optimize;
-            break;
-        }
-    }
+    SharedPtr<LogicalNode> logical_optimize =
+        MakeShared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(), query_context_ptr_->schema_name(), statement->table_name_);
+    this->logical_plan_ = logical_optimize;
     return Status::OK();
 }
 
