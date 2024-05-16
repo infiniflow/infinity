@@ -14,6 +14,8 @@
 # lz4-1.9.4.tar.gz
 # jemalloc-5.3.0.tar.bz2
 # gperftools-2.15.tar.gz
+# openssl-1.1.1w.tar.gz
+# Python-3.12.3.tar.xz
 
 FROM centos:7
 
@@ -127,6 +129,37 @@ RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15
     cd /root && tar xzf gperftools-2.15.tar.gz \
     && cd gperftools-2.15 && ./configure && make -j 8 && make install \
     && ldconfig && cd /root && rm -rf gperftools-2.15
+
+# OpenSSL
+# pyhton 3.6+ ssl module requires openssl 1.1.1+
+# "OpenSSL 1.1.x is not fully source compatible with OpenSSL 1.0.2." refers to https://github.com/openssl/openssl/issues/9772.
+# This means installing to /usr/local/lib may break app compilation.
+RUN --mount=type=bind,source=openssl-1.1.1w.tar.gz,target=/root/openssl-1.1.1w.tar.gz  \
+    cd /root && tar xzf openssl-1.1.1w.tar.gz \
+    && cd openssl-1.1.1w && ./config --prefix=/usr/local/openssl --openssldir=/usr/local/openssl shared \
+    && make -j 8 && make install \
+    && ldconfig && cd /root && rm -rf openssl-1.1.1w
+
+# packages need by python optional modules: _dbm _gdbm _lzma _sqlite3 _tkinter _uuid
+# Too old: ncurses-devel sqlite-devel
+# TODO: failed to build ncurses 5.4, 5.7, 5.9
+RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel bzip2-devel readline-devel tk-devel \
+    && yum clean all
+
+# Install Python 3.12
+RUN --mount=type=bind,source=Python-3.12.3.tar.xz,target=/root/Python-3.12.3.tar.xz  \
+    cd /root && tar xJf Python-3.12.3.tar.xz \
+    && cd Python-3.12.3 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+    && ldconfig && cd /root && rm -rf Python-3.12.3
+
+# Create a python virtual environment. Set PATH so that the shell activate this virtual environment automatically when entering a container from this image.
+RUN /usr/local/bin/python3 -m venv /usr/local/venv
+ENV PATH="/usr/local/venv/bin:/usr/local/bin:$PATH"
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn && pip3 install wheel twine
+
+# infinity python SDK dependencies
+COPY python/requirements.txt .
+RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt pip3 install --no-input -r /root/requirements.txt
 
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
 
