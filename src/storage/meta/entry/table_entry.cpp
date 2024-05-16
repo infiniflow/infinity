@@ -1138,6 +1138,7 @@ Vector<SegmentEntry *> TableEntry::CheckCompaction(TransactionID txn_id) {
 
 bool TableEntry::CompactPrepare() const {
     if (compaction_alg_.get() == nullptr) {
+        LOG_WARN(fmt::format("Table {} compaction algorithm not set", *this->GetTableName()));
         return false;
     }
     compaction_alg_->Disable(); // wait for current compaction to finish

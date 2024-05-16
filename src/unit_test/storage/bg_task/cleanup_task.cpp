@@ -321,7 +321,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
-        table_entry->SetCompactionAlg(nullptr);
+        // table_entry->SetCompactionAlg(nullptr);
 
         for (int i = 0; i < kImportN; ++i) {
             Vector<SharedPtr<ColumnVector>> column_vectors;
@@ -405,7 +405,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
-        table_entry->SetCompactionAlg(nullptr);
+        // table_entry->SetCompactionAlg(nullptr);
 
         for (int i = 0; i < kImportN; ++i) {
             Vector<SharedPtr<ColumnVector>> column_vectors;

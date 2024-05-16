@@ -117,7 +117,7 @@ protected:
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"));
 
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
-            table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
+            // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);

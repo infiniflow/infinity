@@ -43,6 +43,7 @@ import block_entry;
 import compaction_process;
 import compilation_config;
 import logger;
+import third_party;
 
 using namespace infinity;
 
@@ -389,10 +390,15 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_TRUE(status.ok());
             txn5->Delete(table_entry, delete_row_ids);
-            txn_mgr->CommitTxn(txn5);
 
-            auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false);
-            EXPECT_NE(commit_ts, 0u);
+            Thread t([&]() {
+                auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false);
+                EXPECT_NE(commit_ts, 0u);
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            txn_mgr->CommitTxn(txn5);
+            row_count -= delete_n;
+            t.join();
         }
         {
             auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
@@ -410,10 +416,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             EXPECT_NE(compact_segment, nullptr);
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
-            // TODO: has bug here
-            if (compact_segment->actual_row_count() != row_count - delete_n) {
-                LOG_WARN("Bug here. TODO: fix it");
-            }
+            EXPECT_EQ(compact_segment->actual_row_count(), row_count);
 
             txn_mgr->CommitTxn(txn5);
         }
@@ -423,8 +426,8 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 // Cannot compile the test. So annotate it.
 
 TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
-    {
-        String table_name = "tbl1";
+    for (int task_i = 0; task_i < 2; ++task_i) {
+        String table_name = fmt::format("tbl{}", task_i);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
@@ -482,57 +485,60 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
         // add compact
         {
+            Vector<RowID> delete_row_ids;
             Vector<RowID> delete_row_ids2;
-            auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false, [&]() {
-                Vector<RowID> delete_row_ids;
 
-                int delete_row_n1 = 0;
-                int delete_row_n2 = 0;
+            int delete_row_n1 = 0;
+            int delete_row_n2 = 0;
 
-                for (int i = 0; i < (int)segment_sizes.size(); ++i) {
-                    Vector<SegmentOffset> offsets;
-                    Vector<SegmentOffset> offsets2;
-                    for (int j = 0; j < (int)(segment_sizes[i] / 6); ++j) {
-                        offsets.push_back(rand() % (segment_sizes[i] / 3) + segment_sizes[i] / 3);
-                        offsets2.push_back(rand() % (segment_sizes[i] - segment_sizes[i] / 3 * 2) + segment_sizes[i] / 3 * 2);
-                    }
-                    std::sort(offsets.begin(), offsets.end());
-                    std::sort(offsets2.begin(), offsets2.end());
-                    offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
-                    offsets2.erase(std::unique(offsets2.begin(), offsets2.end()), offsets2.end());
-                    for (SegmentOffset offset : offsets) {
-                        delete_row_ids.emplace_back(i, offset);
-                    }
-                    for (SegmentOffset offset2 : offsets2) {
-                        delete_row_ids2.emplace_back(i, offset2);
-                    }
-
-                    delete_row_n1 += offsets.size();
-                    delete_row_n2 += offsets2.size();
+            for (int i = 0; i < (int)segment_sizes.size(); ++i) {
+                Vector<SegmentOffset> offsets;
+                Vector<SegmentOffset> offsets2;
+                for (int j = 0; j < (int)(segment_sizes[i] / 6); ++j) {
+                    offsets.push_back(rand() % (segment_sizes[i] / 3) + segment_sizes[i] / 3);
+                    offsets2.push_back(rand() % (segment_sizes[i] - segment_sizes[i] / 3 * 2) + segment_sizes[i] / 3 * 2);
                 }
+                std::sort(offsets.begin(), offsets.end());
+                std::sort(offsets2.begin(), offsets2.end());
+                offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
+                offsets2.erase(std::unique(offsets2.begin(), offsets2.end()), offsets2.end());
+                for (SegmentOffset offset : offsets) {
+                    delete_row_ids.emplace_back(i, offset);
+                }
+                for (SegmentOffset offset2 : offsets2) {
+                    delete_row_ids2.emplace_back(i, offset2);
+                }
+
+                delete_row_n1 += offsets.size();
+                delete_row_n2 += offsets2.size();
+            }
+
+            auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
+            auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
+            EXPECT_TRUE(status.ok());
+            delete_txn1->Delete(table_entry, delete_row_ids);
+
+            bool slow_delete2 = task_i & 1;
+
+            auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false, [&]() {
+                txn_mgr->CommitTxn(delete_txn1);
+                delete_n += delete_row_n1;
 
                 auto delete_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
                 auto [table_entry, status] = delete_txn2->GetTableByName("default_db", table_name);
                 EXPECT_TRUE(status.ok());
-                delete_txn2->Delete(table_entry, delete_row_ids2);
-                {
-                    auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
 
-                    auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
-                    EXPECT_TRUE(status.ok());
-
-                    delete_txn1->Delete(table_entry, delete_row_ids);
-                    txn_mgr->CommitTxn(delete_txn1);
-
-                    delete_n += delete_row_n1;
+                if (slow_delete2) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
-                {
-                    Thread t([&]() {
-                        // std::this_thread::sleep_for(std::chrono::seconds(1));
-                        txn_mgr->CommitTxn(delete_txn2);
-                        delete_n += delete_row_n2;
-                    });
-                    t.join();
+                try {
+                    delete_txn2->Delete(table_entry, delete_row_ids2);
+                    txn_mgr->CommitTxn(delete_txn2);
+                    LOG_INFO("Delete 2 is committed");
+                    delete_n += delete_row_n2;
+                    EXPECT_FALSE(slow_delete2);
+                } catch (const RecoverableException &e) {
+                    LOG_INFO("Delete 2 is row backed");
                 }
             });
             EXPECT_NE(commit_ts, 0u);
