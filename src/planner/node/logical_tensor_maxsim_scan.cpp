@@ -28,6 +28,9 @@ import logical_type;
 import internal_types;
 import third_party;
 import explain_logical_plan;
+import search_options;
+import infinity_exception;
+import status;
 
 namespace infinity {
 
@@ -76,6 +79,20 @@ TableEntry *LogicalTensorMaxSimScan::table_collection_ptr() const { return base_
 String LogicalTensorMaxSimScan::TableAlias() const { return base_table_ref_->alias_; }
 
 u64 LogicalTensorMaxSimScan::TableIndex() const { return base_table_ref_->table_index_; }
+
+void LogicalTensorMaxSimScan::InitExtraOptions() {
+    SearchOptions options(tensor_maxsim_expr_->options_text_);
+    // topn option
+    if (const auto it = options.options_.find("topn"); it != options.options_.end()) {
+        const int top_n_option = std::stoi(it->second);
+        if (top_n_option <= 0) {
+            RecoverableError(Status::SyntaxError("topn must be a positive integer"));
+        }
+        topn_ = top_n_option;
+    } else {
+        topn_ = DEFAULT_TENSOR_MAXSIM_OPTION_TOP_N;
+    }
+}
 
 String LogicalTensorMaxSimScan::ToString(i64 &space) const {
     std::stringstream ss;

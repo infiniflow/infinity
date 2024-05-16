@@ -51,9 +51,15 @@ public:
 
     String name() override { return "LogicalTensorMaxSimScan"; }
 
+    void InitExtraOptions();
+
     SharedPtr<BaseTableRef> base_table_ref_{};
 
     SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr_{};
+
+    // extra options from tensor_maxsim_expr
+    // will be parsed in InitExtraOptions()
+    u32 topn_ = 0;
 
     SharedPtr<BaseExpression> filter_expression_{};
 

@@ -502,6 +502,17 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildTensorMaxSimExpr(const TensorMa
                                                              expr.dimension_,
                                                              embedding_info->Dimension())));
         }
+        // TODO: now only support float query tensor
+        // TODO: now only support search on tensor column with float or bit data type
+        if (expr.embedding_data_type_ != EmbeddingDataType::kElemFloat) {
+            RecoverableError(Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
+                                                            EmbeddingT::EmbeddingDataType2String(expr.embedding_data_type_))));
+        }
+        if (embedding_info->Type() != EmbeddingDataType::kElemFloat and embedding_info->Type() != EmbeddingDataType::kElemBit) {
+            RecoverableError(
+                Status::NotSupport(fmt::format("Unsupported tensor column type: {}, now only support maxsim search on float or bit tensor column",
+                                               embedding_info->ToString())));
+        }
     }
     arguments.emplace_back(std::move(expr_ptr));
     // Create query embedding

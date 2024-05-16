@@ -56,6 +56,7 @@ import physical_merge_aggregate;
 import physical_merge_parallel_aggregate;
 import physical_merge_sort;
 import physical_merge_top;
+import physical_merge_tensor_maxsim;
 import physical_nested_loop_join;
 import physical_parallel_aggregate;
 import physical_prepared_plan;
@@ -870,13 +871,25 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTensorMaxSimScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalTensorMaxSimScan> logical_maxsim = static_pointer_cast<LogicalTensorMaxSimScan>(logical_operator);
-    return MakeUnique<PhysicalTensorMaxSimScan>(logical_maxsim->node_id(),
-                                                logical_maxsim->base_table_ref_,
-                                                logical_maxsim->tensor_maxsim_expr_,
-                                                logical_maxsim->common_query_filter_,
-                                                logical_maxsim->TableIndex(),
-                                                logical_operator->load_metas());
+    const auto logical_maxsim = static_pointer_cast<LogicalTensorMaxSimScan>(logical_operator);
+    if (auto tensor_maxsim_scan_op = MakeUnique<PhysicalTensorMaxSimScan>(logical_maxsim->node_id(),
+                                                                          logical_maxsim->TableIndex(),
+                                                                          logical_maxsim->base_table_ref_,
+                                                                          logical_maxsim->tensor_maxsim_expr_,
+                                                                          logical_maxsim->common_query_filter_,
+                                                                          logical_maxsim->topn_,
+                                                                          logical_operator->load_metas());
+        tensor_maxsim_scan_op->TaskletCount() == 1) {
+        return tensor_maxsim_scan_op;
+    } else {
+        return MakeUnique<PhysicalMergeTensorMaxSim>(query_context_ptr_->GetNextNodeID(),
+                                                     std::move(tensor_maxsim_scan_op),
+                                                     logical_maxsim->TableIndex(),
+                                                     logical_maxsim->base_table_ref_,
+                                                     logical_maxsim->tensor_maxsim_expr_,
+                                                     logical_maxsim->topn_,
+                                                     MakeShared<Vector<LoadMeta>>());
+    }
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {

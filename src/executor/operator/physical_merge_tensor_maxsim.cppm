@@ -14,7 +14,7 @@
 
 module;
 
-export module physical_tensor_maxsim_scan;
+export module physical_merge_tensor_maxsim;
 
 import stl;
 import query_context;
@@ -24,36 +24,29 @@ import table_entry;
 import tensor_maxsim_expression;
 import base_table_ref;
 import data_type;
-import common_query_filter;
 
 namespace infinity {
 struct LoadMeta;
-struct GlobalBlockID;
-struct BlockIndex;
 
-export class PhysicalTensorMaxSimScan final : public PhysicalOperator {
+export class PhysicalMergeTensorMaxSim final : public PhysicalOperator {
 public:
-    explicit PhysicalTensorMaxSimScan(u64 id,
-                                      u64 maxsim_table_index,
-                                      SharedPtr<BaseTableRef> base_table_ref,
-                                      SharedPtr<TensorMaxSimExpression> tensor_maxsim_expression,
-                                      const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                      u32 topn,
-                                      SharedPtr<Vector<LoadMeta>> load_metas);
+    PhysicalMergeTensorMaxSim(u64 id,
+                              UniquePtr<PhysicalOperator> left,
+                              u64 maxsim_table_index,
+                              SharedPtr<BaseTableRef> base_table_ref,
+                              SharedPtr<TensorMaxSimExpression> tensor_maxsim_expression,
+                              u32 topn,
+                              SharedPtr<Vector<LoadMeta>> load_metas);
 
     void Init() override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SharedPtr<Vector<String>> GetOutputNames() const override;
+    SharedPtr<Vector<String>> GetOutputNames() const override { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
     SizeT TaskletCount() override;
-
-    BlockIndex *GetBlockIndex() const;
-
-    ColumnID SearchColumnID() const;
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
@@ -67,26 +60,15 @@ public:
 
     [[nodiscard]] inline TensorMaxSimExpression *tensor_maxsim_expr() const { return tensor_maxsim_expr_.get(); }
 
-    [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
-
-    [[nodiscard]] Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
-
     [[nodiscard]] inline u32 GetTopN() const { return topn_; }
 
 private:
     u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr_;
-
-    // for filter
-    SharedPtr<CommonQueryFilter> common_query_filter_;
-
     // extra options from tensor_maxsim_expr
-    // inited by LogicalTensorMaxSimScan::InitExtraOptions
+    // inited by Init()
     u32 topn_ = 0;
-
-    // column to search
-    ColumnID search_column_id_ = 0;
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
 };

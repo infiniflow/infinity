@@ -174,6 +174,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             auto maxsimNode = MakeShared<LogicalTensorMaxSimScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, tensor_maxsim_expr);
             maxsimNode->filter_expression_ = filter_expr;
             maxsimNode->common_query_filter_ = common_query_filter;
+            maxsimNode->InitExtraOptions();
             match_knn_nodes.push_back(std::move(maxsimNode));
         }
 

@@ -14,6 +14,8 @@
 
 module;
 
+module operator_state;
+
 import data_block;
 import stl;
 import physical_operator_type;
@@ -21,7 +23,6 @@ import fragment_data;
 import infinity_exception;
 import logger;
 import third_party;
-module operator_state;
 
 namespace infinity {
 
@@ -86,6 +87,13 @@ bool QueueSourceState::GetData() {
             MergeKnnOperatorState *merge_knn_op_state = (MergeKnnOperatorState *)next_op_state;
             merge_knn_op_state->input_data_block_ = std::move(fragment_data->data_block_);
             merge_knn_op_state->input_complete_ = completed;
+            break;
+        }
+        case PhysicalOperatorType::kMergeTensorMaxSim: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
+            MergeTensorMaxSimOperatorState *merge_tensor_maxsim_op_state = (MergeTensorMaxSimOperatorState *)next_op_state;
+            merge_tensor_maxsim_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            merge_tensor_maxsim_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kFusion: {

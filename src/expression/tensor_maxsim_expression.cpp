@@ -21,6 +21,8 @@ import internal_types;
 import third_party;
 import base_expression;
 import column_expression;
+import infinity_exception;
+import status;
 
 namespace infinity {
 
@@ -33,6 +35,19 @@ TensorMaxSimExpression::TensorMaxSimExpression(Vector<SharedPtr<BaseExpression>>
     : BaseExpression(ExpressionType::kTensorMaxSim, std::move(search_column)), embedding_data_type_(embedding_data_type), dimension_(dimension),
       query_embedding_(std::move(query_embedding)), tensor_basic_embedding_dimension_(tensor_basic_embedding_dimension), options_text_(options_text) {
     column_expr_ = static_cast<ColumnExpression *>(arguments_[0].get());
+}
+
+DataType TensorMaxSimExpression::Type() const {
+    switch (embedding_data_type_) {
+        case EmbeddingDataType::kElemFloat: {
+            return DataType(LogicalType::kFloat);
+        }
+        default: {
+            RecoverableError(Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
+                                                            EmbeddingT::EmbeddingDataType2String(embedding_data_type_))));
+            return DataType(LogicalType::kInvalid);
+        }
+    }
 }
 
 String TensorMaxSimExpression::ToString() const {

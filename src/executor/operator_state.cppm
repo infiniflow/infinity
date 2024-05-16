@@ -23,6 +23,7 @@ import fragment_data;
 import data_block;
 import table_scan_function_data;
 import knn_scan_data;
+import tensor_maxsim_scan_function_data;
 import compact_state_data;
 import table_def;
 
@@ -101,6 +102,23 @@ export struct TableScanOperatorState : public OperatorState {
     inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
 
     UniquePtr<TableScanFunctionData> table_scan_function_data_{};
+};
+
+// TensorMaxSimScan
+export struct TensorMaxSimScanOperatorState : public OperatorState {
+    inline explicit TensorMaxSimScanOperatorState() : OperatorState(PhysicalOperatorType::kTensorMaxSimScan) {}
+
+    UniquePtr<TensorMaxSimScanFunctionData> tensor_maxsim_scan_function_data_{};
+};
+
+// MergeTensorMaxSim
+export struct MergeTensorMaxSimOperatorState : public OperatorState {
+    inline explicit MergeTensorMaxSimOperatorState() : OperatorState(PhysicalOperatorType::kMergeTensorMaxSim) {}
+
+    Vector<UniquePtr<DataBlock>> middle_sorted_data_blocks_; // middle result
+    u32 middle_result_count_{};
+    Vector<UniquePtr<DataBlock>> input_data_blocks_;
+    bool input_complete_{false};
 };
 
 // KnnScan
@@ -409,6 +427,7 @@ export enum class SourceStateType {
     kTableScan,
     kIndexScan,
     kKnnScan,
+    kTensorMaxSimScan,
     kCompact,
     kEmpty,
 };
@@ -459,6 +478,13 @@ export struct AggregateSourceState : public SourceState {
 export struct TableScanSourceState : public SourceState {
     explicit TableScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
         : SourceState(SourceStateType::kTableScan), global_ids_(std::move(global_ids)) {}
+
+    SharedPtr<Vector<GlobalBlockID>> global_ids_;
+};
+
+export struct TensorMaxSimScanSourceState : public SourceState {
+    explicit TensorMaxSimScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
+        : SourceState(SourceStateType::kTensorMaxSimScan), global_ids_(std::move(global_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };

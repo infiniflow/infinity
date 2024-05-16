@@ -35,7 +35,7 @@ public:
                            u32 tensor_basic_embedding_dimension,
                            const String &options_text);
 
-    inline DataType Type() const override { return DataType(LogicalType::kFloat); }
+    DataType Type() const override;
 
     String ToString() const override;
 

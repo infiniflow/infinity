@@ -740,7 +740,8 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     // 4 populate result DataBlock
     // 4.1 prepare first output_data_block
     auto &output_data_blocks = operator_state->data_block_array_;
-    Vector<SharedPtr<DataType>> OutputTypes = std::move(*GetOutputTypes());
+    auto OutputTypesPtr = GetOutputTypes();
+    Vector<SharedPtr<DataType>> &OutputTypes = *OutputTypesPtr;
     auto append_data_block = [&]() {
         auto data_block = DataBlock::MakeUniquePtr();
         data_block->Init(OutputTypes);
