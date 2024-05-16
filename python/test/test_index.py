@@ -515,7 +515,7 @@ class TestIndex(TestSdk):
             "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}})
         assert res.error_code == ErrorCode.OK
 
-        with pytest.raises(Exception, match="ERROR:3009*"):
+        with pytest.raises(Exception, match="ERROR:3077*"):
             table_obj.create_index("my_index",
                                    [index.IndexInfo("body",
                                                     index.IndexType.FullText,

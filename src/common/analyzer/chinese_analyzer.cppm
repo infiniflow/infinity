@@ -21,6 +21,7 @@ import jieba;
 import term;
 import analyzer;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -32,7 +33,7 @@ public:
 
     ~ChineseAnalyzer();
 
-    bool Load();
+    Status Load();
 
 protected:
     inline void Parse(const String &input) { jieba_->CutForSearch(input, cut_words_, true); }

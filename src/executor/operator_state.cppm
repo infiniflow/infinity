@@ -23,6 +23,7 @@ import fragment_data;
 import data_block;
 import table_scan_function_data;
 import knn_scan_data;
+import compact_state_data;
 import table_def;
 
 import merge_knn_data;
@@ -33,6 +34,7 @@ import status;
 import internal_types;
 import column_def;
 import data_type;
+import segment_entry;
 
 namespace infinity {
 
@@ -360,8 +362,56 @@ export struct FusionOperatorState : public OperatorState {
     Map<u64, Vector<UniquePtr<DataBlock>>> input_data_blocks_{};
 };
 
+// Compact
+export struct CompactOperatorState : public OperatorState {
+    inline explicit CompactOperatorState(SizeT compact_idx, SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompact), compact_idx_(compact_idx), compact_state_data_(compact_state_data) {}
+
+    SizeT compact_idx_{};
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+};
+
+export struct CompactIndexPrepareOperatorState : public OperatorState {
+    inline explicit CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+        : OperatorState(PhysicalOperatorType::kCompactIndexPrepare), compact_state_data_(compact_state_data),
+          create_index_shared_data_(create_index_shared_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
+    SizeT create_index_idx_{};
+};
+
+export struct CompactIndexDoOperatorState : public OperatorState {
+    inline explicit CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+        : OperatorState(PhysicalOperatorType::kCompactIndexDo), compact_state_data_(compact_state_data),
+          create_index_shared_data_(create_index_shared_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
+    SizeT create_index_idx_{};
+};
+
+export struct CompactFinishOperatorState : public OperatorState {
+    explicit CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompactFinish), compact_state_data_(compact_state_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+};
+
 // Source
-export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kIndexScan, kKnnScan, kEmpty };
+export enum class SourceStateType {
+    kInvalid,
+    kQueue,
+    kAggregate,
+    kTableScan,
+    kIndexScan,
+    kKnnScan,
+    kCompact,
+    kEmpty,
+};
 
 export struct SourceState {
     inline explicit SourceState(SourceStateType state_type) : state_type_(state_type) {}

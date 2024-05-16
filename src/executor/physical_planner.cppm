@@ -123,6 +123,13 @@ private:
     // Command
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    // Compact
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompactIndex(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const;
+
     // Explain
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;
 };

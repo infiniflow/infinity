@@ -94,14 +94,6 @@ public:
     ~InfinityServiceCloneFactory() final = default;
 
     infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) final {
-        SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
-
-        LOG_TRACE(fmt::format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
-                              sock->getSocketInfo(),
-                              sock->getPeerHost(),
-                              sock->getPeerAddress(),
-                              sock->getPeerPort()));
-
         return new InfinityThriftService;
     }
 
@@ -118,7 +110,7 @@ void ThreadedThriftServer::Init(i32 port_no) {
     server = MakeUnique<TThreadedServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                          MakeShared<TServerSocket>(port_no), // port
                                          MakeShared<TBufferedTransportFactory>(),
-                                             binary_protocol_factory);
+                                         binary_protocol_factory);
 }
 
 void ThreadedThriftServer::Start() { server->serve(); }

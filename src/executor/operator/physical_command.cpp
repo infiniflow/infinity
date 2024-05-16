@@ -34,7 +34,6 @@ import defer_op;
 import config;
 import status;
 import infinity_exception;
-import compact_segments_task;
 import variables;
 
 namespace infinity {
@@ -82,7 +81,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             return true;
                         }
                         case GlobalVariable::kInvalid: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("Unknown global variable: {}", set_command->var_name())));
+                            RecoverableError(Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name())));
                         }
                         default: {
                             RecoverableError(Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name())));
@@ -97,31 +96,37 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case GlobalOptionIndex::kLogLevel: {
                             if (set_command->value_str() == "trace") {
                                 SetLogLevel(LogLevel::kTrace);
+                                config->SetLogLevel(LogLevel::kTrace);
                                 return true;
                             }
 
                             if (set_command->value_str() == "debug") {
                                 SetLogLevel(LogLevel::kDebug);
+                                config->SetLogLevel(LogLevel::kDebug);
                                 return true;
                             }
 
                             if (set_command->value_str() == "info") {
                                 SetLogLevel(LogLevel::kInfo);
+                                config->SetLogLevel(LogLevel::kInfo);
                                 return true;
                             }
 
                             if (set_command->value_str() == "warning") {
                                 SetLogLevel(LogLevel::kWarning);
+                                config->SetLogLevel(LogLevel::kWarning);
                                 return true;
                             }
 
                             if (set_command->value_str() == "error") {
                                 SetLogLevel(LogLevel::kError);
+                                config->SetLogLevel(LogLevel::kError);
                                 return true;
                             }
 
                             if (set_command->value_str() == "critical") {
                                 SetLogLevel(LogLevel::kCritical);
+                                config->SetLogLevel(LogLevel::kCritical);
                                 return true;
                             }
 
@@ -162,12 +167,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kCheckTable: {
-            break;
-        }
-        case CommandType::kCompactTable: {
-            auto *txn = query_context->GetTxn();
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry_, txn); // copy the table ref shared_ptr here
-            compact_task->Execute();
             break;
         }
         default: {

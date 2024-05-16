@@ -342,8 +342,20 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             };
             break;
         }
+        case PhysicalOperatorType::kCompactFinish: {
+            auto *output_state = static_cast<CompactFinishOperatorState *>(task_operator_state);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
+                break;
+            }
+            result_sink_state->result_def_ = {
+                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+            };
+            break;
+        }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));
+            RecoverableError(
+                Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));
         }
     }
 }
@@ -370,8 +382,24 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = std::move(create_index_do_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kCompact: {
+            // auto *compact_output_state = static_cast<CompactOperatorState *>(task_operator_state);
+            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
+            break;
+        }
+        case PhysicalOperatorType::kCompactIndexPrepare: {
+            // auto *compact_index_output_state = static_cast<CompactIndexOperatorState *>(task_operator_state);
+            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
+            break;
+        }
+        case PhysicalOperatorType::kCompactIndexDo: {
+            // auto *compact_index_output_state = static_cast<CompactIndexOperatorState *>(task_operator_state);
+            message_sink_state->message_ = MakeUnique<String>("Tmp for test");
+            break;
+        }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));
+            RecoverableError(
+                Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));
             break;
         }
     }

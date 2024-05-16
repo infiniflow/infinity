@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module fragment_builder;
 
 import stl;
@@ -35,14 +37,23 @@ import explain_statement;
 
 namespace infinity {
 
-UniquePtr<PlanFragment> FragmentBuilder::BuildFragment(PhysicalOperator *phys_op) {
-    auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
-    plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-    BuildFragments(phys_op, plan_fragment.get());
-    if (plan_fragment->GetSourceNode() == nullptr) {
-        plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+SharedPtr<PlanFragment> FragmentBuilder::BuildFragment(const Vector<PhysicalOperator *> &phys_ops) {
+    SharedPtr<PlanFragment> result = nullptr;
+    for (auto *phys_op : phys_ops) {
+        auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+        plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+        BuildFragments(phys_op, plan_fragment.get());
+        if (plan_fragment->GetSourceNode() == nullptr) {
+            plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+        }
+        if (result.get() == nullptr) {
+            result = std::move(plan_fragment);
+        } else {
+            PlanFragment::AddNext(result, plan_fragment.get());
+            result = std::move(plan_fragment);
+        }
     }
-    return plan_fragment;
+    return result;
 }
 
 void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr) {
@@ -64,7 +75,8 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
         case ExplainType::kPipeline: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            auto explain_child_fragment = this->BuildFragment(phys_op->left());
+            Vector<PhysicalOperator *> phys_ops{phys_op->left()};
+            auto explain_child_fragment = this->BuildFragment(phys_ops);
 
             // Generate explain context of the child fragment
             ExplainFragment::Explain(explain_child_fragment.get(), texts_ptr);
@@ -288,6 +300,83 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             BuildFragments(phys_op->left(), next_plan_fragment.get());
 
             current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+            return;
+        }
+        case PhysicalOperatorType::kCompact: {
+            if (phys_op->left() != nullptr || phys_op->right() != nullptr) {
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+            return;
+        }
+        case PhysicalOperatorType::kCompactIndexPrepare: {
+            if (phys_op->right() != nullptr) {
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+            if (phys_op->left() != nullptr) {
+                auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+                next_plan_fragment->SetSinkNode(query_context_ptr_,
+                                                SinkType::kLocalQueue,
+                                                phys_op->left()->GetOutputNames(),
+                                                phys_op->left()->GetOutputTypes());
+                BuildFragments(phys_op->left(), next_plan_fragment.get());
+                current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+            }
+            if (phys_op->right() != nullptr) {
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
+            }
+            return;
+        }
+        case PhysicalOperatorType::kCompactIndexDo: {
+            if (phys_op->left() == nullptr || phys_op->right() != nullptr) {
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+
+            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+            next_plan_fragment->SetSinkNode(query_context_ptr_,
+                                            SinkType::kLocalQueue,
+                                            phys_op->left()->GetOutputNames(),
+                                            phys_op->left()->GetOutputTypes());
+            BuildFragments(phys_op->left(), next_plan_fragment.get());
+
+            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+            return;
+        }
+        case PhysicalOperatorType::kCompactFinish: {
+            if (phys_op->left() == nullptr) {
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+            if (phys_op->left() != nullptr) {
+                auto next_plan_fragment1 = MakeUnique<PlanFragment>(GetFragmentId());
+                next_plan_fragment1->SetSinkNode(query_context_ptr_,
+                                                 SinkType::kLocalQueue,
+                                                 phys_op->left()->GetOutputNames(),
+                                                 phys_op->left()->GetOutputTypes());
+                BuildFragments(phys_op->left(), next_plan_fragment1.get());
+                current_fragment_ptr->AddChild(std::move(next_plan_fragment1));
+                if (phys_op->right() != nullptr) {
+                    auto next_plan_fragment2 = MakeUnique<PlanFragment>(GetFragmentId());
+                    next_plan_fragment2->SetSinkNode(query_context_ptr_,
+                                                     SinkType::kLocalQueue,
+                                                     phys_op->right()->GetOutputNames(),
+                                                     phys_op->right()->GetOutputTypes());
+                    BuildFragments(phys_op->right(), next_plan_fragment2.get());
+                    current_fragment_ptr->AddChild(std::move(next_plan_fragment2));
+                }
+            } else if (phys_op->right() != nullptr) {
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
+            }
             return;
         }
         default: {

@@ -124,6 +124,14 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "MergeKnn";
         case PhysicalOperatorType::kCommand:
             return "Command";
+        case PhysicalOperatorType::kCompact:
+            return "Compact";
+        case PhysicalOperatorType::kCompactIndexPrepare:
+            return "CompactIndexPrepare";
+        case PhysicalOperatorType::kCompactIndexDo:
+            return "CompactIndexDo";
+        case PhysicalOperatorType::kCompactFinish:
+            return "CompactFinish";
         case PhysicalOperatorType::kMatch:
             return "Match";
         case PhysicalOperatorType::kFusion:

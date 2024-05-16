@@ -38,7 +38,7 @@ class SegmentIndexEntry;
 class ChunkIndexEntry;
 class BGTaskProcessor;
 class TxnManager;
-enum class CompactSegmentsTaskType;
+enum class CompactStatementType;
 class CatalogDeltaEntry;
 class BufferManager;
 
@@ -80,10 +80,10 @@ public:
 export struct TxnCompactStore {
     Vector<Pair<TxnSegmentStore, Vector<SegmentEntry *>>> compact_data_;
 
-    CompactSegmentsTaskType task_type_;
+    CompactStatementType type_;
 
     TxnCompactStore();
-    TxnCompactStore(CompactSegmentsTaskType type);
+    TxnCompactStore(CompactStatementType type);
 };
 
 export class TxnTableStore {
@@ -106,8 +106,7 @@ public:
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
-    Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
-                                             CompactSegmentsTaskType type);
+    Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 

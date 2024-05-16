@@ -36,7 +36,7 @@ import extra_ddl_info;
 
 import infinity_exception;
 import block_column_entry;
-import compact_segments_task;
+import compact_state_data;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
 import column_def;
@@ -53,6 +53,7 @@ import log_file;
 import default_values;
 import defer_op;
 import index_base;
+import base_table_ref;
 
 module wal_manager;
 
@@ -656,8 +657,8 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
     auto txn = MakeUnique<Txn>(nullptr /*buffer_mgr*/, nullptr /*txn_mgr*/, nullptr /*catalog*/, txn_id, begin_ts);
-    auto block_index = table_entry->GetBlockIndex(txn.get());
-    table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
+    auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(txn.get()));
+    table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
     for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store()) {
@@ -745,7 +746,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
     Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->delete_state_);
-    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), &table_store->delete_state_);
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -764,7 +765,9 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
         if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
-        segment_entry->SetNoDelete();
+        if (!segment_entry->SetNoDelete()) {
+            UnrecoverableError("Assert: Replay segment should be compactable.");
+        }
         segment_entry->SetDeprecated(commit_ts);
     }
 }
@@ -784,7 +787,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
 
     fake_txn->FakeCommit(commit_ts);
     Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), true);
-    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), nullptr);
 }
 
 // // TMP deprecated

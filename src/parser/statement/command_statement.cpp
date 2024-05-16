@@ -20,7 +20,6 @@ std::string UseCmd::ToString() const { return "Use Command"; }
 std::string SetCmd::ToString() const { return "Set Command"; }
 std::string ExportCmd::ToString() const { return "Export Command"; }
 std::string CheckTable::ToString() const { return "Check Table Command"; }
-std::string CompactTable::ToString() const { return "Compact Table Command"; }
 std::string CommandStatement::ToString() const { return command_info_->ToString(); }
 
 } // namespace infinity

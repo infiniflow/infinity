@@ -57,8 +57,6 @@ public:
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    TableEntry *table_entry_ = nullptr; // only used for compact command
-
     const SharedPtr<CommandInfo> command_info_{};
 
     const SharedPtr<Vector<String>> output_names_{};

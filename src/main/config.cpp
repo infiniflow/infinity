@@ -1465,41 +1465,97 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 }
 
 // General
-String Config::Version() { return global_options_.GetStringValue(GlobalOptionIndex::kVersion); }
+String Config::Version() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kVersion);
+}
 
-String Config::TimeZone() { return global_options_.GetStringValue(GlobalOptionIndex::kTimeZone); }
+String Config::TimeZone() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kTimeZone);
+}
 
-i64 Config::TimeZoneBias() { return global_options_.GetIntegerValue(GlobalOptionIndex::kTimeZoneBias); }
+i64 Config::TimeZoneBias() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kTimeZoneBias);
+}
 
 // inline void set_worker_cpu_number(u64 new_cpu_limit) { system_option_.worker_cpu_limit = new_cpu_limit; }
 
-i64 Config::CPULimit() { return global_options_.GetIntegerValue(GlobalOptionIndex::kWorkerCPULimit); }
+i64 Config::CPULimit() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kWorkerCPULimit);
+}
 
 // Network
-String Config::ServerAddress() { return global_options_.GetStringValue(GlobalOptionIndex::kServerAddress); }
+String Config::ServerAddress() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kServerAddress);
+}
 
-i64 Config::PostgresPort() { return global_options_.GetIntegerValue(GlobalOptionIndex::kPostgresPort); }
+i64 Config::PostgresPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPostgresPort);
+}
 
-i64 Config::HTTPPort() { return global_options_.GetIntegerValue(GlobalOptionIndex::kHTTPPort); }
+i64 Config::HTTPPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kHTTPPort);
+}
 
-i64 Config::ClientPort() { return global_options_.GetIntegerValue(GlobalOptionIndex::kClientPort); }
+i64 Config::ClientPort() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kClientPort);
+}
 
-i64 Config::ConnectionPoolSize() { return global_options_.GetIntegerValue(GlobalOptionIndex::kConnectionPoolSize); }
+i64 Config::ConnectionPoolSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kConnectionPoolSize);
+}
 
 // Log
-String Config::LogFileName() { return global_options_.GetStringValue(GlobalOptionIndex::kLogFileName); }
+String Config::LogFileName() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kLogFileName);
+}
 
-String Config::LogDir() { return global_options_.GetStringValue(GlobalOptionIndex::kLogDir); }
+String Config::LogDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kLogDir);
+}
 
-String Config::LogFilePath() { return fmt::format("{}/{}", LogDir(), LogFileName()); }
+String Config::LogFilePath() {
+    return fmt::format("{}/{}", global_options_.GetStringValue(GlobalOptionIndex::kLogDir), global_options_.GetStringValue(GlobalOptionIndex::kLogFileName));
+}
 
-bool Config::LogToStdout() { return global_options_.GetBoolValue(GlobalOptionIndex::kLogToStdout); }
+bool Config::LogToStdout() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetBoolValue(GlobalOptionIndex::kLogToStdout);
+}
 
-i64 Config::LogFileMaxSize() { return global_options_.GetIntegerValue(GlobalOptionIndex::kLogFileMaxSize); }
+i64 Config::LogFileMaxSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kLogFileMaxSize);
+}
 
-i64 Config::LogFileRotateCount() { return global_options_.GetIntegerValue(GlobalOptionIndex::kLogFileRotateCount); }
+i64 Config::LogFileRotateCount() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kLogFileRotateCount);
+}
+
+void Config::SetLogLevel(LogLevel level) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
+    if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
+        UnrecoverableError("Attempt to fetch log level value from log level data type option");
+    }
+    LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
+    log_level_option->value_ = level;
+    return ;
+}
 
 LogLevel Config::GetLogLevel() {
+    std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
         UnrecoverableError("Attempt to fetch log level value from log level data type option");
@@ -1509,33 +1565,70 @@ LogLevel Config::GetLogLevel() {
 }
 
 // Storage
-String Config::DataDir() { return global_options_.GetStringValue(GlobalOptionIndex::kDataDir); }
+String Config::DataDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kDataDir);
+}
 
-i64 Config::CleanupInterval() { return global_options_.GetIntegerValue(GlobalOptionIndex::kCleanupInterval); }
+i64 Config::CleanupInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kCleanupInterval);
+}
 
-i64 Config::CompactInterval() { return global_options_.GetIntegerValue(GlobalOptionIndex::kCompactInterval); }
+i64 Config::CompactInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kCompactInterval);
+}
 
-i64 Config::OptimizeIndexInterval() { return global_options_.GetIntegerValue(GlobalOptionIndex::kOptimizeIndexInterval); }
+i64 Config::OptimizeIndexInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kOptimizeIndexInterval);
+}
 
-i64 Config::MemIndexCapacity() { return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity); }
+i64 Config::MemIndexCapacity() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
+}
 
 // Buffer
-i64 Config::BufferManagerSize() { return global_options_.GetIntegerValue(GlobalOptionIndex::kBufferManagerSize); }
+i64 Config::BufferManagerSize() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kBufferManagerSize);
+}
 
-String Config::TempDir() { return global_options_.GetStringValue(GlobalOptionIndex::kTempDir); }
+String Config::TempDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kTempDir);
+}
 
 // WAL
-String Config::WALDir() { return global_options_.GetStringValue(GlobalOptionIndex::kWALDir); }
+String Config::WALDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kWALDir);
+}
 
-i64 Config::WALCompactThreshold() { return global_options_.GetIntegerValue(GlobalOptionIndex::kWALCompactThreshold); }
+i64 Config::WALCompactThreshold() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kWALCompactThreshold);
+}
 
-i64 Config::FullCheckpointInterval() { return global_options_.GetIntegerValue(GlobalOptionIndex::kFullCheckpointInterval); }
+i64 Config::FullCheckpointInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kFullCheckpointInterval);
+}
 
-i64 Config::DeltaCheckpointInterval() { return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointInterval); }
+i64 Config::DeltaCheckpointInterval() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointInterval);
+}
 
-i64 Config::DeltaCheckpointThreshold() { return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointThreshold); }
+i64 Config::DeltaCheckpointThreshold() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointThreshold);
+}
 
 FlushOptionType Config::FlushMethodAtCommit() {
+    std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit);
     if (base_option->data_type_ != BaseOptionDataType::kFlush) {
         UnrecoverableError("Attempt to fetch flush option value from flush option data type option");
@@ -1545,7 +1638,10 @@ FlushOptionType Config::FlushMethodAtCommit() {
 }
 
 // Resource
-String Config::ResourcePath() { return global_options_.GetStringValue(GlobalOptionIndex::kResourcePath); }
+String Config::ResourcePath() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kResourcePath);
+}
 
 //// Profiler
 // bool enable_profiler() const { return system_option_.enable_profiler; }
@@ -1604,7 +1700,7 @@ void Config::PrintAll() {
     fmt::print(" - flush_method_at_commit: {}\n", FlushOptionTypeToString(FlushMethodAtCommit()));
 
     // Resource dir
-    fmt::print(" - wal_dir: {}\n", ResourcePath());
+    fmt::print(" - resource_dir: {}\n", ResourcePath());
 }
 
 } // namespace infinity

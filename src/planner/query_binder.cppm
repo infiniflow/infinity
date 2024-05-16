@@ -26,9 +26,11 @@ import binding;
 import bind_alias_proxy;
 import bound_delete_statement;
 import bound_update_statement;
+import bound_compact_statement;
 import select_statement;
 import delete_statement;
 import update_statement;
+import compact_statement;
 import parsed_expr;
 import knn_expr;
 import table_reference;
@@ -51,6 +53,8 @@ public:
     UniquePtr<BoundDeleteStatement> BindDelete(const DeleteStatement &statement);
 
     UniquePtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
+
+    UniquePtr<BoundCompactStatement> BindCompact(const CompactStatement &statement);
 
     SharedPtr<BaseTableRef> GetTableRef(const String &db_name, const String &table_name);
 
