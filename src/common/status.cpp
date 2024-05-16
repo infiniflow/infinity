@@ -372,7 +372,7 @@ Status Status::AnalyzerNotFound(const String& name) {
 }
 
 Status Status::NotSupportedAnalyzer(const String& name) {
-    return Status(ErrorCode::kAnalyzerNotFound, MakeUnique<String>(fmt::format("Analyzer {} isn't supported", name)));
+    return Status(ErrorCode::kNotSupportedAnalyzer, MakeUnique<String>(fmt::format("Analyzer {} isn't supported", name)));
 }
 
 Status Status::InvalidAnalyzerName(const String& name) {
