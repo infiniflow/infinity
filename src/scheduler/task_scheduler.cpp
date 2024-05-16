@@ -104,7 +104,7 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
     }
     // DumpPlanFragment(plan_fragment);
     bool use_scheduler = false;
-    switch (base_statement->Type()) {
+    switch(base_statement->Type()) {
         case StatementType::kSelect:
         case StatementType::kExplain:
         case StatementType::kDelete:
@@ -126,12 +126,12 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
         }
     }
 
-    if (!use_scheduler) {
+    if(!use_scheduler) {
         if (!plan_fragment->HasChild()) {
             if (plan_fragment->GetContext()->Tasks().size() == 1) {
                 FragmentTask *task = plan_fragment->GetContext()->Tasks()[0].get();
                 RunTask(task);
-                return;
+                return ;
             } else {
                 UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
             }

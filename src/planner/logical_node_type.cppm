@@ -79,4 +79,4 @@ export enum class LogicalNodeType : u8 {
     kCompactIndex,
     kCompactFinish,
 };
-} // namespace infinity
+}

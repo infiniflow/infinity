@@ -144,6 +144,7 @@ public:
 
     inline SharedPtr<DataTable> GetResult() {
         notifier_->Wait();
+
         if (notifier_->error_fragment_ctx() != nullptr) {
             return notifier_->error_fragment_ctx()->GetResultInternal();
         }

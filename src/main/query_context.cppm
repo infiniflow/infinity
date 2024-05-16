@@ -43,7 +43,7 @@ struct BGQueryState;
 export class QueryContext {
 
 public:
-    explicit QueryContext(BaseSession *session);
+    explicit QueryContext(BaseSession* session);
 
     ~QueryContext();
 
@@ -51,7 +51,7 @@ public:
               TaskScheduler *scheduler_ptr,
               Storage *storage_ptr,
               ResourceManager *resource_manager_ptr,
-              SessionManager *session_manager);
+              SessionManager* session_manager);
 
     inline void UnInit() {
         initialized_ = false;
@@ -94,6 +94,7 @@ public:
 
     void RollbackTxn();
 
+
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
 
     bool SetTxn(Txn *txn) const {
@@ -120,10 +121,10 @@ public:
     [[nodiscard]] inline PhysicalPlanner *physical_planner() const { return physical_planner_.get(); }
     [[nodiscard]] inline FragmentBuilder *fragment_builder() const { return fragment_builder_.get(); }
 
-    [[nodiscard]] BaseSession *current_session() const { return session_ptr_; }
+    [[nodiscard]] BaseSession* current_session() const { return session_ptr_; }
 
     void FlushProfiler(TaskProfiler &&profiler) {
-        if (query_profiler_) {
+        if(query_profiler_) {
             query_profiler_->Flush(std::move(profiler));
         }
     }
@@ -142,18 +143,18 @@ private:
     }
 
     inline void StartProfile(QueryPhase phase) {
-        if (query_profiler_) {
+        if(query_profiler_) {
             query_profiler_->StartPhase(phase);
         }
     }
     inline void StopProfile(QueryPhase phase) {
-        if (query_profiler_) {
+        if(query_profiler_) {
             query_profiler_->StopPhase(phase);
         }
     }
 
     inline void StopProfile() {
-        if (query_profiler_) {
+        if(query_profiler_) {
             query_profiler_->Stop();
         }
     }
@@ -190,6 +191,7 @@ private:
     u64 memory_size_limit_{};
 
     bool initialized_{false};
+
 };
 
 } // namespace infinity

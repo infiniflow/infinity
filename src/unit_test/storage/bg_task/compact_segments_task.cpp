@@ -18,7 +18,6 @@
 
 import stl;
 import storage;
-
 import global_resource_usage;
 import infinity_context;
 import status;

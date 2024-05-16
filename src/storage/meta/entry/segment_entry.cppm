@@ -36,8 +36,8 @@ namespace infinity {
 class TxnTableStore;
 struct TxnSegmentStore;
 struct TableEntry;
-class BlockEntryIter;
 class CompactStateData;
+class BlockEntryIter;
 
 export struct BlocksGuard {
     const Vector<SharedPtr<BlockEntry>> &block_entries_;

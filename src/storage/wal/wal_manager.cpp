@@ -306,10 +306,10 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
     }
     try {
         LOG_TRACE(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                              is_full_checkpoint ? "FULL" : "DELTA",
-                              txn->TxnID(),
-                              txn->BeginTS(),
-                              max_commit_ts));
+                             is_full_checkpoint ? "FULL" : "DELTA",
+                             txn->TxnID(),
+                             txn->BeginTS(),
+                             max_commit_ts));
 
         if (!txn->Checkpoint(max_commit_ts, is_full_checkpoint)) {
             return;
@@ -361,7 +361,9 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     LOG_INFO(fmt::format("Open new wal file {}", wal_path_));
 }
 
-String WalManager::GetWalFilename() const { return wal_path_; }
+String WalManager::GetWalFilename() const {
+    return wal_path_;
+}
 
 /*****************************************************************************
  * REPLAY WAL FILE

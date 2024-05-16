@@ -34,7 +34,6 @@ import defer_op;
 import config;
 import status;
 import infinity_exception;
-
 import variables;
 
 namespace infinity {

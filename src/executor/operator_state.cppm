@@ -52,7 +52,7 @@ export struct OperatorState {
     // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     Vector<UniquePtr<DataBlock>> data_block_array_{};
-    //    UniquePtr<String> error_message_{};
+//    UniquePtr<String> error_message_{};
     Status status_{};
     bool empty_source_{false};
 
@@ -425,7 +425,7 @@ export struct SourceState {
     bool complete_{false};
     OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
-    //    UniquePtr<String> error_message_{};
+//    UniquePtr<String> error_message_{};
     Status status_{};
 };
 
@@ -453,7 +453,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-    //    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
+//    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -505,7 +505,7 @@ export struct SinkState {
     u64 task_id_{};
     OperatorState *prev_op_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
-    //    UniquePtr<String> error_message_{};
+//    UniquePtr<String> error_message_{};
     Status status_{};
 };
 

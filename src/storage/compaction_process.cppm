@@ -17,7 +17,6 @@ module;
 export module compaction_process;
 
 import stl;
-
 import txn;
 import bg_task;
 import blocking_queue;

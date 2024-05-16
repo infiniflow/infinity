@@ -34,7 +34,6 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-
 import index_base;
 import index_base;
 import third_party;

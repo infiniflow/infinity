@@ -955,7 +955,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-        if (where_expr->Type().type() != LogicalType::kBoolean) {
+        if(where_expr->Type().type() != LogicalType::kBoolean) {
             RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
         }
         bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -977,7 +977,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-        if (where_expr->Type().type() != LogicalType::kBoolean) {
+        if(where_expr->Type().type() != LogicalType::kBoolean) {
             RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
         }
         bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);

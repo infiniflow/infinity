@@ -39,7 +39,6 @@ import txn_store;
 import segment_iter;
 import catalog_delta_entry;
 import status;
-
 import compact_state_data;
 import cleanup_scanner;
 import background_process;

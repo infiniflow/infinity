@@ -15,7 +15,6 @@
 module;
 
 #include <vector>
-#include <string>
 
 module buffer_manager;
 

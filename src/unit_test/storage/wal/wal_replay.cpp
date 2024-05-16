@@ -41,7 +41,6 @@ import index_hnsw;
 import index_full_text;
 import bg_task;
 import background_process;
-
 import default_values;
 import base_table_ref;
 import internal_types;
