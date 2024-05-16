@@ -577,8 +577,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                                   std::move(physical_agg_op),
                                                   logical_aggregate->GetOutputNames(),
                                                   logical_aggregate->GetOutputTypes(),
-                                                  logical_operator->load_metas());
-        // TODO: replace merge op load metas with MakeShared<Vector<LoadMeta>>() ?
+                                                  MakeShared<Vector<LoadMeta>>());
     }
 }
 
