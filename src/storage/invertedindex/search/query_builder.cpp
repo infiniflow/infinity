@@ -40,8 +40,8 @@ namespace infinity {
 QueryBuilder::QueryBuilder(Txn *txn, SharedPtr<BaseTableRef> &base_table_ref)
     : table_entry_(base_table_ref->table_entry_ptr_), index_reader_(table_entry_->GetFullTextIndexReader(txn)) {
     u64 total_row_count = 0;
-    for (SegmentEntry *segment_entry : base_table_ref->block_index_->segments_) {
-        total_row_count += segment_entry->row_count();
+    for (const auto &[segment_id, segment_info] : base_table_ref->block_index_->segment_block_index_) {
+        total_row_count += segment_info.segment_offset_;
     }
 
     scorer_.Init(total_row_count, &index_reader_);

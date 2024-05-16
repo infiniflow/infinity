@@ -34,7 +34,6 @@ import defer_op;
 import config;
 import status;
 import infinity_exception;
-import compact_segments_task;
 import variables;
 
 namespace infinity {
@@ -168,12 +167,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kCheckTable: {
-            break;
-        }
-        case CommandType::kCompactTable: {
-            auto *txn = query_context->GetTxn();
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry_, txn); // copy the table ref shared_ptr here
-            compact_task->Execute();
             break;
         }
         default: {

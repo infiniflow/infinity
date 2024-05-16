@@ -71,6 +71,10 @@ import physical_union_all;
 import physical_update;
 import physical_drop_index;
 import physical_command;
+import physical_compact;
+import physical_compact_index_prepare;
+import physical_compact_index_do;
+import physical_compact_finish;
 import physical_match;
 import physical_fusion;
 import physical_create_index_prepare;
@@ -111,6 +115,9 @@ import logical_dummy_scan;
 import logical_explain;
 import logical_drop_index;
 import logical_command;
+import logical_compact;
+import logical_compact_index;
+import logical_compact_finish;
 import logical_match;
 import logical_fusion;
 
@@ -124,6 +131,7 @@ import create_index_info;
 import command_statement;
 import explain_statement;
 import load_meta;
+import block_index;
 
 namespace infinity {
 
@@ -289,8 +297,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             result = BuildCommand(logical_operator);
             break;
         }
+        case LogicalNodeType::kCompact: {
+            result = BuildCompact(logical_operator);
+            break;
+        }
         case LogicalNodeType::kExplain: {
             result = BuildExplain(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCompactIndex: {
+            result = BuildCompactIndex(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCompactFinish: {
+            result = BuildCompactFinish(logical_operator);
             break;
         }
         default: {
@@ -892,15 +912,93 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_command = (LogicalCommand *)(logical_operator.get());
     auto command_info = logical_command->command_info();
-    auto ret = MakeUnique<PhysicalCommand>(logical_command->node_id(),
-                                           command_info,
-                                           logical_command->GetOutputNames(),
-                                           logical_command->GetOutputTypes(),
-                                           logical_operator->load_metas());
-    if (command_info->type() == CommandType::kCompactTable) {
-        ret->table_entry_ = logical_command->table_entry_;
+    return MakeUnique<PhysicalCommand>(logical_command->node_id(),
+                                       command_info,
+                                       logical_command->GetOutputNames(),
+                                       logical_command->GetOutputTypes(),
+                                       logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact = static_cast<const LogicalCompact *>(logical_operator.get());
+    if (logical_compact->left_node().get() != nullptr || logical_compact->right_node().get() != nullptr) {
+        UnrecoverableError("Compact node shouldn't have child.");
     }
-    return ret;
+    return MakeUnique<PhysicalCompact>(logical_compact->node_id(),
+                                       logical_compact->base_table_ref_,
+                                       logical_compact->compact_type_,
+                                       logical_compact->GetOutputNames(),
+                                       logical_compact->GetOutputTypes(),
+                                       logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactIndex(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact_index = static_cast<const LogicalCompactIndex *>(logical_operator.get());
+    if (logical_compact_index->right_node().get() != nullptr) {
+        UnrecoverableError("Compact index node shouldn't have right child.");
+    }
+    UniquePtr<PhysicalOperator> left{};
+    if (logical_compact_index->left_node().get() != nullptr) {
+        const auto &left_node = logical_compact_index->left_node();
+        left = BuildPhysicalOperator(left_node);
+    }
+    auto &index_index = logical_compact_index->base_table_ref_->index_index_;
+
+    bool use_prepare = false;
+    for (const auto &[index_name, index_snapshot] : index_index->index_snapshots_) {
+        const auto *index_base = index_snapshot->table_index_entry_->index_base();
+        if (index_base->index_type_ == IndexType::kHnsw) {
+            use_prepare = true;
+            break;
+        }
+    }
+    if (!use_prepare) {
+        return MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
+                                                       std::move(left),
+                                                       logical_compact_index->base_table_ref_,
+                                                       false,
+                                                       logical_compact_index->GetOutputNames(),
+                                                       logical_compact_index->GetOutputTypes(),
+                                                       logical_operator->load_metas());
+    }
+    auto compact_index_prepare = MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
+                                                                         std::move(left),
+                                                                         logical_compact_index->base_table_ref_,
+                                                                         true,
+                                                                         logical_compact_index->GetOutputNames(),
+                                                                         logical_compact_index->GetOutputTypes(),
+                                                                         logical_operator->load_metas());
+
+    auto compact_index_do = MakeUnique<PhysicalCompactIndexDo>(logical_compact_index->node_id(),
+                                                               std::move(compact_index_prepare),
+                                                               logical_compact_index->base_table_ref_,
+                                                               logical_compact_index->GetOutputNames(),
+                                                               logical_compact_index->GetOutputTypes(),
+                                                               logical_operator->load_metas());
+    return compact_index_do;
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact_finish = static_cast<const LogicalCompactFinish *>(logical_operator.get());
+    UniquePtr<PhysicalOperator> left{}, right{};
+    if (logical_compact_finish->left_node().get() != nullptr) {
+        const auto &left_logical_node = logical_compact_finish->left_node();
+        left = BuildPhysicalOperator(left_logical_node);
+        if (logical_compact_finish->right_node().get() != nullptr) {
+            const auto &right_logical_node = logical_compact_finish->right_node();
+            right = BuildPhysicalOperator(right_logical_node);
+        }
+    } else if (logical_compact_finish->right_node().get() != nullptr) {
+        UnrecoverableError("Compact finish node shouldn't have right child.");
+    }
+    return MakeUnique<PhysicalCompactFinish>(logical_compact_finish->node_id(),
+                                             std::move(left),
+                                             std::move(right),
+                                             logical_compact_finish->base_table_ref_,
+                                             logical_compact_finish->compact_type_,
+                                             logical_compact_finish->GetOutputNames(),
+                                             logical_compact_finish->GetOutputTypes(),
+                                             logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {

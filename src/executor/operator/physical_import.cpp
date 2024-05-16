@@ -460,6 +460,10 @@ void PhysicalImport::CSVRowHandler(void *context) {
                         column_count,
                         table_entry->ColumnCount()));
         LOG_ERROR(*err_msg);
+        for (SizeT i = 0; i < column_count; ++i) {
+            ZsvCell cell = parser_context->parser_.GetCell(i);
+            LOG_ERROR(fmt::format("Column {}: {}", i, std::string_view((char *)cell.str, cell.len)));
+        }
         RecoverableError(Status::ColumnCountMismatch(*err_msg));
     }
 

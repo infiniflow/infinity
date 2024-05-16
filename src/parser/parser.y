@@ -28,6 +28,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "statement/show_statement.h"
 #include "statement/update_statement.h"
 #include "statement/command_statement.h"
+#include "statement/compact_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -121,6 +122,7 @@ struct SQL_LTYPE {
     infinity::FlushStatement*  flush_stmt;
     infinity::OptimizeStatement*  optimize_stmt;
     infinity::CommandStatement* command_stmt;
+    infinity::CompactStatement* compact_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -394,6 +396,7 @@ struct SQL_LTYPE {
 %type <flush_stmt>        flush_statement
 %type <optimize_stmt>     optimize_statement
 %type <command_stmt>      command_statement
+%type <compact_stmt>      compact_statement
 
 %type <stmt_array>        statement_list
 
@@ -499,6 +502,7 @@ statement : create_statement { $$ = $1; }
 | flush_statement { $$ = $1; }
 | optimize_statement { $$ = $1; }
 | command_statement { $$ = $1; }
+| compact_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -511,6 +515,7 @@ explainable_statement : create_statement { $$ = $1; }
 | flush_statement { $$ = $1; }
 | optimize_statement { $$ = $1; }
 | command_statement { $$ = $1; }
+| compact_statement { $$ = $1; }
 
 /*
  * CREATE STATEMENT
@@ -1821,16 +1826,18 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kConfig, infinity::SetVarType::kDouble, $3, $4);
     free($3);
 }
-| COMPACT TABLE table_name {
-    $$ = new infinity::CommandStatement();
+
+compact_statement: COMPACT TABLE table_name {
+    std::string schema_name;
     if ($3->schema_name_ptr_ != nullptr) {
-        $$->command_info_ = std::make_unique<infinity::CompactTable>(std::string($3->schema_name_ptr_), std::string($3->table_name_ptr_));
+        schema_name = std::string($3->schema_name_ptr_);
         free($3->schema_name_ptr_);
-        free($3->table_name_ptr_);
-    } else {
-        $$->command_info_ = std::make_unique<infinity::CompactTable>(std::string($3->table_name_ptr_));
-        free($3->table_name_ptr_);
-    } delete $3;
+    }
+    std::string table_name = std::string($3->table_name_ptr_);
+    free($3->table_name_ptr_);
+
+    $$ = new infinity::ManualCompactStatement(std::move(schema_name), std::move(table_name));
+    delete $3;
 }
 
 /*

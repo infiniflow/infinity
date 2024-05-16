@@ -51,6 +51,7 @@ import base_statement;
 import parser_result;
 import parser_assert;
 import plan_fragment;
+import bg_query_state;
 
 namespace infinity {
 
@@ -107,10 +108,12 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     QueryResult query_result;
-    SharedPtr<LogicalNode> logical_plan = nullptr;
-    UniquePtr<PlanFragment> plan_fragment = nullptr;
-    UniquePtr<PhysicalOperator> physical_plan = nullptr;
+    Vector<SharedPtr<LogicalNode>> logical_plans{};
+    Vector<UniquePtr<PhysicalOperator>> physical_plans{};
+    SharedPtr<PlanFragment> plan_fragment{};
+    UniquePtr<Notifier> notifier{};
 
+    this->BeginTxn();
 //    ProfilerStart("Query");
 //    BaseProfiler profiler;
 //    profiler.Begin();
@@ -132,35 +135,44 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
-        logical_plan = logical_planner_->LogicalPlan();
+        logical_plans = logical_planner_->LogicalPlans();
         StopProfile(QueryPhase::kLogicalPlan);
 //        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
-        optimizer_->optimize(logical_plan, statement->type_);
+        for (auto &logical_plan : logical_plans) {
+            optimizer_->optimize(logical_plan, statement->type_);
+        }
         StopProfile(QueryPhase::kOptimizer);
 
         // Build physical plan
         StartProfile(QueryPhase::kPhysicalPlan);
-        physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
+        for (auto &logical_plan : logical_plans) {
+            auto physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
+            physical_plans.push_back(std::move(physical_plan));
+        }
         StopProfile(QueryPhase::kPhysicalPlan);
 //        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
-        // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
-        plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
+        {
+            Vector<PhysicalOperator *> physical_plan_ptrs;
+            for (auto &physical_plan : physical_plans) {
+                physical_plan_ptrs.push_back(physical_plan.get());
+            }
+            plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
+        }
         StopProfile(QueryPhase::kPipelineBuild);
 
-        auto notifier = MakeUnique<Notifier>();
-
         StartProfile(QueryPhase::kTaskBuild);
+        notifier = MakeUnique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
         StopProfile(QueryPhase::kTaskBuild);
 //        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
         scheduler_->Schedule(plan_fragment.get(), statement);
         query_result.result_table_ = plan_fragment->GetResult();
-        query_result.root_operator_type_ = logical_plan->operator_type();
+        query_result.root_operator_type_ = logical_plans.back()->operator_type();
         StopProfile(QueryPhase::kExecution);
 //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
@@ -196,6 +208,70 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     return query_result;
 }
 
+bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &state) {
+    QueryResult query_result;
+    try {
+        SharedPtr<BindContext> bind_context;
+        auto status = logical_planner_->Build(statement, bind_context);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        current_max_node_id_ = bind_context->GetNewLogicalNodeId();
+        state.logical_plans = logical_planner_->LogicalPlans();
+
+        for (auto &logical_plan : state.logical_plans) {
+            auto physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
+            state.physical_plans.push_back(std::move(physical_plan));
+        }
+
+        {
+            Vector<PhysicalOperator *> physical_plan_ptrs;
+            for (auto &physical_plan : state.physical_plans) {
+                physical_plan_ptrs.push_back(physical_plan.get());
+            }
+            state.plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
+        }
+
+        state.notifier = MakeUnique<Notifier>();
+        FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
+
+        scheduler_->Schedule(state.plan_fragment.get(), statement);
+    } catch (RecoverableException &e) {
+        this->RollbackTxn();
+        query_result.result_table_ = nullptr;
+        query_result.status_.Init(e.ErrorCode(), e.what());
+        return false;
+
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(e.what());
+        raise(SIGUSR1);
+    }
+    return true;
+}
+
+bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback) {
+    QueryResult query_result;
+    if (rollback) {
+        query_result.result_table_ = state.plan_fragment->GetResult();
+        this->RollbackTxn();
+        return false;
+    }
+    try {
+        query_result.result_table_ = state.plan_fragment->GetResult();
+        query_result.root_operator_type_ = state.logical_plans.back()->operator_type();
+        commit_ts = this->CommitTxn();
+    } catch (RecoverableException &e) {
+        query_result.result_table_ = nullptr;
+        query_result.status_.Init(e.ErrorCode(), e.what());
+        this->RollbackTxn();
+        return false;
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(e.what());
+        raise(SIGUSR1);
+    }
+    return true;
+}
+
 void QueryContext::BeginTxn() {
     if (session_ptr_->GetTxn() == nullptr) {
         Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr);
@@ -203,12 +279,13 @@ void QueryContext::BeginTxn() {
     }
 }
 
-void QueryContext::CommitTxn() {
+TxnTimeStamp QueryContext::CommitTxn() {
     Txn* txn = session_ptr_->GetTxn();
-    storage_->txn_manager()->CommitTxn(txn);
+    TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseCommittedTxnCount();
     storage_->txn_manager()->IncreaseCommittedTxnCount();
+    return commit_ts;
 }
 
 void QueryContext::RollbackTxn() {

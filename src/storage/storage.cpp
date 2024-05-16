@@ -44,6 +44,9 @@ import periodic_trigger_thread;
 import periodic_trigger;
 import log_file;
 
+import query_context;
+import infinity_context;
+
 namespace infinity {
 
 Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {}

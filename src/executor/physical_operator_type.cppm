@@ -95,6 +95,12 @@ export enum class PhysicalOperatorType : i8 {
     kOptimize,
     kCommand,
 
+    // Compact
+    kCompact,
+    kCompactIndexPrepare,
+    kCompactIndexDo,
+    kCompactFinish,
+
     kSink,
     kSource,
 };

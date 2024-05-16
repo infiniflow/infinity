@@ -162,7 +162,10 @@ public:
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
-    Status CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores);
+    Status CommitWrite(TransactionID txn_id,
+                       TxnTimeStamp commit_ts,
+                       const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                       const DeleteState *delete_state);
 
     Status RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores);
 
@@ -218,6 +221,8 @@ public:
     Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
     SharedPtr<BlockIndex> GetBlockIndex(Txn *txn);
+
+    SharedPtr<IndexIndex> GetIndexIndex(Txn *txn);
 
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
@@ -278,9 +283,9 @@ public:
 
     void AddDeleteToCompactionAlg(SegmentID segment_id);
 
-    Optional<CompactionInfo> CheckCompaction(std::function<Txn *()> generate_txn);
+    Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id);
 
-    Vector<SegmentEntry *> PickCompactSegments() const;
+    bool CompactPrepare() const;
 
 private:
     // the compaction algorithm, mutable because all its interface are protected by lock

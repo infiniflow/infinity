@@ -223,12 +223,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
     // Generate task set: index segment and no index block
     BlockIndex *block_index = base_table_ref_->block_index_.get();
-    for (SegmentEntry *segment_entry : block_index->segments_) {
-        if (auto iter = index_entry_map.find(segment_entry->segment_id()); iter != index_entry_map.end()) {
+    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+        if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
             index_entries_->emplace_back(iter->second.get());
         } else {
-            BlockEntryIter block_entry_iter(segment_entry);
-            for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+            const auto &block_map = segment_info.block_map_;
+            for (const auto *block_entry : block_map) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
                 block_column_entries_->emplace_back(block_column_entry);
             }
@@ -321,11 +321,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
         auto segment_id = segment_index_entry->segment_id();
         SegmentEntry *segment_entry = nullptr;
-        auto &segment_index_hashmap = base_table_ref_->block_index_->segment_index_;
+        const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
         } else {
-            segment_entry = iter->second;
+            segment_entry = iter->second.segment_entry_;
         }
         if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
             LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after common_query_filter",

@@ -59,7 +59,7 @@ struct WalCmd;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
-enum class CompactSegmentsTaskType;
+enum class CompactStatementType;
 
 export class Txn {
 public:
@@ -163,8 +163,7 @@ public:
 
     Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
-    Status
-    Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
+    Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }

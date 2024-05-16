@@ -86,11 +86,11 @@ SegmentEntry *SegmentLayer::FindSegment(SegmentID segment_id) {
     return nullptr;
 }
 
-Optional<CompactionInfo> DBTCompactionAlg::CheckCompaction(std::function<Txn *()> generate_txn) {
+Vector<SegmentEntry *> DBTCompactionAlg::CheckCompaction(TransactionID txn_id) {
     std::unique_lock lock(mtx_);
 
     if (status_ == CompactionStatus::kDisable) {
-        return None;
+        return {};
     }
 
     int cur_layer_n = segment_layers_.size();
@@ -100,15 +100,13 @@ Optional<CompactionInfo> DBTCompactionAlg::CheckCompaction(std::function<Txn *()
             if (++running_task_n_ == 1) {
                 status_ = CompactionStatus::kRunning;
             }
-            Txn *txn = generate_txn();
-            TransactionID txn_id = txn->TxnID();
             Vector<SegmentEntry *> compact_segments = segment_layer.PickCompacting(txn_id, config_.m_);
 
             txn_2_layer_.emplace(txn_id, layer);
-            return CompactionInfo(std::move(compact_segments), txn);
+            return compact_segments;
         }
     }
-    return None;
+    return {};
 }
 
 void DBTCompactionAlg::AddSegment(SegmentEntry *new_segment) {

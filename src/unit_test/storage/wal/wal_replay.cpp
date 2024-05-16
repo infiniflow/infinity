@@ -41,7 +41,6 @@ import index_hnsw;
 import index_full_text;
 import bg_task;
 import background_process;
-import compact_segments_task;
 import default_values;
 import base_table_ref;
 import internal_types;
@@ -59,6 +58,7 @@ import block_column_entry;
 import table_index_entry;
 import base_entry;
 import compilation_config;
+import compaction_process;
 
 using namespace infinity;
 
@@ -679,6 +679,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
         TxnManager *txn_mgr = storage->txn_manager();
+        CompactionProcessor *compaction_processor = storage->compaction_processor();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -738,16 +739,8 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         }
 
         { // add compact
-            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-            auto [table_entry, status] = txn4->GetTableByName("default_db", "tbl1");
-            EXPECT_NE(table_entry, nullptr);
-
-            {
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-                compact_task->Execute();
-            }
-            txn_mgr->CommitTxn(txn4);
+            auto commit_ts = compaction_processor->ManualDoCompact("default_db", "tbl1", false);
+            EXPECT_NE(commit_ts, 0u);
         }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG

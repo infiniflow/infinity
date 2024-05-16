@@ -46,7 +46,7 @@ import catalog_delta_entry;
 import bg_task;
 import background_process;
 import base_table_ref;
-import compact_segments_task;
+import compact_statement;
 import default_values;
 import chunk_index_entry;
 
@@ -120,7 +120,7 @@ Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool c
 }
 
 Status
-Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
+Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type) {
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
@@ -270,8 +270,7 @@ Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db
 
 Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
     auto *table_entry = table_ref->table_entry_ptr_;
-    auto [segment_index_entries, status] =
-        table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
+    auto [segment_index_entries, status] = table_index_entry->CreateIndexPrepare(table_ref, this, prepare, false, check_ts);
     if (!status.ok()) {
         return Status::OK();
     }
@@ -296,11 +295,8 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
     if (!status.ok()) {
         return status;
     }
-    if (table_index_entry->txn_id_ != txn_id_) {
-        UnrecoverableError("Index is not created by this txn. Something error happened.");
-    }
 
-    return table_index_entry->CreateIndexDo(table_entry, create_index_idxes, this);
+    return table_index_entry->CreateIndexDo(table_ref, create_index_idxes, this);
 }
 
 Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
