@@ -35,7 +35,7 @@ constexpr u64 Str2Int(const char *str, u64 last_value = basis) {
     return (*str != '\0' && *str != '-') ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value;
 }
 
-UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
+Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_view &name) {
     switch (Str2Int(name.data())) {
         case Str2Int(CHINESE.data()): {
             Analyzer *prototype = cache_[CHINESE].get();
@@ -49,18 +49,20 @@ UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
                     path = config->ResourcePath();
                 }
                 UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
-                if (!analyzer->Load()) {
-                    return nullptr;
+                Status load_status = analyzer->Load();
+                if (!load_status.ok()) {
+                    return {nullptr, load_status};
                 }
                 prototype = analyzer.get();
                 cache_[CHINESE] = std::move(analyzer);
             }
-            return MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype));
-        } break;
+            return {MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype)), Status::OK()};
+        }
         case Str2Int(STANDARD.data()): {
-            return MakeUnique<StandardAnalyzer>();
+            return {MakeUnique<StandardAnalyzer>(), Status::OK()};
         }
         case Str2Int(NGRAM.data()): {
+            // ngram-{number}
             u32 ngram = 0;
             const char *str = name.data();
             while (*str != '\0' && *str != '-') {
@@ -70,15 +72,16 @@ UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
                 str++;
                 ngram = std::strtol(str, nullptr, 10);
             } else {
-                return nullptr;
+                return {nullptr, Status::InvalidAnalyzerName(fmt::format("NGRAM-number, but it is {}.", name))};
             }
             if (ngram <= 0) {
-                return nullptr;
+                return {nullptr, Status::InvalidAnalyzerName(fmt::format("NGRAM-number, number > 0, but it is {}.", name))};
             }
-            return MakeUnique<NGramAnalyzer>(ngram);
+            return {MakeUnique<NGramAnalyzer>(ngram), Status::OK()};
         }
-        default:
-            return nullptr;
+        default: {
+            return {nullptr, Status::AnalyzerNotFound(name.data())};
+        }
     }
 }
 

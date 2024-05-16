@@ -56,7 +56,7 @@ ChineseAnalyzer::~ChineseAnalyzer() {
         delete jieba_;
 }
 
-bool ChineseAnalyzer::Load() {
+Status ChineseAnalyzer::Load() {
     fs::path root(dict_path_);
     fs::path dict_path(root / DICT_PATH);
     fs::path hmm_path(root / HMM_PATH);
@@ -66,33 +66,33 @@ bool ChineseAnalyzer::Load() {
 
     if (!fs::exists(dict_path)) {
         // LOG_INFO(fmt::format("Invalid jieba config {} dict for jieba_analyzer does not exist", dict_path.string()));
-        return false;
+        return Status::InvalidAnalyzerFile(dict_path);
     }
     if (!fs::exists(hmm_path)) {
         // LOG_INFO(fmt::format("Invalid jieba config {} hmm for jieba_analyzer does not exist", hmm_path.string()));
-        return false;
+        return Status::InvalidAnalyzerFile(hmm_path);
     }
     if (!fs::exists(userdict_path)) {
         // LOG_INFO(fmt::format("Invalid jieba config {} user_dict for jieba_analyzer does not exist", userdict_path.string()));
-        return false;
+        return Status::InvalidAnalyzerFile(userdict_path);
     }
     if (!fs::exists(idf_path)) {
         // LOG_INFO(fmt::format("Invalid jieba config {} idf for jieba_analyzer does not exist", idf_path.string()));
-        return false;
+        return Status::InvalidAnalyzerFile(idf_path);
     }
     if (!fs::exists(stopwords_path)) {
         // LOG_INFO(fmt::format("Invalid jieba config {} stopword for jieba_analyzer does not exist", stopwords_path.string()));
-        return false;
+        return Status::InvalidAnalyzerFile(stopwords_path);
     }
 
     try {
         jieba_ = new cppjieba::Jieba(dict_path.string(), hmm_path.string(), userdict_path.string(), idf_path.string(), stopwords_path.string());
     } catch (const std::exception &e) {
-        return false;
+        return Status::InvalidAnalyzerFile("Failed to load Jieba analyzer");
     }
     own_jieba_ = true;
     LoadStopwordsDict(stopwords_path.string());
-    return true;
+    return Status::OK();
 }
 
 void ChineseAnalyzer::LoadStopwordsDict(const String &stopwords_path) {

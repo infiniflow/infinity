@@ -148,9 +148,9 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
             analyzer_name = it->second;
         }
     }
-    UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
-    if (analyzer.get() == nullptr) {
-        RecoverableError(Status::UnexpectedError(String("Failed to get or initialize analyzer: ") + analyzer_name));
+    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+    if (!status.ok()) {
+        RecoverableError(status);
     }
     if (analyzer_name == AnalyzerPool::STANDARD) {
         TermList temp_output_terms;

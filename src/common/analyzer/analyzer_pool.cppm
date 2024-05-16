@@ -20,6 +20,7 @@ import stl;
 import singleton;
 import third_party;
 import analyzer;
+import status;
 
 namespace infinity {
 
@@ -27,7 +28,7 @@ export class AnalyzerPool : public Singleton<AnalyzerPool> {
 public:
     using CacheType = FlatHashMap<std::string_view, UniquePtr<Analyzer>>;
 
-    UniquePtr<Analyzer> Get(const std::string_view &name);
+    Tuple<UniquePtr<Analyzer>, Status> GetAnalyzer(const std::string_view &name);
 
     void Set(const std::string_view &name);
 

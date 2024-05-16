@@ -118,7 +118,8 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
 
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     if (offline) {
-        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, nullptr, column_lengths_);
+        auto inverter = MakeShared<ColumnInverter>(nullptr, column_lengths_);
+        inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
             SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             column_length_sum_ += column_length_sum;
@@ -130,7 +131,8 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         inverting_thread_pool_.push(std::move(func));
     } else {
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, provider, column_lengths_);
+        auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+        inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
             // LOG_INFO(fmt::format("online inverter {} begin", id));
             SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);

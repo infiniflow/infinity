@@ -1700,7 +1700,7 @@ void Config::PrintAll() {
     fmt::print(" - flush_method_at_commit: {}\n", FlushOptionTypeToString(FlushMethodAtCommit()));
 
     // Resource dir
-    fmt::print(" - wal_dir: {}\n", ResourcePath());
+    fmt::print(" - resource_dir: {}\n", ResourcePath());
 }
 
 } // namespace infinity
