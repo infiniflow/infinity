@@ -70,7 +70,7 @@ private:
     // inited by Init()
     u32 topn_ = 0;
 
-    bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
+    void ExecuteInner(QueryContext *query_context, MergeTensorMaxSimOperatorState *operator_state) const;
 };
 
 } // namespace infinity

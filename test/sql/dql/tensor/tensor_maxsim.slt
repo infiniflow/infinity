@@ -13,7 +13,7 @@ SELECT * FROM tensor_maxsim;
 ----
 test00 2 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]
 test11 4 [0.2,0.1,0.3,0.4]
-test22 6 [0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]
+test22 6 [0.3,0.2,-11.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]
 test33 8 [0.4,0.3,0.2,0.1]
 test44 12 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]
 test55 14 [0.2,0.1,0.3,0.4],[-0.4,0.3,0.2,0.1],[0,0.2,-0.3,-0.2],[0.3,-0.2,0.2,0.3]
@@ -39,8 +39,8 @@ PROJECT (3)
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MAXSIM(t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float');
 ----
+test22 636.870056
 test55 27.369999
-test22 11.910000
 test66 11.910000
 test33 3.620001
 test77 2.260000
@@ -52,17 +52,65 @@ test11 -9.660001
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MAXSIM(t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'topn=2');
 ----
+test22 636.870056
 test55 27.369999
-test22 11.910000
 
 # filter
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MAXSIM(t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float') WHERE 10 > num;
 ----
-test22 11.910000
+test22 636.870056
 test33 3.620001
 test00 -5.190000
 test11 -9.660001
+
+# two blocks
+statement ok
+COPY tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH ( DELIMITER ',' );
+
+query I
+EXPLAIN SELECT title, SCORE() FROM tensor_maxsim SEARCH MAXSIM(t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float') WHERE 10 > num;
+----
+PROJECT (3)
+ - table index: #4
+ - expressions: [title (#1), SCORE (#2)]
+-> MERGE TensorMaxSim (5)
+   - table name: tensor_maxsim(default_db.tensor_maxsim)
+   - table index: #1
+   - TensorMaxSimScan expression: TensorMaxSim(t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]])
+   - Top N: 10
+   - output columns: [num, title, __score, __rowid]
+  -> TensorMaxSimScan (2)
+     - table name: tensor_maxsim(default_db.tensor_maxsim)
+     - table index: #1
+     - TensorMaxSimScan expression: TensorMaxSim(t, [[0,-10,0,0.7],[9.2,45.6,-55.8,3.5]])
+     - Top N: 10
+     - filter for secondary index: None
+     - filter except secondary index: 10 > CAST(num (#0) AS BigInt)
+     - output columns: [num, title, __score, __rowid]
+
+# default top 10
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MAXSIM(t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float');
+----
+test22 636.870056
+test22 636.870056
+test55 27.369999
+test55 27.369999
+test66 11.910000
+test66 11.910000
+test33 3.620001
+test33 3.620001
+test77 2.260000
+test77 2.260000
+
+# filter, top 3
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MAXSIM(t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'topn=3') WHERE 10 > num;
+----
+test22 636.870056
+test22 636.870056
+test33 3.620001
 
 # Cleanup
 statement ok
