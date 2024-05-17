@@ -5,25 +5,31 @@ slug: /benchmark
 # Benchmark
 This document compares the following key specifications of Elasticsearch, Qdrant, and Infinity:
 
-- QPS
 - Recall
 - Time to insert & build index
 - Time to import & build index
-- Disk usage
-- Peak memory usage
+- query latency
+- QPS
+
+You need to watch resource (persisted index size, peak memory, peak cpu, system load etc.) manually.
+
+Keep the environment clean to ensure that the database under test is able to use up all resource of the system.
+
+Avoid to run multiple databases at the same time, as each one is a significant resource consumer.
 
 ## Versions
 |                   | Version |
 | ----------------- |---------|
-| **Elasticsearch** | v8.13.0 |
-| **Qdrant**        | v1.8.2  |
+| **Elasticsearch** | v8.13.4 |
+| **Qdrant**        | v1.9.2  |
 | **Infinity**      | v0.1.0  |
 
 ## Run Benchmark
 
-1. Install necessary dependencies. 
+1. Install necessary dependencies.
 
 ```python
+cd python/benchmark
 pip install -r requirements.txt
 ```
 
@@ -32,11 +38,27 @@ pip install -r requirements.txt
    - [GIST1M](http://ann-benchmarks.com/gist-960-euclidean.hdf5)
    - [Dbpedia](https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/dbpedia-entity.zip)
    - [Enwiki](https://home.apache.org/~mikemccand/enwiki-20120502-lines-1k.txt.lzma)
-3. Start up the databases to compare:
+
+Preprocess dataset:
+
 ```bash
-docker compose up -d
+sed '1d' datasets/enwiki/enwiki-20120502-lines-1k.txt > datasets/enwiki/enwiki.csv
 ```
-4. Run Benchmark: 
+
+3. Start up the databases to compare:
+
+```bash
+mkdir -p $HOME/elasticsearch
+docker run -d --name elasticsearch --network host -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms16384m -Xmx32000m" -e "xpack.security.enabled=false" -v $HOME/elasticsearch:/usr/share/elasticsearch elasticsearch:8.13.4
+
+mkdir -p $HOME/qdrant
+docker run -d --name qdrant --network host -v $HOME/qdrant:/qdrant qdrant/qdrant:v1.8.2
+
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
+```
+
+1. Run Benchmark: 
 
    > Tasks of this Python script include:
    >
@@ -45,10 +67,25 @@ docker compose up -d
    > - Calculate the time to insert data and build index
    > - Calculate QPS.
    > - Calculate query latencies. 
+
 ```bash
-python run.py
+$ python run.py -h
+usage: run.py [-h] [--generate] [--import] [--query] [--query-express QUERY_EXPRESS] [--engine ENGINE] [--dataset DATASET]
+
+RAG Database Benchmark
+
+options:
+  -h, --help            show this help message and exit
+  --generate            Generate fulltext queries based on the dataset
+  --import              Import data set into database engine
+  --query               Run single client to benchmark query latency
+  --query-express QUERY_EXPRESS
+                        Run multiple clients in express mode to benchmark QPS
+  --engine ENGINE       database engine to benchmark, one of: all, infinity, qdrant, elasticsearch
+  --dataset DATASET     data set to benchmark, one of: all, gist, sift, geonames, enwiki
 ```
-5. Navigate to the **results** folder to view the results and latency of each query. 
+
+2. Navigate to the **results** folder to view the results and latency of each query. 
 
 ## Benchmark Results
 ### SIFT1M
@@ -90,12 +127,19 @@ python run.py
 ### Enwiki
 
 > - 33000000 documents
-> - 100 queries
+> - 10000 `OR` queries generated based on the dataset. All terms are extracted from the dataset and very rare(occurrence < 100) terms are excluded. The number of terms of each query match the weight `[0.03, 0.15, 0.25, 0.25, 0.15, 0.08, 0.04, 0.03, 0.02]`.
 
-|                   | QPS  | Time to insert & build index | Time to import & build index | Disk  | Peak memory |
-| ----------------- | ----------- | ---------------------------- | ---------------------------- | ---- | ----- |
-| **Elasticsearch** | 484      | 2289 s                       | N/A                          | 28 GB  | 5.3 GB |
-| **Infinity**      | 484      | 2321 s                       | 944 s                        | 54 GB  | 5.1 GB |
+|                   | Time to insert & build index | Time to import & build index |
+| ----------------- | ---------------------------- | ---------------------------- |
+| **Elasticsearch** | 2289 s                       | N/A                          |
+| **Infinity**      | 2321 s                       | 944 s                        |
+
+
+| Python clients | infinity(qps, RES, vCPU) | elasticsearch(qps, RES, vCPU) |
+| -------------- | ------------------------ | ----------------------------- |
+| 1              | 636, 9G, 0.9             | 213, 20G, 3                   |
+| 4              | 1938, 9G, 3.2            | 672, 21G, 8.5                 |
+| 8              | 3294, 9G, 5.7            | 1174, 21G, 10                 |
 
 
 ---

@@ -19,7 +19,7 @@ REPORT_QPS_INTERVAL = 60
 
 def parse_args() -> argparse.Namespace:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="Vector Database Benchmark"
+        description="RAG Database Benchmark"
     )
     parser.add_argument(
         "--generate",

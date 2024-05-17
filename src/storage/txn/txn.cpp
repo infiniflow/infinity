@@ -268,11 +268,12 @@ Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db
     return catalog_->GetTableIndexInfo(db_name, table_name, index_name, txn_id_, begin_ts);
 }
 
-Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
+Pair<Vector<SegmentIndexEntry *>, Status>
+Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
     auto *table_entry = table_ref->table_entry_ptr_;
     auto [segment_index_entries, status] = table_index_entry->CreateIndexPrepare(table_ref, this, prepare, false, check_ts);
     if (!status.ok()) {
-        return Status::OK();
+        return {segment_index_entries, status};
     }
 
     auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
@@ -284,7 +285,7 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
         }
     }
-    return Status::OK();
+    return {segment_index_entries, Status::OK()};
 }
 
 // TODO: use table ref instead of table entry

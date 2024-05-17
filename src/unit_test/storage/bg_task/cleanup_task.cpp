@@ -453,7 +453,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
 
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
 
