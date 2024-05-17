@@ -26,7 +26,7 @@ tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
 
 echo
-echo 'step [4/5] : sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev'
+echo 'step [4/5] : sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev liburing-dev libthrift-dev'
 echo
 sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
 

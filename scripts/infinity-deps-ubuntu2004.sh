@@ -58,7 +58,7 @@ sudo add-apt-repository -y ppa:rhansen/qemu
 echo
 echo "step [8/9] : sudo apt update && sudo apt install -y g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev"
 echo
-sudo apt update && sudo apt install -y g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
+sudo apt update && sudo apt install -y g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev liburing-dev libthrift-dev
 
 echo
 echo 'step [9/9] : create a symbolic link for clang-scan-deps-17'

@@ -22,6 +22,7 @@ https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
 https://github.com/axboe/liburing/archive/refs/tags/liburing-2.5.tar.gz
 https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
 https://github.com/lz4/lz4/releases/download/v1.9.4/lz4-1.9.4.tar.gz
+https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
 https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
 https://github.com/gperftools/gperftools/releases/download/gperftools-2.15/gperftools-2.15.tar.gz
 https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-1.1.1w.tar.gz
