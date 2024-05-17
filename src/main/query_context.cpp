@@ -251,7 +251,30 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
     return true;
 }
 
-bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback) {
+bool QueryContext::ExecuteBGOperator(UniquePtr<PhysicalOperator> physical_operator, BGQueryState &state) {
+    QueryResult query_result;
+    try {
+        Vector<PhysicalOperator *> physical_plan_ptrs;
+        physical_plan_ptrs.push_back(physical_operator.get());
+
+        state.physical_plans.push_back(std::move(physical_operator));
+        
+        state.plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
+
+        state.notifier = MakeUnique<Notifier>();
+        FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
+
+        scheduler_->Schedule(state.plan_fragment.get(), nullptr);
+    } catch(RecoverableException &e) {
+        this->RollbackTxn();
+        query_result.result_table_ = nullptr;
+        query_result.status_.Init(e.ErrorCode(), e.what());
+        return false;
+    }
+    return true;
+}
+
+bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts_out, bool rollback) {
     QueryResult query_result;
     if (rollback) {
         query_result.result_table_ = state.plan_fragment->GetResult();
@@ -260,8 +283,7 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
     }
     try {
         query_result.result_table_ = state.plan_fragment->GetResult();
-        query_result.root_operator_type_ = state.logical_plans.back()->operator_type();
-        commit_ts = this->CommitTxn();
+        commit_ts_out = this->CommitTxn();
     } catch (RecoverableException &e) {
         query_result.result_table_ = nullptr;
         query_result.status_.Init(e.ErrorCode(), e.what());

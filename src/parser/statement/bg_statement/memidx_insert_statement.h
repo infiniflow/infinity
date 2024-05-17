@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#pragma once
 
-export module bg_query_state;
-
-import stl;
-import logical_node;
-import physical_operator;
-import plan_fragment;
-import fragment_context;
+#include "base_statement.h"
 
 namespace infinity {
 
-export struct BGQueryState {
-    Vector<SharedPtr<LogicalNode>> logical_plans{};
-    Vector<UniquePtr<PhysicalOperator>> physical_plans{};
-    SharedPtr<PlanFragment> plan_fragment{};
-    UniquePtr<Notifier> notifier{};
-};
+// struct TableIndexEntry;
+
+// class MemIdxInsertStatement : public BaseStatement {
+// public:
+// public:
+//     std::size_t offset_;
+//     std::size_t size_;
+// };
 
 } // namespace infinity

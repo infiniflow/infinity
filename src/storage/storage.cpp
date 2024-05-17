@@ -38,6 +38,7 @@ import infinity_exception;
 import status;
 import background_process;
 import compaction_process;
+import memindex_commit_process;
 import status;
 import bg_task;
 import periodic_trigger_thread;
@@ -87,6 +88,8 @@ void Storage::Init() {
     std::chrono::seconds optimize_interval = static_cast<std::chrono::seconds>(config_ptr_->OptimizeIndexInterval());
     bool enable_optimize = optimize_interval.count() > 0;
 
+    memindex_commit_processor_ = MakeUnique<MemIndexCommitProcessor>(new_catalog_.get(), txn_mgr_.get());
+
     if (enable_compaction || enable_optimize) {
         compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
     } else {
@@ -100,6 +103,7 @@ void Storage::Init() {
     new_catalog_->MemIndexRecover(buffer_mgr_.get());
 
     bg_processor_->Start();
+    memindex_commit_processor_->Start();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Start();
     }
@@ -158,6 +162,7 @@ void Storage::UnInit() {
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Stop();
     }
+    memindex_commit_processor_->Stop();
     bg_processor_->Stop();
     wal_mgr_->Stop();
 
@@ -166,6 +171,7 @@ void Storage::UnInit() {
         compact_processor_.reset();
     }
     bg_processor_.reset();
+    memindex_commit_processor_.reset();
     wal_mgr_.reset();
     new_catalog_.reset();
     buffer_mgr_.reset();

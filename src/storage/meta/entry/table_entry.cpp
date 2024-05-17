@@ -701,16 +701,6 @@ void TableEntry::MemIndexDump(Txn *txn, bool spill) {
     }
 }
 
-void TableEntry::MemIndexCommit() {
-    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
-        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
-        if (status.ok()) {
-            table_index_entry->MemIndexCommit();
-        }
-    }
-}
-
 void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {

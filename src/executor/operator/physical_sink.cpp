@@ -201,7 +201,22 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         case PhysicalOperatorType::kInvalid: {
             UnrecoverableError("Invalid operator");
         }
-        case PhysicalOperatorType::kCreateTable: {
+        case PhysicalOperatorType::kCreateTable: 
+        case PhysicalOperatorType::kCreateCollection:
+        case PhysicalOperatorType::kCreateDatabase: 
+        case PhysicalOperatorType::kCreateView:
+        case PhysicalOperatorType::kDropTable:
+        case PhysicalOperatorType::kDropIndex: 
+        case PhysicalOperatorType::kDropCollection:
+        case PhysicalOperatorType::kDropDatabase:
+        case PhysicalOperatorType::kDropView:
+        case PhysicalOperatorType::kCommand:
+        case PhysicalOperatorType::kFlush:
+        case PhysicalOperatorType::kOptimize:
+        case PhysicalOperatorType::kCreateIndexFinish:
+        case PhysicalOperatorType::kCreateIndexPrepare:
+        case PhysicalOperatorType::kCompactFinish:
+        case PhysicalOperatorType::kMemIndexCommit: {
             auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);
             if (!output_state->Ok()) {
                 result_sink_state->status_ = std::move(output_state->status_);
@@ -209,150 +224,6 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
-            break;
-        }
-        case PhysicalOperatorType::kCreateCollection: {
-            auto *output_state = static_cast<CreateCollectionOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kCreateDatabase: {
-            auto *output_state = static_cast<CreateDatabaseOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kCreateView: {
-            auto *output_state = static_cast<CreateViewOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kDropTable: {
-            auto *output_state = static_cast<DropTableOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kDropIndex: {
-            auto *output_state = static_cast<DropIndexOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
-                };
-            }
-            break;
-        }
-        case PhysicalOperatorType::kDropCollection: {
-            auto *output_state = static_cast<DropCollectionOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kDropDatabase: {
-            auto *output_state = static_cast<DropDatabaseOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kDropView: {
-            auto *output_state = static_cast<DropViewOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kCommand: {
-            auto *output_state = static_cast<CommandOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kFlush: {
-            auto *output_state = static_cast<FlushOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kOptimize: {
-            auto *output_state = static_cast<OptimizeOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
-            }
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            auto *output_state = static_cast<CreateIndexFinishOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-                break;
-            }
-            result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
-            };
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexPrepare: {
-            auto *output_state = static_cast<CreateIndexPrepareOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-                break;
-            }
-            result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
-            };
-            break;
-        }
-        case PhysicalOperatorType::kCompactFinish: {
-            auto *output_state = static_cast<CompactFinishOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-                break;
-            }
-            result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
-            };
             break;
         }
         default: {

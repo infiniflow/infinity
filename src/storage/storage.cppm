@@ -22,6 +22,7 @@ import buffer_manager;
 import wal_manager;
 import background_process;
 import compaction_process;
+import memindex_commit_process;
 import periodic_trigger_thread;
 import log_file;
 
@@ -62,6 +63,7 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
+    UniquePtr<MemIndexCommitProcessor> memindex_commit_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
 };

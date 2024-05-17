@@ -108,10 +108,6 @@ public:
     String GetPathNameTail() const;
     bool GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry);
 
-    // MemIndexCommit is non-blocking.
-    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
-    void MemIndexCommit();
-
     // MemIndexCommit is blocking.
     // Dump or spill the memory indexer
     SharedPtr<ChunkIndexEntry> MemIndexDump(TxnIndexStore *txn_index_store, bool spill = false);
@@ -167,6 +163,8 @@ private:
     SharedPtr<SegmentIndexEntry> last_segment_{};
 
 public:
+    SharedPtr<SegmentIndexEntry> &last_segment() { return last_segment_; }
+
     void Cleanup() override;
 
     void PickCleanup(CleanupScanner *scanner) override;

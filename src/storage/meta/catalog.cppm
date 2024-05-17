@@ -289,14 +289,9 @@ private: // TODO: remove this
 
     HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
-    Atomic<bool> running_{};
-    Thread mem_index_commit_thread_{};
-
-    void MemIndexCommit();
-
-    void MemIndexCommitLoop();
-
 public:
+    MetaMap<DBMeta>::MapGuard GetDBMetaMap() { return db_meta_map_.GetMetaMap(); }
+
     void MemIndexRecover(BufferManager *buffer_manager);
 
     void PickCleanup(CleanupScanner *scanner);

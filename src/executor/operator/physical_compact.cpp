@@ -193,7 +193,6 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     if (group_idx == compact_state_data->segment_data_list_.size()) {
         compact_operator_state->SetComplete();
     }
-    compact_operator_state->SetComplete();
 
     return true;
 }

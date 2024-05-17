@@ -102,24 +102,15 @@ Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
 
 // TODO Consider letting it commit as a transaction.
 Catalog::Catalog(SharedPtr<String> data_dir)
-    : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(*data_dir_ + "/" + String(CATALOG_FILE_DIR))), running_(true) {
+    : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(*data_dir_ + "/" + String(CATALOG_FILE_DIR))) {
     LocalFileSystem fs;
     if (!fs.Exists(*catalog_dir_)) {
         fs.CreateDirectory(*catalog_dir_);
     }
-    mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
     ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
 }
 
-Catalog::~Catalog() {
-    bool expected = true;
-    bool changed = running_.compare_exchange_strong(expected, false);
-    if (!changed) {
-        LOG_INFO("Catalog MemIndexCommitLoop was stopped...");
-        return;
-    }
-    mem_index_commit_thread_.join();
-}
+Catalog::~Catalog() {}
 
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
@@ -1004,29 +995,6 @@ void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_si
 void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
-
-void Catalog::MemIndexCommit() {
-    auto db_meta_map_guard = db_meta_map_.GetMetaMap();
-    for (auto &[_, db_meta] : *db_meta_map_guard) {
-        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
-        if (status.ok()) {
-            db_entry->MemIndexCommit();
-        }
-    }
-}
-
-void Catalog::MemIndexCommitLoop() {
-    auto prev_time = std::chrono::system_clock::now();
-    while (running_.load()) {
-        auto cur_time = std::chrono::system_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(cur_time - prev_time).count() < 1) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-        prev_time = cur_time;
-        MemIndexCommit();
-    }
-}
 
 void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();

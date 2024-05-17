@@ -333,13 +333,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
     max_ts_ = commit_ts;
 }
 
-void SegmentIndexEntry::MemIndexCommit() {
-    const IndexBase *index_base = table_index_entry_->index_base();
-    if (index_base->index_type_ != IndexType::kFullText || memory_indexer_.get() == nullptr)
-        return;
-    memory_indexer_->Commit();
-}
-
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();

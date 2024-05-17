@@ -14,48 +14,44 @@
 
 module;
 
-export module compaction_process;
+export module memindex_commit_process;
 
 import stl;
-import txn;
-import bg_task;
-import blocking_queue;
-import base_statement;
 
 namespace infinity {
 
-class Catalog;
+struct Catalog;
+class MemoryIndexer;
+class PhysicalMemIndexCommit;
 class TxnManager;
 
-export class CompactionProcessor {
+export class MemIndexCommitProcessor {
 public:
-    CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    MemIndexCommitProcessor(Catalog *catalog, TxnManager *txn_mgr);
 
     void Start();
 
     void Stop();
 
-    void Submit(SharedPtr<BGTask> bg_task);
-
-    void DoCompact();
-
-    // for unit test
-    TxnTimeStamp ManualDoCompact(const String &schema_name, const String &table_name, bool rollback, Optional<std::function<void()>> mid_func = None);
+    ~MemIndexCommitProcessor();
 
 private:
-    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
+    void MemIndexCommitLoop();
 
-    void ScanAndOptimize();
+    Vector<MemoryIndexer *> ScanForMemoryIndexers();
 
-    void Process();
+    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
+    void MemIndexCommit();
+
+    UniquePtr<PhysicalMemIndexCommit> MakeCommitOperator(MemoryIndexer *memory_indexer);
 
 private:
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
+    Thread mem_index_commit_thread_{};
 
-    Thread processor_thread_{};
+    Atomic<bool> running_{};
 
-    Catalog *catalog_{};
-    TxnManager *txn_mgr_{};
+    Catalog *catalog_;
+    TxnManager *txn_mgr_;
 };
 
 } // namespace infinity

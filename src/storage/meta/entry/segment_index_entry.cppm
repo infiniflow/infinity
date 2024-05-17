@@ -113,9 +113,6 @@ public:
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager *buffer_manager);
 
-    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
-    void MemIndexCommit();
-
     // Dump or spill the memory indexer
     SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
 

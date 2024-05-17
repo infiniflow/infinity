@@ -39,6 +39,7 @@ class PhysicalPlanner;
 class FragmentBuilder;
 class TaskScheduler;
 struct BGQueryState;
+class PhysicalOperator;
 
 export class QueryContext {
 
@@ -68,7 +69,9 @@ public:
 
     bool ExecuteBGStatement(BaseStatement *statement, BGQueryState &state);
 
-    bool JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback = false);
+    bool ExecuteBGOperator(UniquePtr<PhysicalOperator> physical_operator, BGQueryState &state);
+
+    bool JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts_out, bool rollback = false);
 
     inline void set_current_schema(const String &current_schema) { session_ptr_->set_current_schema(current_schema); }
 
