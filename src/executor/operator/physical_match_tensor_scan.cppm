@@ -14,14 +14,14 @@
 
 module;
 
-export module physical_tensor_maxsim_scan;
+export module physical_match_tensor_scan;
 
 import stl;
 import query_context;
 import operator_state;
 import physical_operator;
 import table_entry;
-import tensor_maxsim_expression;
+import match_tensor_expression;
 import base_table_ref;
 import data_type;
 import common_query_filter;
@@ -31,15 +31,15 @@ struct LoadMeta;
 struct GlobalBlockID;
 struct BlockIndex;
 
-export class PhysicalTensorMaxSimScan final : public PhysicalOperator {
+export class PhysicalMatchTensorScan final : public PhysicalOperator {
 public:
-    explicit PhysicalTensorMaxSimScan(u64 id,
-                                      u64 maxsim_table_index,
-                                      SharedPtr<BaseTableRef> base_table_ref,
-                                      SharedPtr<TensorMaxSimExpression> tensor_maxsim_expression,
-                                      const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                      u32 topn,
-                                      SharedPtr<Vector<LoadMeta>> load_metas);
+    explicit PhysicalMatchTensorScan(u64 id,
+                                     u64 table_index,
+                                     SharedPtr<BaseTableRef> base_table_ref,
+                                     SharedPtr<MatchTensorExpression> match_tensor_expression,
+                                     const SharedPtr<CommonQueryFilter> &common_query_filter,
+                                     u32 topn,
+                                     SharedPtr<Vector<LoadMeta>> load_metas);
 
     void Init() override;
 
@@ -65,7 +65,7 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline TensorMaxSimExpression *tensor_maxsim_expr() const { return tensor_maxsim_expr_.get(); }
+    [[nodiscard]] inline MatchTensorExpression *match_tensor_expr() const { return match_tensor_expr_.get(); }
 
     [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
 
@@ -76,19 +76,18 @@ public:
 private:
     u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_;
-    SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr_;
+    SharedPtr<MatchTensorExpression> match_tensor_expr_;
 
     // for filter
     SharedPtr<CommonQueryFilter> common_query_filter_;
 
-    // extra options from tensor_maxsim_expr
-    // inited by LogicalTensorMaxSimScan::InitExtraOptions
+    // extra options from match_tensor_expr_
     u32 topn_ = 0;
 
     // column to search
     ColumnID search_column_id_ = 0;
 
-    void ExecuteInner(QueryContext *query_context, TensorMaxSimScanOperatorState *operator_state) const;
+    void ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const;
 };
 
 } // namespace infinity

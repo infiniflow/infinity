@@ -14,7 +14,7 @@
 
 module;
 
-export module tensor_maxsim_scan_function_data;
+export module match_tensor_scan_function_data;
 
 import stl;
 import function_data;
@@ -27,10 +27,10 @@ import infinity_exception;
 
 namespace infinity {
 
-export class TensorMaxSimScanFunctionData : public TableFunctionData {
+export class MatchTensorScanFunctionData : public TableFunctionData {
 public:
     using ResultHandler = ReservoirResultHandler<CompareMin<float, RowID>>;
-    TensorMaxSimScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const u32 topn)
+    MatchTensorScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const u32 topn)
         : block_index_(block_index), global_block_ids_(global_block_ids), topn_(topn) {
         Init();
     }

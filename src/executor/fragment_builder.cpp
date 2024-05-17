@@ -182,7 +182,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeTensorMaxSim:
+        case PhysicalOperatorType::kMergeMatchTensor:
         case PhysicalOperatorType::kMergeKnn: {
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
@@ -220,7 +220,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kCrossProduct: {
             UnrecoverableError(fmt::format("Not support {}.", phys_op->GetName()));
         }
-        case PhysicalOperatorType::kTensorMaxSimScan:
+        case PhysicalOperatorType::kMatchTensorScan:
         case PhysicalOperatorType::kKnnScan: {
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));

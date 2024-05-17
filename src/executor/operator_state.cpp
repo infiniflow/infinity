@@ -89,11 +89,11 @@ bool QueueSourceState::GetData() {
             merge_knn_op_state->input_complete_ = completed;
             break;
         }
-        case PhysicalOperatorType::kMergeTensorMaxSim: {
+        case PhysicalOperatorType::kMergeMatchTensor: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
-            MergeTensorMaxSimOperatorState *merge_tensor_maxsim_op_state = (MergeTensorMaxSimOperatorState *)next_op_state;
-            merge_tensor_maxsim_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
-            merge_tensor_maxsim_op_state->input_complete_ = completed;
+            MergeMatchTensorOperatorState *merge_match_tensor_op_state = (MergeMatchTensorOperatorState *)next_op_state;
+            merge_match_tensor_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            merge_match_tensor_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kFusion: {

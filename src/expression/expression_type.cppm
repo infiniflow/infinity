@@ -96,7 +96,7 @@ export enum class ExpressionType {
     kSearch,
     kMatch,
     kFusion,
-    kTensorMaxSim,
+    kMatchTensor,
 
     // Misc.
     kKnn,

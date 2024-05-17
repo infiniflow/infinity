@@ -14,29 +14,29 @@
 
 module;
 
-export module physical_merge_tensor_maxsim;
+export module physical_merge_match_tensor;
 
 import stl;
 import query_context;
 import operator_state;
 import physical_operator;
 import table_entry;
-import tensor_maxsim_expression;
+import match_tensor_expression;
 import base_table_ref;
 import data_type;
 
 namespace infinity {
 struct LoadMeta;
 
-export class PhysicalMergeTensorMaxSim final : public PhysicalOperator {
+export class PhysicalMergeMatchTensor final : public PhysicalOperator {
 public:
-    PhysicalMergeTensorMaxSim(u64 id,
-                              UniquePtr<PhysicalOperator> left,
-                              u64 maxsim_table_index,
-                              SharedPtr<BaseTableRef> base_table_ref,
-                              SharedPtr<TensorMaxSimExpression> tensor_maxsim_expression,
-                              u32 topn,
-                              SharedPtr<Vector<LoadMeta>> load_metas);
+    PhysicalMergeMatchTensor(u64 id,
+                             UniquePtr<PhysicalOperator> left,
+                             u64 table_index,
+                             SharedPtr<BaseTableRef> base_table_ref,
+                             SharedPtr<MatchTensorExpression> match_tensor_expr,
+                             u32 topn,
+                             SharedPtr<Vector<LoadMeta>> load_metas);
 
     void Init() override;
 
@@ -58,19 +58,19 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline TensorMaxSimExpression *tensor_maxsim_expr() const { return tensor_maxsim_expr_.get(); }
+    [[nodiscard]] inline MatchTensorExpression *tensor_maxsim_expr() const { return match_tensor_expr_.get(); }
 
     [[nodiscard]] inline u32 GetTopN() const { return topn_; }
 
 private:
     u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_;
-    SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr_;
+    SharedPtr<MatchTensorExpression> match_tensor_expr_;
     // extra options from tensor_maxsim_expr
     // inited by Init()
     u32 topn_ = 0;
 
-    void ExecuteInner(QueryContext *query_context, MergeTensorMaxSimOperatorState *operator_state) const;
+    void ExecuteInner(QueryContext *query_context, MergeMatchTensorOperatorState *operator_state) const;
 };
 
 } // namespace infinity

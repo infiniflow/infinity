@@ -41,7 +41,7 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
             UnrecoverableError("Unsupported source state type.");
             break;
         }
-        case SourceStateType::kTensorMaxSimScan:
+        case SourceStateType::kMatchTensorScan:
         case SourceStateType::kKnnScan:
         case SourceStateType::kTableScan:
         case SourceStateType::kIndexScan:

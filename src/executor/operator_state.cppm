@@ -23,7 +23,7 @@ import fragment_data;
 import data_block;
 import table_scan_function_data;
 import knn_scan_data;
-import tensor_maxsim_scan_function_data;
+import match_tensor_scan_function_data;
 import compact_state_data;
 import table_def;
 
@@ -104,16 +104,16 @@ export struct TableScanOperatorState : public OperatorState {
     UniquePtr<TableScanFunctionData> table_scan_function_data_{};
 };
 
-// TensorMaxSimScan
-export struct TensorMaxSimScanOperatorState : public OperatorState {
-    inline explicit TensorMaxSimScanOperatorState() : OperatorState(PhysicalOperatorType::kTensorMaxSimScan) {}
+// MatchTensorScan
+export struct MatchTensorScanOperatorState : public OperatorState {
+    inline explicit MatchTensorScanOperatorState() : OperatorState(PhysicalOperatorType::kMatchTensorScan) {}
 
-    UniquePtr<TensorMaxSimScanFunctionData> tensor_maxsim_scan_function_data_{};
+    UniquePtr<MatchTensorScanFunctionData> match_tensor_scan_function_data_{};
 };
 
-// MergeTensorMaxSim
-export struct MergeTensorMaxSimOperatorState : public OperatorState {
-    inline explicit MergeTensorMaxSimOperatorState() : OperatorState(PhysicalOperatorType::kMergeTensorMaxSim) {}
+// MergeMatchTensor
+export struct MergeMatchTensorOperatorState : public OperatorState {
+    inline explicit MergeMatchTensorOperatorState() : OperatorState(PhysicalOperatorType::kMergeMatchTensor) {}
 
     Vector<UniquePtr<DataBlock>> middle_sorted_data_blocks_; // middle result
     u32 middle_result_count_{};
@@ -427,7 +427,7 @@ export enum class SourceStateType {
     kTableScan,
     kIndexScan,
     kKnnScan,
-    kTensorMaxSimScan,
+    kMatchTensorScan,
     kCompact,
     kEmpty,
 };
@@ -482,9 +482,9 @@ export struct TableScanSourceState : public SourceState {
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };
 
-export struct TensorMaxSimScanSourceState : public SourceState {
-    explicit TensorMaxSimScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
-        : SourceState(SourceStateType::kTensorMaxSimScan), global_ids_(std::move(global_ids)) {}
+export struct MatchTensorScanSourceState : public SourceState {
+    explicit MatchTensorScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
+        : SourceState(SourceStateType::kMatchTensorScan), global_ids_(std::move(global_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };

@@ -18,17 +18,20 @@
 #include "type/complex/embedding_type.h"
 namespace infinity {
 
-class TensorMaxSimExpr final : public ParsedExpr {
+enum class MatchTensorMethod : uint8_t {
+    kInvalid,
+    kMaxSim,
+};
+
+class MatchTensorExpr final : public ParsedExpr {
 public:
-    explicit TensorMaxSimExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kTensorMaxSim), own_memory_(own_memory) {}
-
-    ~TensorMaxSimExpr() override;
-
+    explicit MatchTensorExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kTensorMaxSim), own_memory_(own_memory) {}
+    ~MatchTensorExpr() override;
     [[nodiscard]] std::string ToString() const override;
+    static std::string MethodToString(MatchTensorMethod method);
 
-public:
     const bool own_memory_;
-
+    MatchTensorMethod search_method_ = MatchTensorMethod::kInvalid;
     ParsedExpr *column_expr_{};
     void *embedding_data_ptr_{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
     uint32_t dimension_{};

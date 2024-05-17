@@ -28,7 +28,7 @@ import physical_operator;
 import physical_operator_type;
 
 import table_scan_function_data;
-import tensor_maxsim_scan_function_data;
+import match_tensor_scan_function_data;
 import knn_scan_data;
 import physical_table_scan;
 import physical_index_scan;
@@ -40,7 +40,7 @@ import physical_create_index_do;
 import physical_sort;
 import physical_top;
 import physical_merge_top;
-import physical_tensor_maxsim_scan;
+import physical_match_tensor_scan;
 import physical_compact;
 import physical_compact_index_prepare;
 import physical_compact_index_do;
@@ -102,21 +102,21 @@ UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_sc
     return operator_state;
 }
 
-UniquePtr<OperatorState> MakeTensorMaxSimScanState(const PhysicalTensorMaxSimScan *physical_tensor_maxsim_scan, FragmentTask *task) {
+UniquePtr<OperatorState> MakeMatchTensorScanState(const PhysicalMatchTensorScan *physical_match_tensor_scan, FragmentTask *task) {
     SourceState *source_state = task->source_state_.get();
-    if (source_state->state_type_ != SourceStateType::kTensorMaxSimScan) {
-        UnrecoverableError("Expect TensorMaxSimScan source state");
+    if (source_state->state_type_ != SourceStateType::kMatchTensorScan) {
+        UnrecoverableError("Expect MatchTensorScan source state");
     }
-    auto *tensor_maxsim_scan_source_state = static_cast<TensorMaxSimScanSourceState *>(source_state);
-    auto operator_state = MakeUnique<TensorMaxSimScanOperatorState>();
-    operator_state->tensor_maxsim_scan_function_data_ = MakeUnique<TensorMaxSimScanFunctionData>(physical_tensor_maxsim_scan->GetBlockIndex(),
-                                                                                                 tensor_maxsim_scan_source_state->global_ids_,
-                                                                                                 physical_tensor_maxsim_scan->GetTopN());
+    auto *match_tensor_scan_source_state = static_cast<MatchTensorScanSourceState *>(source_state);
+    auto operator_state = MakeUnique<MatchTensorScanOperatorState>();
+    operator_state->match_tensor_scan_function_data_ = MakeUnique<MatchTensorScanFunctionData>(physical_match_tensor_scan->GetBlockIndex(),
+                                                                                               match_tensor_scan_source_state->global_ids_,
+                                                                                               physical_match_tensor_scan->GetTopN());
     return operator_state;
 }
 
-UniquePtr<OperatorState> MakeMergeTensorMaxSimState(PhysicalOperator *physical_op) {
-    auto operator_state = MakeUnique<MergeTensorMaxSimOperatorState>();
+UniquePtr<OperatorState> MakeMergeMatchTensorState(PhysicalOperator *physical_op) {
+    auto operator_state = MakeUnique<MergeMatchTensorOperatorState>();
     return operator_state;
 }
 
@@ -328,12 +328,12 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kMergeTop: {
             return MakeMergeTopState(physical_ops[operator_id]);
         }
-        case PhysicalOperatorType::kTensorMaxSimScan: {
-            auto physical_maxsim_scan = static_cast<PhysicalTensorMaxSimScan *>(physical_ops[operator_id]);
-            return MakeTensorMaxSimScanState(physical_maxsim_scan, task);
+        case PhysicalOperatorType::kMatchTensorScan: {
+            auto physical_match_tensor_scan = static_cast<PhysicalMatchTensorScan *>(physical_ops[operator_id]);
+            return MakeMatchTensorScanState(physical_match_tensor_scan, task);
         }
-        case PhysicalOperatorType::kMergeTensorMaxSim: {
-            return MakeMergeTensorMaxSimState(physical_ops[operator_id]);
+        case PhysicalOperatorType::kMergeMatchTensor: {
+            return MakeMergeMatchTensorState(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kProjection: {
             return MakeTaskStateTemplate<ProjectionOperatorState>(physical_ops[operator_id]);
@@ -795,7 +795,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
         case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kMergeTensorMaxSim:
+        case PhysicalOperatorType::kMergeMatchTensor:
         case PhysicalOperatorType::kFusion: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
@@ -847,7 +847,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
             break;
         }
-        case PhysicalOperatorType::kTensorMaxSimScan: {
+        case PhysicalOperatorType::kMatchTensorScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in parallel/serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -856,10 +856,10 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                 UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
             }
             // Partition the hash range to each source state
-            auto *maxsim_scan_operator = (PhysicalTensorMaxSimScan *)first_operator;
-            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = maxsim_scan_operator->PlanBlockEntries(parallel_count);
+            auto *match_tensor_scan_operator = (PhysicalMatchTensorScan *)first_operator;
+            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = match_tensor_scan_operator->PlanBlockEntries(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<TensorMaxSimScanSourceState>(std::move(blocks_group[task_id]));
+                tasks_[task_id]->source_state_ = MakeUnique<MatchTensorScanSourceState>(std::move(blocks_group[task_id]));
             }
             break;
         }
@@ -998,7 +998,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeTensorMaxSim:
+        case PhysicalOperatorType::kMergeMatchTensor:
         case PhysicalOperatorType::kMergeKnn: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
@@ -1038,7 +1038,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort:
-        case PhysicalOperatorType::kTensorMaxSimScan:
+        case PhysicalOperatorType::kMatchTensorScan:
         case PhysicalOperatorType::kKnnScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
@@ -1198,9 +1198,9 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
             }
             break;
         }
-        case PhysicalOperatorType::kTensorMaxSimScan: {
-            auto *maxsim_scan_operator = static_cast<PhysicalTensorMaxSimScan *>(first_operator);
-            parallel_count = std::min(parallel_count, (i64)(maxsim_scan_operator->TaskletCount()));
+        case PhysicalOperatorType::kMatchTensorScan: {
+            auto *match_tensor_scan_operator = static_cast<PhysicalMatchTensorScan *>(first_operator);
+            parallel_count = std::min(parallel_count, (i64)(match_tensor_scan_operator->TaskletCount()));
             if (parallel_count == 0) {
                 parallel_count = 1;
             }
@@ -1225,7 +1225,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
         }
         case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kMergeTensorMaxSim:
+        case PhysicalOperatorType::kMergeMatchTensor:
         case PhysicalOperatorType::kProjection: {
             // Serial Materialize
             parallel_count = 1;

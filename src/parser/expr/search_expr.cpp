@@ -2,7 +2,7 @@
 #include "fusion_expr.h"
 #include "knn_expr.h"
 #include "match_expr.h"
-#include "tensor_maxsim_expr.h"
+#include "match_tensor_expr.h"
 #include "spdlog/fmt/fmt.h"
 #include <cmath>
 #include <sstream>
@@ -63,10 +63,10 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
 void SearchExpr::Validate() const {
     size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + tensor_maxsim_exprs_.size();
     if (num_sub_expr <= 0) {
-        ParserError("Need at least one KNN/MATCH/MAXSIM/QUERY expression");
+        ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / QUERY expression");
     } else if (num_sub_expr >= 2) {
         if (fusion_expr_ == nullptr)
-            ParserError("Need FUSION expr since there are multiple KNN/MATCH/MAXSIM/QUERY expressions");
+            ParserError("Need FUSION expr since there are multiple MATCH VECTOR / MATCH TENSOR / MATCH TEXT / QUERY expressions");
     }
 }
 
@@ -79,7 +79,7 @@ void SearchExpr::AddExpr(infinity::ParsedExpr *expr) {
             match_exprs_.push_back(static_cast<MatchExpr *>(expr));
             break;
         case ParsedExprType::kTensorMaxSim:
-            tensor_maxsim_exprs_.push_back(static_cast<TensorMaxSimExpr *>(expr));
+            tensor_maxsim_exprs_.push_back(static_cast<MatchTensorExpr *>(expr));
             break;
         case ParsedExprType::kFusion:
             if (fusion_expr_ != nullptr) {

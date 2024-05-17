@@ -48,7 +48,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kJoin:
         case LogicalNodeType::kMatch:
-        case LogicalNodeType::kTensorMaxSimScan:
+        case LogicalNodeType::kMatchTensorScan:
         case LogicalNodeType::kKnnScan: {
             VisitNodeChildren(op);
             bindings_ = op.GetColumnBindings();

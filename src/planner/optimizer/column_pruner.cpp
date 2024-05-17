@@ -31,7 +31,7 @@ import logical_table_scan;
 import logical_index_scan;
 import logical_match;
 import logical_knn_scan;
-import logical_tensor_maxsim_scan;
+import logical_match_tensor_scan;
 import base_table_ref;
 import function;
 import column_binding;
@@ -132,14 +132,14 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             scan.base_table_ref_->RetainColumnByIndices(project_indices);
             return;
         }
-        case LogicalNodeType::kTensorMaxSimScan: {
+        case LogicalNodeType::kMatchTensorScan: {
             VisitNodeExpression(op);
-            auto &maxsim = op.Cast<LogicalTensorMaxSimScan>();
+            auto &match_tensor = op.Cast<LogicalMatchTensorScan>();
             if (all_referenced_) {
                 return;
             }
-            Vector<SizeT> project_indices = ClearUnusedBaseTableColumns(maxsim.base_table_ref_->column_ids_, maxsim.TableIndex());
-            maxsim.base_table_ref_->RetainColumnByIndices(project_indices);
+            Vector<SizeT> project_indices = ClearUnusedBaseTableColumns(match_tensor.base_table_ref_->column_ids_, match_tensor.TableIndex());
+            match_tensor.base_table_ref_->RetainColumnByIndices(project_indices);
             return;
         }
         case LogicalNodeType::kViewScan:

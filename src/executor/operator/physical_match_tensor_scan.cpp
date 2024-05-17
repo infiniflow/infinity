@@ -16,7 +16,7 @@ module;
 
 #include <string>
 #include <vector>
-module physical_tensor_maxsim_scan;
+module physical_match_tensor_scan;
 
 import stl;
 import txn;
@@ -31,7 +31,9 @@ import column_vector;
 import expression_evaluator;
 import expression_state;
 import base_expression;
-import tensor_maxsim_expression;
+import knn_expr;
+import match_tensor_expr;
+import match_tensor_expression;
 import default_values;
 import infinity_exception;
 import third_party;
@@ -53,29 +55,28 @@ import column_def;
 import internal_types;
 import fix_heap;
 import type_info;
-import knn_expr;
 import embedding_info;
 import buffer_manager;
-import tensor_maxsim_scan_function_data;
+import match_tensor_scan_function_data;
 import mlas_matrix_multiply;
 
 namespace infinity {
 
-PhysicalTensorMaxSimScan::PhysicalTensorMaxSimScan(const u64 id,
-                                                   const u64 maxsim_table_index,
-                                                   SharedPtr<BaseTableRef> base_table_ref,
-                                                   SharedPtr<TensorMaxSimExpression> tensor_maxsim_expression,
-                                                   const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                                   const u32 topn,
-                                                   SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kTensorMaxSimScan, nullptr, nullptr, id, load_metas), table_index_(maxsim_table_index),
-      base_table_ref_(std::move(base_table_ref)), tensor_maxsim_expr_(std::move(tensor_maxsim_expression)), common_query_filter_(common_query_filter),
+PhysicalMatchTensorScan::PhysicalMatchTensorScan(const u64 id,
+                                                 const u64 table_index,
+                                                 SharedPtr<BaseTableRef> base_table_ref,
+                                                 SharedPtr<MatchTensorExpression> match_tensor_expr,
+                                                 const SharedPtr<CommonQueryFilter> &common_query_filter,
+                                                 const u32 topn,
+                                                 SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kMatchTensorScan, nullptr, nullptr, id, load_metas), table_index_(table_index),
+      base_table_ref_(std::move(base_table_ref)), match_tensor_expr_(std::move(match_tensor_expr)), common_query_filter_(common_query_filter),
       topn_(topn) {
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
-void PhysicalTensorMaxSimScan::Init() {
-    search_column_id_ = tensor_maxsim_expr_->column_expr_->binding().column_idx;
+void PhysicalMatchTensorScan::Init() {
+    search_column_id_ = match_tensor_expr_->column_expr_->binding().column_idx;
     const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
     const auto &column_type_ptr = column_def->type();
     if (column_type_ptr->type() != LogicalType::kTensor) {
@@ -86,16 +87,24 @@ void PhysicalTensorMaxSimScan::Init() {
         UnrecoverableError(fmt::format("Column {} is not a tensor column", column_def->name()));
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
-    if (embedding_info->Dimension() != tensor_maxsim_expr_->tensor_basic_embedding_dimension_) {
-        UnrecoverableError(fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), tensor_maxsim_expr_->ToString()));
+    if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
+        UnrecoverableError(fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString()));
     }
-    // TODO: now only support float32
-    if (embedding_info->Type() != tensor_maxsim_expr_->embedding_data_type_ or embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-        UnrecoverableError("Now only support tensor maxsim search on float column.");
+    // TODO: now only support MaxSim
+    if (match_tensor_expr_->search_method_ != MatchTensorMethod::kMaxSim) {
+        UnrecoverableError("Now only support MaxSim search.");
+    }
+    // TODO: now only support search on float32 tensor column
+    if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+        UnrecoverableError("Now only support tensor search on float column.");
+    }
+    // TODO: now only support float32 tensor query
+    if (match_tensor_expr_->embedding_data_type_ != EmbeddingDataType::kElemFloat) {
+        UnrecoverableError("Now only support float32 tensor query.");
     }
 }
 
-SharedPtr<Vector<String>> PhysicalTensorMaxSimScan::GetOutputNames() const {
+SharedPtr<Vector<String>> PhysicalMatchTensorScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
     result_names->reserve(base_table_ref_->column_names_->size() + 2);
     for (auto &name : *base_table_ref_->column_names_) {
@@ -106,29 +115,29 @@ SharedPtr<Vector<String>> PhysicalTensorMaxSimScan::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalTensorMaxSimScan::GetOutputTypes() const {
+SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
     result_types->reserve(base_table_ref_->column_types_->size() + 2);
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(tensor_maxsim_expr_->Type()));
+    result_types->emplace_back(MakeShared<DataType>(match_tensor_expr_->Type()));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
-SizeT PhysicalTensorMaxSimScan::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
+SizeT PhysicalMatchTensorScan::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
 
-BlockIndex *PhysicalTensorMaxSimScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
+BlockIndex *PhysicalMatchTensorScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
 
-ColumnID PhysicalTensorMaxSimScan::SearchColumnID() const {
+ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
     if (search_column_id_ == std::numeric_limits<ColumnID>::max()) {
         UnrecoverableError("Search column id is not set. Init() error.");
     }
     return search_column_id_;
 }
 
-Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTensorMaxSimScan::PlanBlockEntries(i64 parallel_count) const {
+Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntries(i64 parallel_count) const {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
 
     u64 all_block_count = block_index->BlockCount();
@@ -155,13 +164,13 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTensorMaxSimScan::PlanBlockEntr
     return result;
 }
 
-bool PhysicalTensorMaxSimScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    auto *tensor_maxsim_scan_operator_state = static_cast<TensorMaxSimScanOperatorState *>(operator_state);
-    ExecuteInner(query_context, tensor_maxsim_scan_operator_state);
+bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto *match_tensor_scan_operator_state = static_cast<MatchTensorScanOperatorState *>(operator_state);
+    ExecuteInner(query_context, match_tensor_scan_operator_state);
     return true;
 }
 
-void PhysicalTensorMaxSimScan::ExecuteInner(QueryContext *query_context, TensorMaxSimScanOperatorState *operator_state) const {
+void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const {
     if (!operator_state->data_block_array_.empty()) {
         UnrecoverableError("TensorScan output data block array should be empty");
     }
@@ -172,9 +181,9 @@ void PhysicalTensorMaxSimScan::ExecuteInner(QueryContext *query_context, TensorM
         // not ready, abort and wait for next time
         return;
     }
-    TensorMaxSimScanFunctionData &function_data = *(operator_state->tensor_maxsim_scan_function_data_);
+    MatchTensorScanFunctionData &function_data = *(operator_state->match_tensor_scan_function_data_);
     if (function_data.finished_) [[unlikely]] {
-        UnrecoverableError("TensorMaxSimScanFunctionData is finished");
+        UnrecoverableError("MatchTensorScanFunctionData is finished");
     }
     const auto search_column_id = SearchColumnID();
     const BlockIndex *block_index = function_data.block_index_;
@@ -218,15 +227,15 @@ void PhysicalTensorMaxSimScan::ExecuteInner(QueryContext *query_context, TensorM
             auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
             FixHeapManager *fix_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
             // query tensor
-            const char *query_tensor_ptr = tensor_maxsim_expr_->query_embedding_.ptr;
-            const u32 query_embedding_num = tensor_maxsim_expr_->num_of_embedding_in_query_tensor_;
-            const u32 basic_embedding_dimension = tensor_maxsim_expr_->tensor_basic_embedding_dimension_;
+            const char *query_tensor_ptr = match_tensor_expr_->query_embedding_.ptr;
+            const u32 query_embedding_num = match_tensor_expr_->num_of_embedding_in_query_tensor_;
+            const u32 basic_embedding_dimension = match_tensor_expr_->tensor_basic_embedding_dimension_;
             const u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
             for (u32 i = 0; i < row_count; ++i) {
                 if (bitmask.IsTrue(i)) {
                     const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[i];
                     const char *tensor_data_ptr = fix_heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
-                    // TODO: now only support float32 (check Init())
+                    // TODO: now only support MaxSim on float32 tensor (check Init())
                     // use mlas
                     auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * embedding_num);
                     matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
@@ -250,7 +259,7 @@ void PhysicalTensorMaxSimScan::ExecuteInner(QueryContext *query_context, TensorM
         }
     }
     if (block_ids_idx >= block_ids.size()) {
-        LOG_TRACE(fmt::format("TensorMaxSimScan: {} task finished", block_ids_idx));
+        LOG_TRACE(fmt::format("MatchTensorScan: {} task finished", block_ids_idx));
         // all task Complete
         const u32 result_n = function_data.End();
         const auto output_type_ptr = GetOutputTypes();

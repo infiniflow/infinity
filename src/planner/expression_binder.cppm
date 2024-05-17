@@ -30,7 +30,7 @@ import function_expr;
 import case_expr;
 import in_expr;
 import knn_expr;
-import tensor_maxsim_expr;
+import match_tensor_expr;
 import search_expr;
 import subquery_expr;
 import cast_expr;
@@ -74,7 +74,7 @@ public:
 
     virtual SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual SharedPtr<BaseExpression> BuildTensorMaxSimExpr(const TensorMaxSimExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+    virtual SharedPtr<BaseExpression> BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual SharedPtr<BaseExpression> BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 

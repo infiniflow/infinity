@@ -24,7 +24,7 @@ import logical_table_scan;
 import logical_index_scan;
 import logical_knn_scan;
 import logical_match;
-import logical_tensor_maxsim_scan;
+import logical_match_tensor_scan;
 import query_context;
 import logical_node_visitor;
 import infinity_exception;
@@ -94,9 +94,9 @@ public:
         } else if (op->operator_type() == LogicalNodeType::kMatch) {
             auto &match = static_cast<LogicalMatch &>(*op);
             match.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
-        } else if (op->operator_type() == LogicalNodeType::kTensorMaxSimScan) {
-            auto &maxsim = static_cast<LogicalTensorMaxSimScan &>(*op);
-            maxsim.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
+        } else if (op->operator_type() == LogicalNodeType::kMatchTensorScan) {
+            auto &match_tensor = static_cast<LogicalMatchTensorScan &>(*op);
+            match_tensor.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
         }
         // visit children after handling current node
         VisitNode(op->left_node());

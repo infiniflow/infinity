@@ -27,7 +27,7 @@ import logical_table_scan;
 import logical_index_scan;
 import logical_knn_scan;
 import logical_match;
-import logical_tensor_maxsim_scan;
+import logical_match_tensor_scan;
 import base_table_ref;
 import load_meta;
 
@@ -55,10 +55,10 @@ Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
 
             return match.base_table_ref_.get();
         }
-        case LogicalNodeType::kTensorMaxSimScan: {
-            auto &maxsim = static_cast<LogicalTensorMaxSimScan &>(op);
+        case LogicalNodeType::kMatchTensorScan: {
+            auto &match_tensor = static_cast<LogicalMatchTensorScan &>(op);
 
-            return maxsim.base_table_ref_.get();
+            return match_tensor.base_table_ref_.get();
         }
         default: {
             return None;
@@ -163,8 +163,8 @@ void CleanScan::VisitNode(LogicalNode &op) {
             CleanScanVisitBaseTableRefNode<LogicalMatch>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
-        case LogicalNodeType::kTensorMaxSimScan: {
-            CleanScanVisitBaseTableRefNode<LogicalTensorMaxSimScan>(op, last_op_load_metas_, scan_table_indexes_);
+        case LogicalNodeType::kMatchTensorScan: {
+            CleanScanVisitBaseTableRefNode<LogicalMatchTensorScan>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
         case LogicalNodeType::kLimit:

@@ -14,14 +14,14 @@
 
 module;
 
-export module logical_tensor_maxsim_scan;
+export module logical_match_tensor_scan;
 
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
 import base_expression;
-import tensor_maxsim_expression;
+import match_tensor_expression;
 import base_table_ref;
 import table_entry;
 import internal_types;
@@ -31,9 +31,9 @@ import common_query_filter;
 
 namespace infinity {
 
-export class LogicalTensorMaxSimScan final : public LogicalNode {
+export class LogicalMatchTensorScan final : public LogicalNode {
 public:
-    explicit LogicalTensorMaxSimScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr);
+    explicit LogicalMatchTensorScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchTensorExpression> match_tensor_expr);
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const override;
 
@@ -49,13 +49,13 @@ public:
 
     String ToString(i64 &space) const override;
 
-    String name() override { return "LogicalTensorMaxSimScan"; }
+    String name() override { return "LogicalMatchTensorScan"; }
 
     void InitExtraOptions();
 
     SharedPtr<BaseTableRef> base_table_ref_{};
 
-    SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr_{};
+    SharedPtr<MatchTensorExpression> match_tensor_expr_{};
 
     // extra options from tensor_maxsim_expr
     // will be parsed in InitExtraOptions()

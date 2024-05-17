@@ -14,7 +14,7 @@
 
 module;
 
-export module tensor_maxsim_expression;
+export module match_tensor_expression;
 
 import stl;
 import data_type;
@@ -23,27 +23,30 @@ import knn_expr;
 import internal_types;
 import base_expression;
 import column_expression;
+import match_tensor_expr;
 
 namespace infinity {
 
-export class TensorMaxSimExpression final : public BaseExpression {
+export class MatchTensorExpression final : public BaseExpression {
 public:
-    TensorMaxSimExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                           EmbeddingDataType embedding_data_type,
-                           u32 dimension,
-                           EmbeddingT query_embedding,
-                           u32 tensor_basic_embedding_dimension,
-                           const String &options_text);
+    MatchTensorExpression(Vector<SharedPtr<BaseExpression>> search_column,
+                          MatchTensorMethod search_method,
+                          EmbeddingDataType embedding_data_type,
+                          u32 dimension,
+                          EmbeddingT query_embedding,
+                          u32 tensor_basic_embedding_dimension,
+                          const String &options_text);
 
     DataType Type() const override;
 
     String ToString() const override;
 
+    MatchTensorMethod search_method_;
     const ColumnExpression *column_expr_ = nullptr;
     const EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
-    const u32 dimension_{0};                     // num of total elements in the tensor (num of embedding * dimension of single embedding)
-    const EmbeddingT query_embedding_;           // treat the query tensor as an embedding here
-    const u32 tensor_basic_embedding_dimension_; // dimension of single embedding in the tensor column
+    const u32 dimension_ = 0;                        // num of total elements in the tensor (num of embedding * dimension of single embedding)
+    const EmbeddingT query_embedding_;               // treat the query tensor as an embedding here
+    const u32 tensor_basic_embedding_dimension_ = 0; // dimension of single embedding in the tensor column
     const u32 num_of_embedding_in_query_tensor_ = dimension_ / tensor_basic_embedding_dimension_;
     String options_text_;
 };

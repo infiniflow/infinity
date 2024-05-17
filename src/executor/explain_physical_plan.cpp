@@ -66,9 +66,9 @@ import physical_merge_limit;
 import physical_merge_top;
 import physical_merge_sort;
 import physical_merge_knn;
-import physical_merge_tensor_maxsim;
+import physical_merge_match_tensor;
 import physical_match;
-import physical_tensor_maxsim_scan;
+import physical_match_tensor_scan;
 import physical_fusion;
 import physical_merge_aggregate;
 import status;
@@ -273,16 +273,16 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             Explain((PhysicalMergeKnn *)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kMergeTensorMaxSim: {
-            Explain((PhysicalMergeTensorMaxSim *)op, result, intent_size);
+        case PhysicalOperatorType::kMergeMatchTensor: {
+            Explain((PhysicalMergeMatchTensor *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kMatch: {
             Explain((PhysicalMatch *)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kTensorMaxSimScan: {
-            Explain((PhysicalTensorMaxSimScan *)op, result, intent_size);
+        case PhysicalOperatorType::kMatchTensorScan: {
+            Explain((PhysicalMatchTensorScan *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kFusion: {
@@ -2054,36 +2054,35 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalTensorMaxSimScan *tensor_maxsim_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
-        explain_header_str = String(intent_size - 2, ' ') + "-> TensorMaxSimScan ";
+        explain_header_str = String(intent_size - 2, ' ') + "-> MatchTensorScan ";
     } else {
-        explain_header_str = "TensorMaxSimScan ";
+        explain_header_str = "MatchTensorScan ";
     }
-    explain_header_str += "(" + std::to_string(tensor_maxsim_node->node_id()) + ")";
+    explain_header_str += "(" + std::to_string(match_tensor_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 
     // Table alias and name
-    String table_name = String(intent_size, ' ') + " - table name: " + tensor_maxsim_node->TableAlias() + "(";
+    String table_name = String(intent_size, ' ') + " - table name: " + match_tensor_node->TableAlias() + "(";
 
-    table_name += *tensor_maxsim_node->table_collection_ptr()->GetDBName() + ".";
-    table_name += *tensor_maxsim_node->table_collection_ptr()->GetTableName() + ")";
+    table_name += *match_tensor_node->table_collection_ptr()->GetDBName() + ".";
+    table_name += *match_tensor_node->table_collection_ptr()->GetTableName() + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(tensor_maxsim_node->table_index());
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(match_tensor_node->table_index());
     result->emplace_back(MakeShared<String>(table_index));
 
-    String tensor_maxsim_expression =
-        String(intent_size, ' ') + " - TensorMaxSimScan expression: " + tensor_maxsim_node->tensor_maxsim_expr()->ToString();
-    result->emplace_back(MakeShared<String>(std::move(tensor_maxsim_expression)));
+    String match_tensor_expression = String(intent_size, ' ') + " - MatchTensor expression: " + match_tensor_node->match_tensor_expr()->ToString();
+    result->emplace_back(MakeShared<String>(std::move(match_tensor_expression)));
 
-    String top_n_expression = String(intent_size, ' ') + " - Top N: " + std::to_string(tensor_maxsim_node->GetTopN());
+    String top_n_expression = String(intent_size, ' ') + " - Top N: " + std::to_string(match_tensor_node->GetTopN());
     result->emplace_back(MakeShared<String>(std::move(top_n_expression)));
 
     // filter expression
-    if (const CommonQueryFilter *filter = tensor_maxsim_node->common_query_filter(); filter) {
+    if (const CommonQueryFilter *filter = match_tensor_node->common_query_filter(); filter) {
         {
             String filter_str = String(intent_size, ' ') + " - filter for secondary index: ";
             if (const auto *filter_expr = filter->secondary_index_filter_qualified_.get(); filter_expr) {
@@ -2106,65 +2105,67 @@ void ExplainPhysicalPlan::Explain(const PhysicalTensorMaxSimScan *tensor_maxsim_
 
     // Output columns
     String output_columns = String(intent_size, ' ') + " - output columns: [";
-    SizeT column_count = tensor_maxsim_node->GetOutputNames()->size();
+    SizeT column_count = match_tensor_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in PhysicalTensorMaxSimScan node.");
+        UnrecoverableError("No column in PhysicalMatchTensorScan node.");
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
-        output_columns += tensor_maxsim_node->GetOutputNames()->at(idx) + ", ";
+        output_columns += match_tensor_node->GetOutputNames()->at(idx) + ", ";
     }
-    output_columns += tensor_maxsim_node->GetOutputNames()->back();
+    output_columns += match_tensor_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 
-    if (tensor_maxsim_node->left() != nullptr) {
-        UnrecoverableError("PhysicalTensorMaxSimScan node have children nodes.");
+    if (match_tensor_node->left() != nullptr) {
+        UnrecoverableError("PhysicalMatchTensorScan node should not have children nodes.");
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMergeTensorMaxSim *merge_tensor_maxsim_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMergeMatchTensor *merge_match_tensor_node,
+                                  SharedPtr<Vector<SharedPtr<String>>> &result,
+                                  i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
-        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE TensorMaxSim ";
+        explain_header_str = String(intent_size - 2, ' ') + "-> MERGE MatchTensor ";
     } else {
-        explain_header_str = "MERGE TensorMaxSim ";
+        explain_header_str = "MERGE MatchTensor ";
     }
-    explain_header_str += "(" + std::to_string(merge_tensor_maxsim_node->node_id()) + ")";
+    explain_header_str += "(" + std::to_string(merge_match_tensor_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 
     // Table alias and name
-    String table_name = String(intent_size, ' ') + " - table name: " + merge_tensor_maxsim_node->TableAlias() + "(";
+    String table_name = String(intent_size, ' ') + " - table name: " + merge_match_tensor_node->TableAlias() + "(";
 
-    table_name += *merge_tensor_maxsim_node->table_collection_ptr()->GetDBName() + ".";
-    table_name += *merge_tensor_maxsim_node->table_collection_ptr()->GetTableName() + ")";
+    table_name += *merge_match_tensor_node->table_collection_ptr()->GetDBName() + ".";
+    table_name += *merge_match_tensor_node->table_collection_ptr()->GetTableName() + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(merge_tensor_maxsim_node->table_index());
+    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(merge_match_tensor_node->table_index());
     result->emplace_back(MakeShared<String>(table_index));
 
-    String tensor_maxsim_expression =
-        String(intent_size, ' ') + " - TensorMaxSimScan expression: " + merge_tensor_maxsim_node->tensor_maxsim_expr()->ToString();
-    result->emplace_back(MakeShared<String>(std::move(tensor_maxsim_expression)));
+    String match_tensor_expression =
+        String(intent_size, ' ') + " - MatchTensor expression: " + merge_match_tensor_node->tensor_maxsim_expr()->ToString();
+    result->emplace_back(MakeShared<String>(std::move(match_tensor_expression)));
 
-    String top_n_expression = String(intent_size, ' ') + " - Top N: " + std::to_string(merge_tensor_maxsim_node->GetTopN());
+    String top_n_expression = String(intent_size, ' ') + " - Top N: " + std::to_string(merge_match_tensor_node->GetTopN());
     result->emplace_back(MakeShared<String>(std::move(top_n_expression)));
 
     // Output columns
     String output_columns = String(intent_size, ' ') + " - output columns: [";
-    SizeT column_count = merge_tensor_maxsim_node->GetOutputNames()->size();
+    SizeT column_count = merge_match_tensor_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in PhysicalTensorMaxSimScan node.");
+        UnrecoverableError("No column in PhysicalMergeMatchTensor node.");
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
-        output_columns += merge_tensor_maxsim_node->GetOutputNames()->at(idx) + ", ";
+        output_columns += merge_match_tensor_node->GetOutputNames()->at(idx) + ", ";
     }
-    output_columns += merge_tensor_maxsim_node->GetOutputNames()->back();
+    output_columns += merge_match_tensor_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 
-    if (merge_tensor_maxsim_node->left() == nullptr) {
-        UnrecoverableError("PhysicalMergeTensorMaxSim should have child node!");
+    if (merge_match_tensor_node->left() == nullptr) {
+        UnrecoverableError("PhysicalMergeMatchTensor should have child node!");
     }
 }
 

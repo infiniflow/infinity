@@ -16,13 +16,13 @@ module;
 
 #include <sstream>
 
-module logical_tensor_maxsim_scan;
+module logical_match_tensor_scan;
 
 import stl;
 import base_table_ref;
 import column_binding;
 import logical_node_type;
-import tensor_maxsim_expression;
+import match_tensor_expression;
 import default_values;
 import logical_type;
 import internal_types;
@@ -34,13 +34,13 @@ import status;
 
 namespace infinity {
 
-LogicalTensorMaxSimScan::LogicalTensorMaxSimScan(const u64 node_id,
-                                                 SharedPtr<BaseTableRef> base_table_ref,
-                                                 SharedPtr<TensorMaxSimExpression> tensor_maxsim_expr)
-    : LogicalNode(node_id, LogicalNodeType::kTensorMaxSimScan), base_table_ref_(std::move(base_table_ref)),
-      tensor_maxsim_expr_(std::move(tensor_maxsim_expr)) {}
+LogicalMatchTensorScan::LogicalMatchTensorScan(const u64 node_id,
+                                               SharedPtr<BaseTableRef> base_table_ref,
+                                               SharedPtr<MatchTensorExpression> match_tensor_expr)
+    : LogicalNode(node_id, LogicalNodeType::kMatchTensorScan), base_table_ref_(std::move(base_table_ref)),
+      match_tensor_expr_(std::move(match_tensor_expr)) {}
 
-Vector<ColumnBinding> LogicalTensorMaxSimScan::GetColumnBindings() const {
+Vector<ColumnBinding> LogicalMatchTensorScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;
     auto &column_ids = base_table_ref_->column_ids_;
     result.reserve(column_ids.size());
@@ -50,7 +50,7 @@ Vector<ColumnBinding> LogicalTensorMaxSimScan::GetColumnBindings() const {
     return result;
 }
 
-SharedPtr<Vector<String>> LogicalTensorMaxSimScan::GetOutputNames() const {
+SharedPtr<Vector<String>> LogicalMatchTensorScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
     const SizeT column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count + 2);
@@ -62,26 +62,26 @@ SharedPtr<Vector<String>> LogicalTensorMaxSimScan::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalTensorMaxSimScan::GetOutputTypes() const {
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatchTensorScan::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
     const SizeT column_count = base_table_ref_->column_names_->size();
     result_types->reserve(column_count + 2);
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(tensor_maxsim_expr_->Type()));
+    result_types->emplace_back(MakeShared<DataType>(match_tensor_expr_->Type()));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
-TableEntry *LogicalTensorMaxSimScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+TableEntry *LogicalMatchTensorScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
 
-String LogicalTensorMaxSimScan::TableAlias() const { return base_table_ref_->alias_; }
+String LogicalMatchTensorScan::TableAlias() const { return base_table_ref_->alias_; }
 
-u64 LogicalTensorMaxSimScan::TableIndex() const { return base_table_ref_->table_index_; }
+u64 LogicalMatchTensorScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-void LogicalTensorMaxSimScan::InitExtraOptions() {
-    SearchOptions options(tensor_maxsim_expr_->options_text_);
+void LogicalMatchTensorScan::InitExtraOptions() {
+    SearchOptions options(match_tensor_expr_->options_text_);
     // topn option
     if (const auto it = options.options_.find("topn"); it != options.options_.end()) {
         const int top_n_option = std::stoi(it->second);
@@ -94,16 +94,15 @@ void LogicalTensorMaxSimScan::InitExtraOptions() {
     }
 }
 
-String LogicalTensorMaxSimScan::ToString(i64 &space) const {
+String LogicalMatchTensorScan::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space != 0) {
         arrow_str = String(space - 2, ' ');
-        arrow_str += "-> LogicalTensorMaxSimScan ";
-    } else {
-        arrow_str = "LogicalTensorMaxSimScan ";
+        arrow_str += "-> ";
     }
-    arrow_str += fmt::format("({})", this->node_id());
+    arrow_str += "LogicalMatchTensorScan";
+    arrow_str += fmt::format(" ({})", this->node_id());
     ss << arrow_str << std::endl;
 
     // Table alias and name
@@ -124,7 +123,7 @@ String LogicalTensorMaxSimScan::ToString(i64 &space) const {
     ss << table_index << std::endl;
 
     String match_info = String(space, ' ');
-    match_info += " - tensor maxsim expression: " + tensor_maxsim_expr_->ToString();
+    match_info += " - match tensor expression: " + match_tensor_expr_->ToString();
     ss << match_info << std::endl;
 
     // filter expression

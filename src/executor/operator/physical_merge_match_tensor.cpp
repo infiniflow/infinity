@@ -14,7 +14,7 @@
 
 module;
 
-module physical_merge_tensor_maxsim;
+module physical_merge_match_tensor;
 
 import stl;
 import txn;
@@ -53,40 +53,40 @@ struct VectorBlockRawIndex {
     explicit operator bool() const { return left_row_cnt_ > 0; }
 };
 
-PhysicalMergeTensorMaxSim::PhysicalMergeTensorMaxSim(const u64 id,
-                                                     UniquePtr<PhysicalOperator> left,
-                                                     const u64 maxsim_table_index,
-                                                     SharedPtr<BaseTableRef> base_table_ref,
-                                                     SharedPtr<TensorMaxSimExpression> tensor_maxsim_expression,
-                                                     const u32 topn,
-                                                     SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kMergeTensorMaxSim, std::move(left), nullptr, id, load_metas), table_index_(maxsim_table_index),
-      base_table_ref_(std::move(base_table_ref)), tensor_maxsim_expr_(std::move(tensor_maxsim_expression)), topn_(topn) {}
+PhysicalMergeMatchTensor::PhysicalMergeMatchTensor(const u64 id,
+                                                   UniquePtr<PhysicalOperator> left,
+                                                   const u64 table_index,
+                                                   SharedPtr<BaseTableRef> base_table_ref,
+                                                   SharedPtr<MatchTensorExpression> match_tensor_expr,
+                                                   const u32 topn,
+                                                   SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kMergeMatchTensor, std::move(left), nullptr, id, load_metas), table_index_(table_index),
+      base_table_ref_(std::move(base_table_ref)), match_tensor_expr_(std::move(match_tensor_expr)), topn_(topn) {}
 
-void PhysicalMergeTensorMaxSim::Init() { left()->Init(); }
+void PhysicalMergeMatchTensor::Init() { left()->Init(); }
 
-SizeT PhysicalMergeTensorMaxSim::TaskletCount() {
-    UnrecoverableError("Not Expected: TaskletCount of PhysicalMergeTensorMaxSim?");
+SizeT PhysicalMergeMatchTensor::TaskletCount() {
+    UnrecoverableError("Not Expected: TaskletCount of PhysicalMergeMatchTensor?");
     return 0;
 }
 
-bool PhysicalMergeTensorMaxSim::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    auto *merge_tensor_maxsim_op_state = static_cast<MergeTensorMaxSimOperatorState *>(operator_state);
-    if (merge_tensor_maxsim_op_state->input_complete_) {
-        LOG_TRACE("PhysicalMergeTensorMaxSim::Input is complete");
+bool PhysicalMergeMatchTensor::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto *merge_match_tensor_op_state = static_cast<MergeMatchTensorOperatorState *>(operator_state);
+    if (merge_match_tensor_op_state->input_complete_) {
+        LOG_TRACE("PhysicalMergeMatchTensor::Input is complete");
     }
-    ExecuteInner(query_context, merge_tensor_maxsim_op_state);
+    ExecuteInner(query_context, merge_match_tensor_op_state);
     return true;
 }
 
-void PhysicalMergeTensorMaxSim::ExecuteInner(QueryContext *query_context, MergeTensorMaxSimOperatorState *operator_state) const {
+void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMatchTensorOperatorState *operator_state) const {
     auto &output_data_block_array = operator_state->data_block_array_;
     if (!output_data_block_array.empty()) {
         UnrecoverableError("output data_block_array_ is not empty");
     }
     auto &input_data_block_array = operator_state->input_data_blocks_;
     if (input_data_block_array.empty()) {
-        UnrecoverableError("PhysicalMergeTensorMaxSim: empty input");
+        UnrecoverableError("PhysicalMergeMatchTensor: empty input");
         return;
     }
     const auto output_type_ptr = GetOutputTypes();

@@ -134,10 +134,10 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "CompactFinish";
         case PhysicalOperatorType::kMatch:
             return "Match";
-        case PhysicalOperatorType::kTensorMaxSimScan:
-            return "TensorMaxSimScan";
-        case PhysicalOperatorType::kMergeTensorMaxSim:
-            return "MergeTensorMaxSim";
+        case PhysicalOperatorType::kMatchTensorScan:
+            return "MatchTensorScan";
+        case PhysicalOperatorType::kMergeMatchTensor:
+            return "MergeMatchTensor";
         case PhysicalOperatorType::kFusion:
             return "Fusion";
         case PhysicalOperatorType::kMergeAggregate:

@@ -12,12 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "tensor_maxsim_expr.h"
+#include "match_tensor_expr.h"
 #include "spdlog/fmt/fmt.h"
 
 namespace infinity {
 
-TensorMaxSimExpr::~TensorMaxSimExpr() {
+std::string MatchTensorExpr::MethodToString(MatchTensorMethod method) {
+    switch (method) {
+        case MatchTensorMethod::kInvalid:
+            return "INVALID";
+        case MatchTensorMethod::kMaxSim:
+            return "MAX_SIM";
+    }
+}
+
+MatchTensorExpr::~MatchTensorExpr() {
     if (column_expr_ != nullptr) {
         delete column_expr_;
         column_expr_ = nullptr;
@@ -74,19 +83,21 @@ TensorMaxSimExpr::~TensorMaxSimExpr() {
     }
 }
 
-std::string TensorMaxSimExpr::ToString() const {
+std::string MatchTensorExpr::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
     const EmbeddingType query_embedding((char *)embedding_data_ptr_, false);
     if (options_text_.empty()) {
-        return fmt::format("MAXSIM({}, {})",
+        return fmt::format("MATCH TENSOR ({}, {}, {})",
                            column_expr_->ToString(),
-                           EmbeddingType::Embedding2String(query_embedding, embedding_data_type_, dimension_));
+                           EmbeddingType::Embedding2String(query_embedding, embedding_data_type_, dimension_),
+                           MethodToString(search_method_));
     }
-    return fmt::format(R"(MAXSIM({}, {}, "{}"))",
+    return fmt::format("MATCH TENSOR ({}, {}, {}, EXTRA OPTION : '{}')",
                        column_expr_->ToString(),
                        EmbeddingType::Embedding2String(query_embedding, embedding_data_type_, dimension_),
+                       MethodToString(search_method_),
                        options_text_);
 }
 

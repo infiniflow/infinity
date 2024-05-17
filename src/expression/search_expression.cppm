@@ -21,7 +21,7 @@ import base_expression;
 import fusion_expression;
 import match_expression;
 import knn_expression;
-import tensor_maxsim_expression;
+import match_tensor_expression;
 import logical_type;
 import internal_types;
 import data_type;
@@ -32,7 +32,7 @@ export class SearchExpression final : public BaseExpression {
 public:
     SearchExpression(Vector<SharedPtr<MatchExpression>> &match_exprs,
                      Vector<SharedPtr<KnnExpression>> &knn_exprs,
-                     Vector<SharedPtr<TensorMaxSimExpression>> &tensor_maxsim_exprs,
+                     Vector<SharedPtr<MatchTensorExpression>> &tensor_maxsim_exprs,
                      SharedPtr<FusionExpression> fusion_expr);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
@@ -42,7 +42,7 @@ public:
 public:
     Vector<SharedPtr<MatchExpression>> match_exprs_{};
     Vector<SharedPtr<KnnExpression>> knn_exprs_{};
-    Vector<SharedPtr<TensorMaxSimExpression>> tensor_maxsim_exprs_{};
+    Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs_{};
     SharedPtr<FusionExpression> fusion_expr_{};
 };
 

@@ -47,7 +47,7 @@ import logical_export;
 import logical_flush;
 import logical_optimize;
 import logical_match;
-import logical_tensor_maxsim_scan;
+import logical_match_tensor_scan;
 import logical_fusion;
 import base_expression;
 
@@ -115,7 +115,7 @@ public:
 
     static void Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
-    static void Explain(const LogicalTensorMaxSimScan *tensor_maxsim_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+    static void Explain(const LogicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 

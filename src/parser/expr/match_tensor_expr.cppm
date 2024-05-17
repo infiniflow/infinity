@@ -14,12 +14,13 @@
 
 module;
 
-#include "tensor_maxsim_expr.h"
+#include "match_tensor_expr.h"
 
-export module tensor_maxsim_expr;
+export module match_tensor_expr;
 
 namespace infinity {
 
-export using infinity::TensorMaxSimExpr;
+export using infinity::MatchTensorMethod;
+export using infinity::MatchTensorExpr;
 
 }
