@@ -69,7 +69,7 @@ protected:
         u32 run_num = rand() % 300;
         while (run_num < 100 || SIZE % run_num != 0)
             run_num = rand() % 300;
-
+        // fmt::print("begin tell = {}\n", ftell(f));
         for (u32 i = 0; i < run_num; ++i) {
             u64 pos = ftell(f);
             fseek(f, 2 * sizeof(u32) + sizeof(u64), SEEK_CUR);
@@ -77,8 +77,14 @@ protected:
             for (u32 j = 0; j < SIZE / run_num; ++j) {
                 str = RandStr<KeyType>(i * SIZE / run_num + j);
                 LenType len = str.size();
+                // fmt::print("begin tell = {}\n", ftell(f));
                 fwrite(&len, sizeof(LenType), 1, f);
                 fwrite(str.data(), len, 1, f);
+//                fmt::print("len: {}, str.size() = {}, size len_type = {}, tell = {}, str: ", len, str.size(), sizeof(LenType), ftell(f));
+//                for (auto c : str) {
+//                    fmt::print("{}",c);
+//                }
+//                fmt::print("\n");
                 s += len + sizeof(LenType);
             }
             u64 next_run_pos = ftell(f);
@@ -87,6 +93,7 @@ protected:
             s = SIZE / run_num;
             fwrite(&s, sizeof(u32), 1, f);
             fwrite(&next_run_pos, sizeof(u64), 1, f);
+            // fmt::print("next_pos: {}\n", next_run_pos);
             fseek(f, 0, SEEK_END);
         }
         fclose(f);

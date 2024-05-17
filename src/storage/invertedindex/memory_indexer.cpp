@@ -58,6 +58,8 @@ import vector_with_lock;
 import infinity_exception;
 import mmap;
 import buf_writer;
+import profiler;
+import third_party;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -174,6 +176,8 @@ void MemoryIndexer::Commit(bool offline) {
 }
 
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
+    // BaseProfiler profiler;
+    // profiler.Begin();
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
     if (!lock.try_lock()) {
         return 0;
@@ -204,6 +208,8 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
             cv_.notify_all();
         }
     }
+    // LOG_INFO(fmt::format("MemoryIndexer::CommitOffline time cost: {}", profiler.ElapsedToString()));
+    // profiler.End();
     return num;
 }
 
@@ -259,7 +265,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         while (GetInflightTasks() > 0) {
             CommitOffline(100);
         }
+        BaseProfiler profiler;
+        profiler.Begin();
         OfflineDump();
+        LOG_INFO(fmt::format("MemoryIndexer::OfflineDump() time cost: {}", profiler.ElapsedToString()));
+        profiler.End();
         return;
     }
 

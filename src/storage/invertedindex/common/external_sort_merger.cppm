@@ -24,6 +24,7 @@ import stl;
 import loser_tree;
 import mmap;
 import infinity_exception;
+import file_writer;
 
 namespace infinity {
 
@@ -216,6 +217,7 @@ export template <typename KeyType, typename LenType>
 class SortMerger {
     typedef SortMerger<KeyType, LenType> self_t;
     typedef KeyAddress<KeyType, LenType> KeyAddr;
+    static constexpr SizeT MAX_TUPLE_LENGTH = 1024;
     String filenm_;
     const u32 MAX_GROUP_SIZE_; //!< max group size
     const u32 BS_SIZE_;        //!< in fact it equals to memory size
@@ -262,6 +264,11 @@ class SortMerger {
     u32 *out_buf_size_{nullptr};  //!< data size of each output buffer
     bool *out_buf_full_{nullptr}; //!< a flag to ensure if the output buffer is full or not
 
+    Vector<u64> curr_addr_;
+    Vector<u64> end_addr_;
+    Vector<UniquePtr<char_t[]>> key_buf_;
+    Vector<char*> key_buf_ptr_;
+    Vector<SharedPtr<MmapReader>> mmap_io_streams_;
     u64 count_;      //!< records number
     u32 group_size_; //!< the real run number that can get from the input file.
 
@@ -275,10 +282,15 @@ class SortMerger {
 
     void Merge();
 
+    void MergeMmap(MmapReader &io_stream, SharedPtr<FileWriter> out_file_writer);
+
     void Output(FILE *f, u32 idx);
 
-    // void Init(MmapIO &io_stream);
+    void Init(MmapReader &io_stream);
 
+    void ReadKeyAt(MmapReader &io_stream, u64 pos);
+
+    void ReadKeyAtNonCopy(MmapReader &io_stream, u64 pos);
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 

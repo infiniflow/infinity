@@ -17,11 +17,18 @@ module;
 #include <filesystem>
 #include <functional>
 #include <queue>
-#include <string.h>
+#include <cstring>
+#include <sys/mman.h>
 
 module external_sort_merger;
 
 import stl;
+import mmap;
+import third_party;
+import file_writer;
+import local_file_system;
+import profiler;
+import logger;
 
 namespace infinity {
 
@@ -33,16 +40,16 @@ namespace infinity {
     }
 
 #define USE_LOSER_TREE
-// #define USE_MMAP_IO
+#define USE_MMAP_IO
 
 template <typename KeyType, typename LenType>
 SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32 bs, u32 output_num)
     : filenm_(filenm), MAX_GROUP_SIZE_(group_size), BS_SIZE_(bs), PRE_BUF_SIZE_((u32)(1. * bs * 0.8 / (group_size + 1))),
       RUN_BUF_SIZE_(PRE_BUF_SIZE_ * group_size), OUT_BUF_SIZE_(bs - RUN_BUF_SIZE_ - PRE_BUF_SIZE_), OUT_BUF_NUM_(output_num) {
     pre_buf_ = run_buf_ = out_buf_ = nullptr;
+    count_ = 0;
 
-    pre_buf_size_ = pre_buf_num_ = count_ = 0;
-
+    pre_buf_size_ = pre_buf_num_ = 0;
     micro_run_idx_ = new u32[MAX_GROUP_SIZE_];
     micro_run_pos_ = new u32[MAX_GROUP_SIZE_];
     num_micro_run_ = new u32[MAX_GROUP_SIZE_];
@@ -61,6 +68,16 @@ SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32
 
     out_buf_size_ = new u32[OUT_BUF_NUM_];
     out_buf_full_ = new bool[OUT_BUF_NUM_];
+
+    curr_addr_.resize(MAX_GROUP_SIZE_, 0);
+    end_addr_.resize(MAX_GROUP_SIZE_, 0);
+    key_buf_.resize(MAX_GROUP_SIZE_);
+    key_buf_ptr_.resize(MAX_GROUP_SIZE_, nullptr);
+    mmap_io_streams_.resize(MAX_GROUP_SIZE_, nullptr);
+    for (u32 i = 0; i < MAX_GROUP_SIZE_; ++i) {
+        key_buf_[i] = MakeUnique<char_t[]>(MAX_TUPLE_LENGTH + 100);
+        // mmap_io_streams_[i] = MakeShared<MmapReader>(filenm_);
+    }
 #ifdef USE_LOSER_TREE
     merge_loser_tree_ = MakeShared<LoserTree<KeyAddr>>(MAX_GROUP_SIZE_);
 #endif
@@ -223,30 +240,53 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         size_micro_run_[i] = pos;
     }
 }
+
+template <typename KeyType, typename LenType>
+void SortMerger<KeyType, LenType>::ReadKeyAt(MmapReader &io_stream, u64 pos) {
+    auto file_pos = curr_addr_[pos];
+//    if (file_pos != io_stream.Tell()) {
+//        io_stream.Seek(file_pos, true);
+//    }
+    // fmt::print("begin tell = {}\n", file_pos);
+    io_stream.Seek(file_pos, true);
+    LenType len;
+    io_stream.ReadBuf((char_t*)&len, sizeof(LenType));
+    io_stream.Seek(file_pos, true);
+    io_stream.ReadBuf(key_buf_[pos].get(), len + sizeof(LenType));
+//    fmt::print("len = {}, sizeof len_type = {}, key buf get len = {}, tell = {}\n", len, sizeof(LenType), *(LenType *)key_buf_[pos].get(), io_stream.Tell());
+//    fmt::print("data = ");
+//    for (u32 i = 0; i < len; ++i) {
+//        fmt::print("{}", key_buf_[pos].get()[i + sizeof(LenType)]);
+//    }
+//    fmt::print("\n");
+    curr_addr_[pos] = io_stream.Tell();
+}
+
+template <typename KeyType, typename LenType>
+void SortMerger<KeyType, LenType>::ReadKeyAtNonCopy(MmapReader &io_stream, u64 pos) {
+//    auto file_pos = curr_addr_[pos];
+//
+//    io_stream.Seek(file_pos, true);
+    // assert(curr_addr_[pos] == io_stream.Tell());
+    LenType len;
+//    io_stream.ReadBuf((char_t*)&len, sizeof(LenType));
+//    io_stream.Seek(file_pos, true);
+    key_buf_ptr_[pos] = io_stream.ReadBufNonCopy(sizeof(LenType));
+    len = *(LenType *)key_buf_ptr_[pos];
+    io_stream.ReadBufNonCopy(len);
+//    fmt::print("len = {}, key = ", len);
+//    for (u32 i = 0; i < len; ++i) {
+//        fmt::print("{}", key_buf_ptr_[pos][i + sizeof(LenType)]);
+//    }
+//    fmt::print("\n");
+
+    // io_stream.ReadBuf(key_buf_[pos].get(), len + sizeof(LenType));
+    curr_addr_[pos] = io_stream.Tell();
+}
+
 #ifdef USE_MMAP_IO
 template <typename KeyType, typename LenType>
-void SortMerger<KeyType, LenType>::Init(MmapIO &io_stream) {
-    // initialize three buffers
-    NewBuffer();
-
-    // initiate output buffers
-    out_buf_size_[0] = 0;
-    sub_out_buf_[0] = out_buf_;
-    out_buf_full_[0] = false;
-    for (u32 i = 1; i < OUT_BUF_NUM_; ++i) {
-        sub_out_buf_[i] = sub_out_buf_[i - 1] + OUT_BUF_SIZE_ / OUT_BUF_NUM_;
-        out_buf_size_[i] = 0;
-        out_buf_full_[i] = false;
-    }
-    out_buf_in_idx_ = 0;
-    out_buf_out_idx_ = 0;
-
-    // initiate the microrun buffer
-    micro_buf_[0] = run_buf_;
-    for (u32 i = 1; i < MAX_GROUP_SIZE_; ++i) {
-        micro_buf_[i] = micro_buf_[i - 1] + PRE_BUF_SIZE_;
-    }
-
+void SortMerger<KeyType, LenType>::Init(MmapReader &io_stream) {
     group_size_ = 0;
     u64 next_run_pos = 0;
     for (u32 i = 0; i < MAX_GROUP_SIZE_ && (u64)io_stream.Tell() < FILE_LEN_; ++i, ++group_size_) {
@@ -255,90 +295,72 @@ void SortMerger<KeyType, LenType>::Init(MmapIO &io_stream) {
         // get the records number of a run
         io_stream.ReadU32(num_run_[i]);
         io_stream.ReadU64(next_run_pos);
-
-        run_addr_[i] = io_stream.Tell();
-
-        // loading size of a microrun
-        u32 s = size_run_[i] > PRE_BUF_SIZE_ ? PRE_BUF_SIZE_ : size_run_[i];
-        size_t ret = io_stream.ReadBuf(micro_buf_[i], s);
-        size_micro_run_[i] = ret;
-        size_loaded_run_[i] = ret;
-        run_curr_addr_[i] = io_stream.Tell();
-        // std::cout << "num_run_[" << i << "] " << num_run_[i] << " size_run_ " << size_run_[i] << " size_micro_run " << size_micro_run_[i]
-        //           << std::endl;
-
-        /// it is not needed for compression, validation will be made within IOStream in that case
-        // if a record can fit in microrun buffer
-        bool flag = false;
-        while (*(LenType *)(micro_buf_[i]) + sizeof(LenType) > s) {
-            size_micro_run_[i] = 0;
-            --count_;
-            // LOG_WARN("[Warning]: A record is too long, it will be ignored");
-
-            io_stream.Seek(*(LenType *)(micro_buf_[i]) + sizeof(LenType) - s);
-            // io_stream.Seek(*(LenType *)(micro_buf_[i]) + sizeof(LenType) - s, SEEK_CUR);
-
-            if (io_stream.Tell() - run_addr_[i] >= (u64)size_run_[i]) {
-                flag = true;
-                break;
-            }
-
-            s = (u32)((u64)size_run_[i] - (io_stream.Tell() - run_addr_[i]) > PRE_BUF_SIZE_ ? PRE_BUF_SIZE_
-                                                                                            : (u64)size_run_[i] - (io_stream.Tell() - run_addr_[i]));
-            size_micro_run_[i] = s;
-            io_stream.Read(micro_buf_[i], s);
-        }
-
+//        fmt::print("i = {}, size_run = {}, num_run = {}, next run pos:{}\n", i, size_run_[i], num_run_[i], next_run_pos);
+        assert(next_run_pos <= FILE_LEN_);
+        end_addr_[i] = next_run_pos;
+        curr_addr_[i] = io_stream.Tell();
+        // fmt::print("curr_addr_[{}] = {}, end_addr_[{}] = {}\n", i, curr_addr_[i], i, end_addr_[i]);
+        mmap_io_streams_[i] = MakeShared<MmapReader>(filenm_, curr_addr_[i], end_addr_[i] - curr_addr_[i]);
+        // mmap_io_streams_[i]->Seek(curr_addr_[i], true);
 #ifdef USE_LOSER_TREE
-        if (flag) {
+        if (curr_addr_[i] >= end_addr_[i]) {
             merge_loser_tree_->InsertStart(nullptr, static_cast<LoserTree<u64>::Source>(i), true);
             continue;
         }
-        auto key = KeyAddr(micro_buf_[i], -1, i);
+//        ReadKeyAt(io_stream, i);
+//        auto key = KeyAddr(key_buf_[i].get(), -1, i);
+        // read block use mmap, need update end_addr
+        end_addr_[i] = mmap_io_streams_[i]->DataLen();
+        ReadKeyAtNonCopy(*mmap_io_streams_[i], i);
+
+        auto key = KeyAddr(key_buf_ptr_[i], -1, i);
         merge_loser_tree_->InsertStart(&key, static_cast<LoserTree<u64>::Source>(i), false);
 #else
-        if (flag) {
+        if (curr_addr_[i] >= end_addr_[i]) {
             continue;
         }
-        merge_heap_.push(KeyAddr(micro_buf_[i], -1, i));
+        ReadKeyAtNonCopy(io_stream, i);
+        merge_heap_.push(KeyAddr(key_buf_ptr_[i].get(), -1, i));
 #endif
-        micro_run_idx_[i] = 1;
-        micro_run_pos_[i] = KeyAddr(micro_buf_[i], -1, i).LEN() + sizeof(LenType);
-        num_micro_run_[i] = 0;
-
-        io_stream.Seek(next_run_pos);
+        io_stream.Seek(next_run_pos, true);
     }
 #ifdef USE_LOSER_TREE
     merge_loser_tree_->Init();
 #endif
-    // initialize predict heap and records number of every microrun
-    for (u32 i = 0; i < group_size_; ++i) {
-        u32 pos = 0;
-        u32 last_pos = -1;
-        assert(i < MAX_GROUP_SIZE_);
-        if (size_micro_run_[i] <= 0)
-            continue;
-        while (pos + sizeof(LenType) <= size_micro_run_[i]) {
-            LenType len = *(LenType *)(micro_buf_[i] + pos);
-            if (pos + sizeof(LenType) + len <= size_micro_run_[i]) {
-                num_micro_run_[i]++;
-                last_pos = pos;
-                pos += sizeof(LenType) + len;
-            } else {
-                break;
-            }
-        }
-        // std::cout << "len " << len << " size_micro_run_[" << i << "] " << size_micro_run_[i] << std::endl;
-        assert(last_pos != (u32)-1); // buffer too small that can't hold one record
-        assert(last_pos + sizeof(LenType) <= size_micro_run_[i]);
-        assert(pos <= size_micro_run_[i]);
-        LenType len = (LenType)(pos - last_pos);
-        char *tmp = (char *)malloc(len);
-        memcpy(tmp, micro_buf_[i] + last_pos, len);
-        pre_heap_.push(KeyAddr(tmp, run_addr_[i] + pos, i));
-        size_micro_run_[i] = pos;
-    }
 }
+
+template <typename KeyType, typename LenType>
+void SortMerger<KeyType, LenType>::MergeMmap(MmapReader &io_stream, SharedPtr<FileWriter> out_file_writer) {
+#ifdef USE_LOSER_TREE
+    while (merge_loser_tree_->TopSource() != LoserTree<KeyAddr>::invalid_) {
+        auto top = merge_loser_tree_->TopKey();
+#else
+    while (merge_heap_.size() > 0) {
+        KeyAddr top = merge_heap_.top();
+        merge_heap_.pop();
+#endif
+        u32 idx = top.IDX();
+        // fmt::print("idx = {}\n", idx);
+        out_file_writer->Write(top.data, top.LEN() + sizeof(LenType));
+        assert(idx < MAX_GROUP_SIZE_);
+        // reach the end of a microrun
+        if (curr_addr_[idx] >= end_addr_[idx]) {
+            merge_loser_tree_->DeleteTopInsert(nullptr, true);
+            --count_;
+            continue;
+        }
+        assert(idx < MAX_GROUP_SIZE_);
+
+//        ReadKeyAt(io_stream, idx);
+//        auto key = KeyAddr(key_buf_[idx].get(), -1, idx);
+        // ReadKeyAtNonCopy(io_stream, idx);
+        ReadKeyAtNonCopy(*mmap_io_streams_[idx], idx);
+        auto key = KeyAddr(key_buf_ptr_[idx], -1, idx);
+        merge_loser_tree_->DeleteTopInsert(&key, false);
+    }
+    out_file_writer->Sync();
+}
+
 #endif
 
 template <typename KeyType, typename LenType>
@@ -532,11 +554,38 @@ void SortMerger<KeyType, LenType>::Output(FILE *f, u32 idx) {
 
 template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Run() {
+    BaseProfiler profiler;
+    profiler.Begin();
 #ifdef USE_MMAP_IO
-    MMappedIO io_stream(filenm_);
+    MmapReader io_stream(filenm_);
     FILE_LEN_ = io_stream.DataLen();
     io_stream.ReadU64(count_);
+    // fmt::print("FILE LEN: {}, count: {}, read begin tell = {}\n", FILE_LEN_, count_, io_stream.Tell());
     Init(io_stream);
+
+//    FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
+//    IASSERT(out_f);
+//    IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
+    String out_file = filenm_ + ".out";
+    LocalFileSystem fs;
+    SharedPtr<FileWriter> out_file_writer = MakeShared<FileWriter>(fs, out_file, 128000);
+    out_file_writer->Write((char*)&count_, sizeof(u64));
+
+    MergeMmap(io_stream, out_file_writer);
+    // out_file_writer->Sync();
+//    Thread merge_thread(std::bind(&self_t::MergeMmap, this, std::ref(io_stream)));
+//    FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
+//    IASSERT(out_f);
+//    IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
+//    Vector<Thread *> out_thread(OUT_BUF_NUM_);
+//    for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
+//        out_thread[i] = new Thread(std::bind(&self_t::Output, this, out_f, i));
+//    }
+//    merge_thread.join();
+//    for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
+//        out_thread[i]->join();
+//        delete out_thread[i];
+//    }
 #else
     FILE *f = fopen(filenm_.c_str(), "r");
 
@@ -548,10 +597,7 @@ void SortMerger<KeyType, LenType>::Run() {
     Init(io_stream);
 
     Thread predict_thread(std::bind(&self_t::Predict, this, io_stream));
-#endif
-
     Thread merge_thread(std::bind(&self_t::Merge, this));
-
     FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
     IASSERT(out_f);
     IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
@@ -560,23 +606,23 @@ void SortMerger<KeyType, LenType>::Run() {
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
         out_thread[i] = new Thread(std::bind(&self_t::Output, this, out_f, i));
     }
-#ifndef USE_MMAP_IO
+
     predict_thread.join();
-#endif
     merge_thread.join();
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
         out_thread[i]->join();
         delete out_thread[i];
     }
-#ifndef USE_MMAP_IO
     fclose(f);
-#endif
     fclose(out_f);
+#endif
 
     if (std::filesystem::exists(filenm_))
         std::filesystem::remove(filenm_);
     if (std::filesystem::exists(filenm_ + ".out"))
         std::filesystem::rename(filenm_ + ".out", filenm_);
+    LOG_INFO(fmt::format("SortMerger<KeyType, LenType>::Run() time cost: {}", profiler.ElapsedToString()));
+    profiler.End();
 }
 
 template class SortMerger<u32, u8>;

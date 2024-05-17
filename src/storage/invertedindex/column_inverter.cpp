@@ -35,6 +35,8 @@ import third_party;
 import status;
 import logger;
 import buf_writer;
+import profiler;
+import third_party;
 
 namespace infinity {
 
@@ -55,6 +57,8 @@ ColumnInverter::~ColumnInverter() = default;
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
 SizeT ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id) {
+    // BaseProfiler profiler;
+    // profiler.Begin();
     begin_doc_id_ = begin_doc_id;
     doc_count_ = row_count;
     Vector<u32> column_lengths(row_count);
@@ -69,6 +73,8 @@ SizeT ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 ro
         term_count_sum += term_count;
     }
     column_lengths_.SetBatch(begin_doc_id, column_lengths);
+    // LOG_INFO(fmt::format("ColumnInverter::InvertColumn time cost: {}", profiler.ElapsedToString()));
+    // profiler.End();
     return term_count_sum;
 }
 
@@ -234,8 +240,12 @@ void ColumnInverter::GeneratePosting() {
 }
 
 void ColumnInverter::SortForOfflineDump() {
+    // BaseProfiler profiler;
+    // profiler.Begin();
     MergePrepare();
     Sort();
+    // LOG_INFO(fmt::format("ColumnInverter::SortForOfflineDump time cost: {}", profiler.ElapsedToString()));
+    // profiler.End();
 }
 
 /// Layout of the input of external sort file
