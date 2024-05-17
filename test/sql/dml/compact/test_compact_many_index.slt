@@ -22,6 +22,9 @@ CREATE INDEX idx3 ON tbl1 (c3) USING Hnsw WITH (M = 16, ef_construction = 200, m
 statement ok
 COMPACT TABLE tbl1;
 
+statement ok
+COMPACT TABLE tbl1;
+
 query I
 SELECT c1 FROM tbl1 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
@@ -56,6 +59,9 @@ CREATE INDEX idx2 ON tbl2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, m
 
 statement ok
 CREATE INDEX idx3 ON tbl2 (c3) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+statement ok
+COMPACT TABLE tbl2;
 
 statement ok
 COMPACT TABLE tbl2;

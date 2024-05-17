@@ -27,6 +27,10 @@ COMPACT TABLE test_compact_with_index;
 ----
 
 query I
+COMPACT TABLE test_compact_with_index;
+----
+
+query I
 SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
 ----
 8

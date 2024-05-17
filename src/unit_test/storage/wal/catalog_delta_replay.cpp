@@ -873,8 +873,11 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
+                    for (auto *segment_index_entry : segment_index_entries) {
+                        table_ref->index_index_->Insert(table_idx_entry, segment_index_entry);
+                    }
 
                     // do create index
                     {
@@ -1038,8 +1041,11 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
+                    for (auto *segment_index_entry : segment_index_entries) {
+                        table_ref->index_index_->Insert(table_idx_entry, segment_index_entry);
+                    }
 
                     // do create index
                     {
@@ -1188,7 +1194,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
 
                     // do create index

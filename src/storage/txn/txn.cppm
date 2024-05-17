@@ -60,6 +60,7 @@ class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
 enum class CompactStatementType;
+struct SegmentIndexEntry;
 
 export class Txn {
 public:
@@ -136,7 +137,8 @@ public:
 
     Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
 
-    Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
+    Pair<Vector<SegmentIndexEntry *>, Status>
+    CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 

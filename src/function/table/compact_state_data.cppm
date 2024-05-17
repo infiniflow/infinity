@@ -26,6 +26,7 @@ import default_values;
 import table_entry;
 import table_index_entry;
 import segment_entry;
+import segment_index_entry;
 import base_table_ref;
 import block_index;
 import txn;
@@ -104,6 +105,12 @@ public:
         std::lock_guard lock(mutex2_);
         auto *index_index = new_table_ref_->index_index_.get();
         index_index->Insert(table_index_entry, txn);
+    }
+
+    void AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry) {
+        std::lock_guard lock(mutex2_);
+        auto *index_index = new_table_ref_->index_index_.get();
+        index_index->Insert(table_index_entry, index_segment_entry);
     }
 
     BaseTableRef *GetNewTableRef() const { return new_table_ref_.get(); }
