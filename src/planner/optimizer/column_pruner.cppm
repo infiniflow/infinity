@@ -45,6 +45,9 @@ private:
     template <class T>
     Vector<T> ClearUnusedExpressions(const Vector<T> &list, idx_t table_idx);
 
+    template <class T>
+    Vector<T> ClearUnusedBaseTableColumns(const Vector<T> &col_list, idx_t table_idx);
+
     bool all_referenced_;
     HashSet<ColumnBinding> column_references_;
 };

@@ -14,8 +14,6 @@
 
 module;
 
-#include <vector>
-
 export module base_table_ref;
 
 import stl;
@@ -53,11 +51,11 @@ public:
         return MakeShared<BaseTableRef>(table_entry, std::move(block_index));
     }
 
-    void RetainColumnByIndices(const Vector<SizeT> &&indices) {
+    void RetainColumnByIndices(const Vector<SizeT> &indices) {
         replace_field(column_ids_, indices);
         replace_field(*column_names_, indices);
         replace_field(*column_types_, indices);
-    };
+    }
 
     SharedPtr<String> schema_name() const { return table_entry_ptr_->GetDBName(); }
 
@@ -76,9 +74,9 @@ private:
     template <typename T>
     inline static void replace_field(Vector<T> &field, const Vector<SizeT> &indices) {
         Vector<T> items;
-        items.reserve(field.size());
-        for (SizeT i : indices) {
-            items.emplace_back(std::move(field[i]));
+        items.reserve(indices.size());
+        for (SizeT i = 0; i < indices.size(); ++i) {
+            items.emplace_back(std::move(field[indices[i]]));
         }
         field = std::move(items);
     }

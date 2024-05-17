@@ -39,6 +39,8 @@ export enum class PhysicalOperatorType : i8 {
     kDummyScan,
     kKnnScan,
     kMergeKnn,
+    kMatchTensorScan,
+    kMergeMatchTensor,
     kMatch,
     kFusion,
 

@@ -182,6 +182,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
+        case PhysicalOperatorType::kMergeMatchTensor:
         case PhysicalOperatorType::kMergeKnn: {
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
@@ -219,12 +220,12 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kCrossProduct: {
             UnrecoverableError(fmt::format("Not support {}.", phys_op->GetName()));
         }
+        case PhysicalOperatorType::kMatchTensorScan:
         case PhysicalOperatorType::kKnnScan: {
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
-            PhysicalKnnScan *knn_scan = static_cast<PhysicalKnnScan *>(phys_op);
-            if (knn_scan->TaskCount() == 1) {
+            if (phys_op->TaskletCount() == 1) {
                 current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             } else {
                 current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);

@@ -151,6 +151,7 @@ export {
 
     // default query option parameter
     constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 10;
+    constexpr u32 DEFAULT_TENSOR_MAXSIM_OPTION_TOP_N = 10;
 
     constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
     constexpr String DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib

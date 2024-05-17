@@ -17,6 +17,7 @@ namespace infinity {
 class MatchExpr;
 class QueryExpr;
 class KnnExpr;
+class MatchTensorExpr;
 class FusionExpr;
 
 class SearchExpr : public ParsedExpr {
@@ -34,6 +35,7 @@ public:
 public:
     std::vector<MatchExpr *> match_exprs_{};
     std::vector<KnnExpr *> knn_exprs_{};
+    std::vector<MatchTensorExpr *> tensor_maxsim_exprs_{};
     FusionExpr *fusion_expr_{};
 
 private:

@@ -23,6 +23,7 @@ import fragment_data;
 import data_block;
 import table_scan_function_data;
 import knn_scan_data;
+import match_tensor_scan_function_data;
 import compact_state_data;
 import table_def;
 
@@ -101,6 +102,23 @@ export struct TableScanOperatorState : public OperatorState {
     inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
 
     UniquePtr<TableScanFunctionData> table_scan_function_data_{};
+};
+
+// MatchTensorScan
+export struct MatchTensorScanOperatorState : public OperatorState {
+    inline explicit MatchTensorScanOperatorState() : OperatorState(PhysicalOperatorType::kMatchTensorScan) {}
+
+    UniquePtr<MatchTensorScanFunctionData> match_tensor_scan_function_data_{};
+};
+
+// MergeMatchTensor
+export struct MergeMatchTensorOperatorState : public OperatorState {
+    inline explicit MergeMatchTensorOperatorState() : OperatorState(PhysicalOperatorType::kMergeMatchTensor) {}
+
+    Vector<UniquePtr<DataBlock>> middle_sorted_data_blocks_; // middle result
+    u32 middle_result_count_{};
+    Vector<UniquePtr<DataBlock>> input_data_blocks_;
+    bool input_complete_{false};
 };
 
 // KnnScan
@@ -409,6 +427,7 @@ export enum class SourceStateType {
     kTableScan,
     kIndexScan,
     kKnnScan,
+    kMatchTensorScan,
     kCompact,
     kEmpty,
 };
@@ -459,6 +478,13 @@ export struct AggregateSourceState : public SourceState {
 export struct TableScanSourceState : public SourceState {
     explicit TableScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
         : SourceState(SourceStateType::kTableScan), global_ids_(std::move(global_ids)) {}
+
+    SharedPtr<Vector<GlobalBlockID>> global_ids_;
+};
+
+export struct MatchTensorScanSourceState : public SourceState {
+    explicit MatchTensorScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
+        : SourceState(SourceStateType::kMatchTensorScan), global_ids_(std::move(global_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };

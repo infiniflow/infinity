@@ -40,7 +40,7 @@ import value_expression;
 import fusion_expression;
 import search_expression;
 import match_expression;
-
+import match_tensor_expression;
 import function;
 import aggregate_function;
 import aggregate_function_set;
@@ -71,6 +71,7 @@ import cast_expr;
 import between_expr;
 import subquery_expr;
 import match_expr;
+import match_tensor_expr;
 import data_type;
 
 import catalog;
@@ -481,9 +482,59 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     return bound_knn_expr;
 }
 
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
+    // Bind query column
+    Vector<SharedPtr<BaseExpression>> arguments;
+    if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
+        UnrecoverableError("MatchTensor expression expect a column expression");
+    }
+    // TODO: now only support MaxSim search method
+    if (expr.search_method_ != MatchTensorMethod::kMaxSim) {
+        RecoverableError(Status::NotSupport(fmt::format("Unsupported search method: {}, now only support MaxSim search method",
+                                                        MatchTensorExpr::MethodToString(expr.search_method_))));
+    }
+    auto expr_ptr = BuildColExpr((ColumnExpr &)*expr.column_expr_, bind_context_ptr, depth, false);
+    auto column_data_type = expr_ptr->Type();
+    TypeInfo *type_info = column_data_type.type_info().get();
+    u32 tensor_column_basic_embedding_dim = 0;
+    if (column_data_type.type() != LogicalType::kTensor or type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
+        RecoverableError(Status::SyntaxError("Expect the column search is an tensor column"));
+    } else {
+        EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
+        tensor_column_basic_embedding_dim = embedding_info->Dimension();
+        if (expr.dimension_ == 0 or expr.dimension_ % tensor_column_basic_embedding_dim != 0) {
+            RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
+                                                             expr.dimension_,
+                                                             embedding_info->Dimension())));
+        }
+        // TODO: now only support float query tensor
+        // TODO: now only support search on tensor column with float data type
+        if (expr.embedding_data_type_ != EmbeddingDataType::kElemFloat) {
+            RecoverableError(Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
+                                                            EmbeddingT::EmbeddingDataType2String(expr.embedding_data_type_))));
+        }
+        if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+            RecoverableError(Status::NotSupport(
+                fmt::format("Unsupported tensor column type: {}, now only support search on float tensor column", embedding_info->ToString())));
+        }
+    }
+    arguments.emplace_back(std::move(expr_ptr));
+    // Create query embedding
+    EmbeddingT query_embedding((ptr_t)expr.embedding_data_ptr_, false);
+    auto bound_tensor_maxsim_expr = MakeShared<MatchTensorExpression>(std::move(arguments),
+                                                                      expr.search_method_,
+                                                                      expr.embedding_data_type_,
+                                                                      expr.dimension_,
+                                                                      std::move(query_embedding),
+                                                                      tensor_column_basic_embedding_dim,
+                                                                      expr.options_text_);
+    return bound_tensor_maxsim_expr;
+}
+
 SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     Vector<SharedPtr<MatchExpression>> match_exprs;
     Vector<SharedPtr<KnnExpression>> knn_exprs;
+    Vector<SharedPtr<MatchTensorExpression>> tensor_maxsim_exprs;
     SharedPtr<FusionExpression> fusion_expr = nullptr;
     for (MatchExpr *match_expr : expr.match_exprs_) {
         match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
@@ -491,9 +542,13 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
     for (KnnExpr *knn_expr : expr.knn_exprs_) {
         knn_exprs.push_back(static_pointer_cast<KnnExpression>(BuildKnnExpr(*knn_expr, bind_context_ptr, depth, false)));
     }
+    for (MatchTensorExpr *tensor_maxsim_expr : expr.tensor_maxsim_exprs_) {
+        tensor_maxsim_exprs.push_back(
+            static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*tensor_maxsim_expr, bind_context_ptr, depth, false)));
+    }
     if (expr.fusion_expr_ != nullptr)
         fusion_expr = MakeShared<FusionExpression>(expr.fusion_expr_->method_, expr.fusion_expr_->options_);
-    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, fusion_expr);
+    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, tensor_maxsim_exprs, fusion_expr);
     return bound_search_expr;
 }
 
@@ -543,13 +598,13 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    RecoverableError(Status::SyntaxError("DISTANCE() needs to be allowed only when there is only KnnScan"));
+                    RecoverableError(Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR"));
                 }
                 break;
             }
             case SpecialType::kScore: {
                 if (!bind_context_ptr->allow_score) {
-                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MatchScan"));
+                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR"));
                 }
                 break;
             }

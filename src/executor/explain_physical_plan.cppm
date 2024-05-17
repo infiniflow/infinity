@@ -61,7 +61,9 @@ import physical_merge_limit;
 import physical_merge_top;
 import physical_merge_sort;
 import physical_merge_knn;
+import physical_merge_match_tensor;
 import physical_match;
+import physical_match_tensor_scan;
 import physical_fusion;
 import physical_merge_aggregate;
 
@@ -173,6 +175,10 @@ public:
     static void Explain(const PhysicalMergeKnn *merge_knn_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const PhysicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const PhysicalMergeMatchTensor *merge_match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
  
