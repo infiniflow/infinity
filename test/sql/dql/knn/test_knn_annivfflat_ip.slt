@@ -15,7 +15,7 @@ COPY test_knn_annivfflat_ip FROM '/var/infinity/test_data/embedding_float_dim4.c
 
 # mertic ip will order descendingly. The query will return row 4, 3, 2
 query I
-SELECT c1 FROM test_knn_annivfflat_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_annivfflat_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 6
@@ -28,7 +28,7 @@ COPY test_knn_annivfflat_ip FROM '/var/infinity/test_data/embedding_float_dim4.c
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
-SELECT c1 FROM test_knn_annivfflat_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_annivfflat_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8
@@ -39,7 +39,7 @@ CREATE INDEX idx_annivfflat__ip ON test_knn_annivfflat_ip (c2) USING IVFFlat WIT
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_annivfflat_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_annivfflat_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8
@@ -51,7 +51,7 @@ COPY test_knn_annivfflat_ip FROM '/var/infinity/test_data/embedding_float_dim4.c
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_annivfflat_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_annivfflat_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8

@@ -126,7 +126,7 @@ def generate(generate_if_exists: bool, copy: bool):
         for v_x in x:
             slt_file.write("query I\n")
             slt_file.write(
-                "SELECT c1 FROM {} SEARCH KNN(c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
+                "SELECT c1 FROM {} SEARCH MATCH VECTOR (c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
                     table_name, to_sql_embedding(v_x + diff)
                 )
             )
@@ -147,7 +147,7 @@ def generate(generate_if_exists: bool, copy: bool):
         for v_x in x:
             slt_file.write("query I\n")
             slt_file.write(
-                "SELECT c1 FROM {} SEARCH KNN(c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
+                "SELECT c1 FROM {} SEARCH MATCH VECTOR (c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
                     table_name, to_sql_embedding(float(v_x) + diff)
                 )
             )

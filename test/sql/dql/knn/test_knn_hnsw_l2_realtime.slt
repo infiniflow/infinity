@@ -17,7 +17,7 @@ statement ok
 INSERT INTO test_knn_hnsw_l2 VALUES (6, [0.3, 0.2, 0.1, 0.4]), (8, [0.4, 0.3, 0.2, 0.1]);
 
 query I
-SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 6
@@ -27,7 +27,7 @@ statement ok
 COPY test_knn_hnsw_l2 FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 
 query I
-SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8

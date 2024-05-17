@@ -15,21 +15,21 @@ COPY test_knn_ip FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (D
 
 # mertic ip will order descendingly. The query will return row 4, 3, 2
 query I
-SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 6
 4
 
 query I
-SELECT c2 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c2 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 0.4,0.3,0.2,0.1
 0.3,0.2,0.1,0.4
 0.2,0.1,0.3,0.4
 
 query II
-SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8 3 0.270000
 6 2 0.250000
@@ -42,7 +42,7 @@ COPY test_knn_ip FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (D
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
-SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 8
@@ -54,7 +54,7 @@ COPY test_knn_ip FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (D
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 8
@@ -62,7 +62,7 @@ SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3
 
 # query shall work when topn exceeds the row count
 query I
-SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 100);
+SELECT c1 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 100);
 ----
 8
 8

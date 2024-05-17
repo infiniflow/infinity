@@ -15,7 +15,7 @@ COPY test_knn_hnsw_l2_filter FROM '/var/infinity/test_data/embedding_float_dim4.
 
 # mertic l2 will order ascendingly. The query will return row 4, 3, 2
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 6
@@ -28,7 +28,7 @@ COPY test_knn_hnsw_l2_filter FROM '/var/infinity/test_data/embedding_float_dim4.
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8
@@ -41,21 +41,21 @@ CREATE INDEX idx1 ON test_knn_hnsw_l2_filter (c2) USING Hnsw WITH (M = 16, ef_co
 # the query will return row 4 from block 1, 2 and 3
 # select with 2 index segment
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8
 6
 
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WHERE c1 < 7;
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WHERE c1 < 7;
 ----
 6
 6
 4
 
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 13) WHERE c1 < 7;
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 13) WHERE c1 < 7;
 ----
 6
 6
@@ -70,21 +70,21 @@ COPY test_knn_hnsw_l2_filter FROM '/var/infinity/test_data/embedding_float_dim4.
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8
 8
 
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WHERE c1 < 7;
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WHERE c1 < 7;
 ----
 6
 6
 6
 
 query I
-SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 13) WHERE c1 < 7;
+SELECT c1 FROM test_knn_hnsw_l2_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 13) WHERE c1 < 7;
 ----
 6
 6

@@ -26,14 +26,14 @@ statement ok
 COMPACT TABLE tbl1;
 
 query I
-SELECT c1 FROM tbl1 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM tbl1 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 0.4,0.4
 0.4,0.4
 0.3,0.3
 
 query I
-SELECT c1 FROM tbl1 SEARCH KNN(c3, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM tbl1 SEARCH MATCH VECTOR (c3, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 0.4,0.4
 0.4,0.4
@@ -67,14 +67,14 @@ statement ok
 COMPACT TABLE tbl2;
 
 query I
-SELECT c1 FROM tbl2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM tbl2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 4
 4
 3
 
 query I
-SELECT c1 FROM tbl2 SEARCH KNN(c3, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM tbl2 SEARCH MATCH VECTOR (c3, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 4
 4

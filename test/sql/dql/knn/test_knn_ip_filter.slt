@@ -15,14 +15,14 @@ COPY test_knn_ip_filter FROM '/var/infinity/test_data/embedding_float_dim4.csv' 
 
 # mertic ip will order descendingly. The query will return row 4, 3, 2
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 6
 4
 
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13);
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13);
 ----
 8
 6
@@ -30,13 +30,13 @@ SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 
 2
 
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WHERE c1 > 5;
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WHERE c1 > 5;
 ----
 8
 6
 
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 1) WHERE c1 < 8;
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 1) WHERE c1 < 8;
 ----
 6
 
@@ -47,21 +47,21 @@ COPY test_knn_ip_filter FROM '/var/infinity/test_data/embedding_float_dim4.csv' 
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 8
 6
 
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WHERE c1 < 8;
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3) WHERE c1 < 8;
 ----
 6
 6
 4
 
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WHERE c1 < 8;
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WHERE c1 < 8;
 ----
 6
 6
@@ -76,20 +76,20 @@ COPY test_knn_ip_filter FROM '/var/infinity/test_data/embedding_float_dim4.csv' 
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 8
 8
 
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 2) WHERE c1 < 7;
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 2) WHERE c1 < 7;
 ----
 6
 6
 
 query I
-SELECT c1 FROM test_knn_ip_filter SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WHERE c1 < 7;
+SELECT c1 FROM test_knn_ip_filter SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 13) WHERE c1 < 7;
 ----
 6
 6
