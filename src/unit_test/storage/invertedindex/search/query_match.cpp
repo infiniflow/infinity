@@ -211,7 +211,7 @@ void QueryMatchTest::CreateIndex(const String& db_name, const String& table_name
             u64 table_idx = 0;
             auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-            auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+            auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
             EXPECT_TRUE(status5.ok());
 
             {

@@ -29,6 +29,13 @@ namespace infinity {
 
 bool PhysicalCompactIndexDo::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *compact_index_do_operator_state = static_cast<CompactIndexDoOperatorState *>(operator_state);
+    auto *compact_state_data = compact_index_do_operator_state->compact_state_data_.get();
+    BaseTableRef *new_table_ref = compact_state_data->GetNewTableRef();
+    if (new_table_ref->block_index_->IsEmpty()) { // compact yield no new segment
+        operator_state->SetComplete();
+        return true;
+    }
+
     auto *index_index = base_table_ref_->index_index_.get();
     SizeT create_index_idx = compact_index_do_operator_state->create_index_idx_;
     if (create_index_idx == index_index->index_snapshots_vec_.size()) {
@@ -38,8 +45,6 @@ bool PhysicalCompactIndexDo::Execute(QueryContext *query_context, OperatorState 
     auto *table_index_entry = index_index->index_snapshots_vec_[create_index_idx]->table_index_entry_;
     const String &index_name = *table_index_entry->GetIndexName();
 
-    auto *compact_state_data = compact_index_do_operator_state->compact_state_data_.get();
-    BaseTableRef *new_table_ref = compact_state_data->GetNewTableRef();
 
     Txn *txn = query_context->GetTxn();
     auto &create_index_idxes = (*compact_index_do_operator_state->create_index_shared_data_)[create_index_idx]->create_index_idxes_;
