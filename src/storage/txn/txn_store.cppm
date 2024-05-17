@@ -188,6 +188,8 @@ public:
 
     bool Empty() const;
 
+    std::mutex mtx_{};
+
 private:
     // Txn store
     Txn *txn_{}; // TODO: remove this
