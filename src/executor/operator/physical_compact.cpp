@@ -119,14 +119,12 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
         return true;
     }
     CompactSegmentData &compact_segment_data = compact_state_data->segment_data_list_[group_idx];
-    compact_segment_data.old_segments_ = compactible_segments_group_[group_idx];
-    const auto &compactible_segments = compact_segment_data.old_segments_;
-
-    for (auto *compactible_segment : compactible_segments) {
-        if (!compactible_segment->TrySetCompacting(compact_state_data)) {
-            UnrecoverableError("Segment should be compactible.");
+    for (auto *candidate_segment : compactible_segments_group_[group_idx]) {
+        if (candidate_segment->TrySetCompacting(compact_state_data)) {
+            compact_segment_data.old_segments_.push_back(candidate_segment);
         }
     }
+    const auto &compactible_segments = compact_segment_data.old_segments_;
 
     auto *txn = query_context->GetTxn();
     auto *buffer_mgr = query_context->storage()->buffer_manager();
