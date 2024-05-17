@@ -17,6 +17,13 @@ Keep the environment clean to ensure that the database under test is able to use
 
 Avoid to run multiple databases at the same time, as each one is a significant resource consumer.
 
+Test environment:
+
+- OS: OpenSUSE Tumbleweed x86_64
+- CPU: Intel CORE i5-13500H 16vCPU
+- RAM: 32GB
+- Disk: 1TB
+
 ## Versions
 |                   | Version |
 | ----------------- |---------|
@@ -28,7 +35,7 @@ Avoid to run multiple databases at the same time, as each one is a significant r
 
 1. Install necessary dependencies.
 
-```python
+```bash
 cd python/benchmark
 pip install -r requirements.txt
 ```
@@ -36,7 +43,6 @@ pip install -r requirements.txt
 2. Download the required Benchmark datasets to your **/datasets** folder：
    - [SIFT1M](http://ann-benchmarks.com/sift-128-euclidean.hdf5)
    - [GIST1M](http://ann-benchmarks.com/gist-960-euclidean.hdf5)
-   - [Dbpedia](https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/dbpedia-entity.zip)
    - [Enwiki](https://home.apache.org/~mikemccand/enwiki-20120502-lines-1k.txt.lzma)
 
 Preprocess dataset:
@@ -58,15 +64,20 @@ sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
 ```
 
-1. Run Benchmark: 
+1. Run Benchmark:
 
-   > Tasks of this Python script include:
-   >
-   > - Delete the original data.
-   > - Re-insert the data
-   > - Calculate the time to insert data and build index
-   > - Calculate QPS.
-   > - Calculate query latencies. 
+Drop file cache before benchmark query latency.
+
+```bash
+echo 3 | sudo tee /proc/sys/vm/drop_caches
+```
+
+Tasks of the Python script `run.py` include:
+ - Delete the original data.
+ - Re-insert the data.
+ - Calculate the time to insert data and build index.
+ - Calculate query latency.
+ - Calculate QPS.
 
 ```bash
 $ python run.py -h
@@ -114,28 +125,18 @@ options:
 
 
 
-### Dbpedia
-
-> -  4160000 documents
-> - 467 queries
-
-|                   | QPS  | Time to insert & build index | Time to import & build index | Disk   | Peak memory |
-| ----------------- | ----------- | ---------------------------- | ---------------------------- | ---- | ------ |
-| **Elasticsearch** | 777  | 291 s                        | N/A                          | 2 GB   | 1.7 GB      |
-| **Infinity**      | 817  | 237 s                        | 123 s                        | 3.4 GB | 0.49 GB     |
-
 ### Enwiki
 
 > - 33000000 documents
 > - 10000 `OR` queries generated based on the dataset. All terms are extracted from the dataset and very rare(occurrence < 100) terms are excluded. The number of terms of each query match the weight `[0.03, 0.15, 0.25, 0.25, 0.15, 0.08, 0.04, 0.03, 0.02]`.
 
-|                   | Time to insert & build index | Time to import & build index |
-| ----------------- | ---------------------------- | ---------------------------- |
-| **Elasticsearch** | 2289 s                       | N/A                          |
-| **Infinity**      | 2321 s                       | 944 s                        |
+|                   | Time to insert & build index | Time to import & build index | Latency(ms)(mean_time, max_time, p95_time) |
+| ----------------- | ---------------------------- | ---------------------------- | ------------------------------------------ |
+| **Elasticsearch** | 2289 s                       | N/A                          | 7.27, 326.31, 14.75                        |
+| **Infinity**      | 2321 s                       | 944 s                        | 1.54, 812.55, 3.51                         |
 
 
-| Python clients | infinity(qps, RES, vCPU) | elasticsearch(qps, RES, vCPU) |
+| Python clients | Infinity(qps, RES, vCPU) | Elasticsearch(qps, RES, vCPU) |
 | -------------- | ------------------------ | ----------------------------- |
 | 1              | 636, 9G, 0.9             | 213, 20G, 3                   |
 | 4              | 1938, 9G, 3.2            | 672, 21G, 8.5                 |
