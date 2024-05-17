@@ -88,7 +88,7 @@ private:
     // column to search
     ColumnID search_column_id_ = 0;
 
-    bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
+    void ExecuteInner(QueryContext *query_context, TensorMaxSimScanOperatorState *operator_state) const;
 };
 
 } // namespace infinity

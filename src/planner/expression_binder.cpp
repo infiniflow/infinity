@@ -599,7 +599,7 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
             }
             case SpecialType::kScore: {
                 if (!bind_context_ptr->allow_score) {
-                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MatchScan"));
+                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MatchScan or TensorMaxSimScan"));
                 }
                 break;
             }

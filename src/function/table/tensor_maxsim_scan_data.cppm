@@ -21,21 +21,46 @@ import function_data;
 import table_function;
 import global_block_id;
 import block_index;
+import internal_types;
+import knn_result_handler;
+import infinity_exception;
 
 namespace infinity {
 
 export class TensorMaxSimScanFunctionData : public TableFunctionData {
 public:
-    TensorMaxSimScanFunctionData(const BlockIndex *block_index,
-                                 const SharedPtr<Vector<GlobalBlockID>> &global_block_ids,
-                                 const ColumnID search_column_id)
-        : block_index_(block_index), global_block_ids_(global_block_ids), search_column_id_(search_column_id) {}
+    using ResultHandler = ReservoirResultHandler<CompareMin<float, RowID>>;
+    TensorMaxSimScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const u32 topn)
+        : block_index_(block_index), global_block_ids_(global_block_ids), topn_(topn) {
+        Init();
+    }
 
+    void Init() {
+        score_result_ = MakeUniqueForOverwrite<float[]>(topn_);
+        row_id_result_ = MakeUniqueForOverwrite<RowID[]>(topn_);
+        result_handler_ = MakeUnique<ResultHandler>(1, topn_, score_result_.get(), row_id_result_.get());
+        result_handler_->Begin();
+    }
+
+    u32 End() {
+        if (finished_) {
+            UnrecoverableError("End() is called twice!");
+            return 0;
+        }
+        finished_ = true;
+        result_handler_->End();
+        return result_handler_->GetSize(0);
+    }
+
+    bool finished_ = false;
     const BlockIndex *block_index_;
     const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_;
-    const ColumnID search_column_id_;
+    const u32 topn_;
+    UniquePtr<float[]> score_result_;
+    UniquePtr<RowID[]> row_id_result_;
+    UniquePtr<ResultHandler> result_handler_;
 
-    u64 current_block_ids_idx_ = 0;
+    u32 current_block_ids_idx_ = 0;
 };
 
 } // namespace infinity

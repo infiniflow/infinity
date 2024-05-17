@@ -49,6 +49,15 @@ import segment_entry;
 import knn_filter;
 import global_block_id;
 import block_index;
+import column_def;
+import internal_types;
+import fix_heap;
+import type_info;
+import knn_expr;
+import embedding_info;
+import buffer_manager;
+import tensor_maxsim_scan_function_data;
+import mlas_matrix_multiply;
 
 namespace infinity {
 
@@ -65,7 +74,26 @@ PhysicalTensorMaxSimScan::PhysicalTensorMaxSimScan(const u64 id,
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
-void PhysicalTensorMaxSimScan::Init() { search_column_id_ = tensor_maxsim_expr_->column_expr_->binding().column_idx; }
+void PhysicalTensorMaxSimScan::Init() {
+    search_column_id_ = tensor_maxsim_expr_->column_expr_->binding().column_idx;
+    const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
+    const auto &column_type_ptr = column_def->type();
+    if (column_type_ptr->type() != LogicalType::kTensor) {
+        UnrecoverableError(fmt::format("Column {} is not a tensor column", column_def->name()));
+    }
+    const auto &type_info = column_type_ptr->type_info();
+    if (type_info->type() != TypeInfoType::kEmbedding) {
+        UnrecoverableError(fmt::format("Column {} is not a tensor column", column_def->name()));
+    }
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
+    if (embedding_info->Dimension() != tensor_maxsim_expr_->tensor_basic_embedding_dimension_) {
+        UnrecoverableError(fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), tensor_maxsim_expr_->ToString()));
+    }
+    // TODO: now only support float32
+    if (embedding_info->Type() != tensor_maxsim_expr_->embedding_data_type_ or embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+        UnrecoverableError("Now only support tensor maxsim search on float column.");
+    }
+}
 
 SharedPtr<Vector<String>> PhysicalTensorMaxSimScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
@@ -128,13 +156,149 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTensorMaxSimScan::PlanBlockEntr
 }
 
 bool PhysicalTensorMaxSimScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    // TODO
-    return false;
+    auto *tensor_maxsim_scan_operator_state = static_cast<TensorMaxSimScanOperatorState *>(operator_state);
+    ExecuteInner(query_context, tensor_maxsim_scan_operator_state);
+    return true;
 }
 
-bool PhysicalTensorMaxSimScan::ExecuteInner(QueryContext *query_context, OperatorState *operator_state) {
-    // TODO
-    return false;
+void PhysicalTensorMaxSimScan::ExecuteInner(QueryContext *query_context, TensorMaxSimScanOperatorState *operator_state) const {
+    if (!operator_state->data_block_array_.empty()) {
+        UnrecoverableError("TensorScan output data block array should be empty");
+    }
+    Txn *txn = query_context->GetTxn();
+    const TxnTimeStamp begin_ts = txn->BeginTS();
+    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+    if (!common_query_filter_->TryFinishBuild(txn)) {
+        // not ready, abort and wait for next time
+        return;
+    }
+    TensorMaxSimScanFunctionData &function_data = *(operator_state->tensor_maxsim_scan_function_data_);
+    if (function_data.finished_) [[unlikely]] {
+        UnrecoverableError("TensorMaxSimScanFunctionData is finished");
+    }
+    const auto search_column_id = SearchColumnID();
+    const BlockIndex *block_index = function_data.block_index_;
+    const Vector<GlobalBlockID> &block_ids = *function_data.global_block_ids_;
+    auto &block_ids_idx = function_data.current_block_ids_idx_;
+    if (const auto task_id = block_ids_idx; task_id < block_ids.size()) {
+        ++block_ids_idx;
+        const auto [segment_id, block_id] = block_ids[task_id];
+        const BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+            // not skipped after common_query_filter
+            const auto row_count = block_entry->row_count();
+            // filter for segment
+            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+            Bitmask bitmask;
+            bitmask.Initialize(std::bit_ceil(row_count));
+            const u32 block_start_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+            const u32 block_end_offset = block_start_offset + row_count;
+            if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                const auto it1 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_start_offset);
+                const auto it2 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_end_offset);
+                bitmask.SetAllFalse();
+                for (auto it = it1; it < it2; ++it) {
+                    bitmask.SetTrue(*it - block_start_offset);
+                }
+            } else {
+                u32 u64_start_offset = block_start_offset / 64;
+                u32 u64_end_offset = (block_end_offset - 1) / 64;
+                if (const u64 *filter_data = std::get<Bitmask>(filter_result).GetData(); filter_data) {
+                    bitmask.SetAllFalse();
+                    u64 *data = bitmask.GetData();
+                    for (u32 i = u64_start_offset; i <= u64_end_offset; ++i) {
+                        data[i - u64_start_offset] = filter_data[i];
+                    }
+                }
+            }
+            block_entry->SetDeleteBitmask(begin_ts, bitmask);
+            auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id);
+            auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+            auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
+            FixHeapManager *fix_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
+            // query tensor
+            const char *query_tensor_ptr = tensor_maxsim_expr_->query_embedding_.ptr;
+            const u32 query_embedding_num = tensor_maxsim_expr_->num_of_embedding_in_query_tensor_;
+            const u32 basic_embedding_dimension = tensor_maxsim_expr_->tensor_basic_embedding_dimension_;
+            const u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
+            for (u32 i = 0; i < row_count; ++i) {
+                if (bitmask.IsTrue(i)) {
+                    const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[i];
+                    const char *tensor_data_ptr = fix_heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
+                    // TODO: now only support float32 (check Init())
+                    // use mlas
+                    auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * embedding_num);
+                    matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
+                                                                   reinterpret_cast<const float *>(tensor_data_ptr),
+                                                                   query_embedding_num,
+                                                                   embedding_num,
+                                                                   basic_embedding_dimension,
+                                                                   output_ptr.get());
+                    float maxsim_score = 0.0f;
+                    for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+                        const float *query_ip_ptr = output_ptr.get() + query_i * embedding_num;
+                        float max_score = std::numeric_limits<float>::lowest();
+                        for (u32 k = 0; k < embedding_num; ++k) {
+                            max_score = std::max(max_score, query_ip_ptr[k]);
+                        }
+                        maxsim_score += max_score;
+                    }
+                    function_data.result_handler_->AddResult(0, maxsim_score, RowID(segment_id, segment_offset_start + i));
+                }
+            }
+        }
+    }
+    if (block_ids_idx >= block_ids.size()) {
+        LOG_TRACE(fmt::format("TensorMaxSimScan: {} task finished", block_ids_idx));
+        // all task Complete
+        const u32 result_n = function_data.End();
+        const auto output_type_ptr = GetOutputTypes();
+        {
+            // prepare output data block
+            const u32 total_data_row_count = result_n;
+            u32 row_idx = 0;
+            do {
+                auto data_block = DataBlock::MakeUniquePtr();
+                data_block->Init(*output_type_ptr);
+                operator_state->data_block_array_.emplace_back(std::move(data_block));
+                row_idx += DEFAULT_BLOCK_CAPACITY;
+            } while (row_idx < total_data_row_count);
+        }
+        u32 output_block_row_id = 0;
+        u32 output_block_idx = 0;
+        DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
+        const float *result_scores = function_data.score_result_.get();
+        const RowID *result_row_ids = function_data.row_id_result_.get();
+        for (u32 top_idx = 0; top_idx < result_n; ++top_idx) {
+            const SegmentID segment_id = result_row_ids[top_idx].segment_id_;
+            const SegmentOffset segment_offset = result_row_ids[top_idx].segment_offset_;
+            const BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+            const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
+            BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+            if (block_entry == nullptr) {
+                UnrecoverableError(fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id));
+            }
+            if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
+                output_block_ptr->Finalize();
+                ++output_block_idx;
+                output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
+                output_block_row_id = 0;
+            }
+            const SizeT column_n = base_table_ref_->column_ids_.size();
+            for (SizeT i = 0; i < column_n; ++i) {
+                const auto column_id = base_table_ref_->column_ids_[i];
+                auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
+            }
+            output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_scores[top_idx]);
+            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
+            ++output_block_row_id;
+        }
+        output_block_ptr->Finalize();
+        operator_state->SetComplete();
+    }
 }
 
 } // namespace infinity

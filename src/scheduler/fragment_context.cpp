@@ -111,7 +111,7 @@ UniquePtr<OperatorState> MakeTensorMaxSimScanState(const PhysicalTensorMaxSimSca
     auto operator_state = MakeUnique<TensorMaxSimScanOperatorState>();
     operator_state->tensor_maxsim_scan_function_data_ = MakeUnique<TensorMaxSimScanFunctionData>(physical_tensor_maxsim_scan->GetBlockIndex(),
                                                                                                  tensor_maxsim_scan_source_state->global_ids_,
-                                                                                                 physical_tensor_maxsim_scan->SearchColumnID());
+                                                                                                 physical_tensor_maxsim_scan->GetTopN());
     return operator_state;
 }
 
