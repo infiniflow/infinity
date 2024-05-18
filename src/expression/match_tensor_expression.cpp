@@ -15,6 +15,7 @@
 module;
 
 module match_tensor_expression;
+
 import stl;
 import expression_type;
 import internal_types;
@@ -23,6 +24,7 @@ import base_expression;
 import column_expression;
 import infinity_exception;
 import status;
+import logger;
 
 namespace infinity {
 

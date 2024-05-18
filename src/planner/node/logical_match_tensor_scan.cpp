@@ -31,6 +31,7 @@ import explain_logical_plan;
 import search_options;
 import infinity_exception;
 import status;
+import logger;
 
 namespace infinity {
 
