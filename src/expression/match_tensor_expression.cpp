@@ -15,6 +15,7 @@
 module;
 
 module match_tensor_expression;
+
 import stl;
 import expression_type;
 import internal_types;
@@ -23,6 +24,7 @@ import base_expression;
 import column_expression;
 import infinity_exception;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -45,8 +47,10 @@ DataType MatchTensorExpression::Type() const {
             return DataType(LogicalType::kFloat);
         }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
-                                                            EmbeddingT::EmbeddingDataType2String(embedding_data_type_))));
+            Status status = Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
+                                                           EmbeddingT::EmbeddingDataType2String(embedding_data_type_)));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             return DataType(LogicalType::kInvalid);
         }
     }

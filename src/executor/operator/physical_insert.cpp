@@ -34,6 +34,7 @@ import base_expression;
 import default_values;
 import status;
 import infinity_exception;
+import logger;
 
 import column_def;
 
@@ -51,8 +52,9 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     }
     if (row_count > DEFAULT_BLOCK_CAPACITY) {
         // Fixme: insert batch can larger than 8192, but currently we limit it.
-        RecoverableError(Status::UnexpectedError(
-            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY)));
+        Status status = Status::UnexpectedError(fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         //        UnrecoverableError(
         //            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
     }

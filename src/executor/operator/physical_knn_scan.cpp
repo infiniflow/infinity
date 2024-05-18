@@ -159,13 +159,17 @@ bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not implemented"));
+                    Status status = Status::NotSupport("Not implemented KNN distance");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented embedding data type");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     return true;
@@ -200,6 +204,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
                 // Table index entry isn't found
+                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
 
@@ -383,7 +388,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 break;
                             }
                             default: {
-                                RecoverableError(Status::NotSupport("Not implemented"));
+                                Status status = Status::NotSupport("Not implemented KNN distance");
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
                             }
                         }
                     };
@@ -507,7 +514,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not implemented"));
+                    Status status = Status::NotSupport("Not implemented index type");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
         }

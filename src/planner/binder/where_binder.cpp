@@ -28,6 +28,7 @@ import bind_alias_proxy;
 import parsed_expr;
 import column_expr;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -55,7 +56,9 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
     }
 
     if (result.get() == nullptr) {
-        RecoverableError(Status::ColumnNotExist(expr.GetName()));
+        Status status = Status::ColumnNotExist(expr.GetName());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return result;
 }

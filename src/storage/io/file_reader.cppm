@@ -17,14 +17,13 @@ module;
 #include <cassert>
 #include <unistd.h>
 
+export module file_reader;
 import stl;
 import file_system;
 import file_system_type;
 import status;
 import infinity_exception;
 import local_file_system;
-
-export module file_reader;
 
 namespace infinity {
 

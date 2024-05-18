@@ -37,6 +37,7 @@ import search_options;
 import phrase_doc_iterator;
 import global_resource_usage;
 import term_doc_iterator;
+import logger;
 
 using namespace infinity;
 
@@ -307,7 +308,9 @@ void QueryMatchTest::QueryMatch(const String& db_name,
 
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr->fields_, match_expr->matching_text_);
     if (!query_tree) {
-        RecoverableError(Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_));
+        Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     FullTextQueryContext full_text_query_context;
     full_text_query_context.query_tree_ = std::move(query_tree);

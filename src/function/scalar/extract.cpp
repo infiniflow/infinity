@@ -27,13 +27,16 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
 struct ExtractYearFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractYear function isn't implemented"));
+        Status status = Status::NotSupport("ExtractYear function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -55,7 +58,9 @@ inline void ExtractYearFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractMonthFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractMonth function isn't implemented"));
+        Status status = Status::NotSupport("ExtractMonth function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -77,7 +82,9 @@ inline void ExtractMonthFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractDayFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractDay function isn't implemented"));
+        Status status = Status::NotSupport("ExtractDay function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -99,7 +106,9 @@ inline void ExtractDayFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractHourFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractHour function isn't implemented"));
+        Status status = Status::NotSupport("ExtractHour function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -121,7 +130,9 @@ inline void ExtractHourFunction::Run(TimeT left, BigIntT &result) {
 struct ExtractMinuteFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractMinute function isn't implemented"));
+        Status status = Status::NotSupport("ExtractMinute function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -143,7 +154,9 @@ inline void ExtractMinuteFunction::Run(TimeT left, BigIntT &result) {
 struct ExtractSecondFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractSecond function isn't implemented"));
+        Status status = Status::NotSupport("ExtractSecond function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 

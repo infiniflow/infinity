@@ -8,11 +8,10 @@ import file_writer;
 import file_reader;
 import posting_byte_slice;
 import skiplist_writer;
+import skiplist_reader;
 import doc_list_format_option;
 import inmem_doc_list_decoder;
-import skiplist_reader;
 import index_defines;
-import skiplist_reader;
 import vbyte_compressor;
 import logger;
 

@@ -131,6 +131,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         auto status = logical_planner_->Build(statement, bind_context);
         // FIXME
         if (!status.ok()) {
+            LOG_ERROR(status.message());
             RecoverableError(status);
         }
 
@@ -214,6 +215,7 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
         SharedPtr<BindContext> bind_context;
         auto status = logical_planner_->Build(statement, bind_context);
         if (!status.ok()) {
+            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();

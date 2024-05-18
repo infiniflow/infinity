@@ -216,7 +216,9 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = grouped_input_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
-            RecoverableError(Status::DataTypeMismatch(input_type->ToString(), output_type->ToString()));
+            Status status = Status::DataTypeMismatch(input_type->ToString(), output_type->ToString());
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         types.emplace_back(input_type);
     }
@@ -357,7 +359,9 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
-            RecoverableError(Status::DataTypeMismatch(input_type->ToString(), output_type->ToString()));
+            Status status = Status::DataTypeMismatch(input_type->ToString(), output_type->ToString());
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         types.emplace_back(input_type);
     }

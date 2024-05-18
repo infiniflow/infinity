@@ -62,6 +62,7 @@ import default_values;
 import catalog;
 import txn_manager;
 import wal_manager;
+import logger;
 
 namespace infinity {
 
@@ -354,7 +355,9 @@ void PhysicalShow::Init() {
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented show type"));
+            Status status = Status::NotSupport("Not implemented show type");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }
@@ -462,6 +465,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     auto [database_info, status] = txn->GetDatabaseInfo(db_name_);
 
     if (!status.ok()) {
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -539,6 +543,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     auto [table_info, status] = txn->GetTableInfo(db_name_, object_name_);
 
     if (!status.ok()) {
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -661,6 +666,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, object_name_, index_name_.value());
 
     if (!status.ok()) {
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -904,6 +910,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     Status status = txn->GetTables(db_name_, table_collections_detail);
 
     if (!status.ok()) {
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1056,6 +1063,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     Status status = txn->GetViews(db_name_, views_detail);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
+        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1203,6 +1211,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1305,6 +1314,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1369,6 +1379,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1462,7 +1473,9 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         }
 
     } else {
-        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        Status status = Status::SegmentNotExist(*segment_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return;
     }
 
@@ -1494,7 +1507,9 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
     if (!segment_entry) {
-        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        Status status = Status::SegmentNotExist(*segment_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return;
     }
     auto block_entry_iter = BlockEntryIter(segment_entry.get());
@@ -1560,13 +1575,17 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
     if (!segment_entry) {
-        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        Status status = Status::SegmentNotExist(*segment_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return;
     }
 
     auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
     if (!block_entry) {
-        RecoverableError(Status::BlockNotExist(*block_id_));
+        Status status = Status::BlockNotExist(*block_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return;
     }
 
@@ -1638,6 +1657,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
+        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1646,19 +1666,25 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     SizeT table_column_id = *column_id_;
 
     if (table_column_id >= column_count) {
-        RecoverableError(Status::ColumnNotExist(fmt::format("index {}", table_column_id)));
+        Status status = Status::ColumnNotExist(fmt::format("index {}", table_column_id));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return;
     }
 
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
     if (!segment_entry) {
-        RecoverableError(Status::SegmentNotExist(*segment_id_));
+        Status status = Status::SegmentNotExist(*segment_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return;
     }
 
     auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
     if (!block_entry) {
-        RecoverableError(Status::BlockNotExist(*block_id_));
+        Status status = Status::BlockNotExist(*block_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return;
     }
 
@@ -2679,6 +2705,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
         }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
+            LOG_ERROR(operator_state->status_.message());
             RecoverableError(operator_state->status_);
             return;
         }
@@ -2824,6 +2851,7 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
             }
             default: {
                 operator_state->status_ = Status::NoSysVar(var_name);
+                LOG_ERROR(operator_state->status_.message());
                 RecoverableError(operator_state->status_);
                 return;
             }
@@ -3124,6 +3152,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
+            LOG_ERROR(operator_state->status_.message());
             RecoverableError(operator_state->status_);
             return;
         }
@@ -3470,6 +3499,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
             }
             default: {
                 operator_state->status_ = Status::NoSysVar(var_name);
+                LOG_ERROR(operator_state->status_.message());
                 RecoverableError(operator_state->status_);
                 return;
             }

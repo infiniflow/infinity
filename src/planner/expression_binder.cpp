@@ -85,7 +85,9 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
         if (result.get() == nullptr) {
-            RecoverableError(Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName())));
+            Status status = Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         // Maybe the correlated expression, trying to bind it in the parent context.
         // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
@@ -451,18 +453,24 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     }
     if (parsed_knn_expr.topn_ <= 0) {
         String topn = std::to_string(parsed_knn_expr.topn_);
-        RecoverableError(Status::InvalidParameterValue("topn", topn, "topn should be greater than 0"));
+        Status status = Status::InvalidParameterValue("topn", topn, "topn should be greater than 0");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     TypeInfo *type_info = expr_ptr->Type().type_info().get();
     if (type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
-        RecoverableError(Status::SyntaxError("Expect the column search is an embedding column"));
+        Status status = Status::SyntaxError("Expect the column search is an embedding column");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
-            RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
-                                                             parsed_knn_expr.dimension_,
-                                                             embedding_info->Dimension())));
+            Status status = Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
+                                                            parsed_knn_expr.dimension_,
+                                                            embedding_info->Dimension()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 
@@ -490,32 +498,41 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     }
     // TODO: now only support MaxSim search method
     if (expr.search_method_ != MatchTensorMethod::kMaxSim) {
-        RecoverableError(Status::NotSupport(fmt::format("Unsupported search method: {}, now only support MaxSim search method",
-                                                        MatchTensorExpr::MethodToString(expr.search_method_))));
+        Status status = Status::NotSupport(fmt::format("Unsupported search method: {}, now only support MaxSim search method",
+                                                       MatchTensorExpr::MethodToString(expr.search_method_)));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*expr.column_expr_, bind_context_ptr, depth, false);
     auto column_data_type = expr_ptr->Type();
     TypeInfo *type_info = column_data_type.type_info().get();
     u32 tensor_column_basic_embedding_dim = 0;
     if (column_data_type.type() != LogicalType::kTensor or type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
-        RecoverableError(Status::SyntaxError("Expect the column search is an tensor column"));
+        Status status = Status::SyntaxError("Expect the column search is an tensor column");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         tensor_column_basic_embedding_dim = embedding_info->Dimension();
         if (expr.dimension_ == 0 or expr.dimension_ % tensor_column_basic_embedding_dim != 0) {
-            RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
-                                                             expr.dimension_,
-                                                             embedding_info->Dimension())));
+            Status status = Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
+                                                            expr.dimension_, embedding_info->Dimension()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         // TODO: now only support float query tensor
         // TODO: now only support search on tensor column with float data type
         if (expr.embedding_data_type_ != EmbeddingDataType::kElemFloat) {
-            RecoverableError(Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
-                                                            EmbeddingT::EmbeddingDataType2String(expr.embedding_data_type_))));
+            Status status = Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
+                                                           EmbeddingT::EmbeddingDataType2String(expr.embedding_data_type_)));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-            RecoverableError(Status::NotSupport(
-                fmt::format("Unsupported tensor column type: {}, now only support search on float tensor column", embedding_info->ToString())));
+            Status status = Status::NotSupport(
+                fmt::format("Unsupported tensor column type: {}, now only support search on float tensor column", embedding_info->ToString()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     arguments.emplace_back(std::move(expr_ptr));
@@ -598,13 +615,17 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    RecoverableError(Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR"));
+                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
                 break;
             }
             case SpecialType::kScore: {
                 if (!bind_context_ptr->allow_score) {
-                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR"));
+                    Status status = Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
                 break;
             }

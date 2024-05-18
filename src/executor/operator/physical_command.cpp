@@ -35,6 +35,7 @@ import config;
 import status;
 import infinity_exception;
 import variables;
+import logger;
 
 namespace infinity {
 
@@ -56,16 +57,22 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     switch(session_var) {
                         case SessionVariable::kEnableProfile: {
                             if (set_command->value_type() != SetVarType::kBool) {
-                                RecoverableError(Status::DataTypeMismatch("Boolean", set_command->value_type_str()));
+                                Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
                             }
                             query_context->current_session()->SessionVariables()->enable_profile_ = set_command->value_bool();
                             return true;
                         }
                         case SessionVariable::kInvalid: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("Unknown session variable: {}", set_command->var_name())));
+                            Status status = Status::InvalidCommand(fmt::format("Unknown session variable: {}", set_command->var_name()));
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
                         }
                         default: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("Session variable: {} is read-only", set_command->var_name())));
+                            Status status = Status::InvalidCommand(fmt::format("Session variable: {} is read-only", set_command->var_name()));
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
                         }
                     }
                     break;
@@ -75,16 +82,22 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     switch(global_var) {
                         case GlobalVariable::kProfileRecordCapacity: {
                             if (set_command->value_type() != SetVarType::kInteger) {
-                                RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
+                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
                             }
                             query_context->storage()->catalog()->ResizeProfileHistory(set_command->value_int());
                             return true;
                         }
                         case GlobalVariable::kInvalid: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name())));
+                            Status status = Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name()));
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
                         }
                         default: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name())));
+                            Status status = Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name()));
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
                         }
                     }
                     break;
@@ -130,22 +143,30 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 return true;
                             }
 
-                            RecoverableError(Status::SetInvalidVarValue("log level", "trace, debug, info, warning, error, critical"));
+                            Status status = Status::SetInvalidVarValue("log level", "trace, debug, info, warning, error, critical");
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
                             break;
                         }
                         case GlobalOptionIndex::kInvalid: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("Unknown config: {}", set_command->var_name())));
+                            Status status = Status::InvalidCommand(fmt::format("Unknown config: {}", set_command->var_name()));
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
                             break;
                         }
                         default: {
-                            RecoverableError(Status::InvalidCommand(fmt::format("Config {} is read-only", set_command->var_name())));
+                            Status status = Status::InvalidCommand(fmt::format("Config {} is read-only", set_command->var_name()));
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
                             break;
                         }
                     }
                     break;
                 }
                 default: {
-                    RecoverableError(Status::InvalidCommand("Invalid set command scope, neither session nor global"));
+                    Status status = Status::InvalidCommand("Invalid set command scope, neither session nor global");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
 
@@ -156,7 +177,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
             auto profiler_record = query_context->current_session()->GetProfileRecord(export_command->file_no());
             if (profiler_record == nullptr) {
-                RecoverableError(Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no())));
+                Status status = Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             LocalFileSystem fs;
             FileWriter file_writer(fs, export_command->file_name(), 128);

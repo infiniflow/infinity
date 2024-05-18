@@ -128,20 +128,12 @@ options:
 ### Enwiki
 
 > - 33000000 documents
-> - 10000 `OR` queries generated based on the dataset. All terms are extracted from the dataset and very rare(occurrence < 100) terms are excluded. The number of terms of each query match the weight `[0.03, 0.15, 0.25, 0.25, 0.15, 0.08, 0.04, 0.03, 0.02]`.
+> - 100000 `OR` queries generated based on the dataset. All terms are extracted from the dataset and very rare(occurrence < 100) terms are excluded. The number of terms of each query match the weight `[0.03, 0.15, 0.25, 0.25, 0.15, 0.08, 0.04, 0.03, 0.02]`.
 
-|                   | Time to insert & build index | Time to import & build index | Latency(ms)(mean_time, max_time, p95_time) |
-| ----------------- | ---------------------------- | ---------------------------- | ------------------------------------------ |
-| **Elasticsearch** | 2289 s                       | N/A                          | 7.27, 326.31, 14.75                        |
-| **Infinity**      | 2321 s                       | 944 s                        | 1.54, 812.55, 3.51                         |
-
-
-| Python clients | Infinity(qps, RES, vCPU) | Elasticsearch(qps, RES, vCPU) |
-| -------------- | ------------------------ | ----------------------------- |
-| 1              | 636, 9G, 0.9             | 213, 20G, 3                   |
-| 4              | 1938, 9G, 3.2            | 672, 21G, 8.5                 |
-| 8              | 3294, 9G, 5.7            | 1174, 21G, 10                 |
-
+|                   | Time to insert & build index | Time to import & build index | P95 Latency(ms)| QPS (8 python clients) |  Memory | vCPU  |
+| ----------------- | ---------------------------- | ---------------------------- | ---------------| -----------------------| --------| ----- |
+| **Elasticsearch** | 2289 s                       | N/A                          | 14.75          | 1174                   | 21.0GB  | 10.0  |
+| **Infinity**      | 2321 s                       | 944 s                        | 3.51           | 3294                   | 9.0GB   | 5.7  |
 
 ---
 

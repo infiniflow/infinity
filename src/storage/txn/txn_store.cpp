@@ -310,7 +310,9 @@ void TxnTableStore::PrepareCommit1() {
     }
     if (!delete_state_.rows_.empty()) {
         if (!table_entry_->CheckDeleteVisible(delete_state_, txn_)) {
-            RecoverableError(Status::TxnConflict(txn_->TxnID(), "Txn conflict reason."));
+            Status status = Status::TxnConflict(txn_->TxnID(), "Txn conflict reason.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }

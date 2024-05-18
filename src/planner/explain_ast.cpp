@@ -47,6 +47,7 @@ import join_reference;
 import subquery_reference;
 import table_reference;
 import statement_common;
+import logger;
 
 namespace infinity {
 
@@ -389,7 +390,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (cross_product_ref->alias_ != nullptr) {
                 from_str += " AS " + String(cross_product_ref->alias_->alias_);
                 if (cross_product_ref->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             } else {
                 from_str += ": ";
@@ -409,7 +412,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (join_reference->alias_ != nullptr) {
                 from_str += " AS " + String(join_reference->alias_->alias_);
                 if (join_reference->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             result->emplace_back(MakeShared<String>(from_str));
@@ -429,7 +434,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (table_reference->alias_ != nullptr) {
                 from_str += " AS " + String(table_reference->alias_->alias_);
                 if (table_reference->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             result->emplace_back(MakeShared<String>(from_str));
@@ -441,7 +448,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (subquery_reference->alias_ != nullptr) {
                 from_str += " AS " + String(subquery_reference->alias_->alias_);
                 if (subquery_reference->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             } else {
                 from_str += ": ";

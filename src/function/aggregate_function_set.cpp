@@ -61,7 +61,9 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
             ss << function.ToString() << std::endl;
         }
         LOG_ERROR(ss.str());
-        RecoverableError(Status::FunctionNotFound(function_str));
+        Status status = Status::FunctionNotFound(function_str);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     if (candidates_index.size() > 1) {
@@ -74,7 +76,9 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
             ss << functions_[index].ToString() << std::endl;
         }
         LOG_ERROR(ss.str());
-        RecoverableError(Status::FunctionNotFound(function_str));
+        Status status = Status::FunctionNotFound(function_str);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     return functions_[candidates_index[0]];
@@ -82,7 +86,9 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
 
 i64 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument) {
     if (argument.get() == nullptr) {
-        RecoverableError(Status::AggregateFunctionWithEmptyArgs());
+        Status status = Status::AggregateFunctionWithEmptyArgs();
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     i64 cost = CastTable::instance().GetCastCost(argument->Type().type(), func.argument_type_.type());

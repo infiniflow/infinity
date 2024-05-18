@@ -62,7 +62,9 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
     switch (explain_op->explain_type()) {
 
         case ExplainType::kAnalyze: {
-            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
+            Status status = Status::NotSupport("Not implement: Query analyze");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case ExplainType::kAst:
         case ExplainType::kUnOpt:

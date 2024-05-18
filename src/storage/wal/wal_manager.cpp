@@ -521,36 +521,48 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
-            case WalCommandType::CREATE_DATABASE:
+            case WalCommandType::CREATE_DATABASE: {
                 WalCmdCreateDatabaseReplay(*dynamic_cast<const WalCmdCreateDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DROP_DATABASE:
+            }
+            case WalCommandType::DROP_DATABASE: {
                 WalCmdDropDatabaseReplay(*dynamic_cast<const WalCmdDropDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::CREATE_TABLE:
+            }
+            case WalCommandType::CREATE_TABLE: {
                 WalCmdCreateTableReplay(*dynamic_cast<const WalCmdCreateTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DROP_TABLE:
+            }
+            case WalCommandType::DROP_TABLE: {
                 WalCmdDropTableReplay(*dynamic_cast<const WalCmdDropTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::ALTER_INFO:
-                RecoverableError(Status::NotSupport("WalCmdAlterInfo Replay Not implemented"));
+            }
+            case WalCommandType::ALTER_INFO: {
+                Status status = Status::NotSupport("WalCmdAlterInfo Replay Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
                 break;
-            case WalCommandType::CREATE_INDEX:
+            }
+            case WalCommandType::CREATE_INDEX: {
                 WalCmdCreateIndexReplay(*dynamic_cast<const WalCmdCreateIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DROP_INDEX:
+            }
+            case WalCommandType::DROP_INDEX: {
                 WalCmdDropIndexReplay(*dynamic_cast<const WalCmdDropIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::IMPORT:
+            }
+            case WalCommandType::IMPORT: {
                 WalCmdImportReplay(*dynamic_cast<const WalCmdImport *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::APPEND:
+            }
+            case WalCommandType::APPEND: {
                 WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DELETE:
+            }
+            case WalCommandType::DELETE: {
                 WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
+            }
             // case WalCommandType::SET_SEGMENT_STATUS_SEALED:
             //     WalCmdSetSegmentStatusSealedReplay(*dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get()), entry.txn_id_,
             //     entry.commit_ts_); break;
@@ -559,11 +571,13 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //                                              entry.txn_id_,
             //                                              entry.commit_ts_);
             //     break;
-            case WalCommandType::CHECKPOINT:
+            case WalCommandType::CHECKPOINT: {
                 break;
-            case WalCommandType::COMPACT:
+            }
+            case WalCommandType::COMPACT: {
                 WalCmdCompactReplay(*static_cast<const WalCmdCompact *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
+            }
             default: {
                 UnrecoverableError("WalManager::ReplayWalEntry unknown wal command type");
             }

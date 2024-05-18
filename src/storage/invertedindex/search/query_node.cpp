@@ -45,7 +45,9 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
 #endif
     std::unique_ptr<QueryNode> optimized_root;
     if (!root) {
-        RecoverableError(Status::SyntaxError("Invalid query statement: Empty query tree"));
+        Status status = Status::SyntaxError("Invalid query statement: Empty query tree");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     // push down the weight to the leaf term node
     root->PushDownWeight();
@@ -62,14 +64,18 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
             break;
         }
         case QueryNodeType::NOT: {
-            RecoverableError(Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level"));
+            Status status = Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             break;
         }
         case QueryNodeType::AND:
         case QueryNodeType::OR: {
             optimized_root = static_cast<MultiQueryNode *>(root.get())->GetNewOptimizedQueryTree();
             if (optimized_root->GetType() == QueryNodeType::NOT) {
-                RecoverableError(Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level"));
+                Status status = Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             break;
         }
@@ -153,7 +159,9 @@ std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
     for (auto &child : children_) {
         switch (child->GetType()) {
             case QueryNodeType::NOT: {
-                RecoverableError(Status::SyntaxError("Invalid query statement: NotQueryNode should not have not child"));
+                Status status = Status::SyntaxError("Invalid query statement: NotQueryNode should not have not child");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
                 break;
             }
             case QueryNodeType::TERM:
@@ -345,7 +353,9 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
         or_node->children_ = std::move(or_list);
         return or_node;
     } else {
-        RecoverableError(Status::SyntaxError("Invalid query statement: OrQueryNode should not have both not child and non-not child"));
+        Status status = Status::SyntaxError("Invalid query statement: OrQueryNode should not have both not child and non-not child");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return nullptr;
     }
 }

@@ -34,6 +34,7 @@ import third_party;
 import infinity_exception;
 import expression_type;
 import bound_cast_func;
+import logger;
 
 namespace infinity {
 
@@ -68,7 +69,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     if (in_aggregate_) {
-        RecoverableError(Status::RecursiveAggregate(expr->ToString()));
+        Status status = Status::RecursiveAggregate(expr->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     in_aggregate_ = true;
     SharedPtr<ExpressionState> &child_state = state->Children()[0];
@@ -80,7 +83,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     this->Execute(child_expr, child_state, child_output_col);
 
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
-        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString()));
+        Status status = Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     auto data_state = state->agg_state_;
@@ -183,7 +188,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    RecoverableError(Status::NotSupport("IN execution isn't implemented yet."));
+    Status status = Status::NotSupport("IN execution isn't implemented yet.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 } // namespace infinity

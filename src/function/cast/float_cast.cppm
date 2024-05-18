@@ -16,7 +16,6 @@ module;
 
 export module float_cast;
 
-
 import stl;
 import bound_cast_func;
 import vector_buffer;
@@ -28,6 +27,7 @@ import column_vector;
 import internal_types;
 import data_type;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -69,7 +69,9 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
         }
         case LogicalType::kBoolean:
         case LogicalType::kEmbedding: {
-            RecoverableError(Status::NotSupport(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString())));
+            Status status = Status::NotSupport(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         default: {
             UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));

@@ -27,6 +27,7 @@ import infinity_exception;
 import third_party;
 import function_set;
 import bind_alias_proxy;
+import logger;
 
 namespace infinity {
 
@@ -69,7 +70,9 @@ SharedPtr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &expr, 
             return result;
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
-            RecoverableError(Status::SyntaxError("Aggregate function is called in another aggregate function."));
+            Status status = Status::SyntaxError("Aggregate function is called in another aggregate function.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 
@@ -103,7 +106,9 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
-            RecoverableError(Status::SyntaxError("Aggregate function is called in another aggregate function."));
+            Status status = Status::SyntaxError("Aggregate function is called in another aggregate function.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         } else {
             this->binding_agg_func_ = true;
         }
@@ -134,7 +139,9 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
 }
 
 SharedPtr<BaseExpression> HavingBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    RecoverableError(Status::SyntaxError("KNN expression isn't supported in having clause"));
+    Status status = Status::SyntaxError("KNN expression isn't supported in having clause");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 

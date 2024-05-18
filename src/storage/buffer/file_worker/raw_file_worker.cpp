@@ -22,6 +22,7 @@ import infinity_exception;
 import local_file_system;
 import third_party;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -58,7 +59,9 @@ void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     LocalFileSystem fs;
     i64 nbytes = fs.Write(*file_handler_, data_, buffer_size_);
     if (nbytes != (i64)buffer_size_) {
-        RecoverableError(Status::DataIOError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_size_, nbytes)));
+        Status status = Status::DataIOError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_size_, nbytes));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
 }
@@ -69,7 +72,9 @@ void RawFileWorker::ReadFromFileImpl() {
     data_ = static_cast<void *>(new char[buffer_size_]);
     i64 nbytes = fs.Read(*file_handler_, data_, buffer_size_);
     if (nbytes != (i64)buffer_size_) {
-        RecoverableError(Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes)));
+        Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 

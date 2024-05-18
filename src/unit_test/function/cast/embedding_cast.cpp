@@ -41,7 +41,28 @@ import embedding_info;
 import knn_expr;
 import data_type;
 
-class EmbeddingCastTest : public BaseTest {};
+class EmbeddingCastTest : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
+        RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        RemoveDbDirs();
+        BaseTest::TearDown();
+    }
+};
 
 TEST_F(EmbeddingCastTest, embedding_cast1) {
     using namespace infinity;
