@@ -224,9 +224,9 @@ void ChunkIndexEntry::Cleanup() {
         LocalFileSystem fs;
         fs.DeleteFile(posting_file);
         fs.DeleteFile(dict_file);
-        LOG_TRACE(fmt::format("cleaned chunk index entry {}", index_prefix));
+        LOG_DEBUG(fmt::format("cleaned chunk index entry {}", index_prefix));
     } else {
-        LOG_TRACE(fmt::format("cleaned chunk index entry {}/{}", *index_dir, chunk_id_));
+        LOG_DEBUG(fmt::format("cleaned chunk index entry {}/{}", *index_dir, chunk_id_));
     }
 }
 

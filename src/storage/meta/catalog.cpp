@@ -931,7 +931,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
 
-    LOG_INFO(fmt::format("Saved catalog to: {}", full_catalog_path));
+    LOG_DEBUG(fmt::format("Saved catalog to: {}", full_catalog_path));
 }
 
 // called by bg_task
@@ -945,7 +945,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
         return true;
     }
-    LOG_TRACE(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
+    LOG_DEBUG(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
 
     for (auto &op : flush_delta_entry->operations()) {
         switch (op->GetType()) {
@@ -992,7 +992,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     //     }
     //     LOG_INFO(ss.str());
     // }
-    LOG_TRACE(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     return false;
 }
