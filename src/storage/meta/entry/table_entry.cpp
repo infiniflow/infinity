@@ -507,12 +507,12 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     switch (compact_store.type_) {
         case CompactStatementType::kAuto: {
             compaction_alg_->CommitCompact(txn_id);
-            LOG_TRACE(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
+            LOG_DEBUG(fmt::format("Compact commit picked, table name: {}", *this->GetTableName()));
             break;
         }
         case CompactStatementType::kManual: {
             //  reinitialize compaction_alg_ with new segments and enable it
-            LOG_TRACE(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
+            LOG_DEBUG(fmt::format("Compact commit whole, table name: {}", *this->GetTableName()));
             compaction_alg_->Enable({});
             break;
         }

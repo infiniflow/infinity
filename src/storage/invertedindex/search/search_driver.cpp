@@ -102,7 +102,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string
         } else {
             oss << "Empty query tree!\n";
         }
-        LOG_TRACE(std::move(oss).str());
+        LOG_DEBUG(std::move(oss).str());
     }
 #endif
     return parsed_query_tree;
