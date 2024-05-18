@@ -135,7 +135,9 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
 
 std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const {
     if (text.empty()) {
-        RecoverableError(Status::SyntaxError("Empty query text"));
+        Status status = Status::SyntaxError("Empty query text");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return nullptr;
     }
     Term input_term;
@@ -150,6 +152,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
     }
     auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
     if (!status.ok()) {
+        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     if (analyzer_name == AnalyzerPool::STANDARD) {

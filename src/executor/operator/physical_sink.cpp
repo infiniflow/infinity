@@ -164,7 +164,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_))));
+            Status status = Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }

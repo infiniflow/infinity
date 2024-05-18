@@ -1099,7 +1099,9 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
-        RecoverableError(Status::ColumnNotExist(column_name));
+        Status status = Status::ColumnNotExist(column_name);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return it->second;
 }

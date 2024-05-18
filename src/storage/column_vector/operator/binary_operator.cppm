@@ -29,6 +29,7 @@ import bitmask_buffer;
 import third_party;
 import internal_types;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -888,7 +889,9 @@ private:
                                                 SizeT,
                                                 void *,
                                                 bool) {
-        RecoverableError(Status::NotSupport("Not implemented"));
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1046,7 +1049,9 @@ private:
                                                     SizeT,
                                                     void *,
                                                     bool) {
-        RecoverableError(Status::NotSupport("Not implemented"));
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1056,7 +1061,9 @@ private:
                                                 SizeT,
                                                 void *,
                                                 bool) {
-        RecoverableError(Status::NotSupport("Not implemented"));
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1066,7 +1073,9 @@ private:
                                                     SizeT,
                                                     void *,
                                                     bool) {
-        RecoverableError(Status::NotSupport("Not implemented"));
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1076,7 +1085,9 @@ private:
                                                          SizeT,
                                                          void *,
                                                          bool) {
-        RecoverableError(Status::NotSupport("Not implemented"));
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 

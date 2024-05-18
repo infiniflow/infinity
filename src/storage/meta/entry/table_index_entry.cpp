@@ -94,7 +94,9 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
 
     // Get column info
     if (index_base->column_names_.size() != 1) {
-        RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
+        Status status = Status::SyntaxError("Currently, composite index doesn't supported.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return table_index_entry;
 }
@@ -318,7 +320,9 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
 Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn) {
     if (this->index_base_->column_names_.size() != 1) {
         // TODO
-        RecoverableError(Status::NotSupport("Not implemented"));
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     auto &index_index = table_ref->index_index_;
     auto iter = index_index->index_snapshots_.find(*index_base_->index_name_);

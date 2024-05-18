@@ -75,7 +75,9 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     return true;

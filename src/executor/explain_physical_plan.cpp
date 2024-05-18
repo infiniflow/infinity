@@ -89,6 +89,7 @@ import statement_common;
 import flush_statement;
 import common_query_filter;
 import table_entry;
+import logger;
 
 namespace infinity {
 
@@ -1481,23 +1482,33 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalUnionAll *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    RecoverableError(Status::NotSupport("Not implemented"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalDummyScan *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    UnrecoverableError("Not implement: PhysicalDummyScan");
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalHashJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    UnrecoverableError("Not implement: PhysicalHashJoin");
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalSortMergeJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    UnrecoverableError("Not implement: PhysicalSortMergeJoin");
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    UnrecoverableError("Not implement: PhysicalIndexJoin");
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
@@ -1657,7 +1668,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<V
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalAlter *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
-    RecoverableError(Status::NotSupport("Not implemented"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

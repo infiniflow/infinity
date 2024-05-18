@@ -25,6 +25,7 @@ import status;
 import infinity_exception;
 import parsed_expr;
 import knn_expr;
+import logger;
 
 namespace infinity {
 
@@ -34,7 +35,9 @@ SharedPtr<BaseExpression> AggregateBinder::BuildExpression(const ParsedExpr &exp
 }
 
 SharedPtr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64 , bool ) {
-    RecoverableError(Status::SyntaxError("KNN expression isn't supported in in aggregate function"));
+    Status status = Status::SyntaxError("KNN expression isn't supported in in aggregate function");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 

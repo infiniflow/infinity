@@ -28,6 +28,7 @@ import column_identifer;
 
 import block_index;
 import column_expr;
+import logger;
 
 namespace infinity {
 
@@ -263,7 +264,9 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
             // TODO: What will happen, when different tables have the same column name?
             Vector<String> &binding_names = binding_names_by_column_[column_name_ref];
             if (binding_names.size() > 1) {
-                RecoverableError(Status::SyntaxError(fmt::format("Ambiguous column table_name: {}", column_identifier.ToString())));
+                Status status = Status::SyntaxError(fmt::format("Ambiguous column table_name: {}", column_identifier.ToString()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
 
             String &binding_name = binding_names[0];
@@ -271,7 +274,9 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
             auto binding_iter = binding_by_name_.find(binding_name);
             if (binding_iter == binding_by_name_.end()) {
                 // Found the binding, but the binding don't have the column, which should happen.
-                RecoverableError(Status::SyntaxError(fmt::format("{} doesn't exist.", column_identifier.ToString())));
+                Status status = Status::SyntaxError(fmt::format("{} doesn't exist.", column_identifier.ToString()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
 
             const auto &binding = binding_iter->second;
@@ -287,7 +292,9 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
                 bound_column_expr->source_position_.binding_name_ = binding->table_name_;
             } else {
                 // Found the binding, but the binding don't have the column, which should happen.
-                RecoverableError(Status::SyntaxError(fmt::format("{} doesn't exist.", column_identifier.ToString())));
+                Status status = Status::SyntaxError(fmt::format("{} doesn't exist.", column_identifier.ToString()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
         } else {
             // Table isn't found in current bind context, maybe its parent has it.
@@ -310,7 +317,9 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
                 bound_column_expr->source_position_ = SourcePosition(binding_context_id_, ExprSourceType::kBinding);
                 bound_column_expr->source_position_.binding_name_ = binding->table_name_;
             } else {
-                RecoverableError(Status::SyntaxError(fmt::format("{} doesn't exist.", column_identifier.ToString())));
+                Status status = Status::SyntaxError(fmt::format("{} doesn't exist.", column_identifier.ToString()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
         } else {
             // Table isn't found in current bind context, maybe its parent has it.

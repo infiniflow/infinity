@@ -33,6 +33,7 @@ import third_party;
 import byte_slice_reader;
 import infinity_exception;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -48,7 +49,9 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     int rc = fs_.MmapFile(posting_file_, data_ptr_, data_len_);
     assert(rc == 0);
     if (rc != 0) {
-        RecoverableError(Status::MmapFileError(posting_file_));
+        Status status = Status::MmapFileError(posting_file_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 
@@ -56,7 +59,9 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     int rc = fs_.MunmapFile(posting_file_);
     assert(rc == 0);
     if (rc != 0) {
-        RecoverableError(Status::MunmapFileError(posting_file_));
+        Status status = Status::MunmapFileError(posting_file_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 

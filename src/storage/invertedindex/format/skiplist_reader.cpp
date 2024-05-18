@@ -1,6 +1,5 @@
 module;
 
-#include <cassert>
 module skiplist_reader;
 
 import stl;
@@ -27,7 +26,7 @@ bool SkipListReader::SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc_id, u32
         const u32 local_prev_ttf = current_ttf;
         if (current_cursor >= num_in_buffer) {
             auto [status, ret] = LoadBuffer();
-            assert(status == 0);
+//            assert(status == 0);
             if (!ret) {
                 // current segment is exhausted
                 // skip current block

@@ -103,15 +103,21 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
     if (table_entry_->ColumnCount() != 1) {
-        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one column."));
+        Status status = Status::ImportFileFormatError("FVECS file must have only one column.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
     if (column_type->type() != kEmbedding) {
-        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one embedding column."));
+        Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
     if (embedding_info->Type() != kElemFloat) {
-        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one embedding column with float element."));
+        Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column with float element.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     LocalFileSystem fs;
@@ -130,11 +136,14 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     }
 
     if (nbytes != sizeof(dimension)) {
-        RecoverableError(Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes)));
+        Status status = Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        RecoverableError(Status::ImportFileFormatError(
-            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension())));
+        Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
@@ -155,8 +164,9 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            RecoverableError(
-                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension)));
+            Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         ptr_t dst_ptr = buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
@@ -464,7 +474,9 @@ void PhysicalImport::CSVRowHandler(void *context) {
             ZsvCell cell = parser_context->parser_.GetCell(i);
             LOG_ERROR(fmt::format("Column {}: {}", i, std::string_view((char *)cell.str, cell.len)));
         }
-        RecoverableError(Status::ColumnCountMismatch(*err_msg));
+        Status status = Status::ColumnCountMismatch(*err_msg);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     // append data to segment entry
@@ -482,7 +494,9 @@ void PhysicalImport::CSVRowHandler(void *context) {
                 auto &column_vector = parser_context->column_vectors_[column_idx];
                 column_vector.AppendByConstantExpr(const_expr);
             } else {
-                RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_)));
+                Status status = Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
         }
     }
@@ -493,7 +507,9 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
             column_vector.AppendByConstantExpr(const_expr);
         } else {
-            RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_)));
+            Status status = Status::ImportFileFormatError(fmt::format("Column {} is empty.", column_def->name_));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     block_entry->IncreaseRowCount(1);
@@ -530,8 +546,10 @@ void AppendJsonTensorToColumn(const nlohmann::json &line_json,
                               EmbeddingInfo *embedding_info) {
     Vector<T> &&embedding = line_json[column_name].get<Vector<T>>();
     if (embedding.size() % embedding_info->Dimension() != 0) {
-        RecoverableError(Status::ImportFileFormatError(
-            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension())));
+        Status status = Status::ImportFileFormatError(
+            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     const auto input_bytes = embedding.size() * sizeof(T);
     const Value embedding_value =
@@ -546,8 +564,10 @@ void AppendJsonTensorToColumn<bool>(const nlohmann::json &line_json,
                                     EmbeddingInfo *embedding_info) {
     Vector<float> &&embedding = line_json[column_name].get<Vector<float>>();
     if (embedding.size() % embedding_info->Dimension() != 0) {
-        RecoverableError(Status::ImportFileFormatError(
-            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension())));
+        Status status = Status::ImportFileFormatError(
+            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     const auto input_bytes = (embedding.size() + 7) / 8;
     auto input_data = MakeUnique<u8[]>(input_bytes);
@@ -693,7 +713,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
             column_vector.AppendByConstantExpr(const_expr);
         } else {
-            RecoverableError(Status::ImportFileFormatError(fmt::format("Column {} not found in JSON.", column_def->name_)));
+            Status status = Status::ImportFileFormatError(fmt::format("Column {} not found in JSON.", column_def->name_));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }

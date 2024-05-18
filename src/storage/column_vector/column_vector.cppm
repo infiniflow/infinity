@@ -35,6 +35,7 @@ import internal_types;
 import data_type;
 import embedding_info;
 import constant_expr;
+import logger;
 
 namespace infinity {
 
@@ -264,7 +265,9 @@ private:
         const auto total_elememt_count = ele_str_views.size();
         const auto input_bytes = total_elememt_count * sizeof(T);
         if (input_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
-            RecoverableError(Status::SyntaxError("Tensor size exceeds the limit."));
+            Status status = Status::SyntaxError("Tensor size exceeds the limit.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         embedding_num = total_elememt_count / unit_embedding_dim;
         auto tmp_data = MakeUniqueForOverwrite<T[]>(total_elememt_count);
@@ -283,7 +286,9 @@ private:
         embedding_num = total_elememt_count / unit_embedding_dim;
         const auto bit_bytes = (total_elememt_count + 7) / 8;
         if (bit_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
-            RecoverableError(Status::SyntaxError("Tensor size exceeds the limit."));
+            Status status = Status::SyntaxError("Tensor size exceeds the limit.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         auto tmp_data = MakeUnique<u8[]>(bit_bytes);
         for (SizeT i = 0; auto &ele_str_view : ele_str_views) {

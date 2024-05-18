@@ -298,7 +298,9 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not support data type for index hnsw."));
+                    Status status = Status::NotSupport("Not support data type for index hnsw.");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             memory_hnsw_indexer_->SetRowCount(row_cnt);
@@ -505,7 +507,9 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not support data type for index hnsw."));
+                    Status status = Status::NotSupport("Not support data type for index hnsw.");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             break;
@@ -575,7 +579,9 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not support data type for index ivf."));
+                    Status status = Status::NotSupport("Not support data type for index ivf.");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             break;
@@ -635,7 +641,9 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                         break;
                     }
                     default: {
-                        RecoverableError(Status::NotSupport("Not implemented"));
+                        Status status = Status::NotSupport("Not implemented");
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
                     }
                 }
             }

@@ -135,6 +135,7 @@ import command_statement;
 import explain_statement;
 import load_meta;
 import block_index;
+import logger;
 
 namespace infinity {
 
@@ -717,13 +718,19 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
         merge_limit += merge_offset;
     }
     if (merge_offset < 0 or merge_limit <= merge_offset) {
-        RecoverableError(Status::SyntaxError("Limit <= 0 or offset < 0"));
+        Status status = Status::SyntaxError("Limit <= 0 or offset < 0");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (merge_offset >= std::numeric_limits<u32>::max()) {
-        RecoverableError(Status::SyntaxError("Offset is too large"));
+        Status status = Status::SyntaxError("Offset is too large");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (merge_limit >= std::numeric_limits<u32>::max()) {
-        RecoverableError(Status::SyntaxError("Limit is too large"));
+        Status status = Status::SyntaxError("Limit is too large");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (input_physical_operator->TaskletCount() <= 1) {
         // only Top
@@ -838,7 +845,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    RecoverableError(Status::NotSupport("BuildViewScan"));
+    Status status = Status::NotSupport("BuildViewScan");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 
@@ -1042,7 +1051,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
     UniquePtr<PhysicalExplain> explain_node{nullptr};
     switch (logical_explain->explain_type()) {
         case ExplainType::kAnalyze: {
-            RecoverableError(Status::NotSupport("Not implement: Explain analyze"));
+            Status status = Status::NotSupport("Not implement: Explain analyze");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             break;
         }
         case ExplainType::kAst:

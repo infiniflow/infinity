@@ -31,6 +31,7 @@ import value;
 import status;
 import infinity_exception;
 import logical_type;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ void PhysicalExplain::Init() {
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             output_names_->emplace_back("Query Analyze");
-            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
+            Status status = Status::NotSupport("Not implement: Query analyze");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case ExplainType::kAst: {
             output_names_->emplace_back("Abstract Syntax Tree");
@@ -102,8 +105,9 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
-            title = "Query Analyze";
-            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
+            Status status = Status::NotSupport("Not implement: Query analyze");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";

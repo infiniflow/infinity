@@ -275,10 +275,14 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 break;
             }
             case kNull: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kMissing: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -419,13 +423,19 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
 #endif
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kNull: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kMissing: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -580,13 +590,19 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             break;
         }
         case kNull: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kMissing: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kInvalid: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }
@@ -618,7 +634,9 @@ String ColumnVector::ToString(SizeT row_index) const {
             return std::to_string(((BigIntT *)data_ptr_)[row_index]);
         }
         case kHugeInt: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kFloat: {
             return std::to_string(((FloatT *)data_ptr_)[row_index]);
@@ -627,7 +645,9 @@ String ColumnVector::ToString(SizeT row_index) const {
             return std::to_string(((DoubleT *)data_ptr_)[row_index]);
         }
         case kDecimal: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kVarchar: {
             VarcharT &varchar_ref = ((VarcharT *)data_ptr_)[row_index];
@@ -657,44 +677,64 @@ String ColumnVector::ToString(SizeT row_index) const {
             return ((TimestampT *)data_ptr_)[row_index].ToString();
         }
         case kInterval: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kArray: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kTuple: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kPoint: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kLine: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kLineSeg: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kBox: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
             //        case kPath: {
             //        }
             //        case kPolygon: {
             //        }
         case kCircle: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
             //        case kBitmap: {
             //        }
         case kUuid: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
             //        case kBlob: {
             //        }
         case kEmbedding: {
             //            RecoverableError(Status::NotSupport("Not implemented"));
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             EmbeddingT embedding_element(nullptr, false);
@@ -705,7 +745,9 @@ String ColumnVector::ToString(SizeT row_index) const {
         }
         case kTensor: {
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             const auto &[embedding_num, chunk_id, chunk_offset] = reinterpret_cast<TensorT *>(data_ptr_)[row_index];
@@ -716,7 +758,9 @@ String ColumnVector::ToString(SizeT row_index) const {
             return (((RowID *)data_ptr_)[row_index]).ToString();
         }
         case kMixed: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         default: {
             UnrecoverableError("Attempt to access an unaccepted type");
@@ -1186,7 +1230,9 @@ namespace {
 Vector<std::string_view> SplitArrayElement(std::string_view data, char delimiter) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        RecoverableError(Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]"));
+        Status status = Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     Vector<std::string_view> ret;
     SizeT i = 1, j = 1;
@@ -1258,7 +1304,9 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             if (embedding_info->Dimension() < ele_str_views.size()) {
-                RecoverableError(Status::ImportFileFormatError("Embedding data size exceeds dimension."));
+                Status status = Status::ImportFileFormatError("Embedding data size exceeds dimension.");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             SizeT dst_off = index * data_type_->Size();
             switch (embedding_info->Type()) {
@@ -1301,7 +1349,9 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             const auto unit_embedding_dim = embedding_info->Dimension();
             if (ele_str_views.size() % unit_embedding_dim != 0) {
-                RecoverableError(Status::ImportFileFormatError("Embedding data size is not multiple of tensor unit dimension."));
+                Status status = Status::ImportFileFormatError("Embedding data size is not multiple of tensor unit dimension.");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             SizeT dst_off = index;
             switch (embedding_info->Type()) {
@@ -1354,7 +1404,9 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }

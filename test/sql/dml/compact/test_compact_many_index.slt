@@ -79,3 +79,9 @@ SELECT c1 FROM tbl2 SEARCH MATCH VECTOR (c3, [0.3, 0.3, 0.2, 0.2], 'float', 'l2'
 4
 4
 3
+
+statement ok
+DROP TABLE tbl2;
+
+statement ok
+DROP TABLE tbl1;

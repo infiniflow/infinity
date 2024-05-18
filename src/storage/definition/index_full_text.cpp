@@ -32,6 +32,7 @@ import logical_type;
 import index_defines;
 import analyzer_pool;
 import analyzer;
+import logger;
 
 namespace infinity {
 
@@ -110,7 +111,9 @@ nlohmann::json IndexFullText::Serialize() const {
 }
 
 SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
-    RecoverableError(Status::NotSupport("Not implemented"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 
@@ -119,10 +122,14 @@ void IndexFullText::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_t
     auto &column_types_vector = *(base_table_ref->column_types_);
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        RecoverableError(Status::ColumnNotExist(column_name));
+        Status status = Status::ColumnNotExist(column_name);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kVarchar) {
-        RecoverableError(Status::InvalidIndexDefinition(
-            fmt::format("Attempt to create full-text index on column: {}, data type: {}.", column_name, data_type->ToString())));
+        Status status = Status::InvalidIndexDefinition(
+            fmt::format("Attempt to create full-text index on column: {}, data type: {}.", column_name, data_type->ToString()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 

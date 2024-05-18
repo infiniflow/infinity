@@ -41,6 +41,7 @@ import third_party;
 import infinity_exception;
 import value;
 import internal_types;
+import logger;
 
 namespace infinity {
 
@@ -67,7 +68,9 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         return false;
     }
     if (fusion_expr_->method_.compare("rrf") != 0) {
-        RecoverableError(Status::NotSupport(fmt::format("Fusion method {} is not implemented.", fusion_expr_->method_)));
+        Status status = Status::NotSupport(fmt::format("Fusion method {} is not implemented.", fusion_expr_->method_));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     SizeT rank_constant = 60;
     if (fusion_expr_->options_.get() != nullptr) {

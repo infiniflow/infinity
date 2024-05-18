@@ -56,6 +56,7 @@ import subquery_expr;
 import infinity_exception;
 import join_reference;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -151,11 +152,15 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             //     |-> Aggregate( count(*) as count_start)
             //         |-> Limit (1)
             //             |-> right plan tree
-            RecoverableError(Status::SyntaxError("Plan EXISTS uncorrelated subquery"));
+            Status status = Status::SyntaxError("Plan EXISTS uncorrelated subquery");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             break;
         }
         case SubqueryType::kNotExists: {
-            RecoverableError(Status::SyntaxError("Plan not EXISTS uncorrelated subquery"));
+            Status status = Status::SyntaxError("Plan not EXISTS uncorrelated subquery");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             break;
         }
         case SubqueryType::kNotIn:
@@ -205,9 +210,12 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
 
             return result;
         }
-        case SubqueryType::kAny:
-            RecoverableError(Status::SyntaxError("Plan ANY uncorrelated subquery"));
+        case SubqueryType::kAny: {
+            Status status = Status::SyntaxError("Plan ANY uncorrelated subquery");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             break;
+        }
         default: {
             UnrecoverableError("Unknown subquery type.");
         }
@@ -224,7 +232,9 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
     auto &correlated_columns = bind_context->correlated_column_exprs_;
 
     if (correlated_columns.empty()) {
-        RecoverableError(Status::SyntaxError("No correlated column"));
+        Status status = Status::SyntaxError("No correlated column");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     // Valid the correlated columns are from one table.
@@ -232,7 +242,9 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
     SizeT table_index = correlated_columns[0]->binding().table_idx;
     for (SizeT idx = 1; idx < column_count; ++idx) {
         if (table_index != correlated_columns[idx]->binding().table_idx) {
-            RecoverableError(Status::SyntaxError("Correlated columns can be only from one table, now."));
+            Status status = Status::SyntaxError("Correlated columns can be only from one table, now.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 
@@ -390,7 +402,9 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             return result;
         }
         case SubqueryType::kAny: {
-            RecoverableError(Status::SyntaxError("Unnest correlated any subquery."));
+            Status status = Status::SyntaxError("Unnest correlated any subquery.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     UnrecoverableError("Unreachable");
@@ -410,8 +424,9 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         auto &left_column_expr = correlated_columns[idx];
         SizeT correlated_column_index = correlated_base_index + idx;
         if (correlated_column_index >= subplan_column_bindings.size()) {
-            RecoverableError(
-                Status::SyntaxError(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size())));
+            Status status = Status::SyntaxError(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
 
         // Generate new correlated column expression

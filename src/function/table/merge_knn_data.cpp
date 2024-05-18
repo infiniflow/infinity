@@ -22,6 +22,7 @@ import infinity_exception;
 import merge_knn;
 import knn_result_handler;
 import status;
+import logger;
 
 module merge_knn_data;
 
@@ -42,7 +43,9 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }

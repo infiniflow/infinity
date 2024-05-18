@@ -24,6 +24,7 @@ import status;
 import infinity_exception;
 import parsed_expr;
 import knn_expr;
+import logger;
 
 namespace infinity {
 
@@ -31,7 +32,9 @@ SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, Bi
     SharedPtr<BaseExpression> result;
     switch (expr.type_) {
         case ParsedExprType::kSubquery: {
-            RecoverableError(Status::SyntaxError("Subquery isn't allowed in JOIN condition."));
+            Status status = Status::SyntaxError("Subquery isn't allowed in JOIN condition.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         default: {
             result = ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
