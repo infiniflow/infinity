@@ -44,7 +44,10 @@ SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, Bi
 }
 
 SharedPtr<BaseExpression> JoinBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64 , bool ) {
-    RecoverableError(Status::SyntaxError("KNN expression isn't supported in join clause."));
+
+    Status status = Status::SyntaxError("KNN expression isn't supported in join clause.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 

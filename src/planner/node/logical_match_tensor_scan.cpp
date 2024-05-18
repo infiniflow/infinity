@@ -86,7 +86,9 @@ void LogicalMatchTensorScan::InitExtraOptions() {
     if (const auto it = options.options_.find("topn"); it != options.options_.end()) {
         const int top_n_option = std::stoi(it->second);
         if (top_n_option <= 0) {
-            RecoverableError(Status::SyntaxError("topn must be a positive integer"));
+            Status status = Status::SyntaxError("topn must be a positive integer");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         topn_ = top_n_option;
     } else {

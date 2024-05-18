@@ -45,8 +45,10 @@ DataType MatchTensorExpression::Type() const {
             return DataType(LogicalType::kFloat);
         }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
-                                                            EmbeddingT::EmbeddingDataType2String(embedding_data_type_))));
+            Status status = Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
+                                                           EmbeddingT::EmbeddingDataType2String(embedding_data_type_)));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             return DataType(LogicalType::kInvalid);
         }
     }
