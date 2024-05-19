@@ -114,7 +114,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
@@ -174,7 +174,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
@@ -238,7 +238,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
@@ -324,7 +324,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
@@ -439,7 +439,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
@@ -591,7 +591,7 @@ TEST_F(CompactTaskTest, compact_not_exist_table) {
     {
         Vector<SharedPtr<ColumnDef>> columns;
         i64 column_id = 0;
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
         columns.emplace_back(column_def_ptr);
         tbl1_def = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), columns);

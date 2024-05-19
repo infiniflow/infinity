@@ -1,8 +1,0 @@
-//
-// Created by JinHai on 2022/9/5.
-//
-
-#pragma once
-
-#define TEST_DATA_PATH "@TEST_DATA_PATH@"
-#define CSV_DATA_PATH "@CSV_DATA_PATH@"

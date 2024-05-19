@@ -27,7 +27,7 @@ module;
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <experimental/source_location>
+#include <source_location>
 #include <filesystem>
 #include <forward_list>
 #include <functional>
@@ -55,8 +55,9 @@ export module stl;
 
 export namespace std {
 
-    using std::experimental::source_location;
-// using std::stringstream;
+    using std::source_location;
+
+    // using std::stringstream;
     using std::forward;
     using std::move;
     using std::exchange;
@@ -92,7 +93,6 @@ export namespace std {
     using std::upper_bound;
 
     using std::condition_variable;
-    using std::condition_variable_any;
     using std::lock_guard;
     using std::memory_order;
     using std::memory_order_acq_rel;
@@ -242,6 +242,13 @@ export namespace std {
     using std::time_t;
     using std::asctime;
     using std::localtime;
+
+    using std::stof;
+    using std::stod;
+
+    using std::construct_at;
+
+    using std::set;
 } // namespace std
 
 namespace infinity {

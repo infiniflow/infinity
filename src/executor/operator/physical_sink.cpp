@@ -207,7 +207,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -217,7 +217,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -227,7 +227,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -237,7 +237,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -247,7 +247,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -257,7 +257,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
                 };
             }
             break;
@@ -268,7 +268,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -278,7 +278,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -288,7 +288,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -298,7 +298,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -308,7 +308,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -318,7 +318,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>())};
             }
             break;
         }
@@ -329,7 +329,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 break;
             }
             result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
             };
             break;
         }
@@ -340,7 +340,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 break;
             }
             result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
             };
             break;
         }
@@ -351,7 +351,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                 break;
             }
             result_sink_state->result_def_ = {
-                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", std::set<ConstraintType>()),
             };
             break;
         }

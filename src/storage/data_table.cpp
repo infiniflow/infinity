@@ -110,8 +110,8 @@ SharedPtr<DataTable> DataTable::MakeEmptyResultTable() {
 
 SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
     Vector<SharedPtr<ColumnDef>> column_defs;
-    column_defs.emplace_back(MakeShared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", HashSet<ConstraintType>()));
-    column_defs.emplace_back(MakeShared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", HashSet<ConstraintType>()));
+    column_defs.emplace_back(MakeShared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", std::set<ConstraintType>()));
+    column_defs.emplace_back(MakeShared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", std::set<ConstraintType>()));
     SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, column_defs);
     SharedPtr<DataTable> result_table = Make(result_table_def_ptr, TableType::kResult);
 

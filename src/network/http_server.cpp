@@ -339,7 +339,7 @@ public:
             }
 
             if (column_type) {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 for (auto &constraint_json : field_element["constraints"]) {
                     String constraint = constraint_json;
                     ToLower(constraint);

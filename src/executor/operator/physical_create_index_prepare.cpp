@@ -15,6 +15,7 @@
 module;
 
 #include <tuple>
+#include <vector>
 
 module physical_create_index_prepare;
 
