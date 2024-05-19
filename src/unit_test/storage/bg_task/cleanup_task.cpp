@@ -178,7 +178,7 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
@@ -228,7 +228,7 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
@@ -303,7 +303,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
     }
@@ -390,7 +390,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), *column_name, constraints));
     }

@@ -55,7 +55,7 @@ ConstraintType StringToConstraintType(const std::string &type) {
 ColumnDef::ColumnDef(int64_t id,
                      std::shared_ptr<DataType> column_type,
                      std::string column_name,
-                     std::unordered_set<ConstraintType> constraints,
+                     std::set<ConstraintType> constraints,
                      std::shared_ptr<ParsedExpr> default_expr)
     : TableElement(TableElementType::kColumn), id_(id), column_type_(std::move(column_type)), name_(std::move(column_name)),
       constraints_(std::move(constraints)), default_expr_(std::move(default_expr)) {

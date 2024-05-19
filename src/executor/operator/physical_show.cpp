@@ -1125,17 +1125,17 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "profile_no", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "parser", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "logical_plan", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "optimizer", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(4, varchar_type, "physical_plan", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(5, varchar_type, "pipeline_build", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "task_build", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(7, varchar_type, "execution", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(8, varchar_type, "commit", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(9, varchar_type, "rollback", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(10, varchar_type, "total_cost", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "profile_no", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "parser", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "logical_plan", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "optimizer", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "physical_plan", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(5, varchar_type, "pipeline_build", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, varchar_type, "task_build", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, varchar_type, "execution", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(8, varchar_type, "commit", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(9, varchar_type, "rollback", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(10, varchar_type, "total_cost", std::set<ConstraintType>()),
     };
 
     auto catalog = txn->GetCatalog();
@@ -1219,10 +1219,10 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "default", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "column_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "column_type", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "constraint", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "default", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
@@ -1815,9 +1815,9 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "config_name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "description", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "config_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
     };
 
     Config *global_config = query_context->global_config();
@@ -2445,13 +2445,13 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    Vector<SharedPtr<ColumnDef>> column_defs = {MakeShared<ColumnDef>(0, varchar_type, "index_name", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(1, varchar_type, "method_type", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(2, bigint_type, "column_id", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(3, varchar_type, "column_name", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(4, varchar_type, "path", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(5, varchar_type, "index_segment", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(6, varchar_type, "other_parameters", HashSet<ConstraintType>())};
+    Vector<SharedPtr<ColumnDef>> column_defs = {MakeShared<ColumnDef>(0, varchar_type, "index_name", std::set<ConstraintType>()),
+                                                MakeShared<ColumnDef>(1, varchar_type, "method_type", std::set<ConstraintType>()),
+                                                MakeShared<ColumnDef>(2, bigint_type, "column_id", std::set<ConstraintType>()),
+                                                MakeShared<ColumnDef>(3, varchar_type, "column_name", std::set<ConstraintType>()),
+                                                MakeShared<ColumnDef>(4, varchar_type, "path", std::set<ConstraintType>()),
+                                                MakeShared<ColumnDef>(5, varchar_type, "index_segment", std::set<ConstraintType>()),
+                                                MakeShared<ColumnDef>(6, varchar_type, "other_parameters", std::set<ConstraintType>())};
 
     auto table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), column_defs);
 
@@ -2560,8 +2560,8 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
                                          const SharedPtr<Vector<String>> &view_column_names) {
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     Vector<SharedPtr<ColumnDef>> output_column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "column_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "column_type", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("Views"), output_column_defs);
@@ -2610,7 +2610,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
     switch (session_var) {
         case SessionVariable::kQueryCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2629,7 +2629,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
         }
         case SessionVariable::kTotalCommitCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2648,7 +2648,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
         }
         case SessionVariable::kTotalRollbackCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2667,7 +2667,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
         }
         case SessionVariable::kConnectedTime: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2686,7 +2686,7 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
         }
         case SessionVariable::kEnableProfile: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2719,9 +2719,9 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "variable_name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "description", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "variable_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("configs"), column_defs);
@@ -2872,7 +2872,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
     switch (global_var) {
         case GlobalVariable::kQueryCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2890,7 +2890,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kSessionCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2911,7 +2911,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kBufferPoolUsage: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2933,7 +2933,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kSchedulePolicy: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2952,7 +2952,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kDeltaLogCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2972,7 +2972,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kNextTxnID: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -2992,7 +2992,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kBufferedObjectCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3012,7 +3012,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kUnusedBufferObjectCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3032,7 +3032,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kActiveTxnCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3052,7 +3052,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kCurrentTs: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3072,7 +3072,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kTotalCommitCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3092,7 +3092,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kTotalRollbackCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3112,7 +3112,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kActiveWALFilename: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3132,7 +3132,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         case GlobalVariable::kProfileRecordCapacity: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", HashSet<ConstraintType>()),
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
             };
 
             SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
@@ -3166,9 +3166,9 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "variable_name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "description", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "variable_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "description", std::set<ConstraintType>()),
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("configs"), column_defs);
@@ -3627,7 +3627,7 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 // void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState *show_operator_state) {
 //     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 //     Vector<SharedPtr<ColumnDef>> output_column_defs = {
-//         MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
+//         MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
 //     };
 //
 //     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);

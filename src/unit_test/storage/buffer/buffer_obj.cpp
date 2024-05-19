@@ -535,7 +535,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embedding_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
@@ -691,7 +691,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }
@@ -772,7 +772,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         ColumnID column_id = 0;
         column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), *column_name, constraints));
     }

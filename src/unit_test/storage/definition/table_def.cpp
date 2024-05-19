@@ -37,14 +37,14 @@ TEST_F(TableDefTest, test1) {
 
     i64 column_id = 0;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kVarchar)), "c2", constraints);
         columns.emplace_back(column_def_ptr);
@@ -65,14 +65,14 @@ TEST_F(TableDefTest, ReadWrite) {
 
     i64 column_id = 0;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
         auto column_def_ptr =
             MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(LogicalType::kVarchar), "c2", constraints);

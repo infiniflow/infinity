@@ -3784,7 +3784,7 @@ yyreduce:
   case 90: /* column_constraints: column_constraint  */
 #line 814 "parser.y"
                                        {
-    (yyval.column_constraints_t) = new std::unordered_set<infinity::ConstraintType>();
+    (yyval.column_constraints_t) = new std::set<infinity::ConstraintType>();
     (yyval.column_constraints_t)->insert((yyvsp[0].column_constraint_t));
 }
 #line 3791 "parser.cpp"

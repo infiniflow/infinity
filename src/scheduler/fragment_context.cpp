@@ -1330,7 +1330,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
                 column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
                                                                materialize_sink_state->column_types_->at(col_idx),
                                                                materialize_sink_state->column_names_->at(col_idx),
-                                                               HashSet<ConstraintType>()));
+                                                               std::set<ConstraintType>()));
             }
 
             SharedPtr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
@@ -1400,7 +1400,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
                                                        first_materialize_sink_state->column_types_->at(col_idx),
                                                        first_materialize_sink_state->column_names_->at(col_idx),
-                                                       HashSet<ConstraintType>()));
+                                                       std::set<ConstraintType>()));
     }
 
     for (const auto &task : tasks_) {
@@ -1447,7 +1447,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
         column_defs.emplace_back(MakeShared<ColumnDef>(col_idx,
                                                        first_materialize_sink_state->column_types_->at(col_idx),
                                                        first_materialize_sink_state->column_names_->at(col_idx),
-                                                       HashSet<ConstraintType>()));
+                                                       std::set<ConstraintType>()));
     }
 
     for (const auto &task : tasks_) {

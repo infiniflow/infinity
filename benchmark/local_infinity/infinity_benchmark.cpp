@@ -136,12 +136,12 @@ int main() {
 
         SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kInteger);
         String col_name_1 = "col1";
-        auto col_def_1 = new ColumnDef(0, col_type, col_name_1, HashSet<ConstraintType>());
+        auto col_def_1 = new ColumnDef(0, col_type, col_name_1, std::set<ConstraintType>());
         column_defs.emplace_back(col_def_1);
 
         col_type = MakeShared<DataType>(LogicalType::kInteger);
         String col_name_2 = "col2";
-        auto col_def_2 = new ColumnDef(1, col_type, col_name_2, HashSet<ConstraintType>());
+        auto col_def_2 = new ColumnDef(1, col_type, col_name_2, std::set<ConstraintType>());
         column_defs.emplace_back(col_def_2);
         {
             // Init Table
@@ -183,12 +183,12 @@ int main() {
 
                     SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kInteger);
                     String col_name_1 = "col1";
-                    auto col_def_1 = new ColumnDef(0, col_type, col_name_1, HashSet<ConstraintType>());
+                    auto col_def_1 = new ColumnDef(0, col_type, col_name_1, std::set<ConstraintType>());
                     column_definitions.emplace_back(col_def_1);
 
                     col_type = MakeShared<DataType>(LogicalType::kInteger);
                     String col_name_2 = "col2";
-                    auto col_def_2 = new ColumnDef(1, col_type, col_name_2, HashSet<ConstraintType>());
+                    auto col_def_2 = new ColumnDef(1, col_type, col_name_2, std::set<ConstraintType>());
                     column_definitions.emplace_back(col_def_2);
 
                     //                    auto [database, status] = infinity->GetDatabase("default_db");
@@ -297,10 +297,10 @@ int main() {
             Vector<ColumnDef *> column_definitions;
             column_definitions.reserve(column_count);
 
-            auto col_def_1 = new ColumnDef(0, col_type, col_name_1, HashSet<ConstraintType>());
+            auto col_def_1 = new ColumnDef(0, col_type, col_name_1, std::set<ConstraintType>());
             column_definitions.emplace_back(col_def_1);
 
-            auto col_def_2 = new ColumnDef(1, col_type, col_name_2, HashSet<ConstraintType>());
+            auto col_def_2 = new ColumnDef(1, col_type, col_name_2, std::set<ConstraintType>());
             column_definitions.emplace_back(col_def_2);
 
             SharedPtr<Infinity> infinity = Infinity::LocalConnect();
@@ -356,7 +356,7 @@ int main() {
         std::shared_ptr<DataType> col1_type =
             std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
         std::string col1_name = "col1";
-        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::unordered_set<ConstraintType>());
+        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col1_def.release());
 
         std::string db_name = "default_db";

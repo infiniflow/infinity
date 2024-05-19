@@ -335,7 +335,7 @@ union SQLSTYPE
     infinity::ColumnDef*              table_column_t;
     infinity::ColumnType              column_type_t;
     infinity::ConstraintType          column_constraint_t;
-    std::unordered_set<infinity::ConstraintType>* column_constraints_t;
+    std::set<infinity::ConstraintType>* column_constraints_t;
     std::vector<std::string>*         identifier_array_t;
     infinity::TableConstraint*        table_constraint_t;
 

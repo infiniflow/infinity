@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Import from: " << base_path << std::endl;
 
         std::string col1_name = "col1";
-        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::unordered_set<ConstraintType>());
+        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col1_def.release());
 
         std::string db_name = "default_db";

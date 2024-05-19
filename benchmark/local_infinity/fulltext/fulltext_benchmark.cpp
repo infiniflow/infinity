@@ -83,19 +83,19 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     {
         String col1_name = "id";
         auto col1_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col1_def = new ColumnDef(0, col1_type, std::move(col1_name), std::unordered_set<ConstraintType>());
+        auto col1_def = new ColumnDef(0, col1_type, std::move(col1_name), std::set<ConstraintType>());
         column_defs.push_back(col1_def);
     }
     {
         String col2_name = "title";
         auto col2_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col2_def = new ColumnDef(0, col2_type, std::move(col2_name), std::unordered_set<ConstraintType>());
+        auto col2_def = new ColumnDef(0, col2_type, std::move(col2_name), std::set<ConstraintType>());
         column_defs.push_back(col2_def);
     }
     {
         String col3_name = "text";
         auto col3_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col3_def = new ColumnDef(0, col3_type, std::move(col3_name), std::unordered_set<ConstraintType>());
+        auto col3_def = new ColumnDef(0, col3_type, std::move(col3_name), std::set<ConstraintType>());
         column_defs.push_back(col3_def);
     }
 

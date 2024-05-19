@@ -1344,7 +1344,7 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         return {nullptr, Status::InvalidDataType()};
     }
 
-    auto constraints = HashSet<ConstraintType>();
+    auto constraints = std::set<ConstraintType>();
 
     for (auto constraint : column_def.constraints) {
         auto type = GetConstraintTypeFromProto(constraint);
