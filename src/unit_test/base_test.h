@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "../../third_party/googletest/googletest/include/gtest/gtest.h"
+#include "gtest/gtest.h"
 #include <type_traits>
 
 #include <algorithm>
