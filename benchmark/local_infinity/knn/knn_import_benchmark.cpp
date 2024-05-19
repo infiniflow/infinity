@@ -18,7 +18,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
-#include <unordered_set>
+#include <set>
 
 import compilation_config;
 import internal_types;
