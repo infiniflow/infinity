@@ -167,7 +167,7 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
@@ -240,7 +240,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), *column_name, constraints);
                 columns.emplace_back(column_def_ptr);
@@ -354,7 +354,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kVarchar)), *column_name, constraints);
                 columns.emplace_back(column_def_ptr);

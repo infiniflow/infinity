@@ -1037,7 +1037,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
             i64 column_id = column_def_json["column_id"];
             String column_name = column_def_json["column_name"];
 
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             if (column_def_json.contains("constraints")) {
                 for (const auto &column_constraint : column_def_json["constraints"]) {
                     ConstraintType constraint = column_constraint;

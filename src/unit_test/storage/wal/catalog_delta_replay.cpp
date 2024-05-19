@@ -183,9 +183,9 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name1 = std::make_shared<std::string>("tb1");
     auto table_name2 = std::make_shared<std::string>("tb2");
     auto table_name3 = std::make_shared<std::string>("tb3");
@@ -260,9 +260,9 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 
@@ -366,9 +366,9 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -451,9 +451,9 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -525,9 +525,9 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_name_committed = std::make_shared<std::string>("tb_committed");
     auto table_name_uncommitted = std::make_shared<std::string>("tb_uncommitted");
@@ -711,7 +711,7 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
@@ -767,9 +767,9 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -923,9 +923,9 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
     auto db_name = std::make_shared<std::string>("db1");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -1093,7 +1093,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
     auto table_name = std::make_shared<std::string>("db1");
     // auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 
-    HashSet<ConstraintType> constraints;
+    std::set<ConstraintType> constraints;
     auto column_def1 = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "col1", constraints);
     auto table_def = TableDef::Make(db_name, table_name, {column_def1});
 

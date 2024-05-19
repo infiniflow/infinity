@@ -22,7 +22,7 @@
 
 #include <memory>
 #include <string>
-#include <unordered_set>
+#include <set>
 #include <vector>
 
 namespace infinity {
@@ -80,7 +80,7 @@ public:
     ColumnDef(int64_t id,
               std::shared_ptr<DataType> column_type,
               std::string column_name,
-              std::unordered_set<ConstraintType> constraints,
+              std::set<ConstraintType> constraints,
               std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
     ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr, std::shared_ptr<ParsedExpr> default_expr = nullptr);
@@ -106,7 +106,7 @@ public:
     int64_t id_{-1};
     const std::shared_ptr<DataType> column_type_{};
     std::string name_{};
-    std::unordered_set<ConstraintType> constraints_{};
+    std::set<ConstraintType> constraints_{};
     std::shared_ptr<ParsedExpr> default_expr_{nullptr};
     bool build_bloom_filter_{};
 };

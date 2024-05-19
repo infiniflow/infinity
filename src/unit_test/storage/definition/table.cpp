@@ -49,14 +49,14 @@ TEST_F(TableTest, test1) {
     SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBoolean);
     column_types.emplace_back(col_type);
     String col_name = "col1";
-    auto col_def = MakeShared<ColumnDef>(0, col_type, col_name, HashSet<ConstraintType>());
+    auto col_def = MakeShared<ColumnDef>(0, col_type, col_name, std::set<ConstraintType>());
 
     columns.emplace_back(col_def);
 
     col_type = MakeShared<DataType>(LogicalType::kBigInt);
     column_types.emplace_back(col_type);
     col_name = "col2";
-    col_def = MakeShared<ColumnDef>(1, col_type, col_name, HashSet<ConstraintType>());
+    col_def = MakeShared<ColumnDef>(1, col_type, col_name, std::set<ConstraintType>());
     columns.emplace_back(col_def);
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("order_by_table"), columns);

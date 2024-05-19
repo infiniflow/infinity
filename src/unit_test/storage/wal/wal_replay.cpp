@@ -178,7 +178,7 @@ TEST_F(WalReplayTest, wal_replay_tables) {
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr =
@@ -186,14 +186,14 @@ TEST_F(WalReplayTest, wal_replay_tables) {
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
@@ -302,7 +302,7 @@ TEST_F(WalReplayTest, wal_replay_append) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
@@ -310,14 +310,14 @@ TEST_F(WalReplayTest, wal_replay_append) {
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kPrimaryKey);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
@@ -404,7 +404,7 @@ TEST_F(WalReplayTest, wal_replay_append) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
@@ -483,7 +483,7 @@ TEST_F(WalReplayTest, wal_replay_import) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
@@ -491,14 +491,14 @@ TEST_F(WalReplayTest, wal_replay_import) {
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kPrimaryKey);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
@@ -685,7 +685,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
@@ -803,7 +803,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
         {
             Vector<SharedPtr<ColumnDef>> columns;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 i64 column_id = 0;
                 auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
@@ -907,7 +907,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
         {
             Vector<SharedPtr<ColumnDef>> columns;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 i64 column_id = 0;
                 auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);

@@ -44,9 +44,9 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     Vector<SharedPtr<ColumnDef>> column_defs{};
     {
         auto column_def1 =
-            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
         auto column_def2 =
-            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
         column_defs.push_back(column_def1);
         column_defs.push_back(column_def2);
     }

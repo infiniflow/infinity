@@ -132,7 +132,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
         SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, maxbytes);
         String column_name = ReadBufAdv<String>(ptr);
         i32 constraints_size = ReadBufAdv<i32>(ptr);
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         for (i32 j = 0; j < constraints_size; j++) {
             ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
             constraints.insert(ct);

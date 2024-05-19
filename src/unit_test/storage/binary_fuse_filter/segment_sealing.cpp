@@ -102,7 +102,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);

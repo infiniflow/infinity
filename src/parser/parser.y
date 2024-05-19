@@ -131,7 +131,7 @@ struct SQL_LTYPE {
     infinity::ColumnDef*              table_column_t;
     infinity::ColumnType              column_type_t;
     infinity::ConstraintType          column_constraint_t;
-    std::unordered_set<infinity::ConstraintType>* column_constraints_t;
+    std::set<infinity::ConstraintType>* column_constraints_t;
     std::vector<std::string>*         identifier_array_t;
     infinity::TableConstraint*        table_constraint_t;
 
@@ -812,7 +812,7 @@ opt_decimal_specification : '(' INTVAL ',' INTVAL ')' { $$ = new std::pair<int64
 */
 
 column_constraints : column_constraint {
-    $$ = new std::unordered_set<infinity::ConstraintType>();
+    $$ = new std::set<infinity::ConstraintType>();
     $$->insert($1);
 }
 | column_constraints column_constraint {
