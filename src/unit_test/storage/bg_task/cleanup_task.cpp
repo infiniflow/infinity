@@ -34,13 +34,13 @@ import physical_import;
 import status;
 import compilation_config;
 import bg_task;
-import compact_segments_task;
 import index_base;
 import third_party;
 import base_table_ref;
 import index_secondary;
 import infinity_exception;
 import wal_manager;
+import compaction_process;
 
 using namespace infinity;
 
@@ -298,6 +298,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
+    CompactionProcessor *compaction_processor = storage->compaction_processor();
     TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
@@ -320,7 +321,7 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
-        table_entry->SetCompactionAlg(nullptr);
+        // table_entry->SetCompactionAlg(nullptr);
 
         for (int i = 0; i < kImportN; ++i) {
             Vector<SharedPtr<ColumnVector>> column_vectors;
@@ -357,18 +358,9 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"));
-
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_TRUE(table_entry != nullptr);
-
-        {
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn);
-            compact_task->Execute();
-        }
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        auto last_commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+        EXPECT_NE(last_commit_ts, 0u);
     }
-
     WaitCleanup(storage, last_commit_ts);
 
     InfinityContext::instance().UnInit();
@@ -388,6 +380,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
+    CompactionProcessor *compaction_processor = storage->compaction_processor();
     TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default_db");
@@ -412,7 +405,7 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"));
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
-        table_entry->SetCompactionAlg(nullptr);
+        // table_entry->SetCompactionAlg(nullptr);
 
         for (int i = 0; i < kImportN; ++i) {
             Vector<SharedPtr<ColumnVector>> column_vectors;
@@ -460,23 +453,15 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
 
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
 
         txn_mgr->CommitTxn(txn);
     }
     {
-        auto txn = txn_mgr->BeginTxn(MakeUnique<String>("compact"));
-
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_TRUE(table_entry != nullptr);
-
-        {
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn);
-            compact_task->Execute();
-        }
-        last_commit_ts = txn_mgr->CommitTxn(txn);
+        last_commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+        EXPECT_NE(last_commit_ts, 0u);
     }
 
     WaitCleanup(storage, last_commit_ts);

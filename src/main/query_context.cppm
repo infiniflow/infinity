@@ -38,6 +38,7 @@ class LogicalPlanner;
 class PhysicalPlanner;
 class FragmentBuilder;
 class TaskScheduler;
+struct BGQueryState;
 
 export class QueryContext {
 
@@ -65,6 +66,10 @@ public:
 
     QueryResult QueryStatement(const BaseStatement *statement);
 
+    bool ExecuteBGStatement(BaseStatement *statement, BGQueryState &state);
+
+    bool JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts, bool rollback = false);
+
     inline void set_current_schema(const String &current_schema) { session_ptr_->set_current_schema(current_schema); }
 
     [[nodiscard]] inline const String &schema_name() const { return session_ptr_->current_database(); }
@@ -85,12 +90,20 @@ public:
 
     void BeginTxn();
 
-    void CommitTxn();
+    TxnTimeStamp CommitTxn();
 
     void RollbackTxn();
 
 
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
+
+    bool SetTxn(Txn *txn) const {
+        if (session_ptr_->GetTxn() == nullptr) {
+            session_ptr_->SetTxn(txn);
+            return true;
+        }
+        return false;
+    }
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }
 

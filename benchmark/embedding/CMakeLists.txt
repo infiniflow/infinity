@@ -23,6 +23,7 @@ target_link_libraries(
         ann_ivfflat_benchmark
         infinity_core
         sql_parser
+        zsv_parser
         benchmark_profiler
         onnxruntime_mlas
         newpfor
@@ -30,6 +31,7 @@ target_link_libraries(
         atomic.a
         lz4.a
         c++.a
+        jma
 )
 
 if(ENABLE_JEMALLOC)

@@ -60,8 +60,6 @@ protected:
     inline void ResetToken() {
         token_ = nullptr;
         len_ = 0;
-        native_token_ = nullptr;
-        native_token_len_ = 0;
         offset_ = 0;
         level_ = 0;
         is_index_ = false;
@@ -75,8 +73,6 @@ protected:
     UniquePtr<Stemmer> stemmer_{nullptr};
     const char *token_{nullptr};
     SizeT len_{0};
-    const char *native_token_{nullptr};
-    SizeT native_token_len_{0};
     u32 offset_{0};
     u32 local_offset_{0};
     int level_{0};

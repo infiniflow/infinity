@@ -24,6 +24,7 @@ import stl;
 import third_party;
 import cast_function;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -36,7 +37,9 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
-        RecoverableError(Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString()));
+        Status status = Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return nullptr;
 }

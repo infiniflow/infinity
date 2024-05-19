@@ -41,14 +41,6 @@ export enum class CompactionStatus : u8 {
     So lock is needed
 */
 
-export struct CompactionInfo {
-public:
-    CompactionInfo(Vector<SegmentEntry *> &&segments, Txn *txn) : segments_(std::move(segments)), txn_(txn) {}
-
-    Vector<SegmentEntry *> segments_;
-    Txn *txn_;
-};
-
 export class CompactionAlg {
 public:
     CompactionAlg() : status_(CompactionStatus::kDisable) {}
@@ -56,7 +48,7 @@ public:
 public:
     virtual ~CompactionAlg() = default;
 
-    virtual Optional<CompactionInfo> CheckCompaction(std::function<Txn *()> generate_txn) = 0;
+    virtual Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id) = 0;
 
     virtual void AddSegment(SegmentEntry *new_segment) = 0;
 

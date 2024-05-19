@@ -41,6 +41,7 @@ import expression_state;
 import internal_types;
 import data_type;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -56,7 +57,8 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport(fmt::format("KnnDistanceType: {} is not support.", (i32)dist_type)));
+            Status status = Status::NotSupport(fmt::format("KnnDistanceType: {} is not support.", (i32)dist_type));
+            RecoverableError(status);
         }
     }
 }
@@ -71,8 +73,10 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport(
-                fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_))));
+            Status status = Status::NotSupport(
+                fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_)));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }

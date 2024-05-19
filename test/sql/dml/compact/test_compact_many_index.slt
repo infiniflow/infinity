@@ -1,0 +1,87 @@
+statement ok
+DROP TABLE IF EXISTS tbl1;
+
+statement ok
+CREATE TABLE tbl1(c1 EMBEDDING(FLOAT,2), c2 EMBEDDING(FLOAT, 4), c3 EMBEDDING(FLOAT, 4));
+
+statement ok
+COPY tbl1 FROM '/var/infinity/test_data/embedding_2.csv' WITH (DELIMITER ',');
+
+statement ok
+COPY tbl1 FROM '/var/infinity/test_data/embedding_2.csv' WITH (DELIMITER ',');
+
+statement ok
+CREATE INDEX idx1 ON tbl1 (c1) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+statement ok
+CREATE INDEX idx2 ON tbl1 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+statement ok
+CREATE INDEX idx3 ON tbl1 (c3) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+statement ok
+COMPACT TABLE tbl1;
+
+statement ok
+COMPACT TABLE tbl1;
+
+query I
+SELECT c1 FROM tbl1 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+0.4,0.4
+0.4,0.4
+0.3,0.3
+
+query I
+SELECT c1 FROM tbl1 SEARCH MATCH VECTOR (c3, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+0.4,0.4
+0.4,0.4
+0.3,0.3
+
+statement ok
+DROP TABLE IF EXISTS tbl2;
+
+statement ok
+CREATE TABLE tbl2(c1 INT, c2 EMBEDDING(FLOAT, 4), c3 EMBEDDING(FLOAT, 4));
+
+statement ok
+COPY tbl2 FROM '/var/infinity/test_data/embedding_3.csv' WITH (DELIMITER ',');
+
+statement ok
+COPY tbl2 FROM '/var/infinity/test_data/embedding_3.csv' WITH (DELIMITER ',');
+
+statement ok
+CREATE INDEX idx1 ON tbl2 (c1);
+
+statement ok
+CREATE INDEX idx2 ON tbl2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+statement ok
+CREATE INDEX idx3 ON tbl2 (c3) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+statement ok
+COMPACT TABLE tbl2;
+
+statement ok
+COMPACT TABLE tbl2;
+
+query I
+SELECT c1 FROM tbl2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+4
+4
+3
+
+query I
+SELECT c1 FROM tbl2 SEARCH MATCH VECTOR (c3, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+----
+4
+4
+3
+
+statement ok
+DROP TABLE tbl2;
+
+statement ok
+DROP TABLE tbl1;

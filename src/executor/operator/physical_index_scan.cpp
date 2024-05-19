@@ -673,11 +673,11 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     auto segment_id = segment_ids[next_idx];
 
     SegmentEntry *segment_entry = nullptr;
-    auto &segment_index_hashmap = base_table_ref_->block_index_->segment_index_;
-    if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
+    const auto &segment_block_index_ = base_table_ref_->block_index_->segment_block_index_;
+    if (auto iter = segment_block_index_.find(segment_id); iter == segment_block_index_.end()) {
         UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
     } else {
-        segment_entry = iter->second;
+        segment_entry = iter->second.segment_entry_;
     }
     // check FastRoughFilter
     const auto &fast_rough_filter = *segment_entry->GetFastRoughFilter();

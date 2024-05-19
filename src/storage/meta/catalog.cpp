@@ -391,8 +391,9 @@ Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, T
 Status Catalog::CommitWrite(TableEntry *table_entry,
                             TransactionID txn_id,
                             TxnTimeStamp commit_ts,
-                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
-    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores);
+                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                            const DeleteState *delete_state) {
+    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores, delete_state);
 }
 
 Status Catalog::RollbackWrite(TableEntry *table_entry, TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores) {
@@ -412,7 +413,9 @@ SharedPtr<FunctionSet> Catalog::GetFunctionSetByName(Catalog *catalog, String fu
     StringToLower(function_name);
 
     if (!catalog->function_sets_.contains(function_name)) {
-        RecoverableError(Status::FunctionNotFound(function_name));
+        Status status = Status::FunctionNotFound(function_name);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return catalog->function_sets_[function_name];
 }
@@ -520,7 +523,9 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
     if (file_size != n_bytes) {
-        RecoverableError(Status::CatalogCorrupted(catalog_path));
+        Status status = Status::CatalogCorrupted(catalog_path);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return catalog_delta_entry;
 }
@@ -870,7 +875,9 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     String json_str(file_size, 0);
     SizeT n_bytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != n_bytes) {
-        RecoverableError(Status::CatalogCorrupted(catalog_path));
+        Status status = Status::CatalogCorrupted(catalog_path);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
@@ -912,8 +919,9 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     SizeT n_bytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (n_bytes != catalog_str.size()) {
-        LOG_ERROR(fmt::format("Saving catalog file failed: {}", catalog_tmp_path));
-        RecoverableError(Status::CatalogCorrupted(catalog_tmp_path));
+        Status status = Status::DataCorrupted(catalog_tmp_path);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();

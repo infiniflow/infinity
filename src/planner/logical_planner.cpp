@@ -29,6 +29,7 @@ import query_binder;
 import bound_delete_statement;
 import bound_update_statement;
 import bound_select_statement;
+import bound_compact_statement;
 import insert_binder;
 import logical_insert;
 import logical_node;
@@ -86,6 +87,7 @@ import drop_schema_info;
 import drop_table_info;
 import drop_view_info;
 import column_def;
+import logger;
 
 namespace {
 
@@ -175,6 +177,9 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
         case StatementType::kCommand: {
             return BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
         }
+        case StatementType::kCompact: {
+            return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
+        }
         default: {
             UnrecoverableError("Invalid statement type.");
         }
@@ -217,7 +222,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
-        RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
+        Status status = Status::NotSupport("Currently, collection isn't supported.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     // Create value list
@@ -246,10 +253,12 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         if (statement->columns_ != nullptr) {
             SizeT column_count = statement->columns_->size();
             if (column_count != value_list.size()) {
-                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
-                                                                 "input value count mismatch ({})",
-                                                                 column_count,
-                                                                 value_list.size())));
+                Status status = Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
+                                                                "input value count mismatch ({})",
+                                                                column_count,
+                                                                value_list.size()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
 
             SizeT table_column_count = table_entry->ColumnCount();
@@ -292,10 +301,12 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
                     value_list.emplace_back(value_expr);
                 } else {
-                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                     "input value count mismatch ({})",
-                                                                     table_column_count,
-                                                                     column_count)));
+                    Status status = Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                    "input value count mismatch ({})",
+                                                                    table_column_count,
+                                                                    column_count));
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
 
                 const SharedPtr<DataType> &table_column_type = column_def->column_type_;
@@ -328,10 +339,12 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             }
 
             if (value_list.size() != table_column_count) {
-                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
-                                                                 "input value count mismatch ({})",
-                                                                 table_column_count,
-                                                                 value_list.size())));
+                Status status = Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                "input value count mismatch ({})",
+                                                                table_column_count,
+                                                                value_list.size()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
 
             // Create value list with table column size and null value
@@ -369,7 +382,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 }
 
 Status LogicalPlanner::BuildInsertSelect(const InsertStatement *, SharedPtr<BindContext> &) {
-    RecoverableError(Status::NotSupport("Not supported"));
+    Status status = Status::NotSupport("Not supported");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return Status::OK();
 }
 
@@ -625,7 +640,9 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
     if (table_name->empty()) {
-        RecoverableError(Status::InvalidIndexName("No index name."));
+        Status status = Status::InvalidIndexName("No index name.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     //    if (create_index_info->column_names_->size() != 1) {
     //        UnrecoverableError("Creating index only support single column now.");
@@ -636,8 +653,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
     if (create_index_info->index_info_list_->size() != 1) {
-        RecoverableError(Status::InvalidIndexDefinition(
-            fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size())));
+        Status status = Status::InvalidIndexDefinition(
+            fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     IndexInfo *index_info = create_index_info->index_info_list_->at(0);
     SharedPtr<IndexBase> base_index_ptr{nullptr};
@@ -772,7 +791,9 @@ Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr
     }
 
     if (IsEqual(drop_schema_info->schema_name_, query_context_ptr_->schema_name())) {
-        RecoverableError(Status::DroppingUsingDb(drop_schema_info->schema_name_));
+        Status status = Status::DroppingUsingDb(drop_schema_info->schema_name_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_schema_info->schema_name_);
@@ -821,12 +842,16 @@ Status LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<B
 }
 
 Status LogicalPlanner::BuildPrepare(const PrepareStatement *, SharedPtr<BindContext> &) {
-    RecoverableError(Status::NotSupport("Prepare statement isn't supported."));
+    Status status = Status::NotSupport("Prepare statement isn't supported.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return Status::OK();
 }
 
 Status LogicalPlanner::BuildExecute(const ExecuteStatement *, SharedPtr<BindContext> &) {
-    RecoverableError(Status::NotSupport("Execute statement isn't supported."));
+    Status status = Status::NotSupport("Execute statement isn't supported.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return Status::OK();
 }
 
@@ -855,7 +880,9 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        RecoverableError(Status::FileNotFound(statement->file_path_));
+        Status status = Status::FileNotFound(statement->file_path_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -883,7 +910,9 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        RecoverableError(Status::FileNotFound(statement->file_path_));
+        Status status = Status::FileNotFound(statement->file_path_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -898,7 +927,9 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 }
 
 Status LogicalPlanner::BuildAlter(const AlterStatement *, SharedPtr<BindContext> &) {
-    RecoverableError(Status::NotSupport("Alter statement isn't supported."));
+    Status status = Status::NotSupport("Alter statement isn't supported.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return Status::OK();
 }
 
@@ -946,25 +977,17 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             }
             break;
         }
-        case CommandType::kCompactTable: {
-            auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
-            BindSchemaName(compact_table->schema_name_);
-
-            Txn *txn = query_context_ptr_->GetTxn();
-            auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name_, compact_table->table_name_);
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
-            logical_command->table_entry_ = table_entry;
-
-            this->logical_plan_ = logical_command;
-            break;
-        }
         default: {
             UnrecoverableError("Invalid command type.");
         }
     }
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    UniquePtr<BoundCompactStatement> bound_statement_ptr = query_binder_ptr->BindCompact(*statement);
+    this->logical_plans_ = bound_statement_ptr->BuildPlans(query_context_ptr_);
     return Status::OK();
 }
 

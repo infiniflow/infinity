@@ -16,6 +16,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     c++.a
+    jma
 )
 
 # ########################################
@@ -38,6 +39,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     c++.a
+    jma
 )
 
 # query benchmark
@@ -58,6 +60,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     c++.a
+    jma
 )
 
 # ########################################
@@ -80,6 +83,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     c++.a
+    jma
 )
 
 if(ENABLE_JEMALLOC)

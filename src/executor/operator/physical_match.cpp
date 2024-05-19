@@ -41,6 +41,7 @@ import infinity_exception;
 import value;
 import third_party;
 import base_table_ref;
+import block_index;
 import load_meta;
 import block_entry;
 import block_column_entry;
@@ -81,7 +82,7 @@ protected:
     const SizeT filter_result_count_ = common_query_filter_->filter_result_count_;
     const Map<SegmentID, std::variant<Vector<u32>, Bitmask>> *filter_result_ptr_ = &common_query_filter_->filter_result_;
     const BaseExpression *secondary_index_filter_ = common_query_filter_->secondary_index_filter_qualified_.get();
-    const HashMap<SegmentID, SegmentEntry *> *segment_index_ = &common_query_filter_->base_table_ref_->block_index_->segment_index_;
+    const Map<SegmentID, SegmentSnapshot> &segment_index = common_query_filter_->base_table_ref_->block_index_->segment_block_index_;
 
     const TxnTimeStamp begin_ts_ = common_query_filter_->begin_ts_;
     SegmentID current_segment_id_ = filter_result_ptr_->size() ? filter_result_ptr_->begin()->first : INVALID_SEGMENT_ID;
@@ -104,8 +105,9 @@ protected:
     RowID SelfBlockLastDocID() const {
         if (current_segment_id_ != cache_segment_id_) {
             cache_segment_id_ = current_segment_id_;
-            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
-            cache_segment_offset_ = cache_segment_entry_->row_count();
+            const auto &segment_info = segment_index.at(cache_segment_id_);
+            cache_segment_entry_ = segment_info.segment_entry_;
+            cache_segment_offset_ = segment_info.segment_offset_;
             cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }
         return RowID(current_segment_id_, cache_segment_offset_);
@@ -138,7 +140,7 @@ protected:
         assert(doc_id_no_beyond.segment_id_ == current_segment_id_);
         if (current_segment_id_ != cache_segment_id_) {
             cache_segment_id_ = current_segment_id_;
-            cache_segment_entry_ = segment_index_->at(cache_segment_id_);
+            cache_segment_entry_ = segment_index.at(cache_segment_id_).segment_entry_;
             cache_segment_offset_ = cache_segment_entry_->row_count();
             cache_need_check_delete_ = cache_segment_entry_->CheckAnyDelete(begin_ts_);
         }
@@ -490,7 +492,9 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     if (diff_percent > bar) {
         OStringStream oss;
         oss << "result mismatch at " << i << " : a: " << a << ", b: " << b << ", diff_percent: " << diff_percent << std::endl;
-        RecoverableError(Status::SyntaxError("Debug Info: " + std::move(oss).str()));
+        Status status = Status::SyntaxError("Debug Info: " + std::move(oss).str());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 
@@ -537,13 +541,17 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         use_ordinary_iter = true;
         use_block_max_iter = true;
     } else {
-        RecoverableError(Status::SyntaxError("block_max option must be empty, true, false or compare"));
+        Status status = Status::SyntaxError("block_max option must be empty, true, false or compare");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!query_tree) {
-        RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
+        Status status = Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     auto finish_parse_query_tree_time = std::chrono::high_resolution_clock::now();
@@ -597,7 +605,9 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     if (auto iter_n_option = search_ops.options_.find("topn"); iter_n_option != search_ops.options_.end()) {
         int top_n_option = std::stoi(iter_n_option->second);
         if (top_n_option <= 0) {
-            RecoverableError(Status::SyntaxError("topn must be a positive integer"));
+            Status status = Status::SyntaxError("topn must be a positive integer");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         top_n = top_n_option;
     } else {
@@ -723,7 +733,9 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         LOG_TRACE(std::move(compare_info).str());
         if (blockmax_result_count != blockmax_result_count_2 or ordinary_result_count != blockmax_result_count or
             blockmax_loop_cnt != blockmax_loop_cnt_2) {
-            RecoverableError(Status::SyntaxError("Debug Info: result count mismatch!"));
+            Status status = Status::SyntaxError("Debug Info: result count mismatch!");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         for (u32 i = 0; i < result_count; ++i) {
             ASSERT_FLOAT_EQ(1e-6, i, ordinary_score_result[i], blockmax_score_result[i]);
@@ -738,7 +750,8 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     // 4 populate result DataBlock
     // 4.1 prepare first output_data_block
     auto &output_data_blocks = operator_state->data_block_array_;
-    Vector<SharedPtr<DataType>> OutputTypes = std::move(*GetOutputTypes());
+    auto OutputTypesPtr = GetOutputTypes();
+    Vector<SharedPtr<DataType>> &OutputTypes = *OutputTypesPtr;
     auto append_data_block = [&]() {
         auto data_block = DataBlock::MakeUniquePtr();
         data_block->Init(OutputTypes);

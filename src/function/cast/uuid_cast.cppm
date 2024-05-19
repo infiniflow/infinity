@@ -27,6 +27,7 @@ import infinity_exception;
 import third_party;
 import internal_types;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -55,7 +56,9 @@ struct UuidTryCastToVarlen {
 
 template <>
 inline bool UuidTryCastToVarlen::Run(const UuidT &, VarcharT &, ColumnVector*) {
-    RecoverableError(Status::NotSupport("Not implemented"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 //    target.length_ = UuidT::LENGTH;
 //    std::memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
 //    Assert<UnrecoverableException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,

@@ -70,7 +70,7 @@ def generate(generate_if_exist: bool, copy_dir: str):
             row_id = i * batch_n + random.randint(0, batch_n - 1)
             slt_file.write("query I\n")
             slt_file.write(
-                "SELECT c1 FROM {} SEARCH KNN(c2, [{}], 'float', '{}', 1) WITH (ef = {});\n".format(
+                "SELECT c1 FROM {} SEARCH MATCH VECTOR (c2, [{}], 'float', '{}', 1) WITH (ef = {});\n".format(
                     table_name, ",".join([str(row_id) for _ in range(dim)]), metric, ef
                 )
             )

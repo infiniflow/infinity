@@ -46,9 +46,6 @@ public:
 
     inline String name() final { return "LogicalCommand"; }
 
-public:
-    TableEntry *table_entry_ = nullptr; // only used for compact command
-
 private:
     SharedPtr<CommandInfo> command_info_{};
 };

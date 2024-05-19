@@ -38,6 +38,7 @@ import status;
 import default_values;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -70,7 +71,9 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
     if (agg_expr->arguments().size() != 1) {
-        RecoverableError(Status::FunctionArgsError(agg_expr->ToString()));
+        Status status = Status::FunctionArgsError(agg_expr->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
@@ -112,7 +115,9 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
     if (cast_expr->arguments().size() != 1) {
-        RecoverableError(Status::FunctionArgsError(cast_expr->ToString()));
+        Status status = Status::FunctionArgsError(cast_expr->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();

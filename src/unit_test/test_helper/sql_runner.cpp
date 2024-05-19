@@ -90,7 +90,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     query_context_ptr->logical_planner()->Build(statement, bind_context);
     query_context_ptr->set_max_node_id(bind_context->GetNewLogicalNodeId());
 
-    SharedPtr<LogicalNode> logical_plan = query_context_ptr->logical_planner()->LogicalPlan();
+    SharedPtr<LogicalNode> logical_plan = query_context_ptr->logical_planner()->LogicalPlans()[0];
 
     // Apply optimized rule to the logical plan
     query_context_ptr->optimizer()->optimize(logical_plan, statement->Type());
@@ -100,7 +100,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
 
     // Create execution pipeline
     // Fragment Builder, only for test now. plan fragment is same as pipeline.
-    auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment(physical_plan.get());
+    auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment({physical_plan.get()});
 
     auto notifier = MakeUnique<Notifier>();
 

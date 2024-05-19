@@ -27,6 +27,7 @@ import data_block;
 import fragment_data;
 import status;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -41,9 +42,11 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
             UnrecoverableError("Unsupported source state type.");
             break;
         }
+        case SourceStateType::kMatchTensorScan:
         case SourceStateType::kKnnScan:
         case SourceStateType::kTableScan:
-        case SourceStateType::kIndexScan: {
+        case SourceStateType::kIndexScan:
+        case SourceStateType::kCompact: {
             return true;
         }
         case SourceStateType::kEmpty: {
@@ -55,7 +58,9 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
             return queue_source_state->GetData();
         }
         default: {
-            RecoverableError(Status::NotSupport("Not support source state type"));
+            Status status = Status::NotSupport("Not support source state type");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     return true;

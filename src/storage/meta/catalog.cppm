@@ -191,8 +191,11 @@ public:
 
     static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
 
-    static Status
-    CommitWrite(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores);
+    static Status CommitWrite(TableEntry *table_entry,
+                              TransactionID txn_id,
+                              TxnTimeStamp commit_ts,
+                              const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                              const DeleteState *delete_state);
 
     static Status RollbackWrite(TableEntry *table_entry, TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores);
 

@@ -36,7 +36,7 @@ import internal_types;
 import data_type;
 import background_process;
 import bg_task;
-import compact_segments_task;
+import compact_statement;
 import build_fast_rough_filter_task;
 
 namespace infinity {
@@ -111,9 +111,9 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
 
 ///-----------------------------------------------------------------------------
 
-TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvalid) {}
+TxnCompactStore::TxnCompactStore() : type_(CompactStatementType::kInvalid) {}
 
-TxnCompactStore::TxnCompactStore(CompactSegmentsTaskType type) : task_type_(type) {}
+TxnCompactStore::TxnCompactStore(CompactStatementType type) : type_(type) {}
 
 ///-----------------------------------------------------------------------------
 
@@ -226,8 +226,8 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
 }
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
-                                                        CompactSegmentsTaskType type) {
-    if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
+                                                        CompactStatementType type) {
+    if (compact_state_.type_ != CompactStatementType::kInvalid) {
         UnrecoverableError("Attempt to compact table store twice");
     }
     compact_state_ = TxnCompactStore(type);
@@ -310,7 +310,9 @@ void TxnTableStore::PrepareCommit1() {
     }
     if (!delete_state_.rows_.empty()) {
         if (!table_entry_->CheckDeleteVisible(delete_state_, txn_)) {
-            RecoverableError(Status::TxnConflict(txn_->TxnID(), "Txn conflict reason."));
+            Status status = Status::TxnConflict(txn_->TxnID(), "Txn conflict reason.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }
@@ -325,7 +327,7 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
     Catalog::Append(table_entry_, txn_id, this, commit_ts, buffer_mgr);
 
     // Attention: "compact" needs to be ahead of "delete"
-    if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
+    if (compact_state_.type_ != CompactStatementType::kInvalid) {
         LOG_TRACE(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), commit_ts));
         Catalog::CommitCompact(table_entry_, txn_id, commit_ts, compact_state_);
     }
@@ -349,7 +351,7 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
-    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_);
+    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_, &delete_state_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
         txn_index_store->Commit(txn_id, commit_ts);

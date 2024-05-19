@@ -56,6 +56,7 @@ import physical_merge_aggregate;
 import physical_merge_parallel_aggregate;
 import physical_merge_sort;
 import physical_merge_top;
+import physical_merge_match_tensor;
 import physical_nested_loop_join;
 import physical_parallel_aggregate;
 import physical_prepared_plan;
@@ -71,7 +72,12 @@ import physical_union_all;
 import physical_update;
 import physical_drop_index;
 import physical_command;
+import physical_compact;
+import physical_compact_index_prepare;
+import physical_compact_index_do;
+import physical_compact_finish;
 import physical_match;
+import physical_match_tensor_scan;
 import physical_fusion;
 import physical_create_index_prepare;
 import physical_create_index_do;
@@ -111,7 +117,11 @@ import logical_dummy_scan;
 import logical_explain;
 import logical_drop_index;
 import logical_command;
+import logical_compact;
+import logical_compact_index;
+import logical_compact_finish;
 import logical_match;
+import logical_match_tensor_scan;
 import logical_fusion;
 
 import value;
@@ -124,6 +134,8 @@ import create_index_info;
 import command_statement;
 import explain_statement;
 import load_meta;
+import block_index;
+import logger;
 
 namespace infinity {
 
@@ -208,6 +220,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             result = BuildMatch(logical_operator);
             break;
         }
+        case LogicalNodeType::kMatchTensorScan: {
+            result = BuildMatchTensorScan(logical_operator);
+            break;
+        }
         case LogicalNodeType::kFusion: {
             result = BuildFusion(logical_operator);
             break;
@@ -289,8 +305,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             result = BuildCommand(logical_operator);
             break;
         }
+        case LogicalNodeType::kCompact: {
+            result = BuildCompact(logical_operator);
+            break;
+        }
         case LogicalNodeType::kExplain: {
             result = BuildExplain(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCompactIndex: {
+            result = BuildCompactIndex(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCompactFinish: {
+            result = BuildCompactFinish(logical_operator);
             break;
         }
         default: {
@@ -557,8 +585,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                                   std::move(physical_agg_op),
                                                   logical_aggregate->GetOutputNames(),
                                                   logical_aggregate->GetOutputTypes(),
-                                                  logical_operator->load_metas());
-        // TODO: replace merge op load metas with MakeShared<Vector<LoadMeta>>() ?
+                                                  MakeShared<Vector<LoadMeta>>());
     }
 }
 
@@ -691,13 +718,19 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
         merge_limit += merge_offset;
     }
     if (merge_offset < 0 or merge_limit <= merge_offset) {
-        RecoverableError(Status::SyntaxError("Limit <= 0 or offset < 0"));
+        Status status = Status::SyntaxError("Limit <= 0 or offset < 0");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (merge_offset >= std::numeric_limits<u32>::max()) {
-        RecoverableError(Status::SyntaxError("Offset is too large"));
+        Status status = Status::SyntaxError("Offset is too large");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (merge_limit >= std::numeric_limits<u32>::max()) {
-        RecoverableError(Status::SyntaxError("Limit is too large"));
+        Status status = Status::SyntaxError("Limit is too large");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (input_physical_operator->TaskletCount() <= 1) {
         // only Top
@@ -812,7 +845,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<Logi
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    RecoverableError(Status::NotSupport("BuildViewScan"));
+    Status status = Status::NotSupport("BuildViewScan");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 
@@ -842,6 +877,28 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
                                      logical_match->common_query_filter_,
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto logical_match_tensor = static_pointer_cast<LogicalMatchTensorScan>(logical_operator);
+    if (auto match_tensor_scan_op = MakeUnique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
+                                                                        logical_match_tensor->TableIndex(),
+                                                                        logical_match_tensor->base_table_ref_,
+                                                                        logical_match_tensor->match_tensor_expr_,
+                                                                        logical_match_tensor->common_query_filter_,
+                                                                        logical_match_tensor->topn_,
+                                                                        logical_operator->load_metas());
+        match_tensor_scan_op->TaskletCount() == 1) {
+        return match_tensor_scan_op;
+    } else {
+        return MakeUnique<PhysicalMergeMatchTensor>(query_context_ptr_->GetNextNodeID(),
+                                                    std::move(match_tensor_scan_op),
+                                                    logical_match_tensor->TableIndex(),
+                                                    logical_match_tensor->base_table_ref_,
+                                                    logical_match_tensor->match_tensor_expr_,
+                                                    logical_match_tensor->topn_,
+                                                    MakeShared<Vector<LoadMeta>>());
+    }
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -892,15 +949,93 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_command = (LogicalCommand *)(logical_operator.get());
     auto command_info = logical_command->command_info();
-    auto ret = MakeUnique<PhysicalCommand>(logical_command->node_id(),
-                                           command_info,
-                                           logical_command->GetOutputNames(),
-                                           logical_command->GetOutputTypes(),
-                                           logical_operator->load_metas());
-    if (command_info->type() == CommandType::kCompactTable) {
-        ret->table_entry_ = logical_command->table_entry_;
+    return MakeUnique<PhysicalCommand>(logical_command->node_id(),
+                                       command_info,
+                                       logical_command->GetOutputNames(),
+                                       logical_command->GetOutputTypes(),
+                                       logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact = static_cast<const LogicalCompact *>(logical_operator.get());
+    if (logical_compact->left_node().get() != nullptr || logical_compact->right_node().get() != nullptr) {
+        UnrecoverableError("Compact node shouldn't have child.");
     }
-    return ret;
+    return MakeUnique<PhysicalCompact>(logical_compact->node_id(),
+                                       logical_compact->base_table_ref_,
+                                       logical_compact->compact_type_,
+                                       logical_compact->GetOutputNames(),
+                                       logical_compact->GetOutputTypes(),
+                                       logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactIndex(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact_index = static_cast<const LogicalCompactIndex *>(logical_operator.get());
+    if (logical_compact_index->right_node().get() != nullptr) {
+        UnrecoverableError("Compact index node shouldn't have right child.");
+    }
+    UniquePtr<PhysicalOperator> left{};
+    if (logical_compact_index->left_node().get() != nullptr) {
+        const auto &left_node = logical_compact_index->left_node();
+        left = BuildPhysicalOperator(left_node);
+    }
+    auto &index_index = logical_compact_index->base_table_ref_->index_index_;
+
+    bool use_prepare = false;
+    for (const auto &[index_name, index_snapshot] : index_index->index_snapshots_) {
+        const auto *index_base = index_snapshot->table_index_entry_->index_base();
+        if (index_base->index_type_ == IndexType::kHnsw) {
+            use_prepare = true;
+            break;
+        }
+    }
+    if (!use_prepare) {
+        return MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
+                                                       std::move(left),
+                                                       logical_compact_index->base_table_ref_,
+                                                       false,
+                                                       logical_compact_index->GetOutputNames(),
+                                                       logical_compact_index->GetOutputTypes(),
+                                                       logical_operator->load_metas());
+    }
+    auto compact_index_prepare = MakeUnique<PhysicalCompactIndexPrepare>(logical_compact_index->node_id(),
+                                                                         std::move(left),
+                                                                         logical_compact_index->base_table_ref_,
+                                                                         true,
+                                                                         logical_compact_index->GetOutputNames(),
+                                                                         logical_compact_index->GetOutputTypes(),
+                                                                         logical_operator->load_metas());
+
+    auto compact_index_do = MakeUnique<PhysicalCompactIndexDo>(logical_compact_index->node_id(),
+                                                               std::move(compact_index_prepare),
+                                                               logical_compact_index->base_table_ref_,
+                                                               logical_compact_index->GetOutputNames(),
+                                                               logical_compact_index->GetOutputTypes(),
+                                                               logical_operator->load_metas());
+    return compact_index_do;
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto *logical_compact_finish = static_cast<const LogicalCompactFinish *>(logical_operator.get());
+    UniquePtr<PhysicalOperator> left{}, right{};
+    if (logical_compact_finish->left_node().get() != nullptr) {
+        const auto &left_logical_node = logical_compact_finish->left_node();
+        left = BuildPhysicalOperator(left_logical_node);
+        if (logical_compact_finish->right_node().get() != nullptr) {
+            const auto &right_logical_node = logical_compact_finish->right_node();
+            right = BuildPhysicalOperator(right_logical_node);
+        }
+    } else if (logical_compact_finish->right_node().get() != nullptr) {
+        UnrecoverableError("Compact finish node shouldn't have right child.");
+    }
+    return MakeUnique<PhysicalCompactFinish>(logical_compact_finish->node_id(),
+                                             std::move(left),
+                                             std::move(right),
+                                             logical_compact_finish->base_table_ref_,
+                                             logical_compact_finish->compact_type_,
+                                             logical_compact_finish->GetOutputNames(),
+                                             logical_compact_finish->GetOutputTypes(),
+                                             logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -916,7 +1051,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
     UniquePtr<PhysicalExplain> explain_node{nullptr};
     switch (logical_explain->explain_type()) {
         case ExplainType::kAnalyze: {
-            RecoverableError(Status::NotSupport("Not implement: Explain analyze"));
+            Status status = Status::NotSupport("Not implement: Explain analyze");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
             break;
         }
         case ExplainType::kAst:

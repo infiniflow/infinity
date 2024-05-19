@@ -85,7 +85,9 @@ void FileWorker::MoveFile() {
     String dest_dir = ChooseFileDir(false);
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (!fs.Exists(src_path)) {
-        RecoverableError(Status::FileNotFound(src_path));
+        Status status = Status::FileNotFound(src_path);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (!fs.Exists(dest_dir)) {
         fs.CreateDirectory(dest_dir);

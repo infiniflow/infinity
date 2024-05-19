@@ -29,6 +29,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -55,7 +56,9 @@ struct ColumnValueReaderTypeGreaterFunction {
 
 template <>
 inline void GreaterFunction::Run(MixedT, BigIntT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed > bigint"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -65,7 +68,9 @@ inline void GreaterFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void GreaterFunction::Run(MixedT, DoubleT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed > double"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -75,7 +80,9 @@ inline void GreaterFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void GreaterFunction::Run(MixedT, VarcharT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed > varchar"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>

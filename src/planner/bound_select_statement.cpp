@@ -43,6 +43,7 @@ import logical_project;
 import logical_filter;
 import logical_table_scan;
 import logical_knn_scan;
+import logical_match_tensor_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
@@ -142,11 +143,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         return root;
     } else {
         SharedPtr<LogicalNode> root = nullptr;
-        SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size();
+        SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->match_tensor_exprs_.size();
         if (num_children <= 0) {
-            UnrecoverableError("SEARCH shall have at least one MATCH or KNN expression");
+            UnrecoverableError("SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression");
         } else if (num_children >= 3) {
-            UnrecoverableError("SEARCH shall have at max two MATCH or KNN expression");
+            UnrecoverableError("SEARCH shall have at max two MATCH TEXT or MATCH VECTOR expression");
         }
 
         // FIXME: need check if there is subquery inside the where conditions
@@ -164,6 +165,17 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             matchNode->filter_expression_ = filter_expr;
             matchNode->common_query_filter_ = common_query_filter;
             match_knn_nodes.push_back(std::move(matchNode));
+        }
+        for (auto &match_tensor_expr : search_expr_->match_tensor_exprs_) {
+            if (table_ref_ptr_->type() != TableRefType::kTable) {
+                UnrecoverableError("Not base table reference");
+            }
+            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+            auto match_tensor_node = MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_tensor_expr);
+            match_tensor_node->filter_expression_ = filter_expr;
+            match_tensor_node->common_query_filter_ = common_query_filter;
+            match_tensor_node->InitExtraOptions();
+            match_knn_nodes.push_back(std::move(match_tensor_node));
         }
 
         bind_context->GenerateTableIndex();

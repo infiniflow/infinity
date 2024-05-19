@@ -36,7 +36,7 @@ import extra_ddl_info;
 
 import infinity_exception;
 import block_column_entry;
-import compact_segments_task;
+import compact_state_data;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
 import column_def;
@@ -53,6 +53,7 @@ import log_file;
 import default_values;
 import defer_op;
 import index_base;
+import base_table_ref;
 
 module wal_manager;
 
@@ -520,36 +521,48 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
-            case WalCommandType::CREATE_DATABASE:
+            case WalCommandType::CREATE_DATABASE: {
                 WalCmdCreateDatabaseReplay(*dynamic_cast<const WalCmdCreateDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DROP_DATABASE:
+            }
+            case WalCommandType::DROP_DATABASE: {
                 WalCmdDropDatabaseReplay(*dynamic_cast<const WalCmdDropDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::CREATE_TABLE:
+            }
+            case WalCommandType::CREATE_TABLE: {
                 WalCmdCreateTableReplay(*dynamic_cast<const WalCmdCreateTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DROP_TABLE:
+            }
+            case WalCommandType::DROP_TABLE: {
                 WalCmdDropTableReplay(*dynamic_cast<const WalCmdDropTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::ALTER_INFO:
-                RecoverableError(Status::NotSupport("WalCmdAlterInfo Replay Not implemented"));
+            }
+            case WalCommandType::ALTER_INFO: {
+                Status status = Status::NotSupport("WalCmdAlterInfo Replay Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
                 break;
-            case WalCommandType::CREATE_INDEX:
+            }
+            case WalCommandType::CREATE_INDEX: {
                 WalCmdCreateIndexReplay(*dynamic_cast<const WalCmdCreateIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DROP_INDEX:
+            }
+            case WalCommandType::DROP_INDEX: {
                 WalCmdDropIndexReplay(*dynamic_cast<const WalCmdDropIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::IMPORT:
+            }
+            case WalCommandType::IMPORT: {
                 WalCmdImportReplay(*dynamic_cast<const WalCmdImport *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::APPEND:
+            }
+            case WalCommandType::APPEND: {
                 WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
-            case WalCommandType::DELETE:
+            }
+            case WalCommandType::DELETE: {
                 WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
+            }
             // case WalCommandType::SET_SEGMENT_STATUS_SEALED:
             //     WalCmdSetSegmentStatusSealedReplay(*dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get()), entry.txn_id_,
             //     entry.commit_ts_); break;
@@ -558,11 +571,13 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             //                                              entry.txn_id_,
             //                                              entry.commit_ts_);
             //     break;
-            case WalCommandType::CHECKPOINT:
+            case WalCommandType::CHECKPOINT: {
                 break;
-            case WalCommandType::COMPACT:
+            }
+            case WalCommandType::COMPACT: {
                 WalCmdCompactReplay(*static_cast<const WalCmdCompact *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
+            }
             default: {
                 UnrecoverableError("WalManager::ReplayWalEntry unknown wal command type");
             }
@@ -656,8 +671,8 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
     auto txn = MakeUnique<Txn>(nullptr /*buffer_mgr*/, nullptr /*txn_mgr*/, nullptr /*catalog*/, txn_id, begin_ts);
-    auto block_index = table_entry->GetBlockIndex(txn.get());
-    table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
+    auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(txn.get()));
+    table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
     for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store()) {
@@ -745,7 +760,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
     Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->delete_state_);
-    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), &table_store->delete_state_);
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -764,7 +779,9 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
         if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
-        segment_entry->SetNoDelete();
+        if (!segment_entry->SetNoDelete()) {
+            UnrecoverableError("Assert: Replay segment should be compactable.");
+        }
         segment_entry->SetDeprecated(commit_ts);
     }
 }
@@ -784,7 +801,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
 
     fake_txn->FakeCommit(commit_ts);
     Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), true);
-    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), nullptr);
 }
 
 // // TMP deprecated

@@ -46,6 +46,11 @@ struct SegmentEntry;
 class BaseTableRef;
 class AddTableIndexEntryOp;
 
+export struct SegmentIndexesGuard {
+    const Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment_;
+    std::shared_lock<std::shared_mutex> lock_;
+};
+
 export struct TableIndexEntry : public BaseEntry, public EntryInterface {
     friend struct TableEntry;
 
@@ -95,6 +100,9 @@ public:
     inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
+
+    SegmentIndexesGuard GetSegmentIndexesGuard() { return {index_by_segment_, std::shared_lock(rw_locker_)}; }
+
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot(const TableEntry *table_entry, Txn *txn);
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     String GetPathNameTail() const;
@@ -113,9 +121,9 @@ public:
     SharedPtr<SegmentIndexEntry> PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config);
 
     Tuple<Vector<SegmentIndexEntry *>, Status>
-    CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
+    CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
-    Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
+    Status CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
 
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }

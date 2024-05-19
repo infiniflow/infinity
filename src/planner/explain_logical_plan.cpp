@@ -49,6 +49,7 @@ import logical_export;
 import logical_flush;
 import logical_optimize;
 import logical_match;
+import logical_match_tensor_scan;
 import logical_fusion;
 import base_expression;
 
@@ -201,6 +202,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         }
         case LogicalNodeType::kMatch: {
             Explain((LogicalMatch *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kMatchTensorScan: {
+            Explain((LogicalMatchTensorScan *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kFusion: {
@@ -1958,11 +1963,27 @@ void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr
 }
 
 void ExplainLogicalPlan::Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
-    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
+    IStringStream iss(match_node->ToString(intent_size));
+    String line;
+    while (std::getline(iss, line)) {
+        result->emplace_back(MakeShared<String>(std::move(line)));
+    }
+}
+
+void ExplainLogicalPlan::Explain(const LogicalMatchTensorScan *match_tensor_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    IStringStream iss(match_tensor_node->ToString(intent_size));
+    String line;
+    while (std::getline(iss, line)) {
+        result->emplace_back(MakeShared<String>(std::move(line)));
+    }
 }
 
 void ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
-    result->emplace_back(MakeShared<String>(fusion_node->ToString(intent_size)));
+    IStringStream iss(fusion_node->ToString(intent_size));
+    String line;
+    while (std::getline(iss, line)) {
+        result->emplace_back(MakeShared<String>(std::move(line)));
+    }
 }
 
 } // namespace infinity

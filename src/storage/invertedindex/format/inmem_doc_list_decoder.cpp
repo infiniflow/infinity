@@ -7,7 +7,6 @@ import memory_pool;
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import index_decoder;
-import skiplist_reader;
 import index_defines;
 
 namespace infinity {

@@ -22,6 +22,7 @@ import file_system_type;
 import status;
 import infinity_exception;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -40,7 +41,9 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
     if (buffer_size_ == 0) {
         already_read_size_ = fs_.Read(*file_handler_, buffer, read_size);
         if (already_read_size_ != read_size) {
-            RecoverableError(Status::DataIOError(fmt::format("No enough data from file: {}", file_handler_->path_.string())));
+            Status status = Status::DataIOError(fmt::format("No enough data reading from {}", file_handler_->path_.string()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     } else {
         if (buffer_offset_ >= buffer_length_)
@@ -56,7 +59,9 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
 
             already_read_size_ = fs_.Read(*file_handler_, buffer + start, read_size - start);
             if (already_read_size_ == 0) {
-                RecoverableError(Status::DataIOError(fmt::format("No enough data from file: {}", file_handler_->path_.string())));
+                Status status = Status::DataIOError(fmt::format("No enough data reading from {}", file_handler_->path_.string()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
 
             buffer_start_ += buffer_offset_ + read_size;
@@ -68,7 +73,9 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
 void FileReader::ReadAt(i64 file_offset, char_t *buffer, SizeT read_size) {
     already_read_size_ = fs_.ReadAt(*file_handler_, file_offset, buffer, read_size);
     if (already_read_size_ != read_size) {
-        RecoverableError(Status::DataIOError(fmt::format("No enough data from file: {}", file_handler_->path_.string())));
+        Status status = Status::DataIOError(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 

@@ -52,12 +52,16 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
     }
 
     if (source.type() != LogicalType::kEmbedding || target.type() != LogicalType::kEmbedding) {
-        RecoverableError(Status::NotSupportedTypeConversion(source.ToString(), target.ToString()));
+        Status status = Status::NotSupportedTypeConversion(source.ToString(), target.ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
-        RecoverableError(Status::DataTypeMismatch(source.ToString(), target.ToString()));
+        Status status = Status::DataTypeMismatch(source.ToString(), target.ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     switch (source_info->Type()) {
         case EmbeddingDataType::kElemInt8: {
@@ -333,13 +337,17 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     const auto source_embedding_dim = embedding_info->Dimension();
     const auto target_embedding_dim = target_embedding_info->Dimension();
     if (source_embedding_dim % target_embedding_dim != 0) {
-        RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
+        Status status = Status::DataTypeMismatch(source_type.ToString(), target_type.ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     const auto target_tensor_num = source_embedding_dim / target_embedding_dim;
     // estimate the size of target tensor
     if (const auto target_tensor_bytes = target_tensor_num * target_embedding_info->Size(); target_tensor_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         // TODO: better error message: tensor size overflow
-        RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
+        Status status = Status::DataTypeMismatch(source_type.ToString(), target_type.ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     target.embedding_num_ = target_tensor_num;
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kTensorHeap) {

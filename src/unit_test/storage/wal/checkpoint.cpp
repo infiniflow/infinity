@@ -34,8 +34,6 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import compact_segments_task;
-import index_base;
 import index_base;
 import third_party;
 import base_table_ref;
@@ -52,6 +50,7 @@ import default_values;
 import global_resource_usage;
 import infinity;
 import background_process;
+import compaction_process;
 import wal_manager;
 
 using namespace infinity;
@@ -117,7 +116,7 @@ protected:
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"));
 
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
-            table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
+            // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
@@ -162,6 +161,7 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     BufferManager *buffer_manager = storage->buffer_manager();
     TxnManager *txn_mgr = storage->txn_manager();
     TxnTimeStamp last_commit_ts = 0;
+    CompactionProcessor *compaction_processor = storage->compaction_processor();
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -186,16 +186,8 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
 
     { // add compact
-        auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-        auto [table_entry, status] = txn4->GetTableByName(*db_name, *table_name);
-        EXPECT_NE(table_entry, nullptr);
-
-        {
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-            compact_task->Execute();
-        }
-        txn_mgr->CommitTxn(txn4);
+        auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+        EXPECT_NE(commit_ts, 0u);
     }
 
     {
@@ -277,7 +269,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
 
@@ -318,7 +310,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
 
@@ -385,7 +377,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
         txn_mgr->CommitTxn(txn);

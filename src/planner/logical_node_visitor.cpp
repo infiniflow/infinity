@@ -39,7 +39,7 @@ import logical_update;
 import logical_knn_scan;
 import logical_index_scan;
 import logical_match;
-
+import logical_match_tensor_scan;
 import aggregate_expression;
 import between_expression;
 import case_expression;
@@ -144,6 +144,13 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kMatch: {
             auto &node = (LogicalMatch &)op;
+            if (node.common_query_filter_ and node.common_query_filter_->filter_leftover_) {
+                VisitExpression(node.common_query_filter_->filter_leftover_);
+            }
+            break;
+        }
+        case LogicalNodeType::kMatchTensorScan: {
+            auto &node = (LogicalMatchTensorScan &)op;
             if (node.common_query_filter_ and node.common_query_filter_->filter_leftover_) {
                 VisitExpression(node.common_query_filter_->filter_leftover_);
             }

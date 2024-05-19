@@ -63,7 +63,7 @@ COPY test_knn_hnsw_l2 FROM '/var/infinity/test_data/embedding_float_dim4.csv' WI
 
 # select with 5 index segment and 10 non-index segment
 query I
-SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
 8
 8

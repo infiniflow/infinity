@@ -367,6 +367,22 @@ Status Status::InvalidCommand(const String &detailed_error) {
     return Status(ErrorCode::kInvalidCommand, MakeUnique<String>(fmt::format("Invalid command: {}", detailed_error)));
 }
 
+Status Status::AnalyzerNotFound(const String& name) {
+    return Status(ErrorCode::kAnalyzerNotFound, MakeUnique<String>(fmt::format("Analyzer {} isn't found", name)));
+}
+
+Status Status::NotSupportedAnalyzer(const String& name) {
+    return Status(ErrorCode::kNotSupportedAnalyzer, MakeUnique<String>(fmt::format("Analyzer {} isn't supported", name)));
+}
+
+Status Status::InvalidAnalyzerName(const String& name) {
+    return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(name));
+}
+
+Status Status::InvalidAnalyzerFile(const String& detailed_info) {
+    return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(fmt::format("Invalid analyzer file: {}", detailed_info)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

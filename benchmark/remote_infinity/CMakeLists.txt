@@ -25,6 +25,7 @@ target_link_libraries(
         atomic.a
         thrift.a
         c++.a
+        jma
 )
 
 if(ENABLE_JEMALLOC)

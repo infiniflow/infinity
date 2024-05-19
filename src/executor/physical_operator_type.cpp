@@ -19,6 +19,7 @@ module physical_operator_type;
 import stl;
 import status;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 String PhysicalOperatorToString(PhysicalOperatorType type) {
@@ -124,8 +125,20 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "MergeKnn";
         case PhysicalOperatorType::kCommand:
             return "Command";
+        case PhysicalOperatorType::kCompact:
+            return "Compact";
+        case PhysicalOperatorType::kCompactIndexPrepare:
+            return "CompactIndexPrepare";
+        case PhysicalOperatorType::kCompactIndexDo:
+            return "CompactIndexDo";
+        case PhysicalOperatorType::kCompactFinish:
+            return "CompactFinish";
         case PhysicalOperatorType::kMatch:
             return "Match";
+        case PhysicalOperatorType::kMatchTensorScan:
+            return "MatchTensorScan";
+        case PhysicalOperatorType::kMergeMatchTensor:
+            return "MergeMatchTensor";
         case PhysicalOperatorType::kFusion:
             return "Fusion";
         case PhysicalOperatorType::kMergeAggregate:
@@ -138,6 +151,8 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "CreateIndexFinish";
     }
 
-    RecoverableError(Status::NotSupport("Unknown physical operator type"));
+    Status status = Status::NotSupport("Unknown physical operator type");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 } // namespace infinity

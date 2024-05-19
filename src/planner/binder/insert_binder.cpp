@@ -27,6 +27,7 @@ import infinity_exception;
 import third_party;
 import function_set;
 import bind_alias_proxy;
+import logger;
 
 namespace infinity {
 
@@ -36,7 +37,9 @@ SharedPtr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, 
 }
 
 SharedPtr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64 , bool ) {
-    RecoverableError(Status::SyntaxError("KNN expression isn't supported in insert clause"));
+    Status status = Status::SyntaxError("KNN expression isn't supported in insert clause");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 

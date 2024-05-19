@@ -32,6 +32,7 @@ import logical_type;
 import index_defines;
 import analyzer_pool;
 import analyzer;
+import logger;
 
 namespace infinity {
 
@@ -41,7 +42,7 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
                                          const String &file_name,
                                          Vector<String> column_names,
                                          const Vector<InitParameter *> &index_param_list) {
-    String analyzer{};
+    String analyzer_name{};
     u64 flag = OPTION_FLAG_ALL;
     SizeT param_count = index_param_list.size();
     for (SizeT param_idx = 0; param_idx < param_count; ++param_idx) {
@@ -49,19 +50,19 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
         String para_name = parameter->param_name_;
         ToLowerString(para_name);
         if (para_name == "analyzer") {
-            analyzer = parameter->param_value_;
+            analyzer_name = parameter->param_value_;
         } else if (para_name == "flag") {
             flag = std::strtoul(parameter->param_value_.c_str(), nullptr, 10);
         }
     }
-    if (analyzer.empty()) {
-        analyzer = "standard";
+    if (analyzer_name.empty()) {
+        analyzer_name = "standard";
     }
-    UniquePtr<Analyzer> ana = AnalyzerPool::instance().Get(analyzer);
-    if (ana.get() == nullptr) {
-        RecoverableError(Status::InvalidIndexDefinition(fmt::format("Attempt to create full-text index using invalid analyer: {}.", analyzer)));
+    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+    if (!status.ok()) {
+        RecoverableError(status);
     }
-    return MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer, (optionflag_t)flag);
+    return MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer_name, (optionflag_t)flag);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {
@@ -110,7 +111,9 @@ nlohmann::json IndexFullText::Serialize() const {
 }
 
 SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
-    RecoverableError(Status::NotSupport("Not implemented"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 
@@ -119,10 +122,14 @@ void IndexFullText::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_t
     auto &column_types_vector = *(base_table_ref->column_types_);
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        RecoverableError(Status::ColumnNotExist(column_name));
+        Status status = Status::ColumnNotExist(column_name);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kVarchar) {
-        RecoverableError(Status::InvalidIndexDefinition(
-            fmt::format("Attempt to create full-text index on column: {}, data type: {}.", column_name, data_type->ToString())));
+        Status status = Status::InvalidIndexDefinition(
+            fmt::format("Attempt to create full-text index on column: {}, data type: {}.", column_name, data_type->ToString()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 

@@ -15,12 +15,8 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import storage;
-import txn_manager;
-import infinity_context;
 import segment_entry;
 import DBT_compaction_alg;
-import txn;
 
 using namespace infinity;
 
@@ -61,17 +57,11 @@ SegmentID MockSegmentEntry::cur_segment_id_ = 0;
 class DBTCompactionTest : public BaseTest {};
 
 TEST_F(DBTCompactionTest, AddSegments) {
-    std::shared_ptr<std::string> config_path = nullptr;
-    RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
-
-    Storage *storage = infinity::InfinityContext::instance().storage();
-    TxnManager *txn_mgr = storage->txn_manager();
+    TransactionID txn_id = 0;
 
     int m = 3;
     int c = 3;
     int s = 1;
-    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->BeginTxn(MakeUnique<String>("compact")); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
     DBTCompact.Enable(Vector<SegmentEntry *>{});
 
@@ -81,26 +71,22 @@ TEST_F(DBTCompactionTest, AddSegments) {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(2);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(2);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
 
-        TransactionID txn_id = txn->TxnID();
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -110,28 +96,22 @@ TEST_F(DBTCompactionTest, AddSegments) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(3);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(5);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -141,42 +121,36 @@ TEST_F(DBTCompactionTest, AddSegments) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(3);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(6);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(9);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(11);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -186,34 +160,25 @@ TEST_F(DBTCompactionTest, AddSegments) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(100);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
-
-    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
-    std::shared_ptr<std::string> config_path = nullptr;
-    RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
-
-    Storage *storage = infinity::InfinityContext::instance().storage();
-    TxnManager *txn_mgr = storage->txn_manager();
+    TransactionID txn_id = 0;
 
     int m = 3;
     int c = 3;
     int s = 1;
-    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->BeginTxn(MakeUnique<String>("compact")); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
     DBTCompact.Enable(Vector<SegmentEntry *>{});
 
@@ -223,26 +188,21 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -253,33 +213,28 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         new_segment->ShrinkSegment(2);
         DBTCompact.DeleteInSegment(new_segment->segment_id());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        auto [segments, txn] = ret.value();
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -290,34 +245,28 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         new_segment->ShrinkSegment(1);
         DBTCompact.DeleteInSegment(new_segment->segment_id());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -327,28 +276,19 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
-
-    infinity::InfinityContext::instance().UnInit();
 }
 
 TEST_F(DBTCompactionTest, FillSegmentCapacity) {
-    std::shared_ptr<std::string> config_path = nullptr;
-    RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
-
-    Storage *storage = infinity::InfinityContext::instance().storage();
-    TxnManager *txn_mgr = storage->txn_manager();
+    TransactionID txn_id = 0;
 
     int m = 4;
     int c = 10;
     int s = 10;
     // layer0: 0~9, layer1: 10~99, layer2: 100~999
-    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->BeginTxn(MakeUnique<String>("compact")); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
     DBTCompact.Enable(Vector<SegmentEntry *>{});
 
@@ -357,32 +297,28 @@ TEST_F(DBTCompactionTest, FillSegmentCapacity) {
         auto segment_entry = MockSegmentEntry::Make(200);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(200);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(200);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(200);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        auto [segments, txn] = ret.value();
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 4u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -392,42 +328,33 @@ TEST_F(DBTCompactionTest, FillSegmentCapacity) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(200);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(200);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
-
-    infinity::InfinityContext::instance().UnInit();
 }
 
 // add rollback test, rollback every compact operation once before success commit it
 TEST_F(DBTCompactionTest, RollbackTest) {
-    std::shared_ptr<std::string> config_path = nullptr;
-    RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
-
-    Storage *storage = infinity::InfinityContext::instance().storage();
-    TxnManager *txn_mgr = storage->txn_manager();
+    TransactionID txn_id = 0;
 
     int m = 3;
     int c = 3;
     int s = 1;
-    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->BeginTxn(MakeUnique<String>("compact")); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
     DBTCompact.Enable(Vector<SegmentEntry *>{});
 
@@ -437,35 +364,27 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         auto segment_entry = MockSegmentEntry::Make(2);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(2);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(2);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_FALSE(segments.empty());
         DBTCompact.RollbackCompact(txn_id);
-        txn_mgr->CommitTxn(txn);
     }
     {
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_FALSE(segments.empty());
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -475,38 +394,27 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(8);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(6);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_FALSE(segments.empty());
         DBTCompact.RollbackCompact(txn_id);
-        txn_mgr->CommitTxn(txn);
     }
     {
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        // auto [segments, txn] = ret.value();
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -516,50 +424,41 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(3);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(6);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(14);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         auto segment_entry = MockSegmentEntry::Make(17);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_FALSE(segments.empty());
         DBTCompact.RollbackCompact(txn_id);
-        txn_mgr->CommitTxn(txn);
     }
     {
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        auto [segments, txn] = ret.value();
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         EXPECT_EQ(compacted_segments.size(), 1u);
@@ -570,36 +469,27 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
     {
         auto segment_entry = MockSegmentEntry::Make(100);
         segment_entries.emplace_back(segment_entry);
         DBTCompact.AddSegment(segment_entry.get());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_FALSE(ret.has_value());
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_TRUE(segments.empty());
     }
     {
         shrink_segment->ShrinkSegment(48);
         DBTCompact.DeleteInSegment(shrink_segment->segment_id());
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_FALSE(segments.empty());
         DBTCompact.RollbackCompact(txn_id);
-        txn_mgr->CommitTxn(txn);
     }
     {
-        auto ret = DBTCompact.CheckCompaction(GetTxn);
-        EXPECT_TRUE(ret.has_value());
-        const auto &segments = ret->segments_;
-        auto *txn = ret->txn_;
-
-        TransactionID txn_id = txn->TxnID();
+        auto segments = DBTCompact.CheckCompaction(++txn_id);
+        EXPECT_FALSE(segments.empty());
         EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
@@ -609,11 +499,8 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         DBTCompact.CommitCompact(txn_id);
         for (auto &segment : compacted_segments) {
             DBTCompact.AddSegment(segment.get());
-            auto ret = DBTCompact.CheckCompaction(GetTxn);
-            ASSERT_EQ(ret.has_value(), false);
+            auto segments = DBTCompact.CheckCompaction(++txn_id);
+            EXPECT_TRUE(segments.empty());
         }
-        txn_mgr->CommitTxn(txn);
     }
-
-    infinity::InfinityContext::instance().UnInit();
 }

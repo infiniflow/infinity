@@ -40,6 +40,7 @@ import execute_statement;
 import alter_statement;
 import explain_statement;
 import command_statement;
+import compact_statement;
 import data_type;
 import extra_ddl_info;
 
@@ -165,10 +166,17 @@ public:
 
     Status BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     // Explain
     Status BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
+    [[nodiscard]] Vector<SharedPtr<LogicalNode>> LogicalPlans() const {
+        if (logical_plans_.empty()) {
+            return {logical_plan_};
+        }
+        return logical_plans_;
+    }
 
 private:
     void BindSchemaName(String &schema_name) const;
@@ -181,6 +189,7 @@ private:
     SharedPtr<Vector<String>> names_ptr_{};
     SharedPtr<Vector<DataType>> types_ptr_{};
     SharedPtr<LogicalNode> logical_plan_{};
+    Vector<SharedPtr<LogicalNode>> logical_plans_{};
 };
 
 } // namespace infinity

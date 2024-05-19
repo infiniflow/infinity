@@ -59,7 +59,8 @@ struct WalCmd;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
-enum class CompactSegmentsTaskType;
+enum class CompactStatementType;
+struct SegmentIndexEntry;
 
 export class Txn {
 public:
@@ -136,7 +137,8 @@ public:
 
     Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
 
-    Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
+    Pair<Vector<SegmentIndexEntry *>, Status>
+    CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
@@ -163,8 +165,7 @@ public:
 
     Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
-    Status
-    Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
+    Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
