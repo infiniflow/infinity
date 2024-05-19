@@ -171,7 +171,7 @@ public:
                 std::tie(start_i, end_i) = hnsw_index.StoreDataRaw(data.get(), element_size / 2, 0 /*offset*/, config);
             }
             {
-                auto write_thread2 = std::jthread([&] {
+                auto write_thread2 = std::thread([&] {
                     int insert_n = element_size - element_size / 2;
                     for (int i = element_size / 2; i < element_size; ++i) {
                         hnsw_index.InsertVecsRaw(data.get() + i * dim, 1 /*offset*/, i);
@@ -182,8 +182,10 @@ public:
                     }
                 });
 
+                write_thread2.detach();
+
                 std::atomic<i32> idx = start_i;
-                std::vector<std::jthread> worker_threads;
+                std::vector<std::thread> worker_threads;
                 for (int i = 0; i < 4; ++i) {
                     worker_threads.emplace_back([&] {
                         while (true) {
@@ -195,6 +197,9 @@ public:
                             hnsw_index.Build(i);
                         }
                     });
+                }
+                for (int i = 0; i < 4; ++i) {
+                    worker_threads[i].join();
                 }
             }
             stop.store(true);

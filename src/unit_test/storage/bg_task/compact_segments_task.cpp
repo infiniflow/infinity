@@ -15,6 +15,7 @@
 #include "unit_test/base_test.h"
 #include <numeric>
 #include <random>
+#include <thread>
 
 import stl;
 import storage;
