@@ -65,12 +65,18 @@ public:
         return sessions_.size();
     }
 
+    void IncreaseQueryCount() { ++total_query_count_; }
+
+    u64 total_query_count() const { return total_query_count_; }
+
 private:
     std::shared_mutex rw_locker_{};
     HashMap<u64, BaseSession*> sessions_;
 
     // First session is ONE;
     atomic_u64 session_id_generator_{};
+
+    Atomic<u64> total_query_count_{0};
 };
 
 }

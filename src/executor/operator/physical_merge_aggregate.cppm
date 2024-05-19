@@ -66,7 +66,7 @@ public:
     T GetOutputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
 
     template <typename T>
-    using MathOperation = StdFunction<T(T, T)>;
+    using MathOperation = std::function<T(T, T)>;
 
     void SimpleMergeAggregateExecute(MergeAggregateOperatorState *merge_aggregate_op_state);
 

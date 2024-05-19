@@ -28,8 +28,8 @@ namespace infinity {
 
 export class LogicalOptimize : public LogicalNode {
 public:
-    explicit LogicalOptimize(u64 node_id, String schema_name, String object_name)
-        : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)) {}
+    explicit LogicalOptimize(u64 node_id, String schema_name, String table_name)
+        : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -41,16 +41,13 @@ public:
 
     inline String name() final { return "LogicalOptimize"; }
 
-    [[nodiscard]] OptimizeType optimize_type() const { return optimize_type_; }
-
     [[nodiscard]] inline const String &schema_name() const { return schema_name_; }
 
-    [[nodiscard]] inline const String &object_name() const { return object_name_; }
+    [[nodiscard]] inline const String &object_name() const { return table_name_; }
 
 private:
-    OptimizeType optimize_type_{OptimizeType::kIRS};
     String schema_name_;
-    String object_name_; // It could be table/collection/view name
+    String table_name_;
 };
 
 } // namespace infinity

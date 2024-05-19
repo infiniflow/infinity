@@ -34,19 +34,31 @@ import default_values;
 import physical_operator_type;
 import physical_operator;
 import physical_sink;
+import base_statement;
+import extra_ddl_info;
+import create_statement;
+import command_statement;
 
 namespace infinity {
 
 // Non-static memory methods
 
-TaskScheduler::TaskScheduler(const Config *config_ptr) { Init(config_ptr); }
+TaskScheduler::TaskScheduler(Config *config_ptr) { Init(config_ptr); }
 
-void TaskScheduler::Init(const Config *config_ptr) {
-    worker_count_ = config_ptr->worker_cpu_limit();
+void TaskScheduler::Init(Config *config_ptr) {
+    worker_count_ = config_ptr->CPULimit();
     worker_array_.reserve(worker_count_);
     worker_workloads_.resize(worker_count_);
     u64 cpu_count = Thread::hardware_concurrency();
-    for (u64 cpu_id = 0; cpu_id < worker_count_; ++cpu_id) {
+
+    u64 cpu_select_step = cpu_count / worker_count_;
+    if (cpu_select_step >= 2) {
+        cpu_select_step = 2;
+    } else {
+        cpu_select_step = 1;
+    }
+
+    for (u64 cpu_id = 0; cpu_id < worker_count_; cpu_id += cpu_select_step) {
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
         UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), cpu_id);
         // Pin the thread to specific cpu
@@ -77,43 +89,62 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
     u64 min_workload = worker_workloads_[0];
     u64 min_workload_worker_id = 0;
     for (u64 worker_id = 1; worker_id < worker_count_ && min_workload; ++worker_id) {
-        if (worker_workloads_[worker_id] < min_workload) {
-            min_workload = worker_workloads_[worker_id];
+        u64 current_worker_load = worker_workloads_[worker_id];
+        if (current_worker_load < min_workload) {
+            min_workload = current_worker_load;
             min_workload_worker_id = worker_id;
         }
     }
     return min_workload_worker_id;
 }
 
-Pair<Vector<PlanFragment *>, SizeT> TaskScheduler::GetStartFragments(PlanFragment *plan_fragment) {
-    Vector<PlanFragment *> leaf_fragments;
-    SizeT all_fragment_n = 0;
-    StdFunction<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) {
-        all_fragment_n += root->GetContext()->Tasks().size();
-        if (root->Children().empty()) {
-            leaf_fragments.emplace_back(root);
-            return;
-        }
-        for (auto &child : root->Children()) {
-            TraversePlanFragmentTree(child.get());
-        }
-    };
-    // Traverse the tree to get all leaf fragments
-    TraversePlanFragmentTree(plan_fragment);
-
-    return {leaf_fragments, all_fragment_n};
-}
-
-void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
+void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
         UnrecoverableError("Scheduler isn't initialized");
     }
     // DumpPlanFragment(plan_fragment);
+    bool use_scheduler = false;
+    switch(base_statement->Type()) {
+        case StatementType::kSelect:
+        case StatementType::kExplain:
+        case StatementType::kDelete:
+        case StatementType::kUpdate: 
+        case StatementType::kCompact:{
+            use_scheduler = true; // continue;
+            break;
+        }
+        case StatementType::kCreate: {
+            const CreateStatement *create_statement = static_cast<const CreateStatement *>(base_statement);
+            if (create_statement->create_info_->type_ == DDLType::kIndex) {
+                // Create index will generate multiple tasks
+                use_scheduler = true;
+            }
+            break;
+        }
+        default: {
+            ;
+        }
+    }
 
-    auto [fragments, task_n] = GetStartFragments(plan_fragment);
+    if(!use_scheduler) {
+        if (!plan_fragment->HasChild()) {
+            if (plan_fragment->GetContext()->Tasks().size() == 1) {
+                FragmentTask *task = plan_fragment->GetContext()->Tasks()[0].get();
+                RunTask(task);
+                return ;
+            } else {
+                UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
+            }
+        } else {
+            UnrecoverableError("None select statement has multiple fragments.");
+        }
+    }
+
+    Vector<PlanFragment *> start_fragments;
+    SizeT task_n = plan_fragment->GetStartFragments(start_fragments);
     plan_fragment->GetContext()->notifier()->SetTaskN(task_n);
-    for (auto *plan_fragment : fragments) {
-        auto &tasks = plan_fragment->GetContext()->Tasks();
+    for (auto *sub_fragment : start_fragments) {
+        auto &tasks = sub_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
@@ -123,6 +154,27 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
             ScheduleTask(task.get(), worker_id);
         }
     }
+}
+
+void TaskScheduler::RunTask(FragmentTask *task) {
+
+    bool finish = false;
+    bool error = false;
+    task->fragment_context()->notifier()->SetTaskN(1);
+    do {
+        task->TryIntoWorkerLoop();
+        task->OnExecute();
+        if (task->status() != FragmentTaskStatus::kError) {
+            if (task->IsComplete()) {
+                task->CompleteTask();
+                finish = true;
+            }
+        } else {
+            error = true;
+            finish = true;
+        }
+    } while (!finish);
+    task->fragment_context()->notifier()->FinishTask(error, task->fragment_context());
 }
 
 void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
@@ -151,15 +203,19 @@ void TaskScheduler::ScheduleTask(FragmentTask *task, u64 worker_id) {
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
     List<FragmentTask *> task_lists;
     auto iter = task_lists.end();
+    auto last_iter = task_lists.end();
     while (true) {
-        Vector<FragmentTask *> dequeue_output;
-        if (task_lists.empty()) {
-            task_queue->DequeueBulk(dequeue_output);
-        } else {
-            task_queue->TryDequeueBulk(dequeue_output);
-        }
-        if (!dequeue_output.empty()) {
-            task_lists.insert(task_lists.end(), dequeue_output.begin(), dequeue_output.end());
+        if (iter == last_iter) {
+            Vector<FragmentTask *> dequeue_output;
+            if (task_lists.empty()) {
+                task_queue->DequeueBulk(dequeue_output);
+            } else {
+                task_queue->TryDequeueBulk(dequeue_output);
+            }
+            if (!dequeue_output.empty()) {
+                task_lists.insert(task_lists.end(), dequeue_output.begin(), dequeue_output.end());
+            }
+            last_iter = task_lists.end();
         }
         if (iter == task_lists.end()) {
             iter = task_lists.begin();
@@ -175,7 +231,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
             continue;
         }
 
-        fragment_task->OnExecute(worker_id);
+        fragment_task->OnExecute();
         fragment_task->SetLastWorkID(worker_id);
 
         bool error = false;
@@ -183,7 +239,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
 
         if (fragment_task->status() != FragmentTaskStatus::kError) {
             if (fragment_task->IsComplete()) {
-                auto *sink_op = fragment_ctx->GetSinkOperator();
+                // auto *sink_op = fragment_ctx->GetSinkOperator();
                 --worker_workloads_[worker_id];
                 fragment_task->CompleteTask();
                 iter = task_lists.erase(iter);
@@ -200,14 +256,16 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
             --worker_workloads_[worker_id];
             iter = task_lists.erase(iter);
         }
-        if (finish) {
-            fragment_ctx->notifier()->FinishTask(error);
+        if (finish || error) {
+            fragment_ctx->notifier()->FinishTask(error, fragment_ctx);
+        } else {
+            fragment_ctx->notifier()->UnstartTask();
         }
     }
 }
 
 void TaskScheduler::DumpPlanFragment(PlanFragment *root) {
-    StdFunction<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
+    std::function<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
         auto *fragment_ctx = fragment->GetContext();
         LOG_INFO(fmt::format("Fragment id: {}, type: {}, ctx: {}",
                              fragment->FragmentID(),

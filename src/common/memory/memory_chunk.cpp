@@ -35,7 +35,7 @@ MemoryChunk *ChunkAllocator::Allocate(SizeT num_bytes) {
     if (next_chunk && alloc_size <= chunk_size_) {
         current_chunk_ = next_chunk;
     } else {
-        const auto allocated_chunk = static_cast<void *>(new char[alloc_size]{});
+        const auto allocated_chunk = static_cast<void *>(new char[alloc_size]);
         if (!allocated_chunk) {
             return nullptr;
         }
@@ -75,16 +75,16 @@ SizeT ChunkAllocator::Release() {
         delete[] (char *)pChunk2;
     }
     chunk_header_ = current_chunk_ = nullptr;
-    SizeT totalBytes = total_bytes_;
+    SizeT total_bytes = total_bytes_;
     used_bytes_ = total_bytes_ = 0;
-    return totalBytes;
+    return total_bytes;
 }
 
 SizeT ChunkAllocator::Reset() {
-    SizeT totalBytes = total_bytes_;
+    SizeT total_bytes = total_bytes_;
     if (current_chunk_ == nullptr) {
         // skip useless reset to avoid cache-miss
-        return totalBytes;
+        return total_bytes;
     }
     for (ChainedMemoryChunk *chunk = chunk_header_; chunk;) {
         if (chunk->GetTotalBytes() <= chunk_size_) {
@@ -108,7 +108,7 @@ SizeT ChunkAllocator::Reset() {
     }
     used_bytes_ = 0;
     current_chunk_ = nullptr;
-    return totalBytes;
+    return total_bytes;
 }
 
 void ChunkAllocator::Clear() {

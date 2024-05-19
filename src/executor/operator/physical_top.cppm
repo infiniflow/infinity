@@ -42,7 +42,7 @@ export class CompareTwoRowAndPreferLeft {
 public:
     CompareTwoRowAndPreferLeft() = default;
     explicit CompareTwoRowAndPreferLeft(
-        Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> &&sort_functions)
+        Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> &&sort_functions)
         : sort_functions_(std::move(sort_functions)) {
         sort_expr_count_ = sort_functions_.size();
     }
@@ -60,7 +60,7 @@ public:
 
 private:
     u32 sort_expr_count_{};
-    Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>>
+    Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>>
         sort_functions_; // sort functions
 };
 
@@ -112,7 +112,7 @@ public:
                                                                   const Vector<UniquePtr<DataBlock>> &data_block_array);
 
     // for Top and Sort
-    static StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+    static std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
     GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression);
 
 private:

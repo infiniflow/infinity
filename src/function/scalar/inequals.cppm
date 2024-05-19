@@ -20,8 +20,8 @@ import stl;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
-export void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterInEqualsFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

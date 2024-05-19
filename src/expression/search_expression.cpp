@@ -15,23 +15,24 @@
 module;
 
 #include <sstream>
+module search_expression;
 import stl;
-
 import expression_type;
 import scalar_function;
 import match_expression;
 import knn_expression;
+import match_tensor_expression;
 import fusion_expression;
 
-module search_expression;
 
 namespace infinity {
 
 SearchExpression::SearchExpression(Vector<SharedPtr<MatchExpression>> &match_exprs,
                                    Vector<SharedPtr<KnnExpression>> &knn_exprs,
+                                   Vector<SharedPtr<MatchTensorExpression>> &match_tensor_exprs,
                                    SharedPtr<FusionExpression> fusion_expr)
     : BaseExpression(ExpressionType::kSearch, Vector<SharedPtr<BaseExpression>>()), match_exprs_(match_exprs), knn_exprs_(knn_exprs),
-      fusion_expr_(fusion_expr) {}
+      match_tensor_exprs_(match_tensor_exprs), fusion_expr_(fusion_expr) {}
 
 String SearchExpression::ToString() const {
     if (!alias_.empty()) {
@@ -52,6 +53,12 @@ String SearchExpression::ToString() const {
             oss << ", ";
         cnt++;
         oss << knn_expr->ToString();
+    }
+    for (auto &tensor_maxsim_expr : match_tensor_exprs_) {
+        if (cnt != 0)
+            oss << ", ";
+        cnt++;
+        oss << tensor_maxsim_expr->ToString();
     }
     if (fusion_expr_.get() != nullptr) {
         if (cnt != 0)

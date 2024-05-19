@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module block_entry;
 
 import stl;
@@ -26,6 +28,10 @@ import bitmask;
 import internal_types;
 import base_entry;
 import block_column_entry;
+import block_version;
+import fast_rough_filter;
+import value;
+import buffer_obj;
 
 namespace infinity {
 
@@ -35,42 +41,20 @@ struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
 
-#pragma pack(4)
-struct CreateField {
-    //    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
-
-    TxnTimeStamp create_ts_{};
-    i32 row_count_{};
-
-    bool operator==(const CreateField &rhs) const { return create_ts_ == rhs.create_ts_ && row_count_ == rhs.row_count_; }
-
-    bool operator!=(const CreateField &rhs) const { return !(*this == rhs); }
-};
-#pragma pack()
-
-export struct BlockVersion {
-    constexpr static String PATH = "version";
-
-    explicit BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
-    bool operator==(const BlockVersion &rhs) const;
-    bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
-    i32 GetRowCount(TxnTimeStamp begin_ts);
-    void LoadFromFile(const String &version_path);
-    void SaveToFile(const String &version_path);
-
-    Vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                    // risk to write uninitialized buffer. (ts, rows)
-    Vector<TxnTimeStamp> deleted_{};
-};
-
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {
+public:
     friend struct TableEntry;
     friend struct SegmentEntry;
+    friend struct WalBlockInfo;
+
+    static Vector<std::string_view> DecodeIndex(std::string_view encode);
+
+    static String EncodeIndex(const BlockID block_id, const SegmentEntry *segment_entry);
 
 public:
     // for iterator unit test
-    explicit BlockEntry() : BaseEntry(EntryType::kBlock){};
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
 
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
@@ -80,42 +64,44 @@ public:
 
     static UniquePtr<BlockEntry> NewReplayBlockEntry(const SegmentEntry *segment_entry,
                                                      BlockID block_id,
-                                                     TxnTimeStamp checkpoint_ts,
-                                                     u64 column_count,
-                                                     BufferManager *buffer_mgr,
                                                      u16 row_count,
+                                                     u16 row_capacity,
                                                      TxnTimeStamp min_row_ts,
-                                                     TxnTimeStamp max_row_ts);
+                                                     TxnTimeStamp max_row_ts,
+                                                     TxnTimeStamp commit_ts,
+                                                     TxnTimeStamp check_point_ts,
+                                                     u16 checkpoint_row_count,
+                                                     BufferManager *buffer_mgr,
+                                                     TransactionID txn_id);
 
-    static UniquePtr<BlockEntry> NewReplayCatalogBlockEntry(const SegmentEntry *segment_entry,
-                                                            BlockID block_id,
-                                                            u16 row_count,
-                                                            u16 row_capacity,
-                                                            TxnTimeStamp min_row_ts,
-                                                            TxnTimeStamp max_row_ts,
-                                                            TxnTimeStamp check_point_ts,
-                                                            u16 checkpoint_row_count,
-                                                            BufferManager *buffer_mgr);
+    void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
-    void MergeFrom(BaseEntry &other) override;
+    void AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id);
 
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
-protected:
-    u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
-
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
-
-    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts);
-
-    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts);
+    void Cleanup();
 
     void Flush(TxnTimeStamp checkpoint_ts);
+
+    void FlushForImport();
+
+    void LoadFilterBinaryData(const String &block_filter_data);
+
+protected:
+    u16
+    AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
+
+    SizeT DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
+
+    void CommitFlushed(TxnTimeStamp commit_ts);
+
+    void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
 
@@ -141,22 +127,32 @@ public:
 
     u32 segment_id() const;
 
+    u32 segment_offset() const { return u32(block_id() * row_capacity()); }
+
+    RowID base_row_id() const { return RowID(segment_id(), segment_offset()); }
+
     const SharedPtr<String> &base_dir() const { return block_dir_; }
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
+    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+
+    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+
+    SizeT row_count(TxnTimeStamp check_ts) const;
+
     // Get visible range of the BlockEntry since the given row number for a txn
     Pair<BlockOffset, BlockOffset> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
 
-    bool CheckVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const;
+    bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const;
+
+    bool CheckDeleteVisible(Vector<BlockOffset> &block_offsets, TxnTimeStamp check_ts) const;
 
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 
     i32 GetAvailableCapacity();
 
-    const String &DirPath() { return *block_dir_; }
-
-    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, BlockVersion::PATH); }
+    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, String(BlockVersion::PATH)); }
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 
@@ -167,9 +163,9 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 private:
-    void FlushData(i64 checkpoint_row_count);
+    void FlushData(SizeT start_row_count, SizeT checkpoint_row_count);
 
-    void FlushVersion(BlockVersion &checkpoint_version);
+    bool FlushVersion(TxnTimeStamp checkpoint_ts);
 
 protected:
     mutable std::shared_mutex rw_locker_{};
@@ -181,11 +177,15 @@ protected:
     u16 row_count_{};
     u16 row_capacity_{};
 
-    UniquePtr<BlockVersion> block_version_{};
+    // UniquePtr<BlockVersion> block_version_{};
+    BufferObj *block_version_{};
 
-    TxnTimeStamp min_row_ts_{0};    // Indicate the commit_ts which create this BlockEntry
-    TxnTimeStamp max_row_ts_{0};    // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
-    TxnTimeStamp checkpoint_ts_{0}; // replay not set
+    // check if a value must not exist in the block
+    FastRoughFilter fast_rough_filter_;
+
+    TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this BlockEntry
+    TxnTimeStamp max_row_ts_{0};           // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
+    TxnTimeStamp checkpoint_ts_{0};        // replay not set
 
     TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
 

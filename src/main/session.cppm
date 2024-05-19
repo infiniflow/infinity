@@ -25,6 +25,14 @@ import catalog;
 
 namespace infinity {
 
+export class SessionVar {
+public:
+    i64 query_count_{};
+    i64 total_commit_count_{};
+    bool enable_profile_{false};
+    i64 connected_time_{};
+};
+
 export enum class SessionType {
     kLocal,
     kRemote,
@@ -34,23 +42,36 @@ export class BaseSession {
 
 public:
     BaseSession(u64 session_id, SessionType session_type)
-        : current_database_("default"), session_type_(session_type), session_id_(session_id) {}
+        : connected_time_(std::time(nullptr)), current_database_("default_db"), session_type_(session_type),
+        session_id_(session_id) {}
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
-    SessionOptions *options() { return &session_options; }
+    SessionVar *SessionVariables() { return &session_variables_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
     inline void SetTxn(Txn *txn) { txn_ = txn; }
 
-    const QueryProfiler *GetProfilerRecord(SizeT index) { return txn_->GetCatalog()->GetProfilerRecord(index); }
+    const QueryProfiler *GetProfileRecord(SizeT index) { return txn_->GetCatalog()->GetProfileRecord(index); }
 
     void IncreaseQueryCount() { ++query_count_; }
 
     [[nodiscard]] u64 query_count() const { return query_count_; }
 
+    void IncreaseCommittedTxnCount() { ++committed_txn_count_; }
+
+    u64 committed_txn_count() const { return committed_txn_count_; }
+
+    void IncreaseRollbackedTxnCount() { ++committed_txn_count_; }
+
+    u64 rollbacked_txn_count() const { return rollbacked_txn_count_; }
+
+    String ConnectedTimeToStr() const { return std::asctime(std::localtime(&connected_time_)); }
+
 protected:
+    std::time_t connected_time_;
+
     // Current schema
     String current_database_{};
 
@@ -59,11 +80,14 @@ protected:
 
     SessionType session_type_{SessionType::kRemote};
 
-    SessionOptions session_options;
+    SessionVar session_variables_;
 
     u64 session_id_{0};
 
     u64 query_count_{0};
+
+    u64 committed_txn_count_{0};
+    u64 rollbacked_txn_count_{0};
 };
 
 export class LocalSession : public BaseSession {
@@ -99,7 +123,7 @@ private:
 
 // export class Session {
 // public:
-//     explicit Session() : current_database_("default") {}
+//     explicit Session() : current_database_("default_db") {}
 //
 //     [[nodiscard]] inline String &current_database() { return current_database_; }
 //

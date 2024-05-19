@@ -28,7 +28,7 @@ def generate(generate_if_exists: bool, copy: bool):
     csv_name = "{}.csv".format(table_name)
     slt_name = "{}.slt".format(table_name)
 
-    copy_dir = "/tmp/infinity/test_data"
+    copy_dir = "/var/infinity/test_data"
     copy_path = copy_dir + "/" + csv_name
 
     csv_path = csv_dir + "/" + csv_name
@@ -104,7 +104,7 @@ def generate(generate_if_exists: bool, copy: bool):
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '/tmp/infinity/test_data/{}' WITH ( DELIMITER ',' );\n".format(
+            "COPY {} FROM '/var/infinity/test_data/{}' WITH ( DELIMITER ',' );\n".format(
                 table_name, csv_name
             )
         )
@@ -126,7 +126,7 @@ def generate(generate_if_exists: bool, copy: bool):
         for v_x in x:
             slt_file.write("query I\n")
             slt_file.write(
-                "SELECT c1 FROM {} SEARCH KNN(c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
+                "SELECT c1 FROM {} SEARCH MATCH VECTOR (c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
                     table_name, to_sql_embedding(v_x + diff)
                 )
             )
@@ -147,7 +147,7 @@ def generate(generate_if_exists: bool, copy: bool):
         for v_x in x:
             slt_file.write("query I\n")
             slt_file.write(
-                "SELECT c1 FROM {} SEARCH KNN(c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
+                "SELECT c1 FROM {} SEARCH MATCH VECTOR (c1, {}, 'float', 'l2', 1) WITH (ef = 4);\n".format(
                     table_name, to_sql_embedding(float(v_x) + diff)
                 )
             )
@@ -159,6 +159,10 @@ def generate(generate_if_exists: bool, copy: bool):
             else:
                 slt_file.write("{}\n".format(to_result_embedding(v_x)))
             slt_file.write("\n")
+
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
 
 
 if __name__ == "__main__":

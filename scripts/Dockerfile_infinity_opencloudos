@@ -1,0 +1,5 @@
+FROM opencloudos/opencloudos:9.0
+
+COPY build/src/infinity /usr/bin
+
+ENTRYPOINT [ "/usr/bin/infinity" ]

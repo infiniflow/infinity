@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 import stl;
@@ -15,6 +29,7 @@ private:
     u8 *data_ptr_;
     SizeT data_len_;
     UniquePtr<Fst> fst_;
+    UniquePtr<FstStream> s_;
 
 public:
     DictionaryReader(const String &dict_path, const PostingFormatOption &option);
@@ -23,6 +38,10 @@ public:
 
     bool Lookup(const String &key, TermMeta &term_meta);
 
-    void LookupPrefix(const String &prefix, Vector<Pair<String, TermMeta>> &term_metas);
+    void InitIterator(const String &min, const String &max);
+
+    void InitIterator(const String &prefix);
+
+    bool Next(String &term, TermMeta &term_meta);
 };
 } // namespace infinity

@@ -120,7 +120,7 @@ public:
 //    inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<PathT, PathT>); }
 //};
 
-void RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterFirstFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "FIRST";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -257,7 +257,7 @@ void RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(first_function);
     }
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

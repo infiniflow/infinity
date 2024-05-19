@@ -8,7 +8,7 @@ CREATE TABLE test_table_star(a INTEGER, b INTEGER, c INTEGER);
 
 # copy data from tbl file
 statement ok
-COPY test_table_star FROM '/tmp/infinity/test_data/integer.csv' WITH ( DELIMITER ',' );
+COPY test_table_star FROM '/var/infinity/test_data/integer.csv' WITH ( DELIMITER ',' );
 
 
 query I

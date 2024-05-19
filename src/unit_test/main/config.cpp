@@ -22,11 +22,11 @@ import compilation_config;
 
 class ConfigTest : public BaseTest {};
 
-static size_t GetAvailableMem() {
-    size_t pages = sysconf(_SC_PHYS_PAGES);
-    size_t page_size = sysconf(_SC_PAGE_SIZE); // Byte
-    return pages * page_size;
-}
+//static size_t GetAvailableMem() {
+//    size_t pages = sysconf(_SC_PHYS_PAGES);
+//    size_t page_size = sysconf(_SC_PAGE_SIZE); // Byte
+//    return pages * page_size;
+//}
 
 TEST_F(ConfigTest, test1) {
     using namespace infinity;
@@ -34,36 +34,31 @@ TEST_F(ConfigTest, test1) {
     Config config;
     config.Init(path);
 
-    EXPECT_EQ(config.version(), "0.1.0");
-    EXPECT_EQ(config.time_zone(), "UTC");
-    EXPECT_EQ(config.time_zone_bias(), 8);
-
-    EXPECT_EQ(config.worker_cpu_limit(), std::thread::hardware_concurrency());
-    EXPECT_EQ(config.total_memory_size(), GetAvailableMem());
-    EXPECT_EQ(config.query_cpu_limit(), std::thread::hardware_concurrency());
-    EXPECT_EQ(config.query_memory_limit(), GetAvailableMem());
+    EXPECT_EQ(config.Version(), "0.2.0");
+    EXPECT_EQ(config.TimeZone(), "UTC");
+    EXPECT_EQ(config.TimeZoneBias(), 8);
+    EXPECT_EQ(config.CPULimit(), std::thread::hardware_concurrency());
 
     // Network
-    EXPECT_EQ(config.listen_address(), "0.0.0.0");
-    EXPECT_EQ(config.pg_port(), 5432);
-    EXPECT_EQ(config.http_port(), 8088u);
-    EXPECT_EQ(config.sdk_port(), 23817u);
+    EXPECT_EQ(config.ServerAddress(), "0.0.0.0");
+    EXPECT_EQ(config.PostgresPort(), 5432);
+    EXPECT_EQ(config.HTTPPort(), 23820u);
+    EXPECT_EQ(config.ClientPort(), 23817u);
 
     // Log
-    EXPECT_EQ(*config.log_filename(), "infinity.log");
-    EXPECT_EQ(*config.log_dir(), "/tmp/infinity/log");
-    EXPECT_EQ(*config.log_file_path(), "/tmp/infinity/log/infinity.log");
-    EXPECT_EQ(config.log_to_stdout(), false);
-    EXPECT_EQ(config.log_max_size(), 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(config.log_file_rotate_count(), 10ul);
-    // EXPECT_EQ(config.log_level(), LogLevel::kTrace);
+    EXPECT_EQ(config.LogFileName(), "infinity.log");
+    EXPECT_EQ(config.LogDir(), "/var/infinity/log");
+    EXPECT_EQ(config.LogFilePath(), "/var/infinity/log/infinity.log");
+    EXPECT_EQ(config.LogToStdout(), false);
+    EXPECT_EQ(config.LogFileMaxSize(), 1024l * 1024l * 1024l);
+    EXPECT_EQ(config.LogFileRotateCount(), 8l);
+    EXPECT_EQ(config.GetLogLevel(), LogLevel::kInfo);
 
-    EXPECT_EQ(*config.data_dir(), "/tmp/infinity/data");
-    EXPECT_EQ(*config.wal_dir(), "/tmp/infinity/wal");
-    EXPECT_EQ(config.default_row_size(), 8192u);
+    EXPECT_EQ(config.DataDir(), "/var/infinity/data");
+    EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
 
-    EXPECT_EQ(config.buffer_pool_size(), 4 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(*config.temp_dir(), "/tmp/infinity/temp");
+    EXPECT_EQ(config.BufferManagerSize(), 4 * 1024l * 1024l * 1024l);
+    EXPECT_EQ(config.TempDir(), "/var/infinity/tmp");
 }
 
 TEST_F(ConfigTest, test2) {
@@ -72,32 +67,28 @@ TEST_F(ConfigTest, test2) {
     Config config;
     config.Init(path);
 
-    EXPECT_EQ(config.version(), "0.1.0");
-    EXPECT_EQ(config.time_zone(), "UTC");
-    EXPECT_EQ(config.time_zone_bias(), -9);
+    EXPECT_EQ(config.Version(), "0.2.0");
+    EXPECT_EQ(config.TimeZone(), "UTC");
+    EXPECT_EQ(config.TimeZoneBias(), -9);
 
-    EXPECT_EQ(config.worker_cpu_limit(), 2u);
-    EXPECT_EQ(config.total_memory_size(), 8 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(config.query_cpu_limit(), 2ul);
-    EXPECT_EQ(config.query_memory_limit(), 4 * 1024ul * 1024ul);
+    EXPECT_EQ(config.CPULimit(), 2u);
 
-    EXPECT_EQ(config.listen_address(), "127.0.0.1");
-    EXPECT_EQ(config.pg_port(), 25432);
-    EXPECT_EQ(config.http_port(), 8089u);
-    EXPECT_EQ(config.sdk_port(), 24817u);
+    EXPECT_EQ(config.ServerAddress(), "127.0.0.1");
+    EXPECT_EQ(config.PostgresPort(), 25432);
+    EXPECT_EQ(config.HTTPPort(), 24821);
+    EXPECT_EQ(config.ClientPort(), 24817);
 
-    EXPECT_EQ(*config.log_filename(), "info.log");
-    EXPECT_EQ(*config.log_dir(), "/var/infinity/log");
-    EXPECT_EQ(*config.log_file_path(), "/var/infinity/log/info.log");
-    EXPECT_EQ(config.log_to_stdout(), true);
-    EXPECT_EQ(config.log_max_size(), 2 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(config.log_file_rotate_count(), 3ul);
-    EXPECT_EQ(config.log_level(), LogLevel::kTrace);
+    EXPECT_EQ(config.LogFileName(), "info.log");
+    EXPECT_EQ(config.LogDir(), "/var/infinity/log");
+    EXPECT_EQ(config.LogFilePath(), "/var/infinity/log/info.log");
+    EXPECT_EQ(config.LogToStdout(), true);
+    EXPECT_EQ(config.LogFileMaxSize(), 2 * 1024l * 1024l * 1024l);
+    EXPECT_EQ(config.LogFileRotateCount(), 3l);
+    EXPECT_EQ(config.GetLogLevel(), LogLevel::kTrace);
 
-    EXPECT_EQ(*config.data_dir(), "/var/infinity/data");
-    EXPECT_EQ(*config.wal_dir(), "/var/infinity/wal");
-    EXPECT_EQ(config.default_row_size(), 4096u);
+    EXPECT_EQ(config.DataDir(), "/var/infinity/data");
+    EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
 
-    EXPECT_EQ(config.buffer_pool_size(), 3 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(*config.temp_dir(), "/tmp");
+    EXPECT_EQ(config.BufferManagerSize(), 3 * 1024l * 1024l * 1024l);
+    EXPECT_EQ(config.TempDir(), "/tmp");
 }

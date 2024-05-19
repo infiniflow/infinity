@@ -1,4 +1,20 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.module;
+
 module;
+
+module inmem_index_segment_reader;
 
 import stl;
 import memory_pool;
@@ -7,32 +23,20 @@ import index_segment_reader;
 import index_defines;
 import posting_writer;
 import memory_indexer;
-
-module inmem_index_segment_reader;
+import third_party;
 
 namespace infinity {
-InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *column_indexer) : posting_table_(column_indexer->GetPostingTable()) {}
+InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
+    : posting_table_(memory_indexer->GetPostingTable()), base_row_id_(memory_indexer->GetBaseRowId()) {}
 
-PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
-    MemoryIndexer::PostingTable::Iterator iter = posting_table_->find(term);
-    if (iter.valid())
-        return iter.getData().get();
-    else
-        return nullptr;
-}
-
-bool InMemIndexSegmentReader::GetSegmentPosting(const String &term,
-                                                docid_t base_doc_id,
-                                                SegmentPosting &seg_posting,
-                                                MemoryPool *session_pool) const {
-    PostingWriter *posting_writer = GetPostingWriter(term);
-    if (posting_writer == nullptr) {
-        return false;
+bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool,  bool fetch_position) const {
+    SharedPtr<PostingWriter> writer;
+    bool found = posting_table_->store_.Get(term, writer);
+    if (found) {
+        seg_posting.Init(base_row_id_, writer);
+        return true;
     }
-    seg_posting.Init(base_doc_id, 0, posting_writer);
-    return true;
+    return false;
 }
-
-docid_t InMemIndexSegmentReader::GetBaseDocId() const { return 0; }
 
 } // namespace infinity

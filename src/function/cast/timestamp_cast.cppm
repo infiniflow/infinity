@@ -63,7 +63,7 @@ struct TimestampTryCastToFixlen {
 
 struct TimestampTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
+    static inline bool Run(SourceType, TargetType &, ColumnVector*) {
         UnrecoverableError(
                 fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -89,7 +89,7 @@ inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
 }
 
 template <>
-inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, ColumnVector*) {
     UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }

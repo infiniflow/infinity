@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "statement/command_statement.h"
 #include "unit_test/base_test.h"
 
 import stl;
@@ -21,8 +22,6 @@ import data_block;
 import value;
 import query_options;
 
-import database;
-import table;
 import logical_type;
 import internal_types;
 import parsed_expr;
@@ -32,21 +31,12 @@ import column_expr;
 import column_def;
 import data_type;
 
-class InfinityTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
-    }
-    void TearDown() override {
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
-        BaseTest::TearDown();
-    }
-};
+class InfinityTest : public BaseTest {};
 
 TEST_F(InfinityTest, test1) {
     using namespace infinity;
-    String path = "/tmp/infinity";
-
+    String path = GetHomeDir();
+    RemoveDbDirs();
     Infinity::LocalInit(path);
 
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
@@ -54,14 +44,14 @@ TEST_F(InfinityTest, test1) {
     {
         QueryResult result = infinity->ListDatabases();
         //    EXPECT_EQ(result.result_table_->row_count(), 1); // Bug
-        EXPECT_EQ(result.result_table_->ColumnCount(), 1);
+        EXPECT_EQ(result.result_table_->ColumnCount(), 1u);
         EXPECT_EQ(result.result_table_->GetColumnNameById(0), "database");
-        EXPECT_EQ(result.result_table_->DataBlockCount(), 1);
+        EXPECT_EQ(result.result_table_->DataBlockCount(), 1u);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
-        EXPECT_EQ(data_block->row_count(), 1);
+        EXPECT_EQ(data_block->row_count(), 1u);
         Value value = data_block->GetValue(0, 0);
         const String &s2 = value.GetVarchar();
-        EXPECT_STREQ(s2.c_str(), "default");
+        EXPECT_STREQ(s2.c_str(), "default_db");
     }
 
     {
@@ -76,20 +66,20 @@ TEST_F(InfinityTest, test1) {
 
         value = data_block->GetValue(0, 1);
         const String &s3 = value.GetVarchar();
-        EXPECT_STREQ(s3.c_str(), "default");
+        EXPECT_STREQ(s3.c_str(), "default_db");
 
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase("db1");
-        EXPECT_EQ(db1_ptr->db_name(), "db1");
+        result = infinity->GetDatabase("db1");
+        EXPECT_TRUE(result.IsOk());
 
-        SharedPtr<Database> db2_ptr = infinity->GetDatabase("db2");
-        EXPECT_EQ(db2_ptr, nullptr);
+        result = infinity->GetDatabase("db2");
+        EXPECT_FALSE(result.IsOk());
 
         DropDatabaseOptions drop_db_opts;
         result = infinity->DropDatabase("db1", drop_db_opts);
         EXPECT_FALSE(result.IsOk());
 
-        SharedPtr<Database> default_db_ptr = infinity->GetDatabase("default");
-        EXPECT_EQ(default_db_ptr->db_name(), "default");
+        result = infinity->GetDatabase("default_db");
+        EXPECT_TRUE(result.IsOk());
 
         result = infinity->DropDatabase("db1", drop_db_opts);
         EXPECT_TRUE(result.IsOk());
@@ -99,13 +89,14 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
         const String &s4 = value.GetVarchar();
-        EXPECT_STREQ(s4.c_str(), "default");
-        SharedPtr<Database> db_instance = infinity->GetDatabase("default");
+        EXPECT_STREQ(s4.c_str(), "default_db");
+        result = infinity->GetDatabase("default_db");
+        EXPECT_TRUE(result.IsOk());
     }
 
     {
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase("default");
-        EXPECT_EQ(db1_ptr->db_name(), "default");
+        QueryResult result = infinity->GetDatabase("default_db");
+        EXPECT_TRUE(result.IsOk());
 
         CreateTableOptions create_table_opts;
 
@@ -116,41 +107,41 @@ TEST_F(InfinityTest, test1) {
 
         SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBoolean);
         String col_name = "col1";
-        auto col_def = new ColumnDef(0, col_type, col_name, HashSet<ConstraintType>());
+        auto col_def = new ColumnDef(0, col_type, col_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
         col_type = MakeShared<DataType>(LogicalType::kBigInt);
         col_name = "col2";
-        col_def = new ColumnDef(1, col_type, col_name, HashSet<ConstraintType>());
+        col_def = new ColumnDef(1, col_type, col_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        QueryResult result = db1_ptr->CreateTable("table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
+        result = infinity->CreateTable("default_db", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
-        result = db1_ptr->ListTables();
+        result = infinity->ListTables("default_db");
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(1, 0);
         const String &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "table1");
 
-        SharedPtr<Table> table1 = db1_ptr->GetTable("table1");
-        EXPECT_NE(table1, nullptr);
+        result = infinity->GetTable("default_db", "table1");
+        EXPECT_TRUE(result.IsOk());
 
         DropTableOptions drop_table_opts;
-        result = db1_ptr->DropTable("table1", drop_table_opts);
+        result = infinity->DropTable("default_db", "table1", drop_table_opts);
         EXPECT_TRUE(result.IsOk());
-        result = db1_ptr->ListTables();
+        result = infinity->ListTables("default_db");
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 0);
 
-        table1 = db1_ptr->GetTable("table1");
-        EXPECT_EQ(table1, nullptr);
+        result = infinity->GetTable("default_db", "table1");
+        EXPECT_FALSE(result.IsOk());
     }
 
     {
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase("default");
-        EXPECT_EQ(db1_ptr->db_name(), "default");
+        QueryResult result = infinity->GetDatabase("default_db");
+        EXPECT_TRUE(result.IsOk());
 
         CreateTableOptions create_table_opts;
 
@@ -160,19 +151,19 @@ TEST_F(InfinityTest, test1) {
 
         SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBigInt);
         String col1_name = "col1";
-        auto col_def = new ColumnDef(0, col_type, col1_name, HashSet<ConstraintType>());
+        auto col_def = new ColumnDef(0, col_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
         col_type = MakeShared<DataType>(LogicalType::kSmallInt);
         String col2_name = "col2";
-        col_def = new ColumnDef(1, col_type, col2_name, HashSet<ConstraintType>());
+        col_def = new ColumnDef(1, col_type, col2_name, std::set<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        QueryResult result = db1_ptr->CreateTable("table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
+        result = infinity->CreateTable("default_db", "table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
-        SharedPtr<Table> table1 = db1_ptr->GetTable("table1");
-        EXPECT_NE(table1, nullptr);
+        result = infinity->GetTable("default_db", "table1");
+        EXPECT_TRUE(result.IsOk());
 
         //        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
 
@@ -190,7 +181,7 @@ TEST_F(InfinityTest, test1) {
         ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
         value2->integer_value_ = 22;
         values->at(0)->emplace_back(value2);
-        table1->Insert(columns, values);
+        infinity->Insert("default_db", "table1", columns, values);
 
         //        QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
         //                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,
@@ -210,7 +201,7 @@ TEST_F(InfinityTest, test1) {
 
         SearchExpr * search_expr = nullptr;
 
-        result = table1->Search(search_expr, nullptr, output_columns);
+        result = infinity->Search("default_db", "table1", search_expr, nullptr, output_columns);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);
@@ -222,7 +213,7 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(value.value_.big_int, 22);
 
         DropTableOptions drop_table_opts;
-        result = db1_ptr->DropTable("table1", drop_table_opts);
+        result = infinity->DropTable("default_db", "table1", drop_table_opts);
         EXPECT_TRUE(result.IsOk());
     }
 
@@ -237,7 +228,7 @@ TEST_F(InfinityTest, test1) {
 
         value = data_block->GetValue(0, 1);
         const String &s3 = value.GetVarchar();
-        EXPECT_STREQ(s3.c_str(), "default");
+        EXPECT_STREQ(s3.c_str(), "default_db");
 
         result = infinity->Query("drop database db1");
         EXPECT_TRUE(result.IsOk());
@@ -247,8 +238,9 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
         const String &s4 = value.GetVarchar();
-        EXPECT_STREQ(s4.c_str(), "default");
-        SharedPtr<Database> db_instance = infinity->GetDatabase("default");
+        EXPECT_STREQ(s4.c_str(), "default_db");
+        result = infinity->GetDatabase("default_db");
+        EXPECT_TRUE(result.IsOk());
     }
     infinity->LocalDisconnect();
 
@@ -257,34 +249,114 @@ TEST_F(InfinityTest, test1) {
 
 TEST_F(InfinityTest, test2) {
     using namespace infinity;
-    String path = "/tmp/infinity";
-
+    String path = GetHomeDir();
+    RemoveDbDirs();
     Infinity::LocalInit(path);
 
     SharedPtr<Infinity> infinity = Infinity::LocalConnect();
 
     {
-        QueryResult result = infinity->ShowVariable("version");
+        QueryResult result = infinity->ShowVariable("total_commit_count", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("session_count");
+        QueryResult result = infinity->ShowVariable("active_txn_count", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("query_count");
+        QueryResult result = infinity->ShowVariable("total_rollback_count", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("buffer_pool_usage");
+        QueryResult result = infinity->ShowVariable("buffer_object_count", SetScope::kGlobal);
         EXPECT_EQ(result.IsOk(), true);
     }
 
     {
-        QueryResult result = infinity->ShowVariable("error");
+        QueryResult result = infinity->ShowVariable("unused_buffer_object", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("next_transaction_id", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("delta_log_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("schedule_policy", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("active_wal_filename", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("current_timestamp", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("session_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("query_count", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("buffer_usage", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("error", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), false);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("connected_timestamp", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("profile_record_capacity", SetScope::kGlobal);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("total_rollback_count", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("enable_profile", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("total_commit_count", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("query_count", SetScope::kSession);
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("error", SetScope::kSession);
         EXPECT_EQ(result.IsOk(), false);
     }
 

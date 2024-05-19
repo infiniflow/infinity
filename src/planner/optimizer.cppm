@@ -14,11 +14,12 @@
 
 module;
 
+export module optimizer;
+
 import stl;
 import optimizer_rule;
 import logical_node;
-
-export module optimizer;
+import base_statement;
 
 namespace infinity {
 
@@ -30,7 +31,7 @@ public:
 
     void AddRule(UniquePtr<OptimizerRule> rule);
 
-    void optimize(SharedPtr<LogicalNode> &unoptimized_plan);
+    void optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType statement_type);
 
 public:
     QueryContext *query_context_ptr_{};

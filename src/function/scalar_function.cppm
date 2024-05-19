@@ -184,7 +184,7 @@ struct TernaryTryOpToVarlenWrapper {
     }
 };
 
-using ScalarFunctionType = StdFunction<void(const DataBlock &, SharedPtr<ColumnVector> &)>;
+using ScalarFunctionType = std::function<void(const DataBlock &, SharedPtr<ColumnVector> &)>;
 
 export class ScalarFunction final : public Function {
 public:

@@ -1,0 +1,97 @@
+statement ok
+DROP TABLE IF EXISTS test_agg_load_meta;
+
+statement ok
+CREATE TABLE test_agg_load_meta (c1 INTEGER, c2 INTEGER, c3 INTEGER);
+
+query I
+EXPLAIN SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
+----
+PROJECT (5)
+ - table index: #4
+ - expressions: [count(star) (#0)]
+-> Merge aggregate (7)
+   - output columns: [COUNT(c1)]
+  -> AGGREGATE (4)
+     - aggregate table index: #3
+     - aggregate: [COUNT(c1 (#1))]
+    -> FILTER (3)
+       - filter: CAST(c2 (#0) AS BigInt) = 5
+       - output columns: [c2, __rowid]
+      -> TABLE SCAN (2)
+         - table name: test_agg_load_meta(default_db.test_agg_load_meta)
+         - table index: #1
+         - output_columns: [c2, __rowid]
+
+query I
+SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
+----
+0
+
+statement ok
+COPY test_agg_load_meta FROM '/var/infinity/test_data/basic.csv' WITH ( DELIMITER ',' );
+
+query I
+EXPLAIN SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
+----
+PROJECT (5)
+ - table index: #4
+ - expressions: [count(star) (#0)]
+-> AGGREGATE (4)
+   - aggregate table index: #3
+   - aggregate: [COUNT(c1 (#1))]
+  -> FILTER (3)
+     - filter: CAST(c2 (#0) AS BigInt) = 5
+     - output columns: [c2, __rowid]
+    -> TABLE SCAN (2)
+       - table name: test_agg_load_meta(default_db.test_agg_load_meta)
+       - table index: #1
+       - output_columns: [c2, __rowid]
+
+query I
+SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
+----
+2
+
+statement ok
+COPY test_agg_load_meta FROM '/var/infinity/test_data/basic.csv' WITH ( DELIMITER ',' );
+
+query I
+EXPLAIN SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
+----
+PROJECT (5)
+ - table index: #4
+ - expressions: [count(star) (#0)]
+-> Merge aggregate (7)
+   - output columns: [COUNT(c1)]
+  -> AGGREGATE (4)
+     - aggregate table index: #3
+     - aggregate: [COUNT(c1 (#1))]
+    -> FILTER (3)
+       - filter: CAST(c2 (#0) AS BigInt) = 5
+       - output columns: [c2, __rowid]
+      -> TABLE SCAN (2)
+         - table name: test_agg_load_meta(default_db.test_agg_load_meta)
+         - table index: #1
+         - output_columns: [c2, __rowid]
+
+query I
+SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
+----
+4
+
+statement ok
+DELETE FROM test_agg_load_meta WHERE c2 = 5;
+
+query I
+SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
+----
+0
+
+query I
+SELECT COUNT(*) FROM test_agg_load_meta;
+----
+6
+
+statement ok
+DROP TABLE test_agg_load_meta;

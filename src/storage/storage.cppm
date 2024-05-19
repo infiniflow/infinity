@@ -20,7 +20,10 @@ import catalog;
 import txn_manager;
 import buffer_manager;
 import wal_manager;
-import backgroud_process;
+import background_process;
+import compaction_process;
+import periodic_trigger_thread;
+import log_file;
 
 export module storage;
 
@@ -28,9 +31,9 @@ namespace infinity {
 
 export class Storage {
 public:
-    explicit Storage(const Config *config_ptr);
+    explicit Storage(Config *config_ptr);
 
-    [[nodiscard]] inline NewCatalog *catalog() noexcept { return new_catalog_.get(); }
+    [[nodiscard]] inline Catalog *catalog() noexcept { return new_catalog_.get(); }
 
     [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
 
@@ -40,21 +43,27 @@ public:
 
     [[nodiscard]] inline BGTaskProcessor *bg_processor() const noexcept { return bg_processor_.get(); }
 
+    [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
+
     void Init();
 
     void UnInit();
 
-    void AttachCatalog(const Vector<String> &catalog_files);
+    void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
 
     void InitNewCatalog();
 
+    Config *config() const { return config_ptr_; }
+
 private:
-    const Config *config_ptr_{};
-    UniquePtr<NewCatalog> new_catalog_{};
+    Config *config_ptr_{};
+    UniquePtr<Catalog> new_catalog_{};
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
+    UniquePtr<CompactionProcessor> compact_processor_{};
+    UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
 };
 
 } // namespace infinity

@@ -36,11 +36,12 @@ public:
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{"default"};
     std::string table_name_{};
 
     std::vector<ColumnDef *> column_defs_{};
     std::vector<TableConstraint *> constraints_{};
+
+    std::vector<infinity::InitParameter *> properties_{};
 
     SelectStatement *select_{nullptr};
 };

@@ -49,7 +49,7 @@ inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target)
 
 struct GeographyTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &, TargetType &, const SharedPtr<ColumnVector> &) {
+    static inline bool Run(const SourceType &, TargetType &, ColumnVector*) {
         UnrecoverableError(
                 fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -57,25 +57,25 @@ struct GeographyTryCastToVarlen {
 };
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const PointT &, VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool GeographyTryCastToVarlen::Run(const PointT &, VarcharT &, ColumnVector*) {
     UnrecoverableError("Not implement: GeographyTryCastToVarlen::Run");
     return false;
 }
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const LineT &, VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool GeographyTryCastToVarlen::Run(const LineT &, VarcharT &, ColumnVector*) {
     UnrecoverableError("Not implement: GeographyTryCastToVarlen::Run");
     return false;
 }
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const LineSegT &, VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool GeographyTryCastToVarlen::Run(const LineSegT &, VarcharT &, ColumnVector*) {
     UnrecoverableError("Not implement: GeographyTryCastToVarlen::Run");
     return false;
 }
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const BoxT &, VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool GeographyTryCastToVarlen::Run(const BoxT &, VarcharT &, ColumnVector*) {
     UnrecoverableError("Not implement: GeographyTryCastToVarlen::Run");
     return false;
 }
@@ -93,7 +93,7 @@ inline bool GeographyTryCastToVarlen::Run(const PolygonT &source, VarcharT &targ
 }
 #endif
 template <>
-inline bool GeographyTryCastToVarlen::Run(const CircleT &, VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool GeographyTryCastToVarlen::Run(const CircleT &, VarcharT &, ColumnVector*) {
     UnrecoverableError("Not implement: GeographyTryCastToVarlen::Run");
     return false;
 }

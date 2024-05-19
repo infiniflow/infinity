@@ -37,25 +37,25 @@ TEST_F(TableDefTest, test1) {
 
     i64 column_id = 0;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kVarchar)), "c2", constraints);
         columns.emplace_back(column_def_ptr);
     }
 
-    TableDef table_def(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
+    TableDef table_def(MakeShared<String>("default_db"), MakeShared<String>("t1"), columns);
 
     EXPECT_EQ(*table_def.table_name(), "t1");
-    EXPECT_EQ(table_def.column_count(), 2);
-    EXPECT_EQ(table_def.GetColIdByName("c1"), 0);
-    EXPECT_EQ(table_def.GetColIdByName("c2"), 1);
+    EXPECT_EQ(table_def.column_count(), 2u);
+    EXPECT_EQ(table_def.GetColIdByName("c1"), 0u);
+    EXPECT_EQ(table_def.GetColIdByName("c2"), 1u);
 }
 
 TEST_F(TableDefTest, ReadWrite) {
@@ -65,21 +65,21 @@ TEST_F(TableDefTest, ReadWrite) {
 
     i64 column_id = 0;
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kUnique);
         constraints.insert(ConstraintType::kNotNull);
         auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
         columns.emplace_back(column_def_ptr);
     }
     {
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         constraints.insert(ConstraintType::kPrimaryKey);
         auto column_def_ptr =
             MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(LogicalType::kVarchar), "c2", constraints);
         columns.emplace_back(column_def_ptr);
     }
 
-    TableDef table_def(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
+    TableDef table_def(MakeShared<String>("default_db"), MakeShared<String>("t1"), columns);
 
     int32_t exp_size = table_def.GetSizeInBytes();
     Vector<char> buf(exp_size, char(0));

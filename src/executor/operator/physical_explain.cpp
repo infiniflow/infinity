@@ -31,6 +31,7 @@ import value;
 import status;
 import infinity_exception;
 import logical_type;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ void PhysicalExplain::Init() {
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             output_names_->emplace_back("Query Analyze");
-            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
+            Status status = Status::NotSupport("Not implement: Query analyze");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case ExplainType::kAst: {
             output_names_->emplace_back("Abstract Syntax Tree");
@@ -81,6 +84,9 @@ void PhysicalExplain::Init() {
             output_names_->emplace_back("Task");
             break;
         }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
+        }
     }
     output_types_->emplace_back(varchar_type);
 
@@ -99,8 +105,9 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
-            title = "Query Analyze";
-            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
+            Status status = Status::NotSupport("Not implement: Query analyze");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";
@@ -126,6 +133,9 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
             title = "Pipeline";
             break;
         }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
+        }
     }
 
     SizeT capacity = DEFAULT_VECTOR_SIZE; // DEFAULT VECTOR SIZE is too large for it.
@@ -133,14 +143,17 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
     task_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
 
-    for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
-        column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
-    }
     if (explain_type_ == ExplainType::kPipeline) {
         AlignParagraphs(*this->texts_, *this->task_texts_);
-
+        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+            column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
+        }
         for (SizeT idx = 0; idx < this->task_texts_->size(); ++idx) {
             task_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->task_texts_)[idx]));
+        }
+    } else {
+        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+            column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
         }
     }
 

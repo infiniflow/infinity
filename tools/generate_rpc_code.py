@@ -39,11 +39,11 @@ def fix_python_import_path(filename: str):
 
 
 def generate_thrift():
-    parent_dir = os.path.dirname(os.getcwd())
-    python_dir = parent_dir + "/python/infinity/remote_thrift"
-    cpp_dir = parent_dir + "/src/network/infinity_thrift"
+    infinity_proj_dir = os.getcwd()
+    python_dir = infinity_proj_dir + "/python/infinity/remote_thrift"
+    cpp_dir = infinity_proj_dir + "/src/network/infinity_thrift"
     create_dir([python_dir, cpp_dir])
-    infinity_thrift_file = python_dir + "/infinity_thrift_rpc/infinity.thrift"
+    infinity_thrift_file = infinity_proj_dir + "/thrift/infinity.thrift"
     os.system("thrift --version")
     os.system(f"thrift --out {python_dir} --gen py {infinity_thrift_file}")
     os.system(f"thrift -r --out {cpp_dir} --gen cpp:no_skeleton {infinity_thrift_file}")

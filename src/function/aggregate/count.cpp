@@ -45,7 +45,7 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(i64); }
 };
 
-void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "COUNT";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -210,7 +210,7 @@ void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
             UnaryAggregate<CountState<MixedT, BigIntT>, MixedT, BigIntT>(func_name, DataType(LogicalType::kMixed), DataType(LogicalType::kBigInt));
         function_set_ptr->AddFunction(count_function);
     }
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

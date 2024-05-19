@@ -14,6 +14,7 @@
 
 module;
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -21,17 +22,21 @@ module index_ivfflat;
 
 import infinity_exception;
 import stl;
-import index_def;
-
+import index_base;
+import status;
 import third_party;
 import serialize;
 import index_base;
 import logical_type;
 import statement_common;
+import logger;
 
 namespace infinity {
 
-SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBase> IndexIVFFlat::Make(SharedPtr<String> index_name,
+                                        const String &file_name,
+                                        Vector<String> column_names,
+                                        const Vector<InitParameter *> &index_param_list) {
     SizeT centroids_count = 0;
     MetricType metric_type = MetricType::kInvalid;
     for (auto para : index_param_list) {
@@ -42,9 +47,11 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_
         }
     }
     if (metric_type == MetricType::kInvalid) {
-        UnrecoverableError("Lack index parameter metric_type");
+        Status status = Status::LackIndexParam();
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
-    return MakeShared<IndexIVFFlat>(std::move(file_name), std::move(column_names), centroids_count, metric_type);
+    return MakeShared<IndexIVFFlat>(index_name, file_name, std::move(column_names), centroids_count, metric_type);
 }
 
 bool IndexIVFFlat::operator==(const IndexIVFFlat &other) const {
@@ -70,13 +77,21 @@ void IndexIVFFlat::WriteAdv(char *&ptr) const {
 }
 
 SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&, int32_t) {
-    UnrecoverableError("Not implemented");
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 
 String IndexIVFFlat::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << centroids_count_ << ", " << MetricTypeToString(metric_type_);
+    return ss.str();
+}
+
+String IndexIVFFlat::BuildOtherParamsString() const {
+    std::stringstream ss;
+    ss << "metric = " << MetricTypeToString(metric_type_) << ", centroids_count = " << centroids_count_;
     return ss.str();
 }
 
@@ -88,7 +103,9 @@ nlohmann::json IndexIVFFlat::Serialize() const {
 }
 
 SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const nlohmann::json &) {
-    UnrecoverableError("Not implemented");
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 
@@ -97,10 +114,14 @@ void IndexIVFFlat::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_ta
     auto &column_types_vector = *(base_table_ref->column_types_);
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        UnrecoverableError(fmt::format("Invalid parameter for IVFFlat index: column name not found: {}.", column_name));
+        Status status = Status::ColumnNotExist(column_name);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
-        UnrecoverableError(
-            fmt::format("Invalid parameter for IVFFlat index: column name: {}, data type not supported: {}.", column_name, data_type->ToString()));
+        Status status = Status::InvalidIndexDefinition(
+            fmt::format("Attempt to create IVFFLAT index on column: {}, data type: {}.", column_name, data_type->ToString()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 

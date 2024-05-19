@@ -8,7 +8,7 @@ if [ $? -ne 0 ] ; then
 fi
 
 echo "#    - name: start infinity debug version"
-sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 if [ $? -ne 0 ] ; then
     echo "### failure! $? ###"
     exit 1
@@ -29,7 +29,7 @@ if [ $? -ne 0 ] ; then
 fi
 
 echo "#    - name: start infinity release version"
-sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > debug.log 2>&1" &
+sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > debug.log 2>&1" &
 if [ $? -ne 0 ] ; then
     echo "### failure! $? ###"
     exit 1

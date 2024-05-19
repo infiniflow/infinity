@@ -22,7 +22,7 @@ import stl;
 import column_binding;
 
 import base_expression;
-import index_def;
+import index_base;
 import logical_type;
 import internal_types;
 

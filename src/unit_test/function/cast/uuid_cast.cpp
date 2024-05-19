@@ -62,7 +62,7 @@ TEST_F(UuidCastTest, uuid_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_TRUE(UuidTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(UuidTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
 
         target.Reset(false);
     }

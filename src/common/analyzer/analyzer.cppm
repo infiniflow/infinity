@@ -35,12 +35,14 @@ public:
         convert_to_placeholder_ = convert_to_placeholder;
     }
 
-    int Analyze(const Term &input, TermList &output, bool jieba_specialize = false) {
+    int Analyze(const Term &input, TermList &output) {
         void *array[2] = {&output, this};
-        if (jieba_specialize)
+        if (IsJiebaSpecialize()) {
             return AnalyzeImpl(input, &array, &Analyzer::AppendTermListForJieba);
-        else
+        }
+        else {
             return AnalyzeImpl(input, &array, &Analyzer::AppendTermList);
+        }
     }
 
 protected:
@@ -48,6 +50,8 @@ protected:
         *HookType)(void *data, const char *text, const u32 len, const u32 offset, const u8 and_or_bit, const u8 level, const bool is_special_char);
 
     typedef void (*HookTypeForJieba)(void *data, cppjieba::Word &cut_words);
+
+    virtual bool IsJiebaSpecialize() { return false; }
 
     virtual int AnalyzeImpl(const Term &input, void *data, HookType func) { return -1; }
 

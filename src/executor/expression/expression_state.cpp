@@ -38,6 +38,7 @@ import status;
 import default_values;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -45,7 +46,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
 
     switch (expression->type()) {
         case ExpressionType::kAggregate:
-            return CreateState(static_pointer_cast<AggregateExpression>(expression), agg_state);
+            return CreateState(static_pointer_cast<AggregateExpression>(expression), agg_state, AggregateFlag::kUninitialized);
         case ExpressionType::kCast:
             return CreateState(static_pointer_cast<CastExpression>(expression));
         case ExpressionType::kCase:
@@ -68,13 +69,16 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
     return nullptr;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state) {
+SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
     if (agg_expr->arguments().size() != 1) {
-        RecoverableError(Status::FunctionArgsError(agg_expr->ToString()));
+        Status status = Status::FunctionArgsError(agg_expr->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->agg_state_ = agg_state;
+    result->agg_flag_ = agg_flag;
     result->AddChild(agg_expr->arguments()[0]);
 
     // Aggregate function will only have one output value.
@@ -95,29 +99,38 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
     }
     result->AddChild(case_expr->ElseExpr());
 
+    ColumnVectorType result_column_vector_type = ColumnVectorType::kConstant;
+    for (SizeT idx = 0; idx < result->Children().size(); ++idx) {
+        if (result->Children()[idx]->OutputColumnVector()->vector_type() != ColumnVectorType::kConstant) {
+            result_column_vector_type = ColumnVectorType::kFlat;
+            break;
+        }
+    }
+
     result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(case_expr->Type()));
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     return result;
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
     if (cast_expr->arguments().size() != 1) {
-        RecoverableError(Status::FunctionArgsError(cast_expr->ToString()));
+        Status status = Status::FunctionArgsError(cast_expr->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);
 
-    //    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
-    //    for(SizeT idx = 0; idx < block_count; ++ idx) {
-    //        if(result->Children()[0]->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
-    //            result_column_vector_type[idx] = ColumnVectorType::kFlat;
-    //        }
-    //    }
+
+    ColumnVectorType result_column_vector_type = ColumnVectorType::kFlat;
+    if (result->Children()[0]->OutputColumnVector()) {
+        result_column_vector_type = result->Children()[0]->OutputColumnVector()->vector_type();
+    }
 
     result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(cast_expr->Type()));
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     //    result->output_data_block_.Init({cast_expr->Type()});
     return result;
@@ -188,15 +201,16 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<InExpres
         result->AddChild(argument_expr);
     }
 
-    //    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
-    //    for(SizeT idx = 0; idx < block_count; ++ idx) {
-    //        if(result->Children()[0]->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
-    //            result_column_vector_type[idx] = ColumnVectorType::kFlat;
-    //        }
-    //    }
+    ColumnVectorType result_column_vector_type = ColumnVectorType::kConstant;
+    for (SizeT idx = 0; idx < result->Children().size(); ++idx) {
+        if (result->Children()[idx]->OutputColumnVector()->vector_type() != ColumnVectorType::kConstant) {
+            result_column_vector_type = ColumnVectorType::kFlat;
+            break;
+        }
+    }
 
     result->column_vector_ = MakeShared<ColumnVector>(in_expr_data_type);
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     return result;
 }

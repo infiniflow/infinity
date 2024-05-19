@@ -23,6 +23,7 @@ import column_expression;
 import status;
 import infinity_exception;
 import subquery_expression;
+import logger;
 
 namespace infinity {
 
@@ -34,7 +35,9 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
     }
 
     if (expression->depth() > 1) {
-        RecoverableError(Status::SyntaxError("Correlated depth > 1 is not supported now."));
+        Status status = Status::SyntaxError("Correlated depth > 1 is not supported now.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     auto entry = bind_context_ptr_->correlated_column_map_.find(expression->binding());
@@ -55,7 +58,9 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
         return nullptr;
     }
 
-    RecoverableError(Status::SyntaxError("Not support rewrite nested correlated subquery in the subquery plan"));
+    Status status = Status::SyntaxError("Not support rewrite nested correlated subquery in the subquery plan");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 

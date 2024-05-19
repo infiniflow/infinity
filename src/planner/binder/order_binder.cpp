@@ -28,6 +28,7 @@ import parsed_expr;
 import constant_expr;
 import knn_expr;
 import function_expr;
+import logger;
 
 namespace infinity {
 
@@ -35,7 +36,9 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
     if (expr->type_ == ParsedExprType::kConstant) {
         ConstantExpr *order_by_index = (ConstantExpr *)expr;
         if (order_by_index->literal_type_ != LiteralType::kInteger) {
-            RecoverableError(Status::SyntaxError("Order by non-integer constant value."));
+            Status status = Status::SyntaxError("Order by non-integer constant value.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         // Order by 1, means order by 1st select list item.
         return;
@@ -78,14 +81,18 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         if (const_expr.literal_type_ == LiteralType::kInteger) {
             column_id = const_expr.integer_value_;
             if (column_id <= 0 or column_id > (i64)bind_context_ptr->project_exprs_.size()) {
-                RecoverableError(Status::SyntaxError("Order by are going to use nonexistent column from select list."));
+                Status status = Status::SyntaxError("Order by are going to use nonexistent column from select list.");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             --column_id;
             //TODO: If we do not have a projection before sort, expression will need to be evaluated twice
             // now return shared_ptr of the chosen project_expr
             return bind_context_ptr->project_exprs_[column_id];
         } else {
-            RecoverableError(Status::SyntaxError("Order by non-integer constant value."));
+            Status status = Status::SyntaxError("Order by non-integer constant value.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     } else {
         String expr_name = expr.GetName();

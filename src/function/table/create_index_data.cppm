@@ -19,14 +19,22 @@ export module create_index_data;
 import stl;
 import segment_entry;
 import block_index;
+import third_party;
+import infinity_exception;
 
 namespace infinity {
 
 export struct CreateIndexSharedData {
-    explicit CreateIndexSharedData(BlockIndex *block_index) {
-        SizeT segment_count = block_index->segments_.size();
-        for (SizeT i = 0; i < segment_count; ++i) {
-            create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
+    CreateIndexSharedData() = default;
+
+    explicit CreateIndexSharedData(BlockIndex *block_index) { Init(block_index); }
+
+    void Init(BlockIndex *block_index) {
+        for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+            auto [iter, insert_ok] = create_index_idxes_.emplace(segment_id, 0);
+            if (!insert_ok) {
+                UnrecoverableError(fmt::format("Duplicate segment id: %u", segment_id));
+            }
         }
     }
 

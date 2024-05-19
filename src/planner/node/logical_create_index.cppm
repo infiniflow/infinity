@@ -22,7 +22,7 @@ import column_binding;
 import logical_node;
 
 import base_table_ref;
-import index_def;
+import index_base;
 import internal_types;
 import extra_ddl_info;
 import data_type;
@@ -42,20 +42,20 @@ public:
     inline String name() override { return "LogicalCreateIndex"; }
 
 public:
-    inline LogicalCreateIndex(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<IndexDef> index_def, ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kCreateIndex), base_table_ref_(base_table_ref), index_definition_(index_def),
+    inline LogicalCreateIndex(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<IndexBase> index_base, ConflictType conflict_type)
+        : LogicalNode(node_id, LogicalNodeType::kCreateIndex), base_table_ref_(base_table_ref), index_definition_(index_base),
           conflict_type_(conflict_type) {}
 
 public:
     [[nodiscard]] inline SharedPtr<BaseTableRef> base_table_ref() const { return base_table_ref_; }
 
-    [[nodiscard]] inline SharedPtr<IndexDef> index_definition() const { return index_definition_; }
+    [[nodiscard]] inline SharedPtr<IndexBase> index_definition() const { return index_definition_; }
 
     [[nodiscard]] inline ConflictType conflict_type() const { return conflict_type_; }
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<IndexDef> index_definition_{};
+    SharedPtr<IndexBase> index_definition_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
 };
 } // namespace infinity

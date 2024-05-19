@@ -24,7 +24,7 @@ public:
 
     [[nodiscard]] virtual std::string ToString() const final;
 
-    std::string schema_name_{"default"};
+    std::string schema_name_;
     std::string collection_name_{};
 };
 

@@ -41,7 +41,7 @@ public:
     bool copy_from_{false};
     std::string file_path_{};
     std::string table_name_{};
-    std::string schema_name_{"default"};
+    std::string schema_name_{};
     bool header_{false};
     CopyFileType copy_file_type_{CopyFileType::kCSV};
     char delimiter_{','};

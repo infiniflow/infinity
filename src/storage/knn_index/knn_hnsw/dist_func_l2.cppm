@@ -15,30 +15,40 @@
 module;
 
 #include "header.h"
-#include <type_traits>
+#include <ostream>
 
 import stl;
 import hnsw_common;
-import plain_store;
-import lvq_store;
 import hnsw_simd_func;
+import plain_vec_store;
+import lvq_vec_store;
 
 export module dist_func_l2;
 
 namespace infinity {
 
-export template <typename DataType, typename LabelType>
+export template <typename DataType>
 class PlainL2Dist {
 public:
-    using DataStore = PlainStore<DataType, LabelType>;
-    using StoreType = typename DataStore::StoreType;
+    using VecStoreMeta = PlainVecStoreMeta<DataType>;
+    using StoreType = typename VecStoreMeta::StoreType;
 
 private:
     using SIMDFuncType = DataType (*)(const DataType *, const DataType *, SizeT);
 
-    SIMDFuncType SIMDFunc = nullptr;
+    SIMDFuncType SIMDFunc;
 
 public:
+    PlainL2Dist() : SIMDFunc(nullptr) {}
+    PlainL2Dist(PlainL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    PlainL2Dist &operator=(PlainL2Dist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~PlainL2Dist() = default;
+
     PlainL2Dist(SizeT dim) {
         if constexpr (std::is_same<DataType, float>()) {
 #if defined(USE_AVX512)
@@ -53,13 +63,21 @@ public:
             } else {
                 SIMDFunc = F32L2AVXResidual;
             }
+#elif defined(USE_SSE)
+            if (dim % 16 == 0) {
+                SIMDFunc = F32L2SSE;
+            } else {
+                SIMDFunc = F32L2SSEResidual;
+            }
 #else
-            SIMDFunc = F32L2BF;
+            SIMDFunc = F32IPBF;
 #endif
         }
     }
 
-    DataType operator()(const StoreType &v1, const StoreType &v2, const DataStore &data_store) const { return SIMDFunc(v1, v2, data_store.dim()); }
+    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+        return SIMDFunc(v1, v2, vec_store_meta.dim());
+    }
 };
 
 export template <typename DataType, typename CompressType>
@@ -80,21 +98,37 @@ public:
     }
 
     static GlobalCacheType MakeGlobalCache(const MeanType *, SizeT) { return {}; }
+
+public:
+    static void DumpLocalCache(std::ostream &os, const LocalCacheType &local_cache) {
+        os << "norm1_scale: " << local_cache.first << ", norm2sq_scalesq: " << local_cache.second << std::endl;
+    }
+
+    static void DumpGlobalCache(std::ostream &, const GlobalCacheType &) {}
 };
 
-export template <typename DataType, typename LabelType, typename CompressType>
+export template <typename DataType, typename CompressType>
 class LVQL2Dist {
 public:
-    using This = LVQL2Dist<DataType, CompressType, LabelType>;
-    using DataStore = LVQStore<DataType, LabelType, CompressType, LVQL2Cache<DataType, CompressType>>;
-    using StoreType = typename DataStore::StoreType;
+    using This = LVQL2Dist<DataType, CompressType>;
+    using VecStoreMeta = LVQVecStoreMeta<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
+    using StoreType = typename VecStoreMeta::StoreType;
 
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);
 
-    SIMDFuncType SIMDFunc = nullptr;
+    SIMDFuncType SIMDFunc;
 
 public:
+    LVQL2Dist() : SIMDFunc(nullptr) {}
+    LVQL2Dist(LVQL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    LVQL2Dist &operator=(LVQL2Dist &&other) {
+        if (this != &other) {
+            SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
+        }
+        return *this;
+    }
+    ~LVQL2Dist() = default;
     LVQL2Dist(SizeT dim) {
         if constexpr (std::is_same<CompressType, i8>()) {
 #if defined(USE_AVX512)
@@ -109,20 +143,27 @@ public:
             } else {
                 SIMDFunc = I8IPAVXResidual;
             }
+#elif defined(USE_SSE)
+            if (dim % 16 == 0) {
+                SIMDFunc = I8IPSSE;
+            } else {
+                SIMDFunc = I8IPSSEResidual;
+            }
 #else
             SIMDFunc = I8IPBF;
 #endif
         }
     }
 
-    DataType operator()(const StoreType &v1, const StoreType &v2, const DataStore &data_store) const {
-        SizeT dim = data_store.dim();
-        i32 c1c2_ip = SIMDFunc(v1.GetCompressVec(), v2.GetCompressVec(), dim);
-        auto [scale1, bias1] = v1.GetScalar();
-        auto [scale2, bias2] = v2.GetScalar();
-        auto beta = bias1 - bias2;
-        auto [norm1_scale_1, norm2sq_scalesq_1] = v1.GetLocalCache();
-        auto [norm1_scale_2, norm2sq_scalesq_2] = v2.GetLocalCache();
+    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+        SizeT dim = vec_store_meta.dim();
+        i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
+        auto scale1 = v1->scale_;
+        auto scale2 = v2->scale_;
+        auto beta = v1->bias_ - v2->bias_;
+
+        auto [norm1_scale_1, norm2sq_scalesq_1] = v1->local_cache_;
+        auto [norm1_scale_2, norm2sq_scalesq_2] = v2->local_cache_;
         return norm2sq_scalesq_1 + norm2sq_scalesq_2 + beta * beta * dim - 2 * scale1 * scale2 * c1c2_ip + 2 * beta * norm1_scale_1 -
                2 * beta * norm1_scale_2;
     }

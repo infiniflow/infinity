@@ -25,6 +25,7 @@ import status;
 import infinity_exception;
 import third_party;
 import parsed_expr;
+import logger;
 
 namespace infinity {
 
@@ -40,7 +41,9 @@ BindAliasProxy::BindAlias(ExpressionBinder &expression_binder, const ParsedExpr 
     const ParsedExpr *select_expr = bind_context_ptr->select_expression_[alias_pair->second];
 
     if (binding_alias_) {
-        RecoverableError(Status::SyntaxError(fmt::format("Trying to bind an alias table_name: {} in another alias", expr_name)));
+        Status status = Status::SyntaxError(fmt::format("Trying to bind an alias table_name: {} in another alias", expr_name));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     binding_alias_ = true;

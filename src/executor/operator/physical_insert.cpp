@@ -34,6 +34,7 @@ import base_expression;
 import default_values;
 import status;
 import infinity_exception;
+import logger;
 
 import column_def;
 
@@ -51,8 +52,9 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     }
     if (row_count > DEFAULT_BLOCK_CAPACITY) {
         // Fixme: insert batch can larger than 8192, but currently we limit it.
-        RecoverableError(Status::UnexpectedError(
-            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY)));
+        Status status = Status::UnexpectedError(fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         //        UnrecoverableError(
         //            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
     }
@@ -86,15 +88,13 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     output_block->Finalize();
 
     auto *txn = query_context->GetTxn();
-    const String &db_name = *table_entry_->GetDBName();
-    const String &table_name = *table_entry_->GetTableName();
-    txn->Append(db_name, table_name, output_block);
+    txn->Append(table_entry_, output_block);
 
     UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("INSERTED {} Rows", output_block->row_count()));
     if (operator_state == nullptr) {
         // Generate the result table
         Vector<SharedPtr<ColumnDef>> column_defs;
-        SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
+        SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("Tables"), column_defs);
         output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
         output_->SetResultMsg(std::move(result_msg));
     } else {

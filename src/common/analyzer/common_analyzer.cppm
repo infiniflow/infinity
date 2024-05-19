@@ -24,6 +24,7 @@ namespace infinity {
 export class CommonLanguageAnalyzer : public Analyzer {
 public:
     CommonLanguageAnalyzer();
+    CommonLanguageAnalyzer(const CommonLanguageAnalyzer &) = delete;
     virtual ~CommonLanguageAnalyzer();
 
     void SetCaseSensitive(bool case_sensitive = true, bool contain_lower = true) {
@@ -59,8 +60,6 @@ protected:
     inline void ResetToken() {
         token_ = nullptr;
         len_ = 0;
-        native_token_ = nullptr;
-        native_token_len_ = 0;
         offset_ = 0;
         level_ = 0;
         is_index_ = false;
@@ -70,13 +69,10 @@ protected:
 protected:
     static const SizeT term_string_buffer_limit_ = 4096 * 3;
 
-    char *lowercase_string_buffer_ = nullptr;
-
-    Stemmer *stemmer_{nullptr};
+    Vector<char> lowercase_string_buffer_;
+    UniquePtr<Stemmer> stemmer_{nullptr};
     const char *token_{nullptr};
     SizeT len_{0};
-    const char *native_token_{nullptr};
-    SizeT native_token_len_{0};
     u32 offset_{0};
     u32 local_offset_{0};
     int level_{0};
@@ -84,7 +80,7 @@ protected:
     bool is_raw_{false};
     bool case_sensitive_{false};
     bool contain_lower_{false};
-    bool extract_eng_stem_{false};
+    bool extract_eng_stem_{true};
     bool extract_synonym_{false};
     bool chinese_{false};
     bool remove_stopwords_{false};

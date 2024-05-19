@@ -16,9 +16,7 @@ add_library(sql_parser
 )
 
 target_include_directories(sql_parser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/src/storage/invertedindex/search")
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
-target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
-target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external")
-target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external/frozen/include")
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")

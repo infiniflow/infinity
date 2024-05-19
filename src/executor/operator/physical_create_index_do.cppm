@@ -24,7 +24,7 @@ import query_context;
 import operator_state;
 import load_meta;
 
-import index_def;
+import index_base;
 import base_table_ref;
 import internal_types;
 import data_type;

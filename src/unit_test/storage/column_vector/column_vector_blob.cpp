@@ -41,12 +41,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
 
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
-    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -57,7 +57,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
@@ -131,7 +131,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     }
 
     column_vector.Reset();
-    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.capacity(), 0u);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
@@ -142,12 +142,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     column_vector.Initialize();
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
-    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -158,7 +158,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
     tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
@@ -211,12 +211,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
-    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -227,7 +227,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), UnrecoverableException);
     auto tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < 1; ++i) {
@@ -266,7 +266,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     }
 
     column_vector.Reset();
-    EXPECT_EQ(column_vector.capacity(), 0);
+    EXPECT_EQ(column_vector.capacity(), 0u);
     EXPECT_EQ(column_vector.tail_index_, 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
@@ -278,12 +278,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
-    EXPECT_EQ(column_vector.data_type_size_, 16);
+    EXPECT_EQ(column_vector.data_type_size_, 16u);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
@@ -361,7 +361,7 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
 
     ColumnVector target_column_vector(data_type);
     target_column_vector.Initialize(column_vector, input_select);
-    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         i64 blob_len = 2 * i + 1;
@@ -421,7 +421,7 @@ TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
     i64 end_idx = 3 * DEFAULT_VECTOR_SIZE / 4;
     i64 count = end_idx - start_idx;
     target_column_vector.Initialize(column_vector, start_idx, end_idx);
-    EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
+    EXPECT_EQ(target_column_vector.Size(), (u64)DEFAULT_VECTOR_SIZE / 2);
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < count; ++i) {

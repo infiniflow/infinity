@@ -71,7 +71,8 @@ public:
 
     bool SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks,
                                 Vector<UniquePtr<DataBlock>> &output_blocks,
-                                Vector<UniquePtr<char[]>> &states);
+                                Vector<UniquePtr<char[]>> &states,
+                                bool task_completed);
 
     inline u64 GroupTableIndex() const { return groupby_index_; }
 

@@ -41,7 +41,7 @@ TEST_F(ExplainTest, test1) {
     fragment_text.push_back(MakeShared<String>("FRAGMENT (2)"));
     fragment_text.push_back(MakeShared<String>("-> SINK (9)"));
     fragment_text.push_back(MakeShared<String>("-> TABLE SCAN (2)"));
-    fragment_text.push_back(MakeShared<String>("   - table name: t1(default.t1)"));
+    fragment_text.push_back(MakeShared<String>("   - table name: t1(default_db.t1)"));
     fragment_text.push_back(MakeShared<String>("   - table index: #1"));
     fragment_text.push_back(MakeShared<String>("   - output_columns: [c1]"));
     fragment_text.push_back(MakeShared<String>("-> SOURCE (10)"));

@@ -15,7 +15,11 @@ def main():
         last_line = f.readlines()[-1]
     print()
     print("last line from log:", last_line)
-    result = float(last_line.split(' ')[-2])
+    x = last_line.split(' ')[-2]
+    if x == "INVALID":
+        print("benchmark result is invalid")
+        sys.exit(1)
+    result = float(x)
     print("average time:", result, 's')
     print("required time:", standard, 's')
     print()

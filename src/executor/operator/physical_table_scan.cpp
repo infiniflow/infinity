@@ -104,14 +104,20 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64
     u64 block_per_task = all_block_count / parallel_count;
     u64 residual = all_block_count % parallel_count;
 
+    Vector<GlobalBlockID> global_blocks;
+    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+        for (const auto *block_entry : segment_info.block_map_) {
+            global_blocks.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
+        }
+    }
     Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
     for (SizeT task_id = 0, global_block_id = 0, residual_idx = 0; (i64)task_id < parallel_count; ++task_id) {
         result[task_id] = MakeShared<Vector<GlobalBlockID>>();
         for (u64 block_id_in_task = 0; block_id_in_task < block_per_task; ++block_id_in_task) {
-            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
+            result[task_id]->emplace_back(global_blocks[global_block_id++]);
         }
         if (residual_idx < residual) {
-            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
+            result[task_id]->emplace_back(global_blocks[global_block_id++]);
             ++residual_idx;
         }
     }
@@ -156,6 +162,22 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+        if (read_offset == 0) {
+            // new block, check FastRoughFilter
+            const auto &fast_rough_filter = *current_block_entry->GetFastRoughFilter();
+            if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
+                // skip this block
+                LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
+                                      block_ids_idx,
+                                      block_ids->size()));
+                ++block_ids_idx;
+                continue;
+            } else {
+                LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
+                                      block_ids_idx,
+                                      block_ids->size()));
+            }
+        }
         auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
         if (row_begin == row_end) {
             // we have read all data from current block, move to next block

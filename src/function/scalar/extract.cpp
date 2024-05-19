@@ -27,13 +27,16 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
 struct ExtractYearFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractYear function isn't implemented"));
+        Status status = Status::NotSupport("ExtractYear function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -55,7 +58,9 @@ inline void ExtractYearFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractMonthFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractMonth function isn't implemented"));
+        Status status = Status::NotSupport("ExtractMonth function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -77,7 +82,9 @@ inline void ExtractMonthFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractDayFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractDay function isn't implemented"));
+        Status status = Status::NotSupport("ExtractDay function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -99,7 +106,9 @@ inline void ExtractDayFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractHourFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractHour function isn't implemented"));
+        Status status = Status::NotSupport("ExtractHour function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -121,7 +130,9 @@ inline void ExtractHourFunction::Run(TimeT left, BigIntT &result) {
 struct ExtractMinuteFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractMinute function isn't implemented"));
+        Status status = Status::NotSupport("ExtractMinute function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -143,7 +154,9 @@ inline void ExtractMinuteFunction::Run(TimeT left, BigIntT &result) {
 struct ExtractSecondFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        RecoverableError(Status::NotSupport("ExtractSecond function isn't implemented"));
+        Status status = Status::NotSupport("ExtractSecond function isn't implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 
@@ -162,7 +175,7 @@ inline void ExtractSecondFunction::Run(TimeT left, BigIntT &result) {
     result = TimeT::GetTimePart(left, TimeUnit::kSecond);
 }
 
-void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
     {
         String func_name = "extract_year";
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -181,7 +194,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                    DataType(kBigInt),
                                                    &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractYearFunction>);
         function_set_ptr->AddFunction(extract_year_from_timestamp);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -202,7 +215,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                     DataType(kBigInt),
                                                     &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractMonthFunction>);
         function_set_ptr->AddFunction(extract_month_from_timestamp);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -223,7 +236,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                   DataType(kBigInt),
                                                   &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractDayFunction>);
         function_set_ptr->AddFunction(extract_day_from_timestamp);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -244,7 +257,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                               DataType(kBigInt),
                                               &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractHourFunction>);
         function_set_ptr->AddFunction(extract_hour_from_time);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -265,7 +278,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                 DataType(kBigInt),
                                                 &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractMinuteFunction>);
         function_set_ptr->AddFunction(extract_minute_from_time);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -286,7 +299,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                 DataType(kBigInt),
                                                 &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractSecondFunction>);
         function_set_ptr->AddFunction(extract_second_from_time);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 }
 

@@ -20,8 +20,8 @@ export module not_func;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
-export void RegisterNotFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterNotFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

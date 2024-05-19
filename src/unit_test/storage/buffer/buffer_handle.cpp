@@ -26,17 +26,21 @@ import infinity_context;
 class BufferHandleTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
         BaseTest::TearDown();
     }
 };
@@ -45,49 +49,50 @@ TEST_F(BufferHandleTest, test1) {
     using namespace infinity;
 
     SizeT memory_limit = 1024;
-    auto temp_dir = MakeShared<String>("/tmp/infinity/spill");
-    auto base_dir = MakeShared<String>("/tmp/infinity/data");
+    String data_dir(GetDataDir());
+    auto temp_dir = MakeShared<String>(data_dir + "/spill");
+    auto base_dir = MakeShared<String>(GetDataDir());
 
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
     SizeT test_size1 = 512;
-    auto file_dir1 = MakeShared<String>("/tmp/infinity/data/dir1");
+    auto file_dir1 = MakeShared<String>(data_dir + "/dir1");
     auto test_fname1 = MakeShared<String>("test1");
     auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
-    auto buf1 = buffer_manager.Allocate(std::move(file_worker1));
+    auto buf1 = buffer_manager.AllocateBufferObject(std::move(file_worker1));
 
     SizeT test_size2 = 512;
-    auto file_dir2 = MakeShared<String>("/tmp/infinity/data/dir2");
+    auto file_dir2 = MakeShared<String>(data_dir + "/dir2");
     auto test_fname2 = MakeShared<String>("test2");
     auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
-    auto buf2 = buffer_manager.Allocate(std::move(file_worker2));
+    auto buf2 = buffer_manager.AllocateBufferObject(std::move(file_worker2));
 
     SizeT test_size3 = 512;
-    auto file_dir3 = MakeShared<String>("/tmp/infinity/data/dir3");
+    auto file_dir3 = MakeShared<String>(data_dir + "/dir3");
     auto test_fname3 = MakeShared<String>("test3");
     auto file_worker3 = MakeUnique<DataFileWorker>(file_dir3, test_fname3, test_size3);
-    auto buf3 = buffer_manager.Allocate(std::move(file_worker3));
+    auto buf3 = buffer_manager.AllocateBufferObject(std::move(file_worker3));
 
     {
         auto buf_handle1 = buf1->Load();
-        EXPECT_EQ(buf1->rc(), 1);
+        EXPECT_EQ(buf1->rc(), 1u);
 
         auto buf_handle2 = buf2->Load();
 
         // out of memory exception
         EXPECT_THROW({ auto buf_handle3 = buf3->Load(); }, UnrecoverableException);
-        EXPECT_EQ(buf3->rc(), 0);
+        EXPECT_EQ(buf3->rc(), 0u);
         EXPECT_EQ(buf3->status(), BufferStatus::kNew);
         EXPECT_EQ(buf3->type(), BufferType::kEphemeral);
     }
 
-    EXPECT_EQ(buf1->rc(), 0);
-    EXPECT_EQ(buf2->rc(), 0);
+    EXPECT_EQ(buf1->rc(), 0u);
+    EXPECT_EQ(buf2->rc(), 0u);
 
     {
         auto buf_handle1 = buf1->Load();
         auto buf_handle1_1 = buf1->Load();
-        EXPECT_EQ(buf1->rc(), 2);
+        EXPECT_EQ(buf1->rc(), 2u);
     }
 
     size_t write_size = 128;
@@ -109,12 +114,10 @@ TEST_F(BufferHandleTest, test1) {
         auto buf_handle1 = buf1->Load();
         auto data = static_cast<const int *>(buf_handle1.GetData());
         for (size_t i = 0; i < write_size; ++i) {
-            EXPECT_EQ(data[i], i);
+            EXPECT_EQ(data[i], (int)i);
         }
 
-        EXPECT_EQ(buf1->Save(), true);
-        buf1->Sync();
-        buf1->CloseFile();
+        buf1->Save();
     }
     {
         auto buf_handle2 = buf2->Load();
@@ -126,7 +129,7 @@ TEST_F(BufferHandleTest, test1) {
 
         auto data = static_cast<int *>(buf_handle1.GetDataMut());
         for (size_t i = 0; i < write_size; ++i) {
-            EXPECT_EQ(data[i], i);
+            EXPECT_EQ(data[i], (int)i);
             data[i] = 2 * i;
         }
     }
@@ -140,7 +143,7 @@ TEST_F(BufferHandleTest, test1) {
 
         auto data = static_cast<int *>(buf_handle1.GetDataMut());
         for (size_t i = 0; i < write_size; ++i) {
-            EXPECT_EQ(data[i], 2 * i);
+            EXPECT_EQ(data[i], int(2 * i));
         }
     }
 }

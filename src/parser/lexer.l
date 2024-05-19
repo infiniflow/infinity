@@ -11,7 +11,7 @@ static thread_local std::stringstream string_buffer;
 %option reentrant
 %option bison-bridge
 
-%option noyywrap nounput
+%option noyywrap nounput noinput
 %option warn
 %option never-interactive
 %option batch
@@ -42,15 +42,19 @@ BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
-BLOCK          { return BLOCK; }
+BLOCK           { return BLOCK; }
+BLOCKS          { return BLOCKS; }
 BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
 CAST            { return CAST; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
+COLUMN          { return COLUMN; }
+COLUMNS         { return COLUMNS; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
+CONFIG          { return CONFIG; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
 CROSS           { return CROSS; }
@@ -64,9 +68,9 @@ DAYS            { return DAYS; }
 DISTINCT        { return DISTINCT; }
 DOUBLE          { return DOUBLE; }
 DECIMAL         { return DECIMAL; }
+DEFAULT         { return DEFAULT; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
-DESCRIBE        { return DESCRIBE; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 ELSE            { return ELSE; }
@@ -81,7 +85,6 @@ EXPORT          { return EXPORT; }
 FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
 FLUSH           { return FLUSH; }
-OPTIMIZE        { return OPTIMIZE; }
 FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
@@ -97,6 +100,7 @@ HUGEINT         { return HUGEINT; }
 IF              { return IF; }
 IN              { return IN; }
 INDEX           { return INDEX; }
+INDEXES         { return INDEXES; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }
@@ -116,6 +120,7 @@ LOG             { return LOG; }
 LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
+MAXSIM          { return MAXSIM; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }
@@ -126,6 +131,7 @@ NOT             { return NOT; }
 OFF             { return OFF; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
+OPTIMIZE        { return OPTIMIZE; }
 OR              { return OR; }
 ORDER           { return ORDER; }
 OUTER           { return OUTER; }
@@ -138,6 +144,7 @@ PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
 PROFILE         { return PROFILE; }
 PROFILES        { return PROFILES; }
+PROPERTIES      { return PROPERTIES; }
 QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
@@ -152,15 +159,16 @@ SEGMENT         { return SEGMENT; }
 SEGMENTS         { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
-STATUS          { return STATUS; }
+TABLE           { return TABLE; }
+TABLES          { return TABLES; }
+TENSOR          { return TENSOR; }
+TEXT            { return TEXT; }
 THEN            { return THEN; }
 TIME            { return TIME; }
 TIMESTAMP       { return TIMESTAMP; }
-TO              { return TO; }
-TABLE           { return TABLE; }
-TABLES          { return TABLES; }
-TRUE            { return TRUE; }
 TINYINT         { return TINYINT; }
+TO              { return TO; }
+TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
 USING           { return USING; }
@@ -168,7 +176,8 @@ UPDATE          { return UPDATE; }
 UUID            { return UUID; }
 USE             { return USE; }
 VALUES          { return VALUES; }
-VAR             { return VAR; }
+VARIABLE        { return VARIABLE; }
+VARIABLES       { return VARIABLES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 VIEW            { return VIEW; }

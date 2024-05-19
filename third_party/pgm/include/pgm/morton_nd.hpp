@@ -36,6 +36,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <stdint.h>
 #include <tuple>
 #include <type_traits>
 #include <immintrin.h>

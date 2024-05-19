@@ -29,6 +29,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -55,7 +56,9 @@ struct ColumnValueReaderTypeGreaterFunction {
 
 template <>
 inline void GreaterFunction::Run(MixedT, BigIntT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed > bigint"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -65,7 +68,9 @@ inline void GreaterFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void GreaterFunction::Run(MixedT, DoubleT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed > double"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -75,7 +80,9 @@ inline void GreaterFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void GreaterFunction::Run(MixedT, VarcharT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed > varchar"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -93,7 +100,7 @@ static void GenerateGreaterFunction(SharedPtr<ScalarFunctionSet> &function_set_p
     function_set_ptr->AddFunction(greater_function);
 }
 
-void RegisterGreaterFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = ">";
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
@@ -157,7 +164,7 @@ void RegisterGreaterFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                          &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(varchar_greater_mixed);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

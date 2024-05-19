@@ -13,23 +13,21 @@
 // limitations under the License.
 
 module;
-// #define rectime 0
+
 #include <cstring>
-// #include <iomanip>
 #include <random>
-// #include <sys/time.h>
+export module kmeans_partition;
 
 import stl;
 import infinity_exception;
 import search_top_k;
 import index_base;
 import vector_distance;
-
-export module kmeans_partition;
+import logger;
 
 namespace infinity {
 
-Vector<u32> random_permutation_id_partially(u32 vector_count, u32 random_num = 0) {
+inline Vector<u32> RandomPermutatePartially(u32 vector_count, u32 random_num = 0) {
     if (random_num == 0 || random_num > vector_count) {
         random_num = vector_count;
     }
@@ -51,7 +49,7 @@ Vector<u32> random_permutation_id_partially(u32 vector_count, u32 random_num = 0
 
 // normalize centroids
 template <typename CentroidType>
-inline void normalize_centroids(u32 dimension, u32 partition_num, CentroidType *centroids) {
+inline void NormalizeCentroids(u32 dimension, u32 partition_num, CentroidType *centroids) {
     for (u32 i = 0; i < partition_num; ++i) {
         CentroidType *centroid = centroids + i * dimension;
         f32 square = IPDistance<f32>(centroid, centroid, dimension);
@@ -68,28 +66,24 @@ inline void normalize_centroids(u32 dimension, u32 partition_num, CentroidType *
 // partition_num: the number of partitions, default to sqrt(vector_count)
 // iteration_max: the max iteration count, default to 10
 export template <typename CentroidsType, typename ElemType, typename CentroidsOutputType>
-void k_means_partition_only_centroids(MetricType metric,
-                                      u32 dimension,
-                                      u32 vector_count,
-                                      const ElemType *vectors_ptr,
-                                      CentroidsOutputType *centroids_output,
-                                      u32 partition_num = 0,
-                                      u32 iteration_max = 0,
-                                      u32 min_points_per_centroid = 32,
-                                      u32 max_points_per_centroid = 256) {
+[[nodiscard]] u32 GetKMeansCentroids(const MetricType metric,
+                                     const u32 dimension,
+                                     const u32 vector_count,
+                                     const ElemType *vectors_ptr,
+                                     Vector<CentroidsOutputType> &centroids_output_vector,
+                                     u32 partition_num = 0,
+                                     u32 iteration_max = 0,
+                                     u32 min_points_per_centroid = 32,
+                                     u32 max_points_per_centroid = 256) {
     constexpr int default_iteration_max = 10;
-    if (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
+    if (metric != MetricType::kMetricL2 && metric != MetricType::kMetricInnerProduct) {
         UnrecoverableError("metric type not implemented");
-        return;
     }
     if (dimension <= 0 || vector_count <= 0) {
         UnrecoverableError("dimension and vector_count must be positive");
     }
     if (vectors_ptr == nullptr) {
         UnrecoverableError("vectors_ptr cannot be nullptr");
-    }
-    if (centroids_output == nullptr) {
-        UnrecoverableError("centroids_output cannot be nullptr");
     }
     if (partition_num > vector_count) {
         UnrecoverableError("partition_num cannot be greater than vector_count");
@@ -100,7 +94,8 @@ void k_means_partition_only_centroids(MetricType metric,
     if (iteration_max <= 0) {
         iteration_max = default_iteration_max;
     }
-
+    centroids_output_vector.resize(dimension * partition_num);
+    CentroidsOutputType *centroids_output = centroids_output_vector.data();
     CentroidsType *centroids = nullptr;
     UniquePtr<CentroidsType[]> centroids_destructor;
     if constexpr (std::is_same_v<CentroidsOutputType, CentroidsType>) {
@@ -120,14 +115,14 @@ void k_means_partition_only_centroids(MetricType metric,
     // If input vectors are too many, randomly choose some vectors to train.
     {
         if (u32 min_num = min_points_per_centroid * partition_num; vector_count < min_num) {
-            // warning : too few vectors, less than min_points_per_centroid * partition_num
+            LOG_TRACE("GetKMeansCentroids: warning : too few vectors, less than min_points_per_centroid * partition_num");
         }
         if (u32 max_num = max_points_per_centroid * partition_num; vector_count > max_num) {
-            // warning : too many vectors, more than max_points_per_centroid * partition_num
+            LOG_TRACE("GetKMeansCentroids: warning : too many vectors, more than max_points_per_centroid * partition_num");
             training_data_num = max_num;
             // generate random training data
             {
-                Vector<u32> random_ids = random_permutation_id_partially(vector_count, training_data_num);
+                Vector<u32> random_ids = RandomPermutatePartially(vector_count, training_data_num);
                 random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
                 training_data = random_training_data_destructor.get();
                 for (u32 i = 0; i < training_data_num; ++i) {
@@ -152,7 +147,7 @@ void k_means_partition_only_centroids(MetricType metric,
                 }
             }
         } else {
-            Vector<u32> random_ids = random_permutation_id_partially(training_data_num, partition_num);
+            Vector<u32> random_ids = RandomPermutatePartially(training_data_num, partition_num);
             if constexpr (std::is_same_v<ElemType, CentroidsType>) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     memcpy(centroids + i * dimension, training_data + random_ids[i] * dimension, sizeof(ElemType) * dimension);
@@ -166,8 +161,8 @@ void k_means_partition_only_centroids(MetricType metric,
             }
         }
         // normalize centroids if inner product metric is used
-        if (metric == MetricType::kMerticInnerProduct) {
-            normalize_centroids(dimension, partition_num, centroids);
+        if (metric == MetricType::kMetricInnerProduct) {
+            NormalizeCentroids(dimension, partition_num, centroids);
         }
     }
 
@@ -217,7 +212,7 @@ void k_means_partition_only_centroids(MetricType metric,
             }
             // For L2 metric, divide the count. If there is no vector in a partition, the centroid of this partition will not be updated.
             // For IP metric, normalize centroids.
-            if (metric == MetricType::kMerticL2) {
+            if (metric == MetricType::kMetricL2) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     if (auto cnt = partition_element_count[i]; cnt > 0) {
                         f32 inv = 1.0f / (f32)cnt;
@@ -226,8 +221,8 @@ void k_means_partition_only_centroids(MetricType metric,
                         }
                     }
                 }
-            } else if (metric == MetricType::kMerticInnerProduct) {
-                normalize_centroids(dimension, partition_num, centroids);
+            } else if (metric == MetricType::kMetricInnerProduct) {
+                NormalizeCentroids(dimension, partition_num, centroids);
             }
         }
 
@@ -265,7 +260,7 @@ void k_means_partition_only_centroids(MetricType metric,
         }
 
         // TODO:stop condition?
-        if (metric == MetricType::kMerticL2 && this_iter_distance >= previous_total_distance)
+        if (metric == MetricType::kMetricL2 && this_iter_distance >= previous_total_distance)
             break;
         previous_total_distance = this_iter_distance;
 
@@ -278,6 +273,7 @@ void k_means_partition_only_centroids(MetricType metric,
             centroids_output[i] = (CentroidsOutputType)centroids[i];
         }
     }
+    return partition_num;
 }
 
 } // namespace infinity

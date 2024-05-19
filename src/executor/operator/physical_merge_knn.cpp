@@ -75,7 +75,9 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     return true;
@@ -124,7 +126,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    UnrecoverableError(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    UnrecoverableError(fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 DataBlock *output_data_block = merge_knn_state->data_block_array_.back().get();

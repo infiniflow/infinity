@@ -27,6 +27,7 @@ import third_party;
 import status;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -62,17 +63,21 @@ inline bool DivFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    RecoverableError(Status::NotSupport("Not implement huge int divide operator."));
+    Status status = Status::NotSupport("Not implement huge int divide operator.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return false;
 }
 
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
-    RecoverableError(Status::NotSupport("Not implement huge int divide operator."));
+    Status status = Status::NotSupport("Not implement huge int divide operator.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return false;
 }
 
-void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "/";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -119,7 +124,7 @@ void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                        &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_double);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

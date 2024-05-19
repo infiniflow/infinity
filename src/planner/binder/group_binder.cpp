@@ -74,7 +74,9 @@ SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, B
         String expr_name = expr.GetName();
 
         if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
-            RecoverableError(Status::SyntaxError(fmt::format("Duplicated group by expression: {}", expr_name)));
+            Status status = Status::SyntaxError(fmt::format("Duplicated group by expression: {}", expr_name));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
 
         // Add the group by expression into bind context
@@ -121,7 +123,9 @@ SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr
 
     Vector<ParsedExpr *> &expr_array = bind_context_ptr->select_expression_;
     if (select_idx > (i64)expr_array.size() or select_idx < 1) {
-        RecoverableError(Status::SyntaxError(fmt::format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size())));
+        Status status = Status::SyntaxError(fmt::format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     select_idx -= 1;
@@ -147,24 +151,32 @@ SharedPtr<BaseExpression> GroupBinder::BuildColExpr(const ColumnExpr &expr, Bind
 SharedPtr<BaseExpression> GroupBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ != FunctionType::kScalar) {
-        RecoverableError(Status::SyntaxError("Only scalar function is supported in group by list."));
+        Status status = Status::SyntaxError("Only scalar function is supported in group by list.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
 void GroupBinder::CheckFuncType(FunctionType func_type) const {
     if (func_type != FunctionType::kScalar) {
-        RecoverableError(Status::SyntaxError("Only scalar function is supported in group by list."));
+        Status status = Status::SyntaxError("Only scalar function is supported in group by list.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 }
 
 SharedPtr<SubqueryExpression> GroupBinder::BuildSubquery(const SubqueryExpr &, BindContext *, SubqueryType, i64, bool) {
-    RecoverableError(Status::SyntaxError("Subquery isn't supported in group by list."));
+    Status status = Status::SyntaxError("Subquery isn't supported in group by list.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 
 SharedPtr<BaseExpression> GroupBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
-    RecoverableError(Status::SyntaxError("KNN expression isn't supported in group by list"));
+    Status status = Status::SyntaxError("KNN expression isn't supported in group by list");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return nullptr;
 }
 

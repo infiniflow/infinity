@@ -5,7 +5,7 @@
 pull_request_rules:
   - name: "Automatic queue when CI passes and approved"
     conditions:
-      # Mergify receives an PR event(`opened``, `reopened`` and etc.), does some actions(`queue` here) if following conditions are all true.
+      # Mergify receives an PR event(`opened`, `reopened` and etc.), does some actions(`queue` here) if following conditions are all true.
       - "#approved-reviews-by>=2"
       - "check-success=tests"
     actions:

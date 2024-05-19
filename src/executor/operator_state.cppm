@@ -23,6 +23,8 @@ import fragment_data;
 import data_block;
 import table_scan_function_data;
 import knn_scan_data;
+import match_tensor_scan_function_data;
+import compact_state_data;
 import table_def;
 
 import merge_knn_data;
@@ -33,6 +35,7 @@ import status;
 import internal_types;
 import column_def;
 import data_type;
+import segment_entry;
 
 namespace infinity {
 
@@ -52,6 +55,7 @@ export struct OperatorState {
     Vector<UniquePtr<DataBlock>> data_block_array_{};
 //    UniquePtr<String> error_message_{};
     Status status_{};
+    bool empty_source_{false};
 
     bool complete_{false};
 
@@ -98,6 +102,23 @@ export struct TableScanOperatorState : public OperatorState {
     inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
 
     UniquePtr<TableScanFunctionData> table_scan_function_data_{};
+};
+
+// MatchTensorScan
+export struct MatchTensorScanOperatorState : public OperatorState {
+    inline explicit MatchTensorScanOperatorState() : OperatorState(PhysicalOperatorType::kMatchTensorScan) {}
+
+    UniquePtr<MatchTensorScanFunctionData> match_tensor_scan_function_data_{};
+};
+
+// MergeMatchTensor
+export struct MergeMatchTensorOperatorState : public OperatorState {
+    inline explicit MergeMatchTensorOperatorState() : OperatorState(PhysicalOperatorType::kMergeMatchTensor) {}
+
+    Vector<UniquePtr<DataBlock>> middle_sorted_data_blocks_; // middle result
+    u32 middle_result_count_{};
+    Vector<UniquePtr<DataBlock>> input_data_blocks_;
+    bool input_complete_{false};
 };
 
 // KnnScan
@@ -359,8 +380,57 @@ export struct FusionOperatorState : public OperatorState {
     Map<u64, Vector<UniquePtr<DataBlock>>> input_data_blocks_{};
 };
 
+// Compact
+export struct CompactOperatorState : public OperatorState {
+    inline explicit CompactOperatorState(SizeT compact_idx, SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompact), compact_idx_(compact_idx), compact_state_data_(compact_state_data) {}
+
+    SizeT compact_idx_{};
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+};
+
+export struct CompactIndexPrepareOperatorState : public OperatorState {
+    inline explicit CompactIndexPrepareOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                     SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+        : OperatorState(PhysicalOperatorType::kCompactIndexPrepare), compact_state_data_(compact_state_data),
+          create_index_shared_data_(create_index_shared_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
+    SizeT create_index_idx_{};
+};
+
+export struct CompactIndexDoOperatorState : public OperatorState {
+    inline explicit CompactIndexDoOperatorState(SharedPtr<CompactStateData> compact_state_data,
+                                                SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data)
+        : OperatorState(PhysicalOperatorType::kCompactIndexDo), compact_state_data_(compact_state_data),
+          create_index_shared_data_(create_index_shared_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_{};
+    SizeT create_index_idx_{};
+};
+
+export struct CompactFinishOperatorState : public OperatorState {
+    explicit CompactFinishOperatorState(SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompactFinish), compact_state_data_(compact_state_data) {}
+
+    SharedPtr<CompactStateData> compact_state_data_{};
+};
+
 // Source
-export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kIndexScan, kKnnScan, kEmpty };
+export enum class SourceStateType {
+    kInvalid,
+    kQueue,
+    kAggregate,
+    kTableScan,
+    kIndexScan,
+    kKnnScan,
+    kMatchTensorScan,
+    kCompact,
+    kEmpty,
+};
 
 export struct SourceState {
     inline explicit SourceState(SourceStateType state_type) : state_type_(state_type) {}
@@ -402,12 +472,19 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
+//    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
     explicit TableScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
         : SourceState(SourceStateType::kTableScan), global_ids_(std::move(global_ids)) {}
+
+    SharedPtr<Vector<GlobalBlockID>> global_ids_;
+};
+
+export struct MatchTensorScanSourceState : public SourceState {
+    explicit MatchTensorScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
+        : SourceState(SourceStateType::kMatchTensorScan), global_ids_(std::move(global_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };
@@ -447,6 +524,8 @@ export struct SinkState {
     [[nodiscard]] inline SinkStateType state_type() const { return state_type_; }
 
     inline bool Error() const { return !status_.ok(); }
+
+    bool Ignore() const { return status_.code() == ErrorCode::kIgnore; }
 
     u64 fragment_id_{};
     u64 task_id_{};

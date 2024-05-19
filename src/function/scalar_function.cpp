@@ -26,6 +26,7 @@ import data_block;
 import base_expression;
 import column_vector;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -41,7 +42,9 @@ void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) 
     }
     for (SizeT idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {
-            RecoverableError(Status::NotSupport("Not implemented: need to cast the argument types"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }

@@ -86,7 +86,7 @@ inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVe
     return true;
 }
 
-void RegisterSubstringFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterSubstringFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "substring";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -97,7 +97,7 @@ void RegisterSubstringFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                   &ScalarFunction::TernaryFunctionToVarlenWithFailure<VarcharT, BigIntT, BigIntT, VarcharT, SubstrFunction>);
     function_set_ptr->AddFunction(varchar_substr);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

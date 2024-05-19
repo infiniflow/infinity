@@ -28,6 +28,12 @@ namespace infinity {
 
 String ToString(ShowType type) {
     switch (type) {
+        case ShowType::kShowDatabase:
+            return "Show database";
+        case ShowType::kShowTable:
+            return "Show table";
+        case ShowType::kShowIndex:
+            return "Show index";
         case ShowType::kShowTables:
             return "Show tables";
         case ShowType::kShowViews:
@@ -44,12 +50,24 @@ String ToString(ShowType type) {
             return "Show profiles";
         case ShowType::kShowSegments:
             return "Show segments";
-        case ShowType::kShowSessionStatus:
-            return "Show session status";
-        case ShowType::kShowGlobalStatus:
-            return "Show global status";
-        case ShowType::kShowVar:
-            return "Show variables";
+        case ShowType::kShowSegment:
+            return "Show segment";
+        case ShowType::kShowBlocks:
+            return "Show blocks";
+        case ShowType::kShowBlock:
+            return "Show block";
+        case ShowType::kShowBlockColumn:
+            return "Show block column";
+        case ShowType::kShowSessionVariable:
+            return "Show session variable";
+        case ShowType::kShowSessionVariables:
+            return "Show session variables";
+        case ShowType::kShowGlobalVariable:
+            return "Show global variable";
+        case ShowType::kShowGlobalVariables:
+            return "Show global variables";
+        case ShowType::kShowConfig:
+            return "Show config";
         case ShowType::kInvalid: {
             UnrecoverableError("Invalid chunk scan type");
         }

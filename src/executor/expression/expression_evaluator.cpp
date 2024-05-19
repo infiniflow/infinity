@@ -34,6 +34,7 @@ import third_party;
 import infinity_exception;
 import expression_type;
 import bound_cast_func;
+import logger;
 
 namespace infinity {
 
@@ -68,7 +69,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     if (in_aggregate_) {
-        RecoverableError(Status::RecursiveAggregate(expr->ToString()));
+        Status status = Status::RecursiveAggregate(expr->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     in_aggregate_ = true;
     SharedPtr<ExpressionState> &child_state = state->Children()[0];
@@ -79,26 +82,37 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     SharedPtr<ColumnVector> &child_output_col = child_state->OutputColumnVector();
     this->Execute(child_expr, child_state, child_output_col);
 
-    if (expr->aggregate_function_.argument_type_ != *child_output_col->data_type()) {
-        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.argument_type_.ToString(), child_output_col->data_type()->ToString()));
-    }
-
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
-        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString()));
+        Status status = Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString());
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     auto data_state = state->agg_state_;
 
-    // 1. Initialize the aggregate state.
-    expr->aggregate_function_.init_func_(data_state);
-
-    // 2. Loop to fill the aggregate state
-    expr->aggregate_function_.update_func_(data_state, child_output_col);
-
-    // 3. Get the aggregate result and append to output column vector.
-
-    const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
-    output_column_vector->AppendByPtr(result_ptr);
+    switch (state->agg_flag_) {
+        case AggregateFlag::kUninitialized: {
+            expr->aggregate_function_.init_func_(data_state);
+            state->agg_flag_ = AggregateFlag::kRunning;
+        }
+        case AggregateFlag::kRunning: {
+            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            break;
+        }
+        case AggregateFlag::kFinish: {
+            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            output_column_vector->AppendByPtr(result_ptr);
+            break;
+        }
+        case AggregateFlag::kRunAndFinish: {
+            expr->aggregate_function_.init_func_(data_state);
+            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
+            output_column_vector->AppendByPtr(result_ptr);
+            break;
+        }
+    }
 
     in_aggregate_ = false;
 }
@@ -174,7 +188,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    RecoverableError(Status::NotSupport("IN execution isn't implemented yet."));
+    Status status = Status::NotSupport("IN execution isn't implemented yet.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 } // namespace infinity

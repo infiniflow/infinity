@@ -23,6 +23,7 @@ import base_table_ref;
 import table_entry;
 import internal_types;
 import data_type;
+import fast_rough_filter;
 
 export module logical_table_scan;
 
@@ -49,6 +50,8 @@ public:
     inline String name() final { return "LogicalTableScan"; }
 
     SharedPtr<BaseTableRef> base_table_ref_{};
+
+    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
 
     bool add_row_id_;
 };

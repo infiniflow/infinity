@@ -154,7 +154,7 @@ void PhysicalSort::Init() {
     if (sort_expr_count != expressions_.size()) {
         UnrecoverableError("order_by_types_.size() != expressions_.size()");
     }
-    Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
+    Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count);
     for (u32 i = 0; i < sort_expr_count; ++i) {
         sort_functions.emplace_back(PhysicalTop::GenerateSortFunction(order_by_types_[i], expressions_[i]));

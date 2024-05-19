@@ -16,7 +16,6 @@ module;
 
 export module float_cast;
 
-
 import stl;
 import bound_cast_func;
 import vector_buffer;
@@ -27,6 +26,8 @@ import third_party;
 import column_vector;
 import internal_types;
 import data_type;
+import status;
+import logger;
 
 namespace infinity {
 
@@ -66,6 +67,12 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, FloatTryCastToVarlen>);
         }
+        case LogicalType::kBoolean:
+        case LogicalType::kEmbedding: {
+            Status status = Status::NotSupport(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
         default: {
             UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
@@ -84,7 +91,7 @@ struct FloatTryCastToFixlen {
 
 struct FloatTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
+    static inline bool Run(SourceType, TargetType &, ColumnVector*) {
         UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -153,7 +160,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
 
 // Cast FloatT to varlen type
 template <>
-inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, ColumnVector* vector_ptr) {
     target.is_value_ = false;
     String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
@@ -235,7 +242,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
 
 // Cast double to varlen type
 template <>
-inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, ColumnVector* vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
     target.is_value_ = false;
     String tmp_str = std::to_string(source);

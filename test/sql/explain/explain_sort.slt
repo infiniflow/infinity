@@ -17,7 +17,7 @@ explain select x from explain2 order by y;
     - expressions: [y (#0) ASC]
     - output columns: [y, __rowid]
    -> TABLE SCAN (2)
-      - table name: explain2(default.explain2)
+      - table name: explain2(default_db.explain2)
       - table index: #1
       - output_columns: [y, __rowid]
 
@@ -31,7 +31,7 @@ explain select y from explain2 order by x;
     - expressions: [x (#0) ASC]
     - output columns: [x, __rowid]
    -> TABLE SCAN (2)
-      - table name: explain2(default.explain2)
+      - table name: explain2(default_db.explain2)
       - table index: #1
       - output_columns: [x, __rowid]
 
@@ -45,7 +45,7 @@ explain select y + x from explain2 order by x + y;
     - expressions: [x (#0) + y (#1) ASC]
     - output columns: [x, y, __rowid]
    -> TABLE SCAN (2)
-      - table name: explain2(default.explain2)
+      - table name: explain2(default_db.explain2)
       - table index: #1
       - output_columns: [x, y, __rowid]
 
@@ -59,7 +59,7 @@ explain select y from explain2 order by y + x;
     - expressions: [y (#0) + x (#1) ASC]
     - output columns: [y, x, __rowid]
    -> TABLE SCAN (2)
-      - table name: explain2(default.explain2)
+      - table name: explain2(default_db.explain2)
       - table index: #1
       - output_columns: [y, x, __rowid]
 
@@ -76,7 +76,7 @@ explain select row_id(), x from explain2 where y > 3 order by x, row_id();
       - filter: CAST(y (#0) AS BigInt) > 3
       - output columns: [y, __rowid]
      -> TABLE SCAN (2)
-        - table name: explain2(default.explain2)
+        - table name: explain2(default_db.explain2)
         - table index: #1
         - output_columns: [y, __rowid]
 

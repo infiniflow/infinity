@@ -21,11 +21,13 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 
+import base_expression;
 import match_expression;
 import base_table_ref;
 import table_entry;
 import internal_types;
 import data_type;
+import common_query_filter;
 
 namespace infinity {
 
@@ -51,6 +53,9 @@ public:
 
     SharedPtr<BaseTableRef> base_table_ref_{};
     SharedPtr<MatchExpression> match_expr_{};
+    SharedPtr<BaseExpression> filter_expression_{};
+
+    SharedPtr<CommonQueryFilter> common_query_filter_{};
 };
 
 } // namespace infinity

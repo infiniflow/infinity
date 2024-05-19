@@ -91,17 +91,15 @@ String LogicalCommand::ToString(i64 &space) const {
                     ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_str();
                     break;
                 }
+                case SetVarType::kInvalid: {
+                    UnrecoverableError("Invalid variable type.");
+                }
             }
             break;
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table_info = (CheckTable *)(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Check table: " << check_table_info->table_name();
-            break;
-        }
-        case CommandType::kCompactTable: {
-            CompactTable *compact_table_info = (CompactTable *)(command_info_.get());
-            ss << String(space, ' ') << arrow_str << "Compact table: " << compact_table_info->table_name();
             break;
         }
         case CommandType::kInvalid: {

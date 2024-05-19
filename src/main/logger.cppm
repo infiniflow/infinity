@@ -27,7 +27,7 @@ class Config;
 export class Logger {
 public:
     static void
-    Initialize(const Config* config_ptr);
+    Initialize(Config* config_ptr);
 
     static void
     Shutdown();
@@ -36,6 +36,11 @@ public:
 export inline void
 LOG_TRACE(const String& msg) {
     infinity_logger->trace(msg);
+}
+
+export inline void
+LOG_DEBUG(const String& msg) {
+    infinity_logger->debug(msg);
 }
 
 export inline void

@@ -18,6 +18,7 @@ module;
 #include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -28,10 +29,18 @@ import file_system_type;
 import infinity_exception;
 import third_party;
 import logger;
+import status;
 
 module local_file_system;
 
 namespace infinity {
+
+namespace fs = std::filesystem;
+
+constexpr std::size_t BUFFER_SIZE = 4096; // Adjust buffer size as needed
+
+std::mutex LocalFileSystem::mtx_{};
+HashMap<String, MmapInfo> LocalFileSystem::mapped_files_{};
 
 LocalFileHandler::~LocalFileHandler() {
     if (fd_ != -1) {
@@ -70,7 +79,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
         }
 #if defined(__linux__)
         if (flags & FileFlags::DIRECT_IO) {
-            file_flags |= O_DIRECT | O_SYNC;
+            file_flags |= O_DIRECT;
         }
 #endif
     }
@@ -79,6 +88,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
     if (fd == -1) {
         UnrecoverableError(fmt::format("Can't open file: {}: {}", path, strerror(errno)));
     }
+    // LOG_TRACE(fmt::format("[+] OPEN FILE: {}", path));
 
     if (lock_type != FileLockType::kNoLock) {
         struct flock file_lock {};
@@ -106,6 +116,7 @@ void LocalFileSystem::Close(FileHandler &file_handler) {
     if (close(fd) != 0) {
         UnrecoverableError(fmt::format("Can't close file: {}: {}", file_handler.path_.string(), strerror(errno)));
     }
+    // LOG_TRACE(fmt::format("[-] CLOSE FILE: {}", file_handler.path_.string()));
 }
 
 void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
@@ -125,16 +136,42 @@ i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
 
 i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    i64 write_count = write(fd, data, nbytes);
-    if (write_count == -1) {
-        UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+    i64 written = 0;
+    while (written < (i64)nbytes) {
+        i64 write_count = write(fd, (char *)data + written, nbytes - written);
+        if (write_count == -1) {
+            UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+        }
+        written += write_count;
     }
-    return write_count;
+    return written;
+}
+
+i64 LocalFileSystem::ReadAt(FileHandler &file_handler, i64 file_offset, void *data, u64 nbytes) {
+    i32 fd = ((LocalFileHandler &)file_handler).fd_;
+    i64 read_count = pread(fd, data, nbytes, file_offset);
+    if (read_count == -1) {
+        UnrecoverableError(fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno)));
+    }
+    return read_count;
+}
+
+i64 LocalFileSystem::WriteAt(FileHandler &file_handler, i64 file_offset, const void *data, u64 nbytes) {
+    i32 fd = ((LocalFileHandler &)file_handler).fd_;
+    i64 written = 0;
+    while (written < (i64)nbytes) {
+        i64 write_count = pwrite(fd, (char *)data + written, nbytes - written, file_offset + written);
+        if (write_count == -1) {
+            UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+        }
+        written += write_count;
+    }
+    return written;
 }
 
 void LocalFileSystem::Seek(FileHandler &file_handler, i64 pos) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    if (0 != lseek(fd, pos, SEEK_SET)) {
+    if ((off_t)-1 == lseek(fd, pos, SEEK_SET)) {
         UnrecoverableError(fmt::format("Can't seek file: {}: {}", file_handler.path_.string(), strerror(errno)));
     }
 }
@@ -166,6 +203,28 @@ void LocalFileSystem::SyncFile(FileHandler &file_handler) {
     if (fsync(fd) != 0) {
         UnrecoverableError(fmt::format("fsync failed: {}, {}", file_handler.path_.string(), strerror(errno)));
     }
+}
+
+void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path) {
+    Path dst{dst_path};
+    Path src{src_path};
+    std::ifstream srcFile(src, std::ios::binary);
+    if (!srcFile.is_open()) {
+        UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
+        return;
+    }
+    std::ofstream dstFile(dst, std::ios::binary | std::ios::app);
+    if (!dstFile.is_open()) {
+        UnrecoverableError(fmt::format("Failed to open destination file {}", dst_path));
+        return;
+    }
+    char buffer[BUFFER_SIZE];
+    while (srcFile.read(buffer, BUFFER_SIZE)) {
+        dstFile.write(buffer, srcFile.gcount());
+    }
+    dstFile.write(buffer, srcFile.gcount());
+    srcFile.close();
+    dstFile.close();
 }
 
 // Directory related methods
@@ -206,6 +265,23 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
     return removed_count;
 }
 
+void LocalFileSystem::CleanupDirectory(const String &path) {
+    std::error_code error_code;
+    Path p{path};
+    if (!fs::exists(p)) {
+        std::filesystem::create_directories(p, error_code);
+        if (error_code.value() != 0) {
+            UnrecoverableError(fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message()));
+        }
+        return;
+    }
+    try {
+        std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
+    } catch (const std::filesystem::filesystem_error &e) {
+        UnrecoverableError(fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what()));
+    }
+}
+
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
     Path dir_path(path);
     if (!is_directory(dir_path)) {
@@ -223,14 +299,12 @@ String LocalFileSystem::GetAbsolutePath(const String &path) {
     return std::filesystem::absolute(p).string();
 }
 
-u64 LocalFileSystem::GetFileSizeByPath(const String& path) {
-    return std::filesystem::file_size(path);
-}
+u64 LocalFileSystem::GetFileSizeByPath(const String &path) { return std::filesystem::file_size(path); }
 
-u64 LocalFileSystem::GetFolderSizeByPath(const String& path) {
+u64 LocalFileSystem::GetFolderSizeByPath(const String &path) {
     u64 totalSize = 0;
 
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(path)) {
         if (std::filesystem::is_regular_file(entry.status())) {
             totalSize += std::filesystem::file_size(entry);
         }
@@ -239,9 +313,53 @@ u64 LocalFileSystem::GetFolderSizeByPath(const String& path) {
     return totalSize;
 }
 
-String LocalFileSystem::ConcatenateFilePath(const String& dir_path, const String& file_path) {
+String LocalFileSystem::ConcatenateFilePath(const String &dir_path, const String &file_path) {
     std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
+}
+
+int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len) {
+    data_ptr = nullptr;
+    data_len = 0;
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = mapped_files_.find(file_path);
+    if (it != mapped_files_.end()) {
+        auto &mmap_info = it->second;
+        data_ptr = mmap_info.data_ptr_;
+        data_len = mmap_info.data_len_;
+        mmap_info.rc_++;
+        return 0;
+    }
+    long len_f = fs::file_size(file_path);
+    if (len_f == 0)
+        return -1;
+    int f = open(file_path.c_str(), O_RDONLY);
+    void *tmpd = mmap(NULL, len_f, PROT_READ, MAP_SHARED, f, 0);
+    if (tmpd == MAP_FAILED)
+        return -1;
+    close(f);
+    int rc = madvise(tmpd, len_f, MADV_DONTDUMP);
+    if (rc < 0)
+        return -1;
+    data_ptr = (u8 *)tmpd;
+    data_len = len_f;
+    mapped_files_.emplace(file_path, MmapInfo{data_ptr, data_len, 1});
+    return 0;
+}
+
+int LocalFileSystem::MunmapFile(const String &file_path) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = mapped_files_.find(file_path);
+    if (it == mapped_files_.end()) {
+        return -1;
+    }
+    auto &mmap_info = it->second;
+    mmap_info.rc_--;
+    if (mmap_info.rc_ == 0) {
+        munmap(mmap_info.data_ptr_, mmap_info.data_len_);
+        mapped_files_.erase(it);
+    }
+    return 0;
 }
 
 } // namespace infinity

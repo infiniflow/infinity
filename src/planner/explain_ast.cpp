@@ -38,7 +38,7 @@ import create_table_info;
 import create_index_info;
 import create_collection_info;
 import drop_collection_info;
-//import drop_index_info;
+// import drop_index_info;
 import drop_schema_info;
 import drop_table_info;
 import base_table_reference;
@@ -47,6 +47,7 @@ import join_reference;
 import subquery_reference;
 import table_reference;
 import statement_common;
+import logger;
 
 namespace infinity {
 
@@ -119,7 +120,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(create_table));
             auto *table_info = (CreateTableInfo *)create_statement->create_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + table_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + table_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
@@ -155,7 +156,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(create_collection));
             auto *collection_info = (CreateCollectionInfo *)create_statement->create_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + collection_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + collection_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
@@ -175,7 +176,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     result->emplace_back(MakeShared<String>("INSERT: "));
     intent_size += 2;
-    String schema_name = String(intent_size, ' ') + "schema: " + insert_statement->schema_name_;
+    String schema_name = String(intent_size, ' ') + "database: " + insert_statement->schema_name_;
     result->emplace_back(MakeShared<String>(schema_name));
     String table_name = String(intent_size, ' ') + "table: " + insert_statement->table_name_;
     result->emplace_back(MakeShared<String>(table_name));
@@ -223,7 +224,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(drop_table));
             auto *table_info = (DropTableInfo *)drop_statement->drop_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + table_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + table_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
@@ -236,7 +237,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(drop_collection));
             auto *collection_info = (DropCollectionInfo *)drop_statement->drop_info_.get();
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + collection_info->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + collection_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
@@ -389,7 +390,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (cross_product_ref->alias_ != nullptr) {
                 from_str += " AS " + String(cross_product_ref->alias_->alias_);
                 if (cross_product_ref->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             } else {
                 from_str += ": ";
@@ -409,7 +412,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (join_reference->alias_ != nullptr) {
                 from_str += " AS " + String(join_reference->alias_->alias_);
                 if (join_reference->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             result->emplace_back(MakeShared<String>(from_str));
@@ -429,7 +434,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (table_reference->alias_ != nullptr) {
                 from_str += " AS " + String(table_reference->alias_->alias_);
                 if (table_reference->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             result->emplace_back(MakeShared<String>(from_str));
@@ -441,7 +448,9 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (subquery_reference->alias_ != nullptr) {
                 from_str += " AS " + String(subquery_reference->alias_->alias_);
                 if (subquery_reference->alias_->column_alias_array_ != nullptr) {
-                    RecoverableError(Status::SyntaxError("Table reference has columns alias"));
+                    Status status = Status::SyntaxError("Table reference has columns alias");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             } else {
                 from_str += ": ";
@@ -461,10 +470,37 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
 void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
 
     switch (show_statement->show_type_) {
+        case ShowStmtType::kDatabase: {
+            result->emplace_back(MakeShared<String>("SHOW DATABASE: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            break;
+        }
+        case ShowStmtType::kTable: {
+            result->emplace_back(MakeShared<String>("SHOW TABLE: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            break;
+        }
+        case ShowStmtType::kIndex: {
+            result->emplace_back(MakeShared<String>("SHOW INDEX: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String index_name = String(intent_size, ' ') + "index: " + show_statement->index_name_.value();
+            result->emplace_back(MakeShared<String>(index_name));
+            break;
+        }
         case ShowStmtType::kColumns: {
             result->emplace_back(MakeShared<String>("SHOW COLUMNS: "));
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
@@ -481,7 +517,7 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
         case ShowStmtType::kTables: {
             result->emplace_back(MakeShared<String>("SHOW TABLES: "));
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             break;
         }
@@ -489,14 +525,30 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW DATABASES: "));
             break;
         }
-        case ShowStmtType::kSegments : {
+        case ShowStmtType::kSegments: {
             result->emplace_back(MakeShared<String>("SHOW SEGMENTS: "));
+            break;
+        }
+        case ShowStmtType::kSegment: {
+            result->emplace_back(MakeShared<String>("SHOW SEGMENT: "));
+            break;
+        }
+        case ShowStmtType::kBlocks: {
+            result->emplace_back(MakeShared<String>("SHOW BLOCKS: "));
+            break;
+        }
+        case ShowStmtType::kBlock: {
+            result->emplace_back(MakeShared<String>("SHOW BLOCK: "));
+            break;
+        }
+        case ShowStmtType::kBlockColumn: {
+            result->emplace_back(MakeShared<String>("SHOW BLOCK COLUMN: "));
             break;
         }
         case ShowStmtType::kIndexes: {
             result->emplace_back(MakeShared<String>("SHOW INDEXES: "));
             intent_size += 2;
-            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
             break;
         }
@@ -508,16 +560,24 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW PROFILES"));
             break;
         }
-        case ShowStmtType::kSessionStatus: {
-            result->emplace_back(MakeShared<String>("SHOW SESSION STATUS"));
+        case ShowStmtType::kSessionVariable: {
+            result->emplace_back(MakeShared<String>("SHOW SESSION VARIABLE"));
             break;
         }
-        case ShowStmtType::kGlobalStatus: {
-            result->emplace_back(MakeShared<String>("SHOW GLOBAL STATUS"));
+        case ShowStmtType::kSessionVariables: {
+            result->emplace_back(MakeShared<String>("SHOW SESSION VARIABLES"));
             break;
         }
-        case ShowStmtType::kVar: {
-            result->emplace_back(MakeShared<String>("SHOW VARIABLES"));
+        case ShowStmtType::kGlobalVariable: {
+            result->emplace_back(MakeShared<String>("SHOW GLOBAL VARIABLE"));
+            break;
+        }
+        case ShowStmtType::kGlobalVariables: {
+            result->emplace_back(MakeShared<String>("SHOW GLOBAL VARIABLES"));
+            break;
+        }
+        case ShowStmtType::kConfig: {
+            result->emplace_back(MakeShared<String>("SHOW CONFIG"));
             break;
         }
     }
@@ -538,11 +598,7 @@ void ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vec
 }
 
 void ExplainAST::BuildOptimize(const OptimizeStatement *optimize_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
-    switch (optimize_statement->type_) {
-        case OptimizeType::kIRS:
-            result->emplace_back(MakeShared<String>("OPTIMIZE FULLTEXT"));
-            break;
-    }
+    result->emplace_back(MakeShared<String>("OPTIMIZE TSABLE"));
 }
 
 void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
@@ -554,7 +610,7 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
         result->emplace_back(MakeShared<String>("EXPORT DATA:"));
     }
 
-    SharedPtr<String> schema_name = MakeShared<String>(String(intent_size, ' ') + "schema: " + copy_statement->schema_name_);
+    SharedPtr<String> schema_name = MakeShared<String>(String(intent_size, ' ') + "database: " + copy_statement->schema_name_);
     result->emplace_back(schema_name);
 
     SharedPtr<String> table_name = MakeShared<String>(String(intent_size, ' ') + "table: " + copy_statement->table_name_);
@@ -589,6 +645,9 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSONL");
             result->emplace_back(file_type);
             break;
+        }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
         }
     }
 }

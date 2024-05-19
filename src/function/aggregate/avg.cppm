@@ -20,8 +20,8 @@ export module avg;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
-export void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

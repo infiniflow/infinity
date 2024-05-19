@@ -26,16 +26,23 @@ import extra_ddl_info;
 import column_def;
 import base_entry;
 
+import table_entry;
+import entry_list;
+import meta_info;
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 class DBEntry;
-class TableEntry;
 class TxnManager;
+class Txn;
 
-export struct TableMeta {
+export struct TableMeta : public MetaInterface {
+    using EntryT = TableEntry;
 
     friend class DBEntry;
-    friend struct NewCatalog;
+    friend struct Catalog;
 
 public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> table_name, DBEntry *db_entry)
@@ -45,45 +52,82 @@ public:
 
     SharedPtr<String> ToString();
 
-    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
-
-    void MergeFrom(TableMeta &other);
 
     [[nodiscard]] const SharedPtr<String> &table_name_ptr() const { return table_name_; }
     [[nodiscard]] const String &table_name() const { return *table_name_; }
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const;
-    [[nodiscard]] const String &db_name() const;
     [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
     [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
 
-private:
-    Tuple<TableEntry *, Status> CreateNewEntry(TableEntryType table_entry_type,
-                                               const SharedPtr<String> &table_collection_name,
-                                               const Vector<SharedPtr<ColumnDef>> &columns,
-                                               TransactionID txn_id,
-                                               TxnTimeStamp begin_ts,
-                                               TxnManager *txn_mgr);
-
-    Tuple<TableEntry *, Status>
-    DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name, ConflictType conflict_type);
-
-    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
-
-    Tuple<TableEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
-
-    Tuple<TableEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    DBEntry *db_entry() { return db_entry_; }
 
 private:
-    std::shared_mutex rw_locker_{};
+    Tuple<TableEntry *, Status> CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                            TableEntryType table_entry_type,
+                                            const SharedPtr<String> &table_collection_name,
+                                            const Vector<SharedPtr<ColumnDef>> &columns,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnManager *txn_mgr,
+                                            ConflictType conflict_type);
+
+    Tuple<SharedPtr<TableEntry>, Status> DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   const String &table_name,
+                                                   ConflictType conflict_type);
+
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn);
+
+    Tuple<TableEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return table_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    }
+
+    Tuple<TableEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return table_entry_list_.GetEntryNolock(txn_id, begin_ts);
+    }
+
+    void DeleteEntry(TransactionID txn_id);
+
+    // replay
+    void
+    CreateEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void UpdateEntryReplay(std::function<void(SharedPtr<TableEntry>, TransactionID, TxnTimeStamp)> &&update_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts);
+
+    void DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    // GetEntryReplay(txn_id, begin_ts);
+    TableEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    //
+
+private:
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> table_name_{};
 
     DBEntry *db_entry_{};
 
-    // Ordered by commit_ts from latest to oldest.
-    List<SharedPtr<BaseEntry>> entry_list_{};
+private:
+    EntryList<TableEntry> table_entry_list_{};
+
+    // TODO: remove
+    std::shared_mutex &rw_locker() { return table_entry_list_.rw_locker_; };
+
+    // TODO: remove
+    List<SharedPtr<TableEntry>> &table_entry_list() { return table_entry_list_.entry_list_; }
+
+public:
+    void Cleanup() override;
+
+    bool PickCleanup(CleanupScanner *scanner) override;
+
+    bool Empty() override { return table_entry_list_.Empty(); }
 };
 
 } // namespace infinity

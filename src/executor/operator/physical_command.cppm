@@ -25,7 +25,7 @@ import query_context;
 import operator_state;
 import load_meta;
 import infinity_exception;
-import base_table_ref;
+import table_entry;
 import command_statement;
 import data_type;
 
@@ -57,8 +57,6 @@ public:
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    SharedPtr<BaseTableRef> table_ref_{}; // only used for compact command
-
     const SharedPtr<CommandInfo> command_info_{};
 
     const SharedPtr<Vector<String>> output_names_{};

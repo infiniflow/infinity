@@ -24,7 +24,6 @@ import first;
 import max;
 import min;
 import sum;
-import count_star;
 
 import add;
 import abs;
@@ -56,7 +55,7 @@ import logical_type;
 
 namespace infinity {
 
-BuiltinFunctions::BuiltinFunctions(UniquePtr<NewCatalog> &catalog_ptr) : catalog_ptr_(catalog_ptr) {}
+BuiltinFunctions::BuiltinFunctions(UniquePtr<Catalog> &catalog_ptr) : catalog_ptr_(catalog_ptr) {}
 
 void BuiltinFunctions::Init() {
     RegisterAggregateFunction();
@@ -68,7 +67,6 @@ void BuiltinFunctions::Init() {
 void BuiltinFunctions::RegisterAggregateFunction() {
     RegisterAvgFunction(catalog_ptr_);
     RegisterCountFunction(catalog_ptr_);
-    RegisterCountStarFunction(catalog_ptr_);
     RegisterFirstFunction(catalog_ptr_);
     RegisterMaxFunction(catalog_ptr_);
     RegisterMinFunction(catalog_ptr_);
@@ -118,13 +116,13 @@ void BuiltinFunctions::RegisterTableFunction() {}
 void BuiltinFunctions::RegisterSpecialFunction() {
 
     SharedPtr<SpecialFunction> row_function = MakeShared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1, SpecialType::kRowID);
-    NewCatalog::AddSpecialFunction(catalog_ptr_.get(), row_function);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), row_function);
 
     SharedPtr<SpecialFunction> create_ts_function = MakeShared<SpecialFunction>("DISTANCE", DataType(LogicalType::kFloat), 2, SpecialType::kDistance);
-    NewCatalog::AddSpecialFunction(catalog_ptr_.get(), create_ts_function);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), create_ts_function);
 
     SharedPtr<SpecialFunction> delete_ts_function = MakeShared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 3, SpecialType::kScore);
-    NewCatalog::AddSpecialFunction(catalog_ptr_.get(), delete_ts_function);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), delete_ts_function);
 }
 
 } // namespace infinity

@@ -27,21 +27,42 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
 template <typename ValueType, typename ResultType>
 struct SumState {
 public:
-    inline void Initialize() { RecoverableError(Status::NotSupport("Not implemented")); }
+    inline void Initialize() {
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
-    inline void Update(const ValueType *__restrict, SizeT) { RecoverableError(Status::NotSupport("Not implemented")); }
+    inline void Update(const ValueType *__restrict, SizeT) {
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { RecoverableError(Status::NotSupport("Not implemented")); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
-    inline ptr_t Finalize() { RecoverableError(Status::NotSupport("Not implemented")); }
+    inline ptr_t Finalize() {
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
-    inline static SizeT Size(const DataType &) { RecoverableError(Status::NotSupport("Not implemented")); }
+    inline static SizeT Size(const DataType &) {
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 };
 
 template <>
@@ -140,7 +161,7 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
-void RegisterSumFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "SUM";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -226,7 +247,7 @@ void RegisterSumFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(sum_function);
     }
 #endif
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

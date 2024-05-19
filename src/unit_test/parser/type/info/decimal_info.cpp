@@ -37,7 +37,7 @@ TEST_F(DecimalInfoTest, decimal_info_A) {
     auto decimal_info = DecimalInfo::Make(38, 38);
     EXPECT_EQ(decimal_info->scale(), 38);
     EXPECT_EQ(decimal_info->precision(), 38);
-    EXPECT_EQ(decimal_info->Size(), 16);
+    EXPECT_EQ(decimal_info->Size(), 16u);
 
     nlohmann::json json;
     json["type_info"] = decimal_info->Serialize();

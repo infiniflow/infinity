@@ -68,10 +68,44 @@ void Status::AppendMessage(const String &msg) {
 }
 
 // Error functions
+
+Status Status::Ignore() { return Status(ErrorCode::kIgnore); }
+
+// 1. Config error
+Status Status::InvalidTimeInfo(const String &time_info) {
+    return Status(ErrorCode::kInvalidTimeInfo, MakeUnique<String>(fmt::format("Invalid time info format: {}", time_info)));
+}
+
+Status Status::EmptyConfigParameter() { return Status(ErrorCode::kEmptyConfigParameter, MakeUnique<String>("Empty configure parameter.")); }
+
+Status Status::MismatchVersion(const String &current_version, const String &expected_version) {
+    return Status(ErrorCode::kMismatchVersion,
+                  MakeUnique<String>(fmt::format("Current infinity version: {}, expected version: {}", current_version, expected_version)));
+}
+
+Status Status::InvalidTimezone(const String &timezone) {
+    return Status(ErrorCode::kInvalidTimezone, MakeUnique<String>(fmt::format("Invalid time zone: {}.", timezone)));
+}
+
+Status Status::InvalidByteSize(const String &byte_size) {
+    return Status(ErrorCode::kInvalidByteSize, MakeUnique<String>(fmt::format("Invalid byte size: {}.", byte_size)));
+}
+
+Status Status::InvalidIPAddr(const String &ip_addr) {
+    return Status(ErrorCode::kInvalidIPAddr, MakeUnique<String>(fmt::format("Invalid ip address: {}.", ip_addr)));
+}
+
+Status Status::InvalidLogLevel(const String &log_level) {
+    return Status(ErrorCode::kInvalidLogLevel, MakeUnique<String>(fmt::format("Invalid log level: {}.", log_level)));
+}
+
+Status Status::InvalidConfig(const String &detailed_info) { return Status(ErrorCode::kInvalidConfig, MakeUnique<String>(detailed_info)); }
+
 // 2. Auth error
 Status Status::WrongPasswd(const String &user_name) {
     return Status(ErrorCode::kWrongPasswd, MakeUnique<String>(fmt::format("Invalid password to login user: {}", user_name)));
 }
+
 Status Status::InsufficientPrivilege(const String &user_name, const String &detailed_error) {
     return Status(ErrorCode::kInsufficientPrivilege, MakeUnique<String>(fmt::format("{} do not have permission to {}", user_name, detailed_error)));
 }
@@ -99,8 +133,20 @@ Status Status::InvalidIndexName(const String &index_name) {
     return Status(ErrorCode::kInvalidIndexName, MakeUnique<String>(fmt::format("{} is a invalid index name", index_name)));
 }
 
+Status Status::InvalidColumnDefinition(const String &detailed_info) {
+    return Status(ErrorCode::kInvalidColumnDefinition, MakeUnique<String>(detailed_info));
+}
+
+Status Status::InvalidTableDefinition(const String &detailed_info) {
+    return Status(ErrorCode::kInvalidTableDefinition, MakeUnique<String>(detailed_info));
+}
+
+Status Status::InvalidIndexDefinition(const String &detailed_info) {
+    return Status(ErrorCode::kInvalidIndexDefinition, MakeUnique<String>(detailed_info));
+}
+
 Status Status::DataTypeMismatch(const String &type1, const String &type2) {
-    return Status(ErrorCode::kInvalidDataTypeMismatch, MakeUnique<String>(fmt::format("Expected: {}, but {} is given.", type1, type2)));
+    return Status(ErrorCode::kDataTypeMismatch, MakeUnique<String>(fmt::format("Expected: {}, but {} is given.", type1, type2)));
 }
 Status Status::NameTooLong(const String &name, const String &object_type) {
     return Status(ErrorCode::kNameTooLong, MakeUnique<String>(fmt::format("{} is too long for a {} name", name, object_type)));
@@ -242,10 +288,106 @@ Status Status::ExceedIndexNameLength(u64 index_name_length) {
                   MakeUnique<String>(fmt::format("Given index name length exceeds {}", MAX_IDENTIFIER_NAME_LENGTH)));
 }
 
+Status Status::NoColumnDefined(const infinity::String &table_name) {
+    return Status(ErrorCode::kNoColumnDefined, MakeUnique<String>(fmt::format("Try to define Table {} without any column.", table_name)));
+}
+
+Status Status::NotSupportedTypeConversion(const String &from_type, const String &to_type) {
+    return Status(ErrorCode::kNotSupportedTypeConversion, MakeUnique<String>(fmt::format("Not support to convert {} to {}", from_type, to_type)));
+}
+
+Status Status::EmptySelectFields() { return Status(ErrorCode::kEmptySelectFields, MakeUnique<String>("Select fields are empty")); }
+
+Status Status::InvalidDataType() { return Status(ErrorCode::kInvalidDataType, MakeUnique<String>("Invalid data type")); }
+
+Status Status::ParseMatchExprFailed(const String &fields, const String &matching_text) {
+    return Status(ErrorCode::kParseMatchExprFailed,
+                  MakeUnique<String>(fmt::format("Trying to match: {} on fields: {} failed.", matching_text, fields)));
+}
+
+Status Status::FTSIndexNotExist(const String &table_name) {
+    return Status(ErrorCode::kFTSIndexNotExist, MakeUnique<String>(fmt::format("Full text index of table: {} not exists.", table_name)));
+}
+
+Status Status::UnknownFTSFault() { return Status(ErrorCode::kUnknownFTSFault, MakeUnique<String>(fmt::format("Unknown full text index fault."))); }
+
+Status Status::InvalidConstraintType() { return Status(ErrorCode::kInvalidConstraintType, MakeUnique<String>("Invalid constraint type.")); }
+
+Status Status::InvalidKnnDistanceType() { return Status(ErrorCode::kInvalidKnnDistanceType, MakeUnique<String>("Invalid knn distance type.")); }
+
+Status Status::InvalidEmbeddingDataType() { return Status(ErrorCode::kInvalidEmbeddingDataType, MakeUnique<String>("Invalid embedding data type.")); }
+
+Status Status::InvalidConstantType() { return Status(ErrorCode::kInvalidConstantType, MakeUnique<String>("Invalid constant type.")); }
+
+Status Status::InvalidParsedExprType() { return Status(ErrorCode::kInvalidParsedExprType, MakeUnique<String>("Invalid parsed expression type.")); }
+
+Status Status::InvalidIndexType() { return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>("Invalid index type.")); }
+
+Status Status::InvalidIndexParam(const String &param_name) {
+    return Status(ErrorCode::kInvalidIndexParam, MakeUnique<String>(fmt::format("Invalid index parameter type: {}", param_name)));
+}
+
+Status Status::LackIndexParam() { return Status(ErrorCode::kLackIndexParam, MakeUnique<String>("Lack index parameter")); }
+
+Status Status::InvalidFilterExpression(const String &expr_str) {
+    return Status(ErrorCode::kInvalidFilterExpression,
+                  MakeUnique<String>(fmt::format("Invalid expression in where clause: {} expression", expr_str)));
+}
+
+Status Status::MultipleFunctionMatched(const String &function, const String &functions) {
+    return Status(ErrorCode::kMultipleFunctionMatched, MakeUnique<String>(fmt::format("{}: matched multiple functions: {}", function, functions)));
+}
+
+Status Status::InsertWithoutValues() { return Status(ErrorCode::kInsertWithoutValues, MakeUnique<String>("Insert into table without any values")); }
+
+Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, MakeUnique<String>("invalid conflict type")); }
+
+Status Status::InvalidJsonFormat(const String &error_message) {
+    return Status(ErrorCode::kInvalidJsonFormat, MakeUnique<String>(fmt::format("Invalid format json: {}", error_message)));
+}
+
+Status Status::DuplicateColumnName(const String &column_name) {
+    return Status(ErrorCode::kDuplicateColumnName, MakeUnique<String>(fmt::format("Duplicated column name: {}", column_name)));
+}
+
+Status Status::InvalidExpression(const String &expr_str) { return Status(ErrorCode::kInvalidExpression, MakeUnique<String>(expr_str)); }
+
+Status Status::SegmentNotExist(const SegmentID &segment_id) {
+    return Status(ErrorCode::kSegmentNotExist, MakeUnique<String>(fmt::format("Segment: {} doesn't exist", segment_id)));
+}
+Status Status::BlockNotExist(const BlockID &block_id) {
+    return Status(ErrorCode::kBlockNotExist, MakeUnique<String>(fmt::format("Block: {} doesn't exist", block_id)));
+}
+
+Status Status::AggregateFunctionWithEmptyArgs() {
+    return Status(ErrorCode::kAggregateFunctionWithEmptyArgs, MakeUnique<String>("Aggregate function with empty arguments"));
+}
+
+Status Status::InvalidCommand(const String &detailed_error) {
+    return Status(ErrorCode::kInvalidCommand, MakeUnique<String>(fmt::format("Invalid command: {}", detailed_error)));
+}
+
+Status Status::AnalyzerNotFound(const String& name) {
+    return Status(ErrorCode::kAnalyzerNotFound, MakeUnique<String>(fmt::format("Analyzer {} isn't found", name)));
+}
+
+Status Status::NotSupportedAnalyzer(const String& name) {
+    return Status(ErrorCode::kNotSupportedAnalyzer, MakeUnique<String>(fmt::format("Analyzer {} isn't supported", name)));
+}
+
+Status Status::InvalidAnalyzerName(const String& name) {
+    return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(name));
+}
+
+Status Status::InvalidAnalyzerFile(const String& detailed_info) {
+    return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(fmt::format("Invalid analyzer file: {}", detailed_info)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
 }
+
 Status Status::TxnConflict(u64 txn_id, const String &conflict_reason) {
     return Status(ErrorCode::kTxnConflict,
                   MakeUnique<String>(fmt::format("Transaction: {} is conflicted, detailed info: {}", txn_id, conflict_reason)));
@@ -330,6 +472,18 @@ Status Status::UnexpectedError(const String &detailed_info) {
     return Status(ErrorCode::kUnexpectedError, MakeUnique<String>(fmt::format("Unexpected error: {}", detailed_info)));
 }
 
+Status Status::ParserError(const String &detailed_info) {
+    return Status(ErrorCode::kParserError, MakeUnique<String>(fmt::format("Parser error: {}", detailed_info)));
+}
+
+Status Status::MmapFileError(const String &detailed_info) {
+    return Status(ErrorCode::kMmapFileError, MakeUnique<String>(fmt::format("mmap error: {}", detailed_info)));
+}
+
+Status Status::MunmapFileError(const String &detailed_info) {
+    return Status(ErrorCode::kMunmapFileError, MakeUnique<String>(fmt::format("munmap error: {}", detailed_info)));
+}
+
 Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }
@@ -337,6 +491,8 @@ Status Status::ColumnCountMismatch(const String &detailed_info) {
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
+
+Status Status::DuplicateEntry() { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>("Duplicate entry")); }
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
 

@@ -1,37 +1,47 @@
 # python-infinity
 
-# dependency
-
-```shell
-pip install -r requirements.txt
-```
-
 # build
 
 ```shell
-python setup.py sdist bdist_wheel
+rm -f dist/* && python setup.py sdist bdist_wheel
 ```
 
 # install
 ```shell
-pip install dist/*.whl
+pip uninstall -y infinity-sdk && pip install dist/*.whl
 ```
 
-# upload
+This will install infinity-sdk and its dependencies.
+
+# upload to pypi.org
 ```shell
-twine upload dist/* 
+twine upload dist/*.whl
 ```
+
+Enter your pypi API token according to the prompt.
+
+Note that pypi allow a version of a package [be uploaded only once](https://pypi.org/help/#file-name-reuse). You need to change the `version` inside the `pyproject.toml` before build and upload.
+
 # using
 
 ```python
 import infinity
 from infinity.common import REMOTE_HOST
+from infinity.common import ConflictType
 
 infinity_obj = infinity.connect(REMOTE_HOST)
-db = infinity_obj.get_database("default")
-db.drop_table("my_table", if_exists=True)
-table = db.create_table(
-    "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
+db = infinity_obj.get_database("default_db")
+db.drop_table("my_table", ConflictType.Ignore)
+table = db_obj.create_table("my_table", {
+            "c1": {
+                "type": "int",
+                "constraints"(optional): ["primary key", ...],
+                "default"(optional): 1/"asdf"/[1,2]/...
+            },
+            "c2": {
+                "type":"vector,1024,float32",
+            }
+        }, None)
 table.insert(
     [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
 table.insert(

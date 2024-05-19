@@ -19,21 +19,21 @@ export module wal_manager;
 import stl;
 import bg_task;
 import wal_entry;
+import options;
+import catalog_delta_entry;
+import blocking_queue;
 
 namespace infinity {
 
 class Storage;
 class BGTaskProcessor;
 class TableEntry;
+class Txn;
+class SegmentEntry;
 
 export class WalManager {
 public:
-    WalManager(Storage *storage,
-               String wal_path,
-               u64 wal_size_threshold,
-               u64 full_checkpoint_interval_sec,
-               u64 delta_checkpoint_interval_sec,
-               u64 delta_checkpoint_interval_wal_bytes);
+    WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
 
     ~WalManager();
 
@@ -43,7 +43,7 @@ public:
 
     // Session request to persist an entry. Assuming txn_id of the entry has
     // been initialized.
-    int PutEntry(SharedPtr<WalEntry> entry);
+    void PutEntries(Vector<WalEntry *> wal_entries);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -51,15 +51,15 @@ public:
     // checkpoint for a batch of sync.
     void Flush();
 
-    // Checkpoint is scheduled regularly.
-    // Checkpoint for transactions which lsn no larger than lsn_pend_chk_.
-    void CheckpointTimer();
+    bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
 
-    void Checkpoint();
+    void Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size);
 
-    void Checkpoint(ForceCheckpointTask *ckp_task);
+    void Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size);
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
+
+    String GetWalFilename() const;
 
     i64 ReplayWalFile();
 
@@ -67,9 +67,18 @@ public:
 
     void RecycleWalFile(TxnTimeStamp full_ckp_ts);
 
+    // Should only call in `Flush` thread
+    i64 WalSize() const;
+
+    i64 GetLastCkpWalSize();
+
+    TxnTimeStamp GetCheckpointedTS();
+
 private:
-    void SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size);
-    Tuple<TxnTimeStamp, i64> GetWalState();
+    // Checkpoint Helper
+    void CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size);
+
+    void SetLastCkpWalSize(i64 wal_size);
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
@@ -79,51 +88,48 @@ private:
     void WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+    // import and compact helper
+    SharedPtr<SegmentEntry> ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    // void WalCmdSetSegmentStatusSealedReplay(const WalCmdSetSegmentStatusSealed &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    // void WalCmdUpdateSegmentBloomFilterDataReplay(const WalCmdUpdateSegmentBloomFilterData &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
     u64 cfg_wal_size_threshold_{};
-    u64 cfg_full_checkpoint_interval_sec_{};
-    u64 cfg_delta_checkpoint_interval_sec_{};
     u64 cfg_delta_checkpoint_interval_wal_bytes_{};
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
+    String wal_dir_{};
     String wal_path_{};
+
     Storage *storage_{};
 
     // WalManager state
     Atomic<bool> running_{};
     Thread flush_thread_{};
-    Thread checkpoint_thread_{};
 
     // TxnManager and Flush thread access following members
-    std::mutex mutex_{};
-    Deque<SharedPtr<WalEntry>> que_{};
+    BlockingQueue<WalEntry *> wait_flush_{};
 
     // Only Flush thread access following members
-    Deque<SharedPtr<WalEntry>> que2_{};
-    StdOfStream ofs_{};
-
-    // Flush and Checkpoint threads access following members
-    std::mutex mutex2_{};
+    std::ofstream ofs_{};
     TxnTimeStamp max_commit_ts_{};
     i64 wal_size_{};
-    atomic_u64 last_ckp_commit_ts_{};
+    FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
 
-    // Only Checkpoint thread access following members
-    i64 last_full_ckp_wal_size_{};
-    i64 last_delta_ckp_wal_size_{};
-    i64 last_full_ckp_time_{};
-    i64 last_delta_ckp_time_{};
+    // Flush and Checkpoint threads access following members
+    mutable std::mutex mutex2_{};
+    i64 last_ckp_wal_size_{};
+    Atomic<bool> checkpoint_in_progress_{false};
 
-
-    Vector<String> wal_list_{};
+    // Only Checkpoint/Cleanup thread access following members
+    TxnTimeStamp last_ckp_ts_{};
+    TxnTimeStamp last_full_ckp_ts_{};
 };
 
 } // namespace infinity

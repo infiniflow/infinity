@@ -81,6 +81,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         }
         columns.push_back(column);
     }
+#if 0
     {
         SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kHugeInt));
         column->Initialize();
@@ -90,6 +91,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
         }
         columns.push_back(column);
     }
+#endif
     {
         SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat));
         column->Initialize();

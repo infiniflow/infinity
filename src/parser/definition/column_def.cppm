@@ -26,5 +26,6 @@ export using infinity::ColumnDef;
 export using infinity::ColumnType;
 export using infinity::TableConstraint;
 export using infinity::ConstrainTypeToString;
+export using infinity::StringToConstraintType;
 
 }

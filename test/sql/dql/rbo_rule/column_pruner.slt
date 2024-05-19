@@ -17,7 +17,7 @@ PROJECT (3)
  - table index: #4
  - expressions: [c1 (#0), c2 (#1), c3 (#2), c4 (#3)]
 -> TABLE SCAN (2)
-   - table name: t1(default.t1)
+   - table name: t1(default_db.t1)
    - table index: #1
    - output columns: [c1, c2, c3, c4, __rowid]
 
@@ -28,7 +28,7 @@ PROJECT (3)
  - table index: #4
  - expressions: [c2 (#0)]
 -> TABLE SCAN (2)
-   - table name: t1(default.t1)
+   - table name: t1(default_db.t1)
    - table index: #1
    - output columns: [c2, __rowid]
 
@@ -39,7 +39,7 @@ EXPLAIN LOGICAL SELECT c1 + 1 FROM t1;
   - table index: #4
   - expressions: [CAST(c1 (#0) AS BigInt) + 1]
  -> TABLE SCAN (2)
-    - table name: t1(default.t1)
+    - table name: t1(default_db.t1)
     - table index: #1
     - output columns: [c1, __rowid]
 
@@ -50,7 +50,7 @@ EXPLAIN LOGICAL SELECT c1 + c2 FROM t1;
   - table index: #4
   - expressions: [c1 (#0) + c2 (#1)]
  -> TABLE SCAN (2)
-    - table name: t1(default.t1)
+    - table name: t1(default_db.t1)
     - table index: #1
     - output columns: [c1, c2, __rowid]
 
@@ -64,7 +64,7 @@ PROJECT (4)
    - filter: CAST(c4 (#0) AS BigInt) > 1
    - output columns: [c4, __rowid]
   -> TABLE SCAN (2)
-     - table name: t1(default.t1)
+     - table name: t1(default_db.t1)
      - table index: #1
      - output columns: [c4, __rowid]
 
@@ -78,11 +78,11 @@ PROJECT (5)
    - filters: [c1 (#0) = c2 (#1)
    - output columns: [c1, __rowid, c2, __rowid]
   -> TABLE SCAN (2)
-     - table name: t1(default.t1)
+     - table name: t1(default_db.t1)
      - table index: #1
      - output columns: [c1, __rowid]
   -> TABLE SCAN (3)
-     - table name: t2(default.t2)
+     - table name: t2(default_db.t2)
      - table index: #2
      - output columns: [c2, __rowid]
 
@@ -99,11 +99,11 @@ PROJECT (6)
      - filters: [c1 (#0) = c2 (#1)
      - output columns: [c1, __rowid, c2, __rowid]
     -> TABLE SCAN (2)
-       - table name: t1(default.t1)
+       - table name: t1(default_db.t1)
        - table index: #1
        - output columns: [c1, __rowid]
     -> TABLE SCAN (3)
-       - table name: t2(default.t2)
+       - table name: t2(default_db.t2)
        - table index: #2
        - output columns: [c2, __rowid]
 
@@ -117,7 +117,7 @@ EXPLAIN LOGICAL SELECT MIN(c1 + 1), AVG(c2) FROM t1;
     - aggregate table index: #3
     - aggregate: [MIN(CAST(c1 (#0) AS BigInt) + 1), SUM(c2 (#1)), COUNT(c2 (#1))]
    -> TABLE SCAN (2)
-      - table name: t1(default.t1)
+      - table name: t1(default_db.t1)
       - table index: #1
       - output columns: [c1, c2, __rowid]
 
@@ -134,7 +134,7 @@ EXPLAIN LOGICAL SELECT Min(c1 + 1), AVG(c2) FROM t1 GROUP BY c1;
     - group by table index: #2
     - group by: [c1 (#0)]
    -> TABLE SCAN (2)
-      - table name: t1(default.t1)
+      - table name: t1(default_db.t1)
       - table index: #1
       - output columns: [c1, c2, __rowid]
 
@@ -142,12 +142,12 @@ EXPLAIN LOGICAL SELECT Min(c1 + 1), AVG(c2) FROM t1 GROUP BY c1;
 query I
 EXPLAIN LOGICAL DELETE FROM t1 WHERE c1=1;
 ----
-DELETE FROM default.t1
+DELETE FROM default_db.t1
 -> FILTER (4)
    - filter: CAST(c1 (#0) AS BigInt) = 1
    - output columns: [c1, __rowid]
   -> TABLE SCAN (2)
-     - table name: t1(default.t1)
+     - table name: t1(default_db.t1)
      - table index: #1
      - output columns: [c1, __rowid]
 

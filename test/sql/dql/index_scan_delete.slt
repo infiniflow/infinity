@@ -5,7 +5,7 @@ statement ok
 CREATE TABLE test_index_scan_delete (c1 integer, mod_256_min_128 tinyint, mod_7 tinyint);
 
 statement ok
-COPY test_index_scan_delete FROM '/tmp/infinity/test_data/test_big_index_scan.csv' WITH ( DELIMITER ',' );
+COPY test_index_scan_delete FROM '/var/infinity/test_data/test_big_index_scan.csv' WITH ( DELIMITER ',' );
 
 statement ok
 DELETE FROM test_index_scan_delete WHERE mod_7 = 1;

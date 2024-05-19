@@ -27,7 +27,13 @@ namespace infinity {
 class BufferManager;
 class BlockColumnEntry;
 
-export enum class VectorBufferType { kInvalid, kStandard, kHeap, kCompactBit };
+export enum class VectorBufferType {
+    kInvalid,
+    kStandard,
+    kHeap, // varchar, can be stored across multiple chunks
+    kCompactBit,
+    kTensorHeap, // tensor, should be stored in one chunk (maybe not necessary?)
+};
 
 export class VectorBuffer {
 public:
@@ -37,9 +43,17 @@ public:
     Make(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
 public:
-    explicit VectorBuffer() { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorBuffer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("VectorBuffer");
+#endif
+    }
 
-    ~VectorBuffer() { GlobalResourceUsage::DecrObjectCount(); }
+    ~VectorBuffer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("VectorBuffer");
+#endif
+    }
 
     void Initialize(SizeT type_size, SizeT capacity);
 

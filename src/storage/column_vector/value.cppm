@@ -15,7 +15,6 @@ module;
 
 export module value;
 
-
 import stl;
 import type_info;
 import logical_type;
@@ -23,6 +22,7 @@ import infinity_exception;
 import internal_types;
 import embedding_info;
 import data_type;
+import knn_expr;
 
 namespace infinity {
 
@@ -68,6 +68,7 @@ struct StringValueInfo : public ExtraValueInfo {
 
 public:
     explicit StringValueInfo(const String &str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_p) {}
+    explicit StringValueInfo(const std::string_view &str_view) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_view) {}
     explicit StringValueInfo(String &&str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(std::move(str_p)) {}
 
     const String &GetString() { return str_; }
@@ -94,6 +95,20 @@ public:
         data_.resize(len);
         std::memcpy(data_.data(), values_p.data(), len);
     }
+
+    template <>
+    explicit EmbeddingValueInfo(const Vector<bool> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+        SizeT len = values_p.size() / 8;
+        data_.resize(len);
+        auto *data_ptr = reinterpret_cast<u8 *>(data_.data());
+        for (SizeT i = 0; i < values_p.size(); i++) {
+            if (values_p[i]) {
+                data_ptr[i / 8] |= (static_cast<u8>(1) << (i % 8));
+            }
+        }
+    }
+
+    String GetString(EmbeddingInfo* embedding_info);
 
     Pair<const_ptr_t, SizeT> GetData() const { return MakePair<const_ptr_t, SizeT>(data_.data(), data_.size()); }
 
@@ -147,21 +162,23 @@ public:
 
     static Value MakeBox(BoxT input);
 
-//    static Value MakePath(PathT input);
-//
-//    static Value MakePolygon(PolygonT input);
+    //    static Value MakePath(PathT input);
+    //
+    //    static Value MakePolygon(PolygonT input);
 
     static Value MakeCircle(CircleT input);
 
-//    static Value MakeBitmap(BitmapT input);
+    //    static Value MakeBitmap(BitmapT input);
 
     static Value MakeUuid(UuidT input);
 
-//    static Value MakeBlob(BlobT input);
+    //    static Value MakeBlob(BlobT input);
 
     static Value MakeRow(RowID input);
 
-    static Value MakeVarchar(const String &str);
+    // static Value MakeVarchar(const String &str);
+
+    static Value MakeVarchar(const std::string_view str_view);
 
     static Value MakeVarchar(const char *ptr, SizeT len);
 
@@ -172,10 +189,30 @@ public:
         auto embedding_info_ptr = EmbeddingInfo::Make(ToEmbeddingDataType<T>(), vec.size());
         Value value(LogicalType::kEmbedding, embedding_info_ptr);
         value.value_info_ = MakeShared<EmbeddingValueInfo>(vec);
+        if constexpr (std::is_same_v<T, bool>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemBit, vec.size()));
+        } else if constexpr (std::is_same_v<T, i8>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt8, vec.size()));
+        } else if constexpr (std::is_same_v<T, i16>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt16, vec.size()));
+        } else if constexpr (std::is_same_v<T, i32>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt32, vec.size()));
+        } else if constexpr (std::is_same_v<T, i64>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, vec.size()));
+        } else if constexpr (std::is_same_v<T, float>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, vec.size()));
+        } else if constexpr (std::is_same_v<T, double>) {
+            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, vec.size()));
+        } else {
+            UnrecoverableError("Not supported embedding data type.");
+        }
+
         return value;
     }
 
     static Value MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
+
+    static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
 
     // Object member
 public:
@@ -297,23 +334,23 @@ LineSegT Value::GetValue() const;
 template <>
 BoxT Value::GetValue() const;
 
-//template <>
-//PathT Value::GetValue() const;
+// template <>
+// PathT Value::GetValue() const;
 //
-//template <>
-//PolygonT Value::GetValue() const;
+// template <>
+// PolygonT Value::GetValue() const;
 
 template <>
 CircleT Value::GetValue() const;
 
-//template <>
-//BitmapT Value::GetValue() const;
+// template <>
+// BitmapT Value::GetValue() const;
 
 template <>
 UuidT Value::GetValue() const;
 
-//template <>
-//BlobT Value::GetValue() const;
+// template <>
+// BlobT Value::GetValue() const;
 
 template <>
 RowID Value::GetValue() const;

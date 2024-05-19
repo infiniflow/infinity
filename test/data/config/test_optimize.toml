@@ -1,0 +1,16 @@
+[general]
+version = "0.2.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+
+[storage]
+# close auto optimize
+optimize_interval = "0s"
+# close auto compaction
+compact_interval = "0s"
+
+[wal]
+[buffer]
+[resource]

@@ -16,13 +16,35 @@
 
 import infinity_exception;
 import stl;
-
+import knn_filter;
 import ann_ivf_flat;
 import bitmask;
 import knn_expr;
 import internal_types;
+import infinity_context;
+import global_resource_usage;
 
-class AnnIVFFlatL2Test : public BaseTest {};
+class AnnIVFFlatL2Test : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+};
 
 TEST_F(AnnIVFFlatL2Test, test1) {
     using namespace infinity;
@@ -30,8 +52,8 @@ TEST_F(AnnIVFFlatL2Test, test1) {
     i64 dimension = 4;
     i64 top_k = 4;
     i64 base_embedding_count = 4;
-    UniquePtr < f32[] > base_embedding = MakeUnique<f32[]>(dimension * base_embedding_count);
-    UniquePtr < f32[] > query_embedding = MakeUnique<f32[]>(dimension);
+    UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(dimension * base_embedding_count);
+    UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(dimension);
 
     {
         base_embedding[0] = 0.1;
@@ -95,12 +117,13 @@ TEST_F(AnnIVFFlatL2Test, test1) {
     EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 3);
 
     {
-        AnnIVFFlatL2 <f32> ann_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
+        AnnIVFFlatL2<f32> ann_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
         auto p_bitmask = Bitmask::Make(64);
+        BitmaskFilter<SegmentOffset> filter(*p_bitmask);
         p_bitmask->SetFalse(1);
         {
             ann_distance_m.Begin();
-            ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, *p_bitmask);
+            ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, filter);
             ann_distance_m.End();
             f32 *distance_array_m = ann_distance_m.GetDistanceByIdx(0);
             RowID *id_array_m = ann_distance_m.GetIDByIdx(0);
@@ -120,7 +143,7 @@ TEST_F(AnnIVFFlatL2Test, test1) {
         p_bitmask->SetFalse(0);
         {
             ann_distance_m.ReInitialize();
-            ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, *p_bitmask);
+            ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, filter);
             ann_distance_m.End();
             f32 *distance_array_m = ann_distance_m.GetDistanceByIdx(0);
             RowID *id_array_m = ann_distance_m.GetIDByIdx(0);
@@ -137,7 +160,7 @@ TEST_F(AnnIVFFlatL2Test, test1) {
         p_bitmask->SetFalse(2);
         {
             ann_distance_m.ReInitialize();
-            ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, *p_bitmask);
+            ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, filter);
             ann_distance_m.End();
             f32 *distance_array_m = ann_distance_m.GetDistanceByIdx(0);
             RowID *id_array_m = ann_distance_m.GetIDByIdx(0);

@@ -37,7 +37,7 @@ import logical_table_scan;
 import logical_filter;
 import logical_update;
 import subquery_unnest;
-
+import logger;
 import conjunction_expression;
 import table_reference;
 
@@ -47,7 +47,9 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
     SharedPtr<LogicalNode> current_node;
     if (where_conditions_.empty()) {
-        RecoverableError(Status::SyntaxError("where_conditions_ shall not be empty"));
+        Status status = Status::SyntaxError("where_conditions_ shall not be empty");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
     if (!where_conditions_.empty()) {
@@ -115,7 +117,9 @@ void BoundUpdateStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            RecoverableError(Status::SyntaxError("Nested subquery detected"));
+            Status status = Status::SyntaxError("Nested subquery detected");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

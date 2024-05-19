@@ -1,0 +1,24 @@
+{
+    "name": "qdrant_sift",
+    "app": "qdrant",
+    "app_path": "servers/qdrant/",
+    "connection_url": "http://localhost:6333",
+    "vector_size": 128,
+    "distance": "L2",
+    "mode": "vector", 
+    "data_path": "datasets/sift/sift-128-euclidean.hdf5",
+    "data_link": "http://ann-benchmarks.com/sift-128-euclidean.hdf5",
+    "vector_name": "embeddings",
+    "topK": 100,
+    "vector_index": {
+       "type": "HNSW",
+       "index_params":{
+           "M": 16,
+           "ef_construct": 200
+       }
+    },
+    "query_type": "json",
+    "query_path": "datasets/sift/sift-128-euclidean.hdf5",
+    "query_link": "http://ann-benchmarks.com/sift-128-euclidean.hdf5",
+    "insert_batch_size": 8192
+}

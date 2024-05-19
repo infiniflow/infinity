@@ -235,8 +235,21 @@ private:
     Vector<StreamState> stack_;
 
 public:
-    FstStream(Fst &fst, Bound min = Bound(), Bound max = Bound()) : fst_(fst), end_at_(max) { SeekMin(min); }
-    FstStream(Fst &fst, u8 *prefix_ptr, SizeT prefix_len) : fst_(fst) {
+    FstStream(Fst &fst, Bound min = Bound(), Bound max = Bound()) : fst_(fst) { Reset(min, max); }
+    FstStream(Fst &fst, u8 *prefix_ptr, SizeT prefix_len) : fst_(fst) { Reset(prefix_ptr, prefix_len); }
+
+    void Reset(Bound min = Bound(), Bound max = Bound()) {
+        end_at_ = max;
+        SeekMin(min);
+    }
+
+    void Reset(u8 *min_ptr, SizeT min_len, u8 *max_ptr, SizeT max_len) {
+        Bound min(Bound::kIncluded, min_ptr, min_len);
+        Bound max(Bound::kIncluded, max_ptr, max_len);
+        Reset(min, max);
+    }
+
+    void Reset(u8 *prefix_ptr, SizeT prefix_len) {
         Bound min(Bound::kIncluded, prefix_ptr, prefix_len);
         Bound max(Bound::kExcluded, prefix_ptr, prefix_len);
         int i;
@@ -249,15 +262,7 @@ public:
         if (i < 0) {
             max = Bound();
         }
-        end_at_ = max;
-        SeekMin(min);
-    }
-
-    void Reset(Bound min = Bound(), Bound max = Bound()) {
-        end_at_ = max;
-        inp_.clear();
-        stack_.clear();
-        SeekMin(min);
+        Reset(min, max);
     }
 
     /// @brief Get next key-value pair per lexicographical order
@@ -305,6 +310,8 @@ private:
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
     void SeekMin(Bound min) {
+        inp_.clear();
+        stack_.clear();
         if (min.IsEmpty()) {
             stack_.emplace_back(fst_.Root(), 0, Output());
             return;

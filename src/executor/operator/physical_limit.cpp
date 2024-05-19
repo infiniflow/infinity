@@ -33,6 +33,7 @@ import status;
 import infinity_exception;
 import expression_type;
 import value_expression;
+import logger;
 
 namespace infinity {
 
@@ -84,7 +85,9 @@ SizeT AtomicCounter::Limit(SizeT row_count) {
 
 bool AtomicCounter::IsLimitOver() {
     if (limit_ < 0) {
-        RecoverableError(Status::InvalidParameterValue("Limit", std::to_string(limit_), "larger than 0"));
+        Status status = Status::InvalidParameterValue("Limit", std::to_string(limit_), "larger than 0");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return limit_ == 0;
 }
@@ -129,7 +132,9 @@ SizeT UnSyncCounter::Limit(SizeT row_count) {
 
 bool UnSyncCounter::IsLimitOver() {
     if (limit_ < 0) {
-        RecoverableError(Status::InvalidParameterValue("Limit", std::to_string(limit_), "larger than 0"));
+        Status status = Status::InvalidParameterValue("Limit", std::to_string(limit_), "larger than 0");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return limit_ == 0;
 }

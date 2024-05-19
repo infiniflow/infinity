@@ -132,6 +132,6 @@ TEST_F(ExpressionExecutorSelectTest, test3) {
                                output_true_select,
                                true);
 #endif
-    EXPECT_EQ(output_true_select->Size(), 0);
+    EXPECT_EQ(output_true_select->Size(), 0u);
     EXPECT_THROW((*output_true_select)[0], UnrecoverableException);
 }

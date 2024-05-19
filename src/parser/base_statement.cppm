@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::StatementType;
 export using infinity::BaseStatement;
 
-}
+} // namespace infinity

@@ -40,6 +40,7 @@ import subquery_unnest;
 
 import conjunction_expression;
 import table_reference;
+import logger;
 
 namespace infinity {
 
@@ -112,7 +113,9 @@ void BoundDeleteStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            RecoverableError(Status::SyntaxError("Nested subquery detected"));
+            Status status = Status::SyntaxError("Nested subquery detected");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

@@ -27,12 +27,14 @@ import knn_scan_data;
 import create_index_data;
 import logger;
 import third_party;
+import compact_state_data;
 
 export module fragment_context;
 
 namespace infinity {
 
 class PlanFragment;
+export class FragmentContext;
 
 export enum class FragmentType {
     kInvalid,
@@ -56,39 +58,54 @@ export String FragmentType2String(FragmentType type) {
 
 export class Notifier {
     SizeT all_task_n_ = 0;
+    SizeT start_task_n_ = 0;
     bool error_ = false;
+    FragmentContext *error_fragment_ctx_ = nullptr;
 
     std::mutex locker_{};
     std::condition_variable cv_{};
+
+    bool Check() const { return all_task_n_ == 0 || (error_ && start_task_n_ == 0); }
 
 public:
     void SetTaskN(SizeT all_task_n) { all_task_n_ = all_task_n; }
 
     void Wait() {
         std::unique_lock<std::mutex> lk(locker_);
-        cv_.wait(lk, [&] { return all_task_n_ == 0; });
+        cv_.wait(lk, [&] { return this->Check(); });
     }
 
     bool StartTask() {
         std::unique_lock<std::mutex> lk(locker_);
         if (!error_) {
+            ++start_task_n_;
             return true;
-        }
-        if (--all_task_n_ == 0) {
-            cv_.notify_one();
         }
         return false;
     }
 
-    void FinishTask(bool error) {
+    void FinishTask(bool error, FragmentContext *fragment_ctx) {
         std::unique_lock<std::mutex> lk(locker_);
-        if (error) {
+        if (error && !error_) {
+            error_fragment_ctx_ = fragment_ctx;
             error_ = true;
         }
-        if (--all_task_n_ == 0) {
+        --start_task_n_;
+        --all_task_n_;
+        if (this->Check()) {
             cv_.notify_one();
         }
     }
+
+    void UnstartTask() {
+        std::unique_lock<std::mutex> lk(locker_);
+        --start_task_n_;
+        if (this->Check()) {
+            cv_.notify_one();
+        }
+    }
+
+    FragmentContext *error_fragment_ctx() const { return error_fragment_ctx_; }
 };
 
 export class FragmentContext {
@@ -117,7 +134,7 @@ public:
 
     [[nodiscard]] PhysicalSource *GetSourceOperator() const;
 
-    void CreateTasks(i64 parallel_count, i64 operator_count);
+    void CreateTasks(i64 parallel_count, i64 operator_count, FragmentContext *parent_context);
 
     inline Vector<UniquePtr<FragmentTask>> &Tasks() { return tasks_; }
 
@@ -127,6 +144,10 @@ public:
 
     inline SharedPtr<DataTable> GetResult() {
         notifier_->Wait();
+
+        if (notifier_->error_fragment_ctx() != nullptr) {
+            return notifier_->error_fragment_ctx()->GetResultInternal();
+        }
 
         return GetResultInternal();
     }
@@ -187,6 +208,10 @@ public:
 
 public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
+
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_array_{};
+
+    SharedPtr<CompactStateData> compact_state_data_{};
 };
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {
@@ -202,6 +227,9 @@ public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
 
     UniquePtr<CreateIndexSharedData> create_index_shared_data_{};
+    SharedPtr<Vector<UniquePtr<CreateIndexSharedData>>> create_index_shared_data_array_{};
+
+    SharedPtr<CompactStateData> compact_state_data_{};
 
 protected:
     HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};

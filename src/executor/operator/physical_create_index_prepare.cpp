@@ -15,6 +15,7 @@
 module;
 
 #include <tuple>
+#include <vector>
 
 module physical_create_index_prepare;
 
@@ -26,7 +27,6 @@ import query_context;
 import operator_state;
 import load_meta;
 
-import index_def;
 import status;
 import infinity_exception;
 import index_base;
@@ -37,18 +37,12 @@ import index_hnsw;
 import default_values;
 import txn_store;
 import base_table_ref;
-import hnsw_common;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
-import lvq_store;
-import plain_store;
 import extra_ddl_info;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,
                                                        SharedPtr<BaseTableRef> base_table_ref,
-                                                       SharedPtr<IndexDef> index_definition,
+                                                       SharedPtr<IndexBase> index_definition,
                                                        ConflictType conflict_type,
                                                        SharedPtr<Vector<String>> output_names,
                                                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
@@ -61,13 +55,26 @@ void PhysicalCreateIndexPrepare::Init() {}
 
 bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    auto result = txn->CreateIndexDef(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_);
-    auto *table_index_entry = std::get<0>(result);
-    auto status = std::get<1>(result);
-    if (!status.ok() || table_index_entry == nullptr) {
+    auto *table_entry = base_table_ref_->table_entry_ptr_;
+    auto [table_index_entry, status] = txn->CreateIndexDef(table_entry, index_def_ptr_, conflict_type_);
+    if (!status.ok()) {
         operator_state->status_ = status;
     } else {
-        txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
+        auto [segment_index_entries, status] = txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+            return true;
+        }
+        for (auto *segment_index_entry : segment_index_entries) {
+            base_table_ref_->index_index_->Insert(table_index_entry, segment_index_entry);
+        }
+        if (!prepare_) {
+            auto status = txn->CreateIndexFinish(table_entry, table_index_entry);
+            if (!status.ok()) {
+                operator_state->status_ = status;
+                return true;
+            }
+        }
     }
     operator_state->SetComplete();
     return true;

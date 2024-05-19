@@ -35,6 +35,8 @@ public:
 
     i64 Write(const void *data, u64 nbytes);
 
+    void Rename(const String& old_name, const String& new_name);
+
     void Sync();
 
     void Close();
@@ -57,6 +59,10 @@ public:
 
     virtual i64 Write(FileHandler &file_handler, const void *data, u64 nbytes) = 0;
 
+    virtual i64 ReadAt(FileHandler &file_handler, i64 file_offset, void *data, u64 nbytes) = 0;
+
+    virtual i64 WriteAt(FileHandler &file_handler, i64 file_offset, const void *data, u64 nbytes) = 0;
+
     virtual void Rename(const String &old_path, const String &new_path) = 0;
 
     virtual void Seek(FileHandler &file_handler, i64 pos) = 0;
@@ -69,12 +75,16 @@ public:
 
     virtual void Close(FileHandler &file_handler) = 0;
 
+    virtual void AppendFile(const String &dst_path, const String &src_path) = 0;
+
     // Directory related methods
     virtual bool Exists(const String &path) = 0; // if file or directory exists
 
     virtual void CreateDirectory(const String &path) = 0;
 
     virtual u64 DeleteDirectory(const String &path) = 0;
+
+    virtual void CleanupDirectory(const String &path) = 0;
 
     virtual Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) = 0;
 

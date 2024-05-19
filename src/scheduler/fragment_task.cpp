@@ -34,6 +34,7 @@ import base_table_ref;
 import defer_op;
 import fragment_context;
 import status;
+import parser_assert;
 
 namespace infinity {
 
@@ -43,7 +44,7 @@ void FragmentTask::Init() {
     operator_states_.resize(operator_count_);
 }
 
-void FragmentTask::OnExecute(i64) {
+void FragmentTask::OnExecute() {
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is running", task_id_, FragmentId()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
@@ -58,9 +59,14 @@ void FragmentTask::OnExecute(i64) {
     // For streaming type, we need to run sink each execution
 
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
+    if(source_state_->state_type_ == SourceStateType::kQueue) {
+        // For debug
+        LOG_TRACE(PhysOpsToString());
+    }
 
     bool execute_success{false};
-    source_op->Execute(fragment_context->query_context(), source_state_.get());
+    source_op->Execute(query_context, source_state_.get());
+    Status operator_status{};
     if (source_state_->status_.ok()) {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
@@ -69,16 +75,19 @@ void FragmentTask::OnExecute(i64) {
         TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
         HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
         profiler.Begin();
-        Status operator_status{};
         try {
             for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
                 profiler.StartOperator(operator_refs[op_idx]);
                 DeferFn defer_fn([&]() { profiler.StopOperator(operator_states_[op_idx].get()); });
 
-                operator_refs[op_idx]->InputLoad(fragment_context->query_context(), operator_states_[op_idx].get(), table_refs);
-                execute_success = operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
+                operator_refs[op_idx]->InputLoad(query_context, operator_states_[op_idx].get(), table_refs);
+                execute_success = operator_refs[op_idx]->Execute(query_context, operator_states_[op_idx].get());
                 operator_refs[op_idx]->FillingTableRefs(table_refs);
 
+                if (!operator_states_[op_idx]->status_.ok()) {
+                    operator_status = operator_states_[op_idx]->status_;
+                    break;
+                }
                 if (!execute_success) {
                     break;
                 }
@@ -86,6 +95,9 @@ void FragmentTask::OnExecute(i64) {
         } catch (RecoverableException &e) {
             LOG_ERROR(e.what());
             operator_status = Status(e.ErrorCode(), e.what());
+        } catch (ParserException &e) {
+            LOG_ERROR(e.what());
+            operator_status = Status::ParserError(e.what());
         } catch (UnrecoverableException &e) {
             LOG_CRITICAL(e.what());
             throw e;
@@ -93,14 +105,12 @@ void FragmentTask::OnExecute(i64) {
 
         profiler.End();
         fragment_context->FlushProfiler(profiler);
-
-        if (!operator_status.ok()) {
-            sink_state_->status_ = operator_status;
-            status_ = FragmentTaskStatus::kError;
-        }
     }
 
-    if (execute_success or !sink_state_->status_.ok()) {
+    if (!operator_status.ok()) {
+        sink_state_->status_ = operator_status;
+        status_ = FragmentTaskStatus::kError;
+    } else if (execute_success) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
         sink_op->Execute(query_context, fragment_context, sink_state_.get());
     }

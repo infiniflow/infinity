@@ -5531,6 +5531,9 @@ TOML_NAMESPACE_START
 					else
 						return {};
 				}
+                default: {
+                    ;
+                }
 			}
 
 			// non-values, or 'exact' types covered above

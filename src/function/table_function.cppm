@@ -33,7 +33,7 @@ public:
     ~TableFunctionData() override = default;
 };
 
-export using TableFunctionType = StdFunction<void(QueryContext *query_context, TableFunctionData *data, DataBlock &output)>;
+export using TableFunctionType = std::function<void(QueryContext *query_context, TableFunctionData *data, DataBlock &output)>;
 
 export class TableFunction : public Function {
 public:

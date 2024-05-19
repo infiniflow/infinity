@@ -30,6 +30,7 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -74,7 +75,9 @@ struct ColumnValueReaderTypeInEqualsFunction {
 
 template <>
 inline void InEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed <> bigint"));
+    Status status = Status::NotSupport("Not implement: mixed <> bigint");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -84,7 +87,9 @@ inline void InEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void InEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed <> double"));
+    Status status = Status::NotSupport("Not implement: mixed <> double");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -94,7 +99,9 @@ inline void InEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void InEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed <> varchar"));
+    Status status = Status::NotSupport("Not implement: mixed <> varchar");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -112,7 +119,7 @@ static void GenerateInEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_
     function_set_ptr->AddFunction(inequals_function);
 }
 
-void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterInEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "<>";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -192,7 +199,7 @@ void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                           &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(varchar_inequals_mixed);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

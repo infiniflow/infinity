@@ -1,7 +1,5 @@
 #include "match_expr.h"
 #include "parser_assert.h"
-#include "query_driver.h"
-#include "search/filter.hpp"
 #include "search_options.h"
 #include "spdlog/fmt/fmt.h"
 
@@ -21,7 +19,7 @@ std::string MatchExpr::ToString() const {
     }
 
     std::ostringstream oss;
-    oss << "MATCH('";
+    oss << "MATCH TEXT ('";
     oss << fields_;
     oss << "', '" << matching_text_ << "'";
     oss << ", '" << options_text_ << "'";

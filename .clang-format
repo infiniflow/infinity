@@ -10,10 +10,8 @@ AllowAllParametersOfDeclarationOnNextLine: false
 AlwaysBreakTemplateDeclarations: Yes
 BinPackArguments: false
 BinPackParameters: false
-BreakBeforeConceptDeclarations: Always
 BreakConstructorInitializers: BeforeColon
 IndentCaseLabels: true
 NamespaceIndentation: None
-IndentAccessModifiers: false
 AccessModifierOffset: -4
 IncludeBlocks: Preserve

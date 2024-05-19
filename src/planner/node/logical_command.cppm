@@ -21,12 +21,13 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 
-import base_table_ref;
 import internal_types;
 import command_statement;
 import data_type;
 
 namespace infinity {
+
+class TableEntry;
 
 export class LogicalCommand : public LogicalNode {
 public:
@@ -44,9 +45,6 @@ public:
     String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalCommand"; }
-
-public:
-    SharedPtr<BaseTableRef> table_ref_{}; // only used for compact command
 
 private:
     SharedPtr<CommandInfo> command_info_{};

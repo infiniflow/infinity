@@ -31,6 +31,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
     random.shuffle(x)
     delete_x = set(random.sample(range(row_n), row_n // 100))
     y = [False if i in delete_x else True for i in x]
+    true_num = sum(y)
 
     with open(csv_path, "w") as csv_file:
         for x1, y1 in zip(x, y):
@@ -42,13 +43,14 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write("CREATE TABLE {} (c1 INTEGER, c2 BOOLEAN);\n".format(table_name))
+        slt_file.write(
+            "CREATE TABLE {} (c1 INTEGER, c2 BOOLEAN);\n".format(table_name))
         slt_file.write("\n")
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '/tmp/infinity/test_data/{}' WITH ( DELIMITER ',' );\n".format(
-                table_name, csv_name
+            "COPY {} FROM '{}/{}' WITH ( DELIMITER ',' );\n".format(
+                table_name, copy_dir, csv_name
             )
         )
         slt_file.write("----\n")
@@ -63,11 +65,18 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("query I\n")
-        slt_file.write("SELECT c1 FROM {};\n".format(table_name))
+        slt_file.write("SELECT COUNT(*) FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        for x1, y1 in zip(x, y):
-            if y1:
-                slt_file.write("{}\n".format(x1))
+        slt_file.write("{}\n".format(true_num))
+        slt_file.write("\n")
+
+        slt_file.write("query I\n")
+        slt_file.write("SELECT c1 FROM {} WHERE c2 = False;\n".format(table_name))
+        slt_file.write("----\n")
+        slt_file.write("\n")
+
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
         slt_file.write("\n")
 
     pass
@@ -87,7 +96,7 @@ if __name__ == "__main__":
         "-c",
         "--copy",
         type=str,
-        default="/tmp/infinity/test_data",
+        default="/var/infinity/test_data",
         dest="copy_dir",
     )
     args = parser.parse_args()

@@ -45,7 +45,6 @@ enum class TypeInfoType : uint8_t {
     kUUID,
     kBlob,
     kEmbedding,
-
 };
 
 class TypeInfo {

@@ -136,6 +136,7 @@ MlasReadExtendedControlRegister(
 
 #if defined(__linux__)
 #include <sys/syscall.h>
+#include <unistd.h>
 #endif
 
 bool

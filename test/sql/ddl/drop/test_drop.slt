@@ -10,8 +10,7 @@ statement ok
 DROP TABLE IF EXISTS test_drop;
 
 statement ok
-CREATE TABLE test_drop (i INTEGER);
-
+CREATE TABLE test_drop (i INTEGER) PROPERTIES (p1 = 1, p2 = abc, p3 = "i, c1, d,e,f", "555" = xxx);
 
 query I
 INSERT INTO test_drop VALUES (42);

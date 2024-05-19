@@ -47,7 +47,7 @@ TEST_F(CastTableTest, casttable_boolean) {
                 break;
             }
             case LogicalType::kVarchar: {
-                EXPECT_EQ(CastTable::instance().GetCastCost(LogicalType::kBoolean, LogicalType::kVarchar), 1);
+                EXPECT_EQ(CastTable::instance().GetCastCost(LogicalType::kBoolean, LogicalType::kVarchar), 100);
                 break;
             }
             default: {

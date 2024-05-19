@@ -18,125 +18,97 @@ export module config;
 import stl;
 import third_party;
 import options;
+import status;
+import command_statement;
 
 namespace infinity {
 
 export constexpr std::string_view profile_history_capacity_name = "profile_history_capacity";
-export constexpr std::string_view enable_profiling_name = "enable_profile";
+export constexpr std::string_view enable_profile_name = "enable_profile";
 export constexpr std::string_view worker_cpu_limit = "cpu_count";
 export constexpr std::string_view log_level = "log_level";
 
 export struct Config {
 public:
-    SharedPtr<String> Init(const SharedPtr<String> &config_path);
+    Status Init(const SharedPtr<String> &config_path);
 
-    void PrintAll() const;
+    void PrintAll();
 
     // General
-    [[nodiscard]] inline String version() const { return system_option_.version; }
+    String Version();
+    String TimeZone();
+    i64 TimeZoneBias();
 
-    [[nodiscard]] inline String time_zone() const { return system_option_.time_zone; }
+    void SetCPULimit(i64 new_cpu_limit);
+    i64 CPULimit();
 
-    [[nodiscard]] inline i32 time_zone_bias() const { return system_option_.time_zone_bias; }
-
-    inline void set_worker_cpu_number(u64 new_cpu_limit) { system_option_.worker_cpu_limit = new_cpu_limit; }
-
-    [[nodiscard]] inline u64 worker_cpu_limit() const { return system_option_.worker_cpu_limit; }
-
-    [[nodiscard]] inline u64 total_memory_size() const { return system_option_.total_memory_size; }
-
-    [[nodiscard]] inline u64 query_cpu_limit() const { return system_option_.query_cpu_limit; }
-
-    [[nodiscard]] inline u64 query_memory_limit() const { return system_option_.query_memory_limit; }
-
-    [[nodiscard]] inline String listen_address() const { return system_option_.listen_address; }
-
-    [[nodiscard]] inline u16 pg_port() const { return system_option_.pg_port; }
-
-    [[nodiscard]] inline u32 http_port() const { return system_option_.http_port; }
-
-    [[nodiscard]] inline u32 sdk_port() const { return system_option_.sdk_port; }
-
-    // Profiler
-    [[nodiscard]] inline bool enable_profiler() const { return system_option_.enable_profiler; }
-
-    [[nodiscard]] inline SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
+    // Network
+    String ServerAddress();
+    i64 PostgresPort();
+    i64 HTTPPort();
+    i64 ClientPort();
+    i64 ConnectionPoolSize();
 
     // Log
-    [[nodiscard]] inline SharedPtr<String> log_filename() const { return system_option_.log_filename; }
+    String LogFileName();
+    String LogDir();
+    String LogFilePath();
+    bool LogToStdout();
+    i64 LogFileMaxSize();
+    i64 LogFileRotateCount();
 
-    [[nodiscard]] inline SharedPtr<String> log_dir() const { return system_option_.log_dir; }
-
-    [[nodiscard]] inline SharedPtr<String> log_file_path() const { return system_option_.log_file_path; }
-
-    [[nodiscard]] inline bool log_to_stdout() const { return system_option_.log_to_stdout; }
-
-    [[nodiscard]] inline SizeT log_max_size() const { return system_option_.log_max_size; }
-
-    [[nodiscard]] inline SizeT log_file_rotate_count() const { return system_option_.log_file_rotate_count; }
-
-    [[nodiscard]] inline LogLevel log_level() const { return system_option_.log_level; }
+    void SetLogLevel(LogLevel level);
+    LogLevel GetLogLevel();
 
     // Storage
-    [[nodiscard]] inline SharedPtr<String> data_dir() const { return system_option_.data_dir; }
+    String DataDir();
 
-    [[nodiscard]] inline SharedPtr<String> wal_dir() const { return system_option_.wal_dir; }
+    i64 CleanupInterval();
 
-    [[nodiscard]] inline u64 default_row_size() const { return system_option_.default_row_size; }
+    i64 CompactInterval();
 
-    [[nodiscard]] inline u64 buffer_pool_size() const { return system_option_.buffer_pool_size; }
+    i64 OptimizeIndexInterval();
 
-    [[nodiscard]] inline SharedPtr<String> temp_dir() const { return system_option_.temp_dir; }
+    i64 MemIndexCapacity();
 
-    // Wal
-    [[nodiscard]] inline u64 full_checkpoint_interval_sec() const { return system_option_.full_checkpoint_interval_sec_; }
+    // Buffer
+    i64 BufferManagerSize();
 
-    [[nodiscard]] inline u64 full_checkpoint_txn_interval() const { return system_option_.full_checkpoint_txn_interval_; }
+    String TempDir();
 
-    [[nodiscard]] inline u64 delta_checkpoint_interval_sec() const { return system_option_.delta_checkpoint_interval_sec_; }
+    // WAL
+    String WALDir();
 
-    [[nodiscard]] inline u64 delta_checkpoint_interval_wal_bytes() const { return system_option_.delta_checkpoint_interval_wal_bytes_; }
+    i64 WALCompactThreshold();
 
-    [[nodiscard]] inline u64 wal_size_threshold() const { return system_option_.wal_size_threshold_; }
+    i64 FullCheckpointInterval();
+
+    i64 DeltaCheckpointInterval();
+
+    i64 DeltaCheckpointThreshold();
+
+    FlushOptionType FlushMethodAtCommit();
 
     // Resource
-    [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
+    String ResourcePath();
 
+public:
+    // Get config by name
+    Tuple<BaseOption *, Status> GetConfigByName(const String& name);
+
+    GlobalOptionIndex GetOptionIndex(const String& var_name) const { return global_options_.GetOptionIndex(var_name); }
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 
-    static SharedPtr<String> ParseByteSize(const String &byte_size_str, u64 &byte_size);
+    static Status ParseByteSize(const String &byte_size_str, i64 &byte_size);
+
+    static Status ParseTimeInfo(const String &time_info, i64 &time_seconds);
 
     static u64 GetAvailableMem();
 
 private:
-    SystemOptions system_option_;
-    SessionOptions default_session_options_;
-};
-
-export enum class SysVar {
-    kQueryCount,
-    kSessionCount,
-    kBufferPoolUsage,
-    kVersion,
-    kQueryMemoryLimit,
-    kQueryCpuLimit,
-    kLogLevel,
-    kSchedulePolicy,
-    kListenAddress,
-    kSQLPort,
-    kSDKPort,
-    kHttpAPIPort,
-    kDataURL,
-    kTimezone,
-    kInvalid,
-};
-
-export struct SystemVariables {
-    static HashMap<String, SysVar> map_;
-
-    static void InitVariablesMap();
-    static SysVar GetSysVarEnumByName(const String& var_name);
+    std::mutex mutex_;
+    GlobalOptions global_options_;
 };
 
 } // namespace infinity

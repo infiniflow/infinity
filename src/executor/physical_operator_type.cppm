@@ -39,6 +39,8 @@ export enum class PhysicalOperatorType : i8 {
     kDummyScan,
     kKnnScan,
     kMergeKnn,
+    kMatchTensorScan,
+    kMergeMatchTensor,
     kMatch,
     kFusion,
 
@@ -94,6 +96,12 @@ export enum class PhysicalOperatorType : i8 {
     kFlush,
     kOptimize,
     kCommand,
+
+    // Compact
+    kCompact,
+    kCompactIndexPrepare,
+    kCompactIndexDo,
+    kCompactFinish,
 
     kSink,
     kSource,

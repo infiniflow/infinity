@@ -17,9 +17,8 @@ export module table_def;
 
 import stl;
 
-import index_def;
+import index_base;
 import column_def;
-
 
 namespace infinity {
 
@@ -32,7 +31,7 @@ public:
 
 public:
     explicit TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns)
-            : schema_name_(std::move(schema)), table_name_(std::move(table_name)), columns_(std::move(columns)) {
+        : schema_name_(std::move(schema)), table_name_(std::move(table_name)), columns_(std::move(columns)) {
         SizeT column_count = columns_.size();
         for (SizeT idx = 0; idx < column_count; ++idx) {
             column_name2id_[columns_[idx]->name()] = idx;
@@ -52,6 +51,8 @@ public:
     static SharedPtr<TableDef> ReadAdv(char *&ptr, i32 maxbytes);
 
     [[nodiscard]] inline const Vector<SharedPtr<ColumnDef>> &columns() const { return columns_; }
+
+    [[nodiscard]] inline Vector<SharedPtr<ColumnDef>> &columns() { return columns_; }
 
     [[nodiscard]] inline SizeT column_count() const { return columns_.size(); }
 
@@ -76,7 +77,7 @@ private:
     SharedPtr<String> table_name_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
-    Vector<IndexDef> indexes_{};
+    Vector<IndexBase> indexes_{};
 };
 
 } // namespace infinity

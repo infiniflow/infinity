@@ -16,10 +16,6 @@
 #include <string>
 #include <utility>
 
-namespace irs {
-class filter;
-} // namespace irs
-
 namespace infinity {
 
 class SearchOptions;

@@ -27,7 +27,7 @@ template <typename T>
 void log_m256(const __m256i &value) {
     const size_t n = sizeof(__m256i) / sizeof(T);
     T buffer[n];
-    _mm256_storeu_si256((__m256i_u *)buffer, value);
+    _mm256_storeu_si256((__m256i *)buffer, value);
     std::cout << "[";
     for (size_t i = 0; i < n; i++) {
         std::cout << (int)buffer[i];
@@ -87,9 +87,9 @@ export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     __m256i sum = _mm256_set1_ps(0);
     const __m256 highest_bit = _mm256_set1_epi8(0x80);
     while (pv1 < pend1) {
-        v1 = _mm256_loadu_si256((__m256i_u *)pv1);
+        v1 = _mm256_loadu_si256((__m256i *)pv1);
         pv1 += 32;
-        v2 = _mm256_loadu_si256((__m256i_u *)pv2);
+        v2 = _mm256_loadu_si256((__m256i *)pv2);
         pv2 += 32;
 
         msb = _mm256_maddubs_epi16(_mm256_and_si256(v1, highest_bit), v2);
@@ -111,6 +111,43 @@ export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
 
 export int32_t I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return I8IPAVX(pv1, pv2, dim) + I8IPBF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
+}
+
+#endif
+
+#if defined(USE_SSE)
+export int32_t I8IPSSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    size_t dim16 = dim >> 4;
+    const int8_t *pend1 = pv1 + (dim16 << 4);
+
+    __m128i v1, v2, msb, low7;
+    __m128i sum = _mm_set1_ps(0);
+    const __m128 highest_bit = _mm_set1_epi8(0x80);
+    while (pv1 < pend1) {
+        v1 = _mm_loadu_si128((__m128i *)pv1);
+        pv1 += 16;
+        v2 = _mm_loadu_si128((__m128i *)pv2);
+        pv2 += 16;
+
+        msb = _mm_maddubs_epi16(_mm_and_si128(v1, highest_bit), v2);
+        low7 = _mm_maddubs_epi16(_mm_andnot_si128(highest_bit, v1), v2);
+
+        low7 = _mm_madd_epi16(low7, _mm_set1_epi16(1));
+        msb = _mm_madd_epi16(msb, _mm_set1_epi16(1));
+
+        sum = _mm_add_epi32(sum, _mm_sub_epi32(low7, msb));
+    }
+
+    // Horizontal add
+    sum = _mm_hadd_epi32(sum, sum);
+    sum = _mm_hadd_epi32(sum, sum);
+
+    // Extract the result
+    return _mm_extract_epi32(sum, 0);
+}
+
+export int32_t I8IPSSEResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    return I8IPSSE(pv1, pv2, dim) + I8IPBF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 
 #endif
@@ -197,6 +234,55 @@ export float F32L2AVXResidual(const float *pv1, const float *pv2, size_t dim) {
 
 #endif
 
+#if defined(USE_SSE)
+export float F32L2SSE(const float *pv1, const float *pv2, size_t dim) {
+    alignas(16) float TmpRes[4];
+    size_t dim16 = dim >> 4;
+
+    const float *pEnd1 = pv1 + (dim16 << 4);
+
+    __m128 diff, v1, v2;
+    __m128 sum = _mm_set1_ps(0);
+
+    while (pv1 < pEnd1) {
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+    }
+
+    _mm_store_ps(TmpRes, sum);
+    return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
+}
+
+export float F32L2SSEResidual(const float *pv1, const float *pv2, size_t dim) {
+    return F32L2SSE(pv1, pv2, dim) + F32L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
+}
+
+#endif
+
 //------------------------------//------------------------------//------------------------------
 
 export float F32IPBF(const float *pv1, const float *pv2, size_t dim) {
@@ -276,6 +362,56 @@ export float F32IPAVX(const float *pVect1, const float *pVect2, SizeT qty) {
 
 export float F32IPAVXResidual(const float *pVect1, const float *pVect2, SizeT qty) {
     return F32IPAVX(pVect1, pVect2, qty) + F32IPBF(pVect1 + (qty & ~15), pVect2 + (qty & ~15), qty & 15);
+}
+
+#endif
+
+#if defined(USE_SSE)
+export float F32IPSSE(const float *pVect1, const float *pVect2, SizeT qty) {
+    alignas(16) float TmpRes[4];
+
+    size_t qty16 = qty / 16;
+
+    const float *pEnd1 = pVect1 + 16 * qty16;
+
+    __m128 sum128 = _mm_set1_ps(0);
+
+    while (pVect1 < pEnd1) {
+        //_mm_prefetch((char*)(pVect2 + 16), _MM_HINT_T0);
+
+        __m128 v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        __m128 v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        sum128 = _mm_add_ps(sum128, _mm_mul_ps(v1, v2));
+
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        sum128 = _mm_add_ps(sum128, _mm_mul_ps(v1, v2));
+
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        sum128 = _mm_add_ps(sum128, _mm_mul_ps(v1, v2));
+
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        sum128 = _mm_add_ps(sum128, _mm_mul_ps(v1, v2));
+    }
+
+    _mm_store_ps(TmpRes, sum128);
+    float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
+
+    return sum;
+}
+
+export float F32IPSSEResidual(const float *pVect1, const float *pVect2, SizeT qty) {
+    return F32IPSSE(pVect1, pVect2, qty) + F32IPBF(pVect1 + (qty & ~15), pVect2 + (qty & ~15), qty & 15);
 }
 
 #endif

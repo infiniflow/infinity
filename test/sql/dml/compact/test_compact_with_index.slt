@@ -5,18 +5,18 @@ statement ok
 CREATE TABLE test_compact_with_index (c1 INT, c2 EMBEDDING(FLOAT, 4));
 
 query I
-COPY test_compact_with_index FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 query I
-COPY test_compact_with_index FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 statement ok
 CREATE INDEX idx1 ON test_compact_with_index (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
 
 query I
-SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
+SELECT c1 FROM test_compact_with_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
 ----
 8
 8
@@ -27,18 +27,22 @@ COMPACT TABLE test_compact_with_index;
 ----
 
 query I
-SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
+COMPACT TABLE test_compact_with_index;
+----
+
+query I
+SELECT c1 FROM test_compact_with_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
 ----
 8
 8
 6
 
 query I
-COPY test_compact_with_index FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 ----
 
 query I
-SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
+SELECT c1 FROM test_compact_with_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
 ----
 8
 8
@@ -49,8 +53,11 @@ COMPACT TABLE test_compact_with_index;
 ----
 
 query I
-SELECT c1 FROM test_compact_with_index SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
+SELECT c1 FROM test_compact_with_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
 ----
 8
 8
 8
+
+statement ok
+DROP TABLE test_compact_with_index;

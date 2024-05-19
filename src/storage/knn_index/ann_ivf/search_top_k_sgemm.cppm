@@ -15,7 +15,12 @@
 module;
 
 #include <functional>
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <immintrin.h>
+#elif defined(__GNUC__) && defined(__aarch64__)
+#include <simde/x86/avx512.h>
+#define __SSE2__
+#endif
 
 import stl;
 import knn_result_handler;
@@ -26,6 +31,8 @@ import heap_twin_operation;
 export module search_top_k_sgemm;
 
 namespace infinity {
+
+#if defined(__AVX2__)
 
 export template <typename ID>
 void search_top_k_with_sgemm(u32 k,
@@ -128,5 +135,111 @@ void search_top_k_with_sgemm(u32 k,
         heap.sort();
     }
 }
+
+#elif defined(__SSE2__)
+
+export template <typename ID>
+void search_top_k_with_sgemm(u32 k,
+                             u32 dimension,
+                             u32 nx,
+                             const f32 *x,
+                             u32 ny,
+                             const f32 *y,
+                             ID *labels,
+                             f32 *distances = nullptr,
+                             bool sort_ = true,
+                             u32 block_size_x = 4096,
+                             u32 block_size_y = 1024) {
+    if (nx == 0 || ny == 0)
+        return;
+    UniquePtr<f32[]> distances_holder;
+    if (distances == nullptr) {
+        distances_holder = MakeUniqueForOverwrite<f32[]>(nx * k);
+        distances = distances_holder.get();
+    }
+    heap_twin_multiple<CompareMax<f32, ID>> heap(nx, k, distances, labels);
+    heap.initialize();
+    auto square_x = MakeUniqueForOverwrite<f32[]>(nx);
+    auto square_y = MakeUniqueForOverwrite<f32[]>(ny);
+    auto x_y_inner_product_buffer = MakeUniqueForOverwrite<f32[]>(block_size_x * block_size_y);
+    L2NormsSquares(square_x.get(), x, dimension, nx);
+    L2NormsSquares(square_y.get(), y, dimension, ny);
+    for (u32 x_part_begin = 0; x_part_begin < nx; x_part_begin += block_size_x) {
+        u32 x_part_end = std::min(nx, x_part_begin + block_size_x);
+        for (u32 y_part_begin = 0; y_part_begin < ny; y_part_begin += block_size_y) {
+            u32 y_part_end = std::min(ny, y_part_begin + block_size_y);
+            u32 x_part_size = x_part_end - x_part_begin;
+            u32 y_part_size = y_part_end - y_part_begin;
+            matrixA_multiply_transpose_matrixB_output_to_C(x + x_part_begin * dimension,
+                                                           y + y_part_begin * dimension,
+                                                           x_part_size,
+                                                           y_part_size,
+                                                           dimension,
+                                                           x_y_inner_product_buffer.get());
+            for (u32 i = 0; i < x_part_size; ++i) {
+                u32 x_id = i + x_part_begin;
+                float *ip_line = x_y_inner_product_buffer.get() + i * y_part_size;
+
+                _mm_prefetch(ip_line, _MM_HINT_NTA);
+                _mm_prefetch(ip_line + 8, _MM_HINT_NTA);
+
+                const __m128 x_norm = _mm_set1_ps(square_x[x_id]);
+                const __m128 mul_minus2 = _mm_set1_ps(-2);
+
+                __m128i current_indices_0 = _mm_setr_epi32(0, 1, 2, 3);
+                __m128i current_indices_1 = _mm_setr_epi32(4, 5, 6, 7);
+                const __m128i indices_delta = _mm_set1_epi32(8);
+
+                u32 j = 0;
+                for (; j < (y_part_size / 8) * 8; j += 8, ip_line += 8) {
+                    u32 j_id = j + y_part_begin;
+                    _mm_prefetch(ip_line + 16, _MM_HINT_NTA);
+                    _mm_prefetch(ip_line + 24, _MM_HINT_NTA);
+
+                    const __m128 y_norm_0 = _mm_loadu_ps(square_y.get() + j_id + 0);
+                    const __m128 y_norm_1 = _mm_loadu_ps(square_y.get() + j_id + 4);
+
+                    const __m128 ip_0 = _mm_loadu_ps(ip_line + 0);
+                    const __m128 ip_1 = _mm_loadu_ps(ip_line + 4);
+
+                    __m128 distances_0 = _mm_fmadd_ps(ip_0, mul_minus2, y_norm_0);
+                    __m128 distances_1 = _mm_fmadd_ps(ip_1, mul_minus2, y_norm_1);
+
+                    f32 distances_scalar_0[4];
+                    f32 distances_scalar_1[4];
+                    u32 indices_scalar_0[4];
+                    u32 indices_scalar_1[4];
+
+                    _mm_storeu_ps(distances_scalar_0, _mm_add_ps(distances_0, x_norm));
+                    _mm_storeu_si128((__m128i *)(indices_scalar_0), current_indices_0);
+                    current_indices_0 = _mm_add_epi32(current_indices_0, indices_delta);
+
+                    _mm_storeu_ps(distances_scalar_1, _mm_add_ps(distances_1, x_norm));
+                    _mm_storeu_si128((__m128i *)(indices_scalar_1), current_indices_1);
+                    current_indices_1 = _mm_add_epi32(current_indices_1, indices_delta);
+
+                    for (u32 jv = 0; jv < 4; ++jv) {
+                        f32 distance_candidate_0 = distances_scalar_0[jv];
+                        u32 index_candidate_0 = indices_scalar_0[jv] + y_part_begin;
+                        f32 distance_candidate_1 = distances_scalar_1[jv];
+                        u32 index_candidate_1 = indices_scalar_1[jv] + y_part_begin;
+                        heap.add(x_id, distance_candidate_0, index_candidate_0);
+                        heap.add(x_id, distance_candidate_1, index_candidate_1);
+                    }
+                }
+                for (; j < y_part_size; ++j, ++ip_line) {
+                    f32 ip = *ip_line;
+                    f32 dis = square_x[x_id] + square_y[j + y_part_begin] - 2 * ip;
+                    heap.add(x_id, dis, j + y_part_begin);
+                }
+            }
+        }
+    }
+    if (sort_) {
+        heap.sort();
+    }
+}
+
+#endif
 
 } // namespace infinity

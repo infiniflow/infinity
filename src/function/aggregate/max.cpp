@@ -177,7 +177,7 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
-void RegisterMaxFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "MAX";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -244,7 +244,7 @@ void RegisterMaxFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(max_function);
     }
 #endif
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

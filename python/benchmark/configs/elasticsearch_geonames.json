@@ -1,0 +1,147 @@
+{
+    "name": "elasticsearch_geonames",
+    "app": "elasticsearch",
+    "app_path": "servers/elasticsearch/",
+    "connection_url": "http://localhost:9200",
+    "data_path": "datasets/geonames/geonames.json",
+    "data_link": "https://rally-tracks.elastic.co/geonames/documents-2.json.bz2",
+    "insert_batch_size": 8192,
+    "query_path": "datasets/geonames/operations.json",
+    "ground_truth_path": "datasets/geonames/ground_truth.json",
+    "query_link": "to_be_set",
+    "mode": "fulltext",
+    "topK": 10,
+    "index": {
+        "settings": {
+        "index.number_of_shards": 5,
+        "index.number_of_replicas": 0,
+        "index.store.type": "fs",
+        "index.requests.cache.enable": false
+        },
+        "mappings": {
+            "dynamic": "strict",
+            "_source": {
+                "enabled": true
+            },
+            "properties": {
+                "elevation": {
+                "type": "integer"
+                },
+                "name": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "geonameid": {
+                "type": "long"
+                },
+                "feature_class": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "location": {
+                "type": "geo_point"
+                },
+                "cc2": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "timezone": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "dem": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "country_code": {
+                "type": "text",
+                "fielddata": true,
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "admin1_code": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "admin2_code": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "admin3_code": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "admin4_code": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "feature_code": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "alternatenames": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "asciiname": {
+                "type": "text",
+                "fields": {
+                    "raw": {
+                    "type": "keyword"
+                    }
+                }
+                },
+                "population": {
+                "type": "long"
+                }
+            }
+        }
+    }  
+}

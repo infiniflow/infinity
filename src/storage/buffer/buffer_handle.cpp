@@ -23,7 +23,7 @@ module buffer_handle;
 namespace infinity {
 BufferHandle::BufferHandle(BufferObj *buffer_obj, void *data) : buffer_obj_(buffer_obj), data_(data) {}
 
-BufferHandle::BufferHandle(const BufferHandle &other) : buffer_obj_(other.buffer_obj_), data_(other.data_) { ++buffer_obj_->rc_; }
+BufferHandle::BufferHandle(const BufferHandle &other) : buffer_obj_(other.buffer_obj_), data_(other.data_) { buffer_obj_->LoadInner(); }
 
 BufferHandle &BufferHandle::operator=(const BufferHandle &other) {
     if (buffer_obj_) {
@@ -31,7 +31,7 @@ BufferHandle &BufferHandle::operator=(const BufferHandle &other) {
     }
     buffer_obj_ = other.buffer_obj_;
     data_ = other.data_;
-    ++buffer_obj_->rc_;
+    buffer_obj_->LoadInner();
     return *this;
 }
 
@@ -55,6 +55,8 @@ BufferHandle::~BufferHandle() {
     if (buffer_obj_) {
         buffer_obj_->UnloadInner();
     }
+    buffer_obj_ = nullptr;
+    data_ = nullptr;
 }
 
 const void *BufferHandle::GetData() const { return data_; }
