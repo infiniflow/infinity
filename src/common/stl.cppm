@@ -200,6 +200,10 @@ export namespace std {
     using std::filesystem::remove_all;
     }
 
+    namespace this_thread {
+        using std::this_thread::sleep_for;
+    }
+
     using std::iota;
     using std::mt19937;
     using std::random_device;
@@ -392,11 +396,6 @@ namespace infinity {
     using ThreadPool = ctpl::thread_pool;
 
     using Thread = std::thread;
-
-    // template< class Rep, class Period >
-    // void SleepFor(const std::chrono::duration<Rep, Period>& sleep_duration) {
-    //     std::this_thread::sleep_for(sleep_duration);
-    // }
 
     using atomic_u32 = std::atomic_uint32_t;
     using atomic_u64 = std::atomic_uint64_t;
