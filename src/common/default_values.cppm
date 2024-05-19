@@ -89,17 +89,17 @@ export {
 
     constexpr SizeT MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
-    constexpr String DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr std::string_view DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
     constexpr SizeT MAX_CLEANUP_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
 
     constexpr SizeT MIN_COMPACT_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr SizeT DEFAULT_COMPACT_INTERVAL_SEC = 10;
-    constexpr String DEFAULT_COMPACT_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr std::string_view DEFAULT_COMPACT_INTERVAL_SEC_STR = "10s"; // 10 seconds
     constexpr SizeT MAX_COMPACT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
 
     constexpr SizeT MIN_OPTIMIZE_INTERVAL_SEC = 1;
     constexpr SizeT DEFAULT_OPTIMIZE_INTERVAL_SEC = 10;
-    constexpr String DEFAULT_OPTIMIZE_INTERVAL_SEC_STR = "10s"; // 10 seconds
+    constexpr std::string_view DEFAULT_OPTIMIZE_INTERVAL_SEC_STR = "10s"; // 10 seconds
     constexpr SizeT MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
 
     constexpr SizeT MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;           // 1 Block
@@ -108,22 +108,22 @@ export {
 
     constexpr i64 MIN_WAL_FILE_SIZE_THRESHOLD = 1024;                                    // 1KB
     constexpr i64 DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * 1024l * 1024l * 1024l;           // 1GB
-    constexpr String DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR = "1GB";           // 1GB
+    constexpr std::string_view DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR = "1GB";           // 1GB
     constexpr i64 MAX_WAL_FILE_SIZE_THRESHOLD = 1024l * DEFAULT_WAL_FILE_SIZE_THRESHOLD; // 1TB
 
     constexpr i64 MIN_FULL_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable full checkpoint
     constexpr i64 DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC = 30; // 30 seconds
-    constexpr String DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
+    constexpr std::string_view DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR = "30s"; // 30 seconds
     constexpr i64 MAX_FULL_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
 
     constexpr i64 MIN_DELTA_CHECKPOINT_INTERVAL_SEC = 0; // 0 means disable delta checkpoint
     constexpr i64 DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC = 5; // 5 seconds
-    constexpr String DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR = "5s"; // 5 seconds
+    constexpr std::string_view DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR = "5s"; // 5 seconds
     constexpr i64 MAX_DELTA_CHECKPOINT_INTERVAL_SEC = 60 * 60 * 24 * 30; // 1 month
 
     constexpr i64 MIN_CHECKPOINT_INTERVAL_WAL_BYTES = 1024; // 1K
     constexpr i64 DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 64 * 1024l * 1024l; // 64 MB
-    constexpr String DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR = "64MB"; // 64 MB
+    constexpr std::string_view DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR = "64MB"; // 64 MB
     constexpr i64 MAX_CHECKPOINT_INTERVAL_WAL_BYTES = 1024l * 1024l * 1024l; // 1GB
 
 
@@ -154,10 +154,10 @@ export {
     constexpr u32 DEFAULT_TENSOR_MAXSIM_OPTION_TOP_N = 10;
 
     constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
-    constexpr String DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
+    constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
 
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
-    constexpr String DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
+    constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
 
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";

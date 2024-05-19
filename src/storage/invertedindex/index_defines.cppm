@@ -57,8 +57,8 @@ export {
 
     using ScoredId = Pair<float, u32>;
     using ScoredIds = Vector<ScoredId>;
-    constexpr String DEFAULT_SCORER = "bm25";
-    constexpr String DEFAULT_SCORER_ARG = "";
+    constexpr std::string_view DEFAULT_SCORER = "bm25";
+    constexpr std::string_view DEFAULT_SCORER_ARG = "";
     constexpr SizeT DEFAULT_TOPN = 100;
 }
 
