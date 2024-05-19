@@ -31,7 +31,7 @@ std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_int_distribution<int> dis(INT32_MAX / 2, INT32_MAX);
 
-String RandStr() {
+static String RandStr() {
     u32 len = dis(gen) % 100 + 50;
     String str;
     str.reserve(len);
