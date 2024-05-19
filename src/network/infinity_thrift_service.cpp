@@ -1965,7 +1965,7 @@ void InfinityThriftService::HandleRowIDType(infinity_thrift_rpc::ColumnField &ou
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1973,7 +1973,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::CommonResponse &r
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1981,7 +1981,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseRespo
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1989,7 +1989,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowTableResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -1997,7 +1997,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowIndexResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2005,7 +2005,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::SelectResponse &r
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListDatabaseResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListDatabaseResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2013,7 +2013,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListDatabaseRespo
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2021,7 +2021,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListTableResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2029,7 +2029,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ListIndexResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2037,7 +2037,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowSegmentRespon
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2045,7 +2045,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockResponse
     }
 }
 
-void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const String error_header) {
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const std::string_view error_header) {
     response.__set_error_code((i64)(status.code()));
     if (!status.ok()) {
         response.__set_error_msg(status.message());
@@ -2053,7 +2053,7 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnRe
     }
 }
 
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2061,7 +2061,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonRespon
     }
 }
 
-void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const String error_header) {
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2071,7 +2071,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectRespon
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListDatabaseResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2081,7 +2081,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListDatabase
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2091,7 +2091,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListTableRes
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListIndexResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2101,7 +2101,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ListIndexRes
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2111,7 +2111,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowDatabase
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2121,7 +2121,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowTableRes
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowIndexResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2131,7 +2131,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowIndexRes
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSegmentResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2141,7 +2141,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowSegmentR
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());
@@ -2151,7 +2151,7 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockRes
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockColumnResponse &response,
                                                const QueryResult &result,
-                                               const String error_header) {
+                                               const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
     if (!result.IsOk()) {
         response.__set_error_msg(result.ErrorStr());

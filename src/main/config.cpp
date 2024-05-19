@@ -755,7 +755,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             // Log File Max Size
                             i64 log_file_max_size = DEFAULT_LOG_FILE_SIZE;
                             if (elem.second.is_string()) {
-                                String log_file_max_size_str = elem.second.value_or(DEFAULT_LOG_FILE_SIZE_STR);
+                                String log_file_max_size_str = elem.second.value_or(DEFAULT_LOG_FILE_SIZE_STR.data());
                                 auto res = ParseByteSize(log_file_max_size_str, log_file_max_size);
                                 if (!res.ok()) {
                                     return res;
@@ -934,7 +934,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             // Cleanup Interval
                             i64 cleanup_interval = DEFAULT_CLEANUP_INTERVAL_SEC;
                             if(elem.second.is_string()) {
-                                String cleanup_interval_str = elem.second.value_or(DEFAULT_CLEANUP_INTERVAL_SEC_STR);
+                                String cleanup_interval_str = elem.second.value_or(DEFAULT_CLEANUP_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(cleanup_interval_str, cleanup_interval);
                                 if (!res.ok()) {
                                     return res;
@@ -958,7 +958,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             // Compact Interval
                             i64 compact_interval = DEFAULT_COMPACT_INTERVAL_SEC;
                             if(elem.second.is_string()) {
-                                String compact_interval_str = elem.second.value_or(DEFAULT_COMPACT_INTERVAL_SEC_STR);
+                                String compact_interval_str = elem.second.value_or(DEFAULT_COMPACT_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(compact_interval_str, compact_interval);
                                 if (!res.ok()) {
                                     return res;
@@ -982,7 +982,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             // Optimize Index Interval
                             i64 optimize_index_interval = DEFAULT_OPTIMIZE_INTERVAL_SEC;
                             if(elem.second.is_string()) {
-                                String optimize_index_interval_str = elem.second.value_or(DEFAULT_OPTIMIZE_INTERVAL_SEC_STR);
+                                String optimize_index_interval_str = elem.second.value_or(DEFAULT_OPTIMIZE_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(optimize_index_interval_str, optimize_index_interval);
                                 if (!res.ok()) {
                                     return res;
@@ -1104,7 +1104,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                         case GlobalOptionIndex::kBufferManagerSize: {
                             i64 buffer_manager_size = DEFAULT_BUFFER_MANAGER_SIZE;
                             if(elem.second.is_string()) {
-                                String buffer_manager_size_str = elem.second.value_or(DEFAULT_BUFFER_MANAGER_SIZE_STR);
+                                String buffer_manager_size_str = elem.second.value_or(DEFAULT_BUFFER_MANAGER_SIZE_STR.data());
                                 auto res = ParseByteSize(buffer_manager_size_str, buffer_manager_size);
                                 if (!res.ok()) {
                                     return res;
@@ -1201,7 +1201,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             i64 wal_compact_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
 
                             if (elem.second.is_string()) {
-                                String wal_compact_threshold_str = elem.second.value_or(DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR);
+                                String wal_compact_threshold_str = elem.second.value_or(DEFAULT_WAL_FILE_SIZE_THRESHOLD_STR.data());
                                 auto res = ParseByteSize(wal_compact_threshold_str, wal_compact_threshold);
                                 if (!res.ok()) {
                                     return res;
@@ -1227,7 +1227,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             // Full Checkpoint Interval
                             i64 full_checkpoint_interval = DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC;
                             if (elem.second.is_string()) {
-                                String full_checkpoint_interval_str = elem.second.value_or(DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR);
+                                String full_checkpoint_interval_str = elem.second.value_or(DEFAULT_FULL_CHECKPOINT_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(full_checkpoint_interval_str, full_checkpoint_interval);
                                 if (!res.ok()) {
                                     return res;
@@ -1254,7 +1254,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             // Delta Checkpoint Interval
                             i64 delta_checkpoint_interval = DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC;
                             if (elem.second.is_string()) {
-                                String delta_checkpoint_interval_str = elem.second.value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR);
+                                String delta_checkpoint_interval_str = elem.second.value_or(DEFAULT_DELTA_CHECKPOINT_INTERVAL_SEC_STR.data());
                                 auto res = ParseTimeInfo(delta_checkpoint_interval_str, delta_checkpoint_interval);
                                 if (!res.ok()) {
                                     return res;
@@ -1281,7 +1281,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             // Delta Checkpoint Threshold
                             i64 delta_checkpoint_threshold = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
                             if (elem.second.is_string()) {
-                                String delta_checkpoint_threshold_str = elem.second.value_or(DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR);
+                                String delta_checkpoint_threshold_str = elem.second.value_or(DELTA_CHECKPOINT_INTERVAL_WAL_BYTES_STR.data());
                                 auto res = ParseByteSize(delta_checkpoint_threshold_str, delta_checkpoint_threshold);
                                 if (!res.ok()) {
                                     return res;
