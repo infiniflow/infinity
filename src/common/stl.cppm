@@ -245,6 +245,8 @@ export namespace std {
 
     using std::stof;
     using std::stod;
+
+    using std::construct_at;
 } // namespace std
 
 namespace infinity {
