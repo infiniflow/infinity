@@ -67,7 +67,7 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
         ss << "to new segment " << new_segment->segment_id();
         segment_data.emplace_back(compact_segment_data.new_segment_, compact_segment_data.old_segments_);
     }
-    LOG_INFO(ss.str());
+    LOG_DEBUG(ss.str());
 
     txn->Compact(table_entry, std::move(segment_data), compact_type_);
     String db_name = *table_entry->GetDBName();

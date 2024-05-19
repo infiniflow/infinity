@@ -329,10 +329,10 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         block_entry->IncreaseRowCount(1);
 
         if (block_entry->GetAvailableCapacity() <= 0) {
-            LOG_TRACE(fmt::format("Block {} saved", block_entry->block_id()));
+            LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
             segment_entry->AppendBlockEntry(std::move(block_entry));
             if (segment_entry->Room() <= 0) {
-                LOG_TRACE(fmt::format("Segment {} saved", segment_entry->segment_id()));
+                LOG_DEBUG(fmt::format("Segment {} saved", segment_entry->segment_id()));
                 SaveSegmentData(table_entry_, txn, segment_entry);
                 u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
                 segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
@@ -393,10 +393,10 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
 
     for (const auto &json_entry : json_arr) {
         if (block_entry->GetAvailableCapacity() <= 0) {
-            LOG_TRACE(fmt::format("Block {} saved", block_entry->block_id()));
+            LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
             segment_entry->AppendBlockEntry(std::move(block_entry));
             if (segment_entry->Room() <= 0) {
-                LOG_TRACE(fmt::format("Segment {} saved", segment_entry->segment_id()));
+                LOG_DEBUG(fmt::format("Segment {} saved", segment_entry->segment_id()));
                 SaveSegmentData(table_entry_, txn, segment_entry);
                 u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
                 segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
@@ -516,11 +516,11 @@ void PhysicalImport::CSVRowHandler(void *context) {
     ++parser_context->row_count_;
 
     if (block_entry->GetAvailableCapacity() <= 0) {
-        LOG_TRACE(fmt::format("Block {} saved", block_entry->block_id()));
+        LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
         segment_entry->AppendBlockEntry(std::move(block_entry));
         // we have already used all space of the segment
         if (segment_entry->Room() <= 0) {
-            LOG_TRACE(fmt::format("Segment {} saved", segment_entry->segment_id()));
+            LOG_DEBUG(fmt::format("Segment {} saved", segment_entry->segment_id()));
             SaveSegmentData(table_entry, txn, segment_entry);
             u64 segment_id = Catalog::GetNextSegmentID(parser_context->table_entry_);
             segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);

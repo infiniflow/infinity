@@ -189,13 +189,15 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyCompact: {
+                    LOG_DEBUG("Do compact start.");
                     DoCompact();
+                    LOG_DEBUG("Do compact end.");
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
-                    LOG_TRACE("Optimize start.");
+                    LOG_DEBUG("Optimize start.");
                     ScanAndOptimize();
-                    LOG_TRACE("Optimize done.");
+                    LOG_DEBUG("Optimize done.");
                     break;
                 }
                 default: {
