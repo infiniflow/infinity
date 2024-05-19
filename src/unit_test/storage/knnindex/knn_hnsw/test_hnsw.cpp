@@ -181,7 +181,6 @@ public:
                         }
                     }
                 });
-                write_thread2.detach();
 
                 write_thread2.detach();
 
@@ -199,7 +198,6 @@ public:
                         }
                     });
                 }
-
                 for (int i = 0; i < 4; ++i) {
                     worker_threads[i].join();
                 }

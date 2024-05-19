@@ -577,16 +577,12 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
     auto ret = std::sscanf(str.data(), "%a", &value);
     ParserAssert(ret == str.size(), "Error: parse float error");
 #else
-    std::sscanf(str.data(), "%a", &value);
-//    ParserAssert(ret == str.size(), "Parse Float error");
-//    auto res = std::from_chars(str.begin(), str.end(), value);
-//    ParserAssert(res.ptr == str.data() + str.size(), "Parse Float error");
-//    auto res = std::from_chars(str.begin(), str.end(), value);
-//    if(res.ptr != str.data() + str.size()) {
-//        std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
-//        std::cerr << error_message << std::endl;
-//        ParserError(error_message);
-//    }
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
 #endif
     return value;
 }
@@ -601,16 +597,12 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     auto ret = std::sscanf(str.data(), "%la", &value);
     ParserAssert(ret == str.size(), "Error: parse double error");
 #else
-    std::sscanf(str.data(), "%la", &value);
-//    ParserAssert(ret == str.size(), "Parse Double error");
-//    auto res = std::from_chars(str.begin(), str.end(), value);
-//    ParserAssert(res.ptr == str.data() + str.size(), "Parse Double error");
-//    auto res = std::from_chars(str.begin(), str.end(), value);
-//    if(res.ptr != str.data() + str.size()) {
-//        std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
-//        std::cerr << error_message << std::endl;
-//        ParserError(error_message);
-//    }
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
 #endif
     return value;
 }
