@@ -238,6 +238,9 @@ export namespace std {
     using std::time_t;
     using std::asctime;
     using std::localtime;
+
+    using std::stof;
+    using std::stod;
 } // namespace std
 
 namespace infinity {

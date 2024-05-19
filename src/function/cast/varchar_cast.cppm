@@ -302,24 +302,40 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, FloatT &target) {
     if (source.IsInlined()) {
-        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        if (ec != std::errc()) {
+        // Used in libc++
+        String substr(source.short_.data_, source.length_);
+        try {
+            target = std::stof(substr);
+        } catch(const std::exception &e) {
             return false;
         }
+
+        // Used in libstdc++
+        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        // if (ec != std::errc()) {
+        //     return false;
+        // }
     } else {
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
             u32 chunk_id = source.vector_.chunk_id_;
             u32 chunk_offset = source.vector_.chunk_offset_;
-            auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
-            varchar_ptr[varchar_len] = '\0';
-            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
 
-            auto [ptr, ec] = std::from_chars(varchar_ptr.get(), varchar_ptr.get() + varchar_len, target);
-            if (ec != std::errc()) {
+            String varchar_ptr(varchar_len, 0);
+            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.data(), chunk_id, chunk_offset, varchar_len);
+
+            // Used in libc++
+            try {
+                target = std::stof(varchar_ptr);
+            } catch(const std::exception &e) {
                 return false;
             }
+            // Used in libstdc++
+            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
+            // if (ec != std::errc()) {
+            //    return false;
+            // }
         }
     }
     return true;
@@ -329,24 +345,40 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, DoubleT &target) {
     if (source.IsInlined()) {
-        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        if (ec != std::errc()) {
+        // Used in libc++
+        String substr(source.short_.data_, source.length_);
+        try {
+            target = std::stod(substr);
+        } catch(const std::exception &e) {
             return false;
         }
+
+        // Used in libstdc++
+        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        // if (ec != std::errc()) {
+        //     return false;
+        // }
     } else {
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
             u32 chunk_id = source.vector_.chunk_id_;
             u32 chunk_offset = source.vector_.chunk_offset_;
-            auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
-            varchar_ptr[varchar_len] = '\0';
-            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
 
-            auto [ptr, ec] = std::from_chars(varchar_ptr.get(), varchar_ptr.get() + varchar_len, target);
-            if (ec != std::errc()) {
+            String varchar_ptr(varchar_len, 0);
+            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.data(), chunk_id, chunk_offset, varchar_len);
+
+            // Used in libc++
+            try {
+                target = std::stod(varchar_ptr);
+            } catch(const std::exception &e) {
                 return false;
             }
+            // Used in libstdc++
+            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
+            // if (ec != std::errc()) {
+            //    return false;
+            // }
         }
     }
     return true;
