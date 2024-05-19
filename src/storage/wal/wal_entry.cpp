@@ -197,7 +197,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::APPEND: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            SharedPtr<DataBlock> block = block->ReadAdv(ptr, ptr_end - ptr);
+            SharedPtr<DataBlock> block = DataBlock::ReadAdv(ptr, ptr_end - ptr);
             cmd = MakeShared<WalCmdAppend>(db_name, table_name, block);
             break;
         }
