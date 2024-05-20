@@ -86,6 +86,9 @@ public:
 
     u32 GetRowCount() const { return row_count_; }
 
+    // Only for fulltext
+    u64 GetColumnLengthSum() const;
+
     inline u32 GetPartNum() const { return (row_count_ + 8191) / 8192; }
 
     inline u32 GetPartRowCount(const u32 part_id) const { return std::min<u32>(8192, row_count_ - part_id * 8192); }

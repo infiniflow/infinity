@@ -912,8 +912,11 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
 
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-
     chunk_index_entries_.push_back(chunk_index_entry); // replay not need lock
+    if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
+        u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
+        UpdateFulltextColumnLenInfo(column_length_sum, row_count);
+    };
     return chunk_index_entry;
 }
 

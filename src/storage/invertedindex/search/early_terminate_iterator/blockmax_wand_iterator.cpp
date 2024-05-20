@@ -39,7 +39,7 @@ BlockMaxWandIterator::~BlockMaxWandIterator() {
         msg += fmt::format(" ({}, {}, {:6f})", pivot, row_id, score);
     }
     msg += fmt::format("\nnext_sort_cnt_ {}, next_it0_docid_mismatch_cnt_ {}, next_sum_score_low_cnt_ {}, next_sum_score_bm_low_cnt_ {}", next_sort_cnt_, next_it0_docid_mismatch_cnt_, next_sum_score_low_cnt_, next_sum_score_bm_low_cnt_);
-    LOG_INFO(msg);
+    LOG_TRACE(msg);
 }
 
 BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators) : sorted_iterators_(std::move(iterators)), pivot_(sorted_iterators_.size()) {

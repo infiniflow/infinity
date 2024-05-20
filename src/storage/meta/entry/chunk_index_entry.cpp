@@ -178,6 +178,18 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
     return chunk_index_entry;
 }
 
+u64 ChunkIndexEntry::GetColumnLengthSum() const {
+    assert(segment_index_entry_->table_index_entry()->index_base()->index_type_ == IndexType::kFullText);
+    // Read the length from buffer object and sum up
+    u64 column_length_sum = 0UL;
+    BufferHandle buffer_handle = buffer_obj_->Load();
+    const u32 *column_lengths = (const u32 *)buffer_handle.GetData();
+    for (SizeT i = 0; i < row_count_; i++) {
+        column_length_sum += column_lengths[i];
+    }
+    return column_length_sum;
+}
+
 BufferHandle ChunkIndexEntry::GetIndex() { return buffer_obj_->Load(); }
 
 nlohmann::json ChunkIndexEntry::Serialize() {
