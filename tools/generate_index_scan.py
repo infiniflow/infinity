@@ -6,7 +6,7 @@ import random
 def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 20000
     csv_dir = "./test/data/csv"
-    slt_dir = "./test/sql/dql"
+    slt_dir = "./test/sql/dql/index_scan"
     csv_name = "/test_big_index_scan.csv"
     slt_name = "/big_index_scan.slt"
     table_name = "test_big_index_scan"
