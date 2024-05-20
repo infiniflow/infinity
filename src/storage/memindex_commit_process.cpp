@@ -40,7 +40,7 @@ import third_party;
 
 namespace infinity {
 
-MemIndexCommitProcessor::MemIndexCommitProcessor(Catalog *catalog, TxnManager *txn_mgr) : running_(false), catalog_(catalog), txn_mgr_(txn_mgr) {}
+MemIndexCommitProcessor::MemIndexCommitProcessor(Catalog *catalog) : running_(false), catalog_(catalog) {}
 
 void MemIndexCommitProcessor::Start() {
     running_.store(true);
@@ -68,10 +68,12 @@ void MemIndexCommitProcessor::MemIndexCommitLoop() {
     auto prev_time = std::chrono::system_clock::now();
     while (running_.load()) {
         auto current_time = std::chrono::system_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(current_time - prev_time).count() >= 1) {
-            MemIndexCommit();
-            prev_time = current_time;
+        if (std::chrono::duration_cast<std::chrono::seconds>(current_time - prev_time).count() < 1) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
         }
+        MemIndexCommit();
+        prev_time = current_time;
     }
 }
 
@@ -124,21 +126,19 @@ Vector<MemoryIndexer *> MemIndexCommitProcessor::ScanForMemoryIndexers() {
 
 void MemIndexCommitProcessor::MemIndexCommit() {
     Vector<MemoryIndexer *> mem_indexers = ScanForMemoryIndexers();
-    Vector<Pair<BGQueryContextWrapper, BGQueryState>> wrappers;
+    Vector<BGQueryContextWrapper> wrappers;
 
     for (auto *mem_indexer : mem_indexers) {
-        BGQueryState bg_state;
         auto physical_memindex_commit = this->MakeCommitOperator(mem_indexer);
-        Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("CommitMemIndex"));
-        BGQueryContextWrapper wrapper(txn);
-        bool res = wrapper.query_context_->ExecuteBGOperator(std::move(physical_memindex_commit), bg_state);
+        BGQueryContextWrapper wrapper;
+        bool res = wrapper.query_context_->ExecuteBGOperator(std::move(physical_memindex_commit), wrapper.bg_state_);
         if (res) {
-            wrappers.emplace_back(std::move(wrapper), std::move(bg_state));
+            wrappers.emplace_back(std::move(wrapper));
         }
     }
-    for (auto &[wrapper, query_state] : wrappers) {
+    for (auto &wrapper : wrappers) {
         TxnTimeStamp commit_ts_out = 0;
-        wrapper.query_context_->JoinBGStatement(query_state, commit_ts_out);
+        wrapper.query_context_->JoinBGStatement(wrapper.bg_state_, commit_ts_out);
     }
 }
 

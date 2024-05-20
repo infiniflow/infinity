@@ -14,23 +14,20 @@
 
 module;
 
-export module invert_task;
+module physical_memindex_insert;
 
 import stl;
-import column_vector;
-import internal_types;
+import memory_indexer;
 
 namespace infinity {
 
-export struct BatchInvertTask {
-public:
-    BatchInvertTask(u64 task_seq, SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 start_doc_id)
-        : task_seq_(task_seq), column_vector_(column_vector), row_offset_(row_offset), row_count_(row_count), start_doc_id_(start_doc_id) {}
+bool PhysicalMemIndexInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto *memindex_insert_operator_state = static_cast<MemIndexInsertOperatorState *>(operator_state);
 
-    u64 task_seq_;
-    SharedPtr<ColumnVector> column_vector_;
-    u32 row_offset_;
-    u32 row_count_;
-    u32 start_doc_id_;
-};
-} // namespace infinity
+    memory_indexer_->InsertExecute(inverter_, column_vector_, row_offset_, row_count_, start_doc_id_, task_seq_, offline_);
+
+    memindex_insert_operator_state->SetComplete();
+    return true;
+}
+
+}

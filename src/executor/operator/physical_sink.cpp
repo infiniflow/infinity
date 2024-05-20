@@ -216,6 +216,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kCompactFinish:
+        case PhysicalOperatorType::kMemIndexInsert:
         case PhysicalOperatorType::kMemIndexCommit: {
             auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);
             if (!output_state->Ok()) {

@@ -68,7 +68,7 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  TransactionID txn_id,
                                  TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kTableIndex, is_delete, TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)), byte_slice_pool_(),
-      buffer_pool_(), inverting_thread_pool_(4), commiting_thread_pool_(2), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
+      buffer_pool_(), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
       index_dir_(index_entry_dir) {
     if (!is_delete) {
         assert(index_base.get() != nullptr);

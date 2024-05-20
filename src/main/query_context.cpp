@@ -211,6 +211,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
 bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &state) {
     QueryResult query_result;
+    this->BeginTxn();
     try {
         SharedPtr<BindContext> bind_context;
         auto status = logical_planner_->Build(statement, bind_context);
@@ -253,6 +254,7 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
 
 bool QueryContext::ExecuteBGOperator(UniquePtr<PhysicalOperator> physical_operator, BGQueryState &state) {
     QueryResult query_result;
+    this->BeginTxn();
     try {
         Vector<PhysicalOperator *> physical_plan_ptrs;
         physical_plan_ptrs.push_back(physical_operator.get());

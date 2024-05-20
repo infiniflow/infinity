@@ -27,7 +27,7 @@ class TxnManager;
 
 export class MemIndexCommitProcessor {
 public:
-    MemIndexCommitProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    MemIndexCommitProcessor(Catalog *catalog);
 
     void Start();
 
