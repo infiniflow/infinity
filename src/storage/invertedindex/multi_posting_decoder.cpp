@@ -68,6 +68,7 @@ bool MultiPostingDecoder::DecodeCurrentDocIDBuffer(docid_t *doc_buffer) {
 }
 
 bool MultiPostingDecoder::DecodeCurrentTFBuffer(tf_t *tf_buffer) {
+    assert(!need_decode_doc_id_);
     if (need_decode_tf_) {
         index_decoder_->DecodeCurrentTFBuffer(tf_buffer);
         need_decode_tf_ = false;
@@ -77,6 +78,7 @@ bool MultiPostingDecoder::DecodeCurrentTFBuffer(tf_t *tf_buffer) {
 }
 
 void MultiPostingDecoder::DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payload_buffer) {
+    assert(!need_decode_doc_id_);
     if (need_decode_doc_payload_) {
         index_decoder_->DecodeCurrentDocPayloadBuffer(doc_payload_buffer);
         need_decode_doc_payload_ = false;

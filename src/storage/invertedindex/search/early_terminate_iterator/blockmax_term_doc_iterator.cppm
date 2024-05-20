@@ -38,7 +38,9 @@ public:
 
     void MultiplyWeight(float factor) { weight_ *= factor; }
 
-    void UpdateScoreThreshold(float threshold) override {} // do nothing
+    bool NextShallow(RowID doc_id) override;
+
+    bool Next(RowID doc_id) override;
 
     bool BlockSkipTo(RowID doc_id, float threshold) override;
 
@@ -79,6 +81,7 @@ private:
     PostingIterator iter_; // initialized in constructor and InitPostingIterator() function
     float weight_ = 1.0f;  // changed in MultiplyWeight()
     // for BM25 Score
+    float bm25_score_cache_ = 0.0f;
     float f1 = 0.0f;
     float f2 = 0.0f;
     float f3 = 0.0f;
@@ -93,6 +96,7 @@ private:
     RowID peek_doc_id_val_ = INVALID_ROWID;
     // debug info
     u32 calc_score_cnt_ = 0;
+    u32 access_score_cnt_ = 0;
     u32 calc_bm_score_cnt_ = 0;
     u32 access_bm_score_cnt_ = 0;
     RowID prev_calc_score_doc_id_ = INVALID_ROWID;
@@ -101,6 +105,7 @@ private:
     u32 peek_cnt_ = 0;
     u32 block_skip_cnt_ = 0;
     u32 block_skip_cnt_inner_ = 0;
+    RowID last_target_doc_id_ = INVALID_ROWID;
 };
 
 } // namespace infinity

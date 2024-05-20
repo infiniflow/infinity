@@ -17,6 +17,44 @@ import third_party;
 
 namespace infinity {
 
+bool BlockMaxPhraseDocIterator::NextShallow(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    for (auto &it : pos_iters_) {
+        bool ok = it->SkipTo(doc_id);
+        if(!ok){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool BlockMaxPhraseDocIterator::Next(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    assert(doc_id_ == INVALID_ROWID || doc_id_ < doc_id);
+    RowID target_doc_id = doc_id;
+    do {
+        for (auto &it : pos_iters_) {
+            target_doc_id = it->SeekDoc(target_doc_id);
+        }
+        if (target_doc_id == INVALID_ROWID) {
+            doc_id_ = INVALID_ROWID;
+            return false;
+        }
+        if (target_doc_id == pos_iters_[0]->DocID()) {
+            doc_id_ = target_doc_id;
+            PhraseColumnMatchData phrase_match_data;
+            if (GetPhraseMatchData(phrase_match_data, target_doc_id)) {
+                current_phrase_freq_ = phrase_match_data.tf_;
+                const float score = BM25Score();
+                if (score > threshold_) {
+                    return true;
+                }
+            }
+            target_doc_id++;
+        }
+    } while (1);
+}
+
 bool BlockMaxPhraseDocIterator::BlockSkipTo(RowID doc_id, float threshold) {
     if (threshold > BM25ScoreUpperBound()) [[unlikely]] {
         return false;

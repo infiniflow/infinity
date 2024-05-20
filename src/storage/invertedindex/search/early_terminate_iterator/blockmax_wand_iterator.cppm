@@ -14,7 +14,7 @@
 
 module;
 
-export module blockmax_and_iterator;
+export module blockmax_wand_iterator;
 import stl;
 import index_defines;
 import early_terminate_iterator;
@@ -22,9 +22,12 @@ import internal_types;
 
 namespace infinity {
 
-export class BlockMaxAndIterator final : public EarlyTerminateIterator {
+// Refers to https://engineering.nyu.edu/~suel/papers/bmw.pdf
+export class BlockMaxWandIterator final : public EarlyTerminateIterator {
 public:
-    explicit BlockMaxAndIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators);
+    explicit BlockMaxWandIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators);
+
+    ~BlockMaxWandIterator() override;
 
     void UpdateScoreThreshold(float threshold) override;
 
@@ -51,7 +54,7 @@ public:
     bool NotPartCheckExist(RowID doc_id) override;
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
-        return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxAndIterator", sorted_iterators_, os, prefix, is_final);
+        return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxWandIterator", sorted_iterators_, os, prefix, is_final);
     }
 
 private:
@@ -59,13 +62,18 @@ private:
     RowID common_block_min_possible_doc_id_{}; // not always exist
     RowID common_block_last_doc_id_{};
     float common_block_max_bm25_score_{};
-    Vector<float> common_block_max_bm25_score_parts_; // value at i: blockmax of sum of BM25 scores for iter i + 1, i + 2, ..., n - 1
-    // won't change after initialization
-    Vector<float> leftover_scores_upper_bound_;                  // value at i: upper bound of sum of BM25 scores for iter i + 1, i + 2, ..., n - 1
-    Vector<UniquePtr<EarlyTerminateIterator>> sorted_iterators_; // sort by df, in ascending order
+    Vector<UniquePtr<EarlyTerminateIterator>> sorted_iterators_; // sort by DocID(), in ascending order
+    Vector<UniquePtr<EarlyTerminateIterator>> backup_iterators_;
+    SizeT pivot_;
     // bm25 score cache
     bool bm25_score_cached_ = false;
-    float bm25_score_cache_ = 0.0F;
+    float bm25_score_cache_ = 0.0f;
+    Vector<Tuple<u32, u64, float>> pivot_history_; //pivot, row_id, score
+    // debug info
+    u32 next_sort_cnt_ = 0;
+    u32 next_it0_docid_mismatch_cnt_ = 0;
+    u32 next_sum_score_low_cnt_ = 0;
+    u32 next_sum_score_bm_low_cnt_ = 0;
 };
 
 } // namespace infinity

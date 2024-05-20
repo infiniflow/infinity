@@ -14,6 +14,8 @@
 
 module;
 
+#include <cassert>
+
 export module early_terminate_iterator;
 import stl;
 import index_defines;
@@ -21,13 +23,19 @@ import internal_types;
 
 namespace infinity {
 
+export enum class EarlyTermAlg : u8 {
+    kBMW = 0,
+    kBMM = 1,
+};
+
 // usage: get sequence of results by calling NextWithThreshold() or BlockNextWithThreshold()
 // do not use Next() directly
 export class EarlyTerminateIterator {
 protected:
     RowID doc_id_ = INVALID_ROWID;
+    float threshold_ = 0.0f;
     u32 doc_freq_ = 0;
-    float bm25_score_upper_bound_ = 0.0F;
+    float bm25_score_upper_bound_ = 0.0f;
 
 public:
     virtual ~EarlyTerminateIterator() = default;
@@ -40,7 +48,25 @@ public:
 
     Pair<RowID, float> BlockNextWithThreshold(float threshold);
 
-    virtual void UpdateScoreThreshold(float threshold) = 0;
+    virtual void UpdateScoreThreshold(float threshold){
+        if (threshold > threshold_)
+            threshold_ = threshold;
+    };
+
+    // Move block cursor to ensure its last_doc_id is no less than given doc_id.
+    // Note that this routine decode skip_list only, and doesn't update doc_id_.
+    // Caller may invoke BlockMaxBM25Score() after this routine.
+    virtual bool NextShallow(RowID doc_id) = 0;
+
+    // Update doc_id_ to one no less than given doc_id and its BM25 score is larger than current threshold.
+    // Note that this routine decode skip_list and doc_list, and doesn't decode tf_list.
+    // Caller may invoke BlockMaxBM25Score() and BM25Score() after this routine.
+    virtual bool Next(RowID doc_id) = 0;
+
+    // Update doc_id_ to one larger than previous one and its BM25 score is larger than current threshold.
+    // Note that this routine decode skip_list and doc_list, and doesn't decode tf_list.
+    // Caller may invoke BlockMaxBM25Score() and BM25Score() after this routine.
+    bool Next();
 
     // only decode skiplist, need to call Seek() or SeekInBlockRange() to decode doc_id, tf, etc.
     virtual bool BlockSkipTo(RowID doc_id, float threshold) = 0;

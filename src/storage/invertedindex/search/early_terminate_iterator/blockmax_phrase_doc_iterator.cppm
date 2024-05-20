@@ -42,7 +42,9 @@ public:
         }
     }
 
-    void UpdateScoreThreshold(float threshold) override {} // do nothing
+    bool NextShallow(RowID doc_id) override;
+
+    bool Next(RowID doc_id) override;
 
     bool BlockSkipTo(RowID doc_id, float threshold) override;
 
@@ -98,7 +100,6 @@ private:
     void SeekDoc(RowID doc_id, RowID seek_end);
 private:
     float avg_column_len_ = 0;
-    Vector<UniquePtr<BlockMaxTermDocIterator>> term_doc_iters_{};
     Vector<UniquePtr<PostingIterator>> pos_iters_{};
     u64 phrase_freq_{0};
     u64 current_phrase_freq_{0};
