@@ -212,6 +212,114 @@ struct KeyAddress<TermTuple, LenType> {
     bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
 };
 
+class CycleBuffer {
+public:
+    CycleBuffer(SizeT total_buffers, SizeT buffer_size)
+        : total_buffers_(total_buffers), buffer_size_(buffer_size), head_(0), tail_(0), full_(false) {
+        buffer_array_.resize(total_buffers);
+        buffer_real_size_.resize(total_buffers);
+        buffer_real_num_.resize(total_buffers);
+        for (auto& buf : buffer_array_) {
+            buf = MakeUnique<char[]>(buffer_size);
+        }
+    }
+
+    void Put(const char* data, SizeT length) {
+        if (length > buffer_size_) {
+            throw std::runtime_error("Data length exceeds buffer capacity");
+        }
+        if (IsFull()) {
+            throw std::runtime_error("Buffer is full");
+        }
+
+        // Copy data into the current buffer
+        std::memcpy(buffer_array_[head_].get(), data, length);
+        head_ = (head_ + 1) % total_buffers_;
+
+        if (head_ == tail_) {
+            full_ = true;
+        }
+    }
+
+    void PutReal(const u32& real_size, const u32& real_num) {
+        buffer_real_size_[head_] = real_size;
+        buffer_real_num_[head_] = real_num;
+
+        head_ = (head_ + 1) % total_buffers_;
+
+        if (head_ == tail_) {
+            full_ = true;
+        }
+    }
+
+    char* PutByRead(DirectIO &io_stream, u32& length) {
+        if (length > buffer_size_) {
+            throw std::runtime_error("Data length exceeds buffer capacity");
+        }
+        if (IsFull()) {
+            throw std::runtime_error("Buffer is full");
+        }
+
+        // Read data into the current buffer
+        length = io_stream.Read(buffer_array_[head_].get(), length);
+        return buffer_array_[head_].get();
+//        auto res_ptr = buffer_array_[head_].get();
+//        head_ = (head_ + 1) % total_buffers_;
+//
+//        if (head_ == tail_) {
+//            full_ = true;
+//        }
+//        return res_ptr;
+    }
+
+    Tuple<const char*, u32, u32> Get() {
+        // std::cout << "CycleBuffer::Get" << std::endl;
+        if (IsEmpty()) {
+            throw std::runtime_error("Buffer is empty");
+        }
+
+        const char* result_data = buffer_array_[tail_].get();
+        auto result_real_size = buffer_real_size_[tail_];
+        auto result_real_num = buffer_real_num_[tail_];
+        tail_ = (tail_ + 1) % total_buffers_;
+        full_ = false;
+
+        return std::make_tuple(result_data, result_real_size, result_real_num);
+    }
+
+    void Reset() {
+        head_ = tail_ = 0;
+        full_ = false;
+    }
+
+    bool IsEmpty() const {
+        return (!full_ && (head_ == tail_));
+    }
+
+    bool IsFull() const {
+        return full_;
+    }
+
+    SizeT Size() const {
+        if (full_) {
+            return total_buffers_;
+        }
+        if (head_ >= tail_) {
+            return head_ - tail_;
+        }
+        return total_buffers_ + head_ - tail_;
+    }
+
+private:
+    Vector<UniquePtr<char[]>> buffer_array_;
+    Vector<u32> buffer_real_size_;
+    Vector<u32> buffer_real_num_;
+    SizeT total_buffers_;
+    SizeT buffer_size_;
+    SizeT head_;
+    SizeT tail_;
+    bool full_;
+};
 
 export template <typename KeyType, typename LenType>
 class SortMerger {
@@ -269,6 +377,12 @@ class SortMerger {
     Vector<UniquePtr<char_t[]>> key_buf_;
     Vector<char*> key_buf_ptr_;
     Vector<SharedPtr<MmapReader>> mmap_io_streams_;
+    UniquePtr<CycleBuffer> cycle_buffer_;
+    std::mutex cycle_buf_mtx_;
+    std::condition_variable cycle_buf_con_;
+    bool read_finish_{false};
+    u32 CYCLE_BUF_SIZE_;
+    u32 CYCLE_BUF_THRESHOLD_;
     u64 count_;      //!< records number
     u32 group_size_; //!< the real run number that can get from the input file.
 
@@ -280,9 +394,13 @@ class SortMerger {
 
     void Predict(DirectIO &io_stream);
 
+    void PredictByQueue(DirectIO &io_stream);
+
     void Merge();
 
     void MergeMmap(MmapReader &io_stream, SharedPtr<FileWriter> out_file_writer);
+
+    void MergeByQueue();
 
     void Output(FILE *f, u32 idx);
 

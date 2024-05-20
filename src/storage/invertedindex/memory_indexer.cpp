@@ -258,18 +258,22 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
 
     return num_generated;
 }
-
+#define PRINT_TIME_COST
 void MemoryIndexer::Dump(bool offline, bool spill) {
     if (offline) {
         assert(!spill);
         while (GetInflightTasks() > 0) {
             CommitOffline(100);
         }
+#ifdef PRINT_TIME_COST
         BaseProfiler profiler;
         profiler.Begin();
+#endif
         OfflineDump();
+#ifdef PRINT_TIME_COST
         LOG_INFO(fmt::format("MemoryIndexer::OfflineDump() time cost: {}", profiler.ElapsedToString()));
         profiler.End();
+#endif
         return;
     }
 
