@@ -155,6 +155,32 @@ struct TryCastValueToVarlenWithType {
 };
 
 template <typename Operator>
+struct TryCastVarlenWithTypeToVarlenWithType {
+    template <typename SourceValueType, typename TargetValueType>
+    inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+        auto *cast_data_ptr = (ColumnVectorCastData *)(state_ptr);
+        // LOG_INFO(fmt::format("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString()));
+        if (Operator::template Run<SourceValueType, TargetValueType>(input,
+                                                                     cast_data_ptr->source_type_,
+                                                                     cast_data_ptr->source_column_vector_ptr_,
+                                                                     result,
+                                                                     cast_data_ptr->target_type_,
+                                                                     cast_data_ptr->target_column_vector_ptr_)) {
+            return;
+        }
+
+        nulls_ptr->SetFalse(idx);
+        result = NullValue<TargetValueType>();
+
+        // This convert is failed
+        cast_data_ptr->all_converted_ = false;
+        //        data_ptr->source_type_  =
+        //        data_ptr->target_type_  =
+        //        data_ptr->result_ref_
+    }
+};
+
+template <typename Operator>
 struct TryCastValueEmbedding {
     template <typename SourceElemType, typename TargetElemType>
     inline static void Execute(const SourceElemType *input, TargetElemType *result, SizeT dim, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
@@ -225,6 +251,14 @@ export struct ColumnVectorCast {
         ColumnVectorCastData input(parameters.strict, source.get(), target.get(), *source->data_type(), *target->data_type());
         EmbeddingUnaryOperator::Execute<SourceElemType, TargetElemType, TryCastValueEmbedding<Operator>>(source, target, count, &input, true);
         return input.all_converted_;
+    }
+
+    template <class Operator>
+    inline static bool
+    TryCastColumnVectorTensor(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &target, SizeT count, CastParameters &parameters) {
+        bool result =
+            GenericTryCastColumnVector<TensorT, TensorT, TryCastVarlenWithTypeToVarlenWithType<Operator>>(source, target, count, parameters);
+        return result;
     }
 };
 

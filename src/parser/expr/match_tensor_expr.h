@@ -14,28 +14,22 @@
 
 #pragma once
 
+#include "constant_expr.h"
 #include "parsed_expr.h"
-#include "type/complex/embedding_type.h"
-namespace infinity {
+#include <memory>
 
-enum class MatchTensorMethod : uint8_t {
-    kInvalid,
-    kMaxSim,
-};
+namespace infinity {
 
 class MatchTensorExpr final : public ParsedExpr {
 public:
-    explicit MatchTensorExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kTensorMaxSim), own_memory_(own_memory) {}
-    ~MatchTensorExpr() override;
+    explicit MatchTensorExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kMatchTensor), own_memory_(own_memory) {}
     [[nodiscard]] std::string ToString() const override;
-    static std::string MethodToString(MatchTensorMethod method);
 
     const bool own_memory_;
-    MatchTensorMethod search_method_ = MatchTensorMethod::kInvalid;
-    ParsedExpr *column_expr_{};
-    void *embedding_data_ptr_{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
-    uint32_t dimension_{};
-    EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
+    std::string search_method_;
+    std::unique_ptr<ParsedExpr> column_expr_;
+    std::unique_ptr<ConstantExpr> tensor_expr_;
+    std::string embedding_data_type_;
     std::string options_text_;
 };
 

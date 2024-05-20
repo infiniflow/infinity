@@ -48,6 +48,19 @@ test44 -5.190000
 test00 -5.190000
 test11 -9.660001
 
+# default top 10
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+----
+test22 636.870056
+test55 27.369999
+test66 11.910000
+test33 3.620001
+test77 2.260000
+test44 -5.190000
+test00 -5.190000
+test11 -9.660001
+
 # option top 2
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', 'topn=2');
@@ -55,9 +68,25 @@ SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.
 test22 636.870056
 test55 27.369999
 
+# option top 2
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=2');
+----
+test22 636.870056
+test55 27.369999
+
 # filter
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
+----
+test22 636.870056
+test33 3.620001
+test00 -5.190000
+test11 -9.660001
+
+# filter
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim') WHERE 10 > num;
 ----
 test22 636.870056
 test33 3.620001
@@ -104,9 +133,32 @@ test33 3.620001
 test77 2.260000
 test77 2.260000
 
+# default top 10
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+----
+test22 636.870056
+test22 636.870056
+test55 27.369999
+test55 27.369999
+test66 11.910000
+test66 11.910000
+test33 3.620001
+test33 3.620001
+test77 2.260000
+test77 2.260000
+
 # filter, top 3
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', 'topn=3') WHERE 10 > num;
+----
+test22 636.870056
+test22 636.870056
+test33 3.620001
+
+# filter, top 3
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=3') WHERE 10 > num;
 ----
 test22 636.870056
 test22 636.870056

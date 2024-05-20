@@ -472,6 +472,10 @@ SizeT AddTableEntryOp::GetSizeInBytes() const {
                 total_size += sizeof(double) * const_expr->double_array_.size();
                 break;
             }
+            case LiteralType::kSubArrayArray: {
+                UnrecoverableError("SubArrayArray not supported");
+                break;
+            }
             case LiteralType::kInterval: {
                 total_size += sizeof(i32);
                 total_size += sizeof(i64);

@@ -32,7 +32,7 @@ export class SearchExpression final : public BaseExpression {
 public:
     SearchExpression(Vector<SharedPtr<MatchExpression>> &match_exprs,
                      Vector<SharedPtr<KnnExpression>> &knn_exprs,
-                     Vector<SharedPtr<MatchTensorExpression>> &tensor_maxsim_exprs,
+                     Vector<SharedPtr<MatchTensorExpression>> &match_tensor_exprs,
                      SharedPtr<FusionExpression> fusion_expr);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }

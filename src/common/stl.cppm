@@ -137,6 +137,7 @@ export namespace std {
     using std::sqrt;
     using std::transform;
     using std::copy_n;
+    using std::tie;
 
     namespace ranges {
 

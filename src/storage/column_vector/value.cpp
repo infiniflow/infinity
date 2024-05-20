@@ -224,7 +224,7 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
         UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
-    if (const SizeT len = embedding_info->Size(); bytes % len != 0) {
+    if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
         Status status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding size={}", bytes, len));
         LOG_ERROR(status.message());
         RecoverableError(status);
@@ -494,6 +494,15 @@ bool Value::operator==(const Value &other) const {
         case kDate: {
             return value_.date == other.value_.date;
         }
+        case kTime: {
+            return value_.time == other.value_.time;
+        }
+        case kDateTime: {
+            return value_.datetime == other.value_.datetime;
+        }
+        case kTimestamp: {
+            return value_.timestamp == other.value_.timestamp;
+        }
         case kPoint: {
             return value_.point == other.value_.point;
         }
@@ -529,8 +538,21 @@ bool Value::operator==(const Value &other) const {
             return std::ranges::equal(data1, data2);
             break;
         }
-        default:
+        case kTensor: {
+            const Vector<char> &data1 = this->value_info_->Get<EmbeddingValueInfo>().data_;
+            const Vector<char> &data2 = other.value_info_->Get<EmbeddingValueInfo>().data_;
+            return std::ranges::equal(data1, data2);
+            break;
+        }
+        case kInterval:
+        case kArray:
+        case kTuple:
+        case kMixed:
+        case kMissing:
+        case kInvalid: {
+            UnrecoverableError("Unhandled cases.");
             return false;
+        }
     }
     return true;
 }
@@ -627,14 +649,17 @@ void Value::CopyUnionValue(const Value &other) {
             break;
         }
         case kVarchar:
+        case kTensor:
         case kEmbedding: {
             this->value_info_ = other.value_info_;
             break;
         }
+        case kArray:
+        case kTuple:
+        case kMixed:
         case kMissing:
-        case kInvalid:
-        default: {
-            LOG_ERROR("Unexpected error!");
+        case kInvalid: {
+            UnrecoverableError("Unhandled case!");
             break;
         }
     }
@@ -732,14 +757,17 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             break;
         }
         case kVarchar:
+        case kTensor:
         case kEmbedding: {
             this->value_info_ = std::move(other.value_info_);
             break;
         }
+        case kArray:
+        case kTuple:
+        case kMixed:
         case kMissing:
-        case kInvalid:
-        default: {
-            LOG_ERROR("Unexpected error!");
+        case kInvalid: {
+            UnrecoverableError("Unhandled case!");
             break;
         }
     }
@@ -797,87 +825,43 @@ String Value::ToString() const {
         case LogicalType::kVarchar: {
             return value_info_->Get<StringValueInfo>().GetString();
         }
-        case LogicalType::kEmbedding: {
-            EmbeddingInfo* embedding_info = static_cast<EmbeddingInfo*>(type_.type_info().get());
-            return value_info_->Get<EmbeddingValueInfo>().GetString(embedding_info);
+        case LogicalType::kTensor: {
+            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            const auto basic_embedding_bytes = embedding_info->Size();
+            if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
+                UnrecoverableError("Tensor data size mismatch.");
+            }
+            const auto embedding_num = data_bytes / basic_embedding_bytes;
+            return TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
-        default: {
+        case LogicalType::kEmbedding: {
+            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            if (data_bytes != embedding_info->Size()) {
+                UnrecoverableError("Embedding data size mismatch.");
+            }
+            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
+            return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
+        }
+        case LogicalType::kDecimal:
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
+        case LogicalType::kUuid:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
             return {};
         }
     }
     return {};
-}
-
-String EmbeddingValueInfo::GetString(EmbeddingInfo* embedding_info) {
-    String res;
-    SizeT count = embedding_info->Dimension();
-    char* ptr = data_.data();
-    switch(embedding_info->Type()) {
-        case EmbeddingDataType::kElemBit: {
-            UnrecoverableError("Not implemented embedding data type: bit.");
-            break;
-        }
-        case EmbeddingDataType::kElemInt8: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i8 element = ((i8*)ptr)[i];
-                res += std::to_string(element) + ", ";
-            }
-            i8 element = ((i8*)ptr)[count - 1];
-            res += std::to_string(element);
-            break;
-        }
-        case EmbeddingDataType::kElemInt16: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i16 element = ((i16*)ptr)[i];
-                res += std::to_string(element) + ", ";
-            }
-            i16 element = ((i16*)ptr)[count - 1];
-            res += std::to_string(element);
-            break;
-        }
-        case EmbeddingDataType::kElemInt32: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i32 element = ((i32*)ptr)[i];
-                res += std::to_string(element) + ", ";
-            }
-            i32 element = ((i32*)ptr)[count - 1];
-            res += std::to_string(element);
-            break;
-        }
-        case EmbeddingDataType::kElemInt64: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                i64 element = ((i64*)ptr)[i];
-                res += std::to_string(element) + ", ";
-            }
-            i64 element = ((i64*)ptr)[count - 1];
-            res += std::to_string(element);
-            break;
-        }
-        case EmbeddingDataType::kElemFloat: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                f32 element = ((f32*)ptr)[i];
-                res += std::to_string(element) + ", ";
-            }
-            f32 element = ((f32*)ptr)[count - 1];
-            res += std::to_string(element);
-            break;
-        }
-        case EmbeddingDataType::kElemDouble: {
-            for(SizeT i = 0; i < count - 1; ++ i) {
-                f64 element = ((f64*)ptr)[i];
-                res += std::to_string(element) + ", ";
-            }
-            f64 element = ((f64*)ptr)[count - 1];
-            res += std::to_string(element);
-            break;
-        }
-        default: {
-            UnrecoverableError("Not supported embedding data type.");
-            break;
-        }
-    }
-    return res;
 }
 
 } // namespace infinity

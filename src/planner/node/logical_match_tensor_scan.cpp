@@ -93,7 +93,7 @@ void LogicalMatchTensorScan::InitExtraOptions() {
         }
         topn_ = top_n_option;
     } else {
-        topn_ = DEFAULT_TENSOR_MAXSIM_OPTION_TOP_N;
+        topn_ = DEFAULT_MATCH_TENSOR_OPTION_TOP_N;
     }
 }
 

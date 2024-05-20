@@ -58,7 +58,7 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline MatchTensorExpression *tensor_maxsim_expr() const { return match_tensor_expr_.get(); }
+    [[nodiscard]] inline MatchTensorExpression *match_tensor_expr() const { return match_tensor_expr_.get(); }
 
     [[nodiscard]] inline u32 GetTopN() const { return topn_; }
 
@@ -66,7 +66,7 @@ private:
     u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<MatchTensorExpression> match_tensor_expr_;
-    // extra options from tensor_maxsim_expr
+    // extra options
     // inited by Init()
     u32 topn_ = 0;
 
