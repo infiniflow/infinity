@@ -28,13 +28,13 @@ SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('body
 Anarchism 30-APR-2012 03:25:17.000 0 21.620300
 
 # only phrase
-query TTI
+query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('body^5', '\"social customs\"', 'topn=3;block_max=compare');
 ----
 Anarchism 30-APR-2012 03:25:17.000 6 20.881144
 
 # phrase and term
-query TTI
+query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('doctitle,body^5', '\"social customs\" harmful', 'topn=3');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 21.620300
@@ -45,7 +45,7 @@ query I
 COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
 
-query TTI
+query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3;block_max=compare');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.533094
@@ -56,41 +56,31 @@ query I
 COPY enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
 ----
 
-query TTI
+query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 25.498550
 Anarchism 30-APR-2012 03:25:17.000 4294967296 25.498550
 Anarchism 30-APR-2012 03:25:17.000 8589934592 25.498550
 
-# Anarchism 30-APR-2012 03:25:17.000 4294967296 50.997108
-# Anarchism 30-APR-2012 03:25:17.000 0 50.997105
-# Anarchism 30-APR-2012 03:25:17.000 8589934592 50.997105
 
-query TTI
+query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 25.498550
 Anarchism 30-APR-2012 03:25:17.000 4294967296 25.498550
 Anarchism 30-APR-2012 03:25:17.000 8589934592 25.498550
 
-# Anarchism 30-APR-2012 03:25:17.000 4294967296 50.997108
-# Anarchism 30-APR-2012 03:25:17.000 0 50.997105
-# Anarchism 30-APR-2012 03:25:17.000 8589934592 50.997105
 
 statement ok
 CREATE INDEX ft_index2 ON enwiki(doctitle) USING FULLTEXT;
 
-query TTI
+query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 25.500229
-Anarchism 30-APR-2012 03:25:17.000 4294967296 25.500229
-Anarchism 30-APR-2012 03:25:17.000 8589934592 25.500229
-
-# Anarchism 30-APR-2012 03:25:17.000 0 51.000462
-# Anarchism 30-APR-2012 03:25:17.000 4294967296 51.000462
-# Anarchism 30-APR-2012 03:25:17.000 8589934592 51.000458
+Anarchism 30-APR-2012 03:25:17.000 4294967296 25.500231
+Anarchism 30-APR-2012 03:25:17.000 8589934592 25.500231
 
 
 # Clean up

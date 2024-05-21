@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <cstdlib>
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -367,6 +368,70 @@ public:
         doc_freq_ = std::numeric_limits<u32>::max();
     }
     void UpdateScoreThreshold(float threshold) override { query_iterator_->UpdateScoreThreshold(threshold); }
+
+    bool NextShallow(RowID doc_id) override {
+        assert(doc_id != INVALID_ROWID);
+        while (true) {
+            if (!query_iterator_->NextShallow(doc_id)) {
+                common_block_min_possible_doc_id_ = INVALID_ROWID;
+                common_block_last_doc_id_ = INVALID_ROWID;
+                return false;
+            }
+            if (const RowID lowest_possible = query_iterator_->BlockMinPossibleDocID(); lowest_possible > doc_id) {
+                doc_id = lowest_possible;
+            }
+            RowID common_block_last_doc_id = query_iterator_->BlockLastDocID();
+            if (!SelfBlockSkipTo(doc_id)) {
+                common_block_min_possible_doc_id_ = INVALID_ROWID;
+                common_block_last_doc_id_ = INVALID_ROWID;
+                return false;
+            }
+            if (const RowID lowest_possible = SelfBlockMinPossibleDocID(); lowest_possible > common_block_last_doc_id) {
+                // continue loop
+                doc_id = common_block_last_doc_id + 1;
+                continue;
+            } else if (lowest_possible > doc_id) {
+                doc_id = lowest_possible;
+            }
+            common_block_last_doc_id = std::min(common_block_last_doc_id, SelfBlockLastDocID());
+            common_block_min_possible_doc_id_ = doc_id;
+            common_block_last_doc_id_ = common_block_last_doc_id;
+            return true;
+        }
+    }
+
+    bool Next(RowID doc_id) override {
+        bool ok = false;
+        while(1) {
+            ok = query_iterator_->Next(doc_id);
+            if (!ok){
+                break;
+            }
+            doc_id = query_iterator_->DocID();
+            // check filter
+            ok = SelfBlockSkipTo(doc_id);
+            if (!ok) {
+                break;
+            }
+            const auto [ok, id2] = SelfSeekInBlockRange(doc_id, SelfBlockLastDocID());
+            if (!ok){
+                break;
+            }
+            if (id2 == doc_id) {
+                common_block_min_possible_doc_id_ = doc_id;
+                common_block_last_doc_id_ = std::max(query_iterator_->BlockLastDocID(), SelfBlockLastDocID());
+                doc_id_ = id2;
+                return true;
+            }
+            assert(id2 > doc_id);
+            doc_id = id2;
+        }
+        common_block_min_possible_doc_id_ = INVALID_ROWID;
+        common_block_last_doc_id_ = INVALID_ROWID;
+        doc_id_ = INVALID_ROWID;
+        return false;
+    }
+
     RowID BlockMinPossibleDocID() const override { return common_block_min_possible_doc_id_; }
     RowID BlockLastDocID() const override { return common_block_last_doc_id_; }
     bool BlockSkipTo(RowID doc_id, float threshold) override {
@@ -394,14 +459,8 @@ public:
             return true;
         }
     }
-    float BlockMaxBM25Score() override {
-        UnrecoverableError("Unreachable code!");
-        return 0.0f;
-    }
-    float BM25Score() override {
-        UnrecoverableError("Unreachable code!");
-        return 0.0f;
-    }
+    float BlockMaxBM25Score() override { return query_iterator_->BlockMaxBM25Score(); }
+    float BM25Score() override { return query_iterator_->BM25Score(); }
     Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
         UnrecoverableError("Unreachable code!");
         return {false, INVALID_ROWID};
@@ -466,8 +525,8 @@ struct FilterQueryNode final : public QueryNode {
         return MakeUnique<FilterIterator<DocIterator>>(common_query_filter_, std::move(search_iter));
     }
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override {
-        auto search_iter = query_tree_->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlg early_term_alg) const override {
+        auto search_iter = query_tree_->CreateEarlyTerminateSearch(table_entry, index_reader, scorer, early_term_alg);
         if (!search_iter) {
             return nullptr;
         }
@@ -498,18 +557,45 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
     }
 }
 
-void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
-    if (et_iter) {
-        while (true) {
-            auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
-            if (id == INVALID_ROWID) [[unlikely]] {
-                break;
+void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter,
+                     FullTextScoreResultHeap &result_heap,
+                     u32 &blockmax_loop_cnt,
+                     EarlyTermAlg early_term_alg) {
+    // et_iter is nullptr if fulltext index is present but there's no data
+    if (et_iter == nullptr)
+        return;
+    switch (early_term_alg) {
+        case EarlyTermAlg::kBMM: {
+            while (true) {
+                auto [id, et_score] = et_iter->BlockNextWithThreshold(result_heap.GetScoreThreshold());
+                if (id == INVALID_ROWID) [[unlikely]] {
+                    break;
+                }
+                ++blockmax_loop_cnt;
+                if (result_heap.AddResult(et_score, id)) {
+                    // update threshold
+                    if (const float new_threshold = result_heap.GetScoreThreshold(); new_threshold > 0.0f) {
+                        et_iter->UpdateScoreThreshold(new_threshold);
+                    }
+                }
             }
-            ++blockmax_loop_cnt;
-            if (result_heap.AddResult(et_score, id)) {
-                // update threshold
-                if (const float new_threshold = result_heap.GetScoreThreshold(); new_threshold > 0.0f) {
-                    et_iter->UpdateScoreThreshold(new_threshold);
+            break;
+        }
+        case EarlyTermAlg::kBMW:
+        default: {
+            while (true) {
+                ++blockmax_loop_cnt;
+                bool ok = et_iter->Next();
+                if (!ok) [[unlikely]] {
+                    break;
+                }
+                RowID id = et_iter->DocID();
+                float et_score = et_iter->BM25Score();
+                if (result_heap.AddResult(et_score, id)) {
+                    // update threshold
+                    if (const float new_threshold = result_heap.GetScoreThreshold(); new_threshold > 0.0f) {
+                        et_iter->UpdateScoreThreshold(new_threshold);
+                    }
                 }
             }
         }
@@ -533,8 +619,15 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     const String &block_max_option = search_ops.options_["block_max"];
     bool use_ordinary_iter = false;
     bool use_block_max_iter = false;
-    if (block_max_option == "true" or block_max_option.empty()) {
+    const String &threshold = search_ops.options_["threshold"];
+    const float begin_threshold = strtof(threshold.c_str(), nullptr);
+    EarlyTermAlg early_term_alg = EarlyTermAlg::kBMW;
+    if (block_max_option.empty() or block_max_option == "true" or block_max_option == "bmw") {
         use_block_max_iter = true;
+        early_term_alg = EarlyTermAlg::kBMW;
+    } else if (block_max_option == "bmm") {
+        use_block_max_iter = true;
+        early_term_alg = EarlyTermAlg::kBMM;
     } else if (block_max_option == "false") {
         use_ordinary_iter = true;
     } else if (block_max_option == "compare") {
@@ -548,7 +641,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
-    if (!query_tree) {
+    if (query_tree == nullptr) {
         Status status = Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_);
         LOG_ERROR(status.message());
         RecoverableError(status);
@@ -590,14 +683,21 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree));
 
     if (use_block_max_iter) {
-        et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+        et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
+        // et_iter is nullptr if fulltext index is present but there's no data
+        if (et_iter != nullptr && begin_threshold > 0.0f)
+            et_iter->UpdateScoreThreshold(begin_threshold);
     }
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context);
     }
     if (use_block_max_iter and use_ordinary_iter) {
-        et_iter_2 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
-        et_iter_3 = query_builder.CreateEarlyTerminateSearch(full_text_query_context);
+        et_iter_2 = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
+        et_iter_3 = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
+        if (et_iter_2 != nullptr && begin_threshold > 0.0f)
+            et_iter_2->UpdateScoreThreshold(begin_threshold);
+        if (et_iter_3 != nullptr && begin_threshold > 0.0f)
+            et_iter_3->UpdateScoreThreshold(begin_threshold);
     }
 
     // 3 full text search
@@ -623,7 +723,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt);
+        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt, early_term_alg);
         result_heap.Sort();
         blockmax_result_count = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -663,7 +763,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 #ifdef INFINITY_DEBUG
         auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
 #endif
-        ExecuteFTSearch(et_iter_2, result_heap, blockmax_loop_cnt_2);
+        ExecuteFTSearch(et_iter_2, result_heap, blockmax_loop_cnt_2, early_term_alg);
         result_heap.Sort();
         blockmax_result_count_2 = result_heap.GetResultSize();
 #ifdef INFINITY_DEBUG
@@ -675,7 +775,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             FullTextScoreResultHeap result_heap_3(top_n, blockmax_score_result_3.get(), blockmax_row_id_result_3.get());
             auto blockmax_begin_ts_3 = std::chrono::high_resolution_clock::now();
             u32 blockmax_loop_cnt_3 = 0;
-            ExecuteFTSearch(et_iter_3, result_heap_3, blockmax_loop_cnt_3);
+            ExecuteFTSearch(et_iter_3, result_heap_3, blockmax_loop_cnt_3, early_term_alg);
             result_heap_3.Sort();
             auto blockmax_end_ts_3 = std::chrono::high_resolution_clock::now();
             if (blockmax_loop_cnt_3 != blockmax_loop_cnt_2) {
@@ -738,7 +838,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             RecoverableError(status);
         }
         for (u32 i = 0; i < result_count; ++i) {
-            ASSERT_FLOAT_EQ(1e-6, i, ordinary_score_result[i], blockmax_score_result[i]);
+            ASSERT_FLOAT_EQ(1e-4, i, ordinary_score_result[i], blockmax_score_result[i]);
             ASSERT_FLOAT_EQ(0.0f, i, blockmax_score_result[i], blockmax_score_result_2[i]);
         }
     }

@@ -26,6 +26,11 @@ import third_party;
 
 namespace infinity {
 
+bool EarlyTerminateIterator::Next() {
+    RowID target_doc_id = (doc_id_ == INVALID_ROWID) ? 0 : (doc_id_ + 1);
+    return Next(target_doc_id);
+}
+
 Pair<RowID, float> EarlyTerminateIterator::BlockNextWithThreshold(float threshold) {
     for (RowID next_skip = doc_id_ + 1;;) {
         if (!BlockSkipTo(next_skip, threshold)) [[unlikely]] {
