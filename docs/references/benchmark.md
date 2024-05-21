@@ -133,7 +133,7 @@ options:
 |                   | Time to insert & build index | Time to import & build index | P95 Latency(ms)| QPS (8 python clients) |  Memory | vCPU  |
 | ----------------- | ---------------------------- | ---------------------------- | ---------------| -----------------------| --------| ----- |
 | **Elasticsearch** | 2289 s                       | N/A                          | 14.75          | 1174                   | 21.0GB  | 10.0  |
-| **Infinity**      | 2321 s                       | 944 s                        | 3.51           | 3294                   | 9.0GB   | 5.7  |
+| **Infinity**      | 2321 s                       | 944 s                        | 3.51           | 3925                   | 9.0GB   | 4.2   |
 
 ---
 
