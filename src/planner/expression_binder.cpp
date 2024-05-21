@@ -276,27 +276,70 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
                         }
                     }
                     if (have_double) {
-                        u32 query_total_dim = 0;
-                        const auto embedding_data_ptr = GetConcatenatedTensorData<double>(&expr, basic_embedding_dim, query_total_dim);
+                        u32 tensor_total_dim = 0;
+                        const auto embedding_data_ptr = GetConcatenatedTensorData<double>(&expr, basic_embedding_dim, tensor_total_dim);
                         UniquePtr<double[]> embedding_data;
                         embedding_data.reset(reinterpret_cast<double *>(embedding_data_ptr));
                         auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, basic_embedding_dim);
-                        Value value = Value::MakeTensor(embedding_data_ptr, query_total_dim * sizeof(double), std::move(type_info_ptr));
+                        Value value = Value::MakeTensor(embedding_data_ptr, tensor_total_dim * sizeof(double), std::move(type_info_ptr));
                         return MakeShared<ValueExpression>(std::move(value));
                     } else {
-                        u32 query_total_dim = 0;
-                        const auto embedding_data_ptr = GetConcatenatedTensorData<i64>(&expr, basic_embedding_dim, query_total_dim);
+                        u32 tensor_total_dim = 0;
+                        const auto embedding_data_ptr = GetConcatenatedTensorData<i64>(&expr, basic_embedding_dim, tensor_total_dim);
                         UniquePtr<i64[]> embedding_data;
                         embedding_data.reset(reinterpret_cast<i64 *>(embedding_data_ptr));
                         auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, basic_embedding_dim);
-                        Value value = Value::MakeTensor(embedding_data_ptr, query_total_dim * sizeof(i64), std::move(type_info_ptr));
+                        Value value = Value::MakeTensor(embedding_data_ptr, tensor_total_dim * sizeof(i64), std::move(type_info_ptr));
                         return MakeShared<ValueExpression>(std::move(value));
                     }
                 }
                 case LiteralType::kSubArrayArray: {
                     // expect it to be tensor-array type
-                    // TODO
-                    return nullptr;
+                    bool have_double = false;
+                    for (const auto &sub_array : expr.sub_array_array_) {
+                        if (sub_array->literal_type_ != LiteralType::kSubArrayArray) {
+                            const auto error_info = "Invalid TensorArray input format.";
+                            LOG_ERROR(error_info);
+                            RecoverableError(Status::SyntaxError(error_info));
+                        }
+                        if (have_double) {
+                            // skip the check if already have double
+                            continue;
+                        }
+                        for (const auto &sub_sub_array : sub_array->sub_array_array_) {
+                            if (sub_sub_array->literal_type_ == LiteralType::kDoubleArray) {
+                                have_double = true;
+                                break;
+                            }
+                        }
+                    }
+                    const auto &grand_child_ptr = expr.sub_array_array_[0]->sub_array_array_[0];
+                    const u32 basic_embedding_dim = grand_child_ptr->long_array_.size() + grand_child_ptr->double_array_.size();
+                    if (have_double) {
+                        auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, basic_embedding_dim);
+                        Value value = Value::MakeTensorArray(std::move(type_info_ptr));
+                        for (const auto &sub_array : expr.sub_array_array_) {
+                            u32 child_tensor_total_dim = 0;
+                            const auto embedding_data_ptr =
+                                GetConcatenatedTensorData<double>(sub_array.get(), basic_embedding_dim, child_tensor_total_dim);
+                            UniquePtr<double[]> embedding_data;
+                            embedding_data.reset(reinterpret_cast<double *>(embedding_data_ptr));
+                            value.AppendToTensorArray(embedding_data_ptr, child_tensor_total_dim * sizeof(double));
+                        }
+                        return MakeShared<ValueExpression>(std::move(value));
+                    } else {
+                        auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, basic_embedding_dim);
+                        Value value = Value::MakeTensorArray(std::move(type_info_ptr));
+                        for (const auto &sub_array : expr.sub_array_array_) {
+                            u32 child_tensor_total_dim = 0;
+                            const auto embedding_data_ptr =
+                                GetConcatenatedTensorData<i64>(sub_array.get(), basic_embedding_dim, child_tensor_total_dim);
+                            UniquePtr<i64[]> embedding_data;
+                            embedding_data.reset(reinterpret_cast<i64 *>(embedding_data_ptr));
+                            value.AppendToTensorArray(embedding_data_ptr, child_tensor_total_dim * sizeof(i64));
+                        }
+                        return MakeShared<ValueExpression>(std::move(value));
+                    }
                 }
                 default: {
                     UnrecoverableError("Unexpected subarray type");

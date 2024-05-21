@@ -370,7 +370,7 @@ struct SQL_LTYPE {
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
-%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TENSOR TEXT
+%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT TENSOR TENSORARRAY
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
@@ -684,6 +684,7 @@ IDENTIFIER column_type default_expr {
 //            break;
 //        }
         case infinity::LogicalType::kTensor:
+        case infinity::LogicalType::kTensorArray:
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
@@ -786,6 +787,14 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | TENSOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt64}; }
 | TENSOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemFloat}; }
 | TENSOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemDouble}; }
+| TENSORARRAY '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemBit}; }
+| TENSORARRAY '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt8}; }
+| TENSORARRAY '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt16}; }
+| TENSORARRAY '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt32}; }
+| TENSORARRAY '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt32}; }
+| TENSORARRAY '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt64}; }
+| TENSORARRAY '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemFloat}; }
+| TENSORARRAY '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemDouble}; }
 | VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBit}; }
 | VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt8}; }
 | VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt16}; }

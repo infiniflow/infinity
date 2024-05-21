@@ -253,11 +253,13 @@ export struct ColumnVectorCast {
         return input.all_converted_;
     }
 
-    template <class Operator>
-    inline static bool
-    TryCastColumnVectorTensor(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &target, SizeT count, CastParameters &parameters) {
+    template <class SourceType, class TargetType, class Operator>
+    inline static bool TryCastColumnVectorVarlenWithType(const SharedPtr<ColumnVector> &source,
+                                                         SharedPtr<ColumnVector> &target,
+                                                         SizeT count,
+                                                         CastParameters &parameters) {
         bool result =
-            GenericTryCastColumnVector<TensorT, TensorT, TryCastVarlenWithTypeToVarlenWithType<Operator>>(source, target, count, parameters);
+            GenericTryCastColumnVector<SourceType, TargetType, TryCastVarlenWithTypeToVarlenWithType<Operator>>(source, target, count, parameters);
         return result;
     }
 };

@@ -26,7 +26,12 @@ import knn_expr;
 
 namespace infinity {
 
-enum class ExtraValueInfoType : u8 { INVALID_TYPE_INFO = 0, STRING_VALUE_INFO = 1, EMBEDDING_VALUE_INFO = 2 };
+enum class ExtraValueInfoType : u8 {
+    INVALID_TYPE_INFO = 0,
+    STRING_VALUE_INFO = 1,
+    EMBEDDING_VALUE_INFO = 2,
+    TENSORARRAY_VALUE_INFO = 3,
+};
 
 //===--------------------------------------------------------------------===//
 // Extra Value Info
@@ -64,7 +69,7 @@ protected:
 // String Value Info
 //===--------------------------------------------------------------------===//
 struct StringValueInfo : public ExtraValueInfo {
-    static constexpr const ExtraValueInfoType TYPE = ExtraValueInfoType::STRING_VALUE_INFO;
+    static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::STRING_VALUE_INFO;
 
 public:
     explicit StringValueInfo(const String &str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_p) {}
@@ -83,7 +88,7 @@ protected:
 // Embedding Value Info
 //===--------------------------------------------------------------------===//
 export struct EmbeddingValueInfo : public ExtraValueInfo {
-    static constexpr const ExtraValueInfoType TYPE = ExtraValueInfoType::EMBEDDING_VALUE_INFO;
+    static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::EMBEDDING_VALUE_INFO;
     friend struct Value;
 
 public:
@@ -108,10 +113,24 @@ public:
         }
     }
 
+    // Also used for tensor info
+    static SharedPtr<EmbeddingValueInfo> MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes);
+
     Pair<const_ptr_t, SizeT> GetData() const { return MakePair<const_ptr_t, SizeT>(data_.data(), data_.size()); }
 
 protected:
     Vector<char> data_;
+};
+
+//===--------------------------------------------------------------------===//
+// TensorArray Value Info
+//===--------------------------------------------------------------------===//
+export struct TensorArrayValueInfo : public ExtraValueInfo {
+    static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::TENSORARRAY_VALUE_INFO;
+    friend struct Value;
+    TensorArrayValueInfo() : ExtraValueInfo(ExtraValueInfoType::TENSORARRAY_VALUE_INFO) {}
+    void AppendTensor(const_ptr_t ptr, SizeT bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
+    Vector<SharedPtr<EmbeddingValueInfo>> member_tensor_data_;
 };
 
 export struct Value {
@@ -212,6 +231,10 @@ public:
 
     static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
 
+    static Value MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr);
+
+    void AppendToTensorArray(const_ptr_t ptr, SizeT bytes);
+
     // Object member
 public:
     // Value getter template for all types in union
@@ -225,6 +248,8 @@ public:
     const String &GetVarchar() const { return this->value_info_->Get<StringValueInfo>().GetString(); }
 
     Pair<const_ptr_t, SizeT> GetEmbedding() const { return this->value_info_->Get<EmbeddingValueInfo>().GetData(); }
+
+    const Vector<SharedPtr<EmbeddingValueInfo>> &GetTensorArray() const { return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_; }
 
     [[nodiscard]] const DataType &type() const { return type_; }
 

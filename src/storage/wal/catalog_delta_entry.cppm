@@ -239,8 +239,7 @@ public:
     void Merge(CatalogDeltaOperation &other) override;
 
 public:
-    i32 next_outline_idx_{0};
-    u64 last_chunk_offset_{};
+    Vector<Pair<u32, u64>> outline_infos_;
 };
 
 /// class AddTableIndexEntryOp

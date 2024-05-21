@@ -72,6 +72,7 @@ static const char *type2name[] = {
 
     // tensor type
     "Tensor",
+    "TensorArray",
 
     "Invalid",
 };
@@ -128,6 +129,7 @@ std::unordered_map<std::string, LogicalType> name2type = {
 
     // tensor
     { "tensor" , LogicalType::kTensor },
+    { "tensorarray" , LogicalType::kTensorArray },
 
     { "invalid" , LogicalType::kInvalid },
 };
@@ -189,6 +191,7 @@ static int64_t type_size[] = {
 
     // tensor type
     8, // Tensor
+    8, // TensorArray
 
     0, // Invalid
 };

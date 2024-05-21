@@ -22,6 +22,7 @@ import float_cast;
 import embedding_cast;
 import varchar_cast;
 import tensor_cast;
+import tensor_array_cast;
 
 import third_party;
 
@@ -151,6 +152,9 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         }
         case kTensor: {
             return BindTensorCast(source, target);
+        }
+        case kTensorArray: {
+            return BindTensorArrayCast(source, target);
         }
         case kRowID: {
             UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));

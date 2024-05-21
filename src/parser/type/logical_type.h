@@ -98,6 +98,11 @@ enum LogicalType : int8_t {
     // dynamic dim * fixed dim (column property) * data type
     kTensor,
 
+    // tensor-array type * 1
+    // dynamic array of tensor with common tensor type (unit embedding dim, data type)
+    // dynamic dim * dynamic dim * fixed dim (column property) * data type
+    kTensorArray,
+
     kInvalid,
 };
 

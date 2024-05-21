@@ -225,22 +225,43 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
-        Status status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding size={}", bytes, len));
+        Status status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
-    if (bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
-        Status status = Status::SyntaxError(
-            fmt::format("Value::MakeTensor(bytes={}) is larger than the maximum tensor size={}", bytes, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE));
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
-    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>();
-    embedding_value_info->data_.resize(bytes);
-    std::memcpy(embedding_value_info->data_.data(), ptr, bytes);
     Value value(LogicalType::kTensor, std::move(type_info_ptr));
-    value.value_info_ = std::move(embedding_value_info);
+    value.value_info_ = EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes);
     return value;
+}
+
+Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
+        UnrecoverableError(fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+    }
+    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
+    if (const SizeT len = embedding_info->Size(); len == 0) {
+        Status status = Status::SyntaxError(fmt::format("Value::MakeTensorArray(unit embedding bytes = {}) is invalid", len));
+        LOG_ERROR(status.message());
+        RecoverableError(std::move(status));
+    }
+    Value value(LogicalType::kTensorArray, std::move(type_info_ptr));
+    value.value_info_ = MakeShared<TensorArrayValueInfo>();
+    return value;
+}
+
+void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
+    if (type_.type() != LogicalType::kTensorArray) {
+        UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
+    }
+    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+    if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
+        Status status =
+            Status::SyntaxError(fmt::format("Value::AppendToTensorArray(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+        LOG_ERROR(status.message());
+        RecoverableError(std::move(status));
+    }
+    auto &tensor_array_info = value_info_->Get<TensorArrayValueInfo>();
+    tensor_array_info.AppendTensor(ptr, bytes);
 }
 
 // Value getter
@@ -544,6 +565,11 @@ bool Value::operator==(const Value &other) const {
             return std::ranges::equal(data1, data2);
             break;
         }
+        case kTensorArray: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+            break;
+        }
         case kInterval:
         case kArray:
         case kTuple:
@@ -650,6 +676,7 @@ void Value::CopyUnionValue(const Value &other) {
         }
         case kVarchar:
         case kTensor:
+        case kTensorArray:
         case kEmbedding: {
             this->value_info_ = other.value_info_;
             break;
@@ -758,6 +785,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         }
         case kVarchar:
         case kTensor:
+        case kTensorArray:
         case kEmbedding: {
             this->value_info_ = std::move(other.value_info_);
             break;
@@ -825,6 +853,15 @@ String Value::ToString() const {
         case LogicalType::kVarchar: {
             return value_info_->Get<StringValueInfo>().GetString();
         }
+        case LogicalType::kEmbedding: {
+            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            if (data_bytes != embedding_info->Size()) {
+                UnrecoverableError("Embedding data size mismatch.");
+            }
+            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
+            return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
+        }
         case LogicalType::kTensor: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
             const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
@@ -835,14 +872,10 @@ String Value::ToString() const {
             const auto embedding_num = data_bytes / basic_embedding_bytes;
             return TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
-        case LogicalType::kEmbedding: {
-            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
-            if (data_bytes != embedding_info->Size()) {
-                UnrecoverableError("Embedding data size mismatch.");
-            }
-            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
-            return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
+        case LogicalType::kTensorArray: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+            return {};
         }
         case LogicalType::kDecimal:
         case LogicalType::kArray:
@@ -862,6 +895,23 @@ String Value::ToString() const {
         }
     }
     return {};
+}
+
+SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes) {
+    if (bytes == 0) {
+        UnrecoverableError("EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.");
+    }
+    if (bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+        Status status = Status::SyntaxError(fmt::format("EmbeddingValueInfo::MakeTensorValueInfo(bytes={}) is larger than the maximum tensor size={}",
+                                                        bytes,
+                                                        DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    auto tensor_info_ptr = MakeShared<EmbeddingValueInfo>();
+    tensor_info_ptr->data_.resize(bytes);
+    std::memcpy(tensor_info_ptr->data_.data(), ptr, bytes);
+    return tensor_info_ptr;
 }
 
 } // namespace infinity

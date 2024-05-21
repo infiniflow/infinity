@@ -162,6 +162,7 @@ SMALLINT        { return SMALLINT; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TENSOR          { return TENSOR; }
+TENSORARRAY     { return TENSORARRAY; }
 TEXT            { return TEXT; }
 THEN            { return THEN; }
 TIME            { return TIME; }

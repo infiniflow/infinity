@@ -34,6 +34,7 @@ import knn_expr;
 import data_type;
 import default_values;
 import embedding_cast;
+import fix_heap;
 
 namespace infinity {
 
@@ -49,22 +50,22 @@ export inline BoundCastFunc BindTensorCast(const DataType &source, const DataTyp
     if (source_info->Dimension() != target_info->Dimension()) {
         RecoverableError(Status::DataTypeMismatch(source.ToString(), target.ToString()));
     }
-    return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorTensor<TensorTryCastToTensor>);
+    return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorVarlenWithType<TensorT, TensorT, TensorTryCastToTensor>);
 }
 
-template <typename TargetValueType, typename SourceValueType>
-void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
-                               const TensorT &source,
-                               ColumnVector *source_vector_ptr,
-                               TensorT &target,
-                               ColumnVector *target_vector_ptr) {
+export template <typename TargetValueType, typename SourceValueType>
+void TensorTryCastToTensorImplInner(const u32 basic_embedding_dim,
+                                    const TensorT &source,
+                                    FixHeapManager *source_fix_heap_mgr,
+                                    TensorT &target,
+                                    FixHeapManager *target_fix_heap_mgr) {
     const auto [source_embedding_num, source_chunk_id, source_chunk_offset] = source;
     target.embedding_num_ = source_embedding_num;
     const auto source_total_dim = basic_embedding_dim * source_embedding_num;
-    const auto source_ptr = source_vector_ptr->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(source_chunk_id, source_chunk_offset);
+    const auto source_ptr = source_fix_heap_mgr->GetRawPtrFromChunk(source_chunk_id, source_chunk_offset);
     if constexpr (std::is_same_v<TargetValueType, SourceValueType>) {
         const auto source_size = std::is_same_v<SourceValueType, BooleanT> ? (source_total_dim + 7) / 8 : source_total_dim * sizeof(SourceValueType);
-        std::tie(target.chunk_id_, target.chunk_offset_) = target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(source_ptr, source_size);
+        std::tie(target.chunk_id_, target.chunk_offset_) = target_fix_heap_mgr->AppendToHeap(source_ptr, source_size);
     } else if constexpr (std::is_same_v<TargetValueType, BooleanT>) {
         static_assert(sizeof(bool) == 1);
         const auto target_size = (source_total_dim + 7) / 8;
@@ -76,7 +77,7 @@ void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
             }
         }
         std::tie(target.chunk_id_, target.chunk_offset_) =
-            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
+            target_fix_heap_mgr->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
     } else {
         const auto target_size = source_total_dim * sizeof(TargetValueType);
         auto target_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_total_dim);
@@ -88,8 +89,21 @@ void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
                                            DataType::TypeToString<TargetValueType>()));
         }
         std::tie(target.chunk_id_, target.chunk_offset_) =
-            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
+            target_fix_heap_mgr->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
     }
+}
+
+template <typename TargetValueType, typename SourceValueType>
+void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
+                               const TensorT &source,
+                               ColumnVector *source_vector_ptr,
+                               TensorT &target,
+                               ColumnVector *target_vector_ptr) {
+    TensorTryCastToTensorImplInner<TargetValueType, SourceValueType>(basic_embedding_dim,
+                                                                     source,
+                                                                     source_vector_ptr->buffer_->fix_heap_mgr_.get(),
+                                                                     target,
+                                                                     target_vector_ptr->buffer_->fix_heap_mgr_.get());
 }
 
 template <typename TargetValueType>
