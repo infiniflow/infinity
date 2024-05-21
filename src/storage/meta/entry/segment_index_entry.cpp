@@ -244,13 +244,13 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 String base_name = fmt::format("ft_{:016x}", begin_row_id.ToUint64());
                 {
                     std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                    memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
-                                                                base_name,
-                                                                begin_row_id,
-                                                                index_fulltext->flag_,
-                                                                index_fulltext->analyzer_,
-                                                                table_index_entry_->GetFulltextByteSlicePool(),
-                                                                table_index_entry_->GetFulltextBufferPool());
+                    memory_indexer_ = MemoryIndexer::Make(*table_index_entry_->index_dir(),
+                                                          base_name,
+                                                          begin_row_id,
+                                                          index_fulltext->flag_,
+                                                          index_fulltext->analyzer_,
+                                                          table_index_entry_->GetFulltextByteSlicePool(),
+                                                          table_index_entry_->GetFulltextBufferPool());
                 }
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
@@ -380,13 +380,13 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
     // Init the mem index from previously spilled one.
     assert(memory_indexer_.get() == nullptr);
     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-    memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
-                                                base_name,
-                                                base_row_id,
-                                                index_fulltext->flag_,
-                                                index_fulltext->analyzer_,
-                                                table_index_entry_->GetFulltextByteSlicePool(),
-                                                table_index_entry_->GetFulltextBufferPool());
+    memory_indexer_ = MemoryIndexer::Make(*table_index_entry_->index_dir(),
+                                          base_name,
+                                          base_row_id,
+                                          index_fulltext->flag_,
+                                          index_fulltext->analyzer_,
+                                          table_index_entry_->GetFulltextByteSlicePool(),
+                                          table_index_entry_->GetFulltextBufferPool());
     memory_indexer_->Load();
 }
 
@@ -419,13 +419,13 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             u32 seg_id = segment_entry->segment_id();
             RowID base_row_id(seg_id, 0);
             String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-            memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
-                                                        base_name,
-                                                        base_row_id,
-                                                        index_fulltext->flag_,
-                                                        index_fulltext->analyzer_,
-                                                        table_index_entry_->GetFulltextByteSlicePool(),
-                                                        table_index_entry_->GetFulltextBufferPool());
+            memory_indexer_ = MemoryIndexer::Make(*table_index_entry_->index_dir(),
+                                                  base_name,
+                                                  base_row_id,
+                                                  index_fulltext->flag_,
+                                                  index_fulltext->analyzer_,
+                                                  table_index_entry_->GetFulltextByteSlicePool(),
+                                                  table_index_entry_->GetFulltextBufferPool());
             u64 column_id = column_def->id();
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {

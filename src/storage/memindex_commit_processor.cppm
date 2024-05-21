@@ -25,6 +25,27 @@ class MemoryIndexer;
 class PhysicalMemIndexCommit;
 class TxnManager;
 
+struct MemIdxPtrHasher {
+    using is_transparent = void;
+
+    SizeT operator()(const SharedPtr<MemoryIndexer> &memory_indexer) const;
+
+    SizeT operator()(MemoryIndexer *memory_indexer) const;
+};
+
+struct MemIdxPtrEqualer {
+    using is_transparent = void;
+
+    template <typename LHS, typename RHS>
+    bool operator()(const LHS &lhs, const RHS &rhs) const {
+        return ToPtr(lhs) == ToPtr(rhs);
+    }
+
+private:
+    static MemoryIndexer *ToPtr(const SharedPtr<MemoryIndexer> &memory_indexer);
+    static MemoryIndexer *ToPtr(MemoryIndexer *memory_indexer);
+};
+
 export class MemIndexCommitProcessor {
 public:
     MemIndexCommitProcessor();
@@ -37,7 +58,7 @@ public:
 
     void AddMemoryIndex(SharedPtr<MemoryIndexer> memory_indexer);
 
-    void RemoveMemoryIndex(const SharedPtr<MemoryIndexer> &memory_indexer);
+    void RemoveMemoryIndex(MemoryIndexer *memory_indexer);
 
 private:
     void MemIndexCommitLoop();
@@ -53,7 +74,7 @@ private:
     Atomic<bool> running_{};
 
     std::mutex mtx_;
-    HashSet<SharedPtr<MemoryIndexer>> memory_indexers_;
+    HashSet<SharedPtr<MemoryIndexer>, MemIdxPtrHasher, MemIdxPtrEqualer> memory_indexers_;
 };
 
 } // namespace infinity

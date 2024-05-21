@@ -97,24 +97,12 @@ void PostingMergerTest::CreateIndex() {
     }
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(),
-                           "chunk1",
-                           RowID(0U, 0U),
-                           flag_,
-                           "standard",
-                           *byte_slice_pool_,
-                           *buffer_pool_);
+    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard", *byte_slice_pool_, *buffer_pool_);
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(),
-                                              "chunk2",
-                                              RowID(0U, 1U),
-                                              flag_,
-                                              "standard",
-                                              *byte_slice_pool_,
-                                              *buffer_pool_);
+    auto indexer2 = MemoryIndexer::Make(GetTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard", *byte_slice_pool_, *buffer_pool_);
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }

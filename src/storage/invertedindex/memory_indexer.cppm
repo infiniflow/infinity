@@ -37,7 +37,7 @@ class BGQueryContextWrapper;
 class PhysicalMemIndexInsert;
 class MemIndexCommitProcessor;
 
-export class MemoryIndexer : public EnableSharedFromThis<MemoryIndexer> {
+export class MemoryIndexer {
 public:
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
@@ -53,6 +53,14 @@ public:
         MemoryPool byte_slice_pool_;
         RecyclePool buffer_pool_;
     };
+
+    static SharedPtr<MemoryIndexer> Make(const String &index_dir,
+                                  const String &base_name,
+                                  RowID base_row_id,
+                                  optionflag_t flag,
+                                  const String &analyzer,
+                                  MemoryPool &byte_slice_pool,
+                                  RecyclePool &buffer_pool);
 
     MemoryIndexer(const String &index_dir,
                   const String &base_name,

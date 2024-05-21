@@ -302,13 +302,13 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts_
 
 void QueryContext::BeginTxn(UniquePtr<String> txn_text) {
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn *new_txn = storage_->txn_manager()->BeginTxn(std::move(txn_text));
+        Txn* new_txn = storage_->txn_manager()->BeginTxn(std::move(txn_text));
         session_ptr_->SetTxn(new_txn);
     }
 }
 
 TxnTimeStamp QueryContext::CommitTxn() {
-    Txn *txn = session_ptr_->GetTxn();
+    Txn* txn = session_ptr_->GetTxn();
     if (txn == nullptr) {
         return 0;
     }
@@ -320,7 +320,7 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
-    Txn *txn = session_ptr_->GetTxn();
+    Txn* txn = session_ptr_->GetTxn();
     if (txn == nullptr) {
         return;
     }

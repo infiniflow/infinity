@@ -41,6 +41,14 @@ import infinity_exception;
 
 namespace infinity {
 
+SizeT MemIdxPtrHasher::operator()(const SharedPtr<MemoryIndexer> &memory_indexer) const { return Hash<MemoryIndexer *>()(memory_indexer.get()); }
+
+SizeT MemIdxPtrHasher::operator()(MemoryIndexer *memory_indexer) const { return Hash<MemoryIndexer *>()(memory_indexer); }
+
+MemoryIndexer *MemIdxPtrEqualer::ToPtr(const SharedPtr<MemoryIndexer> &memory_indexer) { return memory_indexer.get(); }
+
+MemoryIndexer *MemIdxPtrEqualer::ToPtr(MemoryIndexer *memory_indexer) { return memory_indexer; }
+
 MemIndexCommitProcessor::MemIndexCommitProcessor() : running_(false) {}
 
 void MemIndexCommitProcessor::Start() {
@@ -67,13 +75,17 @@ MemIndexCommitProcessor::~MemIndexCommitProcessor() {
 
 void MemIndexCommitProcessor::AddMemoryIndex(SharedPtr<MemoryIndexer> memory_indexer) {
     std::lock_guard guard(mtx_);
-    memory_indexers_.insert(std::move(memory_indexer));
+    auto [iter, insert_ok] = memory_indexers_.insert(std::move(memory_indexer));
+    if (!insert_ok) {
+        UnrecoverableException("MemoryIndexer already exists in MemIndexCommitProcessor");
+    }
 }
 
-void MemIndexCommitProcessor::RemoveMemoryIndex(const SharedPtr<MemoryIndexer> &memory_indexer) {
+void MemIndexCommitProcessor::RemoveMemoryIndex(MemoryIndexer *memory_indexer) {
     std::lock_guard guard(mtx_);
-    SizeT erase_n = memory_indexers_.erase(memory_indexer);
-    if (erase_n == 0) {
+    if (auto iter = memory_indexers_.find(memory_indexer); iter != memory_indexers_.end()) {
+        memory_indexers_.erase(iter);
+    } else {
         UnrecoverableException("MemoryIndexer not found in MemIndexCommitProcessor");
     }
 }

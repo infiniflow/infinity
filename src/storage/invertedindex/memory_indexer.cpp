@@ -73,6 +73,18 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 
 MemoryIndexer::PostingTable::PostingTable() {}
 
+SharedPtr<MemoryIndexer> MemoryIndexer::Make(const String &index_dir,
+                                             const String &base_name,
+                                             RowID base_row_id,
+                                             optionflag_t flag,
+                                             const String &analyzer,
+                                             MemoryPool &byte_slice_pool,
+                                             RecyclePool &buffer_pool) {
+    auto ret = MakeShared<MemoryIndexer>(index_dir, base_name, base_row_id, flag, analyzer, byte_slice_pool, buffer_pool);
+    ret->memindex_commit_processor_->AddMemoryIndex(ret);
+    return ret;
+}
+
 MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &base_name,
                              RowID base_row_id,
@@ -94,7 +106,7 @@ MemoryIndexer::~MemoryIndexer() {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
-    memindex_commit_processor_->RemoveMemoryIndex(this->shared_from_this());
+    memindex_commit_processor_->RemoveMemoryIndex(this);
     Reset();
 }
 
@@ -123,8 +135,6 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     //                          inverted_ring_size,
     //                          sorted_ring_size));
     // }
-    memindex_commit_processor_->AddMemoryIndex(this->shared_from_this());
-
     SharedPtr<ColumnInverter> inverter = nullptr;
     if (offline) {
         inverter = MakeShared<ColumnInverter>(nullptr, column_lengths_);
