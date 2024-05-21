@@ -64,7 +64,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
-    beginned_txns_.emplace_back(new_txn);
+    beginned_txns_.emplace_back(new_txn.get());
     rw_locker_.unlock();
 
     // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
@@ -110,7 +110,6 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     std::lock_guard guard(rw_locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
-    txn->SetTxnRead();
     return commit_ts;
 }
 
@@ -119,7 +118,6 @@ TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
     TxnTimeStamp commit_ts = ++start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     finishing_txns_.emplace(txn);
-    txn->SetTxnWrite();
     return commit_ts;
 }
 
@@ -255,13 +253,9 @@ TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     std::lock_guard guard(rw_locker_);
     TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
-    while (!beginned_txns_.empty()) {
-        auto first_txn = beginned_txns_.front().lock();
-        if (first_txn.get() != nullptr) {
-            first_uncommitted_begin_ts = first_txn->BeginTS();
-            break;
-        }
-        beginned_txns_.pop_front();
+    if (!beginned_txns_.empty()) {
+        auto *first_txn = beginned_txns_.front();
+        first_uncommitted_begin_ts = first_txn->BeginTS();
     }
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
     return std::min(first_uncommitted_begin_ts, checkpointed_ts);
@@ -271,13 +265,6 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 // So maintain the least uncommitted begin ts
 void TxnManager::FinishTxn(Txn *txn) {
     std::lock_guard guard(rw_locker_);
-
-    if (txn->GetTxnType() == TxnType::kInvalid) {
-        UnrecoverableError("Txn type is invalid");
-    } else if (txn->GetTxnType() == TxnType::kRead) {
-        txn_map_.erase(txn->TxnID());
-        return;
-    }
 
     TxnTimeStamp finished_ts = ++start_ts_;
     finished_txns_.emplace_back(finished_ts, txn);
@@ -290,11 +277,7 @@ void TxnManager::FinishTxn(Txn *txn) {
 
     TxnTimeStamp least_uncommitted_begin_ts = txn->CommitTS() + 1;
     while (!beginned_txns_.empty()) {
-        auto first_txn = beginned_txns_.front().lock();
-        if (first_txn.get() == nullptr) {
-            beginned_txns_.pop_front();
-            continue;
-        }
+        auto first_txn = beginned_txns_.front();
         auto status = first_txn->GetTxnState();
         if (status == TxnState::kCommitted || status == TxnState::kRollbacked) {
             beginned_txns_.pop_front();

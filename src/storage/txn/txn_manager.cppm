@@ -114,7 +114,7 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    Deque<WeakPtr<Txn>> beginned_txns_;                // sorted by begin ts
+    Deque<Txn *> beginned_txns_;                // sorted by begin ts
     HashSet<Txn *> finishing_txns_;                    // the txns for conflict check
     Deque<Pair<TxnTimeStamp, Txn *>> finished_txns_;   // sorted by finished ts
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts

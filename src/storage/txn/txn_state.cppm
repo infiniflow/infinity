@@ -60,10 +60,4 @@ export inline String ToString(TxnState txn_state) {
     return String();
 }
 
-export enum class TxnType : i8 {
-    kRead = 0,
-    kWrite,
-    kInvalid,
-};
-
 } // namespace infinity

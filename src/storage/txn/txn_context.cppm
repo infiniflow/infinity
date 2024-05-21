@@ -86,17 +86,12 @@ public:
         commit_ts_ = commit_ts;
     }
 
-    void SetTxnType(TxnType type) { type_ = type; }
-
-    TxnType GetTxnType() const { return type_; }
-
 private:
     std::shared_mutex rw_locker_{};
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnTimeStamp committed_ts_{};
     TxnState state_{TxnState::kStarted};
-    TxnType type_{TxnType::kInvalid};
 };
 
 } // namespace infinity

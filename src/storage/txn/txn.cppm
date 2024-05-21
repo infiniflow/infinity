@@ -182,17 +182,11 @@ public:
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
 
-    inline TxnType GetTxnType() const { return txn_context_.GetTxnType(); }
-
     void SetTxnCommitted(TxnTimeStamp committed_ts);
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 
     void SetTxnRollbacked() { txn_context_.SetTxnRollbacked(); }
-
-    void SetTxnRead() { txn_context_.SetTxnType(TxnType::kRead); }
-
-    void SetTxnWrite() { txn_context_.SetTxnType(TxnType::kWrite); }
 
     // WAL and replay OPS
     // Dangerous! only used during replaying wal.
