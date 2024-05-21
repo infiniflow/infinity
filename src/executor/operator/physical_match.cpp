@@ -561,7 +561,9 @@ void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter,
                      FullTextScoreResultHeap &result_heap,
                      u32 &blockmax_loop_cnt,
                      EarlyTermAlg early_term_alg) {
-    assert(et_iter.get() != nullptr);
+    // et_iter is nullptr if fulltext index is present but there's no data
+    if (et_iter == nullptr)
+        return;
     switch (early_term_alg) {
         case EarlyTermAlg::kBMM: {
             while (true) {
@@ -639,7 +641,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
-    if (!query_tree) {
+    if (query_tree == nullptr) {
         Status status = Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_);
         LOG_ERROR(status.message());
         RecoverableError(status);
@@ -682,7 +684,9 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 
     if (use_block_max_iter) {
         et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
-        et_iter->UpdateScoreThreshold(begin_threshold);
+        // et_iter is nullptr if fulltext index is present but there's no data
+        if (et_iter != nullptr && begin_threshold > 0.0f)
+            et_iter->UpdateScoreThreshold(begin_threshold);
     }
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context);
@@ -690,8 +694,10 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     if (use_block_max_iter and use_ordinary_iter) {
         et_iter_2 = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
         et_iter_3 = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
-        et_iter_2->UpdateScoreThreshold(begin_threshold);
-        et_iter_3->UpdateScoreThreshold(begin_threshold);
+        if (et_iter_2 != nullptr && begin_threshold > 0.0f)
+            et_iter_2->UpdateScoreThreshold(begin_threshold);
+        if (et_iter_3 != nullptr && begin_threshold > 0.0f)
+            et_iter_3->UpdateScoreThreshold(begin_threshold);
     }
 
     // 3 full text search
