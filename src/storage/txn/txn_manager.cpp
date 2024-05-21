@@ -274,9 +274,9 @@ void TxnManager::FinishTxn(Txn *txn) {
 
     if (txn->GetTxnType() == TxnType::kInvalid) {
         UnrecoverableError("Txn type is invalid");
-    } else if (txn->GetTxnType() == TxnType::kRead) {
-        txn_map_.erase(txn->TxnID());
-        return;
+    // } else if (txn->GetTxnType() == TxnType::kRead) {
+    //     txn_map_.erase(txn->TxnID());
+    //     return;
     }
 
     TxnTimeStamp finished_ts = ++start_ts_;

@@ -48,7 +48,7 @@ public:
     void UnInit();
 
     // Schedule start fragments
-    void Schedule(PlanFragment * plan_fragment_root, const BaseStatement* base_statement);
+    void Schedule(PlanFragment * plan_fragment_root, const BaseStatement* base_statement, bool to_threads1 = false);
 
     // `plan_fragment` can be scheduled because all of its dependencies are met.
     void ScheduleFragment(PlanFragment *plan_fragment);
@@ -57,6 +57,8 @@ public:
 
 private:
     u64 FindLeastWorkloadWorker();
+
+    u64 FindLeastWorkloadWorker1();
 
     void ScheduleTask(FragmentTask *task, u64 worker_id);
 

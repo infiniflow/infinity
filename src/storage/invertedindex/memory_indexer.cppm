@@ -35,8 +35,9 @@ namespace infinity {
 
 class BGQueryContextWrapper;
 class PhysicalMemIndexInsert;
+class MemIndexCommitProcessor;
 
-export class MemoryIndexer {
+export class MemoryIndexer : public EnableSharedFromThis<MemoryIndexer> {
 public:
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
@@ -67,12 +68,12 @@ public:
     void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
     void InsertExecute(SharedPtr<ColumnInverter> inverter,
-                 SharedPtr<ColumnVector> column_vector,
-                 u32 row_offset,
-                 u32 row_count,
-                 u32 start_doc_id,
-                 u64 task_seq,
-                 bool offline);
+                       SharedPtr<ColumnVector> column_vector,
+                       u32 row_offset,
+                       u32 row_count,
+                       u32 start_doc_id,
+                       u64 task_seq,
+                       bool offline);
 
     // InsertGap insert some empty documents. This is for abnormal case.
     void InsertGap(u32 row_count);
@@ -124,6 +125,8 @@ private:
                                                          u64 task_seq,
                                                          bool offline);
 
+    void RemoveBGWrapper(i64 seq_inserted);
+
     void WaitInflightTasks() {
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
@@ -139,6 +142,7 @@ private:
     void PrepareSpillFile();
 
 private:
+    MemIndexCommitProcessor *memindex_commit_processor_{};
     String index_dir_;
     String base_name_;
     RowID base_row_id_{INVALID_ROWID};

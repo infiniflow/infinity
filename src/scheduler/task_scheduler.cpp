@@ -43,6 +43,8 @@ namespace infinity {
 
 // Non-static memory methods
 
+const int thread_n1 = 4;
+
 TaskScheduler::TaskScheduler(Config *config_ptr) { Init(config_ptr); }
 
 void TaskScheduler::Init(Config *config_ptr) {
@@ -72,6 +74,13 @@ void TaskScheduler::Init(Config *config_ptr) {
         UnrecoverableError("No cpu is used in scheduler");
     }
 
+    for (u64 cpu_id = 0; cpu_id < thread_n1; ++cpu_id) {
+        UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
+        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), cpu_id + worker_count_);
+        worker_array_.emplace_back(cpu_id + worker_count_, std::move(worker_queue), std::move(worker_thread));
+        worker_workloads_.emplace_back(0);
+    }
+
     initialized_ = true;
 }
 
@@ -98,7 +107,20 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
     return min_workload_worker_id;
 }
 
-void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
+u64 TaskScheduler::FindLeastWorkloadWorker1() {
+    u64 min_workload = worker_workloads_[worker_count_];
+    u64 min_workload_worker_id = worker_count_;
+    for (u64 worker_id = worker_count_ + 1; worker_id < worker_count_ + thread_n1; ++worker_id) {
+        u64 current_worker_load = worker_workloads_[worker_id];
+        if (current_worker_load < min_workload) {
+            min_workload = current_worker_load;
+            min_workload_worker_id = worker_id;
+        }
+    }
+    return min_workload_worker_id;
+}
+
+void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement, bool to_threads1) {
     if (!initialized_) {
         UnrecoverableError("Scheduler isn't initialized");
     }
@@ -154,7 +176,12 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
             if (!task->TryIntoWorkerLoop()) {
                 UnrecoverableError("Task can't be scheduled");
             }
-            u64 worker_id = FindLeastWorkloadWorker();
+            u64 worker_id = 0;
+            if (!to_threads1) {
+                worker_id = FindLeastWorkloadWorker();
+            } else {
+                worker_id = FindLeastWorkloadWorker1();
+            }
             ScheduleTask(task.get(), worker_id);
         }
     }
