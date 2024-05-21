@@ -160,11 +160,18 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
 }
 
 UniquePtr<OperatorState> MakeCompactState(PhysicalCompact *physical_compact, FragmentTask *task, FragmentContext *fragment_ctx) {
+    SourceState *source_state = task->source_state_.get();
+    if (source_state->state_type_ != SourceStateType::kCompact) {
+        UnrecoverableError("Expect compact source state");
+    }
+    auto *compact_source_state = static_cast<CompactSourceState *>(source_state);
+
     if (fragment_ctx->ContextType() != FragmentType::kParallelMaterialize) {
         UnrecoverableError("Compact operator should be in parallel materialized fragment.");
     }
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    auto compact_operator_state = MakeUnique<CompactOperatorState>(task->TaskID(), parallel_materialize_fragment_ctx->compact_state_data_);
+    auto compact_operator_state =
+        MakeUnique<CompactOperatorState>(std::move(compact_source_state->segment_groups_), parallel_materialize_fragment_ctx->compact_state_data_);
     return compact_operator_state;
 }
 
@@ -689,7 +696,6 @@ SizeT InitCompactFragmentContext(PhysicalCompact *compact_operator, FragmentCont
     auto *parent_serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(parent_context);
 
     auto &compact_state_data = parent_serial_materialize_fragment_ctx->compact_state_data_;
-    compact_state_data->segment_data_list_.resize(task_n);
     parallel_materialize_fragment_ctx->compact_state_data_ = compact_state_data;
     return task_n;
 }
@@ -809,8 +815,19 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             tasks_[0]->source_state_ = MakeUnique<QueueSourceState>();
             break;
         }
+        case PhysicalOperatorType::kCompact: {
+            if (fragment_type_ != FragmentType::kParallelMaterialize) {
+                UnrecoverableError(
+                    fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
+            }
+            auto *physical_compact = static_cast<PhysicalCompact *>(first_operator);
+            Vector<Vector<Vector<SegmentEntry *>>> segment_groups_list = physical_compact->PlanCompact(parallel_count);
+            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->source_state_ = MakeUnique<CompactSourceState>(std::move(segment_groups_list[task_id]));
+            }
+            break;
+        }
         case PhysicalOperatorType::kCreateIndexDo:
-        case PhysicalOperatorType::kCompact:
         case PhysicalOperatorType::kCompactIndexDo: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(

@@ -70,8 +70,9 @@ bool PhysicalCompactIndexPrepare::Execute(QueryContext *query_context, OperatorS
 }
 
 SizeT PhysicalCompactIndexPrepare::TaskletCount() {
-    auto *index_index = base_table_ref_->index_index_.get();
-    return index_index->index_snapshots_vec_.size();
+    // auto *index_index = base_table_ref_->index_index_.get();
+    // return index_index->index_snapshots_vec_.size();
+    return 1;
 }
 
 } // namespace infinity
