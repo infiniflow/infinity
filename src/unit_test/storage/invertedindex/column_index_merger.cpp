@@ -27,6 +27,8 @@ import internal_types;
 import logical_type;
 import third_party;
 import random;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 class ColumnIndexMergerTest : public BaseTest {
@@ -51,6 +53,23 @@ public:
     };
 
 protected:
+    void SetUp() override {
+        auto config_path = std::make_shared<std::string>();
+
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        RemoveDbDirs();
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+    }
+
     void CreateIndex(const char *paragraphs[],
                      const SizeT num_paragraph,
                      const String& index_dir,
@@ -84,8 +103,6 @@ protected:
     RecyclePool *buffer_pool_;
 
     MemoryPool *byte_slice_pool_;
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{2};
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -115,9 +132,7 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
                               flag_,
                               "standard",
                               *byte_slice_pool_,
-                              *buffer_pool_,
-                              inverting_thread_pool_,
-                              commiting_thread_pool_);
+                              *buffer_pool_);
         indexer.Insert(column, row_offsets[i], row_counts[i]);
         indexer.Dump();
     }

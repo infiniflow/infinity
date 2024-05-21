@@ -40,6 +40,8 @@ import inmem_posting_decoder;
 import inmem_position_list_decoder;
 import inmem_index_segment_reader;
 import segment_posting;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 
@@ -54,14 +56,20 @@ public:
 protected:
     MemoryPool byte_slice_pool_{};
     RecyclePool buffer_pool_{};
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
     UniquePtr<MemoryPool> memory_pool_ = MakeUnique<MemoryPool>(1024);
 public:
     void SetUp() override {
+        auto config_path = std::make_shared<std::string>();
+
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        RemoveDbDirs();
+        infinity::InfinityContext::instance().Init(config_path);
+
         // https://en.wikipedia.org/wiki/Finite-state_transducer
         const char *paragraphs[] = {
             R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",
@@ -80,7 +88,12 @@ public:
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
     }
 
-    void TearDown() override {}
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+    }
 
     void Check(ColumnIndexReader &reader) {
         for (SizeT i = 0; i < expected_postings_.size(); ++i) {
@@ -118,9 +131,7 @@ TEST_F(MemoryIndexerTest, Insert) {
                            flag_,
                            "standard",
                            byte_slice_pool_,
-                           buffer_pool_,
-                           inverting_thread_pool_,
-                           commiting_thread_pool_);
+                           buffer_pool_);
     indexer1.Insert(column_, 0, 1);
     indexer1.Insert(column_, 1, 3);
     indexer1.Dump();
@@ -131,9 +142,7 @@ TEST_F(MemoryIndexerTest, Insert) {
                                               flag_,
                                               "standard",
                                               byte_slice_pool_,
-                                              buffer_pool_,
-                                              inverting_thread_pool_,
-                                              commiting_thread_pool_);
+                                              buffer_pool_);
     indexer2->Insert(column_, 4, 1);
     while (indexer2->GetInflightTasks() > 0) {
         sleep(1);
@@ -156,9 +165,7 @@ TEST_F(MemoryIndexerTest, test2) {
                            flag_,
                            "standard",
                            byte_slice_pool_,
-                           buffer_pool_,
-                           inverting_thread_pool_,
-                           commiting_thread_pool_);
+                           buffer_pool_);
     indexer1.Insert(column_, 0, 2, true);
     indexer1.Insert(column_, 2, 2, true);
     indexer1.Insert(column_, 4, 1, true);
@@ -180,9 +187,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
                                               flag_,
                                               "standard",
                                               byte_slice_pool_,
-                                              buffer_pool_,
-                                              inverting_thread_pool_,
-                                              commiting_thread_pool_);
+                                              buffer_pool_);
     bool offline = false;
     bool spill = true;
     indexer1->Insert(column_, 0, 2, offline);
@@ -200,9 +205,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
                                                                         flag_,
                                                                         "standard",
                                                                         byte_slice_pool_,
-                                                                        buffer_pool_,
-                                                                        inverting_thread_pool_,
-                                                                        commiting_thread_pool_);
+                                                                        buffer_pool_);
 
     loaded_indexer->Load();
     SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(loaded_indexer.get());

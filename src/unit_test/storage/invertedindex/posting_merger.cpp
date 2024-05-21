@@ -27,6 +27,8 @@ import internal_types;
 import logical_type;
 import infinity_exception;
 import vector_with_lock;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 
@@ -53,13 +55,28 @@ public:
 protected:
     void CreateIndex();
 
+    void SetUp() {
+        auto config_path = std::make_shared<std::string>();
+
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        RemoveDbDirs();
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+    }
+
 protected:
     MemoryPool *memory_pool_;
     RecyclePool *buffer_pool_;
 
     MemoryPool *byte_slice_pool_;
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -86,9 +103,7 @@ void PostingMergerTest::CreateIndex() {
                            flag_,
                            "standard",
                            *byte_slice_pool_,
-                           *buffer_pool_,
-                           inverting_thread_pool_,
-                           commiting_thread_pool_);
+                           *buffer_pool_);
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
@@ -99,9 +114,7 @@ void PostingMergerTest::CreateIndex() {
                                               flag_,
                                               "standard",
                                               *byte_slice_pool_,
-                                              *buffer_pool_,
-                                              inverting_thread_pool_,
-                                              commiting_thread_pool_);
+                                              *buffer_pool_);
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }

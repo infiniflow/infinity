@@ -37,17 +37,20 @@ export struct BGQueryState {
 };
 
 export struct BGQueryContextWrapper {
+    BGQueryState bg_state_;
+
     UniquePtr<QueryContext> query_context_;
 
     SessionManager *session_mgr_;
     SharedPtr<BaseSession> session_;
 
     BGQueryContextWrapper(BGQueryContextWrapper &&other)
-        : query_context_(std::move(other.query_context_)), session_mgr_(other.session_mgr_), session_(std::move(other.session_)) {
+        : bg_state_(std::move(other.bg_state_)), query_context_(std::move(other.query_context_)), session_mgr_(other.session_mgr_),
+          session_(std::move(other.session_)) {
         other.session_mgr_ = nullptr;
     }
 
-    BGQueryContextWrapper(Txn *txn) : session_mgr_(InfinityContext::instance().session_manager()) {
+    BGQueryContextWrapper(Txn *txn = nullptr) : session_mgr_(InfinityContext::instance().session_manager()) {
         session_ = session_mgr_->CreateLocalSession();
         query_context_ = MakeUnique<QueryContext>(session_.get());
         query_context_->Init(InfinityContext::instance().config(),
@@ -55,7 +58,9 @@ export struct BGQueryContextWrapper {
                              InfinityContext::instance().storage(),
                              InfinityContext::instance().resource_manager(),
                              InfinityContext::instance().session_manager());
-        query_context_->SetTxn(txn);
+        if (txn != nullptr) {
+            query_context_->SetTxn(txn);
+        }
     }
 
     ~BGQueryContextWrapper() {

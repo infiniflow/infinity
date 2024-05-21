@@ -33,7 +33,11 @@ import vector_with_lock;
 
 namespace infinity {
 
-export class MemoryIndexer {
+class BGQueryContextWrapper;
+class PhysicalMemIndexInsert;
+class MemIndexCommitProcessor;
+
+export class MemoryIndexer : public EnableSharedFromThis<MemoryIndexer> {
 public:
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
@@ -56,21 +60,25 @@ public:
                   optionflag_t flag,
                   const String &analyzer,
                   MemoryPool &byte_slice_pool,
-                  RecyclePool &buffer_pool,
-                  ThreadPool &inverting_thread_pool,
-                  ThreadPool &commiting_thread_pool);
+                  RecyclePool &buffer_pool);
 
     ~MemoryIndexer();
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
+    void InsertExecute(SharedPtr<ColumnInverter> inverter,
+                       SharedPtr<ColumnVector> column_vector,
+                       u32 row_offset,
+                       u32 row_count,
+                       u32 start_doc_id,
+                       u64 task_seq,
+                       bool offline);
+
     // InsertGap insert some empty documents. This is for abnormal case.
     void InsertGap(u32 row_count);
 
     // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
-    void Commit(bool offline = false);
-
     void Commit1(bool offline = false);
 
     // CommitSync is for online case. It sort a batch of inverters, then generate posting for a batch of inverters.
@@ -108,6 +116,17 @@ public:
     void Reset();
 
 private:
+    UniquePtr<PhysicalMemIndexInsert> MakeInsertOperator(MemoryIndexer *memory_indexer,
+                                                         SharedPtr<ColumnInverter> inverter,
+                                                         SharedPtr<ColumnVector> column_vector,
+                                                         u32 row_offset,
+                                                         u32 row_count,
+                                                         u32 start_doc_id,
+                                                         u64 task_seq,
+                                                         bool offline);
+
+    void RemoveBGWrapper(i64 seq_inserted);
+
     void WaitInflightTasks() {
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
@@ -123,6 +142,7 @@ private:
     void PrepareSpillFile();
 
 private:
+    MemIndexCommitProcessor *memindex_commit_processor_{};
     String index_dir_;
     String base_name_;
     RowID base_row_id_{INVALID_ROWID};
@@ -130,13 +150,12 @@ private:
     String analyzer_;
     MemoryPool &byte_slice_pool_;
     RecyclePool &buffer_pool_;
-    ThreadPool &inverting_thread_pool_;
-    ThreadPool &commiting_thread_pool_;
+    HashMap<i64, BGQueryContextWrapper> bg_wrappers_;
     u32 doc_count_{0};
     SharedPtr<PostingTable> posting_table_;
     PostingPtr prepared_posting_{nullptr};
-    Ring<SharedPtr<ColumnInverter>> ring_inverted_;
-    Ring<SharedPtr<ColumnInverter>> ring_sorted_;
+    Ring<Pair<SharedPtr<ColumnInverter>, i64>> ring_inverted_;
+    Ring<Pair<SharedPtr<ColumnInverter>, i64>> ring_sorted_;
     u64 seq_inserted_{0};
     u64 inflight_tasks_{0};
     std::condition_variable cv_;

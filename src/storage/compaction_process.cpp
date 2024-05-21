@@ -66,18 +66,17 @@ void CompactionProcessor::DoCompact() {
     });
 
     Vector<Pair<UniquePtr<BaseStatement>, Txn *>> statements = this->ScanForCompact(scan_txn);
-    Vector<Pair<BGQueryContextWrapper, BGQueryState>> wrappers;
+    Vector<BGQueryContextWrapper> wrappers;
     for (const auto &[statement, txn] : statements) {
         BGQueryContextWrapper wrapper(txn);
-        BGQueryState state;
-        bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
+        bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), wrapper.bg_state_);
         if (res) {
-            wrappers.emplace_back(std::move(wrapper), std::move(state));
+            wrappers.emplace_back(std::move(wrapper));
         }
     }
-    for (auto &[wrapper, query_state] : wrappers) {
+    for (auto &wrapper : wrappers) {
         TxnTimeStamp commit_ts_out = 0;
-        wrapper.query_context_->JoinBGStatement(query_state, commit_ts_out);
+        wrapper.query_context_->JoinBGStatement(wrapper.bg_state_, commit_ts_out);
     }
     txn_mgr_->CommitTxn(scan_txn);
     success = true;

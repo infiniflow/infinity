@@ -39,7 +39,6 @@ import analyzer;
 import analyzer_pool;
 import term;
 import column_inverter;
-import invert_task;
 import third_party;
 import ring;
 import external_sort_merger;
@@ -54,6 +53,15 @@ import logger;
 import file_system;
 import file_system_type;
 import vector_with_lock;
+
+import bg_query_state;
+import physical_memindex_insert;
+import data_type;
+import logical_type;
+import infinity_exception;
+import infinity_context;
+import storage;
+import memindex_commit_process;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -71,12 +79,11 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
                              optionflag_t flag,
                              const String &analyzer,
                              MemoryPool &byte_slice_pool,
-                             RecyclePool &buffer_pool,
-                             ThreadPool &inverting_thread_pool,
-                             ThreadPool &commiting_thread_pool)
+                             RecyclePool &buffer_pool)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
-      buffer_pool_(buffer_pool), inverting_thread_pool_(inverting_thread_pool), commiting_thread_pool_(commiting_thread_pool), ring_inverted_(15UL),
-      ring_sorted_(13UL) {
+      buffer_pool_(buffer_pool), ring_inverted_(15UL), ring_sorted_(13UL) {
+    auto *storage = InfinityContext::instance().storage();
+    memindex_commit_processor_ = storage->memindex_commit_processor();
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
@@ -87,6 +94,7 @@ MemoryIndexer::~MemoryIndexer() {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
+    memindex_commit_processor_->RemoveMemoryIndex(this->shared_from_this());
     Reset();
 }
 
@@ -115,36 +123,63 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     //                          inverted_ring_size,
     //                          sorted_ring_size));
     // }
+    memindex_commit_processor_->AddMemoryIndex(this->shared_from_this());
 
-    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
+    SharedPtr<ColumnInverter> inverter = nullptr;
     if (offline) {
-        auto inverter = MakeShared<ColumnInverter>(nullptr, column_lengths_);
+        inverter = MakeShared<ColumnInverter>(nullptr, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
-        auto func = [this, task, inverter](int id) {
-            SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            column_length_sum_ += column_length_sum;
-            if (column_length_sum > 0) {
-                inverter->SortForOfflineDump();
-            }
-            this->ring_sorted_.Put(task->task_seq_, inverter);
-        };
-        inverting_thread_pool_.push(std::move(func));
     } else {
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-        auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+        inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
-        auto func = [this, task, inverter](int id) {
-            // LOG_INFO(fmt::format("online inverter {} begin", id));
-            SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            column_length_sum_ += column_length_sum;
-            this->ring_inverted_.Put(task->task_seq_, inverter);
-            // LOG_INFO(fmt::format("online inverter {} end", id));
-        };
-        inverting_thread_pool_.push(std::move(func));
     }
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        inflight_tasks_++;
+        BGQueryContextWrapper bg_wrapper;
+        auto [iter, insert_ok] = bg_wrappers_.emplace((i64)seq_inserted, std::move(bg_wrapper));
+        if (!insert_ok) {
+            UnrecoverableError(fmt::format("MemoryIndexer::Insert: seq_inserted {} already exists", seq_inserted));
+        }
+        auto &wrapper = iter->second;
+        auto physical_memindex_insert =
+            this->MakeInsertOperator(this, inverter, column_vector, row_offset, row_count, doc_count, seq_inserted, offline);
+        bool res = wrapper.query_context_->ExecuteBGOperator(std::move(physical_memindex_insert),
+                                                             wrapper.bg_state_,
+                                                             MakeUnique<String>("Mem idx insert"),
+                                                             true);
+        if (!res) {
+            this->RemoveBGWrapper(seq_inserted);
+            return;
+        } else {
+            inflight_tasks_++;
+        }
+    }
+}
+
+void MemoryIndexer::InsertExecute(SharedPtr<ColumnInverter> inverter,
+                                  SharedPtr<ColumnVector> column_vector,
+                                  u32 row_offset,
+                                  u32 row_count,
+                                  u32 start_doc_id,
+                                  u64 task_seq,
+                                  bool offline) {
+    LOG_TRACE(fmt::format("Index {} insert execute. task_seq: {}", base_name_, task_seq));
+    if (offline) {
+        SizeT column_length_sum = inverter->InvertColumn(column_vector, row_offset, row_count, start_doc_id);
+        column_length_sum_ += column_length_sum;
+        if (column_length_sum > 0) {
+            inverter->SortForOfflineDump();
+        }
+        // LOG_INFO(fmt::format("ADD EXECUTE offline, {}", task_seq));
+        this->ring_sorted_.Put(task_seq, {inverter, task_seq});
+    } else {
+        // LOG_INFO(fmt::format("online inverter {} begin", id));
+        // LOG_INFO(fmt::format("ADD EXECUTE sync, {}", task_seq));
+        SizeT column_length_sum = inverter->InvertColumn(column_vector, row_offset, row_count, start_doc_id);
+        column_length_sum_ += column_length_sum;
+        this->ring_inverted_.Put(task_seq, {inverter, task_seq});
+        // LOG_INFO(fmt::format("online inverter {} end", id));
     }
 }
 
@@ -157,19 +192,52 @@ void MemoryIndexer::InsertGap(u32 row_count) {
     doc_count_ += row_count;
 }
 
-void MemoryIndexer::Commit(bool offline) {
-    if (offline) {
-        commiting_thread_pool_.push([this](int id) { this->CommitOffline(); });
-    } else {
-        commiting_thread_pool_.push([this](int id) { this->CommitSync(); });
-    }
-}
-
 void MemoryIndexer::Commit1(bool offline) {
     if (offline) {
         CommitOffline();
     } else {
         CommitSync();
+    }
+}
+
+UniquePtr<PhysicalMemIndexInsert> MemoryIndexer::MakeInsertOperator(MemoryIndexer *memory_indexer,
+                                                                    SharedPtr<ColumnInverter> inverter,
+                                                                    SharedPtr<ColumnVector> column_vector,
+                                                                    u32 row_offset,
+                                                                    u32 row_count,
+                                                                    u32 start_doc_id,
+                                                                    u64 task_seq,
+                                                                    bool offline) {
+    u64 id = 0;
+    auto output_names = MakeShared<Vector<String>>();
+    output_names->push_back("OK");
+    auto output_types = MakeShared<Vector<SharedPtr<DataType>>>();
+    output_types->push_back(MakeShared<DataType>(LogicalType::kInteger));
+    return MakeUnique<PhysicalMemIndexInsert>(id,
+                                              memory_indexer,
+                                              inverter,
+                                              column_vector,
+                                              row_offset,
+                                              row_count,
+                                              start_doc_id,
+                                              task_seq,
+                                              offline,
+                                              nullptr,
+                                              output_names,
+                                              output_types);
+}
+
+void MemoryIndexer::RemoveBGWrapper(i64 seq_inserted) {
+    if (seq_inserted != -1) {
+        auto iter = bg_wrappers_.find(seq_inserted);
+        if (iter != bg_wrappers_.end()) {
+            auto &wrapper = iter->second;
+            TxnTimeStamp commit_ts_out = 0;
+            wrapper.query_context_->JoinBGStatement(wrapper.bg_state_, commit_ts_out);
+            bg_wrappers_.erase(iter);
+        } else {
+            UnrecoverableError(fmt::format("MemoryIndexer::RemoveBGWrapper: seq_inserted {} not found", seq_inserted));
+        }
     }
 }
 
@@ -182,18 +250,23 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     if (nullptr == spill_file_handle_) {
         PrepareSpillFile();
     }
-    Vector<SharedPtr<ColumnInverter>> inverters;
+    Vector<Pair<SharedPtr<ColumnInverter>, i64>> inverters;
     this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
     SizeT num = inverters.size();
     if (num > 0) {
-        for (auto &inverter : inverters) {
+        for (auto &[inverter, _] : inverters) {
             inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
             num_runs_++;
         }
     }
     if (num > 0) {
         std::unique_lock<std::mutex> lock(mutex_);
+        for (auto &[_, seq_inserted] : inverters) {
+            this->RemoveBGWrapper(seq_inserted);
+            // LOG_INFO(fmt::format("Remove offline {}", seq_inserted));
+        }
         inflight_tasks_ -= num;
+        // LOG_INFO(fmt::format("Minus offline inflight_tasks_ by {}", num));
         if (inflight_tasks_ == 0) {
             cv_.notify_all();
         }
@@ -202,37 +275,47 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
 }
 
 SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
-    Vector<SharedPtr<ColumnInverter>> inverters;
+    Vector<Pair<SharedPtr<ColumnInverter>, i64>> inverters_pairs;
     // LOG_INFO("MemoryIndexer::CommitSync begin");
-    u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
+    u64 seq_commit = this->ring_inverted_.GetBatch(inverters_pairs);
+    Vector<i64> seq_inserteds;
+    Vector<SharedPtr<ColumnInverter>> inverters;
+    for (auto &[inverter, seq_inserted] : inverters_pairs) {
+        inverters.push_back(inverter);
+        seq_inserteds.push_back(seq_inserted);
+    }
     SizeT num_sorted = inverters.size();
     SizeT num_generated = 0;
     // SizeT num_merged = 0;
     if (num_sorted > 0) {
         ColumnInverter::Merge(inverters);
         inverters[0]->Sort();
-        this->ring_sorted_.Put(seq_commit, inverters[0]);
+        this->ring_sorted_.Put(seq_commit, {inverters[0], -1});
     };
 
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
-    if (!lock.try_lock()) {
-        return 0;
-    }
-
-    while (1) {
-        this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
-        // num_merged = inverters.size();
-        if (inverters.empty()) {
-            break;
+    if (lock.try_lock()) {
+        while (1) {
+            this->ring_sorted_.GetBatch(inverters_pairs, wait_if_empty_ms);
+            // num_merged = inverters.size();
+            if (inverters_pairs.empty()) {
+                break;
+            }
+            for (auto &[inverter, seq_inserted] : inverters_pairs) {
+                inverter->GeneratePosting();
+                num_generated += inverter->GetMerged();
+                seq_inserteds.push_back(seq_inserted);
+            }
         }
-        for (auto &inverter : inverters) {
-            inverter->GeneratePosting();
-            num_generated += inverter->GetMerged();
-        }
     }
-    if (num_generated > 0) {
+    {
         std::unique_lock<std::mutex> lock(mutex_);
+        for (auto seq_inserted : seq_inserteds) {
+            this->RemoveBGWrapper(seq_inserted);
+            // LOG_INFO(fmt::format("Remove sync {}", seq_inserted));
+        }
         inflight_tasks_ -= num_generated;
+        // LOG_INFO(fmt::format("Minus sync inflight_tasks_ by {}", num_generated));
         if (inflight_tasks_ == 0) {
             cv_.notify_all();
         }

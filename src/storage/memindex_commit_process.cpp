@@ -37,10 +37,11 @@ import data_type;
 import logical_type;
 import logger;
 import third_party;
+import infinity_exception;
 
 namespace infinity {
 
-MemIndexCommitProcessor::MemIndexCommitProcessor(Catalog *catalog, TxnManager *txn_mgr) : running_(false), catalog_(catalog), txn_mgr_(txn_mgr) {}
+MemIndexCommitProcessor::MemIndexCommitProcessor() : running_(false) {}
 
 void MemIndexCommitProcessor::Start() {
     running_.store(true);
@@ -64,6 +65,19 @@ MemIndexCommitProcessor::~MemIndexCommitProcessor() {
     mem_index_commit_thread_.join();
 }
 
+void MemIndexCommitProcessor::AddMemoryIndex(SharedPtr<MemoryIndexer> memory_indexer) {
+    std::lock_guard guard(mtx_);
+    memory_indexers_.insert(std::move(memory_indexer));
+}
+
+void MemIndexCommitProcessor::RemoveMemoryIndex(const SharedPtr<MemoryIndexer> &memory_indexer) {
+    std::lock_guard guard(mtx_);
+    SizeT erase_n = memory_indexers_.erase(memory_indexer);
+    if (erase_n == 0) {
+        UnrecoverableException("MemoryIndexer not found in MemIndexCommitProcessor");
+    }
+}
+
 void MemIndexCommitProcessor::MemIndexCommitLoop() {
     auto prev_time = std::chrono::system_clock::now();
     while (running_.load()) {
@@ -77,70 +91,28 @@ void MemIndexCommitProcessor::MemIndexCommitLoop() {
     }
 }
 
-Vector<MemoryIndexer *> MemIndexCommitProcessor::ScanForMemoryIndexers() {
-    Vector<MemoryIndexer *> mem_indexers;
-    TransactionID txn_id = 0UL;
-    TxnTimeStamp begin_ts = MAX_TIMESTAMP;
-
-    Vector<DBEntry *> db_entries;
-    {
-        auto db_meta_map_guard = catalog_->GetDBMetaMap();
-        for (auto &[_, db_meta] : *db_meta_map_guard) {
-            auto [db_entry, status] = db_meta->GetEntryNolock(txn_id, begin_ts);
-            if (status.ok()) {
-                db_entries.push_back(db_entry);
-            }
-        }
-    }
-    Vector<TableEntry *> table_entries;
-    for (auto *db_entry : db_entries) {
-        auto table_meta_map_guard = db_entry->GetTableMetaMap();
-        for (auto &[_, table_meta] : *table_meta_map_guard) {
-            auto [table_entry, status] = table_meta->GetEntryNolock(txn_id, begin_ts);
-            if (status.ok()) {
-                table_entries.push_back(table_entry);
-            }
-        }
-    }
-    for (auto *table_entry : table_entries) {
-        auto table_index_meta_map_guard = table_entry->GetTableIndexMetaMap();
-        for (auto &[_, table_index_meta] : *table_index_meta_map_guard) {
-            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-            if (!status.ok()) {
-                continue;
-            }
-            const IndexBase *index_base = table_index_entry->index_base();
-            if (index_base->index_type_ != IndexType::kFullText) {
-                continue;
-            }
-            auto last_segment = table_index_entry->last_segment();
-            if (last_segment.get() == nullptr || last_segment->GetMemoryIndexer() == nullptr) {
-                continue;
-            }
-            LOG_TRACE(fmt::format("Try commit memindex for table: {}, index: {}", *table_entry->GetTableName(), *table_index_entry->GetIndexName()));
-            mem_indexers.push_back(last_segment->GetMemoryIndexer());
-        }
-    }
-    return mem_indexers;
-}
-
 void MemIndexCommitProcessor::MemIndexCommit() {
-    Vector<MemoryIndexer *> mem_indexers = ScanForMemoryIndexers();
-    Vector<Pair<BGQueryContextWrapper, BGQueryState>> wrappers;
-
-    for (auto *mem_indexer : mem_indexers) {
-        BGQueryState bg_state;
-        auto physical_memindex_commit = this->MakeCommitOperator(mem_indexer);
-        Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("CommitMemIndex"));
-        BGQueryContextWrapper wrapper(txn);
-        bool res = wrapper.query_context_->ExecuteBGOperator(std::move(physical_memindex_commit), bg_state);
-        if (res) {
-            wrappers.emplace_back(std::move(wrapper), std::move(bg_state));
+    Vector<SharedPtr<MemoryIndexer>> mem_indexers;
+    {
+        std::lock_guard guard(mtx_);
+        for (auto mem_idx : memory_indexers_) {
+            mem_indexers.push_back(std::move(mem_idx));
         }
     }
-    for (auto &[wrapper, query_state] : wrappers) {
+    Vector<BGQueryContextWrapper> wrappers;
+
+    for (auto &mem_indexer : mem_indexers) {
+        auto physical_memindex_commit = this->MakeCommitOperator(mem_indexer.get());
+        BGQueryContextWrapper wrapper;
+        bool res =
+            wrapper.query_context_->ExecuteBGOperator(std::move(physical_memindex_commit), wrapper.bg_state_, MakeUnique<String>("Mem idx commit"));
+        if (res) {
+            wrappers.emplace_back(std::move(wrapper));
+        }
+    }
+    for (auto &wrapper : wrappers) {
         TxnTimeStamp commit_ts_out = 0;
-        wrapper.query_context_->JoinBGStatement(query_state, commit_ts_out);
+        wrapper.query_context_->JoinBGStatement(wrapper.bg_state_, commit_ts_out);
     }
 }
 

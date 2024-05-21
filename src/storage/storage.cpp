@@ -88,7 +88,7 @@ void Storage::Init() {
     std::chrono::seconds optimize_interval = static_cast<std::chrono::seconds>(config_ptr_->OptimizeIndexInterval());
     bool enable_optimize = optimize_interval.count() > 0;
 
-    memindex_commit_processor_ = MakeUnique<MemIndexCommitProcessor>(new_catalog_.get(), txn_mgr_.get());
+    memindex_commit_processor_ = MakeUnique<MemIndexCommitProcessor>();
 
     if (enable_compaction || enable_optimize) {
         compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
@@ -164,6 +164,9 @@ void Storage::UnInit() {
     }
     memindex_commit_processor_->Stop();
     bg_processor_->Stop();
+
+    new_catalog_.reset();
+
     wal_mgr_->Stop();
 
     txn_mgr_.reset();
@@ -173,7 +176,6 @@ void Storage::UnInit() {
     bg_processor_.reset();
     memindex_commit_processor_.reset();
     wal_mgr_.reset();
-    new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
     fmt::print("Shutdown storage successfully\n");

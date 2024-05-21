@@ -14,12 +14,11 @@
 
 module;
 
-#include <sstream>
 #include <csignal>
-//#include "gperftools/profiler.h"
+#include <sstream>
+// #include "gperftools/profiler.h"
 
 module query_context;
-
 
 import stl;
 import session;
@@ -63,7 +62,7 @@ void QueryContext::Init(Config *global_config_ptr,
                         TaskScheduler *scheduler_ptr,
                         Storage *storage_ptr,
                         ResourceManager *resource_manager_ptr,
-                        SessionManager* session_manager) {
+                        SessionManager *session_manager) {
     global_config_ = global_config_ptr;
     scheduler_ = scheduler_ptr;
     storage_ = storage_ptr;
@@ -114,15 +113,15 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     UniquePtr<Notifier> notifier{};
 
     this->BeginTxn();
-//    ProfilerStart("Query");
-//    BaseProfiler profiler;
-//    profiler.Begin();
+    //    ProfilerStart("Query");
+    //    BaseProfiler profiler;
+    //    profiler.Begin();
     try {
         this->BeginTxn();
-//        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
-//                        session_ptr_->GetTxn()->TxnID(),
-//                        session_ptr_->GetTxn()->BeginTS(),
-//                        statement->ToString()));
+        //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
+        //                        session_ptr_->GetTxn()->TxnID(),
+        //                        session_ptr_->GetTxn()->BeginTS(),
+        //                        statement->ToString()));
         RecordQueryProfiler(statement->type_);
 
         // Build unoptimized logical plan for each SQL statement.
@@ -138,7 +137,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
         logical_plans = logical_planner_->LogicalPlans();
         StopProfile(QueryPhase::kLogicalPlan);
-//        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before optimizer cost: {}", profiler.ElapsedToString()));
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
         for (auto &logical_plan : logical_plans) {
@@ -153,7 +152,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
             physical_plans.push_back(std::move(physical_plan));
         }
         StopProfile(QueryPhase::kPhysicalPlan);
-//        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         {
@@ -169,13 +168,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         notifier = MakeUnique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
         StopProfile(QueryPhase::kTaskBuild);
-//        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
         scheduler_->Schedule(plan_fragment.get(), statement);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = logical_plans.back()->operator_type();
         StopProfile(QueryPhase::kExecution);
-//        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
+        //        LOG_WARN(fmt::format("Before commit cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
@@ -198,19 +197,20 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
         LOG_CRITICAL(e.what());
         raise(SIGUSR1);
-//        throw e;
+        //        throw e;
     }
 
-//    ProfilerStop();
+    //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
     session_manager_->IncreaseQueryCount();
-//    profiler.End();
-//    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
+    //    profiler.End();
+    //    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
     return query_result;
 }
 
 bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &state) {
     QueryResult query_result;
+    this->BeginTxn();
     try {
         SharedPtr<BindContext> bind_context;
         auto status = logical_planner_->Build(statement, bind_context);
@@ -251,21 +251,25 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
     return true;
 }
 
-bool QueryContext::ExecuteBGOperator(UniquePtr<PhysicalOperator> physical_operator, BGQueryState &state) {
+bool QueryContext::ExecuteBGOperator(UniquePtr<PhysicalOperator> physical_operator,
+                                     BGQueryState &state,
+                                     UniquePtr<String> txn_text,
+                                     bool to_threads1) {
     QueryResult query_result;
+    this->BeginTxn(std::move(txn_text));
     try {
         Vector<PhysicalOperator *> physical_plan_ptrs;
         physical_plan_ptrs.push_back(physical_operator.get());
 
         state.physical_plans.push_back(std::move(physical_operator));
-        
+
         state.plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
 
         state.notifier = MakeUnique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
 
-        scheduler_->Schedule(state.plan_fragment.get(), nullptr);
-    } catch(RecoverableException &e) {
+        scheduler_->Schedule(state.plan_fragment.get(), nullptr, to_threads1);
+    } catch (RecoverableException &e) {
         this->RollbackTxn();
         query_result.result_table_ = nullptr;
         query_result.status_.Init(e.ErrorCode(), e.what());
@@ -296,15 +300,18 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts_
     return true;
 }
 
-void QueryContext::BeginTxn() {
+void QueryContext::BeginTxn(UniquePtr<String> txn_text) {
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr);
+        Txn *new_txn = storage_->txn_manager()->BeginTxn(std::move(txn_text));
         session_ptr_->SetTxn(new_txn);
     }
 }
 
 TxnTimeStamp QueryContext::CommitTxn() {
-    Txn* txn = session_ptr_->GetTxn();
+    Txn *txn = session_ptr_->GetTxn();
+    if (txn == nullptr) {
+        return 0;
+    }
     TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseCommittedTxnCount();
@@ -313,7 +320,10 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
-    Txn* txn = session_ptr_->GetTxn();
+    Txn *txn = session_ptr_->GetTxn();
+    if (txn == nullptr) {
+        return;
+    }
     storage_->txn_manager()->RollBackTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();

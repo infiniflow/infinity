@@ -27,7 +27,7 @@ class TxnManager;
 
 export class MemIndexCommitProcessor {
 public:
-    MemIndexCommitProcessor(Catalog *catalog, TxnManager *txn_mgr);
+    MemIndexCommitProcessor();
 
     void Start();
 
@@ -35,10 +35,12 @@ public:
 
     ~MemIndexCommitProcessor();
 
+    void AddMemoryIndex(SharedPtr<MemoryIndexer> memory_indexer);
+
+    void RemoveMemoryIndex(const SharedPtr<MemoryIndexer> &memory_indexer);
+
 private:
     void MemIndexCommitLoop();
-
-    Vector<MemoryIndexer *> ScanForMemoryIndexers();
 
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
@@ -50,8 +52,8 @@ private:
 
     Atomic<bool> running_{};
 
-    Catalog *catalog_;
-    TxnManager *txn_mgr_;
+    std::mutex mtx_;
+    HashSet<SharedPtr<MemoryIndexer>> memory_indexers_;
 };
 
 } // namespace infinity

@@ -419,6 +419,10 @@ export struct CompactFinishOperatorState : public OperatorState {
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
+export struct MemIndexInsertOperatorState : public OperatorState {
+    explicit MemIndexInsertOperatorState() : OperatorState(PhysicalOperatorType::kMemIndexInsert) {}
+};
+
 export struct MemIndexCommitOperatorState : public OperatorState {
     explicit MemIndexCommitOperatorState() : OperatorState(PhysicalOperatorType::kMemIndexCommit) {}
 };

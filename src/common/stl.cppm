@@ -301,8 +301,8 @@ namespace infinity {
     template<typename S, typename T, typename H = std::hash<S>>
     using MultiHashMap = std::unordered_multimap<S, T, H>;
 
-    template<typename S>
-    using HashSet = std::unordered_set<S>;
+    template<typename S, typename H = Hash<S>, typename Eq = EqualTo<S>>
+    using HashSet = std::unordered_set<S, H, Eq>;
 
     template<typename T>
     using MaxHeap = std::priority_queue<T>;

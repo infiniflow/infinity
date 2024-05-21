@@ -250,9 +250,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                                                 index_fulltext->flag_,
                                                                 index_fulltext->analyzer_,
                                                                 table_index_entry_->GetFulltextByteSlicePool(),
-                                                                table_index_entry_->GetFulltextBufferPool(),
-                                                                table_index_entry_->GetFulltextInvertingThreadPool(),
-                                                                table_index_entry_->GetFulltextCommitingThreadPool());
+                                                                table_index_entry_->GetFulltextBufferPool());
                 }
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
@@ -388,9 +386,7 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
                                                 index_fulltext->flag_,
                                                 index_fulltext->analyzer_,
                                                 table_index_entry_->GetFulltextByteSlicePool(),
-                                                table_index_entry_->GetFulltextBufferPool(),
-                                                table_index_entry_->GetFulltextInvertingThreadPool(),
-                                                table_index_entry_->GetFulltextCommitingThreadPool());
+                                                table_index_entry_->GetFulltextBufferPool());
     memory_indexer_->Load();
 }
 
@@ -429,9 +425,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                                                         index_fulltext->flag_,
                                                         index_fulltext->analyzer_,
                                                         table_index_entry_->GetFulltextByteSlicePool(),
-                                                        table_index_entry_->GetFulltextBufferPool(),
-                                                        table_index_entry_->GetFulltextInvertingThreadPool(),
-                                                        table_index_entry_->GetFulltextCommitingThreadPool());
+                                                        table_index_entry_->GetFulltextBufferPool());
             u64 column_id = column_def->id();
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
@@ -449,7 +443,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
 
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
                 memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), true);
-                memory_indexer_->Commit(true);
+                // memory_indexer_->Commit1(true);
             }
             memory_indexer_->Dump(true);
             AddFtChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
