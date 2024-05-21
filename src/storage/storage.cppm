@@ -46,6 +46,8 @@ public:
 
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
+    [[nodiscard]] inline MemIndexCommitProcessor *memindex_commit_processor() const noexcept { return memindex_commit_processor_.get(); }
+
     void Init();
 
     void UnInit();

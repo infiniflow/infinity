@@ -114,17 +114,20 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     SizeT group_idx = compact_operator_state->compact_idx_;
     CompactStateData *compact_state_data = compact_operator_state->compact_state_data_.get();
     RowIDRemap &remapper = compact_state_data->remapper_;
-    if (group_idx == compact_state_data->segment_data_list_.size()) {
+    if (group_idx == compact_operator_state->segment_groups_.size()) {
         compact_operator_state->SetComplete();
         return true;
     }
-    CompactSegmentData &compact_segment_data = compact_state_data->segment_data_list_[group_idx];
-    for (auto *candidate_segment : compactible_segments_group_[group_idx]) {
-        if (candidate_segment->TrySetCompacting(compact_state_data)) {
-            compact_segment_data.old_segments_.push_back(candidate_segment);
+    const Vector<SegmentEntry *> &candidate_segments = compact_operator_state->segment_groups_[group_idx];
+    Vector<SegmentEntry *> compactible_segments;
+    {
+        
+        for (auto *candidate_segment : candidate_segments) {
+            if (candidate_segment->TrySetCompacting(compact_state_data)) {
+                compactible_segments.push_back(candidate_segment);
+            }
         }
     }
-    const auto &compactible_segments = compact_segment_data.old_segments_;
 
     auto *txn = query_context->GetTxn();
     auto *buffer_mgr = query_context->storage()->buffer_manager();
@@ -135,12 +138,10 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
 
     SizeT column_count = table_entry->ColumnCount();
 
-    compact_segment_data.new_segment_ = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn);
-    auto *new_segment = compact_segment_data.new_segment_.get();
-    compact_state_data->AddNewSegment(new_segment, txn);
+    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn);
     SegmentID new_segment_id = new_segment->segment_id();
 
-    UniquePtr<BlockEntry> new_block = BlockEntry::NewBlockEntry(new_segment, new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
+    UniquePtr<BlockEntry> new_block = BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
     const SizeT block_capacity = new_block->row_capacity();
 
     for (SegmentEntry *segment : compactible_segments) {
@@ -178,17 +179,18 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
                     read_size -= read_size1;
                     new_segment->AppendBlockEntry(std::move(new_block));
 
-                    new_block = BlockEntry::NewBlockEntry(new_segment, new_segment->GetNextBlockID(), 0, column_count, txn);
+                    new_block = BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0, column_count, txn);
                 }
                 block_entry_append(row_begin, read_size);
             }
         }
     }
+    compact_state_data->AddNewSegment(new_segment, std::move(compactible_segments), txn);
     if (new_block->row_count() > 0) {
         new_segment->AppendBlockEntry(std::move(new_block));
     }
     compact_operator_state->compact_idx_ = ++group_idx;
-    if (group_idx == compact_state_data->segment_data_list_.size()) {
+    if (group_idx == compact_operator_state->segment_groups_.size()) {
         compact_operator_state->SetComplete();
     }
 
@@ -196,10 +198,6 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
 }
 
 Vector<Vector<Vector<SegmentEntry *>>> PhysicalCompact::PlanCompact(SizeT parallel_count) {
-    if (parallel_count > compactible_segments_group_.size()) {
-        UnrecoverableError(
-            fmt::format("parallel_count {} is larger than compactible_segments_group_ size {}", parallel_count, compactible_segments_group_.size()));
-    }
     Vector<Vector<Vector<SegmentEntry *>>> result(parallel_count);
     for (SizeT i = 0; i < compactible_segments_group_.size(); ++i) {
         result[i % parallel_count].push_back(compactible_segments_group_[i]);

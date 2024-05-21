@@ -95,10 +95,13 @@ public:
 
     const HashMap<SegmentID, Vector<SegmentOffset>> &GetToDelete() const { return to_delete_; }
 
-    void AddNewSegment(SegmentEntry *new_segment, Txn *txn) {
+    void AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn) {
         std::lock_guard lock(mutex2_);
         auto *block_index = new_table_ref_->block_index_.get();
-        block_index->Insert(new_segment, txn);
+        block_index->Insert(new_segment.get(), txn);
+
+        CompactSegmentData data{new_segment, std::move(compacted_segments)};
+        segment_data_list_.push_back(std::move(data));
     }
 
     void AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn) {

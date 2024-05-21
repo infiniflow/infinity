@@ -164,6 +164,9 @@ void Storage::UnInit() {
     }
     memindex_commit_processor_->Stop();
     bg_processor_->Stop();
+
+    new_catalog_.reset();
+
     wal_mgr_->Stop();
 
     txn_mgr_.reset();
@@ -173,7 +176,6 @@ void Storage::UnInit() {
     bg_processor_.reset();
     memindex_commit_processor_.reset();
     wal_mgr_.reset();
-    new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
     fmt::print("Shutdown storage successfully\n");
