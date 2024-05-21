@@ -28,7 +28,7 @@ class TxnManager;
 struct MemIdxPtrHasher {
     using is_transparent = void;
 
-    SizeT operator()(const SharedPtr<MemoryIndexer> &memory_indexer) const;
+    SizeT operator()(const WeakPtr<MemoryIndexer> &memory_indexer) const;
 
     SizeT operator()(MemoryIndexer *memory_indexer) const;
 };
@@ -42,7 +42,7 @@ struct MemIdxPtrEqualer {
     }
 
 private:
-    static MemoryIndexer *ToPtr(const SharedPtr<MemoryIndexer> &memory_indexer);
+    static MemoryIndexer *ToPtr(const WeakPtr<MemoryIndexer> &memory_indexer);
     static MemoryIndexer *ToPtr(MemoryIndexer *memory_indexer);
 };
 
@@ -58,8 +58,6 @@ public:
 
     void AddMemoryIndex(SharedPtr<MemoryIndexer> memory_indexer);
 
-    void RemoveMemoryIndex(MemoryIndexer *memory_indexer);
-
 private:
     void MemIndexCommitLoop();
 
@@ -74,7 +72,7 @@ private:
     Atomic<bool> running_{};
 
     std::mutex mtx_;
-    HashSet<SharedPtr<MemoryIndexer>, MemIdxPtrHasher, MemIdxPtrEqualer> memory_indexers_;
+    HashSet<WeakPtr<MemoryIndexer>, MemIdxPtrHasher, MemIdxPtrEqualer> memory_indexers_;
 };
 
 } // namespace infinity

@@ -41,11 +41,11 @@ import infinity_exception;
 
 namespace infinity {
 
-SizeT MemIdxPtrHasher::operator()(const SharedPtr<MemoryIndexer> &memory_indexer) const { return Hash<MemoryIndexer *>()(memory_indexer.get()); }
+SizeT MemIdxPtrHasher::operator()(const WeakPtr<MemoryIndexer> &memory_indexer) const { return Hash<MemoryIndexer *>()(memory_indexer.lock().get()); }
 
 SizeT MemIdxPtrHasher::operator()(MemoryIndexer *memory_indexer) const { return Hash<MemoryIndexer *>()(memory_indexer); }
 
-MemoryIndexer *MemIdxPtrEqualer::ToPtr(const SharedPtr<MemoryIndexer> &memory_indexer) { return memory_indexer.get(); }
+MemoryIndexer *MemIdxPtrEqualer::ToPtr(const WeakPtr<MemoryIndexer> &memory_indexer) { return memory_indexer.lock().get(); }
 
 MemoryIndexer *MemIdxPtrEqualer::ToPtr(MemoryIndexer *memory_indexer) { return memory_indexer; }
 
@@ -75,18 +75,9 @@ MemIndexCommitProcessor::~MemIndexCommitProcessor() {
 
 void MemIndexCommitProcessor::AddMemoryIndex(SharedPtr<MemoryIndexer> memory_indexer) {
     std::lock_guard guard(mtx_);
-    auto [iter, insert_ok] = memory_indexers_.insert(std::move(memory_indexer));
+    auto [iter, insert_ok] = memory_indexers_.insert(memory_indexer);
     if (!insert_ok) {
         UnrecoverableException("MemoryIndexer already exists in MemIndexCommitProcessor");
-    }
-}
-
-void MemIndexCommitProcessor::RemoveMemoryIndex(MemoryIndexer *memory_indexer) {
-    std::lock_guard guard(mtx_);
-    if (auto iter = memory_indexers_.find(memory_indexer); iter != memory_indexers_.end()) {
-        memory_indexers_.erase(iter);
-    } else {
-        UnrecoverableException("MemoryIndexer not found in MemIndexCommitProcessor");
     }
 }
 
@@ -107,8 +98,13 @@ void MemIndexCommitProcessor::MemIndexCommit() {
     Vector<SharedPtr<MemoryIndexer>> mem_indexers;
     {
         std::lock_guard guard(mtx_);
-        for (auto mem_idx : memory_indexers_) {
-            mem_indexers.push_back(std::move(mem_idx));
+        for (auto iter = memory_indexers_.begin(); iter != memory_indexers_.end();) {
+            if (auto memory_indexer = iter->lock(); memory_indexer) {
+                mem_indexers.push_back(memory_indexer);
+                ++iter;
+            } else {
+                iter = memory_indexers_.erase(iter);
+            }
         }
     }
     Vector<BGQueryContextWrapper> wrappers;

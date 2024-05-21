@@ -106,7 +106,6 @@ MemoryIndexer::~MemoryIndexer() {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
-    memindex_commit_processor_->RemoveMemoryIndex(this);
     Reset();
 }
 

@@ -211,7 +211,7 @@ public:
 
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
-    void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
+    void SetMemoryIndexer(SharedPtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
     static SharedPtr<SegmentIndexEntry> CreateFakeEntry(const String &index_dir);
 
 private:

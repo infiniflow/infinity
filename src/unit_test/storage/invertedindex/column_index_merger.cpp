@@ -126,15 +126,15 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(index_dir);
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
-        MemoryIndexer indexer(index_dir,
+        auto indexer = MemoryIndexer::Make(index_dir,
                               chunk_names[i],
                               base_row_ids[i],
                               flag_,
                               "standard",
                               *byte_slice_pool_,
                               *buffer_pool_);
-        indexer.Insert(column, row_offsets[i], row_counts[i]);
-        indexer.Dump();
+        indexer->Insert(column, row_offsets[i], row_counts[i]);
+        indexer->Dump();
     }
 }
 

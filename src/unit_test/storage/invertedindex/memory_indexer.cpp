@@ -64,10 +64,10 @@ public:
     void SetUp() override {
         auto config_path = std::make_shared<std::string>();
 
+        RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        RemoveDbDirs();
         infinity::InfinityContext::instance().Init(config_path);
 
         // https://en.wikipedia.org/wiki/Finite-state_transducer
@@ -89,10 +89,13 @@ public:
     }
 
     void TearDown() override {
+        column_.reset();
+
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
 #endif
+        RemoveDbDirs();
     }
 
     void Check(ColumnIndexReader &reader) {
@@ -125,10 +128,10 @@ public:
 TEST_F(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_);
-    indexer1.Insert(column_, 0, 1);
-    indexer1.Insert(column_, 1, 3);
-    indexer1.Dump();
+    auto indexer1 = MemoryIndexer::Make(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_);
+    indexer1->Insert(column_, 0, 1);
+    indexer1->Insert(column_, 1, 3);
+    indexer1->Dump();
 
     auto indexer2 = MemoryIndexer::Make(GetTmpDir(), "chunk2", RowID(0U, 4U), flag_, "standard", byte_slice_pool_, buffer_pool_);
     indexer2->Insert(column_, 4, 1);
@@ -147,11 +150,11 @@ TEST_F(MemoryIndexerTest, Insert) {
 
 TEST_F(MemoryIndexerTest, test2) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_);
-    indexer1.Insert(column_, 0, 2, true);
-    indexer1.Insert(column_, 2, 2, true);
-    indexer1.Insert(column_, 4, 1, true);
-    indexer1.Dump(true);
+    auto indexer1 = MemoryIndexer::Make(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_);
+    indexer1->Insert(column_, 0, 2, true);
+    indexer1->Insert(column_, 2, 2, true);
+    indexer1->Insert(column_, 4, 1, true);
+    indexer1->Dump(true);
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
