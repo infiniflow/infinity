@@ -349,6 +349,35 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
         not_node->children_.emplace_back(std::move(optimized_node));
         return not_node;
     } else if (not_list.empty()) {
+        // merge duplicated TermQueryNode children
+        std::vector<std::unique_ptr<QueryNode>> or_list_tmp;
+        for (auto &child1 : or_list) {
+            if (child1->GetType() != QueryNodeType::TERM) {
+                or_list_tmp.emplace_back(std::move(child1));
+                continue;
+            }
+            TermQueryNode *term_query_node1 = static_cast<TermQueryNode *>(child1.get());
+            bool duplicated = false;
+            for (auto &child2 : or_list_tmp) {
+                if (child2->GetType() == QueryNodeType::TERM) {
+                    TermQueryNode *term_query_node2 = static_cast<TermQueryNode *>(child2.get());
+                    if (term_query_node1->term_ == term_query_node2->term_ && term_query_node1->column_ == term_query_node2->column_ &&
+                        term_query_node1->position_ == term_query_node2->position_) {
+                        term_query_node2->weight_ += term_query_node1->weight_;
+                        duplicated = true;
+                        break;
+                    }
+                }
+            }
+            if (!duplicated) {
+                or_list_tmp.emplace_back(std::move(child1));
+            }
+        }
+        or_list = std::move(or_list_tmp);
+
+        if (or_list.size() == 1) {
+            return std::move(or_list[0]);
+        }
         // at least 2 children
         auto or_node = std::make_unique<OrQueryNode>(); // new node, weight is reset to 1.0
         or_node->children_ = std::move(or_list);
