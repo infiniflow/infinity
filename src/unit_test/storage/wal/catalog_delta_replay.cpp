@@ -898,6 +898,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                     }
                     last_commit_ts = txn_mgr->CommitTxn(txn_idx);
                 }
+                WaitFlushDeltaOp(storage, last_commit_ts);
             }
             {
                 // Drop index (by Name)
@@ -909,8 +910,8 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                 }
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
+            WaitFlushDeltaOp(storage, last_commit_ts);
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
