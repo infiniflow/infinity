@@ -440,6 +440,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kFusion: {
             return MakeTaskStateTemplate<FusionOperatorState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kMemIndexCommit: {
+            return MakeTaskStateTemplate<MemIndexCommitOperatorState>(physical_ops[operator_id]);
+        }
         default: {
             UnrecoverableError(fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type())));
         }
@@ -909,6 +912,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kCommand:
+        case PhysicalOperatorType::kMemIndexCommit:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
@@ -1171,6 +1175,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kCommand:
+        case PhysicalOperatorType::kMemIndexCommit:
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:

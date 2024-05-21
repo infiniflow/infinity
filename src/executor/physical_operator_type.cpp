@@ -149,6 +149,10 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "CreateIndexDo";
         case PhysicalOperatorType::kCreateIndexFinish:
             return "CreateIndexFinish";
+        case PhysicalOperatorType::kMemIndexInsert:
+            return "MemIndexInsert";
+        case PhysicalOperatorType::kMemIndexCommit:
+            return "MemIndexCommit";
     }
 
     Status status = Status::NotSupport("Unknown physical operator type");

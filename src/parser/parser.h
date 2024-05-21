@@ -74,7 +74,7 @@ extern int sqldebug;
 #include "statement/show_statement.h"
 #include "statement/update_statement.h"
 #include "statement/command_statement.h"
-#include "statement/compact_statement.h"
+#include "statement/bg_statement/compact_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"

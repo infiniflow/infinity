@@ -103,6 +103,10 @@ export enum class PhysicalOperatorType : i8 {
     kCompactIndexDo,
     kCompactFinish,
 
+    // MemIndex
+    kMemIndexInsert,
+    kMemIndexCommit,
+
     kSink,
     kSource,
 };

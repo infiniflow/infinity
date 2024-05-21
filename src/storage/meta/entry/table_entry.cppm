@@ -183,9 +183,6 @@ public:
     // Dump or spill the memory indexer
     void MemIndexDump(Txn *txn, bool spill = false);
 
-    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
-    void MemIndexCommit();
-
     // Invoked once at init stage to recovery memory index.
     void MemIndexRecover(BufferManager *buffer_manager);
 
@@ -296,6 +293,8 @@ private: // TODO: remove it
 
 public: // TODO: remove it?
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+
+    MetaMap<TableIndexMeta>::MapGuard GetTableIndexMetaMap() { return index_meta_map_.GetMetaMap(); }
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;

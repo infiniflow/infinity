@@ -71,6 +71,8 @@ public:
     // Commit is non-blocking and thread-safe. There shall be a background thread which call this method regularly.
     void Commit(bool offline = false);
 
+    void Commit1(bool offline = false);
+
     // CommitSync is for online case. It sort a batch of inverters, then generate posting for a batch of inverters.
     // Returns the batch size of generated posting.
     SizeT CommitSync(SizeT wait_if_empty_ms = 0);

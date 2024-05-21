@@ -165,6 +165,14 @@ void MemoryIndexer::Commit(bool offline) {
     }
 }
 
+void MemoryIndexer::Commit1(bool offline) {
+    if (offline) {
+        CommitOffline();
+    } else {
+        CommitSync();
+    }
+}
+
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
     if (!lock.try_lock()) {

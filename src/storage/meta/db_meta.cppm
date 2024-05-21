@@ -55,7 +55,6 @@ public:
 
     SharedPtr<String> data_dir() const { return data_dir_; }
 
-private:
     Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,

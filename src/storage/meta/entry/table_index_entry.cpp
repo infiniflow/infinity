@@ -254,12 +254,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
-void TableIndexEntry::MemIndexCommit() {
-    if (last_segment_.get() != nullptr) {
-        last_segment_->MemIndexCommit();
-    }
-}
-
 SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_index_store, bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     if (last_segment_.get() != nullptr) {

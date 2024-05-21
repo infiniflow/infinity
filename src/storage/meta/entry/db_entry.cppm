@@ -144,11 +144,12 @@ private: // TODO: remote it
     HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
 
 public:
+    MetaMap<TableMeta>::MapGuard GetTableMetaMap() { return table_meta_map_.GetMetaMap(); }
+
     void PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup() override;
 
-    void MemIndexCommit();
     void MemIndexRecover(BufferManager *buffer_manager);
 };
 } // namespace infinity

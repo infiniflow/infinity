@@ -419,6 +419,10 @@ export struct CompactFinishOperatorState : public OperatorState {
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
+export struct MemIndexCommitOperatorState : public OperatorState {
+    explicit MemIndexCommitOperatorState() : OperatorState(PhysicalOperatorType::kMemIndexCommit) {}
+};
+
 // Source
 export enum class SourceStateType {
     kInvalid,

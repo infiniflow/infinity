@@ -305,16 +305,6 @@ void DBEntry::Cleanup() {
     LOG_TRACE(fmt::format("Cleaned dir: {}", *db_entry_dir_));
 }
 
-void DBEntry::MemIndexCommit() {
-    auto table_meta_map_guard = table_meta_map_.GetMetaMap();
-    for (auto &[_, table_meta] : *table_meta_map_guard) {
-        auto [table_entry, status] = table_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
-        if (status.ok()) {
-            table_entry->MemIndexCommit();
-        }
-    }
-}
-
 void DBEntry::MemIndexRecover(BufferManager *buffer_manager) {
     auto table_meta_map_guard = table_meta_map_.GetMetaMap();
     for (auto &[_, table_meta] : *table_meta_map_guard) {

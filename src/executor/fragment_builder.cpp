@@ -127,7 +127,8 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kMatch: {
+        case PhysicalOperatorType::kMatch:
+        case PhysicalOperatorType::kMemIndexCommit: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));

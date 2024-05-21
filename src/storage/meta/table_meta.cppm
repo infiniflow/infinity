@@ -64,7 +64,6 @@ public:
 
     DBEntry *db_entry() { return db_entry_; }
 
-private:
     Tuple<TableEntry *, Status> CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TableEntryType table_entry_type,
                                             const SharedPtr<String> &table_collection_name,
