@@ -382,11 +382,11 @@ export struct FusionOperatorState : public OperatorState {
 
 // Compact
 export struct CompactOperatorState : public OperatorState {
-    inline explicit CompactOperatorState(SizeT compact_idx, SharedPtr<CompactStateData> compact_state_data)
-        : OperatorState(PhysicalOperatorType::kCompact), compact_idx_(compact_idx), compact_state_data_(compact_state_data) {}
+    inline explicit CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompact), segment_groups_(std::move(segment_groups)), compact_state_data_(compact_state_data) {}
 
     SizeT compact_idx_{};
-
+    Vector<Vector<SegmentEntry *>> segment_groups_;
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
@@ -498,6 +498,13 @@ export struct IndexScanSourceState : public SourceState {
 
 export struct KnnScanSourceState : public SourceState {
     explicit KnnScanSourceState() : SourceState(SourceStateType::kKnnScan) {}
+};
+
+export struct CompactSourceState : public SourceState {
+    explicit CompactSourceState(Vector<Vector<SegmentEntry *>> segment_groups)
+        : SourceState(SourceStateType::kCompact), segment_groups_(std::move(segment_groups)) {}
+
+    Vector<Vector<SegmentEntry *>> segment_groups_;
 };
 
 export struct EmptySourceState : public SourceState {
