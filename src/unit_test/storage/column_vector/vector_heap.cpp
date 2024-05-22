@@ -104,7 +104,7 @@ TEST_F(VectorHeapTest, var_heap2) {
 
 TEST_F(VectorHeapTest, fix_heap1) {
     using namespace infinity;
-    FixHeapManager vector_heap_mgr_;
+    FixHeapManager vector_heap_mgr_(0, DEFAULT_FIXLEN_CHUNK_SIZE);
 
     SizeT size_count = 20;
     SizeT allocate_size = 1;
@@ -136,7 +136,7 @@ TEST_F(VectorHeapTest, fix_heap1) {
 
 TEST_F(VectorHeapTest, fix_heap2) {
     using namespace infinity;
-    FixHeapManager vector_heap_mgr_;
+    FixHeapManager vector_heap_mgr_(0, DEFAULT_FIXLEN_CHUNK_SIZE);
 
     SizeT size_count = 5000;
     SizeT allocate_size = 260;

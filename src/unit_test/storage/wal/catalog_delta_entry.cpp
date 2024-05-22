@@ -99,7 +99,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
         {
             auto op = MakeUnique<AddColumnEntryOp>();
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}#{}", db_name, table_name, segment_id, block_id, column_id));
-            op->next_outline_idx_ = 0;
+            op->outline_infos_.resize(2);
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
@@ -280,7 +280,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id, column_id));
         op1_same_name->encode_ = op1->encode_ = encode;
 
-        op1_same_name->next_outline_idx_ = op1->next_outline_idx_ = 0;
+        op1_same_name->outline_infos_.resize(2);
+        op1->outline_infos_.resize(2);
 
         op1->merge_flag_ = MergeFlag::kNew;
         op1_same_name->merge_flag_ = MergeFlag::kUpdate;

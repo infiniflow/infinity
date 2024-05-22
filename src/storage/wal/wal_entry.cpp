@@ -104,9 +104,9 @@ String WalBlockInfo::ToString() const {
         ss << "outline_buffer_group_" << i << ": [";
         const auto &outline_info = outline_infos_[i];
         for (SizeT j = 0; j < outline_info.size(); ++j) {
-            auto &[idx, off] = outline_info[i];
+            auto &[idx, off] = outline_info[j];
             ss << "(" << idx << ", " << off << ")";
-            if (i != outline_info.size() - 1) {
+            if (j != outline_info.size() - 1) {
                 ss << ", ";
             }
         }
