@@ -17,6 +17,8 @@ module;
 #include <filesystem>
 #include <queue>
 #include <cstring>
+#include <cstdio>
+#include <unistd.h>
 
 export module external_sort_merger;
 
@@ -74,8 +76,9 @@ export struct TermTuple {
                 }
                 return 0;
             }
-        } else
+        } else {
             return ret < 0 ? -1 : 1;
+        }
     }
 
     bool operator==(const TermTuple &other) const { return Compare(other) == 0; }
@@ -88,6 +91,30 @@ export struct TermTuple {
         doc_id_ = *((u32 *)(p + term_.size() + 1));
         term_pos_ = *((u32 *)(p + term_.size() + 1 + sizeof(doc_id_)));
     }
+};
+
+export struct TermTupleList {
+    TermTupleList(std::string_view term, u32 list_size = 2 * 1024 * 1024) : term_(term) {
+        doc_pos_list_.reserve(list_size);
+        max_tuple_num_ = list_size / (sizeof(u32) * 2);
+    }
+
+    bool IsFull() {
+        return doc_pos_list_.size() >= max_tuple_num_;
+    }
+
+    void Add(u32 doc_id, u32 term_pos) {
+        doc_pos_list_.emplace_back(doc_id, term_pos);
+    }
+
+    SizeT Size() const {
+        return doc_pos_list_.size();
+    }
+
+    String term_;
+    // <doc_id, term_pos>
+    Vector<Pair<u32, u32>> doc_pos_list_;
+    u32 max_tuple_num_{0};
 };
 
 template <typename KeyType, typename LenType, typename = void>
@@ -224,6 +251,36 @@ public:
         }
     }
 
+    void Put(const TermTupleList& tuple_list) {
+        /*
+         * data_len, term_len, doc_list_size, term, [doc_id, term_pos]...
+         */
+        u32 term_len = tuple_list.term_.size();
+        u32 doc_list_size = tuple_list.Size();
+        auto SIZE_U32 = sizeof(u32);
+        u32 data_len = SIZE_U32 + SIZE_U32 + term_len + 2 * SIZE_U32 * doc_list_size;
+        if (data_len > buffer_size_) {
+            throw std::runtime_error("Data length exceeds buffer capacity");
+        }
+        SizeT idx = 0;
+        std::memcpy(buffer_array_[head_].get() + idx, &data_len, SIZE_U32);
+        idx += SIZE_U32;
+        std::memcpy(buffer_array_[head_].get() + idx, &term_len, SIZE_U32);
+        idx += SIZE_U32;
+        std::memcpy(buffer_array_[head_].get() + idx, &doc_list_size, SIZE_U32);
+        idx += SIZE_U32;
+        std::memcpy(buffer_array_[head_].get() + idx, tuple_list.term_.data(), term_len);
+        idx += term_len;
+        std::memcpy(buffer_array_[head_].get() + idx, tuple_list.doc_pos_list_.data(), SIZE_U32 * 2 * doc_list_size);
+        idx += SIZE_U32 * 2 * doc_list_size;
+
+        head_ = (head_ + 1) % total_buffers_;
+
+        if (head_ == tail_) {
+            full_ = true;
+        }
+    }
+
     void Put(const char* data, SizeT length) {
         if (length > buffer_size_) {
             throw std::runtime_error("Data length exceeds buffer capacity");
@@ -272,7 +329,7 @@ public:
 //        return res_ptr;
     }
 
-    Tuple<const char*, u32, u32> Get() {
+    Tuple<const char*, u32, u32> GetTuple() {
         // std::cout << "CycleBuffer::Get" << std::endl;
         if (IsEmpty()) {
             throw std::runtime_error("Buffer is empty");
@@ -286,6 +343,20 @@ public:
 
         return std::make_tuple(result_data, result_real_size, result_real_num);
     }
+
+    const char* Get() {
+        // std::cout << "CycleBuffer::Get" << std::endl;
+        if (IsEmpty()) {
+            throw std::runtime_error("Buffer is empty");
+        }
+
+        const char* result_data = buffer_array_[tail_].get();
+        tail_ = (tail_ + 1) % total_buffers_;
+        full_ = false;
+
+        return result_data;
+    }
+
 
     void Reset() {
         head_ = tail_ = 0;
@@ -323,6 +394,7 @@ private:
 
 export template <typename KeyType, typename LenType>
 class SortMerger {
+public:
     typedef SortMerger<KeyType, LenType> self_t;
     typedef KeyAddress<KeyType, LenType> KeyAddr;
     static constexpr SizeT MAX_TUPLE_LENGTH = 1024;
@@ -380,6 +452,16 @@ class SortMerger {
     UniquePtr<CycleBuffer> cycle_buffer_;
     std::mutex cycle_buf_mtx_;
     std::condition_variable cycle_buf_con_;
+
+    std::mutex out_queue_mtx_;
+    std::condition_variable out_queue_con_;
+    Queue<UniquePtr<char_t[]>> out_queue_;
+    Queue<u32> out_size_queue_;
+    SizeT OUT_BATCH_SIZE_;
+    Queue<UniquePtr<TermTupleList>> term_tuple_list_queue_;
+
+    UniquePtr<CycleBuffer> cycle_term_tuple_list_queue_;
+
     bool read_finish_{false};
     u32 CYCLE_BUF_SIZE_;
     u32 CYCLE_BUF_THRESHOLD_;
@@ -404,15 +486,23 @@ class SortMerger {
 
     void Output(FILE *f, u32 idx);
 
+    void OutputByQueue(FILE* f);
+
+    // void OutputByQueueTerm(FILE *f);
+
+    // void MergeByQueueTerm();
+
     void Init(MmapReader &io_stream);
 
     void ReadKeyAt(MmapReader &io_stream, u64 pos);
 
     void ReadKeyAtNonCopy(MmapReader &io_stream, u64 pos);
+
+    // void MergeByQueue<TermTuple, LenType>();
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
-    ~SortMerger();
+    virtual ~SortMerger();
 
     void SetParams(u32 max_record_len) {
         if (max_record_len > PRE_BUF_SIZE_) {
@@ -433,7 +523,86 @@ public:
             OUT_BUF_SIZE_ = min_buff_size_required;
     }
 
-    void Run();
+    virtual void Run();
+};
+
+//export template <typename KeyType, typename LenType>
+//class SortMergerTerm;
+
+export template <typename KeyType, typename LenType>
+requires std::same_as<KeyType, TermTuple>
+class SortMergerTerm : public SortMerger<KeyType, LenType> {
+protected:
+    typedef SortMergerTerm<KeyType, LenType> self_t;
+    using Super = SortMerger<KeyType, LenType>;
+    using Super::filenm_;
+    using Super::MAX_GROUP_SIZE_;
+    using Super::BS_SIZE_;
+    using Super::PRE_BUF_SIZE_;
+    using Super::RUN_BUF_SIZE_;
+    using Super::OUT_BUF_SIZE_;
+    using Super::OUT_BUF_NUM_;
+    using Super::pre_heap_;
+    using Super::merge_heap_;
+    using Super::merge_loser_tree_;
+    using Super::micro_run_idx_;
+    using Super::micro_run_pos_;
+    using Super::num_micro_run_;
+    using Super::size_micro_run_;
+    using Super::num_run_;
+    using Super::size_run_;
+    using Super::size_loaded_run_;
+    using Super::run_addr_;
+    using Super::run_curr_addr_;
+    using Super::micro_buf_;
+    using Super::sub_out_buf_;
+    using Super::pre_buf_;
+    using Super::run_buf_;
+    using Super::out_buf_;
+    using Super::pre_buf_mtx_;
+    using Super::pre_buf_con_;
+    using Super::in_out_mtx_;
+    using Super::in_out_con_;
+    using Super::out_out_mtx_;
+    using Super::out_out_con_;
+    using Super::pre_buf_size_;
+    using Super::pre_buf_num_;
+    using Super::out_buf_in_idx_;
+    using Super::out_buf_out_idx_;
+    using Super::out_buf_size_;
+    using Super::out_buf_full_;
+    using Super::curr_addr_;
+    using Super::end_addr_;
+    using Super::key_buf_;
+    using Super::key_buf_ptr_;
+    using Super::mmap_io_streams_;
+    using Super::cycle_buffer_;
+    using Super::cycle_buf_mtx_;
+    using Super::cycle_buf_con_;
+    using Super::out_queue_mtx_;
+    using Super::out_queue_con_;
+    using Super::out_queue_;
+    using Super::out_size_queue_;
+    using Super::OUT_BATCH_SIZE_;
+    using Super::term_tuple_list_queue_;
+    using Super::read_finish_;
+    using Super::CYCLE_BUF_SIZE_;
+    using Super::CYCLE_BUF_THRESHOLD_;
+    using Super::count_;
+    using Super::group_size_;
+    using Super::FILE_LEN_;
+    using typename Super::KeyAddr;
+    using Super::MAX_TUPLE_LENGTH;
+    u64 term_list_count_{0};
+
+    void OutputByQueueTerm(FILE *f);
+    void MergeByQueueTerm();
+
+public:
+    SortMergerTerm(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2)
+            : Super(filenm, group_size, bs, output_num) {}
+
+    void RunTerm();
 };
 
 } // namespace infinity
