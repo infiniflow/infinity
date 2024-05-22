@@ -140,7 +140,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_tab
     std::scoped_lock lock(mutex_);
     assert(cache_ts_ <= first_known_update_ts_);
     assert(first_known_update_ts_ == MAX_TIMESTAMP || first_known_update_ts_ <= last_known_update_ts_);
-    if (cache_ts_ != 0 && begin_ts >= cache_ts_ && begin_ts < first_known_update_ts_) [[likely]] {
+    if (first_known_update_ts_ != 0 && begin_ts >= cache_ts_ && begin_ts < first_known_update_ts_) [[likely]] {
         // no need to build, use cache
         result.column_index_readers_ = cache_column_readers_;
         result.column2analyzer_ = column2analyzer_;
