@@ -64,7 +64,7 @@ sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
 ```
 
-1. Run Benchmark:
+4. Run Benchmark:
 
 Drop file cache before benchmark query latency.
 
@@ -96,7 +96,22 @@ options:
   --dataset DATASET     data set to benchmark, one of: all, gist, sift, geonames, enwiki
 ```
 
-2. Navigate to the **results** folder to view the results and latency of each query. 
+Following are commands for engine `infinity` and dataset `enwiki`:
+
+```bash
+python run.py --generate --engine infinity --dataset enwiki
+python run.py --import --engine infinity --dataset enwiki
+python run.py --query --engine infinity --dataset enwiki
+python run.py --query-express=16 --engine infinity --dataset enwiki
+```
+
+Following are commands to issue a single query so that you can compare results among several engines.
+
+```base
+curl -X GET "http://localhost:9200/elasticsearch_enwiki/_search" -H 'Content-Type: application/json' -d'{"size":10,"_source":"doctitle","query": {"match": { "body": "wraysbury istorijos" }}}'
+
+psql -h 0.0.0.0 -p 5432 -c "SELECT doctitle, ROW_ID(), SCORE() FROM infinity_enwiki SEARCH MATCH TEXT ('body', 'wraysbury istorijos', 'topn=10;block_max=true');"
+```
 
 ## Benchmark Results
 ### SIFT1M
@@ -130,10 +145,10 @@ options:
 > - 33000000 documents
 > - 100000 `OR` queries generated based on the dataset. All terms are extracted from the dataset and very rare(occurrence < 100) terms are excluded. The number of terms of each query match the weight `[0.03, 0.15, 0.25, 0.25, 0.15, 0.08, 0.04, 0.03, 0.02]`.
 
-|                   | Time to insert & build index | Time to import & build index | P95 Latency(ms)| QPS (8 python clients) |  Memory | vCPU  |
-| ----------------- | ---------------------------- | ---------------------------- | ---------------| -----------------------| --------| ----- |
-| **Elasticsearch** | 2289 s                       | N/A                          | 14.75          | 1174                   | 21.0GB  | 10.0  |
-| **Infinity**      | 2321 s                       | 944 s                        | 3.51           | 3925                   | 9.0GB   | 4.2   |
+|                   | Time to insert & build index | Time to import & build index | P95 Latency(ms)| QPS (16 python clients) |  Memory | vCPU  |
+| ----------------- | ---------------------------- | ---------------------------- | ---------------| ------------------------| --------| ----- |
+| **Elasticsearch** | 2289 s                       | N/A                          | 14.75          | 1340                    | 21.0GB  | 10.6  |
+| **Infinity**      | 2321 s                       | 2890 s                       | 1.86           | 12328                   | 10.0GB  | 11.0  |
 
 ---
 

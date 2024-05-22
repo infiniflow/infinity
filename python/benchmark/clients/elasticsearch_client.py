@@ -263,6 +263,13 @@ class ElasticsearchClient(BaseClient):
         return results
 
     def check_and_save_results(self, results: List[List[Any]]):
+        if "result_path" in self.data:
+            result_path = self.data["result_path"]
+            with open(result_path, "w") as f:
+                for result in results:
+                    line = json.dumps(result)
+                    f.write(line + "\n")
+            logging.info("query_result_path: {0}".format(result_path))
         if "ground_truth_path" in self.data:
             ground_truth_path = self.data["ground_truth_path"]
             _, ext = os.path.splitext(ground_truth_path)
