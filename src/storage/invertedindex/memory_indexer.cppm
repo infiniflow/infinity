@@ -117,8 +117,6 @@ private:
 
     void OfflineDump();
 
-    void OfflineDumpTermTupleList();
-
     void FinalSpillFile();
 
     void PrepareSpillFile();

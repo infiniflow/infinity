@@ -57,8 +57,6 @@ ColumnInverter::~ColumnInverter() = default;
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
 SizeT ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id) {
-    // BaseProfiler profiler;
-    // profiler.Begin();
     begin_doc_id_ = begin_doc_id;
     doc_count_ = row_count;
     Vector<u32> column_lengths(row_count);
@@ -73,8 +71,6 @@ SizeT ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 ro
         term_count_sum += term_count;
     }
     column_lengths_.SetBatch(begin_doc_id, column_lengths);
-    // LOG_INFO(fmt::format("ColumnInverter::InvertColumn time cost: {}", profiler.ElapsedToString()));
-    // profiler.End();
     return term_count_sum;
 }
 
@@ -240,12 +236,8 @@ void ColumnInverter::GeneratePosting() {
 }
 
 void ColumnInverter::SortForOfflineDump() {
-    // BaseProfiler profiler;
-    // profiler.Begin();
     MergePrepare();
     Sort();
-    // LOG_INFO(fmt::format("ColumnInverter::SortForOfflineDump time cost: {}", profiler.ElapsedToString()));
-    // profiler.End();
 }
 
 /// Layout of the input of external sort file
@@ -312,7 +304,6 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
     // size of this Run in bytes
     u32 data_size = 0;
     u64 data_size_pos = spill_file_tell;
-    // fwrite(&data_size, sizeof(u32), 1, spill_file);
     memcpy(spill_buffer.get() + spill_buf_idx, &data_size, sizeof(u32));
     spill_buf_idx += sizeof(u32);
     spill_file_tell += sizeof(u32);
@@ -320,7 +311,6 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
     // number of tuples
     u32 num_of_tuples = positions_.size();
     tuple_count += num_of_tuples;
-    // fwrite(&num_of_tuples, sizeof(u32), 1, spill_file);
     memcpy(spill_buffer.get() + spill_buf_idx, &num_of_tuples, sizeof(u32));
     spill_buf_idx += sizeof(u32);
     spill_file_tell += sizeof(u32);
@@ -328,8 +318,6 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
     // start offset for next spill
     u64 next_start_offset = 0;
     u64 next_start_offset_pos = spill_file_tell;
-    // u64 next_start_offset_pos = ftell(spill_file);
-    // fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
     memcpy(spill_buffer.get() + spill_buf_idx, &next_start_offset, sizeof(u64));
     spill_buf_idx += sizeof(u64);
     spill_file_tell += sizeof(u64);
@@ -338,7 +326,6 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
     fwrite(spill_buffer.get(), spill_buf_idx, 1, spill_file);
     spill_buf_idx = 0;
 
-    // u64 data_start_offset = ftell(spill_file);
     u64 data_start_offset = spill_file_tell;
     assert((SizeT)ftell(spill_file) == spill_file_tell);
     // sorted data
@@ -352,11 +339,6 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
             term = GetTermFromNum(last_term_num);
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
-        //        fwrite(&record_length, sizeof(u32), 1, spill_file);
-        //        fwrite(term.data(), term.size(), 1, spill_file);
-        //        fwrite(&str_null, sizeof(char), 1, spill_file);
-        //        fwrite(&i.doc_id_, sizeof(docid_t), 1, spill_file);
-        //        fwrite(&i.term_pos_, sizeof(u32), 1, spill_file);
         memcpy(spill_buffer.get() + spill_buf_idx, &record_length, sizeof(u32));
         spill_buf_idx += sizeof(u32);
 
@@ -392,43 +374,26 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
     if (positions_.empty()) {
         return;
     }
-    // SizeT spill_buf_idx = 0;
     SizeT spill_file_tell = ftell(spill_file);
     // size of this Run in bytes
     u32 data_size = 0;
     u64 data_size_pos = spill_file_tell;
-    // fwrite(&data_size, sizeof(u32), 1, spill_file);
-//    memcpy(spill_buffer.get() + spill_buf_idx, &data_size, sizeof(u32));
-//    spill_buf_idx += sizeof(u32);
     buf_writer->Write((const char*)&data_size, sizeof(u32));
     spill_file_tell += sizeof(u32);
 
     // number of tuples
     u32 num_of_tuples = positions_.size();
     tuple_count += num_of_tuples;
-    // fwrite(&num_of_tuples, sizeof(u32), 1, spill_file);
-//    memcpy(spill_buffer.get() + spill_buf_idx, &num_of_tuples, sizeof(u32));
-//    spill_buf_idx += sizeof(u32);
     buf_writer->Write((const char*)&num_of_tuples, sizeof(u32));
     spill_file_tell += sizeof(u32);
 
     // start offset for next spill
     u64 next_start_offset = 0;
     u64 next_start_offset_pos = spill_file_tell;
-    // u64 next_start_offset_pos = ftell(spill_file);
-    // fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
-//    memcpy(spill_buffer.get() + spill_buf_idx, &next_start_offset, sizeof(u64));
-//    spill_buf_idx += sizeof(u64);
     buf_writer->Write((const char*)&next_start_offset, sizeof(u64));
     spill_file_tell += sizeof(u64);
 
-    // assert(spill_buf_idx < spill_buf_size);
-//    fwrite(spill_buffer.get(), spill_buf_idx, 1, spill_file);
-//    spill_buf_idx = 0;
-
-    // u64 data_start_offset = ftell(spill_file);
     u64 data_start_offset = spill_file_tell;
-    // assert((SizeT)ftell(spill_file) == spill_file_tell);
     // sorted data
     u32 last_term_num = std::numeric_limits<u32>::max();
     StringRef term;
@@ -440,37 +405,15 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
             term = GetTermFromNum(last_term_num);
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
-//        fwrite(&record_length, sizeof(u32), 1, spill_file);
-//        fwrite(term.data(), term.size(), 1, spill_file);
-//        fwrite(&str_null, sizeof(char), 1, spill_file);
-//        fwrite(&i.doc_id_, sizeof(docid_t), 1, spill_file);
-//        fwrite(&i.term_pos_, sizeof(u32), 1, spill_file);
-//        memcpy(spill_buffer.get() + spill_buf_idx, &record_length, sizeof(u32));
-//        spill_buf_idx += sizeof(u32);
-//
-//        memcpy(spill_buffer.get() + spill_buf_idx, term.data(), term.size());
-//        spill_buf_idx += term.size();
-//
-//        memcpy(spill_buffer.get() + spill_buf_idx, &str_null, sizeof(char));
-//        spill_buf_idx += sizeof(char);
-//
-//        memcpy(spill_buffer.get() + spill_buf_idx, &i.doc_id_, sizeof(docid_t));
-//        spill_buf_idx += sizeof(docid_t);
-//
-//        memcpy(spill_buffer.get() + spill_buf_idx, &i.term_pos_, sizeof(u32));
-//        spill_buf_idx += sizeof(u32);
+
         buf_writer->Write((const char*)&record_length, sizeof(u32));
         buf_writer->Write(term.data(), term.size());
         buf_writer->Write((const char*)&str_null, sizeof(char));
         buf_writer->Write((const char*)&(i.doc_id_), sizeof(docid_t));
         buf_writer->Write((const char*)&(i.term_pos_), sizeof(u32));
-        // assert(spill_buf_idx < spill_buf_size);
-        // fwrite(spill_buffer.get(), spill_buf_idx, 1, spill_file);
-        // spill_buf_idx = 0;
     }
     buf_writer->Flush();
     // update data size
-    // next_start_offset = ftell(spill_file);
     next_start_offset = buf_writer->Tell();
     data_size = next_start_offset - data_start_offset;
     fseek(spill_file, data_size_pos, SEEK_SET);
@@ -479,6 +422,5 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
     fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
     fseek(spill_file, next_start_offset, SEEK_SET);
 }
-
 
 } // namespace infinity

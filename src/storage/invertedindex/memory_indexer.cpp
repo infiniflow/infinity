@@ -63,9 +63,6 @@ import third_party;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
-#define USE_MMAP
-#define USE_BUF
-//#define USE_MORE_BUF
 bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {
     int ret = strcmp(lhs.c_str(), rhs.c_str());
     return ret < 0;
@@ -89,10 +86,9 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
-#ifdef USE_BUF
+
     spill_buffer_size_ = MAX_TUPLE_LENGTH * 2;
     spill_buffer_ = MakeUnique<char_t[]>(spill_buffer_size_);
-#endif
 }
 
 MemoryIndexer::~MemoryIndexer() {
@@ -176,8 +172,6 @@ void MemoryIndexer::Commit(bool offline) {
 }
 
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
-    // BaseProfiler profiler;
-    // profiler.Begin();
     std::unique_lock<std::mutex> lock(mutex_commit_, std::defer_lock);
     if (!lock.try_lock()) {
         return 0;
@@ -191,13 +185,7 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     SizeT num = inverters.size();
     if (num > 0) {
         for (auto &inverter : inverters) {
-            // inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
-#ifdef USE_BUF
             inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_, spill_buffer_, spill_buffer_size_);
-            // inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_, buf_writer_);
-#else
-            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
-#endif
             num_runs_++;
         }
     }
@@ -208,8 +196,6 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
             cv_.notify_all();
         }
     }
-    // LOG_INFO(fmt::format("MemoryIndexer::CommitOffline time cost: {}", profiler.ElapsedToString()));
-    // profiler.End();
     return num;
 }
 
@@ -258,24 +244,13 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
 
     return num_generated;
 }
-#define PRINT_TIME_COST
 void MemoryIndexer::Dump(bool offline, bool spill) {
     if (offline) {
         assert(!spill);
         while (GetInflightTasks() > 0) {
             CommitOffline(100);
         }
-#ifdef PRINT_TIME_COST
-        BaseProfiler profiler;
-        profiler.Begin();
-#endif
-        OfflineDumpTermTupleList();
-//        OfflineDump();
-#ifdef PRINT_TIME_COST
-//        LOG_INFO(fmt::format("MemoryIndexer::OfflineDump() time cost: {}", profiler.ElapsedToString()));
-        fmt::print("MemoryIndexer::OfflineDumpTermTupleList() time cost: {}\n", profiler.ElapsedToString());
-        profiler.End();
-#endif
+        OfflineDump();
         return;
     }
 
@@ -397,140 +372,8 @@ void MemoryIndexer::OfflineDump() {
     }
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
-    SortMerger<TermTuple, u32> *merger = new SortMerger<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
-//    SortMergerTerm<TermTuple, u32> *merger = new SortMergerTerm<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
-//    merger->RunTerm();
+    SortMergerTermTuple<TermTuple, u32> *merger = new SortMergerTermTuple<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     merger->Run();
-    delete merger;
-#ifdef USE_MMAP
-    MmapReader reader(spill_full_path_);
-    u64 count;
-    reader.ReadU64(count);
-    // idx += sizeof(u64);
-#else
-    FILE *f = fopen(spill_full_path_.c_str(), "r");
-    u64 count;
-    fread((char *)&count, sizeof(u64), 1, f);
-#endif
-    Path path = Path(index_dir_) / base_name_;
-    String index_prefix = path.string();
-    LocalFileSystem fs;
-    String posting_file = index_prefix + POSTING_SUFFIX;
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
-    String dict_file = index_prefix + DICT_SUFFIX;
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
-    TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-    String fst_file = index_prefix + DICT_SUFFIX + ".fst";
-    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
-    OstreamWriter wtr(ofs);
-    FstBuilder fst_builder(wtr);
-
-    u32 record_length;
-    char buf[MAX_TUPLE_LENGTH];
-    String last_term_str;
-    std::string_view last_term;
-    u32 last_doc_id = INVALID_DOCID;
-    UniquePtr<PostingWriter> posting;
-
-    for (u64 i = 0; i < count; ++i) {
-#ifdef USE_MMAP
-        reader.ReadU32(record_length);
-#else
-        fread(&record_length, sizeof(u32), 1, f);
-#endif
-        if (record_length >= MAX_TUPLE_LENGTH) {
-#ifdef USE_MMAP
-            reader.Seek(record_length);
-            // idx += record_length;
-#else
-            // rubbish tuple, abandoned
-            char *buffer = new char[record_length];
-            fread(buffer, record_length, 1, f);
-            // TermTuple tuple(buffer, record_length);
-            delete[] buffer;
-#endif
-            continue;
-        }
-#ifdef USE_MMAP
-        reader.ReadBuf(buf, record_length);
-        // char* tuple_data = reader.ReadBufNonCopy(record_length);
-#else
-        fread(buf, record_length, 1, f);
-#endif
-        TermTuple tuple(buf, record_length);
-        if (tuple.term_ != last_term) {
-            assert(last_term < tuple.term_);
-            if (last_doc_id != INVALID_DOCID) {
-                posting->EndDocument(last_doc_id, 0);
-                // printf(" EndDocument1-%u\n", last_doc_id);
-            }
-            if (posting.get()) {
-                TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
-                posting->Dump(posting_file_writer, term_meta);
-                SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
-                term_meta_dumpler.Dump(dict_file_writer, term_meta);
-                fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
-            }
-            posting = MakeUnique<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
-            // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
-            last_term_str = String(tuple.term_);
-            last_term = std::string_view(last_term_str);
-        } else if (last_doc_id != tuple.doc_id_) {
-            assert(last_doc_id != INVALID_DOCID);
-            assert(last_doc_id < tuple.doc_id_);
-            assert(posting.get() != nullptr);
-            posting->EndDocument(last_doc_id, 0);
-            // printf(" EndDocument2-%u\n", last_doc_id);
-        }
-        last_doc_id = tuple.doc_id_;
-        posting->AddPosition(tuple.term_pos_);
-        // printf(" pos-%u", tuple.term_pos_);
-    }
-#ifdef USE_MMAP
-    // MunmapFile(data_ptr, data_len);
-    // reader.MunmapFile();
-#endif
-    if (last_doc_id != INVALID_DOCID) {
-        posting->EndDocument(last_doc_id, 0);
-        // printf(" EndDocument3-%u\n", last_doc_id);
-        TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
-        posting->Dump(posting_file_writer, term_meta);
-        SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
-        term_meta_dumpler.Dump(dict_file_writer, term_meta);
-        fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
-    }
-    posting_file_writer->Sync();
-    dict_file_writer->Sync();
-    fst_builder.Finish();
-    fs.AppendFile(dict_file, fst_file);
-    fs.DeleteFile(fst_file);
-
-    String column_length_file = index_prefix + LENGTH_SUFFIX;
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
-    Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
-    fs.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
-    fs.Close(*file_handler);
-
-    std::filesystem::remove(spill_full_path_);
-    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump done, num_runs_ {}", num_runs_));
-    num_runs_ = 0;
-}
-
-void MemoryIndexer::OfflineDumpTermTupleList() {
-    // Steps of offline dump:
-    // 1. External sort merge
-    // 2. Generate posting
-    // 3. Dump disk segment data
-    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}\n", num_runs_));
-    if (tuple_count_ == 0) {
-        return;
-    }
-    FinalSpillFile();
-    constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
-    // SortMerger<TermTuple, u32> *merger = new SortMerger<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
-    SortMergerTerm<TermTuple, u32> *merger = new SortMergerTerm<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
-    merger->RunTerm();
-    // merger->Run();
     delete merger;
 
     MmapReader reader(spill_full_path_);
@@ -555,7 +398,7 @@ void MemoryIndexer::OfflineDumpTermTupleList() {
     u32 doc_pos_list_size = 0;
     const u32 MAX_TUPLE_LIST_LENGTH = MAX_TUPLE_LENGTH + 2 * 1024 * 1024;
     auto buf = MakeUnique<char[]>(MAX_TUPLE_LIST_LENGTH);
-    // char buf[MAX_TUPLE_LENGTH];
+
     String last_term_str;
     std::string_view last_term;
     u32 last_doc_id = INVALID_DOCID;
@@ -564,7 +407,6 @@ void MemoryIndexer::OfflineDumpTermTupleList() {
     assert(record_length < MAX_TUPLE_LIST_LENGTH);
 
     for (u64 i = 0; i < term_list_count; ++i) {
-
         reader.ReadU32(record_length);
         reader.ReadU32(term_length);
 
@@ -572,7 +414,6 @@ void MemoryIndexer::OfflineDumpTermTupleList() {
             reader.Seek(record_length - sizeof(u32));
             continue;
         }
-
 
         reader.ReadBuf(buf.get(), record_length - sizeof(u32));
         u32 buf_idx = 0;
@@ -583,12 +424,10 @@ void MemoryIndexer::OfflineDumpTermTupleList() {
         std::string_view term = std::string_view(buf.get() + buf_idx, term_length);
         buf_idx += term_length;
 
-        // TermTuple tuple(buf, record_length);
         if (term != last_term) {
             assert(last_term < term);
             if (last_doc_id != INVALID_DOCID) {
                 posting->EndDocument(last_doc_id, 0);
-                // printf(" EndDocument1-%u\n", last_doc_id);
             }
             if (posting.get()) {
                 TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
@@ -598,7 +437,6 @@ void MemoryIndexer::OfflineDumpTermTupleList() {
                 fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
             }
             posting = MakeUnique<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
-            // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
             last_term_str = String(term);
             last_term = std::string_view(last_term_str);
             last_doc_id = INVALID_DOCID;
@@ -610,27 +448,17 @@ void MemoryIndexer::OfflineDumpTermTupleList() {
             buf_idx += sizeof(u32);
 
             if (last_doc_id != INVALID_DOCID && last_doc_id != doc_id) {
-                // assert(last_doc_id != INVALID_DOCID);
                 assert(last_doc_id < doc_id);
                 assert(posting.get() != nullptr);
                 posting->EndDocument(last_doc_id, 0);
-                // printf(" EndDocument2-%u\n", last_doc_id);
             }
             last_doc_id = doc_id;
             posting->AddPosition(term_pos);
         }
 
-//        last_doc_id = doc_id;
-//        posting->AddPosition(tuple.term_pos_);
-        // printf(" pos-%u", tuple.term_pos_);
     }
-#ifdef USE_MMAP
-    // MunmapFile(data_ptr, data_len);
-    // reader.MunmapFile();
-#endif
     if (last_doc_id != INVALID_DOCID) {
         posting->EndDocument(last_doc_id, 0);
-        // printf(" EndDocument3-%u\n", last_doc_id);
         TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
         posting->Dump(posting_file_writer, term_meta);
         SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
@@ -650,7 +478,6 @@ void MemoryIndexer::OfflineDumpTermTupleList() {
     fs.Close(*file_handler);
 
     std::filesystem::remove(spill_full_path_);
-    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump done, num_runs_ {}", num_runs_));
     num_runs_ = 0;
 }
 
@@ -665,10 +492,6 @@ void MemoryIndexer::FinalSpillFile() {
 void MemoryIndexer::PrepareSpillFile() {
     spill_file_handle_ = fopen(spill_full_path_.c_str(), "w");
     fwrite(&tuple_count_, sizeof(u64), 1, spill_file_handle_);
-#ifdef USE_MORE_BUF
-    const SizeT spill_buf_size = 128000;
-    buf_writer_ = MakeUnique<BufWriter>(spill_file_handle_, spill_buf_size);
-#endif
 }
 
 } // namespace infinity
