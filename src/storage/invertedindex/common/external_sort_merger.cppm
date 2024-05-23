@@ -298,9 +298,10 @@ public:
         }
     }
 
-    void PutReal(const u32& real_size, const u32& real_num) {
+    void PutReal(UniquePtr<char[]>& data_buf, const u32& real_size, const u32& real_num) {
         buffer_real_size_[head_] = real_size;
         buffer_real_num_[head_] = real_num;
+        std::swap(data_buf, buffer_array_[head_]);
 
         head_ = (head_ + 1) % total_buffers_;
 
