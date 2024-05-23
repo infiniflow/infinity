@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "tensor_type.h"
-
 namespace infinity {
 
 #pragma pack(1)
@@ -24,8 +22,6 @@ struct TensorArrayType {
     uint16_t tensor_num_ = 0;
     uint16_t chunk_id_ = 0;
     uint32_t chunk_offset_ = 0;
-
-    //[[nodiscard]] static std::string TensorArray2String(char *tensor_ptr, EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
 };
 
 static_assert(sizeof(TensorArrayType) == sizeof(uint64_t));

@@ -365,21 +365,4 @@ void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts
     this->Commit(commit_ts);
 }
 
-/*
-Vector<String> BlockColumnEntry::OutlinePaths() const {
-    Vector<String> outline_paths;
-    SizeT outline_file_count = 0;
-    {
-        std::shared_lock lock(mutex_);
-        outline_file_count = outline_buffers_.size();
-    }
-    for (SizeT i = 0; i < outline_file_count; ++i) {
-        auto outline_file = OutlineFilename(i);
-
-        outline_paths.push_back(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file));
-    }
-    return outline_paths;
-}
-*/
-
 } // namespace infinity
