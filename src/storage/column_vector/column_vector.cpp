@@ -38,6 +38,14 @@ import buffer_manager;
 import status;
 import logical_type;
 import embedding_info;
+import base_expression;
+import value_expression;
+import expression_binder;
+import cast_function;
+import bound_cast_func;
+import cast_expression;
+import expression_evaluator;
+import expression_state;
 
 import block_column_entry;
 
@@ -1635,120 +1643,23 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
 }
 
 void ColumnVector::AppendByConstantExpr(const ConstantExpr *const_expr) {
-    switch (data_type_->type()) {
-        case kBoolean: {
-            bool v = const_expr->bool_value_;
-            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-            break;
-        }
-        case kTinyInt: {
-            i8 v = static_cast<i8>(const_expr->integer_value_);
-            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-            break;
-        }
-        case kSmallInt: {
-            i16 v = static_cast<i16>(const_expr->integer_value_);
-            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-            break;
-        }
-        case kInteger: {
-            i32 v = static_cast<i32>(const_expr->integer_value_);
-            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-            break;
-        }
-        case kBigInt: {
-            i64 v = const_expr->integer_value_;
-            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-            break;
-        }
-        case kFloat: {
-            float v = static_cast<float>(const_expr->double_value_);
-            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-            break;
-        }
-        case kDouble: {
-            double v = const_expr->double_value_;
-            AppendByPtr(reinterpret_cast<const_ptr_t>(&v));
-            break;
-        }
-        case kVarchar: {
-            std::string_view str_view = const_expr->str_value_;
-            AppendByStringView(str_view, ',');
-            break;
-        }
-        case kTensor:
-        case kTensorArray: {
-            // TODO: used by default value?
-            UnrecoverableError("Need fix!");
-            break;
-        }
-        case kEmbedding: {
-            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
-            // SizeT dim = embedding_info->Dimension();
-            switch (embedding_info->Type()) {
-                case kElemInt8: {
-                    Vector<i8> embedding;
-                    embedding.reserve(const_expr->long_array_.size());
-                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
-                        return static_cast<i8>(v);
-                    });
-                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemInt16: {
-                    Vector<i16> embedding;
-                    embedding.reserve(const_expr->long_array_.size());
-                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
-                        return static_cast<i16>(v);
-                    });
-                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemInt32: {
-                    Vector<i32> embedding;
-                    embedding.reserve(const_expr->long_array_.size());
-                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
-                        return static_cast<i32>(v);
-                    });
-                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemInt64: {
-                    Vector<i64> embedding;
-                    embedding.reserve(const_expr->long_array_.size());
-                    std::transform(const_expr->long_array_.begin(), const_expr->long_array_.end(), std::back_inserter(embedding), [](auto &v) {
-                        return v;
-                    });
-                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemFloat: {
-                    Vector<float> embedding;
-                    embedding.reserve(const_expr->double_array_.size());
-                    std::transform(const_expr->double_array_.begin(), const_expr->double_array_.end(), std::back_inserter(embedding), [](auto &v) {
-                        return static_cast<float>(v);
-                    });
-                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemDouble: {
-                    Vector<i8> embedding;
-                    embedding.reserve(const_expr->double_array_.size());
-                    std::transform(const_expr->double_array_.begin(), const_expr->double_array_.end(), std::back_inserter(embedding), [](auto &v) {
-                        return v;
-                    });
-                    AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Not implement: Embedding type.");
-                }
-            }
-            break;
-        }
-        default: {
-            UnrecoverableError("Not implement: Invalid data type.");
-        }
+    ExpressionBinder tmp_binder(nullptr);
+    auto expr = tmp_binder.BuildValueExpr(*const_expr, nullptr, 0, false);
+    auto value_expr = std::dynamic_pointer_cast<ValueExpression>(expr);
+    if (value_expr->Type() == *data_type()) {
+        auto value_to_insert = value_expr->GetValue();
+        AppendValue(value_to_insert);
+    } else {
+        // try cast
+        BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->Type(), *data_type());
+        SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, expr, *data_type());
+        SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(cast_expr);
+        SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(data_type());
+        output_column_vector->Initialize(ColumnVectorType::kConstant, 1);
+        ExpressionEvaluator evaluator;
+        evaluator.Init(nullptr);
+        evaluator.Execute(cast_expr, expr_state, output_column_vector);
+        AppendWith(*output_column_vector, 0, 1);
     }
 }
 
