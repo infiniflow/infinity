@@ -149,7 +149,7 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
 
 SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, const SizeT file_idx) const {
     if (buffer_group_id == 0) {
-        return MakeShared<String>(fmt::format("col_{}_out0_{}", column_id_, file_idx));
+        return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx));
     } else if (buffer_group_id == 1) {
         return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
     } else {
