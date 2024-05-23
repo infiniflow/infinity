@@ -354,6 +354,8 @@ void WriteToTensor<bool>(TensorT &target_tensor,
         target_fix_heap_manager->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), bit_bytes);
 }
 
+void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const VarcharT &src_ref, FixHeapManager *src_fix_heap_mgr);
+
 void CopyTensor(TensorT &dst_ref,
                 FixHeapManager *dst_fix_heap_mgr,
                 const TensorT &src_ref,
@@ -412,28 +414,11 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
                                              const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
-
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
-
         VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[row_id]);
-
-        u32 varchar_len = src_ptr->length_;
-        if (src_ptr->IsInlined()) {
-            // Only prefix is enough to contain all string data.
-            std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
-        } else {
-            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
-            auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
-                                                                                       src_ptr->vector_.chunk_id_,
-                                                                                       src_ptr->vector_.chunk_offset_,
-                                                                                       varchar_len);
-            dst_ptr->vector_.chunk_id_ = chunk_id;
-            dst_ptr->vector_.chunk_offset_ = chunk_offset;
-        }
-
-        dst_ptr->length_ = varchar_len;
+        CopyVarchar(*dst_ptr, dst_buf->fix_heap_mgr_.get(), *src_ptr, src_buf->fix_heap_mgr_.get());
     }
 }
 
@@ -616,22 +601,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
         VarcharT *dst_ptr = &(((VarcharT *)dst)[dest_start_idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[idx]);
-
-        u32 varchar_len = src_ptr->length_;
-        if (src_ptr->IsInlined()) {
-            // Only prefix is enough to contain all string data.
-            std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
-        } else {
-            std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
-            auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
-                                                                                       src_ptr->vector_.chunk_id_,
-                                                                                       src_ptr->vector_.chunk_offset_,
-                                                                                       varchar_len);
-            dst_ptr->vector_.chunk_id_ = chunk_id;
-            dst_ptr->vector_.chunk_offset_ = chunk_offset;
-        }
-
-        dst_ptr->length_ = varchar_len;
+        CopyVarchar(*dst_ptr, dst_buf->fix_heap_mgr_.get(), *src_ptr, src_buf->fix_heap_mgr_.get());
         ++dest_start_idx;
     }
 }
@@ -810,28 +780,11 @@ ColumnVector::CopyRowFrom<BooleanT>(const VectorBuffer *__restrict src_buf, Size
 template <>
 inline void
 ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
-
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
-
     VarcharT *dst_ptr = &(((VarcharT *)dst)[dst_idx]);
     const VarcharT *src_ptr = &(((const VarcharT *)src)[src_idx]);
-
-    u32 varchar_len = src_ptr->length_;
-    if (src_ptr->IsInlined()) {
-        // Only prefix is enough to contain all string data.
-        std::memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
-    } else {
-        std::memcpy(dst_ptr->vector_.prefix_, src_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
-        auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
-                                                                                   src_ptr->vector_.chunk_id_,
-                                                                                   src_ptr->vector_.chunk_offset_,
-                                                                                   varchar_len);
-        dst_ptr->vector_.chunk_id_ = chunk_id;
-        dst_ptr->vector_.chunk_offset_ = chunk_offset;
-    }
-
-    dst_ptr->length_ = varchar_len;
+    CopyVarchar(*dst_ptr, dst_buf->fix_heap_mgr_.get(), *src_ptr, src_buf->fix_heap_mgr_.get());
 }
 
 template <>

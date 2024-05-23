@@ -1810,21 +1810,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
-                dst_ref.is_value_ = src_ref.is_value_;
-                dst_ref.length_ = src_ref.length_;
-                dst_ref.is_value_ = src_ref.is_value_;
-                if (src_ref.IsInlined()) {
-                    std::memcpy(&dst_ref.short_, &src_ref.short_, src_ref.length_);
-                } else {
-                    // Assume the source must be column vector type.
-                    std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
-                    auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(other.buffer_->fix_heap_mgr_.get(),
-                                                                                               src_ref.vector_.chunk_id_,
-                                                                                               src_ref.vector_.chunk_offset_,
-                                                                                               src_ref.length_);
-                    dst_ref.vector_.chunk_id_ = chunk_id;
-                    dst_ref.vector_.chunk_offset_ = chunk_offset;
-                }
+                CopyVarchar(dst_ref, buffer_->fix_heap_mgr_.get(), src_ref, other.buffer_->fix_heap_mgr_.get());
             }
             break;
         }
@@ -2161,6 +2147,22 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         UnrecoverableError("ptr goes out of range when reading ColumnVector");
     }
     return column_vector;
+}
+
+void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const VarcharT &src_ref, FixHeapManager *src_fix_heap_mgr) {
+    const u32 varchar_len = src_ref.length_;
+    dst_ref.is_value_ = 0;
+    dst_ref.length_ = varchar_len;
+    if (src_ref.IsInlined()) {
+        // Only prefix is enough to contain all string data.
+        std::memcpy(dst_ref.short_.data_, src_ref.short_.data_, varchar_len);
+    } else {
+        std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
+        const auto [chunk_id, chunk_offset] =
+            dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_ref.vector_.chunk_id_, src_ref.vector_.chunk_offset_, varchar_len);
+        dst_ref.vector_.chunk_id_ = chunk_id;
+        dst_ref.vector_.chunk_offset_ = chunk_offset;
+    }
 }
 
 void CopyTensor(TensorT &dst_ref,
