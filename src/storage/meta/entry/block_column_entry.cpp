@@ -149,7 +149,7 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
 
 SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, const SizeT file_idx) const {
     if (buffer_group_id == 0) {
-        return MakeShared<String>(fmt::format("col_{}_out0_{}", column_id_, file_idx));
+        return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx));
     } else if (buffer_group_id == 1) {
         return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
     } else {
@@ -317,9 +317,9 @@ nlohmann::json BlockColumnEntry::Serialize() {
     json_res["column_id"] = this->column_id_;
     {
         std::shared_lock lock(mutex_);
-        json_res["next_outline_idx_0"] = outline_buffers_group_0_.size();
+        json_res["next_outline_idx"] = outline_buffers_group_0_.size();
+        json_res["last_chunk_offset"] = this->LastChunkOff(0);
         json_res["next_outline_idx_1"] = outline_buffers_group_1_.size();
-        json_res["last_chunk_offset_0"] = this->LastChunkOff(0);
         json_res["last_chunk_offset_1"] = this->LastChunkOff(1);
     }
 
@@ -332,11 +332,17 @@ nlohmann::json BlockColumnEntry::Serialize() {
 UniquePtr<BlockColumnEntry>
 BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     const ColumnID column_id = column_data_json["column_id"];
-    const u32 next_outline_idx_0 = column_data_json["next_outline_idx_0"];
-    const u32 next_outline_idx_1 = column_data_json["next_outline_idx_1"];
     const TxnTimeStamp commit_ts = column_data_json["commit_ts"];
-    const u64 last_chunk_offset_0 = column_data_json["last_chunk_offset_0"];
-    const u64 last_chunk_offset_1 = column_data_json["last_chunk_offset_1"];
+    const u32 next_outline_idx_0 = column_data_json["next_outline_idx"];
+    const u64 last_chunk_offset_0 = column_data_json["last_chunk_offset"];
+    u32 next_outline_idx_1 = 0;
+    u64 last_chunk_offset_1 = 0;
+    if (auto it = column_data_json.find("next_outline_idx_1"); it != column_data_json.end()) {
+        next_outline_idx_1 = *it;
+    }
+    if (auto it = column_data_json.find("last_chunk_offset_1"); it != column_data_json.end()) {
+        last_chunk_offset_1 = *it;
+    }
     UniquePtr<BlockColumnEntry> block_column_entry = NewReplayBlockColumnEntry(block_entry,
                                                                                column_id,
                                                                                buffer_mgr,
