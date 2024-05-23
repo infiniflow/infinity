@@ -1,0 +1,75 @@
+statement ok
+DROP TABLE IF EXISTS test_sparse;
+
+statement ok
+CREATE TABLE test_sparse (col1 INT, col2 SPARSE(FLOAT, 30000));
+
+query I
+SHOW TABLE test_sparse COLUMNS;
+----
+col1 Integer (empty) Null
+col2 Sparse(float,int16,30000) (empty) Null
+
+statement ok
+DROP TABLE test_sparse;
+
+################
+
+statement ok
+CREATE TABLE test_sparse (col1 INT, col2 SPARSE(DOUBLE, 30000));
+
+query I
+SHOW TABLE test_sparse COLUMNS;
+----
+col1 Integer (empty) Null
+col2 Sparse(double,int16,30000) (empty) Null
+
+statement ok
+DROP TABLE test_sparse;
+
+################
+
+statement ok
+CREATE TABLE test_sparse (col1 INT, col2 SPARSE(FLOAT, 30));
+
+query I
+SHOW TABLE test_sparse COLUMNS;
+----
+col1 Integer (empty) Null
+col2 Sparse(float,int8,30) (empty) Null
+
+statement ok
+DROP TABLE test_sparse;
+
+################
+
+statement ok
+CREATE TABLE test_sparse (col1 INT, col2 SPARSE(FLOAT, 100000));
+
+query I
+SHOW TABLE test_sparse COLUMNS;
+----
+col1 Integer (empty) Null
+col2 Sparse(float,int32,100000) (empty) Null
+
+statement ok
+DROP TABLE test_sparse;
+
+################
+
+statement ok
+CREATE TABLE test_sparse (col1 INT, col2 SPARSE(FLOAT, 10000000000));
+
+query I
+SHOW TABLE test_sparse COLUMNS;
+----
+col1 Integer (empty) Null
+col2 Sparse(float,int64,10000000000) (empty) Null
+
+statement ok
+DROP TABLE test_sparse;
+
+################
+
+statement error
+CREATE TABLE test_sparse (col1 INT, col2 SPARSE(FLOAT, 0));

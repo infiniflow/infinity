@@ -16,7 +16,6 @@
 
 #include "default_value.h"
 #include "type/complex/embedding_type.h"
-#include "type/logical_type.h"
 #include "type/type_info.h"
 
 #include <memory>

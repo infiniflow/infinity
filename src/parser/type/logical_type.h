@@ -103,6 +103,10 @@ enum LogicalType : int8_t {
     // dynamic dim * dynamic dim * fixed dim (column property) * data type
     kTensorArray,
 
+    // sparse vector
+    // composed of two embedding, one for index, one for value
+    kSparse,
+
     kInvalid,
 };
 

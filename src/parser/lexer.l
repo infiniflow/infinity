@@ -159,6 +159,7 @@ SEGMENT         { return SEGMENT; }
 SEGMENTS         { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
+SPARSE          { return SPARSE; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TENSOR          { return TENSOR; }

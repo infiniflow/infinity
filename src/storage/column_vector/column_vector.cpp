@@ -218,6 +218,11 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             case kTensorArray: {
                 CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
             }
+            case kSparse: {
+                // TODO:
+                UnrecoverableError("Not implemented");
+                break;
+            }
             case kDate: {
                 CopyFrom<DateT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
@@ -366,6 +371,11 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case kTensorArray: {
                 CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kSparse: {
+                // TODO:
+                UnrecoverableError("Not implemented");
                 break;
             }
             case kDate: {
@@ -539,6 +549,11 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
         }
         case kTensorArray: {
             CopyRowFrom<TensorArrayT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case kSparse: {
+            // TODO:
+            UnrecoverableError("Not implemented");
             break;
         }
         case kDate: {

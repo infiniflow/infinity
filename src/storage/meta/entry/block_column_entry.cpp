@@ -278,6 +278,11 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             }
             break;
         }
+        case kSparse: {
+            // TODO:
+            UnrecoverableError("Not implemented");
+            break;
+        }
         case kArray:
         case kTuple:
             //        case kPath:

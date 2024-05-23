@@ -1258,15 +1258,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         ++output_column_idx;
         {
             // Append column type to the second column, if the column type is embedded type, append the embedded type
-            String column_type;
-            if (column->type()->type() == kEmbedding) {
-                auto type = column->type();
-                auto embedding_type = type->type_info()->ToString();
-                column_type = fmt::format("{}({})", type->ToString(), embedding_type);
-
-            } else {
-                column_type = column->type()->ToString();
-            }
+            String column_type = column->type()->ToString();
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
@@ -1859,7 +1851,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     }
 
     {
-        {// option name
+        { // option name
             Value value = Value::MakeVarchar(TIME_ZONE_OPTION_NAME);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -2013,10 +2005,10 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 
     {
         {
-        // option name
-          Value value = Value::MakeVarchar(LOG_FILENAME_OPTION_NAME);
-        ValueExpression value_expr(value);
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            // option name
+            Value value = Value::MakeVarchar(LOG_FILENAME_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
         {
             // option name type

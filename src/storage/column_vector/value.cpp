@@ -570,6 +570,11 @@ bool Value::operator==(const Value &other) const {
             UnrecoverableError("Not implemented yet.");
             break;
         }
+        case kSparse: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+            break;
+        }
         case kInterval:
         case kArray:
         case kTuple:
@@ -681,6 +686,11 @@ void Value::CopyUnionValue(const Value &other) {
             this->value_info_ = other.value_info_;
             break;
         }
+        case kSparse: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+            break;
+        }
         case kArray:
         case kTuple:
         case kMixed:
@@ -790,6 +800,11 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             this->value_info_ = std::move(other.value_info_);
             break;
         }
+        case kSparse: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+            break;
+        }
         case kArray:
         case kTuple:
         case kMixed:
@@ -876,6 +891,11 @@ String Value::ToString() const {
             // TODO
             UnrecoverableError("Not implemented yet.");
             return {};
+        }
+        case LogicalType::kSparse: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+            break;
         }
         case LogicalType::kDecimal:
         case LogicalType::kArray:
