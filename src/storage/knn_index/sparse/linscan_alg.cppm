@@ -17,14 +17,9 @@ module;
 export module linscan_alg;
 
 import stl;
+import sparse_iter;
 
 namespace infinity {
-
-export struct SparseVecRef {
-    const f32 *data_;
-    const u32 *indices_;
-    i32 nnz_;
-};
 
 struct Posting {
     u32 doc_id_;
@@ -37,11 +32,11 @@ public:
 
     Pair<Vector<u32>, Vector<f32>> Query(const SparseVecRef &query, u32 top_k) const;
 
-    SizeT num_docs() const { return num_docs_; }
+    u32 row_num() const { return row_num_; }
 
 private:
     HashMap<u32, Vector<Posting>> inverted_idx_;
-    SizeT num_docs_{};
+    u32 row_num_{};
 };
 
 } // namespace infinity

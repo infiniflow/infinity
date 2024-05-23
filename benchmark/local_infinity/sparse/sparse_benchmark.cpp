@@ -23,47 +23,14 @@ import file_system_type;
 import compilation_config;
 import third_party;
 import profiler;
+
 import linscan_alg;
+import sparse_iter;
 
 using namespace infinity;
 
-const f32 error_bound = 1e-6;
+// const f32 error_bound = 1e-6;
 const int log_interval = 10000;
-
-struct SparseMatrix {
-    UniquePtr<f32[]> data_{};
-    UniquePtr<i32[]> indices_{};
-    UniquePtr<i64[]> indptr_{};
-    i64 nrow_{};
-    i64 ncol_{};
-    i64 nnz_{};
-};
-
-class SparseMatrixIter {
-public:
-    SparseMatrixIter(const SparseMatrix &mat) : mat_(mat) {}
-
-    bool HasNext() { return row_i_ < mat_.nrow_; }
-
-    void Next() {
-        ++row_i_;
-        offset_ = mat_.indptr_[row_i_];
-    }
-
-    SparseVecRef val() const {
-        const float *data = mat_.data_.get() + offset_;
-        const auto *indices = reinterpret_cast<const u32 *>(mat_.indices_.get() + offset_);
-        i32 nnz = mat_.indptr_[row_i_ + 1] - offset_;
-        return SparseVecRef{data, indices, nnz};
-    }
-
-    i64 row_id() const { return row_i_; }
-
-private:
-    const SparseMatrix &mat_;
-    i64 row_i_{};
-    i64 offset_{};
-};
 
 SparseMatrix DecodeSparseDataset(const Path &data_path) {
     SparseMatrix ret;
@@ -155,45 +122,52 @@ Vector<Pair<Vector<u32>, Vector<f32>>> QueryData(const LinScan &index, u32 top_k
     return res;
 }
 
-void CheckGroundtruth(const Path &groundtruth_path, const Vector<Pair<Vector<u32>, Vector<f32>>> &results, u32 top_k) {
+void PrintQuery(u32 query_id, const u32 *gt_indices, const f32 *gt_scores, u32 gt_size, const Vector<u32> &indices, const Vector<f32> &scores) {
+    std::cout << fmt::format("Query {}\n", query_id);
+    for (u32 i = 0; i < gt_size; ++i) {
+        std::cout << fmt::format("{} {}, ", indices[i], scores[i]);
+    }
+    std::cout << "\n";
+    for (u32 i = 0; i < gt_size; ++i) {
+        std::cout << fmt::format("{} {}, ", gt_indices[i], gt_scores[i]);
+    }
+    std::cout << "\n";
+}
+
+f32 CheckGroundtruth(const Path &groundtruth_path, const Vector<Pair<Vector<u32>, Vector<f32>>> &results, u32 top_k) {
     u32 query_n = results.size();
     auto [gt_indices_list, gt_score_list] = DecodeGroundtruth(groundtruth_path, top_k, query_n);
+    SizeT recall_n = 0;
     for (u32 i = 0; i < results.size(); ++i) {
         const auto &[indices, scores] = results[i];
         const u32 *gt_indices = gt_indices_list.get() + i * top_k;
-        const f32 *gt_score = gt_score_list.get() + i * top_k;
 
-        // std::cout << fmt::format("Query {}\n", i);
-        // for (u32 j = 0; j < top_k; ++j) {
-        //     std::cout << fmt::format("{} {}, ", j, indices[j], scores[j]);
-        // }
-        // std::cout << "\n";
-        // for (u32 j = 0; j < top_k; ++j) {
-        //     std::cout << fmt::format("{} {}, ", j, gt_indices[j], gt_score[j]);
-        // }
-        // std::cout << "\n";
-
+        // const f32 *gt_score = gt_score_list.get() + i * top_k;
+        // PrintQuery(i, gt_indices, gt_score, top_k, indices, scores);
+        HashSet<u32> indices_set(indices.begin(), indices.end());
         for (u32 j = 0; j < top_k; ++j) {
-            if (indices[j] != gt_indices[j] || std::abs(scores[j] - gt_score[j]) > error_bound) {
-                std::cout << fmt::format("Error at {}, {}, {}, {}, {}, {}\n", i, j, indices[j], scores[j], gt_indices[j], gt_score[j]);
+            if (indices_set.contains(gt_indices[j])) {
+                ++recall_n;
             }
         }
     }
+    f32 recall = static_cast<f32>(recall_n) / (query_n * top_k);
+    return recall;
 }
 
 int main(int argc, char *argv[]) {
     CLI::App app{"sparse_benchmark"};
 
-    enum class ModeType : i8 {
-        kImport,
-        kQuery,
-    };
-    Map<String, ModeType> mode_type_map = {
-        {"import", ModeType::kImport},
-        {"query", ModeType::kQuery},
-    };
-    ModeType mode_type = ModeType::kImport;
-    app.add_option("--mode", mode_type, "Mode type")->required()->transform(CLI::CheckedTransformer(mode_type_map, CLI::ignore_case));
+    // enum class ModeType : i8 {
+    //     kImport,
+    //     kQuery,
+    // };
+    // Map<String, ModeType> mode_type_map = {
+    //     {"import", ModeType::kImport},
+    //     {"query", ModeType::kQuery},
+    // };
+    // ModeType mode_type = ModeType::kImport;
+    // app.add_option("--mode", mode_type, "Mode type")->required()->transform(CLI::CheckedTransformer(mode_type_map, CLI::ignore_case));
 
     enum class DataSetType : u8 {
         kSmall,
@@ -267,5 +241,7 @@ int main(int argc, char *argv[]) {
     profiler.End();
     std::cout << fmt::format("Query data time: {}\n", profiler.ElapsedToString(1000));
 
+    f32 recall = CheckGroundtruth(groundtruth_path, query_result, top_k);
+    std::cout << fmt::format("Recall: {}\n", recall);
     return 0;
 }

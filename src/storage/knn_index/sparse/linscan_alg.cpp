@@ -30,11 +30,11 @@ void LinScan::Insert(const SparseVecRef &vec, u32 doc_id) {
         Posting posting{doc_id, val};
         inverted_idx_[indice].push_back(posting);
     }
-    ++num_docs_;
+    ++row_num_;
 }
 
 Pair<Vector<u32>, Vector<f32>> LinScan::Query(const SparseVecRef &query, u32 top_k) const {
-    auto scores = MakeUnique<f32[]>(num_docs_);
+    auto scores = MakeUnique<f32[]>(row_num_);
     for (i32 i = 0; i < query.nnz_; ++i) {
         u32 indice = query.indices_[i];
         f32 val = query.data_[i];
@@ -49,22 +49,13 @@ Pair<Vector<u32>, Vector<f32>> LinScan::Query(const SparseVecRef &query, u32 top
         }
     }
 
-    SizeT result_n = std::min((SizeT)top_k, num_docs_);
-    Vector<u32> res(result_n + 1);
-    std::iota(res.begin(), res.begin() + result_n, 0);
-    auto cmp = [&scores](u32 i1, u32 i2) { return scores[i1] > scores[i2]; };
-    std::make_heap(res.begin(), res.begin() + result_n, cmp);
-    for (SizeT i = result_n; i < num_docs_; ++i) {
-        res[result_n] = i;
-        std::push_heap(res.begin(), res.end(), cmp);
-        std::pop_heap(res.begin(), res.end(), cmp);
-    }
-    res.pop_back();
-    std::sort_heap(res.begin(), res.end(), cmp);
+    u32 result_n = std::min((u32)top_k, row_num_);
+    Vector<u32> res(row_num_);
+    std::iota(res.begin(), res.end(), 0);
+    std::partial_sort(res.begin(), res.begin() + result_n, res.end(), [&scores](u32 i1, u32 i2) { return scores[i1] > scores[i2]; });
+    res.resize(result_n);
     Vector<f32> res_score(result_n);
-    for (SizeT i = 0; i < result_n; ++i) {
-        res_score[i] = scores[res[i]];
-    }
+    std::transform(res.begin(), res.end(), res_score.begin(), [&scores](u32 i) { return scores[i]; });
     return {std::move(res), std::move(res_score)};
 }
 
