@@ -85,9 +85,6 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
     prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
-
-    spill_buffer_size_ = MAX_TUPLE_LENGTH * 2;
-    spill_buffer_ = MakeUnique<char_t[]>(spill_buffer_size_);
 }
 
 MemoryIndexer::~MemoryIndexer() {
@@ -186,7 +183,7 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
     SizeT num = inverters.size();
     if (num > 0) {
         for (auto &inverter : inverters) {
-            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_, spill_buffer_, spill_buffer_size_);
+            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_, buf_writer_);
             num_runs_++;
         }
     }
@@ -494,6 +491,8 @@ void MemoryIndexer::FinalSpillFile() {
 void MemoryIndexer::PrepareSpillFile() {
     spill_file_handle_ = fopen(spill_full_path_.c_str(), "w");
     fwrite(&tuple_count_, sizeof(u64), 1, spill_file_handle_);
+    const SizeT write_buf_size = 128000;
+    buf_writer_ = MakeUnique<BufWriter>(spill_file_handle_, write_buf_size);
 }
 
 } // namespace infinity

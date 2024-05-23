@@ -7,14 +7,16 @@ export module buf_writer;
 import stl;
 
 namespace infinity {
-
+// A simple buffer writer that writes data to a file.
+// Now only used for ColumnInverter
+// ColumnInverter will use BufWriter sequentially write data and use spill_file pointer randomly write data
 export struct BufWriter {
     BufWriter(FILE *spill_file, SizeT spill_buf_size) : spill_file_(spill_file), spill_buf_size_(spill_buf_size) {
         spill_buffer_ = MakeUnique<char_t[]>(spill_buf_size_);
     }
 
     void Write(const char* data, SizeT data_size) {
-        if (spill_buf_idx_ + data_size >= spill_buf_size_) {
+        if (spill_buf_idx_ + data_size > spill_buf_size_) {
             Flush();
         }
         memcpy(spill_buffer_.get() + spill_buf_idx_, data, data_size);

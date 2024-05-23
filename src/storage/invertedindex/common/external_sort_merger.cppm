@@ -24,7 +24,6 @@ export module external_sort_merger;
 
 import stl;
 import loser_tree;
-import mmap;
 import infinity_exception;
 import file_writer;
 
@@ -154,9 +153,9 @@ struct KeyAddress {
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
 
-    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+    bool operator>(const KeyAddress &other) const { return Compare(other) > 0; }
 
-    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+    bool operator<(const KeyAddress &other) const { return Compare(other) < 0; }
 };
 
 template <typename KeyType, typename LenType>
@@ -197,9 +196,9 @@ struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyTy
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
 
-    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+    bool operator>(const KeyAddress &other) const { return Compare(other) > 0; }
 
-    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+    bool operator<(const KeyAddress &other) const { return Compare(other) < 0; }
 };
 
 template <typename LenType>
@@ -234,9 +233,9 @@ struct KeyAddress<TermTuple, LenType> {
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
 
-    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+    bool operator>(const KeyAddress &other) const { return Compare(other) > 0; }
 
-    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+    bool operator<(const KeyAddress &other) const { return Compare(other) < 0; }
 };
 
 class CycleBuffer {
@@ -248,36 +247,6 @@ public:
         buffer_real_num_.resize(total_buffers);
         for (auto& buf : buffer_array_) {
             buf = MakeUnique<char[]>(buffer_size);
-        }
-    }
-
-    void Put(const TermTupleList& tuple_list) {
-        /*
-         * data_len, term_len, doc_list_size, term, [doc_id, term_pos]...
-         */
-        u32 term_len = tuple_list.term_.size();
-        u32 doc_list_size = tuple_list.Size();
-        auto SIZE_U32 = sizeof(u32);
-        u32 data_len = SIZE_U32 + SIZE_U32 + term_len + 2 * SIZE_U32 * doc_list_size;
-        if (data_len > buffer_size_) {
-            throw std::runtime_error("Data length exceeds buffer capacity");
-        }
-        SizeT idx = 0;
-        std::memcpy(buffer_array_[head_].get() + idx, &data_len, SIZE_U32);
-        idx += SIZE_U32;
-        std::memcpy(buffer_array_[head_].get() + idx, &term_len, SIZE_U32);
-        idx += SIZE_U32;
-        std::memcpy(buffer_array_[head_].get() + idx, &doc_list_size, SIZE_U32);
-        idx += SIZE_U32;
-        std::memcpy(buffer_array_[head_].get() + idx, tuple_list.term_.data(), term_len);
-        idx += term_len;
-        std::memcpy(buffer_array_[head_].get() + idx, tuple_list.doc_pos_list_.data(), SIZE_U32 * 2 * doc_list_size);
-        idx += SIZE_U32 * 2 * doc_list_size;
-
-        head_ = (head_ + 1) % total_buffers_;
-
-        if (head_ == tail_) {
-            full_ = true;
         }
     }
 
@@ -384,8 +353,9 @@ protected:
     u32 OUT_BUF_SIZE_;         //!< max size of output buffer
     const u32 OUT_BUF_NUM_;    //!< output threads number
 
-    std::priority_queue<KeyAddr> pre_heap_;   //!< predict heap
-    SharedPtr<LoserTree<KeyAddr>> merge_loser_tree_;
+    // both pre_heap_ and merge_losser_tree are defined as small root heaps
+    std::priority_queue<KeyAddr, std::vector<KeyAddr>, std::greater<KeyAddr>> pre_heap_;
+    SharedPtr<LoserTree<KeyAddr, std::less<KeyAddr>>> merge_loser_tree_;
 
     u32 *micro_run_idx_{nullptr};   //!< the access index of each microruns
     u32 *micro_run_pos_{nullptr};   //!< the access position within each microruns
@@ -445,12 +415,6 @@ protected:
 
     void OutputByQueue(FILE* f);
 
-    void Init(MmapReader &io_stream);
-
-    void ReadKeyAt(MmapReader &io_stream, u64 pos);
-
-    void ReadKeyAtNonCopy(MmapReader &io_stream, u64 pos);
-
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
@@ -467,50 +431,25 @@ protected:
     using Super = SortMerger<KeyType, LenType>;
     using Super::filenm_;
     using Super::MAX_GROUP_SIZE_;
-    using Super::BS_SIZE_;
-    using Super::PRE_BUF_SIZE_;
-    using Super::RUN_BUF_SIZE_;
-    using Super::OUT_BUF_SIZE_;
-    using Super::OUT_BUF_NUM_;
-    using Super::pre_heap_;
     using Super::merge_loser_tree_;
     using Super::micro_run_idx_;
     using Super::micro_run_pos_;
     using Super::num_micro_run_;
     using Super::size_micro_run_;
-    using Super::size_run_;
-    using Super::run_addr_;
     using Super::micro_buf_;
-    using Super::sub_out_buf_;
     using Super::run_buf_;
-    using Super::out_buf_;
-    using Super::pre_buf_mtx_;
-    using Super::pre_buf_con_;
-    using Super::in_out_mtx_;
-    using Super::in_out_con_;
-    using Super::out_out_mtx_;
-    using Super::out_out_con_;
-    using Super::out_buf_in_idx_;
-    using Super::out_buf_out_idx_;
-    using Super::out_buf_size_;
-    using Super::out_buf_full_;
     using Super::cycle_buffer_;
     using Super::cycle_buf_mtx_;
     using Super::cycle_buf_con_;
     using Super::out_queue_mtx_;
     using Super::out_queue_con_;
-    using Super::out_queue_;
-    using Super::out_size_queue_;
-    using Super::OUT_BATCH_SIZE_;
     using Super::term_tuple_list_queue_;
     using Super::read_finish_;
     using Super::CYCLE_BUF_SIZE_;
     using Super::CYCLE_BUF_THRESHOLD_;
     using Super::count_;
-    using Super::group_size_;
     using Super::FILE_LEN_;
     using typename Super::KeyAddr;
-    using Super::MAX_TUPLE_LENGTH;
     u64 term_list_count_{0};
 
     void PredictImpl(DirectIO &io_stream);

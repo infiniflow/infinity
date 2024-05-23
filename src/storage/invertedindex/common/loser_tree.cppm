@@ -1,3 +1,5 @@
+// Refers to
+// https://github.com/tlx/tlx/blob/master/tlx/container/loser_tree.hpp
 module;
 
 #include <cassert>

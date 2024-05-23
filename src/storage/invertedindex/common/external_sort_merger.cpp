@@ -26,7 +26,6 @@ module;
 module external_sort_merger;
 
 import stl;
-import mmap;
 import third_party;
 import file_writer;
 import local_file_system;
@@ -72,7 +71,7 @@ SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32
     assert(CYCLE_BUF_THRESHOLD_ <= CYCLE_BUF_SIZE_);
     cycle_buffer_ = MakeUnique<CycleBuffer>(CYCLE_BUF_SIZE_, PRE_BUF_SIZE_);
 
-    merge_loser_tree_ = MakeShared<LoserTree<KeyAddr>>(MAX_GROUP_SIZE_);
+    merge_loser_tree_ = MakeShared<LoserTree<KeyAddr, std::less<KeyAddr>>>(MAX_GROUP_SIZE_);
 }
 
 template <typename KeyType, typename LenType>
@@ -196,8 +195,9 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         u32 pos = 0;
         u32 last_pos = -1;
         assert(i < MAX_GROUP_SIZE_);
-        if (size_micro_run_[i] <= 0)
+        if (size_micro_run_[i] <= 0) {
             continue;
+        }
         while (pos + sizeof(LenType) <= size_micro_run_[i]) {
             LenType len = *(LenType *)(micro_buf_[i] + pos);
             if (pos + sizeof(LenType) + len <= size_micro_run_[i]) {
@@ -248,7 +248,7 @@ void SortMerger<KeyType, LenType>::Predict(DirectIO &io_stream) {
         u32 pre_buf_num = 0;
         u32 pre_buf_size = 0;
         while (1) {
-            if (pos + sizeof(LenType) > s) {
+            if (pos + sizeof(LenType) > s || pos + sizeof(LenType) + *(LenType *)(data_ptr + pos) > s) {
                 // the last record of this microrun
                 IASSERT(last_pos != (u32)-1); // buffer too small that can't hold one record
                 LenType len = *(LenType *)(data_ptr + last_pos) + sizeof(LenType);
@@ -257,19 +257,9 @@ void SortMerger<KeyType, LenType>::Predict(DirectIO &io_stream) {
                 pre_heap_.push(KeyAddr(tmp, addr + (u64)pos, idx));
                 break;
             }
-            LenType len = *(LenType *)(data_ptr + pos);
-            if (pos + sizeof(LenType) + len > s) {
-                IASSERT(last_pos != (u32)-1); // buffer too small that can't hold one record
-                len = *(LenType *)(data_ptr + last_pos) + sizeof(LenType);
-                char *tmp = (char *)malloc(len);
-                memcpy(tmp, data_ptr + last_pos, len);
-                pre_heap_.push(KeyAddr(tmp, addr + (u64)pos, idx));
-                break;
-            }
-
             ++pre_buf_num;
             last_pos = pos;
-            pos += sizeof(LenType) + len;
+            pos += sizeof(LenType) + *(LenType *)(data_ptr + pos);
         }
         pre_buf_size = pos;
 
@@ -322,10 +312,11 @@ void SortMerger<KeyType, LenType>::Merge() {
             std::unique_lock lock(cycle_buf_mtx_);
 
             cycle_buf_con_.wait(lock, [this]() {
-                return !this->cycle_buffer_->IsEmpty() || (this->read_finish_ && this->cycle_buffer_->IsEmpty());
+                return !this->cycle_buffer_->IsEmpty() || read_finish_;
             });
 
-            if (cycle_buffer_->IsEmpty() && read_finish_) {
+            if (read_finish_) {
+                assert(cycle_buffer_->IsEmpty());
                 merge_loser_tree_->DeleteTopInsert(nullptr, true);
                 continue;
             }
@@ -365,7 +356,6 @@ template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::OutputByQueue(FILE *f) {
     DirectIO io_stream(f, "w");
     while (count_ > 0) {
-        // wait its turn to output
         Queue<UniquePtr<char_t[]>> temp_out_queue;
         Queue<u32> temp_out_size_queue;
         {
@@ -406,8 +396,9 @@ void SortMerger<KeyType, LenType>::Output(FILE *f, u32 idx) {
     while (count_ > 0) {
         // wait its turn to output
         std::unique_lock out_lock(out_out_mtx_);
-        while (out_buf_out_idx_ != idx)
+        while (out_buf_out_idx_ != idx) {
             out_out_con_.wait(out_lock);
+        }
 
         if (count_ == 0) {
             ++out_buf_out_idx_;
@@ -488,7 +479,6 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
         auto out_key = top.KEY();
         if (tuple_list == nullptr) {
             tuple_list = MakeUnique<TermTupleList>(out_key.term_);
-            tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
         } else if (idx != last_idx) {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
                 // output
@@ -498,11 +488,9 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
                     out_queue_con_.notify_one();
                 }
                 tuple_list = MakeUnique<TermTupleList>(out_key.term_);
-                tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
-            } else {
-                tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
             }
         }
+        tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
 
         assert(idx < MAX_GROUP_SIZE_);
 
@@ -511,10 +499,11 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
             std::unique_lock lock(cycle_buf_mtx_);
 
             cycle_buf_con_.wait(lock, [this]() {
-                return !this->cycle_buffer_->IsEmpty() || (this->read_finish_ && this->cycle_buffer_->IsEmpty());
+                return !this->cycle_buffer_->IsEmpty() || read_finish_;
             });
 
-            if (cycle_buffer_->IsEmpty() && read_finish_) {
+            if (read_finish_) {
+                assert(cycle_buffer_->IsEmpty());
                 merge_loser_tree_->DeleteTopInsert(nullptr, true);
                 continue;
             }
