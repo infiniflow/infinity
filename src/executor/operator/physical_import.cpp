@@ -572,8 +572,8 @@ void AppendJsonTensorToColumn<bool>(const nlohmann::json &line_json,
     const auto input_bytes = (embedding.size() + 7) / 8;
     auto input_data = MakeUnique<u8[]>(input_bytes);
     for (SizeT i = 0; i < embedding.size(); ++i) {
-        if (embedding[i] > 0) {
-            input_data[i / 8] |= u8(1) << (i % 8);
+        if (embedding[i]) {
+            input_data[i / 8] |= (1u << (i % 8));
         }
     }
     const Value embedding_value =

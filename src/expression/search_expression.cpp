@@ -54,11 +54,11 @@ String SearchExpression::ToString() const {
         cnt++;
         oss << knn_expr->ToString();
     }
-    for (auto &tensor_maxsim_expr : match_tensor_exprs_) {
+    for (auto &match_tensor_expr : match_tensor_exprs_) {
         if (cnt != 0)
             oss << ", ";
         cnt++;
-        oss << tensor_maxsim_expr->ToString();
+        oss << match_tensor_expr->ToString();
     }
     if (fusion_expr_.get() != nullptr) {
         if (cnt != 0)

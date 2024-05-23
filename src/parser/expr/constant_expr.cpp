@@ -110,6 +110,18 @@ std::string ConstantExpr::ToString() const {
             ss << double_array_.back();
             return ss.str();
         }
+        case LiteralType::kSubArrayArray: {
+            std::stringstream ss;
+            size_t len = sub_array_array_.size();
+            if (len <= 0) {
+                ParserError("Invalid array array length");
+            }
+            for (size_t i = 0; i < len - 1; ++i) {
+                ss << '[' << sub_array_array_[i]->ToString() << "],";
+            }
+            ss << '[' << sub_array_array_.back()->ToString() << ']';
+            return ss.str();
+        }
     }
     ParserError("Unexpected branch");
 }
@@ -151,6 +163,13 @@ int32_t ConstantExpr::GetSizeInBytes() const {
         case LiteralType::kDoubleArray: {
             size += sizeof(int64_t);
             size += sizeof(double) * double_array_.size();
+            break;
+        }
+        case LiteralType::kSubArrayArray: {
+            size += sizeof(int64_t);
+            for (const auto &val : sub_array_array_) {
+                size += val->GetSizeInBytes();
+            }
             break;
         }
         case LiteralType::kInterval: {
@@ -202,6 +221,13 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             WriteBufAdv<int64_t>(ptr, double_array_.size());
             for (const auto &val : double_array_) {
                 WriteBufAdv<double>(ptr, val);
+            }
+            break;
+        }
+        case LiteralType::kSubArrayArray: {
+            WriteBufAdv<int64_t>(ptr, sub_array_array_.size());
+            for (const auto &val : sub_array_array_) {
+                val->WriteAdv(ptr);
             }
             break;
         }
@@ -265,6 +291,14 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) 
             }
             break;
         }
+        case LiteralType::kSubArrayArray: {
+            size_t len = ReadBufAdv<int64_t>(ptr);
+            for (size_t i = 0; i < len; ++i) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(ReadAdv(ptr, ptr_end - ptr));
+                const_expr->sub_array_array_.push_back(std::move(sub_arr));
+            }
+            break;
+        }
         case LiteralType::kInterval: {
             TimeUnit interval_type = ReadBufAdv<TimeUnit>(ptr);
             int64_t integer_value = ReadBufAdv<int64_t>(ptr);
@@ -316,6 +350,14 @@ nlohmann::json ConstantExpr::Serialize() const {
             j["value"] = double_array_;
             break;
         }
+        case LiteralType::kSubArrayArray: {
+            nlohmann::json sub_array_j(nlohmann::detail::value_t::array);
+            for (const auto &val : sub_array_array_) {
+                sub_array_j.emplace_back(val->Serialize());
+            }
+            j["value"] = std::move(sub_array_j);
+            break;
+        }
         case LiteralType::kInterval: {
             ParserError("Interval type is not supported in JSON serialization");
         }
@@ -359,6 +401,13 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &cons
         }
         case LiteralType::kDoubleArray: {
             const_expr->double_array_ = constant_expr["value"].get<std::vector<double>>();
+            break;
+        }
+        case LiteralType::kSubArrayArray: {
+            for (const nlohmann::json &array = constant_expr["value"]; const auto &val : array) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(Deserialize(val));
+                const_expr->sub_array_array_.push_back(std::move(sub_arr));
+            }
             break;
         }
         case LiteralType::kInterval: {

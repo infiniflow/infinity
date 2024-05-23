@@ -61,6 +61,8 @@ export using infinity::MixedT;
 
 // tensor
 export using infinity::TensorT;
+// tensor-array
+export using infinity::TensorArrayT;
 
 export using infinity::RowID;
 export using infinity::TimeUnit;

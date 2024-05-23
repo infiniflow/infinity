@@ -195,6 +195,8 @@ public:
 
     EmbeddingType &operator=(const EmbeddingType &other) = delete;
 
+    EmbeddingType &operator=(EmbeddingType &&other) = delete;
+    /*
     EmbeddingType &operator=(EmbeddingType &&other) noexcept {
         if (this == &other)
             return *this;
@@ -207,6 +209,7 @@ public:
         other.ptr = nullptr;
         return *this;
     }
+    */
 
     void Init(const void *ptr, size_t size);
 

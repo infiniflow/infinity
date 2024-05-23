@@ -40,7 +40,7 @@ std::string SearchExpr::ToString() const {
         oss << expr->ToString();
         is_first = false;
     }
-    for (auto &expr : tensor_maxsim_exprs_) {
+    for (auto &expr : match_tensor_exprs_) {
         if (!is_first)
             oss << ", ";
         oss << expr->ToString();
@@ -61,7 +61,7 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
 }
 
 void SearchExpr::Validate() const {
-    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + tensor_maxsim_exprs_.size();
+    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + match_tensor_exprs_.size();
     if (num_sub_expr <= 0) {
         ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / QUERY expression");
     } else if (num_sub_expr >= 2) {
@@ -78,8 +78,8 @@ void SearchExpr::AddExpr(infinity::ParsedExpr *expr) {
         case ParsedExprType::kMatch:
             match_exprs_.push_back(static_cast<MatchExpr *>(expr));
             break;
-        case ParsedExprType::kTensorMaxSim:
-            tensor_maxsim_exprs_.push_back(static_cast<MatchTensorExpr *>(expr));
+        case ParsedExprType::kMatchTensor:
+            match_tensor_exprs_.push_back(static_cast<MatchTensorExpr *>(expr));
             break;
         case ParsedExprType::kFusion:
             if (fusion_expr_ != nullptr) {

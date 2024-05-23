@@ -730,8 +730,16 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
                                                            buffer_mgr,
                                                            txn_id);
         for (ColumnID column_id = 0; column_id < (ColumnID)block_info.outline_infos_.size(); ++column_id) {
-            auto [next_idx, last_off] = block_info.outline_infos_[column_id];
-            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, next_idx, last_off, commit_ts);
+            const auto [next_idx_0, last_off_0] = block_info.outline_infos_[column_id][0];
+            const auto [next_idx_1, last_off_1] = block_info.outline_infos_[column_id][1];
+            auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(),
+                                                                            column_id,
+                                                                            buffer_mgr,
+                                                                            next_idx_0,
+                                                                            next_idx_1,
+                                                                            last_off_0,
+                                                                            last_off_1,
+                                                                            commit_ts);
             block_entry->AddColumnReplay(std::move(column_entry), column_id); // reuse function from delta catalog.
         }
         segment_entry->AddBlockReplay(std::move(block_entry)); // reuse function from delta catalog.

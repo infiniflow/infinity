@@ -370,7 +370,7 @@ struct SQL_LTYPE {
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
-%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TENSOR TEXT
+%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT TENSOR TENSORARRAY
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
@@ -425,6 +425,7 @@ struct SQL_LTYPE {
 %type <expr_t>                  match_text_expr query_expr fusion_expr search_clause
 %type <const_expr_t>            constant_expr interval_expr default_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
+%type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
 %type <expr_array_list_t>       expr_array_list
 %type <update_expr_t>           update_expr;
@@ -437,7 +438,7 @@ struct SQL_LTYPE {
 %type <copy_option_array> copy_option_list
 %type <copy_option_t>     copy_option
 
-%type <str_value>         file_path optional_maxsim_option
+%type <str_value>         file_path extra_match_tensor_option
 
 %type <bool_value>        if_not_exists if_exists distinct
 
@@ -683,6 +684,7 @@ IDENTIFIER column_type default_expr {
 //            break;
 //        }
         case infinity::LogicalType::kTensor:
+        case infinity::LogicalType::kTensorArray:
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
@@ -785,6 +787,14 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | TENSOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt64}; }
 | TENSOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemFloat}; }
 | TENSOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemDouble}; }
+| TENSORARRAY '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemBit}; }
+| TENSORARRAY '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt8}; }
+| TENSORARRAY '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt16}; }
+| TENSORARRAY '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt32}; }
+| TENSORARRAY '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt32}; }
+| TENSORARRAY '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt64}; }
+| TENSORARRAY '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemFloat}; }
+| TENSORARRAY '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemDouble}; }
 | VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBit}; }
 | VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt8}; }
 | VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt16}; }
@@ -1922,138 +1932,34 @@ operand: '(' expr ')' {
 | query_expr
 | fusion_expr
 
-optional_maxsim_option : ',' STRING {
+extra_match_tensor_option : ',' STRING {
     $$ = $2;
 }
 | {
     $$ = nullptr;
 }
 
-//                                      4               6             8          10              11
-//                  MATCH TENSOR ( column_name, search_tensor, tensor_data_type, search_method, optional_maxsim_option(including topn))
-match_tensor_expr : MATCH TENSOR '(' column_expr ',' array_expr ',' STRING ',' STRING optional_maxsim_option ')' {
+//                                       4                   6               8          10              11
+//                  MATCH TENSOR  (  column_name,     search_tensor, tensor_data_type, search_method, extra_match_tensor_option(including topn))
+match_tensor_expr : MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING extra_match_tensor_option ')' {
     infinity::MatchTensorExpr* match_tensor_expr = new infinity::MatchTensorExpr();
     $$ = match_tensor_expr;
-    // TENSOR search column
-    match_tensor_expr->column_expr_ = $4;
-    // TENSOR search options
+    // search column
+    match_tensor_expr->column_expr_.reset($4);
+    // search tensor
+    match_tensor_expr->tensor_expr_.reset($6);
+    // tensor data type
+    ParserHelper::ToLower($8);
+    match_tensor_expr->embedding_data_type_ = $8;
+    free($8);
+    // search method
+    ParserHelper::ToLower($10);
+    match_tensor_expr->search_method_ = $10;
+    free($10);
+    // search options
     if ($11) {
         match_tensor_expr->options_text_ = $11;
         free($11);
-    }
-    // TENSOR search type
-    ParserHelper::ToLower($10);
-    if(strcmp($10, "maxsim") == 0) {
-        match_tensor_expr->search_method_ = infinity::MatchTensorMethod::kMaxSim;
-        free($10);
-    } else {
-        free($10);
-        free($8);
-        delete $6;
-        delete $$;
-        yyerror(&yyloc, scanner, result, "Invalid MATCH TENSOR method type");
-        YYERROR;
-    }
-    // TENSOR query tensor
-    ParserHelper::ToLower($8);
-    if(strcmp($8, "float") == 0) {
-        match_tensor_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemFloat;
-        if(!($6->double_array_.empty())) {
-            match_tensor_expr->dimension_ = $6->double_array_.size();
-            match_tensor_expr->embedding_data_ptr_ = new float[match_tensor_expr->dimension_];
-            for(long i = 0; i < match_tensor_expr->dimension_; ++ i) {
-                ((float*)(match_tensor_expr->embedding_data_ptr_))[i] = $6->double_array_[i];
-            }
-        }
-        if(!($6->long_array_.empty())) {
-            match_tensor_expr->dimension_ = $6->long_array_.size();
-            match_tensor_expr->embedding_data_ptr_ = new float[match_tensor_expr->dimension_];
-            for(long i = 0; i < match_tensor_expr->dimension_; ++ i) {
-                ((float*)(match_tensor_expr->embedding_data_ptr_))[i] = $6->long_array_[i];
-            }
-        }
-        free($8);
-        delete $6;
-    } else if(strcmp($8, "tinyint") == 0) {
-        match_tensor_expr->dimension_ = $6->long_array_.size();
-        match_tensor_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt8;
-        match_tensor_expr->embedding_data_ptr_ = new char[match_tensor_expr->dimension_];
-        for(long i = 0; i < match_tensor_expr->dimension_; ++ i) {
-            ((char*)match_tensor_expr->embedding_data_ptr_)[i] = $6->long_array_[i];
-        }
-        free($8);
-        delete $6;
-    } else if(strcmp($8, "smallint") == 0) {
-        match_tensor_expr->dimension_ = $6->long_array_.size();
-        match_tensor_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt16;
-        match_tensor_expr->embedding_data_ptr_ = new short int[match_tensor_expr->dimension_];
-        for(long i = 0; i < match_tensor_expr->dimension_; ++ i) {
-            ((short int*)match_tensor_expr->embedding_data_ptr_)[i] = $6->long_array_[i];
-        }
-        free($8);
-        delete $6;
-    } else if(strcmp($8, "integer") == 0) {
-        match_tensor_expr->dimension_ = $6->long_array_.size();
-        match_tensor_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt32;
-        match_tensor_expr->embedding_data_ptr_ = new int[match_tensor_expr->dimension_];
-        for(long i = 0; i < match_tensor_expr->dimension_; ++ i) {
-            ((int*)match_tensor_expr->embedding_data_ptr_)[i] = $6->long_array_[i];
-        }
-        free($8);
-        delete $6;
-    } else if(strcmp($8, "bigint") == 0) {
-        match_tensor_expr->dimension_ = $6->long_array_.size();
-        match_tensor_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt64;
-        match_tensor_expr->embedding_data_ptr_ = new long[match_tensor_expr->dimension_];
-        memcpy(match_tensor_expr->embedding_data_ptr_, (void*)$6->long_array_.data(), match_tensor_expr->dimension_ * sizeof(long));
-        free($8);
-        delete $6;
-    } else if(strcmp($8, "bit") == 0) {
-        match_tensor_expr->dimension_ = $6->long_array_.size();
-        if(match_tensor_expr->dimension_ % 8 == 0) {
-            match_tensor_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemBit;
-            long embedding_size = match_tensor_expr->dimension_ / 8;
-            uint8_t *data_ptr = new uint8_t[embedding_size];
-            match_tensor_expr->embedding_data_ptr_ = data_ptr;
-            for(long i = 0; i < embedding_size; ++ i) {
-                uint8_t embedding_unit = 0;
-                for(long bit_idx = 0; bit_idx < 8; ++ bit_idx) {
-                    double val = $6->long_array_[i * 8 + bit_idx];
-                    if (val != 0 && val != 1) {
-                        free($8);
-                        delete $6;
-                        delete $$;
-                        yyerror(&yyloc, scanner, result, "Invalid bit embedding type data");
-                        YYERROR;
-                    }
-                    if(val == 1) {
-                        embedding_unit |= (uint8_t(1) << bit_idx);
-                    }
-                }
-                data_ptr[i] = embedding_unit;
-            }
-            free($8);
-            delete $6;
-        } else {
-            free($8);
-            delete $6;
-            delete $$;
-            yyerror(&yyloc, scanner, result, "tensor data type is bit which length should be aligned with 8");
-            YYERROR;
-        }
-    } else if(strcmp($8, "double") == 0) {
-        match_tensor_expr->dimension_ = $6->double_array_.size();
-        match_tensor_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemDouble;
-        match_tensor_expr->embedding_data_ptr_ = new double[match_tensor_expr->dimension_];
-        memcpy(match_tensor_expr->embedding_data_ptr_, (void*)$6->double_array_.data(), match_tensor_expr->dimension_ * sizeof(double));
-        free($8);
-        delete $6;
-    } else {
-        free($8);
-        delete $6;
-        delete $$;
-        yyerror(&yyloc, scanner, result, "Invalid tensor data type");
-        YYERROR;
     }
 }
 
@@ -2726,12 +2632,30 @@ constant_expr: STRING {
 | interval_expr {
     $$ = $1;
 }
-| long_array_expr {
+| common_array_expr {
     $$ = $1;
 }
-| double_array_expr {
+
+common_array_expr: array_expr {
+    $$ = $1;
+}
+| subarray_array_expr {
+    $$ = $1;
+}
+
+subarray_array_expr: unclosed_subarray_array_expr ']' {
     $$ = $1;
 };
+
+unclosed_subarray_array_expr: '[' common_array_expr {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kSubArrayArray);
+    const_expr->sub_array_array_.emplace_back($2);
+    $$ = const_expr;
+}
+| unclosed_subarray_array_expr ',' common_array_expr {
+    $1->sub_array_array_.emplace_back($3);
+    $$ = $1;
+}
 
 array_expr: long_array_expr {
     $$ = $1;
