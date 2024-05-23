@@ -36,7 +36,7 @@ public:
     std::vector<MatchExpr *> match_exprs_{};
     std::vector<KnnExpr *> knn_exprs_{};
     std::vector<MatchTensorExpr *> match_tensor_exprs_{};
-    FusionExpr *fusion_expr_{};
+    std::vector<FusionExpr *> fusion_exprs_{};
 
 private:
     std::vector<infinity::ParsedExpr *> *exprs_{};

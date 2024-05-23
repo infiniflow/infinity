@@ -1343,54 +1343,6 @@ Vector<std::string_view> SplitArrayElement(std::string_view data, char delimiter
     return ret;
 }
 
-Vector<std::string_view> SplitTensorElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {
-    SizeT data_size = data.size();
-    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        Status status = Status::ImportFileFormatError("Tensor data must be surrounded by [ and ]");
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
-    bool have_child_embedding = false;
-    for (SizeT i = 1; i < data_size - 1; ++i) {
-        if (data[i] == '[') {
-            have_child_embedding = true;
-            break;
-        }
-    }
-    if (!have_child_embedding) {
-        return SplitArrayElement(data, delimiter);
-    }
-    std::string_view child_data = data.substr(1, data_size - 2);
-    Vector<std::string_view> ret;
-    size_t bg_id = 0;
-    while (true) {
-        const auto next_bg_id = child_data.find('[', bg_id);
-        if (next_bg_id == std::string_view::npos) {
-            break;
-        }
-        const auto ed_id = child_data.find(']', next_bg_id);
-        if (ed_id == std::string_view::npos) {
-            Status status = Status::ImportFileFormatError("Tensor data member embedding must be surrounded by [ and ]");
-            LOG_ERROR(status.message());
-            RecoverableError(status);
-        }
-        if (const auto check_inner_valid = child_data.find('[', next_bg_id + 1); check_inner_valid < ed_id) {
-            Status status = Status::ImportFileFormatError("Tensor data format invalid: mismatch of inner '[', ']'.");
-            LOG_ERROR(status.message());
-            RecoverableError(status);
-        }
-        Vector<std::string_view> sub_result = SplitArrayElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), delimiter);
-        if (sub_result.size() != unit_embedding_dim) {
-            Status status = Status::ImportFileFormatError("Tensor data member embedding size must be equal to unit embedding dimension.");
-            LOG_ERROR(status.message());
-            RecoverableError(status);
-        }
-        ret.insert(ret.end(), sub_result.begin(), sub_result.end());
-        bg_id = ed_id + 1;
-    }
-    return ret;
-}
-
 Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
@@ -2108,6 +2060,54 @@ void CopyTensorArray(TensorArrayT &dst_ref,
     }
     std::tie(dst_ref.chunk_id_, dst_ref.chunk_offset_) =
         dst_buffer->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(dst_tensor_data.data()), tensor_num * sizeof(TensorT));
+}
+
+Vector<std::string_view> SplitTensorElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {
+    SizeT data_size = data.size();
+    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+        Status status = Status::ImportFileFormatError("Tensor data must be surrounded by [ and ]");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    bool have_child_embedding = false;
+    for (SizeT i = 1; i < data_size - 1; ++i) {
+        if (data[i] == '[') {
+            have_child_embedding = true;
+            break;
+        }
+    }
+    if (!have_child_embedding) {
+        return SplitArrayElement(data, delimiter);
+    }
+    std::string_view child_data = data.substr(1, data_size - 2);
+    Vector<std::string_view> ret;
+    size_t bg_id = 0;
+    while (true) {
+        const auto next_bg_id = child_data.find('[', bg_id);
+        if (next_bg_id == std::string_view::npos) {
+            break;
+        }
+        const auto ed_id = child_data.find(']', next_bg_id);
+        if (ed_id == std::string_view::npos) {
+            Status status = Status::ImportFileFormatError("Tensor data member embedding must be surrounded by [ and ]");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        if (const auto check_inner_valid = child_data.find('[', next_bg_id + 1); check_inner_valid < ed_id) {
+            Status status = Status::ImportFileFormatError("Tensor data format invalid: mismatch of inner '[', ']'.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        Vector<std::string_view> sub_result = SplitArrayElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), delimiter);
+        if (sub_result.size() != unit_embedding_dim) {
+            Status status = Status::ImportFileFormatError("Tensor data member embedding size must be equal to unit embedding dimension.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        ret.insert(ret.end(), sub_result.begin(), sub_result.end());
+        bg_id = ed_id + 1;
+    }
+    return ret;
 }
 
 } // namespace infinity
