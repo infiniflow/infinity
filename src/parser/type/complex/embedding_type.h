@@ -196,20 +196,6 @@ public:
     EmbeddingType &operator=(const EmbeddingType &other) = delete;
 
     EmbeddingType &operator=(EmbeddingType &&other) = delete;
-    /*
-    EmbeddingType &operator=(EmbeddingType &&other) noexcept {
-        if (this == &other)
-            return *this;
-        if (ptr != nullptr) {
-            //            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
-            Reset();
-        }
-        const_cast<bool &>(new_allocated_) = other.new_allocated_;
-        ptr = other.ptr;
-        other.ptr = nullptr;
-        return *this;
-    }
-    */
 
     void Init(const void *ptr, size_t size);
 
