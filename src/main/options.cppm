@@ -18,6 +18,7 @@ export module options;
 
 import stl;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -32,7 +33,7 @@ export enum class BaseOptionDataType {
 };
 
 export struct BaseOption {
-    explicit BaseOption(String name, BaseOptionDataType data_type) : name_(std::move(name)), data_type_(data_type) {}
+    explicit BaseOption(std::string_view name, BaseOptionDataType data_type) : name_(std::move(name)), data_type_(data_type) {}
     virtual ~BaseOption() = default;
 
     String name_{};
@@ -40,7 +41,7 @@ export struct BaseOption {
 };
 
 export struct IntegerOption : public BaseOption {
-    explicit IntegerOption(String name, i64 default_value, i64 upper_bound, i64 lower_bound)
+    explicit IntegerOption(std::string_view name, i64 default_value, i64 upper_bound, i64 lower_bound)
         : BaseOption(std::move(name), BaseOptionDataType::kInteger), value_(default_value), upper_bound_(upper_bound), lower_bound_(lower_bound) {}
 
     [[nodiscard]] inline bool Validate() const { return value_ >= lower_bound_ && value_ <= upper_bound_; }
@@ -51,7 +52,7 @@ export struct IntegerOption : public BaseOption {
 };
 
 export struct FloatOption : public BaseOption {
-    explicit FloatOption(String name, f64 default_value, f64 upper_bound, f64 lower_bound)
+    explicit FloatOption(std::string_view name, f64 default_value, f64 upper_bound, f64 lower_bound)
         : BaseOption(std::move(name), BaseOptionDataType::kFloat), value_(default_value), upper_bound_(upper_bound), lower_bound_(lower_bound) {}
 
     f64 value_{};
@@ -60,20 +61,20 @@ export struct FloatOption : public BaseOption {
 };
 
 export struct StringOption : public BaseOption {
-    explicit StringOption(String name, String default_value)
+    explicit StringOption(std::string_view name, std::string_view default_value)
         : BaseOption(std::move(name), BaseOptionDataType::kString), value_(std::move(default_value)) {}
 
     String value_{};
 };
 
 export struct BooleanOption : public BaseOption {
-    explicit BooleanOption(String name, bool default_value) : BaseOption(std::move(name), BaseOptionDataType::kBoolean), value_(default_value) {}
+    explicit BooleanOption(std::string_view name, bool default_value) : BaseOption(std::move(name), BaseOptionDataType::kBoolean), value_(default_value) {}
 
     bool value_{};
 };
 
 export struct LogLevelOption : public BaseOption {
-    explicit LogLevelOption(String name, LogLevel log_level) : BaseOption(std::move(name), BaseOptionDataType::kLogLevel), value_(log_level) {}
+    explicit LogLevelOption(std::string_view name, LogLevel log_level) : BaseOption(std::move(name), BaseOptionDataType::kLogLevel), value_(log_level) {}
 
     LogLevel value_{};
 };
@@ -104,7 +105,7 @@ export String FlushOptionTypeToString(FlushOptionType flush_option_type) {
 }
 
 export struct FlushOption : public BaseOption {
-    explicit FlushOption(String name, FlushOptionType flush_type) : BaseOption(std::move(name), BaseOptionDataType::kFlush), value_(flush_type) {}
+    explicit FlushOption(std::string_view name, FlushOptionType flush_type) : BaseOption(std::move(name), BaseOptionDataType::kFlush), value_(flush_type) {}
 
     FlushOptionType value_{};
 };
@@ -140,12 +141,14 @@ export enum class GlobalOptionIndex {
     kDeltaCheckpointThreshold = 26,
     kFlushMethodAtCommit = 27,
     kResourcePath = 28,
+    kInvalid = 29
 };
 
 export struct GlobalOptions {
-    void AddOption(UniquePtr<BaseOption> option, GlobalOptionIndex option_index);
-    GlobalOptionIndex GetOptionIndex(const String &option_name);
-    BaseOption *GetOptionByName(const String &option_name);
+    GlobalOptions();
+    Status AddOption(UniquePtr<BaseOption> option);
+    GlobalOptionIndex GetOptionIndex(const String &option_name) const;
+    Tuple<BaseOption *, Status> GetOptionByName(const String &option_name);
     BaseOption *GetOptionByIndex(GlobalOptionIndex option_index);
 
     String GetStringValue(GlobalOptionIndex option_index);

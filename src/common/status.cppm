@@ -116,6 +116,11 @@ export enum class ErrorCode : long {
     kInvalidTopKType = 3073,
     kInvalidCreateOption = 3074,
     kInvalidDropOption = 3075,
+    kInvalidCommand = 3076,
+    kAnalyzerNotFound = 3077,
+    kNotSupportedAnalyzer = 3078,
+    kInvalidAnalyzerName = 3079,
+    kInvalidAnalyzerFile = 3080,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -249,6 +254,11 @@ public:
     static Status SegmentNotExist(const SegmentID &segment_id);
     static Status BlockNotExist(const BlockID &block_id);
     static Status AggregateFunctionWithEmptyArgs();
+    static Status InvalidCommand(const String& detailed_error);
+    static Status AnalyzerNotFound(const String& name);
+    static Status NotSupportedAnalyzer(const String& name);
+    static Status InvalidAnalyzerName(const String& name);
+    static Status InvalidAnalyzerFile(const String& detailed_info);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

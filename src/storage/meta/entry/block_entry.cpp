@@ -88,9 +88,12 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
                                                       TxnTimeStamp commit_ts,
                                                       TxnTimeStamp check_point_ts,
                                                       u16 checkpoint_row_count,
-                                                      BufferManager *buffer_mgr) {
+                                                      BufferManager *buffer_mgr,
+                                                      TransactionID txn_id) {
 
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, 0);
+
+    block_entry->txn_id_ = txn_id;
 
     block_entry->row_count_ = row_count;
     block_entry->min_row_ts_ = min_row_ts;
@@ -295,7 +298,6 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
-        txn_id_ = txn_id;
         this->Commit(commit_ts);
         for (auto &column : columns_) {
             column->CommitColumn(txn_id, commit_ts);
@@ -405,6 +407,8 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
     auto commit_ts = block_entry_json["commit_ts"];
     auto checkpoint_ts = block_entry_json["checkpoint_ts"];
 
+    auto txn_id = block_entry_json["txn_id"];
+
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewReplayBlockEntry(segment_entry,
                                                                         block_id,
                                                                         row_count,
@@ -414,10 +418,10 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
                                                                         commit_ts,
                                                                         checkpoint_ts,
                                                                         row_count,
-                                                                        buffer_mgr);
+                                                                        buffer_mgr,
+                                                                        txn_id);
 
     block_entry->begin_ts_ = block_entry_json["begin_ts"];
-    block_entry->txn_id_ = block_entry_json["txn_id"];
 
     for (const auto &block_column_json : block_entry_json["columns"]) {
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));

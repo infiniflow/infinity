@@ -20,7 +20,9 @@ module;
 #include <cstring>
 #include <iostream>
 #include <vector>
+
 module column_inverter;
+
 import stl;
 import analyzer;
 import analyzer_pool;
@@ -45,11 +47,17 @@ static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);
 }
 
-ColumnInverter::ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider, VectorWithLock<u32> &column_lengths)
-    : analyzer_(AnalyzerPool::instance().Get(analyzer)), posting_writer_provider_(posting_writer_provider), column_lengths_(column_lengths) {
-    if (analyzer_.get() == nullptr) {
-        RecoverableError(Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer)));
+ColumnInverter::ColumnInverter(PostingWriterProvider posting_writer_provider, VectorWithLock<u32> &column_lengths)
+    : posting_writer_provider_(posting_writer_provider), column_lengths_(column_lengths) {}
+
+void ColumnInverter::InitAnalyzer(const String &analyzer_name) {
+    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+    if(!status.ok()) {
+        Status status = Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
+    analyzer_ = std::move(analyzer);
 }
 
 ColumnInverter::~ColumnInverter() = default;

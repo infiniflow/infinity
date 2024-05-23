@@ -41,7 +41,6 @@ import index_hnsw;
 import index_full_text;
 import bg_task;
 import background_process;
-import compact_segments_task;
 import default_values;
 import base_table_ref;
 import internal_types;
@@ -59,6 +58,7 @@ import block_column_entry;
 import table_index_entry;
 import base_entry;
 import compilation_config;
+import compaction_process;
 
 using namespace infinity;
 
@@ -178,7 +178,7 @@ TEST_F(WalReplayTest, wal_replay_tables) {
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr =
@@ -186,14 +186,14 @@ TEST_F(WalReplayTest, wal_replay_tables) {
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);
@@ -302,7 +302,7 @@ TEST_F(WalReplayTest, wal_replay_append) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
@@ -310,14 +310,14 @@ TEST_F(WalReplayTest, wal_replay_append) {
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kPrimaryKey);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
@@ -404,7 +404,7 @@ TEST_F(WalReplayTest, wal_replay_append) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
@@ -483,7 +483,7 @@ TEST_F(WalReplayTest, wal_replay_import) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kUnique);
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
@@ -491,14 +491,14 @@ TEST_F(WalReplayTest, wal_replay_import) {
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kPrimaryKey);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
             }
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
@@ -679,12 +679,13 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
         TxnManager *txn_mgr = storage->txn_manager();
+        CompactionProcessor *compaction_processor = storage->compaction_processor();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
                 columns.emplace_back(column_def_ptr);
@@ -738,16 +739,8 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         }
 
         { // add compact
-            auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-            auto [table_entry, status] = txn4->GetTableByName("default_db", "tbl1");
-            EXPECT_NE(table_entry, nullptr);
-
-            {
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-                compact_task->Execute();
-            }
-            txn_mgr->CommitTxn(txn4);
+            auto commit_ts = compaction_processor->ManualDoCompact("default_db", "tbl1", false);
+            EXPECT_NE(commit_ts, 0u);
         }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
@@ -810,7 +803,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
         {
             Vector<SharedPtr<ColumnDef>> columns;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 i64 column_id = 0;
                 auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
@@ -846,7 +839,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
                 auto result = txn->CreateIndexDef(table_entry, index_base_ivf, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
@@ -914,7 +907,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
         {
             Vector<SharedPtr<ColumnDef>> columns;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 constraints.insert(ConstraintType::kNotNull);
                 i64 column_id = 0;
                 auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
@@ -953,7 +946,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
                 auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);

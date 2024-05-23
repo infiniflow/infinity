@@ -6,6 +6,7 @@
   "data_path": "datasets/enwiki/enwiki.csv",
   "insert_batch_size": 8192,
   "query_path": "datasets/enwiki/operations.txt",
+  "result_path": "datasets/enwiki/elasticsearch_result.jsonl",
   "mode": "fulltext",
   "topK": 10,
   "index": {

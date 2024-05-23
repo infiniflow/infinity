@@ -62,9 +62,13 @@ struct AnnIVFFlatIndexData {
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                RecoverableError(Status::NotSupport("Metric type not implemented"));
+                Status status = Status::NotSupport("Metric type not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             } else {
-                RecoverableError(Status::NotSupport("Metric type not supported"));
+                Status status = Status::NotSupport("Metric type not supported");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             return;
         }
@@ -101,9 +105,13 @@ struct AnnIVFFlatIndexData {
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                RecoverableError(Status::NotSupport("Metric type not implemented"));
+                Status status = Status::NotSupport("Metric type not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             } else {
-                RecoverableError(Status::NotSupport("Metric type not supported"));
+                Status status = Status::NotSupport("Metric type not supported");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             return;
         }

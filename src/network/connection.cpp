@@ -250,6 +250,8 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 object_width = 16;
                 break;
             }
+            case LogicalType::kTensor:
+            case LogicalType::kTensorArray:
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
                     UnrecoverableError("Not embedding type");

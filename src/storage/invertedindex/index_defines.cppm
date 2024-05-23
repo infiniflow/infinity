@@ -35,9 +35,9 @@ export {
     constexpr optionflag_t NO_BLOCK_MAX = of_term_payload | of_doc_payload | of_position_list | of_term_frequency;
     constexpr optionflag_t NO_TERM_FREQUENCY = of_term_payload | of_doc_payload;
     constexpr optionflag_t OPTION_FLAG_NONE = of_none;
-    constexpr docid_t INVALID_DOCID = -1;
+    constexpr docid_t INVALID_DOCID = u32(-1);
     constexpr RowID INVALID_ROWID = u64(-1);
-    constexpr pos_t INVALID_POSITION = std::numeric_limits<u32>::max();
+    constexpr pos_t INVALID_POSITION = u32(-1);
     constexpr u32 MAX_DOC_PER_RECORD = 128;
     constexpr u32 MAX_DOC_PER_RECORD_BIT_NUM = 7;
     constexpr u32 MAX_DOC_PER_BITMAP_BLOCK = 256;
@@ -57,8 +57,8 @@ export {
 
     using ScoredId = Pair<float, u32>;
     using ScoredIds = Vector<ScoredId>;
-    constexpr String DEFAULT_SCORER = "bm25";
-    constexpr String DEFAULT_SCORER_ARG = "";
+    constexpr std::string_view DEFAULT_SCORER = "bm25";
+    constexpr std::string_view DEFAULT_SCORER_ARG = "";
     constexpr SizeT DEFAULT_TOPN = 100;
 }
 

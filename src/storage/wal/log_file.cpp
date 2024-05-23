@@ -71,7 +71,7 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
         if (full_info.max_commit_ts_ < max_commit_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(full_info.path_);
-            LOG_INFO(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
+            LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
         } else if (full_info.max_commit_ts_ == max_commit_ts) {
             found = true;
         }
@@ -83,7 +83,7 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
         if (delta_info.max_commit_ts_ <= max_commit_ts) {
             LocalFileSystem fs;
             fs.DeleteFile(delta_info.path_);
-            LOG_INFO(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
+            LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
         }
     }
 }

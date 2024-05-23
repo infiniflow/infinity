@@ -35,6 +35,7 @@ import data_file_worker;
 import catalog_delta_entry;
 import internal_types;
 import data_type;
+import logical_type;
 
 namespace infinity {
 
@@ -83,9 +84,11 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry,
                                                                         ColumnID column_id,
                                                                         BufferManager *buffer_manager,
-                                                                        i32 next_outline_idx,
-                                                                        u64 last_chunk_offset,
-                                                                        TxnTimeStamp commit_ts) {
+                                                                        const u32 next_outline_idx_0,
+                                                                        const u32 next_outline_idx_1,
+                                                                        const u64 last_chunk_offset_0,
+                                                                        const u64 last_chunk_offset_1,
+                                                                        const TxnTimeStamp commit_ts) {
     UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
     column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
     column_entry->column_type_ = block_entry->GetColumnType(column_id);
@@ -98,13 +101,36 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
 
-    for (i32 outline_idx = 0; outline_idx < next_outline_idx; ++outline_idx) {
+    column_entry->outline_buffers_group_0_.reserve(next_outline_idx_0);
+    for (u32 outline_idx = 0; outline_idx < next_outline_idx_0; ++outline_idx) {
         // FIXME: not use default value
-        auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(outline_idx), DEFAULT_FIXLEN_CHUNK_SIZE);
-        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(file_worker));
-        column_entry->outline_buffers_.emplace_back(buffer_obj);
+        SizeT buffer_size = 0;
+        if (column_type->type() == LogicalType::kTensor) {
+            buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
+        } else {
+            buffer_size = DEFAULT_FIXLEN_CHUNK_SIZE;
+        }
+        auto outline_buffer_file_worker =
+            MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, outline_idx), buffer_size);
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
+        column_entry->outline_buffers_group_0_.push_back(buffer_obj);
     }
-    column_entry->last_chunk_offset_ = last_chunk_offset;
+    column_entry->outline_buffers_group_1_.reserve(next_outline_idx_1);
+    for (u32 outline_idx = 0; outline_idx < next_outline_idx_1; ++outline_idx) {
+        // FIXME: not use default value
+        SizeT buffer_size = 0;
+        if (column_type->type() == LogicalType::kTensorArray) {
+            buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
+        } else {
+            UnrecoverableError("unexpected data type");
+        }
+        auto outline_buffer_file_worker =
+            MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(1, outline_idx), buffer_size);
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
+        column_entry->outline_buffers_group_1_.push_back(buffer_obj);
+    }
+    column_entry->last_chunk_offset_0_ = last_chunk_offset_0;
+    column_entry->last_chunk_offset_1_ = last_chunk_offset_1;
 
     return column_entry;
 }
@@ -119,6 +145,73 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     ColumnVector column_vector(column_type_);
     column_vector.Initialize(buffer_mgr, this, block_entry_->row_count());
     return column_vector;
+}
+
+SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, const SizeT file_idx) const {
+    if (buffer_group_id == 0) {
+        return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx));
+    } else if (buffer_group_id == 1) {
+        return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
+    } else {
+        UnrecoverableError("Invalid buffer group id");
+        return nullptr;
+    }
+}
+
+void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj *buffer) {
+    std::unique_lock lock(mutex_);
+    if (buffer_group_id == 0) {
+        outline_buffers_group_0_.push_back(buffer);
+    } else if (buffer_group_id == 1) {
+        outline_buffers_group_1_.push_back(buffer);
+    } else {
+        UnrecoverableError("Invalid buffer group id");
+    }
+}
+
+BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const SizeT idx) const {
+    std::shared_lock lock(mutex_);
+    if (buffer_group_id == 0) {
+        return outline_buffers_group_0_[idx];
+    } else if (buffer_group_id == 1) {
+        return outline_buffers_group_1_[idx];
+    } else {
+        UnrecoverableError("Invalid buffer group id");
+        return nullptr;
+    }
+}
+
+SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
+    std::shared_lock lock(mutex_);
+    if (buffer_group_id == 0) {
+        return outline_buffers_group_0_.size();
+    } else if (buffer_group_id == 1) {
+        return outline_buffers_group_1_.size();
+    } else {
+        UnrecoverableError("Invalid buffer group id");
+        return 0;
+    }
+}
+
+u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
+    if (buffer_group_id == 0) {
+        return last_chunk_offset_0_;
+    } else if (buffer_group_id == 1) {
+        return last_chunk_offset_1_;
+    } else {
+        UnrecoverableError("Invalid buffer group id");
+        return 0;
+    }
+}
+
+void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offset) {
+    if (buffer_group_id == 0) {
+        last_chunk_offset_0_ = offset;
+    } else if (buffer_group_id == 1) {
+        last_chunk_offset_1_ = offset;
+    } else {
+        UnrecoverableError("Invalid buffer group id");
+    }
 }
 
 void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
@@ -164,14 +257,21 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
 
             break;
         }
+        case kTensor:
+        case kTensorArray:
         case kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
-            LOG_TRACE(fmt::format("Saving varchar {}", block_column_entry->column_id()));
+            LOG_TRACE(fmt::format("Saving column {}", block_column_entry->column_id()));
             block_column_entry->buffer_->Save();
-            LOG_TRACE(fmt::format("Saved varchar {}", block_column_entry->column_id()));
+            LOG_TRACE(fmt::format("Saved column {}", block_column_entry->column_id()));
 
             std::shared_lock lock(block_column_entry->mutex_);
-            for (auto *outline_buffer : block_column_entry->outline_buffers_) {
+            for (auto *outline_buffer : block_column_entry->outline_buffers_group_0_) {
+                if (outline_buffer != nullptr) {
+                    outline_buffer->Save();
+                }
+            }
+            for (auto *outline_buffer : block_column_entry->outline_buffers_group_1_) {
                 if (outline_buffer != nullptr) {
                     outline_buffer->Save();
                 }
@@ -200,7 +300,12 @@ void BlockColumnEntry::Cleanup() {
     if (buffer_ != nullptr) {
         buffer_->PickForCleanup();
     }
-    for (auto *outline_buffer : outline_buffers_) {
+    for (auto *outline_buffer : outline_buffers_group_0_) {
+        if (outline_buffer) {
+            outline_buffer->PickForCleanup();
+        }
+    }
+    for (auto *outline_buffer : outline_buffers_group_1_) {
         if (outline_buffer) {
             outline_buffer->PickForCleanup();
         }
@@ -212,8 +317,10 @@ nlohmann::json BlockColumnEntry::Serialize() {
     json_res["column_id"] = this->column_id_;
     {
         std::shared_lock lock(mutex_);
-        json_res["next_outline_idx"] = outline_buffers_.size();
-        json_res["last_chunk_offset"] = this->LastChunkOff();
+        json_res["next_outline_idx"] = outline_buffers_group_0_.size();
+        json_res["last_chunk_offset"] = this->LastChunkOff(0);
+        json_res["next_outline_idx_1"] = outline_buffers_group_1_.size();
+        json_res["last_chunk_offset_1"] = this->LastChunkOff(1);
     }
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
@@ -224,13 +331,26 @@ nlohmann::json BlockColumnEntry::Serialize() {
 
 UniquePtr<BlockColumnEntry>
 BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
-    ColumnID column_id = column_data_json["column_id"];
-    i32 next_outline_idx = column_data_json["next_outline_idx"];
-    TxnTimeStamp commit_ts = column_data_json["commit_ts"];
-    u64 last_chunk_offset = column_data_json["last_chunk_offset"];
-    UniquePtr<BlockColumnEntry> block_column_entry =
-        NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts);
-
+    const ColumnID column_id = column_data_json["column_id"];
+    const TxnTimeStamp commit_ts = column_data_json["commit_ts"];
+    const u32 next_outline_idx_0 = column_data_json["next_outline_idx"];
+    const u64 last_chunk_offset_0 = column_data_json["last_chunk_offset"];
+    u32 next_outline_idx_1 = 0;
+    u64 last_chunk_offset_1 = 0;
+    if (auto it = column_data_json.find("next_outline_idx_1"); it != column_data_json.end()) {
+        next_outline_idx_1 = *it;
+    }
+    if (auto it = column_data_json.find("last_chunk_offset_1"); it != column_data_json.end()) {
+        last_chunk_offset_1 = *it;
+    }
+    UniquePtr<BlockColumnEntry> block_column_entry = NewReplayBlockColumnEntry(block_entry,
+                                                                               column_id,
+                                                                               buffer_mgr,
+                                                                               next_outline_idx_0,
+                                                                               next_outline_idx_1,
+                                                                               last_chunk_offset_0,
+                                                                               last_chunk_offset_1,
+                                                                               commit_ts);
     block_column_entry->begin_ts_ = column_data_json["begin_ts"];
     block_column_entry->txn_id_ = column_data_json["txn_id"];
 
@@ -245,6 +365,7 @@ void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts
     this->Commit(commit_ts);
 }
 
+/*
 Vector<String> BlockColumnEntry::OutlinePaths() const {
     Vector<String> outline_paths;
     SizeT outline_file_count = 0;
@@ -259,5 +380,6 @@ Vector<String> BlockColumnEntry::OutlinePaths() const {
     }
     return outline_paths;
 }
+*/
 
 } // namespace infinity

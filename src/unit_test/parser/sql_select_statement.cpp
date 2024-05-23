@@ -1309,7 +1309,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     {
         // bad dimension type double not match hamming
-        String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0;";
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1317,7 +1317,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     {
         // bit which length should be aligned with 8
-        String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0;";
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1325,7 +1325,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     {
         // bit only support hamming
-        String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;";
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
         std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
@@ -1341,7 +1341,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     {
         // bad dimension type double not match hamming
-        String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0 ORDER BY c2;";
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0 ORDER BY c2;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1349,7 +1349,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     {
         // bit which length should be aligned with 8
-        String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;";
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;";
         parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1357,7 +1357,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
 
     {
         // bit only support hamming
-        String input_sql = "SELECT b FROM t1 SEARCH MATCH('author^2,name^5', 'frank dune') LIMIT 5;";
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH TEXT ('author^2,name^5', 'frank dune') LIMIT 5;";
         parser->Parse(input_sql, result.get());
         std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
@@ -1376,16 +1376,16 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     SELECT *
     FROM t1
     SEARCH
-        MATCH('author^2,name^5', 'frank dune'),
-        MATCH('name', 'to the star', 'operator=OR;fuzziness=AUTO:1,5;minimum_should_match=1'),
+        MATCH TEXT ('author^2,name^5', 'frank dune'),
+        MATCH TEXT ('name', 'to the star', 'operator=OR;fuzziness=AUTO:1,5;minimum_should_match=1'),
         QUERY('name:dune'),
         QUERY('_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~)', 'default_operator=and;default_field=name'),
-        KNN(c1, [1, 2], 'integer', 'l2', 3),
-        KNN(c1, [3, 10, 1111], 'bigint', 'cosine', 3),
-        KNN(c1, [1.0, 2.0], 'double', 'cosine', 3),
-        KNN(c1, [1.00, 2.00], 'double', 'ip', 3),
-        KNN(c1, [1,0,1,0,1,1,0,0], 'bit', 'hamming', 3),
-        KNN(c1, [1.00, 2.00], 'float', 'ip', 3),
+        MATCH VECTOR (c1, [1, 2], 'integer', 'l2', 3),
+        MATCH VECTOR (c1, [3, 10, 1111], 'bigint', 'cosine', 3),
+        MATCH VECTOR (c1, [1.0, 2.0], 'double', 'cosine', 3),
+        MATCH VECTOR (c1, [1.00, 2.00], 'double', 'ip', 3),
+        MATCH VECTOR (c1, [1,0,1,0,1,1,0,0], 'bit', 'hamming', 3),
+        MATCH VECTOR (c1, [1.00, 2.00], 'float', 'ip', 3),
         FUSION('rrf', 'rank_constant=60')
     WHERE a > 0
     )##";
@@ -1482,17 +1482,17 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     long embedding_size = knn_expr4->dimension_ / 8;
     Vector<i64> vec4 = {1, 0, 1, 0, 1, 1, 0, 0};
     for (long i = 0; i < embedding_size; ++i) {
-        char embedding_unit = 0;
+        uint8_t embedding_unit = 0;
         for (long bit_idx = 0; bit_idx < 8; ++bit_idx) {
             if (vec4[i * 8 + bit_idx] == 1) {
-                char temp = embedding_unit << 1;
-                temp &= 1;
-                embedding_unit = temp;
+                embedding_unit |= (uint8_t(1) << bit_idx);
             } else if (vec4[i * 8 + bit_idx] == 0) {
-                embedding_unit <<= 0;
+                // no-op
+            } else {
+                UnrecoverableError("bit value should be 0 or 1");
             }
         }
-        EXPECT_EQ(((char *)knn_expr4->embedding_data_ptr_)[i], embedding_unit);
+        EXPECT_EQ(((char *)knn_expr4->embedding_data_ptr_)[i], static_cast<char>(embedding_unit));
     }
     EXPECT_EQ(knn_expr4->topn_, 3);
 

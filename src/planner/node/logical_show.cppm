@@ -42,8 +42,6 @@ export enum class ShowType {
     kShowBlocks,
     kShowBlock,
     kShowBlockColumn,
-    kShowSessionStatus,
-    kShowGlobalStatus,
     kShowSessionVariable,
     kShowSessionVariables,
     kShowGlobalVariable,

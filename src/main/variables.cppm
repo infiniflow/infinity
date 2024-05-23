@@ -22,34 +22,42 @@ import command_statement;
 namespace infinity {
 
 // Variable has two scopes: global and session
-export enum class SysVariable {
-    kQueryCount,                // global and session
+export enum class GlobalVariable {
+    kQueryCount,                // global
     kSessionCount,              // global
     kBufferPoolUsage,           // global
     kSchedulePolicy,            // global
     kDeltaLogCount,             // global
     kNextTxnID,                 // global
     kBufferedObjectCount,       // global
-    kGCListSizeOfBufferManager, // global
+    kUnusedBufferObjectCount,   // global
     kActiveTxnCount,            // global
     kCurrentTs,                 // global
-    kTotalCommitCount,          // global and session
-    kConnectedTime,             // session
-    kCatalogVersion,            // global
+    kTotalCommitCount,          // global
+    kTotalRollbackCount,        // global
     kActiveWALFilename,         // global
-    kEnableProfile,             // session
-    kProfileRecordCapacity,     // session
+    kProfileRecordCapacity,     // global
 
     kInvalid,
 };
 
+export enum class SessionVariable {
+    kQueryCount,                // session
+    kTotalCommitCount,          // session
+    kTotalRollbackCount,        // session
+    kConnectedTime,             // session
+    kEnableProfile,             // session
 
+    kInvalid,
+};
 
-export struct SystemVariables {
-    static HashMap<String, SysVariable> name_map_;
+export struct VarUtil {
+    static HashMap<String, GlobalVariable> global_name_map_;
+    static HashMap<String, SessionVariable> session_name_map_;
 
     static void InitVariablesMap();
-    static SysVariable GetSysVarEnumByName(const String &variable_name);
+    static GlobalVariable GetGlobalVarByName(const String &variable_name);
+    static SessionVariable GetSessionVarByName(const String &variable_name);
 };
 
 }

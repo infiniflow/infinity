@@ -78,7 +78,7 @@ public:
         : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry), running_task_n_(0) {
     }
 
-    virtual Optional<CompactionInfo> CheckCompaction(std::function<Txn *()> generate_txn) override;
+    virtual Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id) override;
 
     virtual void AddSegment(SegmentEntry *new_segment) override;
 

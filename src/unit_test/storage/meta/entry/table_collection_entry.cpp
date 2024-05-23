@@ -76,7 +76,7 @@ TEST_F(TableEntryTest, test1) {
         Vector<SharedPtr<ColumnDef>> columns;
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr =
@@ -84,7 +84,7 @@ TEST_F(TableEntryTest, test1) {
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
@@ -129,7 +129,7 @@ TEST_F(TableEntryTest, test2) {
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr =
@@ -137,14 +137,14 @@ TEST_F(TableEntryTest, test2) {
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);

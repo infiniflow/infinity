@@ -82,7 +82,7 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.LogDir(), "/var/infinity/log");
     EXPECT_EQ(config.LogFilePath(), "/var/infinity/log/info.log");
     EXPECT_EQ(config.LogToStdout(), true);
-    EXPECT_EQ(config.LogFileMaxSize(), 64 * 1024l * 1024l);
+    EXPECT_EQ(config.LogFileMaxSize(), 2 * 1024l * 1024l * 1024l);
     EXPECT_EQ(config.LogFileRotateCount(), 3l);
     EXPECT_EQ(config.GetLogLevel(), LogLevel::kTrace);
 

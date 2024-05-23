@@ -44,7 +44,7 @@ import column_def;
 import data_type;
 import default_values;
 import DBT_compaction_alg;
-import compact_segments_task;
+import compact_statement;
 import local_file_system;
 import build_fast_rough_filter_task;
 import block_entry;
@@ -208,7 +208,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
 
 /// replay
 void TableEntry::UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry) {
-    txn_id_.store(table_entry->txn_id_);
+    txn_id_ = table_entry->txn_id_;
     begin_ts_ = table_entry->begin_ts_;
     commit_ts_.store(table_entry->commit_ts_);
     row_count_ = table_entry->row_count();
@@ -327,11 +327,19 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         if (!status.ok())
             continue;
         const IndexBase *index_base = table_index_entry->index_base();
-        if (index_base->index_type_ != IndexType::kFullText && index_base->index_type_ != IndexType::kHnsw) {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_WARN(*err_msg);
-            continue;
+        switch (index_base->index_type_) {
+            case IndexType::kFullText:
+            case IndexType::kSecondary:
+            case IndexType::kHnsw: {
+                // support realtime index
+                break;
+            }
+            default: {
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                LOG_WARN(*err_msg);
+                continue;
+            }
         }
         PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
         SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
@@ -445,7 +453,7 @@ Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferMan
 }
 
 Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
-    if (compact_store.task_type_ == CompactSegmentsTaskType::kInvalid) {
+    if (compact_store.type_ == CompactStatementType::kInvalid) {
         return Status::OK();
     }
 
@@ -466,10 +474,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
 
             auto *segment_entry = segment_store.segment_entry_;
 
-            segment_entry->CommitSegment(txn_id, commit_ts);
-            for (auto [block_id, block_entry] : segment_store.block_entries_) {
-                block_entry->CommitBlock(txn_id, commit_ts);
-            }
+            segment_entry->CommitSegment(txn_id, commit_ts, segment_store, nullptr);
 
             for (const auto &old_segment : old_segments) {
                 // old_segment->TrySetDeprecated(commit_ts);
@@ -499,15 +504,15 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         return Status::OK();
     }
 
-    switch (compact_store.task_type_) {
-        case CompactSegmentsTaskType::kCompactPickedSegments: {
+    switch (compact_store.type_) {
+        case CompactStatementType::kAuto: {
             compaction_alg_->CommitCompact(txn_id);
-            LOG_TRACE(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
+            LOG_DEBUG(fmt::format("Compact commit picked, table name: {}", *this->GetTableName()));
             break;
         }
-        case CompactSegmentsTaskType::kCompactTable: {
+        case CompactStatementType::kManual: {
             //  reinitialize compaction_alg_ with new segments and enable it
-            LOG_TRACE(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
+            LOG_DEBUG(fmt::format("Compact commit whole, table name: {}", *this->GetTableName()));
             compaction_alg_->Enable({});
             break;
         }
@@ -548,12 +553,12 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
         }
     }
     if (compaction_alg_.get() != nullptr) {
-        switch (compact_store.task_type_) {
-            case CompactSegmentsTaskType::kCompactPickedSegments: {
+        switch (compact_store.type_) {
+            case CompactStatementType::kAuto: {
                 compaction_alg_->RollbackCompact(txn_id);
                 break;
             }
-            case CompactSegmentsTaskType::kCompactTable: {
+            case CompactStatementType::kManual: {
                 Vector<SegmentEntry *> old_segments;
                 for (const auto &[_, old_segs] : compact_store.compact_data_) {
                     old_segments.insert(old_segments.end(), old_segs.begin(), old_segs.end());
@@ -570,13 +575,13 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
     return Status::OK();
 }
 
-Status TableEntry::CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
+Status TableEntry::CommitWrite(TransactionID txn_id,
+                               TxnTimeStamp commit_ts,
+                               const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                               const DeleteState *delete_state) {
     for (const auto &[segment_id, segment_store] : segment_stores) {
         auto *segment_entry = segment_store.segment_entry_;
-        segment_entry->CommitSegment(txn_id, commit_ts);
-        for (auto [block_id, block_entry] : segment_store.block_entries_) {
-            block_entry->CommitBlock(txn_id, commit_ts);
-        }
+        segment_entry->CommitSegment(txn_id, commit_ts, segment_store, delete_state);
     }
     return Status::OK();
 }
@@ -618,7 +623,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
         const IndexBase *index_base = table_index_entry->index_base();
         switch (index_base->index_type_) {
             case IndexType::kHnsw:
-            case IndexType::kFullText: {
+            case IndexType::kFullText:
+            case IndexType::kSecondary: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
@@ -830,9 +836,11 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 }
                 break;
             }
-            case IndexType::kHnsw: {
+            case IndexType::kHnsw:
+            case IndexType::kSecondary: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
-                for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
+                auto segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
+                for (auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {
                     SegmentEntry *segment_entry = GetSegmentByID(segment_id, begin_ts).get();
                     if (segment_entry != nullptr) {
                         auto *merged_chunk_entry = segment_index_entry->RebuildChunkIndexEntries(txn_table_store, segment_entry);
@@ -872,7 +880,7 @@ SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID seg_id, Txn *txn) c
         return nullptr;
     }
     const auto &segment = iter->second;
-    if (segment->commit_ts_ > txn->BeginTS() && segment->txn_id_ != txn->TxnID()) {
+    if (!segment->CheckVisible(txn)) {
         return nullptr;
     }
     return segment;
@@ -900,17 +908,29 @@ String TableEntry::GetPathNameTail() const {
     return table_entry_dir_->substr(delimiter_i + 1);
 }
 
-SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
+SharedPtr<BlockIndex> TableEntry::GetBlockIndex(Txn *txn) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
-    result->Reserve(this->segment_map_.size());
 
     // Add segment that is not deprecated
     for (const auto &segment_pair : this->segment_map_) {
-        result->Insert(segment_pair.second.get(), begin_ts);
+        result->Insert(segment_pair.second.get(), txn);
     }
 
+    return result;
+}
+
+SharedPtr<IndexIndex> TableEntry::GetIndexIndex(Txn *txn) {
+    SharedPtr<IndexIndex> result = MakeShared<IndexIndex>();
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (!status.ok()) {
+            continue;
+        }
+        result->Insert(table_index_entry, txn);
+    }
     return result;
 }
 
@@ -927,16 +947,6 @@ bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
     return true;
 }
 
-bool TableEntry::CheckVisible(SegmentID segment_id, TxnTimeStamp begin_ts) const {
-    std::shared_lock lock(this->rw_locker_);
-    auto iter = segment_map_.find(segment_id);
-    if (iter == segment_map_.end()) {
-        return false;
-    }
-    const auto &segment = iter->second;
-    return segment->CheckVisible(begin_ts);
-}
-
 nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
@@ -950,7 +960,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["table_entry_type"] = this->table_entry_type_;
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
-        json_res["txn_id"] = this->txn_id_.load();
+        json_res["txn_id"] = this->txn_id_;
         json_res["deleted"] = this->deleted_;
         if (!this->deleted_) {
             json_res["table_entry_dir"] = *this->table_entry_dir_;
@@ -990,6 +1000,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
+        if (segment_entry->commit_ts_ > max_commit_ts) {
+            continue;
+        }
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
         checkpoint_row_count += segment_entry->checkpoint_row_count();
     }
@@ -1024,7 +1037,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
             i64 column_id = column_def_json["column_id"];
             String column_name = column_def_json["column_name"];
 
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             if (column_def_json.contains("constraints")) {
                 for (const auto &column_constraint : column_def_json["constraints"]) {
                     ConstraintType constraint = column_constraint;
@@ -1086,7 +1099,9 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
-        RecoverableError(Status::ColumnNotExist(column_name));
+        Status status = Status::ColumnNotExist(column_name);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return it->second;
 }
@@ -1119,28 +1134,20 @@ void TableEntry::AddDeleteToCompactionAlg(SegmentID segment_id) {
     compaction_alg_->DeleteInSegment(segment_id);
 }
 
-Optional<CompactionInfo> TableEntry::CheckCompaction(std::function<Txn *()> generate_txn) {
+Vector<SegmentEntry *> TableEntry::CheckCompaction(TransactionID txn_id) {
     if (compaction_alg_.get() == nullptr) {
-        return None;
+        return {};
     }
-    return compaction_alg_->CheckCompaction(generate_txn);
+    return compaction_alg_->CheckCompaction(txn_id);
 }
 
-Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
-    if (compaction_alg_.get() != nullptr) {
-        compaction_alg_->Disable(); // wait for current compaction to finish
+bool TableEntry::CompactPrepare() const {
+    if (compaction_alg_.get() == nullptr) {
+        LOG_WARN(fmt::format("Table {} compaction algorithm not set", *this->GetTableName()));
+        return false;
     }
-    Vector<SegmentEntry *> result;
-    std::shared_lock lock(this->rw_locker_);
-    for (const auto &[segment_id, segment] : this->segment_map_) {
-        auto status = segment->status();
-        if (status == SegmentStatus::kSealed) {
-            result.emplace_back(segment.get());
-        } else if (status == SegmentStatus::kCompacting || status == SegmentStatus::kNoDelete) {
-            UnrecoverableError("Segment should not be compacting or no delete when picking manually");
-        }
-    }
-    return result;
+    compaction_alg_->Disable(); // wait for current compaction to finish
+    return true;
 }
 
 void TableEntry::PickCleanup(CleanupScanner *scanner) {
@@ -1186,8 +1193,6 @@ void TableEntry::Cleanup() {
     LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return fulltext_column_index_cache_.GetIndexReader(txn_id, begin_ts, this);
-}
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
 
 } // namespace infinity

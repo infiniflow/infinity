@@ -37,6 +37,7 @@ import search_options;
 import phrase_doc_iterator;
 import global_resource_usage;
 import term_doc_iterator;
+import logger;
 
 using namespace infinity;
 
@@ -97,7 +98,7 @@ void QueryMatchTest::InitData() {
     };
 }
 
-TEST_F(QueryMatchTest, DISABLED_basic_phrase) {
+TEST_F(QueryMatchTest, basic_phrase) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);
@@ -115,7 +116,7 @@ TEST_F(QueryMatchTest, DISABLED_basic_phrase) {
     }
 }
 
-TEST_F(QueryMatchTest, DISABLED_basic_term) {
+TEST_F(QueryMatchTest, basic_term) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);
@@ -138,19 +139,19 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
     {
         String col1_name = "id";
         auto col1_type = MakeShared<DataType>(LogicalType::kVarchar);
-        auto col1_def = MakeShared<ColumnDef>(0, col1_type, std::move(col1_name), std::unordered_set<ConstraintType>());
+        auto col1_def = MakeShared<ColumnDef>(0, col1_type, std::move(col1_name), std::set<ConstraintType>());
         column_defs.push_back(col1_def);
     }
     {
         String col2_name = "title";
         auto col2_type = MakeShared<DataType>(LogicalType::kVarchar);
-        auto col2_def = MakeShared<ColumnDef>(1, col2_type, std::move(col2_name), std::unordered_set<ConstraintType>());
+        auto col2_def = MakeShared<ColumnDef>(1, col2_type, std::move(col2_name), std::set<ConstraintType>());
         column_defs.push_back(col2_def);
     }
     {
         String col3_name = "text";
         auto col3_type = MakeShared<DataType>(LogicalType::kVarchar);
-        auto col3_def = MakeShared<ColumnDef>(2, col3_type, std::move(col3_name), std::unordered_set<ConstraintType>());
+        auto col3_def = MakeShared<ColumnDef>(2, col3_type, std::move(col3_name), std::set<ConstraintType>());
         column_defs.push_back(col3_def);
     }
     auto table_def = TableDef::Make(MakeShared<String>(db_name), MakeShared<String>(table_name), std::move(column_defs));
@@ -206,13 +207,12 @@ void QueryMatchTest::CreateIndex(const String& db_name, const String& table_name
                 columns.emplace_back(idx);
             }
 
-            TxnTimeStamp begin_ts = txn_idx->BeginTS();
-            SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+            SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
             u64 table_idx = 0;
             auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-            auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+            auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
             EXPECT_TRUE(status5.ok());
 
             {
@@ -292,12 +292,9 @@ void QueryMatchTest::QueryMatch(const String& db_name,
     auto [table_index_entry, status_index] = txn->GetIndexByName(db_name, table_name, index_name);
     EXPECT_TRUE(status_index.ok());
 
-    auto txn_id = txn->TxnID();
-    auto begin_ts = txn->BeginTS();
+    auto fake_table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
 
-    auto fake_table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
-
-    QueryBuilder query_builder(txn_id, begin_ts, fake_table_ref);
+    QueryBuilder query_builder(txn, fake_table_ref);
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
 
     auto match_expr = MakeShared<MatchExpr>();
@@ -311,7 +308,9 @@ void QueryMatchTest::QueryMatch(const String& db_name,
 
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr->fields_, match_expr->matching_text_);
     if (!query_tree) {
-        RecoverableError(Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_));
+        Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     FullTextQueryContext full_text_query_context;
     full_text_query_context.query_tree_ = std::move(query_tree);
@@ -322,7 +321,8 @@ void QueryMatchTest::QueryMatch(const String& db_name,
         fmt::print("iter_row_id is INVALID_ROWID\n");
     } else {
         do {
-            query_builder.Score(iter_row_id);
+            auto score = query_builder.Score(iter_row_id);
+            fmt::print("iter_row_id = {}, score = {}\n", iter_row_id.ToUint64(), score);
             iter_row_id = doc_iterator->Next();
         } while (iter_row_id != INVALID_ROWID);
         if (query_type == DocIteratorType::kPhraseIterator) {

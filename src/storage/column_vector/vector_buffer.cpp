@@ -14,6 +14,7 @@
 
 module;
 
+module vector_buffer;
 import stl;
 import fix_heap;
 import buffer_obj;
@@ -21,15 +22,16 @@ import buffer_manager;
 import buffer_handle;
 import infinity_exception;
 import block_column_entry;
-
-module vector_buffer;
+import default_values;
 
 namespace infinity {
 
-SharedPtr<VectorBuffer> VectorBuffer::Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type) {
+SharedPtr<VectorBuffer>
+VectorBuffer::Make(const SizeT data_type_size, const SizeT capacity, const Pair<VectorBufferType, VectorBufferType> buffer_types) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
-    buffer_ptr->buffer_type_ = buffer_type;
-    switch (buffer_type) {
+    buffer_ptr->buffer_type_ = buffer_types.first;
+    buffer_ptr->buffer_type_1_ = buffer_types.second;
+    switch (buffer_types.first) {
         case VectorBufferType::kCompactBit: {
             buffer_ptr->InitializeCompactBit(capacity);
             break;
@@ -44,12 +46,13 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(SizeT data_type_size, SizeT capacity,
 
 SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
                                            BlockColumnEntry *block_column_entry,
-                                           SizeT data_type_size,
-                                           SizeT capacity,
-                                           VectorBufferType buffer_type) {
+                                           const SizeT data_type_size,
+                                           const SizeT capacity,
+                                           const Pair<VectorBufferType, VectorBufferType> buffer_types) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
-    buffer_ptr->buffer_type_ = buffer_type;
-    switch (buffer_type) {
+    buffer_ptr->buffer_type_ = buffer_types.first;
+    buffer_ptr->buffer_type_1_ = buffer_types.second;
+    switch (buffer_types.first) {
         case VectorBufferType::kCompactBit: {
             buffer_ptr->InitializeCompactBit(buffer_mgr, block_column_entry, capacity);
             break;
@@ -84,7 +87,14 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
         ptr_ = MakeUniqueForOverwrite<char[]>(data_size);
     }
     if (buffer_type_ == VectorBufferType::kHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>();
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_CHUNK_SIZE);
+    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
+    }
+    if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
+    } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
+        UnrecoverableError("Unexpected buffer type for fix_heap_mgr_1_.");
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -124,7 +134,14 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
     }
     ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>(buffer_mgr, block_column_entry);
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, buffer_mgr, block_column_entry, DEFAULT_FIXLEN_CHUNK_SIZE);
+    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, buffer_mgr, block_column_entry, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
+    }
+    if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, buffer_mgr, block_column_entry, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
+    } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
+        UnrecoverableError("Unexpected buffer type for fix_heap_mgr_1_.");
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -133,7 +150,14 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
 
 void VectorBuffer::ResetToInit() {
     if (buffer_type_ == VectorBufferType::kHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>();
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_CHUNK_SIZE);
+    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
+    }
+    if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
+        fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
+    } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
+        UnrecoverableError("Unexpected buffer type for fix_heap_mgr_1_.");
     }
 }
 

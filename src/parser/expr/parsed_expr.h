@@ -31,6 +31,7 @@ enum class ParsedExprType {
     kIn,
     kKnn,
     kMatch,
+    kMatchTensor,
     kFusion,
     kSearch
 };

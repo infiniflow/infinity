@@ -27,22 +27,41 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
 template <typename ValueType, typename ResultType>
 struct AvgState {
 public:
-    inline void Initialize() { RecoverableError(Status::NotSupport("Initialize average state.")); }
+    inline void Initialize() {
+        Status status = Status::NotSupport("Initialize average state.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
-    inline void Update(const ValueType *__restrict, SizeT) { RecoverableError(Status::NotSupport("Update average state.")); }
+    inline void Update(const ValueType *__restrict, SizeT) {
+        Status status = Status::NotSupport("Update average state.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { RecoverableError(Status::NotSupport("Constant update average state.")); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
+        Status status = Status::NotSupport("Constant update average state.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
-    inline ptr_t Finalize() { RecoverableError(Status::NotSupport("Finalize average state.")); }
+    inline ptr_t Finalize() {
+        Status status = Status::NotSupport("Finalize average state.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
 
     inline static SizeT Size(const DataType &data_type) {
-        RecoverableError(Status::NotSupport(fmt::format("Average state type size: {}", data_type.ToString())));
+        Status status = Status::NotSupport(fmt::format("Average state type size: {}", data_type.ToString()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 };
 

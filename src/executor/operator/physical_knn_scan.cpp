@@ -159,13 +159,17 @@ bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not implemented"));
+                    Status status = Status::NotSupport("Not implemented KNN distance");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented embedding data type");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     return true;
@@ -200,6 +204,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
                 // Table index entry isn't found
+                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
 
@@ -223,12 +228,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
     // Generate task set: index segment and no index block
     BlockIndex *block_index = base_table_ref_->block_index_.get();
-    for (SegmentEntry *segment_entry : block_index->segments_) {
-        if (auto iter = index_entry_map.find(segment_entry->segment_id()); iter != index_entry_map.end()) {
+    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+        if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
             index_entries_->emplace_back(iter->second.get());
         } else {
-            BlockEntryIter block_entry_iter(segment_entry);
-            for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+            const auto &block_map = segment_info.block_map_;
+            for (const auto *block_entry : block_map) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
                 block_column_entries_->emplace_back(block_column_entry);
             }
@@ -241,9 +246,10 @@ SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_i
 
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
-    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+    Txn *txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
 
-    if (!common_query_filter_->TryFinishBuild(begin_ts, query_context->GetTxn()->buffer_mgr())) {
+    if (!common_query_filter_->TryFinishBuild(txn)) {
         // not ready, abort and wait for next time
         return;
     }
@@ -320,11 +326,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
         auto segment_id = segment_index_entry->segment_id();
         SegmentEntry *segment_entry = nullptr;
-        auto &segment_index_hashmap = base_table_ref_->block_index_->segment_index_;
+        const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
         } else {
-            segment_entry = iter->second;
+            segment_entry = iter->second.segment_entry_;
         }
         if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
             LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after common_query_filter",
@@ -382,7 +388,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 break;
                             }
                             default: {
-                                RecoverableError(Status::NotSupport("Not implemented"));
+                                Status status = Status::NotSupport("Not implemented KNN distance");
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
                             }
                         }
                     };
@@ -484,7 +492,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 if (block_entry == nullptr) {
                                     UnrecoverableError(
                                         fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id));
-                                }
+                                } // this is for debug
                             }
                             merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                         }
@@ -493,7 +501,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetHnswIndexSnapshot();
                     int i = 0;
                     for (auto &chunk_index_entry : chunk_index_entries) {
-                        if (chunk_index_entry->CheckVisible(begin_ts)) {
+                        if (chunk_index_entry->CheckVisible(txn)) {
                             BufferHandle index_handle = chunk_index_entry->GetIndex();
                             hnsw_search(index_handle, false, i++);
                         }
@@ -506,7 +514,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not implemented"));
+                    Status status = Status::NotSupport("Not implemented index type");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
         }

@@ -83,19 +83,19 @@ SharedPtr<Infinity> CreateDbAndTable(const String &db_name, const String &table_
     {
         String col1_name = "id";
         auto col1_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col1_def = new ColumnDef(0, col1_type, std::move(col1_name), std::unordered_set<ConstraintType>());
+        auto col1_def = new ColumnDef(0, col1_type, std::move(col1_name), std::set<ConstraintType>());
         column_defs.push_back(col1_def);
     }
     {
         String col2_name = "title";
         auto col2_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col2_def = new ColumnDef(0, col2_type, std::move(col2_name), std::unordered_set<ConstraintType>());
+        auto col2_def = new ColumnDef(0, col2_type, std::move(col2_name), std::set<ConstraintType>());
         column_defs.push_back(col2_def);
     }
     {
         String col3_name = "text";
         auto col3_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col3_def = new ColumnDef(0, col3_type, std::move(col3_name), std::unordered_set<ConstraintType>());
+        auto col3_def = new ColumnDef(0, col3_type, std::move(col3_name), std::set<ConstraintType>());
         column_defs.push_back(col3_def);
     }
 
@@ -222,8 +222,8 @@ void BenchmarkOptimize(SharedPtr<Infinity> infinity, const String &db_name, cons
 
 void BenchmarkQuery(SharedPtr<Infinity> infinity, const String &db_name, const String &table_name) {
     std::string fields = "text";
-    //std::vector<std::string> query_vec = {"one of", "is", "a", "\"is a\"", "\"one of\""};// {"Animalia", "Algorithms", "Animalia Algorithms", "network space", "harmful chemical anarchism"};
-    std::vector<std::string> query_vec = {"harmful chemical anarchism", "\"harmful chemical\"", "\"one of\"", "harmful chemical"};
+    std::vector<std::string> query_vec = {"harmful \"social custom\"", "social custom \"harmful chemical\"", "\"annual American awards\"", "harmful chemical", "\"one of\""};
+
     for (auto match_text : query_vec) {
         BaseProfiler profiler;
         profiler.Begin();
@@ -314,7 +314,7 @@ int main(int argc, char *argv[]) {
     };
     Mode mode(Mode::kInsert);
     SizeT insert_batch = 500;
-    app.add_option("--mode", mode, "Bencmark mode, one of insert, import, merge, query")
+    app.add_option("--mode", mode, "Benchmark mode, one of insert, import, merge, query")
         ->required()
         ->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
     app.add_option("--insert-batch", insert_batch, "batch size of each insert, valid only at insert and merge mode, default value 500");
@@ -331,7 +331,7 @@ int main(int argc, char *argv[]) {
     String srcfile = test_data_path();
     srcfile += "/benchmark/dbpedia-entity/corpus.jsonl";
 
-// #define DEL_LOCAL_DATA
+//#define DEL_LOCAL_DATA
 #ifdef DEL_LOCAL_DATA
     system("rm -rf /var/infinity/data /var/infinity/wal /var/infinity/log /var/infinity/tmp");
 #endif
@@ -358,7 +358,7 @@ int main(int argc, char *argv[]) {
         case Mode::kQuery: {
             BenchmarkCreateIndex(infinity, db_name, table_name, index_name);
             BenchmarkInsert(infinity, db_name, table_name, srcfile, insert_batch);
-            // BenchmarkOptimize(infinity, db_name, table_name);
+            BenchmarkOptimize(infinity, db_name, table_name);
             sleep(10);
             BenchmarkMoreQuery(infinity, db_name, table_name, 1);
             break;

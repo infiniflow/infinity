@@ -33,12 +33,14 @@ namespace infinity {
 
 export class ColumnInverter {
 public:
-    ColumnInverter(const String &analyzer, PostingWriterProvider posting_writer_provider, VectorWithLock<u32> &column_lengths);
+    ColumnInverter(PostingWriterProvider posting_writer_provider, VectorWithLock<u32> &column_lengths);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
     ~ColumnInverter();
+
+    void InitAnalyzer(const String &analyzer);
 
     SizeT InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
 

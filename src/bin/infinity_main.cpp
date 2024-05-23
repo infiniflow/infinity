@@ -100,6 +100,8 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
     switch (signal_number) {
         case SIGUSR1: {
             fmt::print("Unrecoverable error issued, stop the server");
+            exit(-1);
+            break;
         }
         case SIGINT:
         case SIGQUIT:
@@ -115,7 +117,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGSEGV: {
             // Print back strace
             infinity::PrintStacktrace("SEGMENT FAULTS");
-            exit(0);
+            exit(-1);
             break;
         }
 #ifdef ENABLE_JEMALLOC_PROF

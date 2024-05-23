@@ -15,6 +15,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jma
 )
 
 # ########################################
@@ -36,6 +37,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jma
 )
 
 # query benchmark
@@ -55,6 +57,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jma
 )
 
 # ########################################
@@ -76,6 +79,7 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    jma
 )
 
 

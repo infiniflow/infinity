@@ -65,7 +65,9 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
             ss << function.ToString() << std::endl;
         }
         LOG_ERROR(ss.str());
-        RecoverableError(Status::FunctionNotFound(function_str));
+        Status status = Status::FunctionNotFound(function_str);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     if (candidates_index.size() > 1) {

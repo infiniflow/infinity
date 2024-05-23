@@ -46,7 +46,7 @@ namespace infinity {
 
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
-    static constexpr String kErrorMsgHeader = "[THRIFT ERROR]";
+    static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
 
 public:
     InfinityThriftService() = default;
@@ -185,61 +185,61 @@ private:
 
     void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
-    static void ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ShowIndexResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ListDatabaseResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ListDatabaseResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ListIndexResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ShowSegmentResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ShowBlockResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
-    static void ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const String error_header = kErrorMsgHeader);
-
-    static void
-    ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    static void ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ListDatabaseResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::ListDatabaseResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ListIndexResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::ListIndexResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ShowIndexResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ShowSegmentResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::ShowIndexResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void
-    ProcessQueryResult(infinity_thrift_rpc::ShowBlockResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader);
+    ProcessQueryResult(infinity_thrift_rpc::ShowSegmentResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowBlockResponse &response, const QueryResult &result, const std::string_view error_header = ErrorMsgHeader);
 
     static void ProcessQueryResult(infinity_thrift_rpc::ShowBlockColumnResponse &response,
                                    const QueryResult &result,
-                                   const String error_header = kErrorMsgHeader);
+                                   const std::string_view error_header = ErrorMsgHeader);
 };
 
 } // namespace infinity

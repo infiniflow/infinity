@@ -19,7 +19,7 @@ std::string MatchExpr::ToString() const {
     }
 
     std::ostringstream oss;
-    oss << "MATCH('";
+    oss << "MATCH TEXT ('";
     oss << fields_;
     oss << "', '" << matching_text_ << "'";
     oss << ", '" << options_text_ << "'";

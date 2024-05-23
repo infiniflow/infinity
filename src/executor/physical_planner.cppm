@@ -116,12 +116,19 @@ private:
 
     // Knn
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const;
-
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildMatchTensorScan(const SharedPtr<LogicalNode> &logical_operator) const;
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const;
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const;
 
     // Command
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    // Compact
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompactIndex(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompactFinish(const SharedPtr<LogicalNode> &logical_operator) const;
 
     // Explain
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;

@@ -37,6 +37,7 @@ enum class LiteralType : int32_t {
     kTimestamp,
     kIntegerArray,
     kDoubleArray,
+    kSubArrayArray,
     kInterval,
 };
 
@@ -69,6 +70,7 @@ public:
     char *date_value_{nullptr};
     std::vector<int64_t> long_array_{};
     std::vector<double> double_array_{};
+    std::vector<std::shared_ptr<ConstantExpr>> sub_array_array_{};
 };
 
 } // namespace infinity

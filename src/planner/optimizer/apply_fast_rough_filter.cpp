@@ -23,6 +23,7 @@ import logical_filter;
 import logical_table_scan;
 import logical_index_scan;
 import logical_knn_scan;
+import logical_match_tensor_scan;
 import logical_match;
 import query_context;
 import logical_node_visitor;
@@ -65,6 +66,10 @@ public:
             // also need to apply filter
             auto &match = static_cast<LogicalMatch &>(*op);
             match.common_query_filter_->TryApplyFastRoughFilterOptimizer();
+        } else if (op->operator_type() == LogicalNodeType::kMatchTensorScan) {
+            // also need to apply filter
+            auto &matchtensor = static_cast<LogicalMatchTensorScan &>(*op);
+            matchtensor.common_query_filter_->TryApplyFastRoughFilterOptimizer();
         } else if (op->operator_type() == LogicalNodeType::kIndexScan) {
             UnrecoverableError("ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.");
         }

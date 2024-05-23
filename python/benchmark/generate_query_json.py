@@ -1,74 +1,43 @@
-import json
-import csv
 import random
 import os
+import re
+from collections import Counter
+import logging
 
-def load_terms(file_path):
+def generate_terms_txt(src_fp, dst_fp):
+    word_counts = Counter()
+    i = 0
+    with open(src_fp, 'r', encoding='utf-8', errors='ignore') as file:
+        for line in file:
+            words = re.findall(r'\b[a-zA-Z]+\b', line)                                        # find pure alphabet words
+            words = [x.lower() for x in words]
+            word_counts.update(words)
+            i += 1
+    word_counts = Counter({key: value for key, value in word_counts.items() if value >= 100})  # remove words which are very very rare
+    logging.info(f"read {i} lines {len(word_counts)} words from {src_fp} to generate terms file {dst_fp}")
+    sorted_words = word_counts.most_common()        # in descending order
+    with open(dst_fp, 'w', encoding='utf-8') as file:
+        for word, count in sorted_words:
+            file.write(f'{word} {count}\n')
+
+
+def load_terms(terms_path):
     data = []
-    _, ext = os.path.splitext(file_path)
-    if ext == '.csv':
-        with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
-            reader = csv.reader(file, delimiter='\t')
-            line_count = 0
-            for row in reader:
-                if line_count >= 100:
-                    break
-                if len(row) >= 3:
-                    body = row[2]
-                    terms = body.split()
-                    data.extend(terms)
-                    line_count += 1
-    elif ext == '.txt':
-        with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
-            for line in file:
-                columns = line.split()
-                if columns[0] == "HighTerm:":
-                    continue
-                if "'" in columns[1]:
-                    continue
-                data.append(columns[1])
+    with open(terms_path, 'r', encoding='utf-8', errors='ignore') as file:
+        for line in file:
+            columns = line.split()
+            data.append(columns[0])
     return data
 
-def random_select(data, n):
-    return random.sample(data, n)
 
-def generate_query_txt(terms_path, query_cnt = 1, terms_count = 4, operation_path="datasets/enwiki/operations.txt"):
-    querys = []
-    for i in range(query_cnt):
-        new_value = ""
-        terms = load_terms(terms_path)
-        if terms_count > 0:
-            query_terms = random_select(terms, terms_count)
-        else:
-            terms_count = random.randint(1, -terms_count + 1)
-            query_terms = random_select(terms, terms_count)
-        new_value = " ".join(query_terms)
-        querys.append(new_value)
-    with open(operation_path, 'w') as file:
-        for query in querys:
-            file.write(query + '\n')
-
-
-def generate_query_json(terms_path, terms_count = 10, operation_path="datasets/enwiki/operations.json"):
-    data = [
-        {
-            "name": "term",
-            "body": {
-                "query": {
-                    "match": {
-                        "body": ""
-                    }
-                }
-            }
-        }
-    ]
-
-    new_value = ""
+def generate_query_txt(dataset_path, terms_path, query_path, query_cnt = 100000):
+    if not os.path.exists(terms_path):
+        generate_terms_txt(dataset_path, terms_path)
     terms = load_terms(terms_path)
-    query_terms = random_select(terms, terms_count)
-    new_value = " ".join(query_terms)
-    data[0]["body"]["query"]["match"]["body"] = new_value
-    print(f"generate terms = {new_value}")
-
-    with open(operation_path, "w") as json_file:
-        json.dump(data, json_file, indent=2)
+    probabilities = [0.03, 0.15, 0.25, 0.25, 0.15, 0.08, 0.04, 0.03, 0.02]
+    with open(query_path, 'w') as file:
+        for i in range(query_cnt):
+            terms_count = 1 + random.choices(population=range(len(probabilities)), weights=probabilities, k=1)[0]
+            query_terms = random.sample(terms, terms_count)
+            query = " ".join(query_terms)
+            file.write(query + '\n')

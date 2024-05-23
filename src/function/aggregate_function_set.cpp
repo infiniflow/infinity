@@ -19,7 +19,7 @@ import stl;
 import base_expression;
 import aggregate_function;
 import cast_table;
-
+import logger;
 import status;
 import infinity_exception;
 
@@ -54,23 +54,31 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
     if (candidates_index.empty()) {
         // No matched function
         std::stringstream ss;
-        ss << "Can't find matched function for " << FunctionSet::ToString(name_, {input_argument}) << std::endl;
+        String function_str = FunctionSet::ToString(name_, {input_argument});
+        ss << "Can't find matched function for " << function_str << std::endl;
         ss << "Candidate functions: " << std::endl;
         for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }
-        UnrecoverableError(ss.str());
+        LOG_ERROR(ss.str());
+        Status status = Status::FunctionNotFound(function_str);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     if (candidates_index.size() > 1) {
         // multiple functions matched
         std::stringstream ss;
-        ss << "Multiple matched functions of " << FunctionSet::ToString(name_, {input_argument}) << std::endl;
+        String function_str = FunctionSet::ToString(name_, {input_argument});
+        ss << "Multiple matched functions of " << function_str << std::endl;
         ss << "Matched candidate functions: " << std::endl;
         for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
         }
-        UnrecoverableError(ss.str());
+        LOG_ERROR(ss.str());
+        Status status = Status::FunctionNotFound(function_str);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     return functions_[candidates_index[0]];
@@ -78,7 +86,9 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
 
 i64 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument) {
     if (argument.get() == nullptr) {
-        RecoverableError(Status::AggregateFunctionWithEmptyArgs());
+        Status status = Status::AggregateFunctionWithEmptyArgs();
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     i64 cost = CastTable::instance().GetCastCost(argument->Type().type(), func.argument_type_.type());

@@ -57,6 +57,49 @@ import log_file;
 
 namespace infinity {
 
+void ProfileHistory::Resize(SizeT new_size) {
+    std::unique_lock<std::mutex> lk(lock_);
+    if(new_size == 0) {
+        deque_.clear();
+        return;
+    }
+
+    if(new_size == max_size_) {
+        return;
+    }
+
+    if(new_size < deque_.size()) {
+        SizeT diff = max_size_ - new_size;
+        for(SizeT i = 0; i < diff; ++ i) {
+            deque_.pop_back();
+        }
+    }
+
+    max_size_ = new_size;
+}
+
+QueryProfiler *ProfileHistory::GetElement(SizeT index) {
+    std::unique_lock<std::mutex> lk(lock_);
+    if (index < 0 || index > max_size_) {
+        return nullptr;
+    }
+
+    return deque_[index].get();
+}
+
+Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
+    Vector<SharedPtr<QueryProfiler>> elements;
+    elements.reserve(max_size_);
+
+    std::unique_lock<std::mutex> lk(lock_);
+    for (SizeT i = 0; i < deque_.size(); ++i) {
+        if (deque_[i].get() != nullptr) {
+            elements.push_back(deque_[i]);
+        }
+    }
+    return elements;
+}
+
 // TODO Consider letting it commit as a transaction.
 Catalog::Catalog(SharedPtr<String> data_dir)
     : data_dir_(std::move(data_dir)), catalog_dir_(MakeShared<String>(*data_dir_ + "/" + String(CATALOG_FILE_DIR))), running_(true) {
@@ -65,6 +108,7 @@ Catalog::Catalog(SharedPtr<String> data_dir)
         fs.CreateDirectory(*catalog_dir_);
     }
     mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
+    ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
 }
 
 Catalog::~Catalog() {
@@ -76,8 +120,6 @@ Catalog::~Catalog() {
     }
     mem_index_commit_thread_.join();
 }
-
-void Catalog::SetTxnMgr(TxnManager *txn_mgr) { txn_mgr_ = txn_mgr; }
 
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
@@ -208,7 +250,9 @@ Tuple<SharedPtr<TableEntry>, Status> Catalog::DropTableByName(const String &db_n
     return db_entry->DropTable(table_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Status Catalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Status Catalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, Txn *txn) {
+    TransactionID txn_id = txn->TxnID();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     // Check the db entries
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
@@ -216,7 +260,7 @@ Status Catalog::GetTables(const String &db_name, Vector<TableDetail> &output_tab
         LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
         return status;
     }
-    return db_entry->GetTablesDetail(txn_id, begin_ts, output_table_array);
+    return db_entry->GetTablesDetail(txn, output_table_array);
 }
 
 Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -231,8 +275,9 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableInfo>, Status>
-Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, Txn *txn) {
+    TransactionID txn_id = txn->TxnID();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
@@ -240,7 +285,7 @@ Catalog::GetTableInfo(const String &db_name, const String &table_name, Transacti
         return {nullptr, status};
     }
 
-    return db_entry->GetTableInfo(table_name, txn_id, begin_ts);
+    return db_entry->GetTableInfo(table_name, txn);
 }
 
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
@@ -346,8 +391,9 @@ Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, T
 Status Catalog::CommitWrite(TableEntry *table_entry,
                             TransactionID txn_id,
                             TxnTimeStamp commit_ts,
-                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
-    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores);
+                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                            const DeleteState *delete_state) {
+    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores, delete_state);
 }
 
 Status Catalog::RollbackWrite(TableEntry *table_entry, TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores) {
@@ -367,7 +413,9 @@ SharedPtr<FunctionSet> Catalog::GetFunctionSetByName(Catalog *catalog, String fu
     StringToLower(function_name);
 
     if (!catalog->function_sets_.contains(function_name)) {
-        RecoverableError(Status::FunctionNotFound(function_name));
+        Status status = Status::FunctionNotFound(function_name);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return catalog->function_sets_[function_name];
 }
@@ -475,7 +523,9 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
     if (file_size != n_bytes) {
-        RecoverableError(Status::CatalogCorrupted(catalog_path));
+        Status status = Status::CatalogCorrupted(catalog_path);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return catalog_delta_entry;
 }
@@ -659,7 +709,8 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                  commit_ts,
                                                                  check_point_ts,
                                                                  check_point_row_count,
-                                                                 buffer_mgr);
+                                                                 buffer_mgr,
+                                                                 txn_id);
 
                 if (merge_flag == MergeFlag::kNew) {
                     if (!block_filter_binary_data.empty()) {
@@ -684,16 +735,21 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 std::from_chars(decodes[3].begin(), decodes[3].end(), block_id);
                 ColumnID column_id = 0;
                 std::from_chars(decodes[4].begin(), decodes[4].end(), column_id);
-                i32 next_outline_idx = add_column_entry_op->next_outline_idx_;
-                u64 last_chunk_offset = add_column_entry_op->last_chunk_offset_;
-
+                const auto [next_outline_idx_0, last_chunk_offset_0] = add_column_entry_op->outline_infos_[0];
+                const auto [next_outline_idx_1, last_chunk_offset_1] = add_column_entry_op->outline_infos_[1];
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
-                block_entry->AddColumnReplay(
-                    BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts),
-                    column_id);
+                block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry,
+                                                                                         column_id,
+                                                                                         buffer_mgr,
+                                                                                         next_outline_idx_0,
+                                                                                         next_outline_idx_1,
+                                                                                         last_chunk_offset_0,
+                                                                                         last_chunk_offset_1,
+                                                                                         commit_ts),
+                                             column_id);
                 break;
             }
 
@@ -824,7 +880,9 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     String json_str(file_size, 0);
     SizeT n_bytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != n_bytes) {
-        RecoverableError(Status::CatalogCorrupted(catalog_path));
+        Status status = Status::CatalogCorrupted(catalog_path);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
@@ -866,8 +924,9 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     SizeT n_bytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (n_bytes != catalog_str.size()) {
-        LOG_ERROR(fmt::format("Saving catalog file failed: {}", catalog_tmp_path));
-        RecoverableError(Status::CatalogCorrupted(catalog_tmp_path));
+        Status status = Status::DataCorrupted(catalog_tmp_path);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();
@@ -877,7 +936,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
 
-    LOG_INFO(fmt::format("Saved catalog to: {}", full_catalog_path));
+    LOG_DEBUG(fmt::format("Saved catalog to: {}", full_catalog_path));
 }
 
 // called by bg_task
@@ -887,13 +946,11 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
 
-    DeferFn defer_fn([&]() { txn_mgr_->RemoveWaitFlushTxns(flush_delta_entry->txn_ids()); });
-
     if (flush_delta_entry->operations().empty()) {
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
         return true;
     }
-    LOG_TRACE(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
+    LOG_DEBUG(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
 
     for (auto &op : flush_delta_entry->operations()) {
         switch (op->GetType()) {
@@ -940,7 +997,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     //     }
     //     LOG_INFO(ss.str());
     // }
-    LOG_TRACE(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     return false;
 }

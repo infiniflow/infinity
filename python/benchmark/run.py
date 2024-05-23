@@ -1,74 +1,163 @@
 import argparse
 import os
 import logging
+import sys
+import time
+import multiprocessing
 
 from clients.elasticsearch_client import ElasticsearchClient
 from clients.infinity_client import InfinityClient
 from clients.qdrant_client import QdrantClient
 from generate_query_json import generate_query_txt
 
-ENGINES = ['infinity', 'qdrant', 'elasticsearch']
-DATA_SETS = ['gist', 'sift', 'geonames', 'enwiki']
+ENGINES = ["infinity", "qdrant", "elasticsearch"]
+DATA_SETS = ["gist", "sift", "geonames", "enwiki"]
+
+WARM_UP_SECONDS = 60
+REPORT_QPS_INTERVAL = 60
+
 
 def parse_args() -> argparse.Namespace:
-    parser: argparse.ArgumentParser = argparse.ArgumentParser(description="Vector Database Benchmark")
-    parser.add_argument('-e', '--engine', type=str, default='all', dest='engine')
-    parser.add_argument('-m', '--mode', type=str, default='all', dest='mode')
-    parser.add_argument('-t', '--threads', type=int, default=1, dest='threads')
-    parser.add_argument('-r', '--rounds', type=int, default=5, dest='rounds')
-    parser.add_argument('--hardware', type=str, default='8c_16g', dest='hardware')
-    parser.add_argument('--limit-ram', type=str, default='16g', dest='limit_ram')
-    parser.add_argument('--limit-cpu', type=int, default=8, dest='limit_cpu')
-    parser.add_argument('--generate-query-num', type=int, default=1, dest='query_num')
-    parser.add_argument('--generate-term-num', type=int, default=4, dest='term_num')
-    parser.add_argument('--query', action='store_true', dest='query')
-    parser.add_argument('--import', action='store_true', dest='import_data')
-    parser.add_argument('--generate', action='store_true', dest='generate_terms')
-
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        description="RAG Database Benchmark"
+    )
+    parser.add_argument(
+        "--generate",
+        action="store_true",
+        dest="generate_terms",
+        help="Generate fulltext queries based on the dataset",
+    )
+    parser.add_argument(
+        "--import",
+        action="store_true",
+        dest="import_data",
+        help="Import data set into database engine",
+    )
+    parser.add_argument(
+        "--query",
+        action="store_true",
+        dest="query",
+        help="Run single client to benchmark query latency",
+    )
+    parser.add_argument(
+        "--query-express",
+        type=int,
+        default=0,
+        dest="query_express",
+        help="Run multiple clients in express mode to benchmark QPS",
+    )
+    parser.add_argument(
+        "--engine",
+        type=str,
+        default="all",
+        dest="engine",
+        help="database engine to benchmark, one of: all, " + ", ".join(ENGINES),
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="all",
+        dest="dataset",
+        help="data set to benchmark, one of: all, " + ", ".join(DATA_SETS),
+    )
     return parser.parse_args()
+
 
 def generate_config_paths(kwargs: argparse.Namespace) -> list[tuple[str, str]]:
     paths = []
-    config_path_prefix = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs")
-
-    def add_path(_engine: str, _mode: str):
-        paths.append((os.path.join(config_path_prefix, f"{_engine}_{_mode}.json"), _engine))
-
-    engines = ENGINES if kwargs.engine == 'all' else [kwargs.engine]
-    modes = DATA_SETS if kwargs.mode == 'all' else [kwargs.mode]
-
+    config_path_prefix = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "configs"
+    )
+    engines = ENGINES if kwargs.engine == "all" else [kwargs.engine]
+    datasets = DATA_SETS if kwargs.dataset == "all" else [kwargs.dataset]
     for engine in engines:
-        for mode in modes:
-            add_path(engine, mode)
+        for dataset in datasets:
+            paths.append(
+                (os.path.join(config_path_prefix, f"{engine}_{dataset}.json"), engine)
+            )
     return paths
 
-def get_client(engine: str, config: str, options: argparse.Namespace):
-    if engine == 'qdrant':
-        return QdrantClient(config, options)
-    elif engine == 'elasticsearch':
-        return ElasticsearchClient(config, options)
-    elif engine == 'infinity':
-        return InfinityClient(config, options)
+
+def get_client(engine: str, conf_path: str, options: argparse.Namespace):
+    if engine == "qdrant":
+        return QdrantClient(conf_path, options)
+    elif engine == "elasticsearch":
+        return ElasticsearchClient(conf_path, options)
+    elif engine == "infinity":
+        return InfinityClient(conf_path, options)
     else:
         raise ValueError(f"Unknown engine: {engine}")
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)-8s %(message)s')
+
+def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)-15s %(levelname)-8s (%(process)d) %(message)s",
+    )
     args = parse_args()
     config_paths = generate_config_paths(args)
 
     if args.generate_terms:
         # TODO: Write a fixed path for the fulltext benchmark, expand or delete it for the general benchmark
-        generate_query_txt("datasets/enwiki/enwiki-top-terms.txt",
-                           query_cnt=args.query_num,
-                           terms_count=args.term_num,
-                           operation_path="datasets/enwiki/operations.txt")
+        generate_query_txt(
+            "datasets/enwiki/enwiki.csv",
+            "datasets/enwiki/enwiki-terms.txt",
+            "datasets/enwiki/operations.txt",
+        )
+        sys.exit(0)
 
-    for path, engine in config_paths:
-        if not os.path.exists(path):
+    for conf_path, engine in config_paths:
+        if not os.path.exists(conf_path):
             logging.info("qdrant does not support full text search")
             continue
-        logging.info("Running {} with {}".format(engine, path))
-        client = get_client(engine, path, args)
-        client.run_experiment(args)
-        logging.info("Finished {} with {}".format(engine, path))
+        logging.info("Running {} with {}".format(engine, conf_path))
+        if args.query_express >= 1:
+            shared_counter = multiprocessing.Value("i", 0)
+            exit_event = multiprocessing.Event()
+            workers = []
+            clients = []
+            for i in range(args.query_express):
+                client = get_client(engine, conf_path, args)
+                clients.append(client)
+                worker = multiprocessing.Process(
+                    target=client.search_express_outer,
+                    args=(shared_counter, exit_event),
+                )
+                worker.start()
+                workers.append(worker)
+            try:
+                logging.info(f"Let database warm-up for {WARM_UP_SECONDS} seconds")
+                time.sleep(WARM_UP_SECONDS)
+                logging.info(
+                    "Collecting statistics for 30 minutes. Print statistics so far every minute. Type Ctrl+C to quit."
+                )
+                shared_counter.value = 0
+                start = time.time()
+                start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start))
+                counter_prev = 0
+                for i in range(int(1800 / REPORT_QPS_INTERVAL)):
+                    time.sleep(REPORT_QPS_INTERVAL)
+                    now = time.time()
+                    counter = shared_counter.value
+                    avg_start = counter / (now - start)
+                    avg_interval = (counter - counter_prev) / REPORT_QPS_INTERVAL
+                    counter_prev = counter
+                    logging.info(
+                        f"average QPS since {start_str}: {avg_start}, average QPS of last interval:{avg_interval}"
+                    )
+            except KeyboardInterrupt:
+                logging.info("Interrupted by user! Exiting...")
+            except Exception as e:
+                logging.error(e)
+            finally:
+                exit_event.set()
+                for worker in workers:
+                    worker.join()
+        else:
+            client = get_client(engine, conf_path, args)
+            client.run_experiment(args)
+        logging.info("Finished {} with {}".format(engine, conf_path))
+
+
+if __name__ == "__main__":
+    main()

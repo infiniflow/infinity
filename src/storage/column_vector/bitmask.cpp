@@ -325,4 +325,15 @@ SharedPtr<Bitmask> Bitmask::ReadAdv(char *&ptr, i32) {
     return bitmask;
 }
 
+Bitmask &Bitmask::operator=(Bitmask &&right) {
+    if (this != &right) {
+        data_ptr_ = right.data_ptr_;
+        buffer_ptr = std::move(right.buffer_ptr);
+        count_ = right.count_;
+        right.data_ptr_ = nullptr;
+        right.count_ = 0;
+    }
+    return *this;
+}
+
 } // namespace infinity

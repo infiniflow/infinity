@@ -191,7 +191,7 @@ void LocalFileSystem::DeleteFile(const String &file_name) {
     bool is_deleted = std::filesystem::remove(p, error_code);
     if (error_code.value() == 0) {
         if (!is_deleted) {
-            UnrecoverableError(fmt::format("Can't delete file: {}: {}", file_name, strerror(errno)));
+            LOG_WARN(fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno)));
         }
     } else {
         UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));

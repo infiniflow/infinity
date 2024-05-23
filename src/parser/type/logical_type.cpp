@@ -70,6 +70,10 @@ static const char *type2name[] = {
     "Null",
     "Missing",
 
+    // tensor type
+    "Tensor",
+    "TensorArray",
+
     "Invalid",
 };
 
@@ -122,6 +126,10 @@ std::unordered_map<std::string, LogicalType> name2type = {
     { "heterogeneous" , LogicalType::kMixed }, 
     { "null" , LogicalType::kNull },
     { "missing" , LogicalType::kMissing },
+
+    // tensor
+    { "tensor" , LogicalType::kTensor },
+    { "tensorarray" , LogicalType::kTensorArray },
 
     { "invalid" , LogicalType::kInvalid },
 };
@@ -180,6 +188,11 @@ static int64_t type_size[] = {
     // only used in heterogeneous type
     0, // Null
     0, // Missing
+
+    // tensor type
+    8, // Tensor
+    8, // TensorArray
+
     0, // Invalid
 };
 

@@ -7,7 +7,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 10000
     limit_offset = [[10, 9000], [10, 10], [8, 9995], [9000, 1000]]
     csv_dir = "./test/data/csv"
-    slt_dir = "./test/sql/dql"
+    slt_dir = "./test/sql/dql/sort_top"
     csv_name = "/test_big_top.csv"
     slt_name = "/big_top.slt"
     table_name = "test_big_top"

@@ -14,11 +14,10 @@
 
 module;
 
-#include "type/complex/row_id.h"
 #include <fstream>
-
+#include <sstream>
+#include <vector>
 module catalog_delta_entry;
-
 import crc;
 import serialize;
 import data_block;
@@ -287,8 +286,11 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
       checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
 
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
-    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts), next_outline_idx_(column_entry->OutlineBufferCount()),
-      last_chunk_offset_(column_entry->LastChunkOff()) {}
+    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
+    for (u32 layer = 0; layer < 2; ++layer) {
+        outline_infos_.emplace_back(column_entry->OutlineBufferCount(layer), column_entry->LastChunkOff(layer));
+    }
+}
 
 AddTableIndexEntryOp::AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, table_index_entry, commit_ts), index_dir_(table_index_entry->index_dir()),
@@ -327,7 +329,7 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
         SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, max_bytes);
         String column_name = ReadBufAdv<String>(ptr);
         i32 constraints_size = ReadBufAdv<i32>(ptr);
-        HashSet<ConstraintType> constraints;
+        std::set<ConstraintType> constraints;
         for (i32 j = 0; j < constraints_size; j++) {
             ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
             constraints.insert(ct);
@@ -376,9 +378,12 @@ UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(char *&ptr) {
 UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(char *&ptr) {
     auto add_column_op = MakeUnique<AddColumnEntryOp>();
     add_column_op->ReadAdvBase(ptr);
-
-    add_column_op->next_outline_idx_ = ReadBufAdv<i32>(ptr);
-    add_column_op->last_chunk_offset_ = ReadBufAdv<u64>(ptr);
+    const auto outline_infos_size = ReadBufAdv<u32>(ptr);
+    add_column_op->outline_infos_.resize(outline_infos_size);
+    for (auto &[outline_buffer_count, last_chunk_offset] : add_column_op->outline_infos_) {
+        outline_buffer_count = ReadBufAdv<u32>(ptr);
+        last_chunk_offset = ReadBufAdv<u64>(ptr);
+    }
     return add_column_op;
 }
 
@@ -472,6 +477,10 @@ SizeT AddTableEntryOp::GetSizeInBytes() const {
                 total_size += sizeof(double) * const_expr->double_array_.size();
                 break;
             }
+            case LiteralType::kSubArrayArray: {
+                UnrecoverableError("SubArrayArray not supported");
+                break;
+            }
             case LiteralType::kInterval: {
                 total_size += sizeof(i32);
                 total_size += sizeof(i64);
@@ -508,7 +517,7 @@ SizeT AddBlockEntryOp::GetSizeInBytes() const {
 
 SizeT AddColumnEntryOp::GetSizeInBytes() const {
     auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-    total_size += sizeof(next_outline_idx_) + sizeof(last_chunk_offset_);
+    total_size += sizeof(u32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
     return total_size;
 }
 
@@ -595,8 +604,12 @@ void AddBlockEntryOp::WriteAdv(char *&buf) const {
 void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->type_);
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->next_outline_idx_);
-    WriteBufAdv(buf, this->last_chunk_offset_);
+    const u32 outline_infos_size = outline_infos_.size();
+    WriteBufAdv(buf, outline_infos_size);
+    for (const auto &[outline_buffer_count, last_chunk_offset] : outline_infos_) {
+        WriteBufAdv(buf, outline_buffer_count);
+        WriteBufAdv(buf, last_chunk_offset);
+    }
 }
 
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
@@ -674,10 +687,17 @@ const String AddBlockEntryOp::ToString() const {
 }
 
 const String AddColumnEntryOp::ToString() const {
-    return fmt::format("AddColumnEntryOp {} next_outline_idx: {}, last_chunk_offset: {}",
-                       CatalogDeltaOperation::ToString(),
-                       next_outline_idx_,
-                       last_chunk_offset_);
+    std::ostringstream oss;
+    oss << fmt::format("AddColumnEntryOp {} outline_infos: [", CatalogDeltaOperation::ToString());
+    for (u32 i = 0; i < outline_infos_.size(); ++i) {
+        const auto &[outline_buffer_count, last_chunk_offset] = outline_infos_[i];
+        oss << fmt::format("outline_buffer_group_{} : [outline_buffer_count: {}, last_chunk_offset: {}]", i, outline_buffer_count, last_chunk_offset);
+        if (i != outline_infos_.size() - 1) {
+            oss << ", ";
+        }
+    }
+    oss << "]";
+    return std::move(oss).str();
 }
 
 const String AddTableIndexEntryOp::ToString() const {
@@ -742,8 +762,7 @@ bool AddBlockEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
 
 bool AddColumnEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddColumnEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && next_outline_idx_ == rhs_op->next_outline_idx_ &&
-           last_chunk_offset_ == rhs_op->last_chunk_offset_;
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && outline_infos_ == rhs_op->outline_infos_;
 }
 
 bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
@@ -998,15 +1017,17 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     //     }
     // }
     std::lock_guard<std::mutex> lock(catalog_delta_locker_);
-    if (delta_entry->sequence() != last_sequence_ + 1) {
+    u64 entry_sequence = delta_entry->sequence();
+    if (entry_sequence != last_sequence_ + 1) {
         // Discontinuous
-        u64 entry_sequence = delta_entry->sequence();
+        // LOG_INFO(fmt::format("Add delta entry: {} in to sequence_heap_", entry_sequence));
         sequence_heap_.push(entry_sequence);
         delta_entry_map_.emplace(entry_sequence, std::move(delta_entry));
     } else {
         // Continuous
         do {
             wal_size_ = std::max(wal_size_, wal_size);
+            // LOG_INFO(fmt::format("Add delta entry: {} in to delta_ops_", entry_sequence));
             this->AddDeltaEntryInner(delta_entry.get());
 
             ++last_sequence_;

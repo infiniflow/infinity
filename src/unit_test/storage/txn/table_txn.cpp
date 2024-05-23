@@ -64,7 +64,7 @@ UniquePtr<TableDef> MockTableDesc() {
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kUnique);
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr =
@@ -72,14 +72,14 @@ UniquePtr<TableDef> MockTableDesc() {
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kPrimaryKey);
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "big_int_col", constraints);
             columns.emplace_back(column_def_ptr);
         }
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             constraints.insert(ConstraintType::kNotNull);
             auto column_def_ptr = MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kDouble)), "double_col", constraints);
             columns.emplace_back(column_def_ptr);

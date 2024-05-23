@@ -1,6 +1,6 @@
 [general]
 version = "0.2.0"
-timezone = "utc-8"
+time_zone = "utc-8"
 
 [network]
 [log]
@@ -11,7 +11,7 @@ compact_interval = "0s"
 
 [wal]
 #short checkpoint interval for test
-delta_checkpoint_interval_sec = "1s"
+delta_checkpoint_interval = "1s"
 
 [buffer]
 [resource]

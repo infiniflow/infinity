@@ -34,9 +34,15 @@ import cleanup_scanner;
 namespace infinity {
 
 class TxnTableStore;
+struct TxnSegmentStore;
 struct TableEntry;
-class CompactSegmentsTask;
+class CompactStateData;
 class BlockEntryIter;
+
+export struct BlocksGuard {
+    const Vector<SharedPtr<BlockEntry>> &block_entries_;
+    std::shared_lock<std::shared_mutex> lock_;
+};
 
 export enum class SegmentStatus : u8 {
     kUnsealed,
@@ -93,9 +99,9 @@ public:
 
     bool SetSealed();
 
-    bool TrySetCompacting(CompactSegmentsTask *compact_task);
+    bool TrySetCompacting(CompactStateData *compact_state_data);
 
-    void SetNoDelete();
+    bool SetNoDelete();
 
     void SetDeprecated(TxnTimeStamp deprecate_ts);
 
@@ -109,7 +115,7 @@ public:
 
     bool CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, Txn *txn) const;
 
-    bool CheckVisible(TxnTimeStamp check_ts) const;
+    virtual bool CheckVisible(Txn *txn) const override;
 
     bool CheckDeprecate(TxnTimeStamp check_ts) const;
 
@@ -154,9 +160,7 @@ public:
     }
 
     // only used in Serialize(), FullCheckpoint, and no concurrency
-    SizeT checkpoint_row_count() const {
-        return checkpoint_row_count_;
-    }
+    SizeT checkpoint_row_count() const { return checkpoint_row_count_; }
 
     int Room() const { return this->row_capacity_ - this->row_count(); }
 
@@ -174,6 +178,8 @@ public:
 
     SharedPtr<BlockEntry> GetBlockEntryByID(BlockID block_id) const;
 
+    BlocksGuard GetBlocksGuard() const { return BlocksGuard{block_entries_, std::shared_lock(rw_locker_)}; }
+
 public:
     SizeT row_count(TxnTimeStamp check_ts) const;
 
@@ -183,7 +189,7 @@ public:
 
     void CommitFlushed(TxnTimeStamp commit_ts);
 
-    void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts);
+    void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnSegmentStore &segment_store, const DeleteState *delete_state);
 
     void RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID, BlockEntry *> &block_entries);
 
@@ -228,10 +234,9 @@ private:
     // check if a value must not exist in the segment
     FastRoughFilter fast_rough_filter_;
 
-    CompactSegmentsTask *compact_task_{};
+    CompactStateData *compact_state_data_{};
     SegmentStatus status_;
 
-    std::condition_variable_any no_delete_complete_cv_{};
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 
 public:

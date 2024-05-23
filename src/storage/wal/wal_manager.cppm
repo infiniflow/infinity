@@ -59,6 +59,8 @@ public:
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
 
+    String GetWalFilename() const;
+
     i64 ReplayWalFile();
 
     void ReplayWalEntry(const WalEntry &entry);
@@ -69,6 +71,8 @@ public:
     i64 WalSize() const;
 
     i64 GetLastCkpWalSize();
+
+    TxnTimeStamp GetCheckpointedTS();
 
 private:
     // Checkpoint Helper
@@ -123,7 +127,7 @@ private:
     i64 last_ckp_wal_size_{};
     Atomic<bool> checkpoint_in_progress_{false};
 
-    // Only Checkpoint thread access following members
+    // Only Checkpoint/Cleanup thread access following members
     TxnTimeStamp last_ckp_ts_{};
     TxnTimeStamp last_full_ckp_ts_{};
 };

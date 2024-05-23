@@ -21,6 +21,7 @@ import stl;
 import index_defines;
 import early_terminate_iterator;
 import internal_types;
+import third_party;
 
 namespace infinity {
 
@@ -37,13 +38,64 @@ BlockMaxAndIterator::BlockMaxAndIterator(Vector<UniquePtr<EarlyTerminateIterator
 }
 
 void BlockMaxAndIterator::UpdateScoreThreshold(float threshold) {
-    if (threshold < 0) {
-        return;
-    }
+    EarlyTerminateIterator::UpdateScoreThreshold(threshold);
     const float base_threshold = threshold - BM25ScoreUpperBound();
     for (const auto &it : sorted_iterators_) {
-        it->UpdateScoreThreshold(base_threshold + it->BM25ScoreUpperBound());
+        float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
+        it->UpdateScoreThreshold(new_threshold);
     }
+}
+
+bool BlockMaxAndIterator::NextShallow(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    common_block_last_doc_id_ = INVALID_ROWID;
+    for (const auto &it : sorted_iterators_) {
+        bool ok = it->NextShallow(doc_id);
+        if(!ok){
+            common_block_min_possible_doc_id_ = INVALID_ROWID;
+            common_block_last_doc_id_ = INVALID_ROWID;
+            return false;
+        }
+        if (common_block_last_doc_id_ > it->BlockLastDocID()){
+            common_block_last_doc_id_ = it->BlockLastDocID();
+        }
+    }
+    common_block_min_possible_doc_id_ = doc_id;
+    return true;
+}
+
+bool BlockMaxAndIterator::Next(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    bm25_score_cached_ = false;
+    assert(doc_id_ == INVALID_ROWID || doc_id_ < doc_id);
+    RowID target_doc_id = doc_id;
+    do {
+        for (const auto &it : sorted_iterators_) {
+            bool ok = it->Next(target_doc_id);
+            if(!ok){
+                doc_id_ = INVALID_ROWID;
+                return false;
+            }
+            target_doc_id = it->DocID();
+        }
+        if (target_doc_id == INVALID_ROWID) {
+            doc_id_ = INVALID_ROWID;
+            return false;
+        }
+        if (target_doc_id == sorted_iterators_[0]->DocID()) {
+            float sum_score = 0.0f;
+            for (const auto &it : sorted_iterators_) {
+                sum_score += it->BM25Score();
+            }
+            if (sum_score > threshold_) {
+                doc_id_ = target_doc_id;
+                bm25_score_cache_ = sum_score;
+                bm25_score_cached_ = true;
+                return true;
+            }
+        }
+        target_doc_id++;
+    } while (1);
 }
 
 bool BlockMaxAndIterator::BlockSkipTo(RowID doc_id, float threshold) {
@@ -79,7 +131,7 @@ bool BlockMaxAndIterator::BlockSkipTo(RowID doc_id, float threshold) {
                 sum_score += sorted_iterators_[j - 1]->BlockMaxBM25Score();
                 common_block_max_bm25_score_parts_[j - 1] = prev_sum_score;
             }
-            assert((sum_score <= bm25_score_upper_bound_));
+            // assert((sum_score <= bm25_score_upper_bound_));
             if (sum_score >= threshold) {
                 common_block_max_bm25_score_ = sum_score;
                 common_block_min_possible_doc_id_ = doc_id;

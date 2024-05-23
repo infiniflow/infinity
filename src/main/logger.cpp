@@ -32,12 +32,12 @@ void Logger::Initialize(Config *config_ptr) {
         stdout_sinker = MakeShared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
     }
 
-    SizeT log_max_size = config_ptr->LogFileMaxSize();
+    SizeT log_file_max_size = config_ptr->LogFileMaxSize();
     SizeT log_file_rotate_count = config_ptr->LogFileRotateCount();
 
     if (rotating_file_sinker.get() == nullptr) {
         rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(config_ptr->LogFilePath(),
-                                                                                log_max_size,
+                                                                                log_file_max_size,
                                                                                 log_file_rotate_count); // NOLINT
     }
 

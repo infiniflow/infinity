@@ -14,41 +14,37 @@
 
 module;
 
+#include <vector>
+
 module block_index;
 
 import stl;
 import segment_entry;
 import global_block_id;
-import block_iter;
-import segment_iter;
+import txn;
+import table_index_entry;
+import segment_index_entry;
 
 namespace infinity {
 
-void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, bool check_ts) {
-    if (!check_ts || segment_entry->CheckVisible(timestamp)) {
-        u32 segment_id = segment_entry->segment_id();
-        segments_.emplace_back(segment_entry);
-        segment_index_.emplace(segment_id, segment_entry);
-        BlocksInfo blocks_info;
-
-        auto block_entry_iter = BlockEntryIter(segment_entry);
-        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-            if (timestamp >= block_entry->min_row_ts()) {
-                blocks_info.block_map_.emplace(block_entry->block_id(), block_entry);
-                global_blocks_.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
+void BlockIndex::Insert(SegmentEntry *segment_entry, Txn *txn) {
+    if (segment_entry->CheckVisible(txn)) {
+        SegmentSnapshot segment_info;
+        segment_info.segment_entry_ = segment_entry;
+        {
+            auto block_guard = segment_entry->GetBlocksGuard();
+            for (const auto &block_entry : block_guard.block_entries_) {
+                if (block_entry->CheckVisible(txn)) {
+                    segment_info.block_map_.emplace_back(block_entry.get());
+                }
             }
         }
-        blocks_info.segment_offset_ = segment_entry->row_count(timestamp);
-        // blocks_info.segment_offset_ = segment_entry->row_count(); // use false row count to pass benchmark
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        segment_info.segment_offset_ = segment_entry->row_count(begin_ts);
 
-        segment_block_index_.emplace(segment_id, std::move(blocks_info));
+        SegmentID segment_id = segment_entry->segment_id();
+        segment_block_index_.emplace(segment_id, std::move(segment_info));
     }
-}
-
-void BlockIndex::Reserve(SizeT n) {
-    segments_.reserve(n);
-    segment_index_.reserve(n);
-    segment_block_index_.reserve(n);
 }
 
 SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
@@ -62,14 +58,51 @@ SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
 
 BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
     auto seg_it = segment_block_index_.find(segment_id);
-    if (seg_it != segment_block_index_.end()) {
-        const auto &blocks_info = seg_it->second;
-        auto block_it = blocks_info.block_map_.find(block_id);
-        if (block_it != blocks_info.block_map_.end()) {
-            return block_it->second;
-        }
+    if (seg_it == segment_block_index_.end()) {
+        return nullptr;
     }
-    return nullptr;
+    const auto &blocks_info = seg_it->second;
+    if (blocks_info.block_map_.size() <= block_id) {
+        return nullptr;
+    }
+    return blocks_info.block_map_[block_id];
+}
+
+void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot) {
+    index_snapshots_vec_.push_back(index_snapshot.get());
+    index_snapshots_.emplace(std::move(index_name), index_snapshot);
+}
+
+void IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
+    if (table_index_entry->CheckVisible(txn)) {
+        auto index_snapshot = MakeUnique<IndexSnapshot>();
+        index_snapshot->table_index_entry_ = table_index_entry;
+
+        SegmentIndexesGuard segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
+        for (const auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {
+            if (segment_index_entry->CheckVisible(txn)) {
+                index_snapshot->segment_index_entries_.emplace(segment_id, segment_index_entry.get());
+            }
+        }
+
+        String index_name = *table_index_entry->GetIndexName();
+        Insert(std::move(index_name), std::move(index_snapshot));
+    }
+}
+
+void IndexIndex::Insert(TableIndexEntry *table_index_entry, SegmentIndexEntry *segment_index_entry) {
+    auto index_snapshot_it = index_snapshots_.find(*table_index_entry->GetIndexName());
+    IndexSnapshot *index_snapshot_ptr = nullptr;
+    if (index_snapshot_it == index_snapshots_.end()) {
+        auto index_snapshot = MakeUnique<IndexSnapshot>();
+        index_snapshot_ptr = index_snapshot.get();
+        index_snapshot->table_index_entry_ = table_index_entry;
+        String index_name = *table_index_entry->GetIndexName();
+        Insert(std::move(index_name), std::move(index_snapshot));
+    } else {
+        index_snapshot_ptr = index_snapshot_it->second.get();
+    }
+    index_snapshot_ptr->segment_index_entries_.emplace(segment_index_entry->segment_id(), segment_index_entry);
 }
 
 } // namespace infinity

@@ -34,7 +34,6 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import compact_segments_task;
 import index_base;
 import index_base;
 import third_party;
@@ -50,38 +49,27 @@ import logger;
 import infinity_exception;
 import default_values;
 import block_index;
+import wal_manager;
+import compaction_process;
 
 using namespace infinity;
 
 class CatalogDeltaReplayTest : public BaseTest {
 protected:
-    void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
-        // TxnTimeStamp visible_ts = 0;
-        // auto start = std::chrono::steady_clock::now();
-        // while (true) {
-        //     visible_ts = txn_mgr->GetMinUnflushedTS();
-        //     if (visible_ts <= last_commit_ts) {
-        //         break;
-        //     }
-        //     auto end = std::chrono::steady_clock::now();
-        //     auto duration = std::chrono::duration_cast<Seconds>(end - start);
-        //     if (duration.count() > 10) {
-        //         UnrecoverableException("WaitFlushDeltaOp timeout");
-        //     }
-        //     std::this_thread::sleep_for(Seconds(1));
-        // };
+    void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
+        TxnManager *txn_mgr = storage->txn_manager();
 
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = txn_mgr->GetCleanupScanTS();
             if (visible_ts >= last_commit_ts) {
                 break;
             }
             // wait for at most 10s
             time_t end = time(nullptr);
             if (end - start > 10) {
-                UnrecoverableException("WaitFlushDeltaOp timeout");
+                UnrecoverableError("WaitFlushDeltaOp timeout");
             }
         }
     }
@@ -91,7 +79,7 @@ protected:
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
 
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
-            table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
+            // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
@@ -155,7 +143,7 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
             txn->CreateDatabase(*db_name3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -195,9 +183,9 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name1 = std::make_shared<std::string>("tb1");
     auto table_name2 = std::make_shared<std::string>("tb2");
     auto table_name3 = std::make_shared<std::string>("tb3");
@@ -232,7 +220,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -272,9 +260,9 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 
@@ -331,7 +319,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -359,7 +347,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
                         ASSERT_EQ(block_entry->columns().size(), 2ul);
                         {
                             auto &col2 = block_entry->columns()[1];
-                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                            EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                         }
                     }
                 }
@@ -378,9 +366,9 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -419,7 +407,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
             ASSERT_TRUE(status.ok());
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -446,7 +434,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
                     ASSERT_EQ(block_entry->columns().size(), 2ul);
                     {
                         auto &col2 = block_entry->columns()[1];
-                        EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                        EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                     }
                 }
             }
@@ -463,9 +451,9 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -525,7 +513,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             txn_mgr->CommitTxn(txn);
         }
 
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -537,9 +525,9 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_name_committed = std::make_shared<std::string>("tb_committed");
     auto table_name_uncommitted = std::make_shared<std::string>("tb_uncommitted");
@@ -661,7 +649,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             ASSERT_TRUE(status.ok());
 
             last_commit_ts = txn_mgr->CommitTxn(txn_record3);
-            WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+            WaitFlushDeltaOp(storage, last_commit_ts);
         }
         infinity::InfinityContext::instance().UnInit();
     }
@@ -697,7 +685,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
                         ASSERT_EQ(block_entry->columns().size(), 2ul);
                         {
                             auto &col2 = block_entry->columns()[1];
-                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                            EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                         }
                     }
                 }
@@ -716,13 +704,14 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
 
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_manager = storage->buffer_manager();
+    CompactionProcessor *compaction_processor = storage->compaction_processor();
     TxnManager *txn_mgr = storage->txn_manager();
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
@@ -742,18 +731,8 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
     {
-        // add compact
-        auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-        auto [table_entry, status] = txn4->GetTableByName("default_db", table_name);
-        EXPECT_NE(table_entry, nullptr);
-
-        {
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-            compact_task->Execute();
-        }
-        // rollback
-        txn_mgr->RollBackTxn(txn4);
+        auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, true);
+        EXPECT_EQ(commit_ts, 0u);
     }
 
     {
@@ -788,9 +767,9 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
     auto db_name = std::make_shared<std::string>("default_db");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -889,14 +868,16 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                         columns.emplace_back(idx);
                     }
 
-                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
-                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
+                    for (auto *segment_index_entry : segment_index_entries) {
+                        table_ref->index_index_->Insert(table_idx_entry, segment_index_entry);
+                    }
 
                     // do create index
                     {
@@ -917,6 +898,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                     }
                     last_commit_ts = txn_mgr->CommitTxn(txn_idx);
                 }
+                WaitFlushDeltaOp(storage, last_commit_ts);
             }
             {
                 // Drop index (by Name)
@@ -928,8 +910,8 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                 }
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
+            WaitFlushDeltaOp(storage, last_commit_ts);
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -942,9 +924,9 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
     auto db_name = std::make_shared<std::string>("db1");
 
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -1055,14 +1037,16 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                         columns.emplace_back(idx);
                     }
 
-                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
-                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
+                    for (auto *segment_index_entry : segment_index_entries) {
+                        table_ref->index_index_->Insert(table_idx_entry, segment_index_entry);
+                    }
 
                     // do create index
                     {
@@ -1095,7 +1079,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -1110,7 +1094,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
     auto table_name = std::make_shared<std::string>("db1");
     // auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 
-    HashSet<ConstraintType> constraints;
+    std::set<ConstraintType> constraints;
     auto column_def1 = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "col1", constraints);
     auto table_def = TableDef::Make(db_name, table_name, {column_def1});
 
@@ -1118,6 +1102,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         InfinityContext::instance().Init(config_path);
         Storage *storage = InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
+        CompactionProcessor *compaction_processor = storage->compaction_processor();
 
         TxnManager *txn_mgr = storage->txn_manager();
         TxnTimeStamp last_commit_ts = 0;
@@ -1205,13 +1190,12 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                         columns.emplace_back(idx);
                     }
 
-                    TxnTimeStamp begin_ts = txn_idx->BeginTS();
-                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
+                    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
                     auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
-                    auto status5 = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
+                    auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
 
                     // do create index
@@ -1240,18 +1224,8 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
             this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
             {
-
-                auto txn_cpt = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-                auto [table_entry, status] = txn_cpt->GetTableByName(*db_name, *table_name);
-                EXPECT_NE(table_entry, nullptr);
-
-                {
-                    auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn_cpt);
-                    compact_task->Execute();
-                }
-
-                last_commit_ts = txn_mgr->CommitTxn(txn_cpt);
+                last_commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+                EXPECT_NE(last_commit_ts, 0u);
             }
 
             {
@@ -1265,7 +1239,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
         }
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }

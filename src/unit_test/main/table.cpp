@@ -59,12 +59,12 @@ TEST_F(InfinityTableTest, test1) {
         std::shared_ptr<DataType> col1_type =
             std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
         String col1_name = "col1";
-        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, HashSet<ConstraintType>());
+        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::set<ConstraintType>());
         column_defs.emplace_back(col1_def.release());
 
         std::shared_ptr<DataType> col2_type = std::make_shared<DataType>(LogicalType::kBigInt);
         String col2_name = "col2";
-        auto col2_def = std::make_unique<ColumnDef>(0, col2_type, col2_name, HashSet<ConstraintType>());
+        auto col2_def = std::make_unique<ColumnDef>(0, col2_type, col2_name, std::set<ConstraintType>());
         column_defs.emplace_back(col2_def.release());
 
         std::string db_name = "db1";

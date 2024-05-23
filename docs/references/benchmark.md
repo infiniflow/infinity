@@ -5,50 +5,113 @@ slug: /benchmark
 # Benchmark
 This document compares the following key specifications of Elasticsearch, Qdrant, and Infinity:
 
-- QPS
 - Recall
 - Time to insert & build index
 - Time to import & build index
-- Disk usage
-- Peak memory usage
+- query latency
+- QPS
+
+You need to watch resource (persisted index size, peak memory, peak cpu, system load etc.) manually.
+
+Keep the environment clean to ensure that the database under test is able to use up all resource of the system.
+
+Avoid to run multiple databases at the same time, as each one is a significant resource consumer.
+
+Test environment:
+
+- OS: OpenSUSE Tumbleweed x86_64
+- CPU: Intel CORE i5-13500H 16vCPU
+- RAM: 32GB
+- Disk: 1TB
 
 ## Versions
 |                   | Version |
 | ----------------- |---------|
-| **Elasticsearch** | v8.13.0 |
-| **Qdrant**        | v1.8.2  |
+| **Elasticsearch** | v8.13.4 |
+| **Qdrant**        | v1.9.2  |
 | **Infinity**      | v0.1.0  |
 
 ## Run Benchmark
 
-1. Install necessary dependencies. 
+1. Install necessary dependencies.
 
-```python
-pip install requirements.txt
+```bash
+cd python/benchmark
+pip install -r requirements.txt
 ```
 
 2. Download the required Benchmark datasets to your **/datasets** folder：
    - [SIFT1M](http://ann-benchmarks.com/sift-128-euclidean.hdf5)
    - [GIST1M](http://ann-benchmarks.com/gist-960-euclidean.hdf5)
-   - [Dbpedia](https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/dbpedia-entity.zip)
    - [Enwiki](https://home.apache.org/~mikemccand/enwiki-20120502-lines-1k.txt.lzma)
-3. Start up the databases to compare:
-```bash
-docker compose up -d
-```
-4. Run Benchmark: 
 
-   > Tasks of this Python script include:
-   >
-   > - Delete the original data.
-   > - Re-insert the data
-   > - Calculate the time to insert data and build index
-   > - Calculate QPS.
-   > - Calculate query latencies. 
+Preprocess dataset:
+
 ```bash
-python run.py
+sed '1d' datasets/enwiki/enwiki-20120502-lines-1k.txt > datasets/enwiki/enwiki.csv
 ```
-5. Navigate to the **results** folder to view the results and latency of each query. 
+
+3. Start up the databases to compare:
+
+```bash
+mkdir -p $HOME/elasticsearch
+docker run -d --name elasticsearch --network host -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms16384m -Xmx32000m" -e "xpack.security.enabled=false" -v $HOME/elasticsearch:/usr/share/elasticsearch elasticsearch:8.13.4
+
+mkdir -p $HOME/qdrant
+docker run -d --name qdrant --network host -v $HOME/qdrant:/qdrant qdrant/qdrant:v1.8.2
+
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
+```
+
+4. Run Benchmark:
+
+Drop file cache before benchmark query latency.
+
+```bash
+echo 3 | sudo tee /proc/sys/vm/drop_caches
+```
+
+Tasks of the Python script `run.py` include:
+ - Delete the original data.
+ - Re-insert the data.
+ - Calculate the time to insert data and build index.
+ - Calculate query latency.
+ - Calculate QPS.
+
+```bash
+$ python run.py -h
+usage: run.py [-h] [--generate] [--import] [--query] [--query-express QUERY_EXPRESS] [--engine ENGINE] [--dataset DATASET]
+
+RAG Database Benchmark
+
+options:
+  -h, --help            show this help message and exit
+  --generate            Generate fulltext queries based on the dataset
+  --import              Import data set into database engine
+  --query               Run single client to benchmark query latency
+  --query-express QUERY_EXPRESS
+                        Run multiple clients in express mode to benchmark QPS
+  --engine ENGINE       database engine to benchmark, one of: all, infinity, qdrant, elasticsearch
+  --dataset DATASET     data set to benchmark, one of: all, gist, sift, geonames, enwiki
+```
+
+Following are commands for engine `infinity` and dataset `enwiki`:
+
+```bash
+python run.py --generate --engine infinity --dataset enwiki
+python run.py --import --engine infinity --dataset enwiki
+python run.py --query --engine infinity --dataset enwiki
+python run.py --query-express=16 --engine infinity --dataset enwiki
+```
+
+Following are commands to issue a single query so that you can compare results among several engines.
+
+```base
+curl -X GET "http://localhost:9200/elasticsearch_enwiki/_search" -H 'Content-Type: application/json' -d'{"size":10,"_source":"doctitle","query": {"match": { "body": "wraysbury istorijos" }}}'
+
+psql -h 0.0.0.0 -p 5432 -c "SELECT doctitle, ROW_ID(), SCORE() FROM infinity_enwiki SEARCH MATCH TEXT ('body', 'wraysbury istorijos', 'topn=10;block_max=true');"
+```
 
 ## Benchmark Results
 ### SIFT1M
@@ -77,26 +140,15 @@ python run.py
 
 
 
-### Dbpedia
-
-> -  4160000 documents
-> - 467 queries
-
-|                   | QPS  | Time to insert & build index | Time to import & build index | Disk   | Peak memory |
-| ----------------- | ----------- | ---------------------------- | ---------------------------- | ---- | ------ |
-| **Elasticsearch** | 777  | 291 s                        | N/A                          | 2 GB   | 1.7 GB      |
-| **Infinity**      | 817  | 237 s                        | 123 s                        | 3.4 GB | 0.49 GB     |
-
 ### Enwiki
 
 > - 33000000 documents
-> - 100 queries
+> - 100000 `OR` queries generated based on the dataset. All terms are extracted from the dataset and very rare(occurrence < 100) terms are excluded. The number of terms of each query match the weight `[0.03, 0.15, 0.25, 0.25, 0.15, 0.08, 0.04, 0.03, 0.02]`.
 
-|                   | QPS  | Time to insert & build index | Time to import & build index | Disk  | Peak memory |
-| ----------------- | ----------- | ---------------------------- | ---------------------------- | ---- | ----- |
-| **Elasticsearch** | 484      | 2289 s                       | N/A                          | 28 GB  | 5.3 GB |
-| **Infinity**      | 484      | 2321 s                       | 944 s                        | 54 GB  | 5.1 GB |
-
+|                   | Time to insert & build index | Time to import & build index | P95 Latency(ms)| QPS (16 python clients) |  Memory | vCPU  |
+| ----------------- | ---------------------------- | ---------------------------- | ---------------| ------------------------| --------| ----- |
+| **Elasticsearch** | 2289 s                       | N/A                          | 14.75          | 1340                    | 21.0GB  | 10.6  |
+| **Infinity**      | 2321 s                       | 2890 s                       | 1.86           | 12328                   | 10.0GB  | 11.0  |
 
 ---
 

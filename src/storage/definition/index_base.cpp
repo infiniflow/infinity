@@ -31,6 +31,7 @@ import status;
 import infinity_exception;
 import create_index_info;
 import index_defines;
+import logger;
 
 namespace infinity {
 
@@ -135,7 +136,9 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             UnrecoverableError("Error index method while reading");
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     if (ptr_end < ptr) {
@@ -206,7 +209,9 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             UnrecoverableError("Error index method while deserializing");
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
     return res;

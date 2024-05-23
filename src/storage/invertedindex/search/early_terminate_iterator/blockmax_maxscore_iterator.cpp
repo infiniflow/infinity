@@ -34,13 +34,13 @@ BlockMaxMaxscoreIterator::~BlockMaxMaxscoreIterator() {
         << " not_use_prev_candidate_cnt: " << not_use_prev_candidate_cnt_ << "\n";
     oss << "    pivot_history:\n";
     for (const auto &p : pivot_history_) {
-        oss << "    pivit value: " << p.first << " at doc_id: " << p.second << '\n';
+        oss << "    pivot value: " << p.first << " at doc_id: " << p.second << '\n';
     }
     oss << "    must_have_history:\n";
     for (const auto &p : must_have_history_) {
         oss << "    must_have value: " << p.first << " at doc_id: " << p.second << '\n';
     }
-    LOG_TRACE(std::move(oss).str());
+    LOG_DEBUG(std::move(oss).str());
 }
 
 BlockMaxMaxscoreIterator::BlockMaxMaxscoreIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators) : sorted_iterators_(std::move(iterators)) {
@@ -316,9 +316,7 @@ Pair<bool, RowID> BlockMaxMaxscoreIterator::PeekInBlockRange(RowID doc_id, RowID
 }
 
 void BlockMaxMaxscoreIterator::UpdateScoreThreshold(const float threshold) {
-    if (threshold < 0) {
-        return;
-    }
+    EarlyTerminateIterator::UpdateScoreThreshold(threshold);
     const float base_threshold = threshold - BM25ScoreUpperBound();
     for (const auto &it : sorted_iterators_) {
         it->UpdateScoreThreshold(base_threshold + it->BM25ScoreUpperBound());

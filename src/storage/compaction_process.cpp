@@ -20,7 +20,6 @@ module compaction_process;
 
 import stl;
 import bg_task;
-import compact_segments_task;
 import catalog;
 import txn_manager;
 import db_entry;
@@ -29,6 +28,13 @@ import logger;
 import infinity_exception;
 import third_party;
 import blocking_queue;
+import bg_query_state;
+import query_context;
+import infinity_context;
+import compact_statement;
+import compilation_config;
+import defer_op;
+import bg_query_state;
 
 namespace infinity {
 
@@ -50,12 +56,53 @@ void CompactionProcessor::Stop() {
 
 void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
-Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
-    auto generate_txn = [this]() { return txn_mgr_->BeginTxn(MakeUnique<String>("Compact")); };
-
+void CompactionProcessor::DoCompact() {
     Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
+    bool success = false;
+    DeferFn defer_fn([&] {
+        if (!success) {
+            txn_mgr_->RollBackTxn(scan_txn);
+        }
+    });
 
-    Vector<UniquePtr<CompactSegmentsTask>> compaction_tasks;
+    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> statements = this->ScanForCompact(scan_txn);
+    Vector<Pair<BGQueryContextWrapper, BGQueryState>> wrappers;
+    for (const auto &[statement, txn] : statements) {
+        BGQueryContextWrapper wrapper(txn);
+        BGQueryState state;
+        bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
+        if (res) {
+            wrappers.emplace_back(std::move(wrapper), std::move(state));
+        }
+    }
+    for (auto &[wrapper, query_state] : wrappers) {
+        TxnTimeStamp commit_ts_out = 0;
+        wrapper.query_context_->JoinBGStatement(query_state, commit_ts_out);
+    }
+    txn_mgr_->CommitTxn(scan_txn);
+    success = true;
+}
+
+TxnTimeStamp
+CompactionProcessor::ManualDoCompact(const String &schema_name, const String &table_name, bool rollback, Optional<std::function<void()>> mid_func) {
+    auto statement = MakeUnique<ManualCompactStatement>(schema_name, table_name);
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ManualCompact"));
+    BGQueryContextWrapper wrapper(txn);
+    BGQueryState state;
+    bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
+    if (mid_func) {
+        mid_func.value()();
+    }
+    TxnTimeStamp out_commit_ts = 0;
+    if (res) {
+        wrapper.query_context_->JoinBGStatement(state, out_commit_ts, rollback);
+    }
+    return out_commit_ts;
+}
+
+Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompact(Txn *scan_txn) {
+
+    Vector<Pair<UniquePtr<BaseStatement>, Txn *>> compaction_tasks;
     TransactionID txn_id = scan_txn->TxnID();
     TxnTimeStamp begin_ts = scan_txn->BeginTS();
     Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
@@ -63,19 +110,19 @@ Vector<UniquePtr<CompactSegmentsTask>> CompactionProcessor::ScanForCompact() {
         Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
         for (auto *table_entry : table_entries) {
             while (true) {
-                auto compaction_info = table_entry->CheckCompaction(generate_txn);
-                if (!compaction_info) {
+                Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Compact"));
+                TransactionID txn_id = txn->TxnID();
+                auto compact_segments = table_entry->CheckCompaction(txn_id);
+                if (compact_segments.empty()) {
+                    txn_mgr_->RollBackTxn(txn);
                     break;
                 }
 
-                UniquePtr<CompactSegmentsTask> compact_task =
-                    CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry, std::move(compaction_info->segments_), compaction_info->txn_);
-                compaction_tasks.emplace_back(std::move(compact_task));
+                compaction_tasks.emplace_back(MakeUnique<AutoCompactStatement>(table_entry, std::move(compact_segments)), txn);
             }
         }
     }
 
-    txn_mgr_->CommitTxn(scan_txn);
     return compaction_tasks;
 }
 
@@ -110,22 +157,15 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyCompact: {
-                    Vector<UniquePtr<CompactSegmentsTask>> compact_tasks = this->ScanForCompact();
-                    for (auto &compact_task : compact_tasks) {
-                        LOG_TRACE(fmt::format("Compact {} start.", compact_task->table_name()));
-                        compact_task->Execute();
-                        if (compact_task->TryCommitTxn()) {
-                            LOG_TRACE(fmt::format("Compact {} done.", compact_task->table_name()));
-                        } else {
-                            LOG_TRACE(fmt::format("Compact {} rollback.", compact_task->table_name()));
-                        }
-                    }
+                    LOG_DEBUG("Do compact start.");
+                    DoCompact();
+                    LOG_DEBUG("Do compact end.");
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
-                    LOG_TRACE("Optimize start.");
+                    LOG_DEBUG("Optimize start.");
                     ScanAndOptimize();
-                    LOG_TRACE("Optimize done.");
+                    LOG_DEBUG("Optimize done.");
                     break;
                 }
                 default: {

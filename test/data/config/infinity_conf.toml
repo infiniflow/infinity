@@ -1,6 +1,6 @@
 [general]
 version                 = "0.2.0"
-timezone                = "utc-9"
+time_zone                = "utc-9"
 cpu_limit               = 2
 
 [network]
@@ -14,7 +14,7 @@ connection_pool_size    = 128
 log_filename            = "info.log"
 log_dir                 = "/var/infinity/log"
 log_to_stdout           = true
-log_max_size            = "2GB"
+log_file_max_size            = "2GB"
 log_file_rotate_count   = 3
 
 # trace/info/warning/error/critical 5 log levels, default: info
@@ -22,7 +22,6 @@ log_level               = "trace"
 
 [storage]
 data_dir                = "/var/infinity/data"
-default_row_size        = 4096
 
 [buffer]
 buffer_manager_size        = "3GB"

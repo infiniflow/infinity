@@ -162,7 +162,10 @@ public:
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
-    Status CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores);
+    Status CommitWrite(TransactionID txn_id,
+                       TxnTimeStamp commit_ts,
+                       const HashMap<SegmentID, TxnSegmentStore> &segment_stores,
+                       const DeleteState *delete_state);
 
     Status RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores);
 
@@ -217,7 +220,9 @@ public:
 
     Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
-    SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
+    SharedPtr<BlockIndex> GetBlockIndex(Txn *txn);
+
+    SharedPtr<IndexIndex> GetIndexIndex(Txn *txn);
 
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
@@ -235,15 +240,13 @@ public:
 
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
-    IndexReader GetFullTextIndexReader(TransactionID txn_id, TxnTimeStamp begin_ts);
+    IndexReader GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
         return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
     bool CheckDeleteVisible(DeleteState &delete_state, Txn *txn);
-
-    bool CheckVisible(SegmentID segment_id, TxnTimeStamp check_ts) const;
 
 private:
     TableMeta *const table_meta_{};
@@ -280,9 +283,9 @@ public:
 
     void AddDeleteToCompactionAlg(SegmentID segment_id);
 
-    Optional<CompactionInfo> CheckCompaction(std::function<Txn *()> generate_txn);
+    Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id);
 
-    Vector<SegmentEntry *> PickCompactSegments() const;
+    bool CompactPrepare() const;
 
 private:
     // the compaction algorithm, mutable because all its interface are protected by lock

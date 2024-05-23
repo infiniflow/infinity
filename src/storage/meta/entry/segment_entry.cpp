@@ -39,7 +39,7 @@ import txn_store;
 import segment_iter;
 import catalog_delta_entry;
 import status;
-import compact_segments_task;
+import compact_state_data;
 import cleanup_scanner;
 import background_process;
 import wal_entry;
@@ -151,27 +151,32 @@ void SegmentEntry::UpdateBlockReplay(SharedPtr<BlockEntry> new_block, String blo
     block_entries_[block_id]->UpdateBlockReplay(new_block, std::move(block_filter_binary_data));
 }
 
-bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
+bool SegmentEntry::TrySetCompacting(CompactStateData *compact_state_data) {
     std::unique_lock lock(rw_locker_);
-    if (status_ == SegmentStatus::kUnsealed) {
-        UnrecoverableError("Assert: Compactable segment should be sealed.");
-    }
     if (status_ != SegmentStatus::kSealed) {
         return false;
     }
-    compact_task_ = compact_task;
+    compact_state_data_ = compact_state_data;
     status_ = SegmentStatus::kCompacting;
     return true;
 }
 
-void SegmentEntry::SetNoDelete() {
+bool SegmentEntry::SetNoDelete() {
     std::unique_lock lock(rw_locker_);
-    if (status_ != SegmentStatus::kCompacting) {
+    if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
         UnrecoverableError("Assert: kNoDelete is only allowed to set on compacting segment.");
     }
     status_ = SegmentStatus::kNoDelete;
-    no_delete_complete_cv_.wait(lock, [this] { return delete_txns_.empty(); });
-    compact_task_ = nullptr;
+    if (!delete_txns_.empty()) {
+        std::stringstream ss;
+        for (auto txn_id : delete_txns_) {
+            ss << txn_id << " ";
+        }
+        LOG_WARN(fmt::format("Segment {} cannot set no delete, because has delete txns: {}", segment_id_, ss.str()));
+        return false;
+    }
+    compact_state_data_ = nullptr;
+    return true;
 }
 
 void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
@@ -233,9 +238,10 @@ bool SegmentEntry::CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &blo
     return true;
 }
 
-bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
+bool SegmentEntry::CheckVisible(Txn *txn) const {
+    TxnTimeStamp begin_ts = txn->BeginTS();
     std::shared_lock lock(rw_locker_);
-    return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;
+    return begin_ts < deprecate_ts_ && BaseEntry::CheckVisible(txn);
 }
 
 bool SegmentEntry::CheckDeprecate(TxnTimeStamp check_ts) const {
@@ -366,34 +372,6 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
         }
     }
     this->DecreaseRemainRow(delete_row_n);
-    {
-        std::unique_lock w_lock(rw_locker_);
-        if (this->first_delete_ts_ == UNCOMMIT_TS) {
-            this->first_delete_ts_ = commit_ts;
-        }
-        if (status_ == SegmentStatus::kDeprecated) {
-            UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
-        }
-        if (compact_task_ != nullptr) {
-            if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
-                UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
-            }
-            Vector<SegmentOffset> segment_offsets;
-            for (const auto &[block_id, delete_rows] : block_row_hashmap) {
-                for (BlockOffset block_offset : delete_rows) {
-                    SegmentOffset segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset;
-                    segment_offsets.push_back(segment_offset);
-                }
-            }
-            compact_task_->AddToDelete(segment_id_, std::move(segment_offsets));
-        }
-        {
-            delete_txns_.erase(txn_id);
-            if (delete_txns_.empty()) { // == 0 when replay
-                no_delete_complete_cv_.notify_one();
-            }
-        }
-    }
     return delete_row_n;
 }
 
@@ -403,16 +381,51 @@ void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
     }
 }
 
-void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
+void SegmentEntry::CommitSegment(TransactionID txn_id,
+                                 TxnTimeStamp commit_ts,
+                                 const TxnSegmentStore &segment_store,
+                                 const DeleteState *delete_state) {
     std::unique_lock w_lock(rw_locker_);
+    if (status_ == SegmentStatus::kDeprecated) {
+        UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
+    }
+
+    if (delete_state != nullptr) {
+        auto iter = delete_state->rows_.find(segment_id_);
+        if (iter != delete_state->rows_.end()) {
+            const auto &block_row_hashmap = iter->second;
+            if (this->first_delete_ts_ == UNCOMMIT_TS) {
+                this->first_delete_ts_ = commit_ts;
+            }
+            delete_txns_.erase(txn_id);
+
+            if (compact_state_data_ != nullptr) {
+                if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
+                    UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
+                }
+                Vector<SegmentOffset> segment_offsets;
+                for (const auto &[block_id, block_offsets] : block_row_hashmap) {
+                    for (auto block_offset : block_offsets) {
+                        segment_offsets.push_back(block_id * DEFAULT_BLOCK_CAPACITY + block_offset);
+                    }
+                }
+                compact_state_data_->AddToDelete(segment_id_, segment_offsets);
+                LOG_INFO(fmt::format("Append {} rows to to_delete_list in compact list", segment_offsets.size()));
+            }
+        }
+    }
+
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
         UnrecoverableError(fmt::format("SegmentEntry commit_ts {} is less than max_row_ts {}", commit_ts, max_row_ts_));
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
-        this->txn_id_ = txn_id;
         this->Commit(commit_ts);
+    }
+    // hold the lock here
+    for (const auto &[block_id, block_entry] : segment_store.block_entries_) {
+        block_entry->CommitBlock(txn_id, commit_ts);
     }
 }
 

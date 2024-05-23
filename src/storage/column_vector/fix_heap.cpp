@@ -30,24 +30,30 @@ import data_file_worker;
 
 namespace infinity {
 
-FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size) {
+FixHeapManager::FixHeapManager(const u32 heap_id, const u64 chunk_size) : heap_id_(heap_id), current_chunk_size_(chunk_size) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
     current_chunk_idx_ = INVALID_CHUNK_ID;
+    if (chunk_size == DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+        allow_storage_across_chunks_ = false;
+    }
 }
 
-FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size)
-    : current_chunk_size_(chunk_size), current_chunk_offset_(block_column_entry->LastChunkOff()), buffer_mgr_(buffer_mgr),
+FixHeapManager::FixHeapManager(const u32 heap_id, BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, const u64 chunk_size)
+    : heap_id_(heap_id), current_chunk_size_(chunk_size), current_chunk_offset_(block_column_entry->LastChunkOff(heap_id)), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
-    int cnt = block_column_entry->OutlineBufferCount();
+    const int cnt = block_column_entry->OutlineBufferCount(heap_id);
     if (cnt == 0) {
         current_chunk_idx_ = INVALID_CHUNK_ID;
     } else {
         current_chunk_idx_ = cnt - 1;
+    }
+    if (chunk_size == DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
+        allow_storage_across_chunks_ = false;
     }
 }
 
@@ -64,10 +70,10 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
     } else {
         // allocate by buffer_mgr, and store returned buffer_obj in `block_column_entry_`
         auto file_worker = MakeUnique<DataFileWorker>(block_column_entry_->base_dir(),
-                                                      block_column_entry_->OutlineFilename(current_chunk_idx_),
+                                                      block_column_entry_->OutlineFilename(heap_id_, current_chunk_idx_),
                                                       current_chunk_size_);
         auto *buffer_obj = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
-        block_column_entry_->AppendOutlineBuffer(buffer_obj);
+        block_column_entry_->AppendOutlineBuffer(heap_id_, buffer_obj);
         return VectorHeapChunk(buffer_obj);
     }
 }
@@ -82,6 +88,22 @@ Pair<ChunkId, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (current_chunk_idx_ == INVALID_CHUNK_ID) {
         current_chunk_idx_ = 0;
         chunks_.emplace(current_chunk_idx_, AllocateChunk());
+    }
+    if (!allow_storage_across_chunks_) {
+        if (nbytes > current_chunk_size_) {
+            UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the tensor heap", nbytes));
+        }
+        if (current_chunk_offset_ + nbytes <= current_chunk_size_) {
+            // use current chunk
+            auto old_chunk_offset = current_chunk_offset_;
+            current_chunk_offset_ += nbytes;
+            return {current_chunk_idx_, old_chunk_offset};
+        } else {
+            // allocate new chunk
+            chunks_.emplace(++current_chunk_idx_, AllocateChunk());
+            current_chunk_offset_ = nbytes;
+            return {current_chunk_idx_, 0};
+        }
     }
     ChunkId start_chunk_id = current_chunk_idx_;
     ChunkId start_chunk_offset = current_chunk_offset_;
@@ -108,12 +130,12 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
     if (auto iter = chunks_.find(chunk_id); iter != chunks_.end()) {
         return iter->second;
     }
-    if (buffer_mgr_ == nullptr || chunk_id >= (ChunkId)block_column_entry_->OutlineBufferCount()) {
+    if (buffer_mgr_ == nullptr || chunk_id >= (ChunkId)block_column_entry_->OutlineBufferCount(heap_id_)) {
         UnrecoverableError("No such chunk in heap");
     }
-    auto *outline_buffer = block_column_entry_->GetOutlineBuffer(chunk_id);
+    auto *outline_buffer = block_column_entry_->GetOutlineBuffer(heap_id_, chunk_id);
     if (outline_buffer == nullptr) {
-        auto filename = block_column_entry_->OutlineFilename(chunk_id);
+        auto filename = block_column_entry_->OutlineFilename(heap_id_, chunk_id);
         auto base_dir = block_column_entry_->base_dir();
         auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, current_chunk_size_);
         outline_buffer = buffer_mgr_->GetBufferObject(std::move(file_worker));
@@ -150,7 +172,7 @@ Pair<ChunkId, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbyt
         }
     }
     if (buffer_mgr_ != nullptr) {
-        block_column_entry_->SetLastChunkOff(current_chunk_offset_);
+        block_column_entry_->SetLastChunkOff(heap_id_, current_chunk_offset_);
     }
 
     return {start_chunk_id, start_chunk_offset};
@@ -199,7 +221,7 @@ Pair<ChunkId, u64> FixHeapManager::AppendToHeap(FixHeapManager *src_heap_mgr, Ch
         }
     }
     if (buffer_mgr_ != nullptr) {
-        block_column_entry_->SetLastChunkOff(current_chunk_offset_);
+        block_column_entry_->SetLastChunkOff(heap_id_, current_chunk_offset_);
     }
 
     return {start_chunk_id, start_chunk_offset};
@@ -223,6 +245,12 @@ void FixHeapManager::ReadFromHeap(char *buffer, ChunkId chunk_id, u64 chunk_offs
             chunk_offset = 0;
         }
     }
+}
+
+const char *FixHeapManager::GetRawPtrFromChunk(ChunkId chunk_id, u64 chunk_offset) {
+    const VectorHeapChunk &src_chunk = ReadChunk(chunk_id);
+    const char *start_ptr = src_chunk.GetPtr() + chunk_offset;
+    return start_ptr;
 }
 
 String FixHeapManager::Stats() const {

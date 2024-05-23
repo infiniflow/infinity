@@ -50,7 +50,7 @@ TEST_F(PhysicalSortTest, test1) {
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0,
                                                          col_type,
                                                          col_name,
-                                                         HashSet<ConstraintType>());
+                                                         std::set<ConstraintType>());
     columns.emplace_back(col_def);
 
     col_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -59,7 +59,7 @@ TEST_F(PhysicalSortTest, test1) {
     col_def = MakeShared<ColumnDef>(1,
                                     col_type,
                                     col_name,
-                                    HashSet<ConstraintType>());
+                                    std::set<ConstraintType>());
     columns.emplace_back(col_def);
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"),

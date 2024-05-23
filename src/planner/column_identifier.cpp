@@ -14,6 +14,8 @@
 
 module;
 
+module column_identifer;
+
 import stl;
 
 import column_expr;
@@ -21,14 +23,15 @@ import infinity_exception;
 import status;
 import third_party;
 import query_context;
-
-module column_identifer;
+import logger;
 
 namespace infinity {
 
 ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const ColumnExpr &expr) {
     if (expr.star_ && expr.names_.empty()) {
-        RecoverableError(Status::SyntaxError("Star expression should be unfolded before."));
+        Status status = Status::SyntaxError("Star expression should be unfolded before.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
 
     SharedPtr<String> db_name_ptr = nullptr;
@@ -38,7 +41,9 @@ ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const Co
 
     i64 name_count = expr.names_.size();
     if (name_count > 4 || name_count <= 0) {
-        RecoverableError(Status::SyntaxError("Star expression should be unfolded before."));
+        Status status = Status::SyntaxError("Star expression should be unfolded before.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     --name_count;
     column_name_ptr = MakeShared<String>(expr.names_[name_count]);

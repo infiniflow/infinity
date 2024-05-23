@@ -86,7 +86,7 @@ std::string KnnExpr::ToString() const {
     }
 
     std::string expr_str =
-        fmt::format("KNN({}, {}, {}, Float32, {})", column_expr_->ToString(), "xxxxxx", dimension_, KnnDistanceType2Str(distance_type_));
+        fmt::format("MATCH VECTOR ({}, {}, {}, Float32, {})", column_expr_->ToString(), "xxxxxx", dimension_, KnnDistanceType2Str(distance_type_));
     if (!opt_params_->empty()) {
         expr_str += '(';
         for (size_t i = 0; i < opt_params_->size(); ++i) {

@@ -15,6 +15,7 @@
 module;
 
 #include <tuple>
+#include <vector>
 
 module physical_create_index_prepare;
 
@@ -59,10 +60,13 @@ bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorSt
     if (!status.ok()) {
         operator_state->status_ = status;
     } else {
-        auto status = txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
+        auto [segment_index_entries, status] = txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
         if (!status.ok()) {
             operator_state->status_ = status;
             return true;
+        }
+        for (auto *segment_index_entry : segment_index_entries) {
+            base_table_ref_->index_index_->Insert(table_index_entry, segment_index_entry);
         }
         if (!prepare_) {
             auto status = txn->CreateIndexFinish(table_entry, table_index_entry);

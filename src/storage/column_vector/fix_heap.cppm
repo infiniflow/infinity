@@ -34,9 +34,9 @@ export struct FixHeapManager {
     static constexpr u64 INVALID_CHUNK_OFFSET = std::numeric_limits<u64>::max();
 
 public:
-    explicit FixHeapManager(u64 chunk_size = DEFAULT_FIXLEN_CHUNK_SIZE);
+    explicit FixHeapManager(u32 heap_id, u64 chunk_size);
 
-    explicit FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size = DEFAULT_FIXLEN_CHUNK_SIZE);
+    FixHeapManager(u32 heap_id, BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size);
 
     ~FixHeapManager();
 
@@ -49,6 +49,8 @@ public:
     // Read #nbytes size of data from offset: #chunk_offset of chunk: #chunk_id to buffer: #buffer, Make sure the buffer has enough space to hold
     // the size of data.
     void ReadFromHeap(char *buffer, ChunkId chunk_id, u64 chunk_offset, SizeT nbytes);
+
+    const char *GetRawPtrFromChunk(ChunkId chunk_id, u64 chunk_offset);
 
     [[nodiscard]] String Stats() const;
 
@@ -89,6 +91,8 @@ private:
     VectorHeapChunk &ReadChunk(ChunkId chunk_id);
 
 private:
+    u32 heap_id_ = 0;
+    bool allow_storage_across_chunks_{true};
     HashMap<ChunkId, VectorHeapChunk> chunks_{};
     u64 current_chunk_size_{DEFAULT_FIXLEN_CHUNK_SIZE};
     ChunkId current_chunk_idx_{INVALID_CHUNK_ID};

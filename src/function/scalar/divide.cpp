@@ -27,6 +27,7 @@ import third_party;
 import status;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -62,13 +63,17 @@ inline bool DivFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    RecoverableError(Status::NotSupport("Not implement huge int divide operator."));
+    Status status = Status::NotSupport("Not implement huge int divide operator.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return false;
 }
 
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
-    RecoverableError(Status::NotSupport("Not implement huge int divide operator."));
+    Status status = Status::NotSupport("Not implement huge int divide operator.");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
     return false;
 }
 

@@ -94,7 +94,9 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
 
     // Get column info
     if (index_base->column_names_.size() != 1) {
-        RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
+        Status status = Status::SyntaxError("Currently, composite index doesn't supported.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     return table_index_entry;
 }
@@ -111,13 +113,14 @@ SharedPtr<TableIndexEntry> TableIndexEntry::ReplayTableIndexEntry(TableIndexMeta
     return table_index_entry;
 }
 
-Map<SegmentID, SharedPtr<SegmentIndexEntry>> TableIndexEntry::GetIndexBySegmentSnapshot(const TableEntry *table_entry, TxnTimeStamp begin_ts) {
+Map<SegmentID, SharedPtr<SegmentIndexEntry>> TableIndexEntry::GetIndexBySegmentSnapshot(const TableEntry *table_entry, Txn *txn) {
     std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_snapshot;
     for (const auto &[segment_id, segment_index_entry] : this->index_by_segment_) {
-        bool visible = table_entry->CheckVisible(segment_id, begin_ts);
-        if (!visible)
+        auto segment_entry = table_entry->GetSegmentByID(segment_id, txn);
+        if (segment_entry.get() == nullptr) {
             continue;
+        }
         index_by_segment_snapshot.emplace(segment_id, segment_index_entry);
     }
     return index_by_segment_snapshot;
@@ -190,7 +193,7 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<SharedPtr<SegmentIndexEntry>> segment_index_entry_candidates;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
-        json["txn_id"] = this->txn_id_.load();
+        json["txn_id"] = this->txn_id_;
         json["begin_ts"] = this->begin_ts_;
         json["commit_ts"] = this->commit_ts_.load();
         json["deleted"] = this->deleted_;
@@ -267,8 +270,15 @@ SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_inde
 }
 
 SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
-    if (index_base_->index_type_ != IndexType::kFullText && index_base_->index_type_ != IndexType::kHnsw) {
-        return nullptr;
+    switch (index_base_->index_type_) {
+        case IndexType::kHnsw:
+        case IndexType::kFullText:
+        case IndexType::kSecondary: {
+            break;
+        }
+        default: {
+            return nullptr;
+        }
     }
     auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_capacity(), column_def_);
     u32 segment_id = segment_entry->segment_id();
@@ -280,12 +290,19 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
 }
 
 Tuple<Vector<SegmentIndexEntry *>, Status>
-TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
+TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
+    TableEntry *table_entry = table_ref->table_entry_ptr_;
+    auto &block_index = table_ref->block_index_;
+    if (table_ref->index_index_.get() == nullptr) {
+        table_ref->index_index_ = MakeShared<IndexIndex>();
+    }
     Vector<SegmentIndexEntry *> segment_index_entries;
     SegmentID unsealed_id = table_entry->unsealed_id();
-    for (const auto *segment_entry : block_index->segments_) {
-        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_entry->row_count(), column_def_);
-        SegmentID segment_id = segment_entry->segment_id();
+    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+        SegmentOffset segment_offset = segment_info.segment_offset_;
+
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_, segment_offset, column_def_);
+        auto *segment_entry = segment_info.segment_entry_;
         SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         if (!is_replay) {
             segment_index_entry->CreateIndexPrepare(segment_entry, txn, prepare, check_ts);
@@ -300,13 +317,20 @@ TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_i
     return {segment_index_entries, Status::OK()};
 }
 
-Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
+Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn) {
     if (this->index_base_->column_names_.size() != 1) {
         // TODO
-        RecoverableError(Status::NotSupport("Not implemented"));
+        Status status = Status::NotSupport("Not implemented");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = GetIndexBySegmentSnapshot(table_entry, MAX_TIMESTAMP);
-    for (auto &[segment_id, segment_index_entry] : index_by_segment) {
+    auto &index_index = table_ref->index_index_;
+    auto iter = index_index->index_snapshots_.find(*index_base_->index_name_);
+    if (iter == index_index->index_snapshots_.end()) {
+        return Status::OK();
+    }
+    auto &segment_index_snapshots = iter->second;
+    for (auto &[segment_id, segment_index_entry] : segment_index_snapshots->segment_index_entries_) {
         atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
         auto status = segment_index_entry->CreateIndexDo(create_index_idx);
         if (!status.ok()) {

@@ -58,8 +58,6 @@ public:
 private:
     u64 FindLeastWorkloadWorker();
 
-    SizeT GetStartFragments(PlanFragment* plan_fragment, Vector<PlanFragment *>& leaf_fragments);
-
     void ScheduleTask(FragmentTask *task, u64 worker_id);
 
     void RunTask(FragmentTask *task);

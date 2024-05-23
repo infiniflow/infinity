@@ -30,6 +30,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -72,7 +73,9 @@ struct ColumnValueReaderTypeEqualsFunction {
 
 template <>
 inline void EqualsFunction::Run(MixedT, BigIntT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed == bigint"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -82,7 +85,9 @@ inline void EqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void EqualsFunction::Run(MixedT, DoubleT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed == double"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>
@@ -92,7 +97,9 @@ inline void EqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void EqualsFunction::Run(MixedT, VarcharT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: mixed == varchar"));
+    Status status = Status::NotSupport("Not implemented");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 template <>

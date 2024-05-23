@@ -14,7 +14,6 @@
 
 module;
 
-#include "type/complex/row_id.h"
 #include <cassert>
 #include <sstream>
 #include <vector>
@@ -58,6 +57,7 @@ import chunk_index_entry;
 import abstract_hnsw;
 import block_column_iter;
 import txn_store;
+import secondary_index_in_mem;
 
 namespace infinity {
 
@@ -162,9 +162,16 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
     // reference file_worker will be invalidated when vector_file_worker is resized
     const auto index_base = param->index_base_;
     const auto column_def = param->column_def_;
-    if (index_base->index_type_ == IndexType::kFullText || index_base->index_type_ == IndexType::kHnsw) {
-        // fulltext doesn't use BufferManager
-        return vector_file_worker;
+    switch (index_base->index_type_) {
+        case IndexType::kHnsw:
+        case IndexType::kFullText:
+        case IndexType::kSecondary: {
+            // these indexes don't use BufferManager
+            return vector_file_worker;
+        }
+        default: {
+            break;
+        }
     }
 
     auto file_name = MakeShared<String>(IndexFileName(segment_id));
@@ -183,24 +190,6 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
                 default: {
                     UnrecoverableError("Create IVF Flat index: Unsupported element type.");
                 }
-            }
-            break;
-        }
-        case IndexType::kSecondary: {
-            auto create_secondary_param = static_cast<CreateSecondaryIndexParam *>(param);
-            auto const row_count = create_secondary_param->row_count_;
-            auto const part_capacity = create_secondary_param->part_capacity_;
-            // now we can only use row_count to calculate the part_num
-            // because the actual_row_count will reduce when we delete rows
-            // consider the timestamp, actual_row_count may be less than, equal to or greater than rows we can actually read
-            u32 part_num = (row_count + part_capacity - 1) / part_capacity;
-            vector_file_worker.resize(part_num + 1);
-            // cannot use invalid file_worker
-            vector_file_worker[0] = MakeUnique<SecondaryIndexFileWorker>(index_dir, file_name, index_base, column_def, 0, row_count, part_capacity);
-            for (u32 i = 1; i <= part_num; ++i) {
-                auto part_file_name = MakeShared<String>(fmt::format("{}_part{}", *file_name, i));
-                vector_file_worker[i] =
-                    MakeUnique<SecondaryIndexFileWorker>(index_dir, part_file_name, index_base, column_def, i, row_count, part_capacity);
             }
             break;
         }
@@ -253,16 +242,18 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
             if (memory_indexer_.get() == nullptr) {
                 String base_name = fmt::format("ft_{:016x}", begin_row_id.ToUint64());
-                std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
-                                                            base_name,
-                                                            begin_row_id,
-                                                            index_fulltext->flag_,
-                                                            index_fulltext->analyzer_,
-                                                            table_index_entry_->GetFulltextByteSlicePool(),
-                                                            table_index_entry_->GetFulltextBufferPool(),
-                                                            table_index_entry_->GetFulltextInvertingThreadPool(),
-                                                            table_index_entry_->GetFulltextCommitingThreadPool());
+                {
+                    std::unique_lock<std::shared_mutex> lck(rw_locker_);
+                    memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
+                                                                base_name,
+                                                                begin_row_id,
+                                                                index_fulltext->flag_,
+                                                                index_fulltext->analyzer_,
+                                                                table_index_entry_->GetFulltextByteSlicePool(),
+                                                                table_index_entry_->GetFulltextBufferPool(),
+                                                                table_index_entry_->GetFulltextInvertingThreadPool(),
+                                                                table_index_entry_->GetFulltextCommitingThreadPool());
+                }
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
                 RowID exp_begin_row_id = memory_indexer_->GetBaseRowId() + memory_indexer_->GetDocCount();
@@ -307,14 +298,25 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not support data type for index hnsw."));
+                    Status status = Status::NotSupport("Not support data type for index hnsw.");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             memory_hnsw_indexer_->SetRowCount(row_cnt);
             break;
         }
-        case IndexType::kIVFFlat:
         case IndexType::kSecondary: {
+            if (memory_secondary_index_.get() == nullptr) {
+                std::unique_lock<std::shared_mutex> lck(rw_locker_);
+                memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, begin_row_id);
+            }
+            auto block_id = block_entry->block_id();
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            memory_secondary_index_->Insert(block_id, block_column_entry, buffer_manager, row_offset, row_count);
+            break;
+        }
+        case IndexType::kIVFFlat: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_WARN(*err_msg);
@@ -363,6 +365,17 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
             }
             return chunk_index_entry;
         }
+        case IndexType::kSecondary: {
+            if (memory_secondary_index_.get() == nullptr) {
+                return nullptr;
+            }
+            std::unique_lock lck(rw_locker_);
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
+            chunk_index_entry->SaveIndexFile();
+            chunk_index_entries_.push_back(chunk_index_entry);
+            memory_secondary_index_.reset();
+            return chunk_index_entry;
+        }
         default: {
             return nullptr;
         }
@@ -388,7 +401,23 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
     memory_indexer_->Load();
 }
 
-u32 SegmentIndexEntry::MemIndexRowCount() { return memory_indexer_.get() == nullptr ? 0 : memory_indexer_->GetDocCount(); }
+u32 SegmentIndexEntry::MemIndexRowCount() {
+    const IndexBase *index_base = table_index_entry_->index_base();
+    switch (index_base->index_type_) {
+        case IndexType::kFullText: {
+            return memory_indexer_.get() ? memory_indexer_->GetDocCount() : 0;
+        }
+        case IndexType::kHnsw: {
+            return memory_hnsw_indexer_.get() ? memory_hnsw_indexer_->GetRowCount() : 0;
+        }
+        case IndexType::kSecondary: {
+            return memory_secondary_index_.get() ? memory_secondary_index_->GetRowCount() : 0;
+        }
+        default: {
+            return 0;
+        }
+    }
+}
 
 void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
     TxnTimeStamp begin_ts = txn->BeginTS();
@@ -478,13 +507,28 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not support data type for index hnsw."));
+                    Status status = Status::NotSupport("Not support data type for index hnsw.");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             break;
         }
-        case IndexType::kIVFFlat:
-        case IndexType::kSecondary: { // TODO
+        case IndexType::kSecondary: {
+            u32 seg_id = segment_entry->segment_id();
+            RowID base_row_id(seg_id, 0);
+            memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
+            u64 column_id = column_def->id();
+            auto block_entry_iter = BlockEntryIter(segment_entry);
+            for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+                const auto block_id = block_entry->block_id();
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                memory_secondary_index_->Insert(block_id, block_column_entry, buffer_mgr, 0, block_entry->row_count());
+            }
+            MemIndexDump();
+            break;
+        }
+        case IndexType::kIVFFlat: { // TODO
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("{} PopulateEntirely is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_WARN(*err_msg);
@@ -535,7 +579,9 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                     break;
                 }
                 default: {
-                    RecoverableError(Status::NotSupport("Not support data type for index ivf."));
+                    Status status = Status::NotSupport("Not support data type for index ivf.");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
                 }
             }
             break;
@@ -549,32 +595,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
             break;
         }
         case IndexType::kSecondary: {
-            auto &data_type = column_def->type();
-            if (!(data_type->CanBuildSecondaryIndex())) {
-                UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
-            }
-            // 1. build secondary index by merge sort
-            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            // fetch the row_count from segment_entry
-            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), part_capacity);
-            secondary_index_builder->LoadSegmentData(segment_entry, buffer_mgr, column_def->id(), begin_ts, check_ts);
-            secondary_index_builder->StartOutput();
-            // 2. output into SecondaryIndexDataPart
-            {
-                u32 part_num = GetIndexPartNum();
-                for (u32 part_id = 0; part_id < part_num; ++part_id) {
-                    BufferHandle buffer_handle_part = GetIndexPartAt(part_id);
-                    auto secondary_index_part = static_cast<SecondaryIndexDataPart *>(buffer_handle_part.GetDataMut());
-                    secondary_index_builder->OutputToPart(secondary_index_part);
-                }
-            }
-            // 3. output into SecondaryIndexDataHead
-            {
-                BufferHandle buffer_handle_head = GetIndex();
-                auto secondary_index_head = static_cast<SecondaryIndexDataHead *>(buffer_handle_head.GetDataMut());
-                secondary_index_builder->OutputToHeader(secondary_index_head);
-            }
-            secondary_index_builder->EndOutput();
+            PopulateEntirely(segment_entry, txn, populate_entire_config);
             break;
         }
         default: {
@@ -620,7 +641,9 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                         break;
                     }
                     default: {
-                        RecoverableError(Status::NotSupport("Not implemented"));
+                        Status status = Status::NotSupport("Not implemented");
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
                     }
                 }
             }
@@ -730,8 +753,7 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
             return MakeUnique<CreateIndexParam>(index_base, column_def);
         }
         case IndexType::kSecondary: {
-            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
+            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count);
         }
         default: {
             UniquePtr<String> err_msg =
@@ -768,7 +790,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     return nullptr;
                 }
                 for (const auto &chunk_index_entry : chunk_index_entries_) {
-                    if (chunk_index_entry->CheckVisible(begin_ts)) {
+                    if (chunk_index_entry->CheckVisible(txn)) {
                         row_count += chunk_index_entry->row_count_;
                         old_chunks.push_back(chunk_index_entry.get());
                     }
@@ -807,6 +829,31 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
             return merged_chunk_index_entry.get();
         }
+        case IndexType::kSecondary: {
+            BufferManager *buffer_mgr = txn->buffer_mgr();
+            Vector<ChunkIndexEntry *> old_chunks;
+            u32 row_count = 0;
+            {
+                std::shared_lock lock(rw_locker_);
+                if (chunk_index_entries_.size() <= 1) {
+                    return nullptr;
+                }
+                for (const auto &chunk_index_entry : chunk_index_entries_) {
+                    if (chunk_index_entry->CheckVisible(txn)) {
+                        row_count += chunk_index_entry->GetRowCount();
+                        old_chunks.push_back(chunk_index_entry.get());
+                    }
+                }
+            }
+            RowID base_rowid(segment_id_, 0);
+            SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = CreateSecondaryIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
+            BufferHandle handle = merged_chunk_index_entry->GetIndex();
+            auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
+            data_ptr->InsertMergeData(old_chunks, merged_chunk_index_entry);
+            ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+            txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
+            return merged_chunk_index_entry.get();
+        }
         default: {
             UnrecoverableError("RebuildChunkIndexEntries is not supported for this index type.");
         }
@@ -831,6 +878,11 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateChunkIndexEntry(SharedPtr<Co
     auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
     ChunkID chunk_id = this->GetNextChunkID();
     return ChunkIndexEntry::NewChunkIndexEntry(chunk_id, this, param.get(), base_rowid, buffer_mgr);
+}
+
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr) {
+    ChunkID chunk_id = this->GetNextChunkID();
+    return ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(chunk_id, this, "", base_rowid, row_count, buffer_mgr);
 }
 
 void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry) {
@@ -860,8 +912,11 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
 
     SharedPtr<ChunkIndexEntry> chunk_index_entry =
         ChunkIndexEntry::NewReplayChunkIndexEntry(chunk_id, this, param.get(), base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-
     chunk_index_entries_.push_back(chunk_index_entry); // replay not need lock
+    if (table_index_entry_->table_index_def()->index_type_ == IndexType::kFullText) {
+        u64 column_length_sum = chunk_index_entry->GetColumnLengthSum();
+        UpdateFulltextColumnLenInfo(column_length_sum, row_count);
+    };
     return chunk_index_entry;
 }
 

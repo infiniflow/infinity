@@ -46,7 +46,7 @@ import catalog_delta_entry;
 import bg_task;
 import background_process;
 import base_table_ref;
-import compact_segments_task;
+import compact_statement;
 import default_values;
 import chunk_index_entry;
 
@@ -120,7 +120,7 @@ Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool c
 }
 
 Status
-Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
+Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type) {
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
@@ -207,9 +207,7 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
 Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_array) {
     this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
-
-    return catalog_->GetTables(db_name, output_table_array, txn_id_, begin_ts);
+    return catalog_->GetTables(db_name, output_table_array, this);
 }
 
 Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
@@ -270,24 +268,28 @@ Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db
     return catalog_->GetTableIndexInfo(db_name, table_name, index_name, txn_id_, begin_ts);
 }
 
-Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
+Pair<Vector<SegmentIndexEntry *>, Status>
+Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
     auto *table_entry = table_ref->table_entry_ptr_;
-    auto [segment_index_entries, status] =
-        table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
+    auto [segment_index_entries, status] = table_index_entry->CreateIndexPrepare(table_ref, this, prepare, false, check_ts);
     if (!status.ok()) {
-        return Status::OK();
+        return {segment_index_entries, status};
     }
 
-    auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
-    txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
-    for (auto &segment_index_entry : segment_index_entries) {
-        Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-        segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
-        for (auto &chunk_index_intry : chunk_index_entries) {
-            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
+    {
+        std::lock_guard guard(txn_store_.mtx_);
+        auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
+        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+        for (auto &segment_index_entry : segment_index_entries) {
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            for (auto &chunk_index_intry : chunk_index_entries) {
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
+            }
         }
     }
-    return Status::OK();
+
+    return {segment_index_entries, Status::OK()};
 }
 
 // TODO: use table ref instead of table entry
@@ -298,11 +300,8 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
     if (!status.ok()) {
         return status;
     }
-    if (table_index_entry->txn_id_ != txn_id_) {
-        UnrecoverableError("Index is not created by this txn. Something error happened.");
-    }
 
-    return table_index_entry->CreateIndexDo(table_entry, create_index_idxes);
+    return table_index_entry->CreateIndexDo(table_ref, create_index_idxes, this);
 }
 
 Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
@@ -351,8 +350,7 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
 }
 
 Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, const String &table_name) {
-    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
-    return catalog_->GetTableInfo(db_name, table_name, txn_id_, begin_ts);
+    return catalog_->GetTableInfo(db_name, table_name, this);
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {

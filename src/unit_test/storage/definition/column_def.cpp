@@ -32,7 +32,7 @@ class ColumnDefTest : public BaseTest {};
 TEST_F(ColumnDefTest, test1) {
     using namespace infinity;
 
-    HashSet<ConstraintType> constraints;
+    std::set<ConstraintType> constraints;
     constraints.insert(ConstraintType::kUnique);
     constraints.insert(ConstraintType::kNotNull);
     auto column_def_ptr = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "c1", constraints);
@@ -45,7 +45,7 @@ TEST_F(ColumnDefTest, test1) {
 TEST_F(ColumnDefTest, test2) {
     using namespace infinity;
 
-    HashSet<ConstraintType> constraints;
+    std::set<ConstraintType> constraints;
     constraints.insert(ConstraintType::kPrimaryKey);
     auto column_def_ptr = MakeShared<ColumnDef>(3, MakeShared<DataType>(LogicalType::kVarchar), "c2", constraints);
     EXPECT_EQ(*column_def_ptr->type(), DataType(LogicalType::kVarchar));

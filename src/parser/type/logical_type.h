@@ -93,6 +93,16 @@ enum LogicalType : int8_t {
     // only used in heterogeneous type
     kMissing,
 
+    // tensor type * 1
+    // now only support 2D tensor
+    // dynamic dim * fixed dim (column property) * data type
+    kTensor,
+
+    // tensor-array type * 1
+    // dynamic array of tensor with common tensor type (unit embedding dim, data type)
+    // dynamic dim * dynamic dim * fixed dim (column property) * data type
+    kTensorArray,
+
     kInvalid,
 };
 

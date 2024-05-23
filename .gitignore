@@ -76,10 +76,8 @@ parser.output
 #query_parser.h
 #query_parser.cpp
 
-test/sql/dql/sort.slt
 test/sql/**/*big*.slt
 test/sql/**/*fvecs*.slt
-test/data/csv/test_sort.csv
 test/data/csv/*big*.csv
 test/data/csv/*9_commas.csv
 test/data/fvecs/*big*.fvecs
@@ -122,4 +120,7 @@ callgrind.out.*
 # ignore vscode clangd cache file
 .cache/
 
+# ignore all benchmark datasets
 python/benchmark/datasets/
+
+myvenv/

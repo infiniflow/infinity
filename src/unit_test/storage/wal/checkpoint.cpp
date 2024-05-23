@@ -34,8 +34,6 @@ import buffer_manager;
 import physical_import;
 import status;
 import compilation_config;
-import compact_segments_task;
-import index_base;
 import index_base;
 import third_party;
 import base_table_ref;
@@ -52,6 +50,8 @@ import default_values;
 import global_resource_usage;
 import infinity;
 import background_process;
+import compaction_process;
+import wal_manager;
 
 using namespace infinity;
 
@@ -65,12 +65,13 @@ protected:
 
     void TearDown() override { RemoveDbDirs(); }
 
-    void WaitFlushDeltaOp(TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+    void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
+        TxnManager *txn_mgr = storage->txn_manager();
         LOG_INFO("Waiting flush delta op");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = txn_mgr->GetCleanupScanTS();
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Flush delta op finished after {}", end - start));
@@ -78,17 +79,21 @@ protected:
             }
             // wait for at most 10s
             if (end - start > 10) {
-                UnrecoverableException("WaitFlushDeltaOp timeout");
+                UnrecoverableError("WaitFlushDeltaOp timeout");
             }
         }
     }
 
-    void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+    void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
+        Catalog *catalog = storage->catalog();
+        TxnManager *txn_mgr = storage->txn_manager();
+        BufferManager *buffer_mgr = storage->buffer_manager();
+
         LOG_INFO("Waiting cleanup");
         TxnTimeStamp visible_ts = 0;
         time_t start = time(nullptr);
         while (true) {
-            visible_ts = txn_mgr->GetMinUnflushedTS();
+            visible_ts = txn_mgr->GetCleanupScanTS();
             time_t end = time(nullptr);
             if (visible_ts >= last_commit_ts) {
                 LOG_INFO(fmt::format("Cleanup finished after {}", end - start));
@@ -96,12 +101,12 @@ protected:
             }
             // wait for at most 10s
             if (end - start > 10) {
-                UnrecoverableException("WaitCleanup timeout");
+                UnrecoverableError("WaitCleanup timeout");
             }
+            LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
             usleep(1000 * 1000);
         }
 
-        auto buffer_mgr = txn_mgr->GetBufferMgr();
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, buffer_mgr);
         cleanup_task->Execute();
     }
@@ -111,7 +116,7 @@ protected:
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"));
 
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
-            table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
+            // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
@@ -155,14 +160,14 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_manager = storage->buffer_manager();
     TxnManager *txn_mgr = storage->txn_manager();
-    Catalog *catalog = storage->catalog();
     TxnTimeStamp last_commit_ts = 0;
+    CompactionProcessor *compaction_processor = storage->compaction_processor();
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
         i64 column_id = 0;
         {
-            HashSet<ConstraintType> constraints;
+            std::set<ConstraintType> constraints;
             auto column_def_ptr =
                 MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
             columns.emplace_back(column_def_ptr);
@@ -181,16 +186,8 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
     this->AddSegments(txn_mgr, *table_name, segment_sizes, buffer_manager);
 
     { // add compact
-        auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("compact table"));
-
-        auto [table_entry, status] = txn4->GetTableByName(*db_name, *table_name);
-        EXPECT_NE(table_entry, nullptr);
-
-        {
-            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-            compact_task->Execute();
-        }
-        txn_mgr->CommitTxn(txn4);
+        auto commit_ts = compaction_processor->ManualDoCompact(*db_name, *table_name, false);
+        EXPECT_NE(commit_ts, 0u);
     }
 
     {
@@ -214,9 +211,7 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
 
         txn_mgr->CommitTxn(txn5);
     }
-    WaitCleanup(catalog, txn_mgr, last_commit_ts);
-    usleep(5000 * 1000);
-    WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+    WaitCleanup(storage, last_commit_ts);
     infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -245,7 +240,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), *column_name, constraints);
                 columns.emplace_back(column_def_ptr);
@@ -271,11 +266,10 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
 
@@ -298,7 +292,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
 
         auto last_commit_ts = txn_mgr->CommitTxn(txn);
 
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
@@ -313,11 +307,10 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
 
@@ -361,7 +354,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         {
             i64 column_id = 0;
             {
-                HashSet<ConstraintType> constraints;
+                std::set<ConstraintType> constraints;
                 auto column_def_ptr =
                     MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kVarchar)), *column_name, constraints);
                 columns.emplace_back(column_def_ptr);
@@ -381,11 +374,10 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
+        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
-        auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
         txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
         txn_mgr->CommitTxn(txn);
@@ -422,7 +414,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         }
 
         usleep(5000 * 1000);
-        WaitFlushDeltaOp(txn_mgr, last_commit_ts);
+        WaitFlushDeltaOp(storage, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }

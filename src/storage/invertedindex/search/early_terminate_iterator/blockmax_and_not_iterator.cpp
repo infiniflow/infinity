@@ -24,6 +24,38 @@ import internal_types;
 
 namespace infinity {
 
+
+bool BlockMaxAndNotIterator::NextShallow(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    return inner_iterators_[0]->NextShallow(doc_id);
+}
+
+bool BlockMaxAndNotIterator::Next(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    assert(doc_id_ == INVALID_ROWID || doc_id_ < doc_id);
+    RowID target_doc_id = doc_id;
+    bool breaked = false;
+    do {
+        bool ok = inner_iterators_[0]->Next(doc_id);
+        if (!ok){
+            return false;
+        }
+        target_doc_id = inner_iterators_[0]->DocID();
+        for (u32 i = 1; i < inner_iterators_.size(); ++i) {
+            ok = inner_iterators_[i]->Next(target_doc_id);
+            if(ok && target_doc_id == inner_iterators_[i]->DocID()){
+                breaked = true;
+                break;
+            }
+        }
+        if (!breaked &&inner_iterators_[0]->BM25Score() < threshold_){
+            breaked = true;
+        }
+    } while(breaked);
+    doc_id_ = target_doc_id;
+    return true;
+}
+
 Pair<bool, RowID> BlockMaxAndNotIterator::SeekInBlockRange(RowID doc_id, const RowID doc_id_no_beyond) {
     const RowID block_end = std::min(doc_id_no_beyond, BlockLastDocID());
     while (true) {

@@ -14,8 +14,7 @@
 
 module;
 
-#include "type/complex/varchar.h"
-#include "type/logical_type.h"
+#include <cstring>
 #include <sstream>
 
 module column_vector;
@@ -33,7 +32,8 @@ import serialize;
 import third_party;
 import logger;
 import value;
-
+import internal_types;
+import logical_type;
 import buffer_manager;
 import status;
 import logical_type;
@@ -43,7 +43,7 @@ import block_column_entry;
 
 namespace infinity {
 
-VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
+Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
     if (initialized) {
         UnrecoverableError("Column vector is already initialized.");
     }
@@ -68,7 +68,8 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
 
     tail_index_ = 0;
     data_type_size_ = data_type_->Size();
-    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
+    Pair<VectorBufferType, VectorBufferType> result = {VectorBufferType::kInvalid, VectorBufferType::kInvalid};
+    VectorBufferType &vector_buffer_type = result.first;
     switch (data_type_->type()) {
             //        case LogicalType::kBlob:
             //        case LogicalType::kBitmap:
@@ -82,6 +83,15 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
             vector_buffer_type = VectorBufferType::kHeap;
             break;
         }
+        case LogicalType::kTensor: {
+            vector_buffer_type = VectorBufferType::kTensorHeap;
+            break;
+        }
+        case LogicalType::kTensorArray: {
+            vector_buffer_type = VectorBufferType::kHeap;
+            result.second = VectorBufferType::kTensorHeap;
+            break;
+        }
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
@@ -91,28 +101,28 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
             vector_buffer_type = VectorBufferType::kStandard;
         }
     }
-    return vector_buffer_type;
+    return result;
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
-    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
+    Pair<VectorBufferType, VectorBufferType> vector_buffer_types = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() == nullptr) {
         if (vector_type_ == ColumnVectorType::kConstant) {
-            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
+            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_types);
             nulls_ptr_ = Bitmask::Make(8);
         } else {
-            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
+            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_types);
             nulls_ptr_ = Bitmask::Make(capacity_);
         }
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        if (vector_buffer_type == VectorBufferType::kHeap) {
-            if (buffer_->fix_heap_mgr_.get() != nullptr) {
+        if (vector_buffer_types.first == VectorBufferType::kHeap or vector_buffer_types.first == VectorBufferType::kTensorHeap) {
+            if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
                 UnrecoverableError("Vector heap should be null.");
             }
-            buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
+            buffer_->ResetToInit();
         }
     }
 }
@@ -122,17 +132,17 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
                               SizeT current_row_count,
                               ColumnVectorType vector_type,
                               SizeT capacity) {
-    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
+    Pair<VectorBufferType, VectorBufferType> vector_buffer_types = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() != nullptr) {
         UnrecoverableError("Column vector is already initialized.");
     }
 
     if (vector_type_ == ColumnVectorType::kConstant) {
-        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_type);
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_types);
         nulls_ptr_ = Bitmask::Make(8);
     } else {
-        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_type);
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_types);
         nulls_ptr_ = Bitmask::Make(capacity_); // TODO: version file is not managed by buffer_manager now.
     }
     data_ptr_ = buffer_->GetDataMut();
@@ -192,6 +202,13 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             case kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
+            }
+            case kTensor: {
+                CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
+            }
+            case kTensorArray: {
+                CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
             }
             case kDate: {
                 CopyFrom<DateT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
@@ -266,10 +283,14 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 break;
             }
             case kNull: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kMissing: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -329,6 +350,14 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case kVarchar: {
                 CopyFrom<VarcharT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTensor: {
+                CopyFrom<TensorT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kTensorArray: {
+                CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kDate: {
@@ -406,13 +435,19 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
 #endif
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kNull: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kMissing: {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -490,6 +525,14 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             CopyRowFrom<VarcharT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
+        case kTensor: {
+            CopyRowFrom<TensorT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case kTensorArray: {
+            CopyRowFrom<TensorArrayT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
         case kDate: {
             CopyRowFrom<DateT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
@@ -563,13 +606,19 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             break;
         }
         case kNull: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kMissing: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kInvalid: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }
@@ -601,7 +650,9 @@ String ColumnVector::ToString(SizeT row_index) const {
             return std::to_string(((BigIntT *)data_ptr_)[row_index]);
         }
         case kHugeInt: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kFloat: {
             return std::to_string(((FloatT *)data_ptr_)[row_index]);
@@ -610,7 +661,9 @@ String ColumnVector::ToString(SizeT row_index) const {
             return std::to_string(((DoubleT *)data_ptr_)[row_index]);
         }
         case kDecimal: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kVarchar: {
             VarcharT &varchar_ref = ((VarcharT *)data_ptr_)[row_index];
@@ -618,9 +671,6 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                if (varchar_ref.IsValue()) {
-                    UnrecoverableError("Must be vector type of varchar, here");
-                }
                 String result_str;
                 result_str.resize(varchar_ref.length_);
                 buffer_->fix_heap_mgr_->ReadFromHeap(result_str.data(),
@@ -643,44 +693,64 @@ String ColumnVector::ToString(SizeT row_index) const {
             return ((TimestampT *)data_ptr_)[row_index].ToString();
         }
         case kInterval: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kArray: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kTuple: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kPoint: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kLine: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kLineSeg: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         case kBox: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
             //        case kPath: {
             //        }
             //        case kPolygon: {
             //        }
         case kCircle: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
             //        case kBitmap: {
             //        }
         case kUuid: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
             //        case kBlob: {
             //        }
         case kEmbedding: {
             //            RecoverableError(Status::NotSupport("Not implemented"));
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                RecoverableError(Status::NotSupport("Not implemented"));
+                Status status = Status::NotSupport("Not implemented");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             EmbeddingT embedding_element(nullptr, false);
@@ -689,11 +759,47 @@ String ColumnVector::ToString(SizeT row_index) const {
             embedding_element.SetNull();
             return embedding_str;
         }
+        case kTensor: {
+            if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
+                UnrecoverableError("Tensor type mismatch with unexpected type_info");
+            }
+            const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            const auto &[embedding_num, chunk_id, chunk_offset] = reinterpret_cast<TensorT *>(data_ptr_)[row_index];
+            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
+            return TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+        }
+        case kTensorArray: {
+            if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
+                UnrecoverableError("TensorArray type mismatch with unexpected type_info");
+            }
+            const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            auto embedding_data_type = embedding_info->Type();
+            auto unit_embedding_dimension = embedding_info->Dimension();
+            const auto &[tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = reinterpret_cast<const TensorArrayT *>(data_ptr_)[row_index];
+            Vector<TensorT> tensor_array(tensor_num);
+            buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensor_array.data()),
+                                                 tensor_array_chunk_id,
+                                                 tensor_array_chunk_offset,
+                                                 tensor_num * sizeof(TensorT));
+            OStringStream oss;
+            for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
+                const auto &[embedding_num, chunk_id, chunk_offset] = tensor_array[tensor_id];
+                const char *raw_data_ptr = buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(chunk_id, chunk_offset);
+                oss << "[" << TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_data_type, unit_embedding_dimension, embedding_num)
+                    << "]";
+                if (tensor_id != tensor_num - 1) {
+                    oss << ",";
+                }
+            }
+            return std::move(oss).str();
+        }
         case kRowID: {
             return (((RowID *)data_ptr_)[row_index]).ToString();
         }
         case kMixed: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         default: {
             UnrecoverableError("Attempt to access an unaccepted type");
@@ -804,6 +910,30 @@ Value ColumnVector::GetValue(SizeT index) const {
         case kEmbedding: {
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
             return Value::MakeEmbedding(ptr, data_type_->type_info());
+        }
+        case kTensor: {
+            auto &[embedding_num, chunk_id, chunk_offset] = reinterpret_cast<TensorT *>(data_ptr_)[index];
+            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
+            const auto single_embedding_size = data_type_->type_info()->Size();
+            const auto tensor_size = embedding_num * single_embedding_size;
+            Value value = Value::MakeTensor(raw_data_ptr, tensor_size, data_type_->type_info());
+            return value;
+        }
+        case kTensorArray: {
+            const auto unit_embedding_bytes = data_type_->type_info()->Size();
+            const auto &[tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = reinterpret_cast<const TensorArrayT *>(data_ptr_)[index];
+            Vector<TensorT> tensor_array(tensor_num);
+            buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensor_array.data()),
+                                                 tensor_array_chunk_id,
+                                                 tensor_array_chunk_offset,
+                                                 tensor_num * sizeof(TensorT));
+            Value value = Value::MakeTensorArray(data_type_->type_info());
+            for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
+                const auto &[embedding_num, chunk_id, chunk_offset] = tensor_array[tensor_id];
+                const char *raw_data_ptr = buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(chunk_id, chunk_offset);
+                value.AppendToTensorArray(raw_data_ptr, embedding_num * unit_embedding_bytes);
+            }
+            return value;
         }
         case kRowID: {
             return Value::MakeRow(((RowID *)data_ptr_)[index]);
@@ -945,7 +1075,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             VarcharT &target_ref = ((VarcharT *)data_ptr_)[index];
             target_ref.is_value_ = false;
             target_ref.length_ = varchar_len;
-            if (varchar_len <= VARCHAR_INLINE_LENGTH) {
+            if (varchar_len <= VARCHAR_INLINE_LEN) {
                 // Only prefix is enough to contain all string data.
                 std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
             } else {
@@ -954,6 +1084,40 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
                 target_ref.vector_.chunk_id_ = chunk_id;
                 target_ref.vector_.chunk_offset_ = chunk_offset;
             }
+            break;
+        }
+        case kTensor: {
+            const auto embedding_size_unit = data_type_->type_info()->Size();
+            const auto [src_ptr, src_size] = value.GetEmbedding();
+            if (src_size == 0 or (src_size % embedding_size_unit) != 0) {
+                UnrecoverableError(fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
+                                               src_size,
+                                               embedding_size_unit));
+            }
+            auto &[embedding_num, chunk_id, chunk_offset] = reinterpret_cast<TensorT *>(data_ptr_)[index];
+            embedding_num = src_size / embedding_size_unit;
+            std::tie(chunk_id, chunk_offset) = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ptr, src_size);
+            break;
+        }
+        case kTensorArray: {
+            auto &[tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = reinterpret_cast<TensorArrayT *>(data_ptr_)[index];
+            const auto embedding_size_unit = data_type_->type_info()->Size();
+            const auto &value_tensor_array = value.GetTensorArray();
+            tensor_num = value_tensor_array.size();
+            Vector<TensorT> tensor_array_data(tensor_num);
+            for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
+                auto &[embedding_num, tensor_chunk_id, tensor_chunk_offset] = tensor_array_data[tensor_id];
+                const auto [tensor_data_ptr, tensor_data_bytes] = value_tensor_array[tensor_id]->GetData();
+                if (tensor_data_bytes == 0 or (tensor_data_bytes % embedding_size_unit) != 0) {
+                    UnrecoverableError(fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
+                                                   tensor_data_bytes,
+                                                   data_type_->Size()));
+                }
+                embedding_num = tensor_data_bytes / embedding_size_unit;
+                std::tie(tensor_chunk_id, tensor_chunk_offset) = this->buffer_->fix_heap_mgr_1_->AppendToHeap(tensor_data_ptr, tensor_data_bytes);
+            }
+            std::tie(tensor_array_chunk_id, tensor_array_chunk_offset) =
+                this->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensor_array_data.data()), tensor_num * sizeof(TensorT));
             break;
         }
         case kEmbedding: {
@@ -1038,26 +1202,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             break;
         }
         case kVarchar: {
-            // Copy string
-            const VarcharT &src_ref = *(VarcharT *)(raw_ptr);
-            if (!src_ref.IsValue()) {
-                UnrecoverableError("Only can set value not column vector here.");
-            }
-
-            u64 varchar_len = src_ref.length_;
-            VarcharT &target_ref = ((VarcharT *)data_ptr_)[index];
-            target_ref.is_value_ = false;
-            target_ref.length_ = varchar_len;
-            if (src_ref.IsInlined()) {
-                // Only prefix is enough to contain all string data.
-                std::memcpy(target_ref.short_.data_, src_ref.short_.data_, varchar_len);
-            } else {
-                std::memcpy(target_ref.vector_.prefix_, src_ref.value_.prefix_, VARCHAR_PREFIX_LEN);
-                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ref.value_.ptr_, varchar_len);
-                target_ref.vector_.chunk_id_ = chunk_id;
-                target_ref.vector_.chunk_offset_ = chunk_offset;
-            }
-            break;
+            UnrecoverableError("Cannot SetByRawPtr to Varchar.");
         }
         case kDate: {
             ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
@@ -1118,6 +1263,12 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         }
             //        case kBlob: {
             //        }
+        case kTensor: {
+            UnrecoverableError("Cannot SetByRawPtr to Tensor.");
+        }
+        case kTensorArray: {
+            UnrecoverableError("Cannot SetByRawPtr to TensorArray.");
+        }
         case kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
@@ -1139,16 +1290,6 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     }
 }
 
-void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
-    // We assume the value_ptr point to the same type data.
-    if (data_type_->type() == LogicalType::kEmbedding) {
-        auto *embedding_ptr = (EmbeddingT *)(value_ptr);
-        SetByRawPtr(index, embedding_ptr->ptr);
-    } else {
-        SetByRawPtr(index, value_ptr);
-    }
-}
-
 void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     if (!initialized) {
         UnrecoverableError("Column vector isn't initialized.");
@@ -1161,18 +1302,16 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     if (tail_index_ >= capacity_) {
         UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     }
-    if (data_type_->type() == LogicalType::kEmbedding) {
-        SetByRawPtr(tail_index_++, value_ptr);
-    } else {
-        SetByPtr(tail_index_++, value_ptr);
-    }
+    SetByRawPtr(tail_index_++, value_ptr);
 }
 
 namespace {
 Vector<std::string_view> SplitArrayElement(std::string_view data, char delimiter) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        RecoverableError(Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]"));
+        Status status = Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     Vector<std::string_view> ret;
     SizeT i = 1, j = 1;
@@ -1186,7 +1325,99 @@ Vector<std::string_view> SplitArrayElement(std::string_view data, char delimiter
         if (i == data_size - 1) {
             break;
         }
+        if (data[i] == '[' || data[i] == ']') {
+            Status status = Status::ImportFileFormatError("Invalid Embedding data format: should not contain '[' or ']' in embedding!");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
         i++;
+    }
+    return ret;
+}
+
+Vector<std::string_view> SplitTensorElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {
+    SizeT data_size = data.size();
+    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+        Status status = Status::ImportFileFormatError("Tensor data must be surrounded by [ and ]");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    bool have_child_embedding = false;
+    for (SizeT i = 1; i < data_size - 1; ++i) {
+        if (data[i] == '[') {
+            have_child_embedding = true;
+            break;
+        }
+    }
+    if (!have_child_embedding) {
+        return SplitArrayElement(data, delimiter);
+    }
+    std::string_view child_data = data.substr(1, data_size - 2);
+    Vector<std::string_view> ret;
+    size_t bg_id = 0;
+    while (true) {
+        const auto next_bg_id = child_data.find('[', bg_id);
+        if (next_bg_id == std::string_view::npos) {
+            break;
+        }
+        const auto ed_id = child_data.find(']', next_bg_id);
+        if (ed_id == std::string_view::npos) {
+            Status status = Status::ImportFileFormatError("Tensor data member embedding must be surrounded by [ and ]");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        if (const auto check_inner_valid = child_data.find('[', next_bg_id + 1); check_inner_valid < ed_id) {
+            Status status = Status::ImportFileFormatError("Tensor data format invalid: mismatch of inner '[', ']'.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        Vector<std::string_view> sub_result = SplitArrayElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), delimiter);
+        if (sub_result.size() != unit_embedding_dim) {
+            Status status = Status::ImportFileFormatError("Tensor data member embedding size must be equal to unit embedding dimension.");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        ret.insert(ret.end(), sub_result.begin(), sub_result.end());
+        bg_id = ed_id + 1;
+    }
+    return ret;
+}
+
+Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {
+    SizeT data_size = data.size();
+    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+        Status status = Status::ImportFileFormatError("TensorArray data must be surrounded by [ and ]");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    std::string_view child_data = data.substr(1, data_size - 2);
+    Vector<Vector<std::string_view>> ret;
+    size_t bg_id = 0;
+    while (true) {
+        const auto next_bg_id = child_data.find('[', bg_id);
+        if (next_bg_id == std::string_view::npos) {
+            break;
+        }
+        i32 depth = -1;
+        u32 ed_id = next_bg_id + 1;
+        while (ed_id < child_data.size()) {
+            if (child_data[ed_id] == '[') {
+                --depth;
+            } else if (child_data[ed_id] == ']') {
+                if (++depth == 0) {
+                    break;
+                }
+            }
+            ++ed_id;
+        }
+        if (ed_id == child_data.size() or depth != 0) {
+            Status status = Status::ImportFileFormatError("TensorArray format error");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        auto sub_result = SplitTensorElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), delimiter, unit_embedding_dim);
+        ret.emplace_back(std::move(sub_result));
+        bg_id = ed_id + 1;
     }
     return ret;
 }
@@ -1244,12 +1475,14 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             if (embedding_info->Dimension() < ele_str_views.size()) {
-                RecoverableError(Status::ImportFileFormatError("Embedding data size exceeds dimension."));
+                Status status = Status::ImportFileFormatError("Embedding data size exceeds dimension.");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
             }
             SizeT dst_off = index * data_type_->Size();
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    RecoverableError(Status::NotSupport("Not implemented"));
+                    AppendEmbedding<BooleanT>(ele_str_views, dst_off);
                     break;
                 }
                 case kElemInt8: {
@@ -1282,11 +1515,108 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             }
             break;
         }
+        case kTensor: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            const auto unit_embedding_dim = embedding_info->Dimension();
+            Vector<std::string_view> ele_str_views = SplitTensorElement(sv, delimiter, unit_embedding_dim);
+            if (ele_str_views.size() == 0 or ele_str_views.size() % unit_embedding_dim != 0) {
+                Status status = Status::ImportFileFormatError("Embedding data size is not multiple of tensor unit dimension.");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
+            }
+            SizeT dst_off = index;
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    AppendTensor<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt8: {
+                    AppendTensor<TinyIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendTensor<SmallIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendTensor<IntegerT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendTensor<BigIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemFloat: {
+                    AppendTensor<FloatT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemDouble: {
+                    AppendTensor<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid embedding type");
+                }
+            }
+            break;
+        }
+        case kTensorArray: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            const auto unit_embedding_dim = embedding_info->Dimension();
+            Vector<Vector<std::string_view>> ele_str_views = SplitTensorArrayElement(sv, delimiter, unit_embedding_dim);
+            if (ele_str_views.size() == 0) {
+                Status status = Status::ImportFileFormatError("TensorArray data size is 0.");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
+            }
+            for (const auto &ele_str_view : ele_str_views) {
+                if (ele_str_view.size() == 0 or ele_str_view.size() % unit_embedding_dim != 0) {
+                    Status status = Status::ImportFileFormatError("Tensor dimension is not multiple of embedding unit dimension.");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
+                }
+            }
+            SizeT dst_off = index;
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    AppendTensorArray<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt8: {
+                    AppendTensorArray<TinyIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendTensorArray<SmallIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendTensorArray<IntegerT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendTensorArray<BigIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemFloat: {
+                    AppendTensorArray<FloatT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemDouble: {
+                    AppendTensorArray<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid embedding type");
+                }
+            }
+            break;
+        }
         case kVarchar: {
             auto &varchar = (reinterpret_cast<VarcharT *>(data_ptr_))[index];
             varchar.is_value_ = false;
             varchar.length_ = sv.size();
-            if (sv.size() <= VARCHAR_INLINE_LENGTH) {
+            if (sv.size() <= VARCHAR_INLINE_LEN) {
                 std::memcpy(varchar.short_.data_, sv.data(), sv.size());
             } else {
                 std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
@@ -1297,7 +1627,9 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             break;
         }
         default: {
-            RecoverableError(Status::NotSupport("Not implemented"));
+            Status status = Status::NotSupport("Not implemented");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
     }
 }
@@ -1342,6 +1674,12 @@ void ColumnVector::AppendByConstantExpr(const ConstantExpr *const_expr) {
         case kVarchar: {
             std::string_view str_view = const_expr->str_value_;
             AppendByStringView(str_view, ',');
+            break;
+        }
+        case kTensor:
+        case kTensorArray: {
+            // TODO: used by default value?
+            UnrecoverableError("Need fix!");
             break;
         }
         case kEmbedding: {
@@ -1472,21 +1810,28 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
-                dst_ref.is_value_ = src_ref.is_value_;
-                dst_ref.length_ = src_ref.length_;
-                dst_ref.is_value_ = src_ref.is_value_;
-                if (src_ref.IsInlined()) {
-                    std::memcpy(&dst_ref.short_, &src_ref.short_, src_ref.length_);
-                } else {
-                    // Assume the source must be column vector type.
-                    std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
-                    auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(other.buffer_->fix_heap_mgr_.get(),
-                                                                                               src_ref.vector_.chunk_id_,
-                                                                                               src_ref.vector_.chunk_offset_,
-                                                                                               src_ref.length_);
-                    dst_ref.vector_.chunk_id_ = chunk_id;
-                    dst_ref.vector_.chunk_offset_ = chunk_offset;
-                }
+                CopyVarchar(dst_ref, buffer_->fix_heap_mgr_.get(), src_ref, other.buffer_->fix_heap_mgr_.get());
+            }
+            break;
+        }
+        case kTensor: {
+            auto *base_src_ptr = (TensorT *)(other.data_ptr_);
+            TensorT *base_dst_ptr = ((TensorT *)(data_ptr_)) + this->tail_index_;
+            const u32 embedding_size_unit = data_type_->type_info()->Size();
+            for (SizeT idx = 0; idx < count; ++idx) {
+                const TensorT &src_ref = base_src_ptr[from + idx];
+                TensorT &dst_ref = base_dst_ptr[idx];
+                CopyTensor(dst_ref, buffer_->fix_heap_mgr_.get(), src_ref, other.buffer_->fix_heap_mgr_.get(), embedding_size_unit);
+            }
+            break;
+        }
+        case kTensorArray: {
+            auto *base_src_ptr = (TensorArrayT *)(other.data_ptr_);
+            TensorArrayT *base_dst_ptr = ((TensorArrayT *)(data_ptr_)) + this->tail_index_;
+            for (SizeT idx = 0; idx < count; ++idx) {
+                const TensorArrayT &src_ref = base_src_ptr[from + idx];
+                TensorArrayT &dst_ref = base_dst_ptr[idx];
+                CopyTensorArray(dst_ref, buffer_.get(), src_ref, other.buffer_.get(), data_type_->type_info()->Size());
             }
             break;
         }
@@ -1668,8 +2013,8 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         return false;
     if (data_type_->type() == kVarchar) {
         for (SizeT i = 0; i < this->tail_index_; i++) {
-            const Varchar *lhs = reinterpret_cast<const Varchar *>(this->data_ptr_ + i * this->data_type_size_);
-            const Varchar *rhs = reinterpret_cast<const Varchar *>(other.data_ptr_ + i * this->data_type_size_);
+            const VarcharT *lhs = reinterpret_cast<const VarcharT *>(this->data_ptr_ + i * this->data_type_size_);
+            const VarcharT *rhs = reinterpret_cast<const VarcharT *>(other.data_ptr_ + i * this->data_type_size_);
             if (lhs->length_ != rhs->length_) {
                 return false;
             }
@@ -1708,8 +2053,11 @@ i32 ColumnVector::GetSizeInBytes() const {
     } else {
         size += this->tail_index_ * this->data_type_size_;
     }
-    if (data_type_->type() == kVarchar) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray) {
         size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
+    }
+    if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
+        size += sizeof(i32) + buffer_->fix_heap_mgr_1_->total_size();
     }
     size += this->nulls_ptr_->GetSizeInBytes();
     return size;
@@ -1739,11 +2087,17 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         ptr += this->tail_index_ * this->data_type_size_;
     }
     // write variable part
-    if (data_type_->type() == kVarchar) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray) {
         i32 heap_len = buffer_->fix_heap_mgr_->total_size();
         WriteBufAdv<i32>(ptr, heap_len);
         buffer_->fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
         ptr += heap_len;
+    }
+    if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
+        i32 heap_len_1 = buffer_->fix_heap_mgr_1_->total_size();
+        WriteBufAdv<i32>(ptr, heap_len_1);
+        buffer_->fix_heap_mgr_1_->ReadFromHeap(ptr, 0, 0, heap_len_1);
+        ptr += heap_len_1;
     }
     this->nulls_ptr_->WriteAdv(ptr);
     return;
@@ -1768,11 +2122,18 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         ptr += tail_index * data_type_size;
     }
     // read variable part
-    if (data_type->type() == kVarchar) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
         if (heap_len > 0) {
             column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
             ptr += heap_len;
+        }
+    }
+    if (const auto data_t = data_type->type(); data_t == kTensorArray) {
+        i32 heap_len_1 = ReadBufAdv<i32>(ptr);
+        if (heap_len_1 > 0) {
+            column_vector->buffer_->fix_heap_mgr_1_->AppendToHeap(ptr, heap_len_1);
+            ptr += heap_len_1;
         }
     }
 
@@ -1786,6 +2147,56 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         UnrecoverableError("ptr goes out of range when reading ColumnVector");
     }
     return column_vector;
+}
+
+void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const VarcharT &src_ref, FixHeapManager *src_fix_heap_mgr) {
+    const u32 varchar_len = src_ref.length_;
+    dst_ref.is_value_ = 0;
+    dst_ref.length_ = varchar_len;
+    if (src_ref.IsInlined()) {
+        // Only prefix is enough to contain all string data.
+        std::memcpy(dst_ref.short_.data_, src_ref.short_.data_, varchar_len);
+    } else {
+        std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
+        const auto [chunk_id, chunk_offset] =
+            dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_ref.vector_.chunk_id_, src_ref.vector_.chunk_offset_, varchar_len);
+        dst_ref.vector_.chunk_id_ = chunk_id;
+        dst_ref.vector_.chunk_offset_ = chunk_offset;
+    }
+}
+
+void CopyTensor(TensorT &dst_ref,
+                FixHeapManager *dst_fix_heap_mgr,
+                const TensorT &src_ref,
+                FixHeapManager *src_fix_heap_mgr,
+                const u32 unit_embedding_bytes) {
+    const u32 embedding_num = src_ref.embedding_num_;
+    dst_ref.embedding_num_ = embedding_num;
+    const auto tensor_bytes = embedding_num * unit_embedding_bytes;
+    std::tie(dst_ref.chunk_id_, dst_ref.chunk_offset_) =
+        dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_ref.chunk_id_, src_ref.chunk_offset_, tensor_bytes);
+}
+
+void CopyTensorArray(TensorArrayT &dst_ref,
+                     VectorBuffer *dst_buffer,
+                     const TensorArrayT &src_ref,
+                     const VectorBuffer *src_buffer,
+                     const u32 unit_embedding_bytes) {
+    const u32 tensor_num = src_ref.tensor_num_;
+    dst_ref.tensor_num_ = tensor_num;
+    Vector<TensorT> src_tensor_data(tensor_num);
+    Vector<TensorT> dst_tensor_data(tensor_num);
+    src_buffer->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(src_tensor_data.data()),
+                                            src_ref.chunk_id_,
+                                            src_ref.chunk_offset_,
+                                            tensor_num * sizeof(TensorT));
+    for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
+        const TensorT &src_tensor_ref = src_tensor_data[tensor_id];
+        TensorT &dst_tensor_ref = dst_tensor_data[tensor_id];
+        CopyTensor(dst_tensor_ref, dst_buffer->fix_heap_mgr_1_.get(), src_tensor_ref, src_buffer->fix_heap_mgr_1_.get(), unit_embedding_bytes);
+    }
+    std::tie(dst_ref.chunk_id_, dst_ref.chunk_offset_) =
+        dst_buffer->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(dst_tensor_data.data()), tensor_num * sizeof(TensorT));
 }
 
 } // namespace infinity

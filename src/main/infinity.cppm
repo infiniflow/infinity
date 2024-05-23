@@ -69,13 +69,21 @@ public:
 
     QueryResult Flush();
 
-    QueryResult SetVariable(const String &variable_name, const String &variable_value, SetScope scope);
+    QueryResult SetVariableOrConfig(const String &name, bool value, SetScope scope);
+
+    QueryResult SetVariableOrConfig(const String &name, i64 value, SetScope scope);
+
+    QueryResult SetVariableOrConfig(const String &name, double value, SetScope scope);
+
+    QueryResult SetVariableOrConfig(const String &name, String value, SetScope scope);
 
     QueryResult ShowVariable(const String &variable_name, SetScope scope);
 
     QueryResult ShowVariables(SetScope scope);
 
     QueryResult ShowConfig(const String &config_name);
+
+    QueryResult ShowConfigs();
 
     // For embedded sqllogictest
     QueryResult Query(const String &query_text);

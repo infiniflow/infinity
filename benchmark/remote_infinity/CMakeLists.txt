@@ -24,6 +24,7 @@ target_link_libraries(
         lz4.a
         atomic.a
         thrift.a
+        jma
 )
 
 if(ENABLE_JEMALLOC)

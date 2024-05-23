@@ -287,6 +287,12 @@ template <>
 std::string DataType::TypeToString<MixedT>();
 
 template <>
+std::string DataType::TypeToString<TensorT>();
+
+template <>
+std::string DataType::TypeToString<TensorArrayT>();
+
+template <>
 BooleanT DataType::StringToValue<BooleanT>(const std::string_view &str_view);
 
 template <>

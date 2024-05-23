@@ -63,9 +63,9 @@ TEST_F(RepeatReplayTest, append) {
 
     auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 
@@ -114,7 +114,7 @@ TEST_F(RepeatReplayTest, append) {
                 ASSERT_EQ(block_entry->columns().size(), 2ul);
                 {
                     auto &col2 = block_entry->columns()[1];
-                    EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                    EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                 }
             }
         }
@@ -182,9 +182,9 @@ TEST_F(RepeatReplayTest, import) {
 
     auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 

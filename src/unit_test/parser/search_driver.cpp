@@ -20,10 +20,33 @@ import query_node;
 import term;
 import analyzer;
 import infinity_exception;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 
-class SearchDriverTest : public BaseTest {};
+class SearchDriverTest : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
+        RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        RemoveDbDirs();
+        BaseTest::TearDown();
+    }
+};
 
 int ParseStream(const SearchDriver &driver, std::istream &ist) {
     // read and parse line by line, ignoring empty lines and comments

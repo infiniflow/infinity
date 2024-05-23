@@ -102,7 +102,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string
         } else {
             oss << "Empty query tree!\n";
         }
-        LOG_TRACE(std::move(oss).str());
+        LOG_DEBUG(std::move(oss).str());
     }
 #endif
     return parsed_query_tree;
@@ -135,7 +135,9 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
 
 std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const {
     if (text.empty()) {
-        RecoverableError(Status::SyntaxError("Empty query text"));
+        Status status = Status::SyntaxError("Empty query text");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
         return nullptr;
     }
     Term input_term;
@@ -148,9 +150,10 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
             analyzer_name = it->second;
         }
     }
-    UniquePtr<Analyzer> analyzer = AnalyzerPool::instance().Get(analyzer_name);
-    if (analyzer.get() == nullptr) {
-        RecoverableError(Status::UnexpectedError(String("Failed to get or initialize analyzer: ") + analyzer_name));
+    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
+    if (!status.ok()) {
+        LOG_ERROR(status.message());
+        RecoverableError(status);
     }
     if (analyzer_name == AnalyzerPool::STANDARD) {
         TermList temp_output_terms;
@@ -198,6 +201,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         result->column_ = field;
         return result;
     } else {
+        /*
         fmt::print("Create Or Query Node\n");
         auto result = std::make_unique<OrQueryNode>();
         for (auto &term : terms) {
@@ -207,7 +211,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
             result->Add(std::move(subquery));
         }
         return result;
-        /*
+        */
         // create phrase query node
         auto result = std::make_unique<PhraseQueryNode>();
         for (auto term : terms) {
@@ -215,7 +219,6 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         }
         result->column_ = field;
         return result;
-        */
     }
 }
 

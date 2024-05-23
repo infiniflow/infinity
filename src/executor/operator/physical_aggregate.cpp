@@ -81,7 +81,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                              MakeShared<DataType>(expr->Type()),
                                                              expr->Name(),
-                                                             HashSet<ConstraintType>());
+                                                             std::set<ConstraintType>());
         groupby_columns.emplace_back(col_def);
         types.emplace_back(expr->Type());
         ++ idx;
@@ -116,7 +116,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
             SharedPtr<DataType> col_type = input_table_->GetColumnTypeById(idx);
             String col_name = input_table_->GetColumnNameById(idx);
 
-            SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
+            SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, std::set<ConstraintType>());
             columns.emplace_back(col_def);
         }
 
@@ -152,7 +152,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
             SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
                                                                  data_type,
                                                                  expr->Name(),
-                                                                 HashSet<ConstraintType>());
+                                                                 std::set<ConstraintType>());
             aggregate_columns.emplace_back(col_def);
 
             // for output block
@@ -216,7 +216,9 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = grouped_input_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
-            RecoverableError(Status::DataTypeMismatch(input_type->ToString(), output_type->ToString()));
+            Status status = Status::DataTypeMismatch(input_type->ToString(), output_type->ToString());
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         types.emplace_back(input_type);
     }
@@ -357,7 +359,9 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
-            RecoverableError(Status::DataTypeMismatch(input_type->ToString(), output_type->ToString()));
+            Status status = Status::DataTypeMismatch(input_type->ToString(), output_type->ToString());
+            LOG_ERROR(status.message());
+            RecoverableError(status);
         }
         types.emplace_back(input_type);
     }
@@ -617,7 +621,7 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
         SharedPtr<DataType> output_type = MakeShared<DataType>(expr->Type());
 
         // column definition
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, output_type, expr->Name(), HashSet<ConstraintType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, output_type, expr->Name(), std::set<ConstraintType>());
         aggregate_columns.emplace_back(col_def);
 
         // for output block
