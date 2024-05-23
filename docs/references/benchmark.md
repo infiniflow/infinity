@@ -57,11 +57,11 @@ sed '1d' datasets/enwiki/enwiki-20120502-lines-1k.txt > datasets/enwiki/enwiki.c
 mkdir -p $HOME/elasticsearch
 docker run -d --name elasticsearch --network host -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms16384m -Xmx32000m" -e "xpack.security.enabled=false" -v $HOME/elasticsearch:/usr/share/elasticsearch elasticsearch:8.13.4
 
-mkdir -p $HOME/qdrant
-docker run -d --name qdrant --network host -v $HOME/qdrant:/qdrant qdrant/qdrant:v1.8.2
+mkdir -p $HOME/qdrant/storage
+docker run -d --name qdrant --network host -v $HOME/qdrant/storage:/qdrant/storage qdrant/qdrant:v1.9.2
 
-sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
+mkdir -p $HOME/infinity
+docker run -d --name infinity -v $HOME/infinity:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
 ```
 
 4. Run Benchmark:
@@ -101,7 +101,7 @@ Following are commands for engine `infinity` and dataset `enwiki`:
 ```bash
 python run.py --generate --engine infinity --dataset enwiki
 python run.py --import --engine infinity --dataset enwiki
-python run.py --query --engine infinity --dataset enwiki
+python run.py --query=16 --engine infinity --dataset enwiki
 python run.py --query-express=16 --engine infinity --dataset enwiki
 ```
 

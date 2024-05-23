@@ -1,7 +1,7 @@
 {
     "name": "infinity_geonames",
     "app": "infinity",
-    "connection_url": "http://localhost:23817",
+    "host": "127.0.0.1:23817",
     "data_path": "datasets/geonames/geonames.json",
     "data_link": "https://rally-tracks.elastic.co/geonames/documents-2.json.bz2",
     "insert_batch_size": 8192,
