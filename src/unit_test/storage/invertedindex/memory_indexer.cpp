@@ -71,14 +71,6 @@ public:
             R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
         };
 
-//        const char *paragraphs[] = {
-//            R"#(a, b, c)#",
-//            R"#(a, b)#",
-//            R"#(c, d)#",
-//            R"#(e, d)#",
-//            R"#(a, c)#",
-//        };
-
         const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
         column_ = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
         column_->Initialize();

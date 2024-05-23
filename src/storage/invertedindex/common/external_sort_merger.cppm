@@ -310,28 +310,7 @@ public:
         }
     }
 
-    char* PutByRead(DirectIO &io_stream, u32& length) {
-        if (length > buffer_size_) {
-            throw std::runtime_error("Data length exceeds buffer capacity");
-        }
-        if (IsFull()) {
-            throw std::runtime_error("Buffer is full");
-        }
-
-        // Read data into the current buffer
-        length = io_stream.Read(buffer_array_[head_].get(), length);
-        return buffer_array_[head_].get();
-//        auto res_ptr = buffer_array_[head_].get();
-//        head_ = (head_ + 1) % total_buffers_;
-//
-//        if (head_ == tail_) {
-//            full_ = true;
-//        }
-//        return res_ptr;
-    }
-
     Tuple<const char*, u32, u32> GetTuple() {
-        // std::cout << "CycleBuffer::Get" << std::endl;
         if (IsEmpty()) {
             throw std::runtime_error("Buffer is empty");
         }
@@ -346,7 +325,6 @@ public:
     }
 
     const char* Get() {
-        // std::cout << "CycleBuffer::Get" << std::endl;
         if (IsEmpty()) {
             throw std::runtime_error("Buffer is empty");
         }
@@ -357,7 +335,6 @@ public:
 
         return result_data;
     }
-
 
     void Reset() {
         head_ = tail_ = 0;
@@ -395,7 +372,7 @@ private:
 
 export template <typename KeyType, typename LenType>
 class SortMerger {
-public:
+protected:
     typedef SortMerger<KeyType, LenType> self_t;
     typedef KeyAddress<KeyType, LenType> KeyAddr;
     static constexpr SizeT MAX_TUPLE_LENGTH = 1024;
@@ -408,23 +385,18 @@ public:
     const u32 OUT_BUF_NUM_;    //!< output threads number
 
     std::priority_queue<KeyAddr> pre_heap_;   //!< predict heap
-    std::priority_queue<KeyAddr> merge_heap_; //!< merge heap
     SharedPtr<LoserTree<KeyAddr>> merge_loser_tree_;
 
     u32 *micro_run_idx_{nullptr};   //!< the access index of each microruns
     u32 *micro_run_pos_{nullptr};   //!< the access position within each microruns
     u32 *num_micro_run_{nullptr};   //!< the records number of each microruns
     u32 *size_micro_run_{nullptr};  //!< the size of entire microrun
-    u32 *num_run_{nullptr};         //!< records number of each runs
     u32 *size_run_{nullptr};        //!< size of each entire runs
-    u32 *size_loaded_run_{nullptr}; //!< size of data that have been read within each entire runs
     u64 *run_addr_{nullptr};        //!< start file address of each runs
-    u64 *run_curr_addr_{nullptr};   //!< current file address of each runs
 
     char **micro_buf_{nullptr};   //!< address of every microrun channel buffer
     char **sub_out_buf_{nullptr}; //!< addresses of each output buffer
 
-    char *pre_buf_{nullptr}; //!< predict buffer
     char *run_buf_{nullptr}; //!< entire run buffer
     char *out_buf_{nullptr}; //!< the entire output buffer
 
@@ -437,19 +409,11 @@ public:
     std::mutex out_out_mtx_; //!< mutex and condition to ensure the seqence of file writing of all the output threads
     std::condition_variable out_out_con_;
 
-    u32 pre_buf_size_; //!< the current size of microrun that has been loaded onto prediect buffer
-    u32 pre_buf_num_;  //!< the current records number of microrun that has been loaded onto prediect buffer
-    //u32 pre_idx_;    //!< the index of microrun channel right in the predict buffer
     u32 out_buf_in_idx_;          //!< used by merge to get the current available output buffer
     u32 out_buf_out_idx_;         //!< used by output threads to get the index of the turn of outputting
     u32 *out_buf_size_{nullptr};  //!< data size of each output buffer
     bool *out_buf_full_{nullptr}; //!< a flag to ensure if the output buffer is full or not
 
-    Vector<u64> curr_addr_;
-    Vector<u64> end_addr_;
-    Vector<UniquePtr<char_t[]>> key_buf_;
-    Vector<char*> key_buf_ptr_;
-    Vector<SharedPtr<MmapReader>> mmap_io_streams_;
     UniquePtr<CycleBuffer> cycle_buffer_;
     std::mutex cycle_buf_mtx_;
     std::condition_variable cycle_buf_con_;
@@ -460,8 +424,6 @@ public:
     Queue<u32> out_size_queue_;
     SizeT OUT_BATCH_SIZE_;
     Queue<UniquePtr<TermTupleList>> term_tuple_list_queue_;
-
-    UniquePtr<CycleBuffer> cycle_term_tuple_list_queue_;
 
     bool read_finish_{false};
     u32 CYCLE_BUF_SIZE_;
@@ -477,21 +439,11 @@ public:
 
     void Predict(DirectIO &io_stream);
 
-    void PredictByQueue(DirectIO &io_stream);
-
     void Merge();
-
-    void MergeMmap(MmapReader &io_stream, SharedPtr<FileWriter> out_file_writer);
-
-    void MergeByQueue();
 
     void Output(FILE *f, u32 idx);
 
     void OutputByQueue(FILE* f);
-
-    // void OutputByQueueTerm(FILE *f);
-
-    // void MergeByQueueTerm();
 
     void Init(MmapReader &io_stream);
 
@@ -499,42 +451,19 @@ public:
 
     void ReadKeyAtNonCopy(MmapReader &io_stream, u64 pos);
 
-    // void MergeByQueue<TermTuple, LenType>();
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
     virtual ~SortMerger();
 
-    void SetParams(u32 max_record_len) {
-        if (max_record_len > PRE_BUF_SIZE_) {
-            PRE_BUF_SIZE_ = max_record_len;
-            RUN_BUF_SIZE_ = PRE_BUF_SIZE_ * MAX_GROUP_SIZE_;
-            // OUT_BUF_SIZE_ = BS_SIZE_ - RUN_BUF_SIZE_ - PRE_BUF_SIZE_; ///we do not change OUT_BUF_SIZE_
-        }
-    }
-
-    void SetParams(u32 max_record_len, u32 min_buff_size_required) {
-        if (max_record_len > PRE_BUF_SIZE_)
-            PRE_BUF_SIZE_ = max_record_len;
-        if (RUN_BUF_SIZE_ < min_buff_size_required)
-            RUN_BUF_SIZE_ = min_buff_size_required;
-        if (RUN_BUF_SIZE_ < PRE_BUF_SIZE_ * MAX_GROUP_SIZE_)
-            RUN_BUF_SIZE_ = PRE_BUF_SIZE_ * MAX_GROUP_SIZE_;
-        if (OUT_BUF_SIZE_ < min_buff_size_required)
-            OUT_BUF_SIZE_ = min_buff_size_required;
-    }
-
     virtual void Run();
 };
 
-//export template <typename KeyType, typename LenType>
-//class SortMergerTerm;
-
 export template <typename KeyType, typename LenType>
 requires std::same_as<KeyType, TermTuple>
-class SortMergerTerm : public SortMerger<KeyType, LenType> {
+class SortMergerTermTuple : public SortMerger<KeyType, LenType> {
 protected:
-    typedef SortMergerTerm<KeyType, LenType> self_t;
+    typedef SortMergerTermTuple<KeyType, LenType> self_t;
     using Super = SortMerger<KeyType, LenType>;
     using Super::filenm_;
     using Super::MAX_GROUP_SIZE_;
@@ -544,20 +473,15 @@ protected:
     using Super::OUT_BUF_SIZE_;
     using Super::OUT_BUF_NUM_;
     using Super::pre_heap_;
-    using Super::merge_heap_;
     using Super::merge_loser_tree_;
     using Super::micro_run_idx_;
     using Super::micro_run_pos_;
     using Super::num_micro_run_;
     using Super::size_micro_run_;
-    using Super::num_run_;
     using Super::size_run_;
-    using Super::size_loaded_run_;
     using Super::run_addr_;
-    using Super::run_curr_addr_;
     using Super::micro_buf_;
     using Super::sub_out_buf_;
-    using Super::pre_buf_;
     using Super::run_buf_;
     using Super::out_buf_;
     using Super::pre_buf_mtx_;
@@ -566,17 +490,10 @@ protected:
     using Super::in_out_con_;
     using Super::out_out_mtx_;
     using Super::out_out_con_;
-    using Super::pre_buf_size_;
-    using Super::pre_buf_num_;
     using Super::out_buf_in_idx_;
     using Super::out_buf_out_idx_;
     using Super::out_buf_size_;
     using Super::out_buf_full_;
-    using Super::curr_addr_;
-    using Super::end_addr_;
-    using Super::key_buf_;
-    using Super::key_buf_ptr_;
-    using Super::mmap_io_streams_;
     using Super::cycle_buffer_;
     using Super::cycle_buf_mtx_;
     using Super::cycle_buf_con_;
@@ -596,14 +513,16 @@ protected:
     using Super::MAX_TUPLE_LENGTH;
     u64 term_list_count_{0};
 
-    void OutputByQueueTerm(FILE *f);
-    void MergeByQueueTerm();
+    void PredictImpl(DirectIO &io_stream);
 
+    void OutputImpl(FILE *f);
+
+    void MergeImpl();
 public:
-    SortMergerTerm(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2)
-            : Super(filenm, group_size, bs, output_num) {}
+    SortMergerTermTuple(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2)
+        : Super(filenm, group_size, bs, output_num) {}
 
-    void RunTerm();
+    void Run() override;
 };
 
 } // namespace infinity

@@ -48,13 +48,11 @@ export int MunmapFile(u8 *&data_ptr, SizeT &data_len, SizeT offset_diff = 0) {
 
 export struct MmapReader {
     MmapReader(const String &filename, SizeT offset = 0, SizeT len = SizeT(-1), int advice = MADV_SEQUENTIAL) {
-        // int rc = MmapFile(filename, data_ptr_, data_len_, advice);
-        // fmt::print("filename = {}, offset = {}, len = {}\n", filename, offset, len);
         int rc = MmapPartFile(filename, data_ptr_, len, advice, offset);
         idx_ = 0;
         data_len_ = len;
         if (rc < 0) {
-            throw UnrecoverableException("MmapFile failed");
+            UnrecoverableError("MmapFile failed");
         }
     }
 
@@ -117,7 +115,6 @@ export struct MmapReader {
         offset_diff_ = offset - aligned_offset;
 
         SizeT mapped_length = data_len + offset_diff_;
-        // void* mapped = mmap(NULL, mapped_length, PROT_READ, MAP_SHARED, fd, aligned_offset);
 
         int f = open(fp.c_str(), O_RDONLY);
         void *tmpd = mmap(NULL, mapped_length, PROT_READ, MAP_SHARED, f, aligned_offset);
@@ -128,7 +125,6 @@ export struct MmapReader {
         if (rc < 0)
             return -1;
         data_ptr = (u8 *)tmpd + offset_diff_;
-        // data_len = len_f;
         return 0;
     }
 

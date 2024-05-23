@@ -46,10 +46,6 @@ void LoserTreeTest::GenerateData(infinity::SizeT num_size, infinity::SizeT loser
     }
     for (SizeT i = 0; i < loser_num; ++i) {
         std::sort(loser[i].begin(), loser[i].end());
-//        for (SizeT j = 0; j < loser[i].size(); ++j) {
-//            fmt::print("{} ", loser[i][j]);
-//        }
-//        fmt::print("\n");
     }
 }
 
@@ -70,7 +66,6 @@ void LoserTreeTest::MultiWayMerge(infinity::SizeT num_size, infinity::SizeT lose
         auto min_value = loser_tree->TopKey();
         auto min_source = loser_tree->TopSource();
         merge_res.push_back(min_value);
-        // fmt::print("min val = {}, min source = {}\n", min_value, min_source);
         auto& min_seq = num_idx[min_source];
 
         if (min_seq < loser[min_source].size()) {
@@ -85,17 +80,6 @@ void LoserTreeTest::MultiWayMerge(infinity::SizeT num_size, infinity::SizeT lose
     for (SizeT i = 0; i < merge_res.size(); ++i) {
         EXPECT_EQ(merge_res[i], numbers[i]);
     }
-    return ;
-    for (SizeT i = 0; i < merge_res.size(); ++i) {
-        fmt::print("{} ", merge_res[i]);
-        // EXPECT_EQ(merge_res[i], numbers[i]);
-    }
-    fmt::print("\n");
-    for (SizeT i = 0; i < numbers.size(); ++i) {
-        fmt::print("{} ", numbers[i]);
-        // EXPECT_EQ(merge_res[i], numbers[i]);
-    }
-    fmt::print("\n");
 }
 
 TEST_F(LoserTreeTest, BasicMerge1) {
