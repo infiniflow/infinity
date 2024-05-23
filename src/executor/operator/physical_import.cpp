@@ -539,46 +539,80 @@ void PhysicalImport::CSVRowHandler(void *context) {
     parser_context->block_entry_ = std::move(block_entry);
 }
 
-template <typename T>
-void AppendJsonTensorToColumn(const nlohmann::json &line_json,
-                              const String &column_name,
-                              ColumnVector &column_vector,
-                              EmbeddingInfo *embedding_info) {
-    Vector<T> &&embedding = line_json[column_name].get<Vector<T>>();
-    if (embedding.size() % embedding_info->Dimension() != 0) {
-        Status status = Status::ImportFileFormatError(
-            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension()));
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
-    const auto input_bytes = embedding.size() * sizeof(T);
-    const Value embedding_value =
-        Value::MakeTensor(reinterpret_cast<const_ptr_t>(embedding.data()), input_bytes, column_vector.data_type()->type_info());
-    column_vector.AppendValue(embedding_value);
-}
-
-template <>
-void AppendJsonTensorToColumn<bool>(const nlohmann::json &line_json,
-                                    const String &column_name,
-                                    ColumnVector &column_vector,
-                                    EmbeddingInfo *embedding_info) {
-    Vector<float> &&embedding = line_json[column_name].get<Vector<float>>();
-    if (embedding.size() % embedding_info->Dimension() != 0) {
-        Status status = Status::ImportFileFormatError(
-            fmt::format("Tensor element count {} isn't multiple of dimension {}.", embedding.size(), embedding_info->Dimension()));
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
-    const auto input_bytes = (embedding.size() + 7) / 8;
-    auto input_data = MakeUnique<u8[]>(input_bytes);
-    for (SizeT i = 0; i < embedding.size(); ++i) {
-        if (embedding[i]) {
-            input_data[i / 8] |= (1u << (i % 8));
+SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object) {
+    switch (json_object.type()) {
+        case nlohmann::json::value_t::boolean: {
+            auto res = MakeShared<ConstantExpr>(LiteralType::kBoolean);
+            res->bool_value_ = json_object.get<bool>();
+            return res;
+        }
+        case nlohmann::json::value_t::number_unsigned:
+        case nlohmann::json::value_t::number_integer: {
+            auto res = MakeShared<ConstantExpr>(LiteralType::kInteger);
+            res->integer_value_ = json_object.get<i64>();
+            return res;
+        }
+        case nlohmann::json::value_t::number_float: {
+            auto res = MakeShared<ConstantExpr>(LiteralType::kDouble);
+            res->double_value_ = json_object.get<double>();
+            return res;
+        }
+        case nlohmann::json::value_t::string: {
+            auto res = MakeShared<ConstantExpr>(LiteralType::kString);
+            auto str = json_object.get<String>();
+            res->str_value_ = strdup(json_object.get<String>().c_str());
+            return res;
+        }
+        case nlohmann::json::value_t::array: {
+            const u32 array_size = json_object.size();
+            if (array_size == 0) {
+                const auto error_info = "Empty json array!";
+                LOG_ERROR(error_info);
+                RecoverableError(Status::ImportFileFormatError(error_info));
+                return nullptr;
+            }
+            switch (json_object[0].type()) {
+                case nlohmann::json::value_t::boolean:
+                case nlohmann::json::value_t::number_unsigned:
+                case nlohmann::json::value_t::number_integer: {
+                    auto res = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+                    res->long_array_.resize(array_size);
+                    for (u32 i = 0; i < array_size; ++i) {
+                        res->long_array_[i] = json_object[i].get<i64>();
+                    }
+                    return res;
+                }
+                case nlohmann::json::value_t::number_float: {
+                    auto res = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
+                    res->double_array_.resize(array_size);
+                    for (u32 i = 0; i < array_size; ++i) {
+                        res->double_array_[i] = json_object[i].get<double>();
+                    }
+                    return res;
+                }
+                case nlohmann::json::value_t::array: {
+                    auto res = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
+                    res->sub_array_array_.resize(array_size);
+                    for (u32 i = 0; i < array_size; ++i) {
+                        res->sub_array_array_[i] = BuildConstantExprFromJson(json_object[i]);
+                    }
+                    return res;
+                }
+                default: {
+                    const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                    LOG_ERROR(error_info);
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+            }
+        }
+        default: {
+            const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
+            LOG_ERROR(error_info);
+            RecoverableError(Status::ImportFileFormatError(error_info));
+            return nullptr;
         }
     }
-    const Value embedding_value =
-        Value::MakeTensor(reinterpret_cast<const_ptr_t>(input_data.get()), input_bytes, column_vector.data_type()->type_info());
-    column_vector.AppendValue(embedding_value);
 }
 
 void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors) {
@@ -667,42 +701,11 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                     }
                     break;
                 }
-                case kTensor: {
-                    auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-                    // SizeT dim = embedding_info->Dimension();
-                    switch (embedding_info->Type()) {
-                        case kElemBit: {
-                            AppendJsonTensorToColumn<bool>(line_json, column_def->name_, column_vector, embedding_info);
-                            break;
-                        }
-                        case kElemInt8: {
-                            AppendJsonTensorToColumn<i8>(line_json, column_def->name_, column_vector, embedding_info);
-                            break;
-                        }
-                        case kElemInt16: {
-                            AppendJsonTensorToColumn<i16>(line_json, column_def->name_, column_vector, embedding_info);
-                            break;
-                        }
-                        case kElemInt32: {
-                            AppendJsonTensorToColumn<i32>(line_json, column_def->name_, column_vector, embedding_info);
-                            break;
-                        }
-                        case kElemInt64: {
-                            AppendJsonTensorToColumn<i64>(line_json, column_def->name_, column_vector, embedding_info);
-                            break;
-                        }
-                        case kElemFloat: {
-                            AppendJsonTensorToColumn<float>(line_json, column_def->name_, column_vector, embedding_info);
-                            break;
-                        }
-                        case kElemDouble: {
-                            AppendJsonTensorToColumn<double>(line_json, column_def->name_, column_vector, embedding_info);
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Not implement: Embedding type.");
-                        }
-                    }
+                case kTensor:
+                case kTensorArray: {
+                    // build ConstantExpr
+                    SharedPtr<ConstantExpr> const_expr = BuildConstantExprFromJson(line_json[column_def->name_]);
+                    column_vector.AppendByConstantExpr(const_expr.get());
                     break;
                 }
                 default: {
