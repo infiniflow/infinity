@@ -27,6 +27,11 @@ import match_tensor_expr;
 
 namespace infinity {
 
+export enum class MatchTensorMethod : u8 {
+    kInvalid,
+    kMaxSim,
+};
+
 export class MatchTensorExpression final : public BaseExpression {
 public:
     MatchTensorExpression(Vector<SharedPtr<BaseExpression>> search_column,
@@ -40,6 +45,8 @@ public:
     DataType Type() const override;
 
     String ToString() const override;
+
+    static String MethodToString(MatchTensorMethod method);
 
     MatchTensorMethod search_method_;
     const ColumnExpression *column_expr_ = nullptr;

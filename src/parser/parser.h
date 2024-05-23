@@ -242,59 +242,60 @@ struct SQL_LTYPE {
     EMBEDDING = 370,               /* EMBEDDING  */
     VECTOR = 371,                  /* VECTOR  */
     BIT = 372,                     /* BIT  */
-    TENSOR = 373,                  /* TENSOR  */
-    TEXT = 374,                    /* TEXT  */
-    PRIMARY = 375,                 /* PRIMARY  */
-    KEY = 376,                     /* KEY  */
-    UNIQUE = 377,                  /* UNIQUE  */
-    NULLABLE = 378,                /* NULLABLE  */
-    IS = 379,                      /* IS  */
-    DEFAULT = 380,                 /* DEFAULT  */
-    TRUE = 381,                    /* TRUE  */
-    FALSE = 382,                   /* FALSE  */
-    INTERVAL = 383,                /* INTERVAL  */
-    SECOND = 384,                  /* SECOND  */
-    SECONDS = 385,                 /* SECONDS  */
-    MINUTE = 386,                  /* MINUTE  */
-    MINUTES = 387,                 /* MINUTES  */
-    HOUR = 388,                    /* HOUR  */
-    HOURS = 389,                   /* HOURS  */
-    DAY = 390,                     /* DAY  */
-    DAYS = 391,                    /* DAYS  */
-    MONTH = 392,                   /* MONTH  */
-    MONTHS = 393,                  /* MONTHS  */
-    YEAR = 394,                    /* YEAR  */
-    YEARS = 395,                   /* YEARS  */
-    EQUAL = 396,                   /* EQUAL  */
-    NOT_EQ = 397,                  /* NOT_EQ  */
-    LESS_EQ = 398,                 /* LESS_EQ  */
-    GREATER_EQ = 399,              /* GREATER_EQ  */
-    BETWEEN = 400,                 /* BETWEEN  */
-    AND = 401,                     /* AND  */
-    OR = 402,                      /* OR  */
-    EXTRACT = 403,                 /* EXTRACT  */
-    LIKE = 404,                    /* LIKE  */
-    DATA = 405,                    /* DATA  */
-    LOG = 406,                     /* LOG  */
-    BUFFER = 407,                  /* BUFFER  */
-    KNN = 408,                     /* KNN  */
-    USING = 409,                   /* USING  */
-    SESSION = 410,                 /* SESSION  */
-    GLOBAL = 411,                  /* GLOBAL  */
-    OFF = 412,                     /* OFF  */
-    EXPORT = 413,                  /* EXPORT  */
-    PROFILE = 414,                 /* PROFILE  */
-    CONFIGS = 415,                 /* CONFIGS  */
-    CONFIG = 416,                  /* CONFIG  */
-    PROFILES = 417,                /* PROFILES  */
-    VARIABLES = 418,               /* VARIABLES  */
-    VARIABLE = 419,                /* VARIABLE  */
-    SEARCH = 420,                  /* SEARCH  */
-    MATCH = 421,                   /* MATCH  */
-    MAXSIM = 422,                  /* MAXSIM  */
-    QUERY = 423,                   /* QUERY  */
-    FUSION = 424,                  /* FUSION  */
-    NUMBER = 425                   /* NUMBER  */
+    TEXT = 373,                    /* TEXT  */
+    TENSOR = 374,                  /* TENSOR  */
+    TENSORARRAY = 375,             /* TENSORARRAY  */
+    PRIMARY = 376,                 /* PRIMARY  */
+    KEY = 377,                     /* KEY  */
+    UNIQUE = 378,                  /* UNIQUE  */
+    NULLABLE = 379,                /* NULLABLE  */
+    IS = 380,                      /* IS  */
+    DEFAULT = 381,                 /* DEFAULT  */
+    TRUE = 382,                    /* TRUE  */
+    FALSE = 383,                   /* FALSE  */
+    INTERVAL = 384,                /* INTERVAL  */
+    SECOND = 385,                  /* SECOND  */
+    SECONDS = 386,                 /* SECONDS  */
+    MINUTE = 387,                  /* MINUTE  */
+    MINUTES = 388,                 /* MINUTES  */
+    HOUR = 389,                    /* HOUR  */
+    HOURS = 390,                   /* HOURS  */
+    DAY = 391,                     /* DAY  */
+    DAYS = 392,                    /* DAYS  */
+    MONTH = 393,                   /* MONTH  */
+    MONTHS = 394,                  /* MONTHS  */
+    YEAR = 395,                    /* YEAR  */
+    YEARS = 396,                   /* YEARS  */
+    EQUAL = 397,                   /* EQUAL  */
+    NOT_EQ = 398,                  /* NOT_EQ  */
+    LESS_EQ = 399,                 /* LESS_EQ  */
+    GREATER_EQ = 400,              /* GREATER_EQ  */
+    BETWEEN = 401,                 /* BETWEEN  */
+    AND = 402,                     /* AND  */
+    OR = 403,                      /* OR  */
+    EXTRACT = 404,                 /* EXTRACT  */
+    LIKE = 405,                    /* LIKE  */
+    DATA = 406,                    /* DATA  */
+    LOG = 407,                     /* LOG  */
+    BUFFER = 408,                  /* BUFFER  */
+    KNN = 409,                     /* KNN  */
+    USING = 410,                   /* USING  */
+    SESSION = 411,                 /* SESSION  */
+    GLOBAL = 412,                  /* GLOBAL  */
+    OFF = 413,                     /* OFF  */
+    EXPORT = 414,                  /* EXPORT  */
+    PROFILE = 415,                 /* PROFILE  */
+    CONFIGS = 416,                 /* CONFIGS  */
+    CONFIG = 417,                  /* CONFIG  */
+    PROFILES = 418,                /* PROFILES  */
+    VARIABLES = 419,               /* VARIABLES  */
+    VARIABLE = 420,                /* VARIABLE  */
+    SEARCH = 421,                  /* SEARCH  */
+    MATCH = 422,                   /* MATCH  */
+    MAXSIM = 423,                  /* MAXSIM  */
+    QUERY = 424,                   /* QUERY  */
+    FUSION = 425,                  /* FUSION  */
+    NUMBER = 426                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -377,7 +378,7 @@ union SQLSTYPE
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
 
-#line 381 "parser.h"
+#line 382 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

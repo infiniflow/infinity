@@ -61,6 +61,8 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         }
         case kMixed:
         case kVarchar:
+        case kTensor:
+        case kTensorArray:
         case kArray:
         case kTuple: {
 //        case kPath:
@@ -71,10 +73,6 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         }
         case kNull:
         case kMissing: {
-            plain_type_ = true;
-            break;
-        }
-        case kTensor: {
             plain_type_ = true;
             break;
         }
@@ -118,7 +116,7 @@ size_t DataType::Size() const {
     }
 
     // embedding, varchar data can get data here.
-    if (type_info_ != nullptr and type_ != kTensor) {
+    if (type_info_ != nullptr and type_ != kTensor and type_ != kTensorArray) {
         return type_info_->Size();
     }
 
@@ -184,6 +182,7 @@ int32_t DataType::GetSizeInBytes() const {
                 size += sizeof(int64_t) * 2;
                 break;
             case LogicalType::kTensor:
+            case LogicalType::kTensorArray:
             case LogicalType::kEmbedding:
                 size += sizeof(EmbeddingDataType);
                 size += sizeof(int32_t);
@@ -226,6 +225,7 @@ void DataType::WriteAdv(char *&ptr) const {
             break;
         }
         case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
         case LogicalType::kEmbedding: {
             const EmbeddingInfo *embedding_info = dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
             ParserAssert(embedding_info != nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
@@ -260,6 +260,7 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
             break;
         }
         case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
         case LogicalType::kEmbedding: {
             EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
             int32_t dimension = ReadBufAdv<int32_t>(ptr);
@@ -308,6 +309,7 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
                 break;
             }
             case LogicalType::kTensor:
+            case LogicalType::kTensorArray:
             case LogicalType::kEmbedding: {
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
                 break;
@@ -491,6 +493,11 @@ std::string DataType::TypeToString<MixedT>() {
 template <>
 std::string DataType::TypeToString<TensorT>() {
     return "Tensor";
+}
+
+template <>
+std::string DataType::TypeToString<TensorArrayT>() {
+    return "TensorArray";
 }
 
 template <>

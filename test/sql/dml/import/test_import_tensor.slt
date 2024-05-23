@@ -4,9 +4,8 @@ DROP TABLE IF EXISTS test_tensor_type;
 statement ok
 CREATE TABLE test_tensor_type ( c1 int, c2 tensor(float,4));
 
-query I
+statement ok
 COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4.csv' WITH ( DELIMITER ',' );
-----
 
 query II
 SELECT c1, c2 FROM test_tensor_type;
@@ -21,6 +20,9 @@ SELECT count(*) FROM test_tensor_type;
 ----
 4
 
+statement error
+COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4_invalid.csv' WITH ( DELIMITER ',' );
+
 # Clean up
 statement ok
 DROP TABLE test_tensor_type;
@@ -28,9 +30,8 @@ DROP TABLE test_tensor_type;
 statement ok
 CREATE TABLE test_tensor_type ( c1 int, c2 tensor(bit,8));
 
-query I
+statement ok
 COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim8.csv' WITH ( DELIMITER ',' );
-----
 
 query II
 SELECT c1, c2 FROM test_tensor_type;

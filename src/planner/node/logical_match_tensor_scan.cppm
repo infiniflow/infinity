@@ -57,7 +57,7 @@ public:
 
     SharedPtr<MatchTensorExpression> match_tensor_expr_{};
 
-    // extra options from tensor_maxsim_expr
+    // extra options
     // will be parsed in InitExtraOptions()
     u32 topn_ = 0;
 

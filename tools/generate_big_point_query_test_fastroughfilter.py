@@ -7,7 +7,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 10000
     repeat_n = 100
     csv_dir = "./test/data/csv"
-    slt_dir = "./test/sql/dql"
+    slt_dir = "./test/sql/dql/filter"
     csv_name = "/test_big_top.csv"
     table_name1 = "test_big_point_query_bloom_filter_miss"
     table_name2 = "test_big_point_query_bloom_filter_exist"

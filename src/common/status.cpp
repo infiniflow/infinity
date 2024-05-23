@@ -253,11 +253,11 @@ Status Status::FunctionArgsError(const String &func_name) {
 }
 
 Status Status::ImportFileFormatError(const infinity::String &detailed_info) {
-    return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Import file format error: ", detailed_info)));
+    return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Import file format error: {}", detailed_info)));
 }
 
 Status Status::DataNotExist(const infinity::String &detailed_info) {
-    return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Data not exist: ", detailed_info)));
+    return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Data not exist: {}", detailed_info)));
 }
 
 Status Status::EmptyDBName() { return Status(ErrorCode::kEmptyDbName, MakeUnique<String>("Empty database name.")); }

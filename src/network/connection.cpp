@@ -250,6 +250,8 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 object_width = 16;
                 break;
             }
+            case LogicalType::kTensor:
+            case LogicalType::kTensorArray:
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
                     UnrecoverableError("Not embedding type");
@@ -258,53 +260,6 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
                 switch (embedding_info->Type()) {
 
-                    case kElemBit: {
-                        object_id = 1000;
-                        object_width = 1;
-                        break;
-                    }
-                    case kElemInt8: {
-                        object_id = 1002;
-                        object_width = 1;
-                        break;
-                    }
-                    case kElemInt16: {
-                        object_id = 1005;
-                        object_width = 2;
-                        break;
-                    }
-                    case kElemInt32: {
-                        object_id = 1007;
-                        object_width = 4;
-                        break;
-                    }
-                    case kElemInt64: {
-                        object_id = 1016;
-                        object_width = 8;
-                        break;
-                    }
-                    case kElemFloat: {
-                        object_id = 1021;
-                        object_width = 4;
-                        break;
-                    }
-                    case kElemDouble: {
-                        object_id = 1022;
-                        object_width = 8;
-                        break;
-                    }
-                    case kElemInvalid: {
-                        UnrecoverableError("Invalid embedding data type");
-                    }
-                }
-                break;
-            }
-            case LogicalType::kTensor: {
-                if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    UnrecoverableError("Not tensor type");
-                }
-                EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-                switch (embedding_info->Type()) {
                     case kElemBit: {
                         object_id = 1000;
                         object_width = 1;

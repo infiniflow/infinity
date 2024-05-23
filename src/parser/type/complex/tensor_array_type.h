@@ -14,23 +14,22 @@
 
 #pragma once
 
-#include "constant_expr.h"
-#include "parsed_expr.h"
-#include <memory>
+#include "tensor_type.h"
 
 namespace infinity {
 
-class MatchTensorExpr final : public ParsedExpr {
-public:
-    explicit MatchTensorExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kMatchTensor), own_memory_(own_memory) {}
-    [[nodiscard]] std::string ToString() const override;
+#pragma pack(1)
 
-    const bool own_memory_;
-    std::string search_method_;
-    std::unique_ptr<ParsedExpr> column_expr_;
-    std::unique_ptr<ConstantExpr> tensor_expr_;
-    std::string embedding_data_type_;
-    std::string options_text_;
+struct TensorArrayType {
+    uint16_t tensor_num_ = 0;
+    uint16_t chunk_id_ = 0;
+    uint32_t chunk_offset_ = 0;
+
+    //[[nodiscard]] static std::string TensorArray2String(char *tensor_ptr, EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
 };
+
+static_assert(sizeof(TensorArrayType) == sizeof(uint64_t));
+
+#pragma pack()
 
 } // namespace infinity

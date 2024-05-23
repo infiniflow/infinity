@@ -37,7 +37,7 @@ import default_values;
 
 namespace infinity {
 
-struct EmbeddingTryCastToFixlen;
+export struct EmbeddingTryCastToFixlen;
 struct EmbeddingTryCastToVarlen;
 
 template <typename SourceElemType>
@@ -124,17 +124,36 @@ struct EmbeddingTryCastToFixlen {
     template <typename SourceElemType, typename TargetElemType>
     static inline bool Run(const SourceElemType *source, TargetElemType *target, SizeT len) {
         if constexpr (std::is_same_v<TargetElemType, bool>) {
+            if constexpr (!(std::is_same_v<SourceElemType, TinyIntT> || std::is_same_v<SourceElemType, SmallIntT> ||
+                            std::is_same_v<SourceElemType, IntegerT> || std::is_same_v<SourceElemType, BigIntT> ||
+                            std::is_same_v<SourceElemType, FloatT> || std::is_same_v<SourceElemType, DoubleT>)) {
+                UnrecoverableError(fmt::format("Not support to cast from {} to {}",
+                                               DataType::TypeToString<SourceElemType>(),
+                                               DataType::TypeToString<TargetElemType>()));
+            }
             auto *dst = reinterpret_cast<u8 *>(target);
             std::fill_n(dst, (len + 7) / 8, 0);
             for (SizeT i = 0; i < len; ++i) {
-                if (source[i] > SourceElemType{}) {
-                    dst[i / 8] |= (u8(1) << (i % 8));
+                if (source[i]) {
+                    dst[i / 8] |= (1u << (i % 8));
                 }
             }
             return true;
-        }
-        if constexpr (std::is_same<SourceElemType, TinyIntT>() || std::is_same<SourceElemType, SmallIntT>() ||
-                      std::is_same<SourceElemType, IntegerT>() || std::is_same<SourceElemType, BigIntT>()) {
+        } else if constexpr (std::is_same_v<SourceElemType, bool>) {
+            if constexpr (!(std::is_same_v<TargetElemType, TinyIntT> || std::is_same_v<TargetElemType, SmallIntT> ||
+                            std::is_same_v<TargetElemType, IntegerT> || std::is_same_v<TargetElemType, BigIntT> ||
+                            std::is_same_v<TargetElemType, FloatT> || std::is_same_v<TargetElemType, DoubleT>)) {
+                UnrecoverableError(fmt::format("Not support to cast from {} to {}",
+                                               DataType::TypeToString<SourceElemType>(),
+                                               DataType::TypeToString<TargetElemType>()));
+            }
+            const auto *src = reinterpret_cast<const u8 *>(source);
+            for (SizeT i = 0; i < len; ++i) {
+                target[i] = (src[i / 8] & (1u << (i % 8))) ? 1 : 0;
+            }
+            return true;
+        } else if constexpr (std::is_same<SourceElemType, TinyIntT>() || std::is_same<SourceElemType, SmallIntT>() ||
+                             std::is_same<SourceElemType, IntegerT>() || std::is_same<SourceElemType, BigIntT>()) {
             for (SizeT i = 0; i < len; ++i) {
                 if (!IntegerTryCastToFixlen::Run(source[i], target[i])) {
                     return false;
@@ -148,10 +167,11 @@ struct EmbeddingTryCastToFixlen {
                 }
             }
             return true;
+        } else {
+            UnrecoverableError(
+                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>()));
+            return false;
         }
-        UnrecoverableError(
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>()));
-        return false;
     }
 };
 
@@ -215,8 +235,8 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_e
         auto target_tmp_ptr = MakeUnique<u8[]>(target_size);
         auto src_ptr = reinterpret_cast<const SourceValueType *>(source.ptr);
         for (SizeT i = 0; i < source_embedding_dim; ++i) {
-            if (src_ptr[i] > SourceValueType{}) {
-                target_tmp_ptr[i / 8] |= (u8(1) << (i % 8));
+            if (src_ptr[i]) {
+                target_tmp_ptr[i / 8] |= (1u << (i % 8));
             }
         }
         const auto [chunk_id, chunk_offset] =

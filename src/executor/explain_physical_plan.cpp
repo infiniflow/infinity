@@ -2158,7 +2158,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeMatchTensor *merge_match_te
     result->emplace_back(MakeShared<String>(table_index));
 
     String match_tensor_expression =
-        String(intent_size, ' ') + " - MatchTensor expression: " + merge_match_tensor_node->tensor_maxsim_expr()->ToString();
+        String(intent_size, ' ') + " - MatchTensor expression: " + merge_match_tensor_node->match_tensor_expr()->ToString();
     result->emplace_back(MakeShared<String>(std::move(match_tensor_expression)));
 
     String top_n_expression = String(intent_size, ' ') + " - Top N: " + std::to_string(merge_match_tensor_node->GetTopN());

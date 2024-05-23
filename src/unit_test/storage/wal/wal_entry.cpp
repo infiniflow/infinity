@@ -85,9 +85,10 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
         block_info.block_id_ = 0;
         block_info.row_count_ = row_count;
         block_info.row_capacity_ = row_count;
-        Vector<Pair<i32, u64>> outline_infos;
+        Vector<Vector<Pair<u32, u64>>> outline_infos;
+        outline_infos.resize(column_count);
         for (SizeT i = 0; i < column_count; ++i) {
-            outline_infos.emplace_back(0, 0);
+            outline_infos[i].resize(2);
         }
         block_info.outline_infos_ = std::move(outline_infos);
     }
