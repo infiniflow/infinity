@@ -88,6 +88,8 @@ import drop_table_info;
 import drop_view_info;
 import column_def;
 import logger;
+import statement_common;
+import block_index;
 
 namespace {
 
@@ -868,7 +870,29 @@ Status LogicalPlanner::BuildCopy(CopyStatement *statement, SharedPtr<BindContext
 }
 
 Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    // Check the table existence
+    // Currently export only support jsonl and CSV
+    switch(statement->copy_file_type_) {
+        case CopyFileType::kJSONL:
+        case CopyFileType::kCSV: {
+            break;
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("Exporting file type: {} isn't supported.", *CopyFileTypeToStr(statement->copy_file_type_)));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+    }
+
+    // Check the file existence
+    LocalFileSystem fs;
+
+    String to_write_path;
+    if (fs.Exists(statement->file_path_)) {
+        Status status = Status::DuplicatedFile(statement->file_path_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+
     Txn *txn = query_context_ptr_->GetTxn();
 
     auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
@@ -876,23 +900,17 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         RecoverableError(status);
     }
 
-    // Check the file existence
-    LocalFileSystem fs;
-
-    String to_write_path;
-    if (!fs.Exists(statement->file_path_)) {
-        Status status = Status::FileNotFound(statement->file_path_);
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
+    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn);
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                      table_entry,
                                                                       statement->schema_name_,
                                                                       statement->table_name_,
                                                                       statement->file_path_,
                                                                       statement->header_,
                                                                       statement->delimiter_,
-                                                                      statement->copy_file_type_);
+                                                                      statement->copy_file_type_,
+                                                                      block_index);
 
     this->logical_plan_ = logical_export;
     return Status::OK();

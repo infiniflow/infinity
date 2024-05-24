@@ -28,7 +28,7 @@ enum class CopyFileType {
     kInvalid,
 };
 
-inline std::shared_ptr<std::string> copy_file_to_str(CopyFileType copy_file_type) {
+inline std::shared_ptr<std::string> CopyFileTypeToStr(CopyFileType copy_file_type) {
     switch (copy_file_type) {
         case CopyFileType::kCSV:
             return std::make_shared<std::string>("CSV");

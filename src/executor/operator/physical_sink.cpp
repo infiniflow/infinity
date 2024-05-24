@@ -369,6 +369,11 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = std::move(import_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kExport: {
+            auto *export_output_state = static_cast<ExportOperatorState *>(task_operator_state);
+            message_sink_state->message_ = std::move(export_output_state->result_msg_);
+            break;
+        }
         case PhysicalOperatorType::kInsert: {
             auto *insert_output_state = static_cast<InsertOperatorState *>(task_operator_state);
             message_sink_state->message_ = std::move(insert_output_state->result_msg_);

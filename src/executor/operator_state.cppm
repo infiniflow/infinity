@@ -267,6 +267,7 @@ export struct ImportOperatorState : public OperatorState {
 // Export
 export struct ExportOperatorState : public OperatorState {
     inline explicit ExportOperatorState() : OperatorState(PhysicalOperatorType::kExport) {}
+    UniquePtr<String> result_msg_{};
 };
 
 // Alter

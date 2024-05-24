@@ -433,7 +433,7 @@ Status Status::IOError(const String &detailed_info) {
 }
 
 Status Status::DuplicatedFile(const String &filename) {
-    return Status(ErrorCode::kDuplicatedFile, MakeUnique<String>(fmt::format("Duplicated file: {}", filename)));
+    return Status(ErrorCode::kDuplicatedFile, MakeUnique<String>(fmt::format("File already existed: {}", filename)));
 }
 
 Status Status::ConfigFileError(const String &path, const String &detailed_info) {
