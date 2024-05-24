@@ -74,7 +74,6 @@ public:
     SharedPtr<String> OutlineFilename(u32 buffer_group_id, SizeT file_idx) const;
 
     String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
-    //Vector<String> OutlinePaths() const;
 
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 

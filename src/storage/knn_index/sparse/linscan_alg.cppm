@@ -12,20 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module;
+
+export module linscan_alg;
+
+import stl;
+import sparse_iter;
 
 namespace infinity {
 
-#pragma pack(1)
-
-struct TensorArrayType {
-    uint16_t tensor_num_ = 0;
-    uint16_t chunk_id_ = 0;
-    uint32_t chunk_offset_ = 0;
+struct Posting {
+    u32 doc_id_;
+    f32 val_;
 };
 
-static_assert(sizeof(TensorArrayType) == sizeof(uint64_t));
+export class LinScan {
+public:
+    void Insert(const SparseVecRef &vec, u32 doc_id);
 
-#pragma pack()
+    Pair<Vector<u32>, Vector<f32>> Query(const SparseVecRef &query, u32 top_k) const;
+
+    u32 row_num() const { return row_num_; }
+
+private:
+    HashMap<u32, Vector<Posting>> inverted_idx_;
+    u32 row_num_{};
+};
 
 } // namespace infinity
