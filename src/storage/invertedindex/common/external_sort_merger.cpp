@@ -315,8 +315,7 @@ void SortMerger<KeyType, LenType>::Merge() {
                 return !this->cycle_buffer_->IsEmpty() || read_finish_;
             });
 
-            if (read_finish_) {
-                assert(cycle_buffer_->IsEmpty());
+            if (read_finish_ && cycle_buffer_->IsEmpty()) {
                 merge_loser_tree_->DeleteTopInsert(nullptr, true);
                 continue;
             }
@@ -479,6 +478,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
         auto out_key = top.KEY();
         if (tuple_list == nullptr) {
             tuple_list = MakeUnique<TermTupleList>(out_key.term_);
+            tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
         } else if (idx != last_idx) {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
                 // output
@@ -489,8 +489,8 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
                 }
                 tuple_list = MakeUnique<TermTupleList>(out_key.term_);
             }
+            tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
         }
-        tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
 
         assert(idx < MAX_GROUP_SIZE_);
 
@@ -502,8 +502,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
                 return !this->cycle_buffer_->IsEmpty() || read_finish_;
             });
 
-            if (read_finish_) {
-                assert(cycle_buffer_->IsEmpty());
+            if (read_finish_ && cycle_buffer_->IsEmpty()) {
                 merge_loser_tree_->DeleteTopInsert(nullptr, true);
                 continue;
             }
