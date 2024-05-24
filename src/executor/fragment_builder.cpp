@@ -178,7 +178,21 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             break;
         }
-        case PhysicalOperatorType::kFusion:
+        case PhysicalOperatorType::kFusion: {
+            if (phys_op->left() == nullptr) {
+                UnrecoverableError(fmt::format("No input node of {}", phys_op->GetName()));
+            }
+            if (phys_op->left()->operator_type() == PhysicalOperatorType::kFusion) {
+                if (phys_op->right() != nullptr) {
+                    UnrecoverableError("Fusion operator with fusion operator child shouldn't have right child.");
+                }
+                current_fragment_ptr->AddOperator(phys_op);
+                // call next Fusion operator
+                BuildFragments(phys_op->left(), current_fragment_ptr);
+                break;
+            }
+            [[fallthrough]];
+        }
         case PhysicalOperatorType::kMergeAggregate:
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:

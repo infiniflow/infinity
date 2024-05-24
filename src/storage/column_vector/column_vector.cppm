@@ -1026,4 +1026,6 @@ export using BooleanColumnWriter = ColumnVectorPtrAndIdx<BooleanT>;
 export template <BinaryGenerateBoolean ColumnValueType>
 using ColumnValueReader = ColumnVectorPtrAndIdx<ColumnValueType>;
 
+export Vector<std::string_view> SplitTensorElement(std::string_view data, char delimiter, const u32 unit_embedding_dim);
+
 } // namespace infinity

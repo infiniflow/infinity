@@ -902,17 +902,16 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {
-    SharedPtr<LogicalFusion> logical_fusion = static_pointer_cast<LogicalFusion>(logical_operator);
+    const auto logical_fusion = static_pointer_cast<LogicalFusion>(logical_operator);
     UniquePtr<PhysicalOperator> left_phy = nullptr, right_phy = nullptr;
-    auto left_logical_node = logical_operator->left_node();
-    if (left_logical_node.get() != nullptr) {
+    if (const auto &left_logical_node = logical_operator->left_node(); left_logical_node.get() != nullptr) {
         left_phy = BuildPhysicalOperator(left_logical_node);
     }
-    auto right_logical_node = logical_operator->right_node();
-    if (right_logical_node.get() != nullptr) {
+    if (const auto right_logical_node = logical_operator->right_node(); right_logical_node.get() != nullptr) {
         right_phy = BuildPhysicalOperator(right_logical_node);
     }
     return MakeUnique<PhysicalFusion>(logical_fusion->node_id(),
+                                      logical_fusion->base_table_ref_,
                                       std::move(left_phy),
                                       std::move(right_phy),
                                       logical_fusion->fusion_expr_,

@@ -172,8 +172,8 @@ public:
         }
         auto search_expr = (SearchExpr *)expr;
 
-        allow_distance = !search_expr->knn_exprs_.empty() && search_expr->fusion_expr_ == nullptr;
-        allow_score = !search_expr->match_exprs_.empty() || !search_expr->match_tensor_exprs_.empty() || search_expr->fusion_expr_ != nullptr;
+        allow_distance = !search_expr->knn_exprs_.empty() && search_expr->fusion_exprs_.empty();
+        allow_score = !search_expr->match_exprs_.empty() || !search_expr->match_tensor_exprs_.empty() || !(search_expr->fusion_exprs_.empty());
     }
 
     void AddSubqueryBinding(const String &name,
