@@ -66,34 +66,35 @@ docker run -d --name infinity -v $HOME/infinity:/var/infinity --ulimit nofile=50
 
 4. Run Benchmark:
 
-Drop file cache before benchmark query latency.
+Drop file cache before benchmark.
 
 ```bash
 echo 3 | sudo tee /proc/sys/vm/drop_caches
 ```
 
 Tasks of the Python script `run.py` include:
- - Delete the original data.
- - Re-insert the data.
- - Calculate the time to insert data and build index.
- - Calculate query latency.
- - Calculate QPS.
+ - Generate fulltext query set.
+ - Measure the time to import data and build index.
+ - Measure the query latency.
+ - Measure the QPS.
 
 ```bash
 $ python run.py -h
-usage: run.py [-h] [--generate] [--import] [--query] [--query-express QUERY_EXPRESS] [--engine ENGINE] [--dataset DATASET]
+usage: run.py [-h] [--generate] [--import] [--query QUERY] [--query-express QUERY_EXPRESS] [--concurrency CONCURRENCY] [--engine ENGINE] [--dataset DATASET]
 
 RAG Database Benchmark
 
 options:
-  -h, --help            show this help message and exit
-  --generate            Generate fulltext queries based on the dataset
-  --import              Import data set into database engine
-  --query               Run single client to benchmark query latency
-  --query-express QUERY_EXPRESS
-                        Run multiple clients in express mode to benchmark QPS
-  --engine ENGINE       database engine to benchmark, one of: all, infinity, qdrant, elasticsearch
-  --dataset DATASET     data set to benchmark, one of: all, gist, sift, geonames, enwiki
+-h, --help            show this help message and exit
+--generate            Generate fulltext query set based on the dataset (default: False)
+--import              Import dataset into database engine (default: False)
+--query QUERY         Run the query set only once using given number of clients with recording the result and latency. This is for result validation and latency analysis (default: 0)
+--query-express QUERY_EXPRESS
+Run the query set randomly using given number of clients without recording the result and latency. This is for QPS measurement. (default: 0)
+--concurrency CONCURRENCY
+Choose concurrency mechanism, one of: mp - multiprocessing(recommended), mt - multithreading. (default: mp)
+--engine ENGINE       Choose database engine to benchmark, one of: infinity, qdrant, elasticsearch (default: infinity)
+--dataset DATASET     Choose dataset to benchmark, one of: gist, sift, geonames, enwiki (default: enwiki)
 ```
 
 Following are commands for engine `infinity` and dataset `enwiki`:
