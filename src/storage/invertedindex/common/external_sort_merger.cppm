@@ -16,9 +16,16 @@ module;
 
 #include <filesystem>
 #include <queue>
+#include <cstring>
+#include <cstdio>
+#include <unistd.h>
+
 export module external_sort_merger;
 
 import stl;
+import loser_tree;
+import infinity_exception;
+import file_writer;
 
 namespace infinity {
 
@@ -68,8 +75,9 @@ export struct TermTuple {
                 }
                 return 0;
             }
-        } else
+        } else {
             return ret < 0 ? -1 : 1;
+        }
     }
 
     bool operator==(const TermTuple &other) const { return Compare(other) == 0; }
@@ -82,6 +90,30 @@ export struct TermTuple {
         doc_id_ = *((u32 *)(p + term_.size() + 1));
         term_pos_ = *((u32 *)(p + term_.size() + 1 + sizeof(doc_id_)));
     }
+};
+
+export struct TermTupleList {
+    TermTupleList(std::string_view term, u32 list_size = 2 * 1024 * 1024) : term_(term) {
+        doc_pos_list_.reserve(list_size);
+        max_tuple_num_ = list_size / (sizeof(u32) * 2);
+    }
+
+    bool IsFull() {
+        return doc_pos_list_.size() >= max_tuple_num_;
+    }
+
+    void Add(u32 doc_id, u32 term_pos) {
+        doc_pos_list_.emplace_back(doc_id, term_pos);
+    }
+
+    SizeT Size() const {
+        return doc_pos_list_.size();
+    }
+
+    String term_;
+    // <doc_id, term_pos>
+    Vector<Pair<u32, u32>> doc_pos_list_;
+    u32 max_tuple_num_{0};
 };
 
 template <typename KeyType, typename LenType, typename = void>
@@ -121,9 +153,9 @@ struct KeyAddress {
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
 
-    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+    bool operator>(const KeyAddress &other) const { return Compare(other) > 0; }
 
-    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+    bool operator<(const KeyAddress &other) const { return Compare(other) < 0; }
 };
 
 template <typename KeyType, typename LenType>
@@ -164,9 +196,9 @@ struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyTy
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
 
-    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+    bool operator>(const KeyAddress &other) const { return Compare(other) > 0; }
 
-    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+    bool operator<(const KeyAddress &other) const { return Compare(other) < 0; }
 };
 
 template <typename LenType>
@@ -201,16 +233,118 @@ struct KeyAddress<TermTuple, LenType> {
 
     bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
 
-    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+    bool operator>(const KeyAddress &other) const { return Compare(other) > 0; }
 
-    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+    bool operator<(const KeyAddress &other) const { return Compare(other) < 0; }
 };
 
+class CycleBuffer {
+public:
+    CycleBuffer(SizeT total_buffers, SizeT buffer_size)
+        : total_buffers_(total_buffers), buffer_size_(buffer_size), head_(0), tail_(0), full_(false) {
+        buffer_array_.resize(total_buffers);
+        buffer_real_size_.resize(total_buffers);
+        buffer_real_num_.resize(total_buffers);
+        for (auto& buf : buffer_array_) {
+            buf = MakeUnique<char[]>(buffer_size);
+        }
+    }
+
+    void Put(const char* data, SizeT length) {
+        if (length > buffer_size_) {
+            throw std::runtime_error("Data length exceeds buffer capacity");
+        }
+        if (IsFull()) {
+            throw std::runtime_error("Buffer is full");
+        }
+
+        // Copy data into the current buffer
+        std::memcpy(buffer_array_[head_].get(), data, length);
+        head_ = (head_ + 1) % total_buffers_;
+
+        if (head_ == tail_) {
+            full_ = true;
+        }
+    }
+
+    void PutReal(UniquePtr<char[]>& data_buf, const u32& real_size, const u32& real_num) {
+        buffer_real_size_[head_] = real_size;
+        buffer_real_num_[head_] = real_num;
+        std::swap(data_buf, buffer_array_[head_]);
+
+        head_ = (head_ + 1) % total_buffers_;
+
+        if (head_ == tail_) {
+            full_ = true;
+        }
+    }
+
+    Tuple<const char*, u32, u32> GetTuple() {
+        if (IsEmpty()) {
+            throw std::runtime_error("Buffer is empty");
+        }
+
+        const char* result_data = buffer_array_[tail_].get();
+        auto result_real_size = buffer_real_size_[tail_];
+        auto result_real_num = buffer_real_num_[tail_];
+        tail_ = (tail_ + 1) % total_buffers_;
+        full_ = false;
+
+        return std::make_tuple(result_data, result_real_size, result_real_num);
+    }
+
+    const char* Get() {
+        if (IsEmpty()) {
+            throw std::runtime_error("Buffer is empty");
+        }
+
+        const char* result_data = buffer_array_[tail_].get();
+        tail_ = (tail_ + 1) % total_buffers_;
+        full_ = false;
+
+        return result_data;
+    }
+
+    void Reset() {
+        head_ = tail_ = 0;
+        full_ = false;
+    }
+
+    bool IsEmpty() const {
+        return (!full_ && (head_ == tail_));
+    }
+
+    bool IsFull() const {
+        return full_;
+    }
+
+    SizeT Size() const {
+        if (full_) {
+            return total_buffers_;
+        }
+        if (head_ >= tail_) {
+            return head_ - tail_;
+        }
+        return total_buffers_ + head_ - tail_;
+    }
+
+private:
+    Vector<UniquePtr<char[]>> buffer_array_;
+    Vector<u32> buffer_real_size_;
+    Vector<u32> buffer_real_num_;
+    SizeT total_buffers_;
+    SizeT buffer_size_;
+    SizeT head_;
+    SizeT tail_;
+    bool full_;
+};
 
 export template <typename KeyType, typename LenType>
 class SortMerger {
+protected:
     typedef SortMerger<KeyType, LenType> self_t;
     typedef KeyAddress<KeyType, LenType> KeyAddr;
+    static constexpr SizeT MAX_TUPLE_LENGTH = 1024;
     String filenm_;
     const u32 MAX_GROUP_SIZE_; //!< max group size
     const u32 BS_SIZE_;        //!< in fact it equals to memory size
@@ -219,23 +353,20 @@ class SortMerger {
     u32 OUT_BUF_SIZE_;         //!< max size of output buffer
     const u32 OUT_BUF_NUM_;    //!< output threads number
 
-    std::priority_queue<KeyAddr> pre_heap_;   //!< predict heap
-    std::priority_queue<KeyAddr> merge_heap_; //!< merge heap
+    // both pre_heap_ and merge_losser_tree are defined as small root heaps
+    std::priority_queue<KeyAddr, std::vector<KeyAddr>, std::greater<KeyAddr>> pre_heap_;
+    SharedPtr<LoserTree<KeyAddr, std::less<KeyAddr>>> merge_loser_tree_;
 
     u32 *micro_run_idx_{nullptr};   //!< the access index of each microruns
     u32 *micro_run_pos_{nullptr};   //!< the access position within each microruns
     u32 *num_micro_run_{nullptr};   //!< the records number of each microruns
     u32 *size_micro_run_{nullptr};  //!< the size of entire microrun
-    u32 *num_run_{nullptr};         //!< records number of each runs
     u32 *size_run_{nullptr};        //!< size of each entire runs
-    u32 *size_loaded_run_{nullptr}; //!< size of data that have been read within each entire runs
     u64 *run_addr_{nullptr};        //!< start file address of each runs
-    u64 *run_curr_addr_{nullptr};   //!< current file address of each runs
 
     char **micro_buf_{nullptr};   //!< address of every microrun channel buffer
     char **sub_out_buf_{nullptr}; //!< addresses of each output buffer
 
-    char *pre_buf_{nullptr}; //!< predict buffer
     char *run_buf_{nullptr}; //!< entire run buffer
     char *out_buf_{nullptr}; //!< the entire output buffer
 
@@ -248,14 +379,25 @@ class SortMerger {
     std::mutex out_out_mtx_; //!< mutex and condition to ensure the seqence of file writing of all the output threads
     std::condition_variable out_out_con_;
 
-    u32 pre_buf_size_; //!< the current size of microrun that has been loaded onto prediect buffer
-    u32 pre_buf_num_;  //!< the current records number of microrun that has been loaded onto prediect buffer
-    // u32 pre_idx_;//!< the index of microrun channel right in the predict buffer
     u32 out_buf_in_idx_;          //!< used by merge to get the current available output buffer
     u32 out_buf_out_idx_;         //!< used by output threads to get the index of the turn of outputting
     u32 *out_buf_size_{nullptr};  //!< data size of each output buffer
     bool *out_buf_full_{nullptr}; //!< a flag to ensure if the output buffer is full or not
 
+    UniquePtr<CycleBuffer> cycle_buffer_;
+    std::mutex cycle_buf_mtx_;
+    std::condition_variable cycle_buf_con_;
+
+    std::mutex out_queue_mtx_;
+    std::condition_variable out_queue_con_;
+    Queue<UniquePtr<char_t[]>> out_queue_;
+    Queue<u32> out_size_queue_;
+    SizeT OUT_BATCH_SIZE_;
+    Queue<UniquePtr<TermTupleList>> term_tuple_list_queue_;
+
+    bool read_finish_{false};
+    u32 CYCLE_BUF_SIZE_;
+    u32 CYCLE_BUF_THRESHOLD_;
     u64 count_;      //!< records number
     u32 group_size_; //!< the real run number that can get from the input file.
 
@@ -271,31 +413,36 @@ class SortMerger {
 
     void Output(FILE *f, u32 idx);
 
+    void OutputByQueue(FILE* f);
+
+    void Unpin(Vector<UniquePtr<Thread>> &threads);
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
-    ~SortMerger();
+    virtual ~SortMerger();
 
-    void SetParams(u32 max_record_len) {
-        if (max_record_len > PRE_BUF_SIZE_) {
-            PRE_BUF_SIZE_ = max_record_len;
-            RUN_BUF_SIZE_ = PRE_BUF_SIZE_ * MAX_GROUP_SIZE_;
-            // OUT_BUF_SIZE_ = BS_SIZE_ - RUN_BUF_SIZE_ - PRE_BUF_SIZE_; ///we do not change OUT_BUF_SIZE_
-        }
-    }
+    virtual void Run();
+};
 
-    void SetParams(u32 max_record_len, u32 min_buff_size_required) {
-        if (max_record_len > PRE_BUF_SIZE_)
-            PRE_BUF_SIZE_ = max_record_len;
-        if (RUN_BUF_SIZE_ < min_buff_size_required)
-            RUN_BUF_SIZE_ = min_buff_size_required;
-        if (RUN_BUF_SIZE_ < PRE_BUF_SIZE_ * MAX_GROUP_SIZE_)
-            RUN_BUF_SIZE_ = PRE_BUF_SIZE_ * MAX_GROUP_SIZE_;
-        if (OUT_BUF_SIZE_ < min_buff_size_required)
-            OUT_BUF_SIZE_ = min_buff_size_required;
-    }
+export template <typename KeyType, typename LenType>
+requires std::same_as<KeyType, TermTuple>
+class SortMergerTermTuple : public SortMerger<KeyType, LenType> {
+protected:
+    typedef SortMergerTermTuple<KeyType, LenType> self_t;
+    using Super = SortMerger<KeyType, LenType>;
+    using typename Super::KeyAddr;
+    u64 term_list_count_{0};
 
-    void Run();
+    void PredictImpl(DirectIO &io_stream);
+
+    void OutputImpl(FILE *f);
+
+    void MergeImpl();
+public:
+    SortMergerTermTuple(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2)
+        : Super(filenm, group_size, bs, output_num) {}
+
+    void Run() override;
 };
 
 } // namespace infinity
