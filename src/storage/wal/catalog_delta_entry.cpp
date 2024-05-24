@@ -438,55 +438,8 @@ SizeT AddTableEntryOp::GetSizeInBytes() const {
         total_size += sizeof(i32) + cd.name_.length();
         total_size += sizeof(i32);
         total_size += cd.constraints_.size() * sizeof(ConstraintType);
-        total_size += sizeof(i32);
         auto const_expr = dynamic_cast<ConstantExpr *>(cd.default_expr_.get());
-        switch (const_expr->literal_type_) {
-            case LiteralType::kBoolean: {
-                total_size += sizeof(bool);
-                break;
-            }
-            case LiteralType::kDouble: {
-                total_size += sizeof(double);
-                break;
-            }
-            case LiteralType::kString: {
-                total_size += sizeof(i32) + (std::string(const_expr->str_value_)).length();
-                break;
-            }
-            case LiteralType::kInteger: {
-                total_size += sizeof(i64);
-                break;
-            }
-            case LiteralType::kNull: {
-                break;
-            }
-            case LiteralType::kDate:
-            case LiteralType::kTime:
-            case LiteralType::kDateTime:
-            case LiteralType::kTimestamp: {
-                total_size += sizeof(i32) + (std::string(const_expr->date_value_)).length();
-                break;
-            }
-            case LiteralType::kIntegerArray: {
-                total_size += sizeof(i64);
-                total_size += sizeof(i64) * const_expr->long_array_.size();
-                break;
-            }
-            case LiteralType::kDoubleArray: {
-                total_size += sizeof(i64);
-                total_size += sizeof(double) * const_expr->double_array_.size();
-                break;
-            }
-            case LiteralType::kSubArrayArray: {
-                UnrecoverableError("SubArrayArray not supported");
-                break;
-            }
-            case LiteralType::kInterval: {
-                total_size += sizeof(i32);
-                total_size += sizeof(i64);
-                break;
-            }
-        }
+        total_size += const_expr->GetSizeInBytes();
     }
 
     total_size += sizeof(SizeT);

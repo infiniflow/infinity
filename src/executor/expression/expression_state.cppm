@@ -14,6 +14,8 @@
 
 module;
 
+export module expression_state;
+
 import stl;
 import base_expression;
 import aggregate_expression;
@@ -24,8 +26,6 @@ import function_expression;
 import value_expression;
 import in_expression;
 import column_vector;
-
-export module expression_state;
 
 namespace infinity {
 
