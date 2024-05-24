@@ -141,9 +141,7 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
         case ttypes.ColumnType.ColumnInt16:
             return list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
         case ttypes.ColumnType.ColumnRowID:
-            all_list = list(struct.unpack('<{}i'.format(
-                len(column_vector) // 4), column_vector))
-            return [all_list[i:i + 2] for i in range(0, len(all_list), 2)]
+            return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnEmbedding:
             dimension = column_data_type.physical_type.embedding_type.dimension
             # print(dimension)

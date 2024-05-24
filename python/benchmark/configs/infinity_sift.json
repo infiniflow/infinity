@@ -1,9 +1,10 @@
 {
     "name": "infinity_sift_1m",
     "app": "infinity",
-    "host": "http://127.0.0.1:23817",
+    "host": "127.0.0.1:23817",
     "data_path": "datasets/sift/sift-128-euclidean.hdf5",
     "data_link": "http://ann-benchmarks.com/sift-128-euclidean.hdf5",
+    "insert_batch_size": 8192,
     "topK": 100,
     "mode": "vector", 
     "schema": {
