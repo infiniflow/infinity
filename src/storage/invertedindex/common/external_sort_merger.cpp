@@ -389,6 +389,19 @@ void SortMerger<KeyType, LenType>::OutputByQueue(FILE *f) {
 }
 
 template <typename KeyType, typename LenType>
+void SortMerger<KeyType, LenType>::Unpin(Vector<UniquePtr<Thread>> &threads) {
+    int num_cores = std::thread::hardware_concurrency();
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    for (int i = 0; i < num_cores; ++i) {
+        CPU_SET(i, &cpuset);
+    }
+    for (auto& thread : threads) {
+        pthread_setaffinity_np(thread->native_handle(), sizeof(cpu_set_t), &cpuset);
+    }
+}
+
+template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Output(FILE *f, u32 idx) {
     DirectIO io_stream(f, "w");
 
@@ -439,22 +452,24 @@ void SortMerger<KeyType, LenType>::Run() {
 
     Init(io_stream);
 
-    Thread predict_thread(std::bind(&self_t::Predict, this, io_stream));
-    Thread merge_thread(std::bind(&self_t::Merge, this));
+    UniquePtr<Thread> predict_thread = MakeUnique<Thread>(std::bind(&self_t::Predict, this, io_stream));
+    UniquePtr<Thread> merge_thread = MakeUnique<Thread>(std::bind(&self_t::Merge, this));
     FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
     IASSERT(out_f);
     IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
 
-    Vector<Thread *> out_thread(OUT_BUF_NUM_);
+    Vector<UniquePtr<Thread>> threads;
+    threads.push_back(std::move(predict_thread));
+    threads.push_back(std::move(merge_thread));
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
-        out_thread[i] = new Thread(std::bind(&self_t::Output, this, out_f, i));
+        UniquePtr<Thread> out_thread = MakeUnique<Thread>(std::bind(&self_t::Output, this, out_f, i));
+        threads.push_back(std::move(out_thread));
     }
 
-    predict_thread.join();
-    merge_thread.join();
-    for (u32 i = 0; i < OUT_BUF_NUM_; ++i) {
-        out_thread[i]->join();
-        delete out_thread[i];
+    this->Unpin(threads);
+
+    for (auto& thread : threads) {
+        thread->join();
     }
     fclose(f);
     fclose(out_f);
@@ -472,8 +487,8 @@ requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
     UniquePtr<TermTupleList> tuple_list = nullptr;
     u32 last_idx = -1;
-    while (merge_loser_tree_->TopSource() != LoserTree<KeyAddr>::invalid_) {
-        auto top = merge_loser_tree_->TopKey();
+    while (this->merge_loser_tree_->TopSource() != LoserTree<KeyAddr>::invalid_) {
+        auto top = this->merge_loser_tree_->TopKey();
         u32 idx = top.IDX();
         auto out_key = top.KEY();
         if (tuple_list == nullptr) {
@@ -483,58 +498,58 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
                 // output
                 {
-                    std::unique_lock lock(out_queue_mtx_);
-                    term_tuple_list_queue_.push(std::move(tuple_list));
-                    out_queue_con_.notify_one();
+                    std::unique_lock lock(this->out_queue_mtx_);
+                    this->term_tuple_list_queue_.push(std::move(tuple_list));
+                    this->out_queue_con_.notify_one();
                 }
                 tuple_list = MakeUnique<TermTupleList>(out_key.term_);
             }
             tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
         }
 
-        assert(idx < MAX_GROUP_SIZE_);
+        assert(idx < this->MAX_GROUP_SIZE_);
 
-        if (micro_run_idx_[idx] == num_micro_run_[idx]) {
-            IASSERT(micro_run_pos_[idx] <= size_micro_run_[idx]);
-            std::unique_lock lock(cycle_buf_mtx_);
+        if (this->micro_run_idx_[idx] == this->num_micro_run_[idx]) {
+            IASSERT(this->micro_run_pos_[idx] <= this->size_micro_run_[idx]);
+            std::unique_lock lock(this->cycle_buf_mtx_);
 
-            cycle_buf_con_.wait(lock, [this]() {
-                return !this->cycle_buffer_->IsEmpty() || read_finish_;
+            this->cycle_buf_con_.wait(lock, [this]() {
+                return !this->cycle_buffer_->IsEmpty() || this->read_finish_;
             });
 
-            if (read_finish_ && cycle_buffer_->IsEmpty()) {
-                merge_loser_tree_->DeleteTopInsert(nullptr, true);
+            if (this->read_finish_ && this->cycle_buffer_->IsEmpty()) {
+                this->merge_loser_tree_->DeleteTopInsert(nullptr, true);
                 continue;
             }
 
-            assert(idx < MAX_GROUP_SIZE_);
-            auto res = cycle_buffer_->GetTuple();
+            assert(idx < this->MAX_GROUP_SIZE_);
+            auto res = this->cycle_buffer_->GetTuple();
             auto pre_buf_size = std::get<1>(res);
             auto pre_buf_num = std::get<2>(res);
-            memcpy(micro_buf_[idx], std::get<0>(res), pre_buf_size);
+            memcpy(this->micro_buf_[idx], std::get<0>(res), pre_buf_size);
 
-            size_micro_run_[idx] = pre_buf_size;
-            num_micro_run_[idx] = pre_buf_num;
-            micro_run_pos_[idx] = micro_run_idx_[idx] = 0;
+            this->size_micro_run_[idx] = pre_buf_size;
+            this->num_micro_run_[idx] = pre_buf_num;
+            this->micro_run_pos_[idx] = this->micro_run_idx_[idx] = 0;
 
-            if (cycle_buffer_->Size() < CYCLE_BUF_THRESHOLD_) {
-                cycle_buf_con_.notify_one();
+            if (this->cycle_buffer_->Size() < this->CYCLE_BUF_THRESHOLD_) {
+                this->cycle_buf_con_.notify_one();
             }
         }
 
-        assert(idx < MAX_GROUP_SIZE_);
-        auto key = KeyAddr(micro_buf_[idx] + micro_run_pos_[idx], -1, idx);
-        merge_loser_tree_->DeleteTopInsert(&key, false);
+        assert(idx < this->MAX_GROUP_SIZE_);
+        auto key = KeyAddr(this->micro_buf_[idx] + this->micro_run_pos_[idx], -1, idx);
+        this->merge_loser_tree_->DeleteTopInsert(&key, false);
 
-        ++micro_run_idx_[idx];
-        micro_run_pos_[idx] += KeyAddr(micro_buf_[idx] + micro_run_pos_[idx], -1, idx).LEN() + sizeof(LenType);
+        ++this->micro_run_idx_[idx];
+        this->micro_run_pos_[idx] += KeyAddr(this->micro_buf_[idx] + this->micro_run_pos_[idx], -1, idx).LEN() + sizeof(LenType);
     }
     {
-        std::unique_lock lock(out_queue_mtx_);
+        std::unique_lock lock(this->out_queue_mtx_);
         if (tuple_list != nullptr) {
-            term_tuple_list_queue_.push(std::move(tuple_list));
+            this->term_tuple_list_queue_.push(std::move(tuple_list));
         }
-        out_queue_con_.notify_one();
+        this->out_queue_con_.notify_one();
     }
 }
 
@@ -542,21 +557,21 @@ template <typename KeyType, typename LenType>
 requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::OutputImpl(FILE *f) {
     DirectIO io_stream(f, "w");
-    while (count_ > 0) {
+    while (this->count_ > 0) {
         UniquePtr<TermTupleList> temp_term_tuple;
         {
-            std::unique_lock out_lock(out_queue_mtx_);
-            out_queue_con_.wait(out_lock, [this]() { return !this->term_tuple_list_queue_.empty(); });
+            std::unique_lock out_lock(this->out_queue_mtx_);
+            this->out_queue_con_.wait(out_lock, [this]() { return !this->term_tuple_list_queue_.empty(); });
 
-            if (count_ == 0) {
+            if (this->count_ == 0) {
                 break;
             }
 
-            temp_term_tuple = std::move(term_tuple_list_queue_.front());
+            temp_term_tuple = std::move(this->term_tuple_list_queue_.front());
             ++term_list_count_;
-            term_tuple_list_queue_.pop();
+            this->term_tuple_list_queue_.pop();
         }
-        count_ -= temp_term_tuple->Size();
+        this->count_ -= temp_term_tuple->Size();
 
         // output format
         // |   u32    |    u32   |     u32       |  char [term_len]  | pair<u32, u32> [doc_list_size]
@@ -573,7 +588,7 @@ void SortMergerTermTuple<KeyType, LenType>::OutputImpl(FILE *f) {
         io_stream.Write(buf, SIZE_U32 * 3);
         io_stream.Write(temp_term_tuple->term_.data(), term_len);
         io_stream.Write((char*)temp_term_tuple->doc_pos_list_.data(), SIZE_U32 * 2 * doc_list_size);
-        if (count_ == 0) {
+        if (this->count_ == 0) {
             io_stream.Seek(0, SEEK_SET);
             io_stream.Write((char*)(&term_list_count_), sizeof(u64));
             term_list_count_ = 0;
@@ -591,36 +606,43 @@ void SortMergerTermTuple<KeyType, LenType>::PredictImpl(DirectIO &io_stream) {
 template <typename KeyType, typename LenType>
 requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::Run() {
-    FILE *f = fopen(filenm_.c_str(), "r");
+    FILE *f = fopen(this->filenm_.c_str(), "r");
 
     DirectIO io_stream(f);
-    FILE_LEN_ = io_stream.Length();
+    this->FILE_LEN_ = io_stream.Length();
 
     term_list_count_ = 0;
-    io_stream.Read((char *)(&count_), sizeof(u64));
+    io_stream.Read((char *)(&this->count_), sizeof(u64));
 
     Super::Init(io_stream);
 
-    Thread predict_thread(std::bind(&self_t::PredictImpl, this, io_stream));
-    Thread merge_thread(std::bind(&self_t::MergeImpl, this));
-    FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
+    UniquePtr<Thread> predict_thread = MakeUnique<Thread>(std::bind(&self_t::PredictImpl, this, io_stream));
+    UniquePtr<Thread> merge_thread = MakeUnique<Thread>(std::bind(&self_t::MergeImpl, this));
+    FILE *out_f = fopen((this->filenm_ + ".out").c_str(), "w+");
     IASSERT(out_f);
-    IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
+    IASSERT(fwrite(&this->count_, sizeof(u64), 1, out_f) == 1);
 
-    Thread out_thread(std::bind(&self_t::OutputImpl, this, out_f));
+    UniquePtr<Thread> out_thread = MakeUnique<Thread>(std::bind(&self_t::OutputImpl, this, out_f));
 
-    predict_thread.join();
-    merge_thread.join();
-    out_thread.join();
+    Vector<UniquePtr<Thread>> threads;
+    threads.push_back(std::move(predict_thread));
+    threads.push_back(std::move(merge_thread));
+    threads.push_back(std::move(out_thread));
+
+    this->Unpin(threads);
+
+    for (auto& thread : threads) {
+        thread->join();
+    }
 
     fclose(f);
     fclose(out_f);
 
-    if (std::filesystem::exists(filenm_)) {
-        std::filesystem::remove(filenm_);
+    if (std::filesystem::exists(this->filenm_)) {
+        std::filesystem::remove(this->filenm_);
     }
-    if (std::filesystem::exists(filenm_ + ".out")) {
-        std::filesystem::rename(filenm_ + ".out", filenm_);
+    if (std::filesystem::exists(this->filenm_ + ".out")) {
+        std::filesystem::rename(this->filenm_ + ".out", this->filenm_);
     }
 }
 

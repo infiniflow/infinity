@@ -415,6 +415,7 @@ protected:
 
     void OutputByQueue(FILE* f);
 
+    void Unpin(Vector<UniquePtr<Thread>> &threads);
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
@@ -429,26 +430,6 @@ class SortMergerTermTuple : public SortMerger<KeyType, LenType> {
 protected:
     typedef SortMergerTermTuple<KeyType, LenType> self_t;
     using Super = SortMerger<KeyType, LenType>;
-    using Super::filenm_;
-    using Super::MAX_GROUP_SIZE_;
-    using Super::merge_loser_tree_;
-    using Super::micro_run_idx_;
-    using Super::micro_run_pos_;
-    using Super::num_micro_run_;
-    using Super::size_micro_run_;
-    using Super::micro_buf_;
-    using Super::run_buf_;
-    using Super::cycle_buffer_;
-    using Super::cycle_buf_mtx_;
-    using Super::cycle_buf_con_;
-    using Super::out_queue_mtx_;
-    using Super::out_queue_con_;
-    using Super::term_tuple_list_queue_;
-    using Super::read_finish_;
-    using Super::CYCLE_BUF_SIZE_;
-    using Super::CYCLE_BUF_THRESHOLD_;
-    using Super::count_;
-    using Super::FILE_LEN_;
     using typename Super::KeyAddr;
     u64 term_list_count_{0};
 
