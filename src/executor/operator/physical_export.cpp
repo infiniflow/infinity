@@ -62,20 +62,68 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
 }
 
 SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state) {
-    LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}", schema_name_, table_name_, file_path_));
+    const Vector<SharedPtr<ColumnDef>>& column_defs = table_entry_->column_defs();
+    SizeT column_count = column_defs.size();
 
+    LocalFileSystem fs;
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
+    DeferFn file_defer([&]() { fs.Close(*file_handler); });
+
+    if(header_) {
+        // Output CSV header
+        String header;
+        for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+            ColumnDef* column_def = column_defs[column_idx].get();
+            header += column_def->name();
+            if(column_idx != column_count - 1) {
+                header += delimiter_;
+            } else {
+                header += '\n';
+            }
+        }
+        fs.Write(*file_handler, header.c_str(), header.size());
+    }
+
+    SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
         LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
         for(SizeT block_idx = 0; block_idx < block_count; ++ block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
+            BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
+            SizeT block_row_count = block_entry->row_count();
+
+            Vector<ColumnVector> column_vectors;
+            column_vectors.reserve(column_count);
+            for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+                column_vectors.emplace_back(block_entry->GetColumnBlockEntry(column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
+                if(column_vectors[column_idx].Size() != block_row_count) {
+                    UnrecoverableError("Unmatched row_count between block and block_column");
+                }
+            }
+
+            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+                String line;
+                for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+                    Value v = column_vectors[column_idx].GetValue(row_idx);
+                    line += v.ToString();
+                    if(column_idx == column_count - 1) {
+                        line += "\n";
+                    } else {
+                        line += delimiter_;
+                    }
+                }
+                fs.Write(*file_handler, line.c_str(), line.size());
+                ++ row_count;
+            }
         }
     }
-
-    LOG_DEBUG(fmt::format("Header ? {}", header_));
-    LOG_DEBUG(fmt::format("Delimiter {}", delimiter_));
-    return 0;
+    LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
+    return row_count;
 }
 
 SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state) {
