@@ -14,13 +14,14 @@ DATA_SETS = ["gist", "sift", "geonames", "enwiki"]
 
 def parse_args() -> argparse.Namespace:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="RAG Database Benchmark"
+        description="RAG Database Benchmark",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--generate",
         action="store_true",
         dest="generate_queries",
-        help="Generate fulltext queries based on the dataset",
+        help="Generate fulltext query set based on the dataset",
     )
     parser.add_argument(
         "--import",
@@ -40,21 +41,28 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         dest="query_express",
-        help="Run the query set randomly using given number of clients without recording the result. This is for QPS measurement.",
+        help="Run the query set randomly using given number of clients without recording the result and latency. This is for QPS measurement.",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=str,
+        default="mp",
+        dest="concurrency",
+        help="Choose concurrency mechanism, one of: mp - multiprocessing(recommended), mt - multithreading.",
     )
     parser.add_argument(
         "--engine",
         type=str,
         default="infinity",
         dest="engine",
-        help="database engine to benchmark, one of: " + ", ".join(ENGINES),
+        help="Choose database engine to benchmark, one of: " + ", ".join(ENGINES),
     )
     parser.add_argument(
         "--dataset",
         type=str,
         default="enwiki",
         dest="dataset",
-        help="dataset to benchmark, one of: " + ", ".join(DATA_SETS),
+        help="Choose dataset to benchmark, one of: " + ", ".join(DATA_SETS),
     )
     return parser.parse_args()
 
