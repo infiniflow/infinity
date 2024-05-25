@@ -72,6 +72,7 @@ import between_expr;
 import subquery_expr;
 import match_expr;
 import match_tensor_expr;
+import fusion_expr;
 import data_type;
 
 import catalog;
@@ -834,7 +835,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
     Vector<SharedPtr<MatchExpression>> match_exprs;
     Vector<SharedPtr<KnnExpression>> knn_exprs;
     Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
-    SharedPtr<FusionExpression> fusion_expr = nullptr;
+    Vector<SharedPtr<FusionExpression>> fusion_exprs;
     for (MatchExpr *match_expr : expr.match_exprs_) {
         match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
     }
@@ -845,10 +846,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         match_tensor_exprs.push_back(
             static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
     }
-    if (expr.fusion_expr_ != nullptr) {
-        fusion_expr = MakeShared<FusionExpression>(expr.fusion_expr_->method_, expr.fusion_expr_->options_);
+    for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
+        fusion_exprs.push_back(MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_));
     }
-    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, fusion_expr);
+    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, fusion_exprs);
     return bound_search_expr;
 }
 

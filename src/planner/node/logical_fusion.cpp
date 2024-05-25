@@ -29,9 +29,8 @@ import internal_types;
 
 namespace infinity {
 
-LogicalFusion::LogicalFusion(u64 node_id,
-                             SharedPtr<FusionExpression> fusion_expr)
-    : LogicalNode(node_id, LogicalNodeType::kFusion), fusion_expr_(fusion_expr) {}
+LogicalFusion::LogicalFusion(const u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<FusionExpression> fusion_expr)
+    : LogicalNode(node_id, LogicalNodeType::kFusion), base_table_ref_(std::move(base_table_ref)), fusion_expr_(std::move(fusion_expr)) {}
 
 String LogicalFusion::ToString(i64 &space) const {
     std::stringstream ss;

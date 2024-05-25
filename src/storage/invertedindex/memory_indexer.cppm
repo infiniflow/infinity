@@ -30,6 +30,7 @@ import skiplist;
 import internal_types;
 import map_with_lock;
 import vector_with_lock;
+import buf_writer;
 
 namespace infinity {
 
@@ -120,6 +121,10 @@ private:
 
     void PrepareSpillFile();
 
+    u32 ReadU32LE(const u8 *ptr) { return *(u32 *)ptr; }
+
+    u64 ReadU64LE(const u8 *ptr) { return *(u64 *)ptr; }
+
 private:
     String index_dir_;
     String base_name_;
@@ -151,5 +156,10 @@ private:
     // for column length info
     VectorWithLock<u32> column_lengths_;
     Atomic<u32> column_length_sum_{0};
+
+    // spill file write buf
+    UniquePtr<char_t[]> spill_buffer_{};
+    SizeT spill_buffer_size_{0};
+    UniquePtr<BufWriter> buf_writer_;
 };
 } // namespace infinity

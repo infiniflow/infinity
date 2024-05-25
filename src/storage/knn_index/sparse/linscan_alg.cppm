@@ -14,29 +14,29 @@
 
 module;
 
-#include <sstream>
-
-module fusion_expression;
+export module linscan_alg;
 
 import stl;
-import expression_type;
-
-import scalar_function;
-import search_options;
-import infinity_exception;
-import third_party;
+import sparse_iter;
 
 namespace infinity {
 
-FusionExpression::FusionExpression(const String &method, SharedPtr<SearchOptions> options)
-    : BaseExpression(ExpressionType::kFusion, Vector<SharedPtr<BaseExpression>>()), method_(method), options_(std::move(options)) {}
+struct Posting {
+    u32 doc_id_;
+    f32 val_;
+};
 
-String FusionExpression::ToString() const {
-    if (!alias_.empty()) {
-        return alias_;
-    }
-    String expr_str = fmt::format("FUSION('{}', '{}')", method_, options_ ? options_->ToString() : "");
-    return expr_str;
-}
+export class LinScan {
+public:
+    void Insert(const SparseVecRef &vec, u32 doc_id);
+
+    Pair<Vector<u32>, Vector<f32>> Query(const SparseVecRef &query, u32 top_k) const;
+
+    u32 row_num() const { return row_num_; }
+
+private:
+    HashMap<u32, Vector<Posting>> inverted_idx_;
+    u32 row_num_{};
+};
 
 } // namespace infinity

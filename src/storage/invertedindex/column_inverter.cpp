@@ -36,6 +36,9 @@ import infinity_exception;
 import third_party;
 import status;
 import logger;
+import buf_writer;
+import profiler;
+import third_party;
 
 namespace infinity {
 
@@ -253,24 +256,32 @@ void ColumnInverter::SortForOfflineDump() {
 //    +-----------+  +----------------++--------------------++--------------------------++-------------------------------------------------------+
 //                   ----------------------------------------------------------------------------------------------------------------------------+
 //                                                            Data within each group
-void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
+
+void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter>& buf_writer) {
     // spill sort results for external merge sort
     if (positions_.empty()) {
         return;
     }
+    SizeT spill_file_tell = ftell(spill_file);
     // size of this Run in bytes
     u32 data_size = 0;
-    u64 data_size_pos = ftell(spill_file);
-    fwrite(&data_size, sizeof(u32), 1, spill_file);
+    u64 data_size_pos = spill_file_tell;
+    buf_writer->Write((const char*)&data_size, sizeof(u32));
+    spill_file_tell += sizeof(u32);
+
     // number of tuples
     u32 num_of_tuples = positions_.size();
     tuple_count += num_of_tuples;
-    fwrite(&num_of_tuples, sizeof(u32), 1, spill_file);
+    buf_writer->Write((const char*)&num_of_tuples, sizeof(u32));
+    spill_file_tell += sizeof(u32);
+
     // start offset for next spill
     u64 next_start_offset = 0;
-    u64 next_start_offset_pos = ftell(spill_file);
-    fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
-    u64 data_start_offset = ftell(spill_file);
+    u64 next_start_offset_pos = spill_file_tell;
+    buf_writer->Write((const char*)&next_start_offset, sizeof(u64));
+    spill_file_tell += sizeof(u64);
+
+    u64 data_start_offset = spill_file_tell;
     // sorted data
     u32 last_term_num = std::numeric_limits<u32>::max();
     StringRef term;
@@ -282,15 +293,16 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
             term = GetTermFromNum(last_term_num);
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
-        fwrite(&record_length, sizeof(u32), 1, spill_file);
-        fwrite(term.data(), term.size(), 1, spill_file);
-        fwrite(&str_null, sizeof(char), 1, spill_file);
-        fwrite(&i.doc_id_, sizeof(docid_t), 1, spill_file);
-        fwrite(&i.term_pos_, sizeof(u32), 1, spill_file);
-    }
 
+        buf_writer->Write((const char*)&record_length, sizeof(u32));
+        buf_writer->Write(term.data(), term.size());
+        buf_writer->Write((const char*)&str_null, sizeof(char));
+        buf_writer->Write((const char*)&(i.doc_id_), sizeof(docid_t));
+        buf_writer->Write((const char*)&(i.term_pos_), sizeof(u32));
+    }
+    buf_writer->Flush();
     // update data size
-    next_start_offset = ftell(spill_file);
+    next_start_offset = buf_writer->Tell();
     data_size = next_start_offset - data_start_offset;
     fseek(spill_file, data_size_pos, SEEK_SET);
     fwrite(&data_size, sizeof(u32), 1, spill_file); // update offset for next spill

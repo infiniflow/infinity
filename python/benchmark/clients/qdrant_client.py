@@ -1,4 +1,3 @@
-import argparse
 from qdrant_client import QdrantClient as QC
 from qdrant_client import models
 from qdrant_client.models import VectorParams, Distance
@@ -7,30 +6,28 @@ import time
 import json
 import h5py
 from typing import Any
-import random
 import logging
 
 from .base_client import BaseClient
 
 
 class QdrantClient(BaseClient):
-    def __init__(
-        self, conf_path: str, options: argparse.Namespace, drop_old: bool = True
-    ) -> None:
-        BaseClient.__init__(self, conf_path, drop_old)
+    def __init__(self, conf_path: str) -> None:
+        BaseClient.__init__(self, conf_path)
         with open(conf_path, "r") as f:
             self.data = json.load(f)
         self.client = QC(self.data["connection_url"])
-        self.collection_name = self.data["name"]
+        self.table_name = self.data["name"]
         if self.data["distance"] == "cosine":
             self.distance = Distance.COSINE
         elif self.data["distance"] == "L2":
             self.distance = Distance.EUCLID
         self.path_prefix = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        logging.getLogger("httpx").setLevel(logging.WARNING)
 
     def upload_bach(self, ids: list[int], vectors, payloads=None):
         self.client.upsert(
-            collection_name=self.collection_name,
+            collection_name=self.table_name,
             points=models.Batch(ids=ids, vectors=vectors, payloads=payloads),
             wait=True,
         )
@@ -53,7 +50,7 @@ class QdrantClient(BaseClient):
             hnsw_config = None
 
         self.client.recreate_collection(
-            collection_name=self.collection_name,
+            collection_name=self.table_name,
             vectors_config=VectorParams(
                 size=self.data["vector_size"], distance=self.distance
             ),
@@ -63,7 +60,7 @@ class QdrantClient(BaseClient):
         if "payload_index_schema" in self.data:
             for field_name, field_schema in self.data["payload_index_schema"].items():
                 self.client.create_payload_index(
-                    collection_name=self.collection_name,
+                    collection_name=self.table_name,
                     field_name=field_name,
                     field_schema=field_schema,
                 )
@@ -79,7 +76,7 @@ class QdrantClient(BaseClient):
                     lowercase=schema.get("lowercase", None),
                 )
                 self.client.create_payload_index(
-                    collection_name=self.collection_name,
+                    collection_name=self.table_name,
                     field_name=field_name,
                     field_schema=field_schema,
                 )
@@ -129,79 +126,20 @@ class QdrantClient(BaseClient):
         else:
             raise TypeError("Unsupported file type")
 
-    def search_express(self, shared_counter, exit_event):
-        """
-        Search in express mode: doesn't record per-query latency and result.
-        """
-        # get the queries path
-        query_path = os.path.join(self.path_prefix, self.data["query_path"])
-        results = []
-        _, ext = os.path.splitext(query_path)
-        if ext == ".json" and self.data["mode"] == "vector":
-            with open(query_path, "r") as f:
-                lines = f.readlines()
-                while self.running:
-                    line = random.choice(lines)
-                    query = json.loads(line)
-                    _ = self.client.search(
-                        collection_name=self.collection_name,
-                        query_vector=query["vector"],
-                        limit=self.data.get("topK", 10),
-                        with_payload=False,
-                    )
-                    if not self.running:
-                        break
-        elif ext == ".hdf5" and self.data["mode"] == "vector":
-            with h5py.File(query_path, "r") as f:
-                lines = f["test"]
-                while self.running:
-                    line = random.choice(lines)
-                    _ = self.client.search(
-                        collection_name=self.collection_name,
-                        query_vector=line,
-                        limit=self.data.get("topK", 10),
-                    )
-                    if not self.running:
-                        break
-        else:
-            raise TypeError("Unsupported file type")
-        return results
+    def setup_clients(self, num_threads=1):
+        self.clients = list()
+        for i in range(num_threads):
+            client = QC(self.data["connection_url"])
+            self.clients.append(client)
 
-    def search(self) -> list[list[Any]]:
-        # get the queries path
-        query_path = os.path.join(self.path_prefix, self.data["query_path"])
-        results = []
-        _, ext = os.path.splitext(query_path)
-        if ext == ".json" and self.data["mode"] == "vector":
-            with open(query_path, "r") as f:
-                for line in f.readlines():
-                    query = json.loads(line)
-                    start = time.time()
-                    result = self.client.search(
-                        collection_name=self.collection_name,
-                        query_vector=query["vector"],
-                        limit=self.data.get("topK", 10),
-                        with_payload=False,
-                    )
-                    end = time.time()
-                    logging.info(
-                        f"latency of search: {(end - start)*1000:.2f} milliseconds"
-                    )
-                    results.append(result)
-        elif ext == ".hdf5" and self.data["mode"] == "vector":
-            with h5py.File(query_path, "r") as f:
-                start = time.time()
-                for line in f["test"]:
-                    result = self.client.search(
-                        collection_name=self.collection_name,
-                        query_vector=line,
-                        limit=self.data.get("topK", 10),
-                    )
-                    results.append(result)
-                end = time.time()
-                logging.info(
-                    f"latency of KNN search: {(end - start)*1000/len(f['test']):.2f} milliseconds"
-                )
-        else:
-            raise TypeError("Unsupported file type")
-        return results
+    def do_single_query(self, query_id, client_id) -> list[Any]:
+        query = self.queries[query_id]
+        client = self.clients[client_id]
+        assert self.data["mode"] == "vector"
+        res = client.search(
+            collection_name=self.table_name,
+            query_vector=query,
+            limit=self.data.get("topK", 10),
+            with_payload=False,
+        )
+        return res

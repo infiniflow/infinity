@@ -1509,8 +1509,9 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     }
     EXPECT_EQ(knn_expr5->topn_, 3);
 
-    EXPECT_NE(search_expr->fusion_expr_, nullptr);
-    auto *fusion_expr = search_expr->fusion_expr_;
+    EXPECT_EQ(search_expr->fusion_exprs_.size(), 1);
+    EXPECT_NE(search_expr->fusion_exprs_[0], nullptr);
+    auto *fusion_expr = search_expr->fusion_exprs_[0];
     EXPECT_EQ(fusion_expr->method_, String("rrf"));
 
     EXPECT_NE(select_statement->where_expr_, nullptr);

@@ -185,7 +185,6 @@ TEST_F(HnswLVQTest, test1) {
         {
             uint8_t file_flags = FileFlags::READ_FLAG;
             auto [file_handler, status] = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
-
             if(!status.ok()) {
                 UnrecoverableError(status.message());
             }
