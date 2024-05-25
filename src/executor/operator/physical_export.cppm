@@ -62,9 +62,9 @@ public:
         return 0;
     }
 
-    void ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state);
+    SizeT ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state);
 
-    void ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state);
+    SizeT ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state);
 
     inline CopyFileType FileType() const { return file_type_; }
 

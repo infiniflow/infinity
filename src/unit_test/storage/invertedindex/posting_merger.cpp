@@ -171,7 +171,10 @@ TEST_F(PostingMergerTest, Basic) {
             String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-            UniquePtr<FileHandler> file_handler = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handler, status] = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+            }
             const u32 file_size = fs.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_length_array.resize(id_offset + file_read_array_len);

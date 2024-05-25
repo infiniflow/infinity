@@ -122,7 +122,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
 
     LocalFileSystem fs;
 
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     DeferFn defer_fn([&]() { fs.Close(*file_handler); });
 
     int dimension = 0;
@@ -275,7 +278,10 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
 
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
     LocalFileSystem fs;
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
     SizeT file_size = fs.GetFileSize(*file_handler);
@@ -355,7 +361,10 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
     nlohmann::json json_arr;
     {
         LocalFileSystem fs;
-        UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+        auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
         SizeT file_size = fs.GetFileSize(*file_handler);

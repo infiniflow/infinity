@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 module physical_export;
 
 import query_context;
@@ -25,6 +27,11 @@ import column_def;
 import block_entry;
 import column_vector;
 import value;
+import local_file_system;
+import file_system;
+import file_system_type;
+import defer_op;
+import stl;
 
 namespace infinity {
 
@@ -32,13 +39,14 @@ void PhysicalExport::Init() {}
 
 bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operator_state) {
     ExportOperatorState *export_op_state = static_cast<ExportOperatorState *>(operator_state);
+    SizeT exported_row_count{0};
     switch (file_type_) {
         case CopyFileType::kCSV: {
-            ExportToCSV(query_context, export_op_state);
+            exported_row_count = ExportToCSV(query_context, export_op_state);
             break;
         }
         case CopyFileType::kJSONL: {
-            ExportToJSONL(query_context, export_op_state);
+            exported_row_count = ExportToJSONL(query_context, export_op_state);
             break;
         }
         default: {
@@ -46,18 +54,15 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
 
-    auto result_msg = MakeUnique<String>("EXPORT 0 Rows");
+    auto result_msg = MakeUnique<String>(fmt::format("EXPORT {} Rows", exported_row_count));
     export_op_state->result_msg_ = std::move(result_msg);
 
     export_op_state->SetComplete();
     return true;
 }
 
-void PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state) {
-    LOG_DEBUG(fmt::format("Export to CSV"));
-    LOG_DEBUG(fmt::format("Export file path: {}", file_path_));
-    LOG_DEBUG(fmt::format("Export table_name: {}", table_name_));
-    LOG_DEBUG(fmt::format("Export db_name: {}", schema_name_));
+SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state) {
+    LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}", schema_name_, table_name_, file_path_));
 
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
@@ -70,18 +75,22 @@ void PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorStat
 
     LOG_DEBUG(fmt::format("Header ? {}", header_));
     LOG_DEBUG(fmt::format("Delimiter {}", delimiter_));
+    return 0;
 }
 
-void PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state) {
+SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state) {
 
-    LOG_DEBUG(fmt::format("Export to JSONL"));
-    LOG_DEBUG(fmt::format("Export file path: {}", file_path_));
-    LOG_DEBUG(fmt::format("Export table_name: {}", table_name_));
-    LOG_DEBUG(fmt::format("Export db_name: {}", schema_name_));
     const Vector<SharedPtr<ColumnDef>>& column_defs = table_entry_->column_defs();
     SizeT column_count = column_defs.size();
 
+    LocalFileSystem fs;
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
+    DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
+    SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
         LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
@@ -108,13 +117,14 @@ void PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorSt
                     v.AppendToJson(column_def->name(), line_json);
                 }
                 LOG_DEBUG(line_json.dump());
-//                LOG_DEBUG(fmt::format("{} : {}", column_def->name(), v.ToString()));
+                String to_write = line_json.dump() + "\n";
+                fs.Write(*file_handler, to_write.c_str(), to_write.size());
+                ++ row_count;
             }
         }
     }
-
-    LOG_DEBUG(fmt::format("Header ? {}", header_));
-    LOG_DEBUG(fmt::format("Delimiter {}", delimiter_));
+    LOG_DEBUG(fmt::format("Export to JSONL, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
+    return row_count;
 }
 
 } // namespace infinity

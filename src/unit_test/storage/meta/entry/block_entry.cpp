@@ -48,12 +48,18 @@ TEST_F(BlockVersionTest, SaveAndLoad) {
     LocalFileSystem fs;
 
     {
-        auto file_handler = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+        auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         block_version.SpillToFile(*file_handler);
     }
 
     {
-        auto file_handler = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         auto block_version2 = BlockVersion::LoadFromFile(*file_handler);
         ASSERT_EQ(block_version, *block_version2);
     }

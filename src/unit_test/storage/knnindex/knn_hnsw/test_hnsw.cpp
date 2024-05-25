@@ -32,6 +32,7 @@ import dist_func_l2;
 import dist_func_ip;
 import vec_store_type;
 import hnsw_common;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -84,14 +85,20 @@ public:
             EXPECT_GE(correct_rate, 0.95);
 
             u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-            UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+            }
             hnsw_index.Save(*file_handler);
             file_handler->Close();
         }
 
         {
             u8 file_flags = FileFlags::READ_FLAG;
-            UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+            }
 
             auto hnsw_index = Hnsw::Load(*file_handler);
             hnsw_index.SetEf(10);
