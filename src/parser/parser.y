@@ -1106,7 +1106,7 @@ drop_statement: DROP DATABASE if_exists IDENTIFIER {
 /*
  * COPY STATEMENT
  */
-// COPY database.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER TRUE)
+// COPY database.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER)
 copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     $$ = new infinity::CopyStatement();
 

@@ -76,7 +76,11 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             String column_len_file = (Path(index_dir_) / base_names[i]).string() + LENGTH_SUFFIX;
             RowID base_row_id = base_rowids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-            UniquePtr<FileHandler> file_handler = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handler, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+
             const u32 file_size = fs_.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_lengths.resize(id_offset + file_read_array_len);
@@ -88,8 +92,11 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
         }
 
         String column_length_file = index_prefix + LENGTH_SUFFIX;
-        UniquePtr<FileHandler> file_handler =
+        auto [file_handler, status] =
             fs_.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         fs_.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
         fs_.Close(*file_handler);
     }

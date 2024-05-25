@@ -897,6 +897,108 @@ String Value::ToString() const {
     return {};
 }
 
+void Value::AppendToJson(const String& name, nlohmann::json& json) {
+    switch (type_.type()) {
+        case LogicalType::kBoolean: {
+            json[name] = value_.boolean;
+            return;
+        }
+        case LogicalType::kTinyInt: {
+            json[name] = value_.tiny_int;
+            return;
+        }
+        case LogicalType::kSmallInt: {
+            json[name] = value_.small_int;
+            return;
+        }
+        case LogicalType::kInteger: {
+            json[name] = value_.integer;
+            return;
+        }
+        case LogicalType::kBigInt: {
+            json[name] = value_.big_int;
+            return;
+        }
+        case LogicalType::kFloat: {
+            json[name] = value_.float32;
+            return;
+        }
+        case LogicalType::kDouble: {
+            json[name] = value_.float64;
+            return;
+        }
+        case LogicalType::kDate: {
+            json[name] = value_.date.ToString();
+            return;
+        }
+        case LogicalType::kTime: {
+            json[name] = value_.time.ToString();
+            return;
+        }
+        case LogicalType::kDateTime: {
+            json[name] = value_.datetime.ToString();
+            return;
+        }
+        case LogicalType::kTimestamp: {
+            json[name] = value_.timestamp.ToString();
+            return;
+        }
+        case LogicalType::kInterval: {
+            json[name] = value_.interval.ToString();
+            return;
+        }
+        case LogicalType::kRowID: {
+            json[name] = value_.row.ToString();
+            return;
+        }
+        case LogicalType::kVarchar: {
+            json[name] = value_info_->Get<StringValueInfo>().GetString();
+            return;
+        }
+        case LogicalType::kEmbedding: {
+            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            if (data_bytes != embedding_info->Size()) {
+                UnrecoverableError("Embedding data size mismatch.");
+            }
+            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
+            json[name] = EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
+            return;
+        }
+        case LogicalType::kTensor: {
+            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            const auto basic_embedding_bytes = embedding_info->Size();
+            if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
+                UnrecoverableError("Tensor data size mismatch.");
+            }
+            const auto embedding_num = data_bytes / basic_embedding_bytes;
+            json[name] = TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            return;
+        }
+        case LogicalType::kTensorArray: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+        }
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
+        case LogicalType::kUuid:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
+            UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
+        }
+    }
+}
+
 SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes) {
     if (bytes == 0) {
         UnrecoverableError("EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.");

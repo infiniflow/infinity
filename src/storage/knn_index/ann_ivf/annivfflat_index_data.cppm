@@ -247,7 +247,10 @@ struct AnnIVFFlatIndexData {
 
     void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
         u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         SaveIndexInner(*file_handler);
         file_handler->Close();
     }
@@ -280,7 +283,10 @@ struct AnnIVFFlatIndexData {
 
     static UniquePtr<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>> LoadIndex(const String &file_path, UniquePtr<FileSystem> fs) {
         u8 file_flags = FileFlags::READ_FLAG;
-        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         auto index_data = LoadIndexInner(*file_handler);
         file_handler->Close();
         return index_data;

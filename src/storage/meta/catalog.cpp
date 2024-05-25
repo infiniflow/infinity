@@ -511,7 +511,10 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     const auto &catalog_path = delta_ckp_info.path_;
 
     LocalFileSystem fs;
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     i32 file_size = fs.GetFileSize(*catalog_file_handler);
     Vector<char> buf(file_size);
     fs.Read(*catalog_file_handler, buf.data(), file_size);
@@ -875,7 +878,10 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     const auto &catalog_path = full_ckp_info.path_;
 
     LocalFileSystem fs;
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     SizeT file_size = fs.GetFileSize(*catalog_file_handler);
     String json_str(file_size, 0);
     SizeT n_bytes = catalog_file_handler->Read(json_str.data(), file_size);
@@ -920,7 +926,10 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     u8 fileflags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
 
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
+    auto [catalog_file_handler, status] = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
 
     SizeT n_bytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (n_bytes != catalog_str.size()) {

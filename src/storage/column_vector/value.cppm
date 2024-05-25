@@ -23,6 +23,7 @@ import internal_types;
 import embedding_info;
 import data_type;
 import knn_expr;
+import third_party;
 
 namespace infinity {
 
@@ -256,6 +257,8 @@ public:
     [[nodiscard]] String ToString() const;
 
     void Reset();
+
+    void AppendToJson(const String& name, nlohmann::json& json);
 
     // Member method
 public:

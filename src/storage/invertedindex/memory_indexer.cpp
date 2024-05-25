@@ -297,7 +297,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : "");
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
     Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
     fs.Write(*file_handler, &column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
     fs.Close(*file_handler);
@@ -331,7 +335,11 @@ void MemoryIndexer::Load() {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(column_length_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
     Vector<u32> &column_lengths = column_lengths_.UnsafeVec();
     column_lengths.resize(doc_count_);
     fs.Read(*file_handler, &column_lengths[0], sizeof(column_lengths[0]) * column_lengths.size());
@@ -471,7 +479,11 @@ void MemoryIndexer::OfflineDump() {
     fs.DeleteFile(fst_file);
 
     String column_length_file = index_prefix + LENGTH_SUFFIX;
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
     Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
     fs.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     fs.Close(*file_handler);

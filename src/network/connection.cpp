@@ -340,10 +340,12 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             message = query_result.ToString();
             break;
         }
-        case LogicalNodeType::kImport: {
+        case LogicalNodeType::kImport:
+        case LogicalNodeType::kExport: {
             message = *query_result.result_table_->result_msg();
             break;
         }
+
         default: {
             message = fmt::format("SELECT {}", std::to_string(query_result.result_table_->row_count()));
         }

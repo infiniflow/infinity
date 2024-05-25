@@ -17,6 +17,7 @@ module;
 import stl;
 import file_system;
 import file_system_type;
+import status;
 
 export module local_file_system;
 
@@ -44,7 +45,7 @@ public:
 
     ~LocalFileSystem() override = default;
 
-    UniquePtr<FileHandler> OpenFile(const String &path, u8 flags, FileLockType lock_type) final;
+    Pair<UniquePtr<FileHandler>, Status> OpenFile(const String &path, u8 flags, FileLockType lock_type) final;
 
     i64 Read(FileHandler &file_handler, void *data, u64 nbytes) final;
 

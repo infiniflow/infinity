@@ -16,6 +16,7 @@ module;
 
 import stl;
 import file_system_type;
+import status;
 
 export module file_system;
 
@@ -53,7 +54,7 @@ public:
     virtual ~FileSystem() = default;
 
     // File related methods
-    virtual UniquePtr<FileHandler> OpenFile(const String &path, u8 flags, FileLockType lock_type) = 0;
+    virtual Pair<UniquePtr<FileHandler>, Status> OpenFile(const String &path, u8 flags, FileLockType lock_type) = 0;
 
     virtual i64 Read(FileHandler &file_handler, void *data, u64 nbytes) = 0;
 

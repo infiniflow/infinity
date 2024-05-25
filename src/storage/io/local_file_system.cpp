@@ -52,7 +52,7 @@ LocalFileHandler::~LocalFileHandler() {
     }
 }
 
-UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, FileLockType lock_type) {
+Pair<UniquePtr<FileHandler>, Status> LocalFileSystem::OpenFile(const String &path, u8 flags, FileLockType lock_type) {
     i32 file_flags{O_RDWR};
     bool read_flag = flags & FileFlags::READ_FLAG;
     bool write_flag = flags & FileFlags::WRITE_FLAG;
@@ -63,7 +63,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
     } else if (write_flag) {
         file_flags = O_WRONLY;
     } else {
-        UnrecoverableError("Please specify a read or write flag on file open");
+        return {nullptr, Status::InvalidFileFlag(file_flags)};
     }
 
     if (write_flag) {
@@ -86,7 +86,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
 
     i32 fd = open(path.c_str(), file_flags, 0666);
     if (fd == -1) {
-        UnrecoverableError(fmt::format("Can't open file: {}: {}", path, strerror(errno)));
+        return {nullptr, Status::IOError(fmt::format("Can't open file: {}: {}", path, strerror(errno)))};
     }
     // LOG_TRACE(fmt::format("[+] OPEN FILE: {}", path));
 
@@ -102,10 +102,10 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
         file_lock.l_start = 0;
         file_lock.l_len = 0;
         if (fcntl(fd, F_SETLK, &file_lock) == -1) {
-            UnrecoverableError(fmt::format("Can't lock file: {}: {}", path, strerror(errno)));
+            return {nullptr, Status::LockFileError(path, strerror(errno))};
         }
     }
-    return MakeUnique<LocalFileHandler>(*this, path, fd);
+    return {MakeUnique<LocalFileHandler>(*this, path, fd), Status::OK()};
 }
 
 void LocalFileSystem::Close(FileHandler &file_handler) {

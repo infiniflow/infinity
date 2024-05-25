@@ -433,15 +433,15 @@ Status Status::IOError(const String &detailed_info) {
 }
 
 Status Status::DuplicatedFile(const String &filename) {
-    return Status(ErrorCode::kDuplicatedFile, MakeUnique<String>(fmt::format("Duplicated file: {}", filename)));
+    return Status(ErrorCode::kDuplicatedFile, MakeUnique<String>(fmt::format("File already existed: {}", filename)));
 }
 
 Status Status::ConfigFileError(const String &path, const String &detailed_info) {
     return Status(ErrorCode::kConfigFileError, MakeUnique<String>(fmt::format("Config file: {}, {}", path, detailed_info)));
 }
 
-Status Status::LockFileExists(const String &path) {
-    return Status(ErrorCode::kLockFileExists, MakeUnique<String>(fmt::format("Lock file: is existed", path)));
+Status Status::LockFileError(const String &path, const String& error_msg) {
+    return Status(ErrorCode::kLockFileError, MakeUnique<String>(fmt::format("Lock file error: {}, {}", path, error_msg)));
 }
 
 Status Status::CatalogCorrupted(const String &path) {
@@ -482,6 +482,10 @@ Status Status::MmapFileError(const String &detailed_info) {
 
 Status Status::MunmapFileError(const String &detailed_info) {
     return Status(ErrorCode::kMunmapFileError, MakeUnique<String>(fmt::format("munmap error: {}", detailed_info)));
+}
+
+Status Status::InvalidFileFlag(u8 flag) {
+    return Status(ErrorCode::kInvalidFileFlag, MakeUnique<String>(fmt::format("Invalid open file flag: {}", flag)));
 }
 
 Status Status::ColumnCountMismatch(const String &detailed_info) {

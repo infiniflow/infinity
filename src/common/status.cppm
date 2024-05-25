@@ -142,7 +142,7 @@ export enum class ErrorCode : long {
     kIOError = 7001,
     kDuplicatedFile = 7002,
     kConfigFileError = 7003,
-    kLockFileExists = 7004,
+    kLockFileError = 7004,
     kCatalogCorrupted = 7005,
     kDataCorrupted = 7006,
     kIndexCorrupted = 7007,
@@ -153,6 +153,7 @@ export enum class ErrorCode : long {
     kParserError = 7012,
     kMmapFileError = 7013,
     kMunmapFileError = 7014,
+    kInvalidFileFlag = 7015,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -280,7 +281,7 @@ public:
     static Status IOError(const String &detailed_info);
     static Status DuplicatedFile(const String &filename);
     static Status ConfigFileError(const String &path, const String &detailed_info);
-    static Status LockFileExists(const String &path);
+    static Status LockFileError(const String &path, const String& error_msg);
     static Status CatalogCorrupted(const String &path);
     static Status DataCorrupted(const String &path);
     static Status IndexCorrupted(const String &path);
@@ -291,6 +292,7 @@ public:
     static Status ParserError(const String &detailed_info);
     static Status MmapFileError(const String &detailed_info);
     static Status MunmapFileError(const String &detailed_info);
+    static Status InvalidFileFlag(u8 flag);
 
     // meta
     static Status InvalidEntry();

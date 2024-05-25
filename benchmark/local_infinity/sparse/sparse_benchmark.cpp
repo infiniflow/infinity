@@ -39,7 +39,10 @@ SparseMatrix DecodeSparseDataset(const Path &data_path) {
     if (!fs.Exists(data_path)) {
         throw std::runtime_error(fmt::format("Data path: {} does not exist.", data_path.string()));
     }
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(data_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(data_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    if(!status.ok()) {
+        throw std::runtime_error(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
+    }
     i64 nrow = 0;
     i64 ncol = 0;
     i64 nnz = 0;
@@ -73,7 +76,11 @@ Pair<UniquePtr<u32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtru
     if (!fs.Exists(groundtruth_path)) {
         throw std::runtime_error(fmt::format("Groundtruth path: {} does not exist.", groundtruth_path.string()));
     }
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(groundtruth_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(groundtruth_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    if(!status.ok()) {
+        throw std::runtime_error(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
+    }
+
     SizeT file_size = fs.GetFileSize(*file_handler);
     if (file_size != sizeof(u32) * 2 + (sizeof(u32) + sizeof(float)) * (query_n * top_k)) {
         throw std::runtime_error("Invalid groundtruth file format");
