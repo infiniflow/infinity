@@ -812,10 +812,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
                     msg += " -> " + dst_base_name;
                     LOG_INFO(msg);
-                    ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
-                                                          index_fulltext->flag_,
-                                                          &table_index_entry->GetFulltextByteSlicePool(),
-                                                          &table_index_entry->GetFulltextBufferPool());
+                    ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_, index_fulltext->flag_);
                     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {

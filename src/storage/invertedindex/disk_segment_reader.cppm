@@ -16,7 +16,7 @@ module;
 
 export module disk_index_segment_reader;
 import stl;
-import memory_pool;
+
 import segment_posting;
 import index_defines;
 import index_segment_reader;
@@ -34,7 +34,7 @@ public:
 
     virtual ~DiskIndexSegmentReader();
 
-    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const override;
+    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position = true) const override;
 
 private:
     RowID base_row_id_{INVALID_ROWID};

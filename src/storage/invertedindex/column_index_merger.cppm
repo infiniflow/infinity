@@ -3,7 +3,7 @@ module;
 export module column_index_merger;
 
 import stl;
-import memory_pool;
+
 import file_writer;
 import posting_decoder;
 import posting_merger;
@@ -20,7 +20,7 @@ import vector_with_lock;
 namespace infinity {
 export class ColumnIndexMerger {
 public:
-    ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool);
+    ColumnIndexMerger(const String &index_dir, optionflag_t flag);
     ~ColumnIndexMerger();
 
     void Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name);
@@ -32,8 +32,6 @@ private:
 
     String index_dir_;
     optionflag_t flag_;
-    MemoryPool *memory_pool_{nullptr};
-    RecyclePool *buffer_pool_{nullptr};
     SharedPtr<FileWriter> posting_file_writer_;
     LocalFileSystem fs_;
 

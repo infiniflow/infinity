@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import segment_posting;
 import index_defines;
 export module index_segment_reader;
@@ -27,7 +27,7 @@ public:
     virtual ~IndexSegmentReader() {}
 
     // fetch_position is only valid in DiskIndexSegmentReader
-    virtual bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position = true) const = 0;
+    virtual bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position = true) const = 0;
 };
 
 } // namespace infinity

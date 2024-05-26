@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import file_writer;
 import file_reader;
 import posting_byte_slice;
@@ -17,8 +17,6 @@ namespace infinity {
 export class DocListEncoder {
 public:
     DocListEncoder(const DocListFormatOption &format_option,
-                   MemoryPool *byte_slice_pool,
-                   RecyclePool *buffer_pool,
                    DocListFormat *doc_list_format = nullptr);
 
     ~DocListEncoder();
@@ -50,7 +48,7 @@ public:
 
     void Flush();
 
-    InMemDocListDecoder *GetInMemDocListDecoder(MemoryPool *session_pool) const;
+    InMemDocListDecoder *GetInMemDocListDecoder() const;
 
     PostingByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
 
@@ -79,7 +77,6 @@ private:
     float block_max_percentage_ = 0.0f;
 
     UniquePtr<SkipListWriter> doc_skiplist_writer_;
-    MemoryPool *byte_slice_pool_{nullptr};
     friend class InMemDocListDecoderTest;
 };
 

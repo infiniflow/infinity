@@ -17,7 +17,7 @@ module;
 module inmem_index_segment_reader;
 
 import stl;
-import memory_pool;
+
 import segment_posting;
 import index_segment_reader;
 import index_defines;
@@ -29,7 +29,7 @@ namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
     : posting_table_(memory_indexer->GetPostingTable()), base_row_id_(memory_indexer->GetBaseRowId()) {}
 
-bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool,  bool fetch_position) const {
+bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position) const {
     SharedPtr<PostingWriter> writer;
     bool found = posting_table_->store_.Get(term, writer);
     if (found) {

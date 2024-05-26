@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 
 export module byte_slice;
 
@@ -18,11 +18,11 @@ export struct ByteSlice {
 
     static constexpr SizeT GetHeadSize() { return sizeof(ByteSlice); }
 
-    static ByteSlice *CreateSlice(SizeT data_size, MemoryPool *pool = nullptr);
+    static ByteSlice *CreateSlice(SizeT data_size);
 
     static ByteSlice *NewSlice(u8 *data, SizeT data_size);
 
-    static void DestroySlice(ByteSlice *slice, MemoryPool *pool = nullptr);
+    static void DestroySlice(ByteSlice *slice);
 
     static ByteSlice *GetEmptySlice() {
         static ByteSlice slice;
@@ -42,7 +42,7 @@ export class ByteSliceList {
 public:
     ByteSliceList();
 
-    ByteSliceList(ByteSlice *slice, MemoryPool *pool = nullptr);
+    ByteSliceList(ByteSlice *slice);
 
     virtual ~ByteSliceList();
 
@@ -59,13 +59,12 @@ public:
 
     void MergeWith(ByteSliceList &other);
 
-    virtual void Clear(MemoryPool *pool);
+    virtual void Clear();
 
 private:
     ByteSlice *head_;
     ByteSlice *tail_;
     SizeT volatile total_size_;
-    MemoryPool *pool_{nullptr};
 };
 
 export class ByteSliceListIterator {

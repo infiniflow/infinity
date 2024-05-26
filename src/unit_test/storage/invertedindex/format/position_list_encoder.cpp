@@ -2,7 +2,7 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import memory_pool;
+
 import index_defines;
 import posting_byte_slice;
 import posting_list_format;
@@ -17,22 +17,20 @@ using namespace infinity;
 
 class PositionListEncoderTest : public BaseTest {
 public:
-    PositionListEncoderTest() : buffer_pool_(10240), byte_slice_pool_(10240) {}
+    PositionListEncoderTest() {}
 
     void SetUp() override { file_ = String(GetTmpDir()) + "/position"; }
     void TearDown() override {}
 
 protected:
     String file_;
-    MemoryPool buffer_pool_;
-    MemoryPool byte_slice_pool_;
     LocalFileSystem fs_;
 };
 
 TEST_F(PositionListEncoderTest, test1) {
     optionflag_t option_flag = of_position_list | of_term_frequency;
     PostingFormatOption format_option(option_flag);
-    PositionListEncoder position_encoder(format_option, &byte_slice_pool_, &buffer_pool_);
+    PositionListEncoder position_encoder(format_option);
 
     for (u32 i = 0; i <= MAX_DOC_PER_RECORD + 1; i++) {
         position_encoder.AddPosition(i);
@@ -48,7 +46,7 @@ TEST_F(PositionListEncoderTest, test1) {
 TEST_F(PositionListEncoderTest, test2) {
     optionflag_t option_flag = of_position_list | of_term_frequency;
     PostingFormatOption format_option(option_flag);
-    PositionListEncoder position_encoder(format_option, &byte_slice_pool_, &buffer_pool_);
+    PositionListEncoder position_encoder(format_option);
 
     for (u32 i = 1; i <= MAX_DOC_PER_RECORD + 1; i++) {
         position_encoder.AddPosition(i);

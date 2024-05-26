@@ -5,7 +5,7 @@ module;
 import stl;
 import byte_slice;
 import byte_slice_reader;
-import memory_pool;
+
 import in_doc_pos_state;
 import skiplist_reader;
 import position_list_format_option;
@@ -18,22 +18,14 @@ module position_list_decoder;
 
 namespace infinity {
 
-PositionListDecoder::PositionListDecoder(const PostingFormatOption &option, MemoryPool *session_pool)
-    : pos_skiplist_reader_(nullptr), session_pool_(session_pool), pos_encoder_(nullptr), total_tf_(0), decoded_pos_count_(0), record_offset_(0),
-      pre_record_ttf_(0), offset_in_record_(0), pos_list_begin_(0), last_decode_offset_(0), option_(option), need_reopen_(true),
-      pos_single_slice_(nullptr) {}
+PositionListDecoder::PositionListDecoder(const PostingFormatOption &option)
+    : pos_skiplist_reader_(nullptr), pos_encoder_(nullptr), total_tf_(0), decoded_pos_count_(0), record_offset_(0), pre_record_ttf_(0),
+      offset_in_record_(0), pos_list_begin_(0), last_decode_offset_(0), option_(option), need_reopen_(true), pos_single_slice_(nullptr) {}
 
 PositionListDecoder::~PositionListDecoder() {
-    if (session_pool_) {
-        if (pos_skiplist_reader_) {
-            pos_skiplist_reader_->~SkipListReader();
-            session_pool_->Deallocate((void *)pos_skiplist_reader_, skiplist_reader_real_size_);
-        }
-    } else {
-        if (pos_skiplist_reader_)
-            delete pos_skiplist_reader_;
-        pos_skiplist_reader_ = nullptr;
-    }
+    if (pos_skiplist_reader_)
+        delete pos_skiplist_reader_;
+    pos_skiplist_reader_ = nullptr;
 }
 
 void PositionListDecoder::InitPositionSkipList(const ByteSliceList *pos_list,
@@ -46,9 +38,7 @@ void PositionListDecoder::InitPositionSkipList(const ByteSliceList *pos_list,
         decoded_pos_count_ = total_tf;
         state->SetRecordOffset(pos_skiplist_end);
     } else {
-        pos_skiplist_reader_ = session_pool_ ? new ((session_pool_)->Allocate(sizeof(SkipListReaderByteSlice)))
-                                                   SkipListReaderByteSlice(option_.GetPosListFormatOption())
-                                             : new SkipListReaderByteSlice(option_.GetPosListFormatOption());
+        pos_skiplist_reader_ = new SkipListReaderByteSlice(option_.GetPosListFormatOption());
         skiplist_reader_real_size_ = sizeof(SkipListReaderByteSlice);
         static_cast<SkipListReaderByteSlice *>(pos_skiplist_reader_)->Load(pos_list, pos_skiplist_start, pos_skiplist_end);
         decoded_pos_count_ = 0;
@@ -65,9 +55,7 @@ void PositionListDecoder::InitPositionSkipList(ByteSlice *pos_list,
         decoded_pos_count_ = total_tf;
         state->SetRecordOffset(pos_skiplist_end);
     } else {
-        pos_skiplist_reader_ = session_pool_ ? new ((session_pool_)->Allocate(sizeof(SkipListReaderByteSlice)))
-                                                   SkipListReaderByteSlice(option_.GetPosListFormatOption())
-                                             : new SkipListReaderByteSlice(option_.GetPosListFormatOption());
+        pos_skiplist_reader_ = new SkipListReaderByteSlice(option_.GetPosListFormatOption());
         skiplist_reader_real_size_ = sizeof(SkipListReaderByteSlice);
         static_cast<SkipListReaderByteSlice *>(pos_skiplist_reader_)->Load(pos_list, pos_skiplist_start, pos_skiplist_end);
         decoded_pos_count_ = 0;

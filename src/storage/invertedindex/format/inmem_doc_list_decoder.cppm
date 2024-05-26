@@ -3,7 +3,7 @@ module;
 export module inmem_doc_list_decoder;
 
 import stl;
-import memory_pool;
+
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import index_decoder;
@@ -23,7 +23,7 @@ public:
         docid_t &last_doc_id_;
         ttf_t &current_ttf_;
     };
-    InMemDocListDecoder(MemoryPool *session_pool, const DocListFormatOption &doc_list_format_option);
+    InMemDocListDecoder(const DocListFormatOption &doc_list_format_option);
     ~InMemDocListDecoder();
 
     void Init(df_t df, SkipListReaderPostingByteSlice *skiplist_reader, PostingByteSlice *doc_list_buffer);
@@ -46,7 +46,6 @@ private:
     bool DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_prev_record, u32 offset, docid_t start_doc_id, docid_t &last_doc_id);
 
     // u32 skiped_item_count_ = 0;
-    MemoryPool *session_pool_;
     SkipListReaderPostingByteSlice *skiplist_reader_ = nullptr;
     PostingByteSlice *doc_list_buffer_ = nullptr;
     PostingByteSliceReader doc_list_reader_;

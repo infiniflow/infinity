@@ -16,7 +16,7 @@ module;
 
 module doc_iterator;
 import stl;
-import memory_pool;
+
 import index_defines;
 import internal_types;
 import term_doc_iterator;

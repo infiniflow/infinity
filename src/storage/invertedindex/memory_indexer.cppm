@@ -18,7 +18,7 @@ module;
 
 export module memory_indexer;
 import stl;
-import memory_pool;
+
 import index_defines;
 import posting_writer;
 import column_vector;
@@ -47,8 +47,6 @@ public:
     struct PostingTable {
         PostingTable();
         PostingTableStore store_;
-        MemoryPool byte_slice_pool_;
-        RecyclePool buffer_pool_;
     };
 
     MemoryIndexer(const String &index_dir,
@@ -56,8 +54,6 @@ public:
                   RowID base_row_id,
                   optionflag_t flag,
                   const String &analyzer,
-                  MemoryPool &byte_slice_pool,
-                  RecyclePool &buffer_pool,
                   ThreadPool &inverting_thread_pool,
                   ThreadPool &commiting_thread_pool);
 
@@ -98,8 +94,6 @@ public:
 
     u32 GetColumnLength(u32 doc_id) { return column_lengths_.Get(doc_id); }
 
-    MemoryPool *GetPool() { return &byte_slice_pool_; }
-
     SharedPtr<PostingTable> GetPostingTable() { return posting_table_; }
 
     SharedPtr<PostingWriter> GetOrAddPosting(const String &term);
@@ -131,8 +125,6 @@ private:
     RowID base_row_id_{INVALID_ROWID};
     optionflag_t flag_;
     String analyzer_;
-    MemoryPool &byte_slice_pool_;
-    RecyclePool &buffer_pool_;
     ThreadPool &inverting_thread_pool_;
     ThreadPool &commiting_thread_pool_;
     u32 doc_count_{0};

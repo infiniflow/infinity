@@ -20,7 +20,7 @@ module;
 module column_index_reader;
 
 import stl;
-import memory_pool;
+
 import segment_posting;
 import index_segment_reader;
 import posting_iterator;
@@ -69,11 +69,11 @@ void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentI
     }
 }
 
-UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool, bool fetch_position) {
+UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, bool fetch_position) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
-        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool, fetch_position);
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, fetch_position);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
@@ -81,17 +81,17 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryP
     if (seg_postings->empty()) {
         return nullptr;
     }
-    auto iter = MakeUnique<PostingIterator>(flag_, session_pool);
+    auto iter = MakeUnique<PostingIterator>(flag_);
     u32 state_pool_size = 0; // TODO
     iter->Init(std::move(seg_postings), state_pool_size);
     return iter;
 }
 
-UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, MemoryPool *session_pool, float weight, bool fetch_position) {
+UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, float weight, bool fetch_position) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
-        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, session_pool, fetch_position);
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, fetch_position);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
@@ -99,7 +99,7 @@ UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const Strin
     if (seg_postings->empty()) {
         return nullptr;
     }
-    auto result = MakeUnique<BlockMaxTermDocIterator>(flag_, session_pool);
+    auto result = MakeUnique<BlockMaxTermDocIterator>(flag_);
     result->MultiplyWeight(weight);
     u32 state_pool_size = 0; // TODO
     result->InitPostingIterator(std::move(seg_postings), state_pool_size);
@@ -136,7 +136,6 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_tab
     TxnTimeStamp begin_ts = txn->BeginTS();
     TransactionID txn_id = txn->TxnID();
     IndexReader result;
-    result.session_pool_ = MakeShared<MemoryPool>();
     std::scoped_lock lock(mutex_);
     assert(cache_ts_ <= first_known_update_ts_);
     assert(first_known_update_ts_ == MAX_TIMESTAMP || first_known_update_ts_ <= last_known_update_ts_);

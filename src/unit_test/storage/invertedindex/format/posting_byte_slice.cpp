@@ -1,7 +1,7 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import memory_pool;
+
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import doc_list_format_option;
@@ -12,19 +12,13 @@ using namespace infinity;
 
 class PostingByteSliceTest : public BaseTest {
 public:
-    PostingByteSliceTest() {
-        byte_slice_pool_ = new MemoryPool(1024);
-        buffer_pool_ = new RecyclePool(1024);
-    }
-    ~PostingByteSliceTest() {
-        delete byte_slice_pool_;
-        delete buffer_pool_;
-    }
+    PostingByteSliceTest() {}
+    ~PostingByteSliceTest() {}
     void SetUp() override {
         DocListFormatOption option(NO_TERM_FREQUENCY);
         doc_list_format_.reset(new DocListFormat());
         doc_list_format_->Init(option);
-        posting_byte_slice_.reset(new PostingByteSlice(byte_slice_pool_, buffer_pool_));
+        posting_byte_slice_.reset(new PostingByteSlice());
         posting_byte_slice_->Init(doc_list_format_.get());
     }
 
@@ -34,8 +28,6 @@ public:
     }
 
 protected:
-    MemoryPool *byte_slice_pool_;
-    RecyclePool *buffer_pool_;
     SharedPtr<PostingByteSlice> posting_byte_slice_;
     SharedPtr<DocListFormat> doc_list_format_;
 };
@@ -101,7 +93,7 @@ TEST_F(PostingByteSliceTest, test3) {
         }
     }
 
-    PostingByteSlice snapshot_posting_byte_slice(byte_slice_pool_, buffer_pool_);
+    PostingByteSlice snapshot_posting_byte_slice;
     posting_byte_slice_->SnapShot(&snapshot_posting_byte_slice);
 
     ASSERT_EQ(snapshot_posting_byte_slice.GetTotalCount(), posting_byte_slice_->GetTotalCount());

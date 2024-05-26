@@ -3,7 +3,7 @@ module;
 
 module doc_list_encoder;
 import stl;
-import memory_pool;
+
 import file_writer;
 import file_reader;
 import posting_byte_slice;
@@ -17,12 +17,9 @@ import logger;
 
 namespace infinity {
 
-DocListEncoder::DocListEncoder(const DocListFormatOption &format_option,
-                               MemoryPool *byte_slice_pool,
-                               RecyclePool *buffer_pool,
-                               DocListFormat *doc_list_format)
-    : doc_list_buffer_(byte_slice_pool, buffer_pool), own_doc_list_format_(false), format_option_(format_option), doc_list_format_(doc_list_format),
-      last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr), byte_slice_pool_(byte_slice_pool) {
+DocListEncoder::DocListEncoder(const DocListFormatOption &format_option, DocListFormat *doc_list_format)
+    : doc_list_buffer_(), own_doc_list_format_(false), format_option_(format_option), doc_list_format_(doc_list_format), last_doc_id_(0),
+      current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr) {
     if (!doc_list_format) {
         doc_list_format_ = new DocListFormat;
         doc_list_format_->Init(format_option);
@@ -144,8 +141,7 @@ void DocListEncoder::FlushDocListBuffer() {
 }
 
 void DocListEncoder::CreateDocSkipListWriter() {
-    RecyclePool *buffer_pool = dynamic_cast<RecyclePool *>(doc_list_buffer_.GetBufferPool());
-    doc_skiplist_writer_ = MakeUnique<SkipListWriter>(byte_slice_pool_, buffer_pool);
+    doc_skiplist_writer_ = MakeUnique<SkipListWriter>();
     doc_skiplist_writer_->Init(doc_list_format_->GetDocSkipListFormat());
 }
 
@@ -163,24 +159,18 @@ void DocListEncoder::AddSkipListItem(u32 item_size) {
     }
 }
 
-InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_pool) const {
+InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder() const {
     df_t df = df_;
     SkipListReaderPostingByteSlice *skiplist_reader = nullptr;
     if (doc_skiplist_writer_) {
-        skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(SkipListReaderPostingByteSlice)))
-                                             SkipListReaderPostingByteSlice(format_option_, session_pool)
-                                       : new SkipListReaderPostingByteSlice(format_option_, session_pool);
+        skiplist_reader = new SkipListReaderPostingByteSlice(format_option_);
         skiplist_reader->Load(doc_skiplist_writer_.get());
     }
 
-    PostingByteSlice *doc_list_buffer = session_pool ? new (session_pool->Allocate(sizeof(PostingByteSlice)))
-                                                           PostingByteSlice(session_pool, session_pool)
-                                                     : new PostingByteSlice(session_pool, session_pool);
+    PostingByteSlice *doc_list_buffer = new PostingByteSlice();
     doc_list_buffer_.SnapShot(doc_list_buffer);
 
-    InMemDocListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListDecoder)))
-                                                      InMemDocListDecoder(session_pool, format_option_)
-                                                : new InMemDocListDecoder(session_pool, format_option_);
+    InMemDocListDecoder *decoder = new InMemDocListDecoder(format_option_);
     decoder->Init(df, skiplist_reader, doc_list_buffer);
 
     return decoder;

@@ -17,7 +17,7 @@ module;
 export module multi_query_iterator;
 
 import stl;
-import memory_pool;
+
 import index_defines;
 import doc_iterator;
 import term_doc_iterator;

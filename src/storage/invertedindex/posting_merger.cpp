@@ -3,7 +3,7 @@ module;
 module posting_merger;
 
 import stl;
-import memory_pool;
+
 import file_writer;
 import doc_list_encoder;
 import inmem_posting_decoder;
@@ -115,12 +115,9 @@ bool DocMerger::HasNext() {
 
 class PostingDumper {
 public:
-    PostingDumper(MemoryPool *memory_pool,
-                  RecyclePool *buffer_pool,
-                  const PostingFormatOption &format_option,
-                  VectorWithLock<u32> &column_length_array)
+    PostingDumper(const PostingFormatOption &format_option, VectorWithLock<u32> &column_length_array)
         : format_option_(format_option), column_lengths_(column_length_array) {
-        posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option, column_lengths_);
+        posting_writer_ = MakeShared<PostingWriter>(format_option, column_lengths_);
     }
 
     ~PostingDumper() {}
@@ -174,9 +171,9 @@ private:
     DocMerger doc_merger_;
 };
 
-PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, optionflag_t flag, VectorWithLock<u32> &column_length_array)
-    : memory_pool_(memory_pool), buffer_pool_(buffer_pool), format_option_(flag), column_lengths_(column_length_array) {
-    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, column_lengths_);
+PostingMerger::PostingMerger(optionflag_t flag, VectorWithLock<u32> &column_length_array)
+    : format_option_(flag), column_lengths_(column_length_array) {
+    posting_dumper_ = MakeShared<PostingDumper>(format_option_, column_lengths_);
 }
 
 PostingMerger::~PostingMerger() {}

@@ -411,7 +411,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
     }
-    auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get(), fetch_position);
+    auto posting_iterator = column_index_reader->Lookup(term_, fetch_position);
     if (!posting_iterator) {
         return nullptr;
     }
@@ -439,7 +439,7 @@ std::unique_ptr<EarlyTerminateIterator> TermQueryNode::CreateEarlyTerminateSearc
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
     }
-    auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight(), fetch_position);
+    auto search = column_index_reader->LookupBlockMax(term_, GetWeight(), fetch_position);
     if (!search) {
         return nullptr;
     }
@@ -465,7 +465,7 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
     }
     Vector<std::unique_ptr<PostingIterator>> posting_iterators;
     for (auto &term : terms_) {
-        auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
+        auto posting_iterator = column_index_reader->Lookup(term, fetch_position);
         if (nullptr == posting_iterator) {
             return nullptr;
         }
@@ -499,7 +499,7 @@ std::unique_ptr<EarlyTerminateIterator> PhraseQueryNode::CreateEarlyTerminateSea
 
     Vector<std::unique_ptr<PostingIterator>> posting_iterators;
     for (auto& term : terms_) {
-        auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
+        auto posting_iterator = column_index_reader->Lookup(term, fetch_position);
         if (nullptr == posting_iterator) {
             fmt::print("not found term = {}\n", term);
             return nullptr;
