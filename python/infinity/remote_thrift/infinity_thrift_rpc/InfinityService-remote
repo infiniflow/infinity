@@ -24,7 +24,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] [-novalidate] [-ca_certs certs] [-keyfile keyfile] [-certfile certfile] function [arg1 [arg2...]]')
     print('')
     print('Functions:')
-    print('  CommonResponse Connect()')
+    print('  CommonResponse Connect(ConnectRequest request)')
     print('  CommonResponse Disconnect(CommonRequest request)')
     print('  CommonResponse CreateDatabase(CreateDatabaseRequest request)')
     print('  CommonResponse DropDatabase(DropDatabaseRequest request)')
@@ -133,10 +133,10 @@ client = InfinityService.Client(protocol)
 transport.open()
 
 if cmd == 'Connect':
-    if len(args) != 0:
-        print('Connect requires 0 args')
+    if len(args) != 1:
+        print('Connect requires 1 args')
         sys.exit(1)
-    pp.pprint(client.Connect())
+    pp.pprint(client.Connect(eval(args[0]),))
 
 elif cmd == 'Disconnect':
     if len(args) != 1:

@@ -21,6 +21,7 @@ export module infinity_thrift_types;
 namespace infinity_thrift_rpc {
 
 export using infinity_thrift_rpc::InfinityServiceIf;
+export using infinity_thrift_rpc::ConnectRequest;
 export using infinity_thrift_rpc::CommonResponse;
 export using infinity_thrift_rpc::CommonRequest;
 export using infinity_thrift_rpc::CreateDatabaseRequest;
