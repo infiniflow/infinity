@@ -67,8 +67,10 @@ Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, Trans
     : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), txn_context_(begin_ts),
       wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
-    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, MAX_TIMESTAMP);
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, begin_ts);
+    txn->txn_context_.commit_ts_ = begin_ts;
+    txn->txn_context_.state_ = TxnState::kCommitted;
     return txn;
 }
 
@@ -477,13 +479,6 @@ void Txn::CancelCommitBottom() {
     std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
-}
-
-// Dangerous! only used during replaying wal.
-void Txn::FakeCommit(TxnTimeStamp commit_ts) {
-    txn_context_.begin_ts_ = commit_ts;
-    txn_context_.commit_ts_ = commit_ts;
-    txn_context_.state_ = TxnState::kCommitted;
 }
 
 void Txn::Rollback() {
