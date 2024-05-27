@@ -26,6 +26,7 @@ import load_meta;
 import infinity_exception;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -45,7 +46,9 @@ public:
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     SizeT TaskletCount() override {
-        UnrecoverableError("Not implement: TaskletCount not Implement");
+        String error_message = "Not implement: TaskletCount not Implement";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 

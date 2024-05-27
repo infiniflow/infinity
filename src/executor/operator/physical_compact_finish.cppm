@@ -27,6 +27,7 @@ import infinity_exception;
 import base_table_ref;
 import compact_state_data;
 import compact_statement;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ public:
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
     SizeT TaskletCount() override {
-        UnrecoverableError("Not implement: TaskletCount not Implement");
+        String error_message = "Not implement: TaskletCount not Implement";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 
