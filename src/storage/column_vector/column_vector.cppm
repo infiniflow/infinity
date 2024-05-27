@@ -284,6 +284,50 @@ private:
             buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensors.data()), tensors.size() * sizeof(TensorT));
     }
 
+    template <typename T>
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+        const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+        switch (sparse_info->IndexType()) {
+            case kElemInt8: {
+                AppendSparse<T, TinyIntT>(ele_str_views, dst_off);
+                break;
+            }
+            case kElemInt16: {
+                AppendSparse<T, SmallIntT>(ele_str_views, dst_off);
+                break;
+            }
+            case kElemInt32: {
+                AppendSparse<T, IntegerT>(ele_str_views, dst_off);
+                break;
+            }
+            case kElemInt64: {
+                AppendSparse<T, BigIntT>(ele_str_views, dst_off);
+                break;
+            }
+            default: {
+                UnrecoverableError("Unsupported sparse index type.");
+            }
+        }
+    }
+
+    template <typename T, typename IdxT>
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+        auto &target_sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+        SizeT total_element_count = ele_str_views.size();
+        target_sparse.nnz_ = total_element_count;
+
+        auto tmp_indices = MakeUniqueForOverwrite<IdxT[]>(total_element_count);
+        auto tmp_data = MakeUniqueForOverwrite<T[]>(total_element_count);
+        for (u32 i = 0; i < total_element_count; ++i) {
+            auto [index, value] = DataType::StringToSparseValue<T, IdxT>(ele_str_views[i]);
+            tmp_indices[i] = index;
+            tmp_data[i] = value;
+        }
+        std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) =
+            buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_indices.get()), total_element_count * sizeof(IdxT));
+        buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), total_element_count * sizeof(T));
+    }
+
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
@@ -316,18 +360,18 @@ void WriteToTensor(TensorT &target_tensor,
                    FixHeapManager *target_fix_heap_manager,
                    const Vector<std::string_view> &ele_str_views,
                    const SizeT unit_embedding_dim) {
-    const auto total_elememt_count = ele_str_views.size();
-    const auto input_bytes = total_elememt_count * sizeof(T);
+    const auto total_element_count = ele_str_views.size();
+    const auto input_bytes = total_element_count * sizeof(T);
     if (input_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         Status status = Status::SyntaxError("Tensor size exceeds the limit.");
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
-    auto tmp_data = MakeUniqueForOverwrite<T[]>(total_elememt_count);
-    for (u32 i = 0; i < total_elememt_count; ++i) {
+    auto tmp_data = MakeUniqueForOverwrite<T[]>(total_element_count);
+    for (u32 i = 0; i < total_element_count; ++i) {
         tmp_data[i] = DataType::StringToValue<T>(ele_str_views[i]);
     }
-    target_tensor.embedding_num_ = total_elememt_count / unit_embedding_dim;
+    target_tensor.embedding_num_ = total_element_count / unit_embedding_dim;
     std::tie(target_tensor.chunk_id_, target_tensor.chunk_offset_) =
         target_fix_heap_manager->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), input_bytes);
 }
@@ -337,20 +381,20 @@ void WriteToTensor<bool>(TensorT &target_tensor,
                          FixHeapManager *target_fix_heap_manager,
                          const Vector<std::string_view> &ele_str_views,
                          const SizeT unit_embedding_dim) {
-    const auto total_elememt_count = ele_str_views.size();
-    const auto bit_bytes = (total_elememt_count + 7) / 8;
+    const auto total_element_count = ele_str_views.size();
+    const auto bit_bytes = (total_element_count + 7) / 8;
     if (bit_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         Status status = Status::SyntaxError("Tensor size exceeds the limit.");
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
     auto tmp_data = MakeUnique<u8[]>(bit_bytes);
-    for (u32 i = 0; i < total_elememt_count; ++i) {
+    for (u32 i = 0; i < total_element_count; ++i) {
         if (const auto value = DataType::StringToValue<float>(ele_str_views[i]); value) {
             tmp_data[i / 8] |= (1u << (i % 8));
         }
     }
-    target_tensor.embedding_num_ = total_elememt_count / unit_embedding_dim;
+    target_tensor.embedding_num_ = total_element_count / unit_embedding_dim;
     std::tie(target_tensor.chunk_id_, target_tensor.chunk_offset_) =
         target_fix_heap_manager->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), bit_bytes);
 }

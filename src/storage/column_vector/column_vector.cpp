@@ -1630,6 +1630,20 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             }
             break;
         }
+        case kSparse: {
+            const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
+            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
+            switch(sparse_info->DataType()) {
+                case kElemDouble: {
+                    AppendSparse<DoubleT>(ele_str_views, index);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid sparse type");
+                }
+            }
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented");
             LOG_ERROR(status.message());
