@@ -15,7 +15,7 @@
 module;
 
 #include <iostream>
-
+//#include <nanobind/nanobind.h>
 module infinity;
 
 import stl;
@@ -62,6 +62,10 @@ import infinity_exception;
 namespace infinity {
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
+
+void Infinity::Hello() {
+    std::cout << "hello infinity" << std::endl;
+}
 
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
@@ -764,3 +768,14 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name) 
 }
 
 } // namespace infinity
+
+//int add(int a, int b) {
+//    return a + b;
+//}
+//
+//NB_MODULE(infinity, m) {
+//    m.def("add", &add);
+////    m.def("hello", &infinity::Infinity::Hello);
+//////    m.def("add", &add);
+//////    m.def("mul", &mul);
+//}

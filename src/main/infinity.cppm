@@ -47,6 +47,7 @@ public:
 
     static void LocalUnInit();
 
+    static void Hello();
     // Infinity API
 public:
     static SharedPtr<Infinity> RemoteConnect();

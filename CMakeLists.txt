@@ -141,6 +141,67 @@ if(ENABLE_JEMALLOC AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+
+find_package(Python 3.8
+        REQUIRED COMPONENTS Interpreter Development.Module
+        OPTIONAL_COMPONENTS Development.SABIModule)
+message("after find python, Python3_INCLUDE_DIRS = ${Python3_INCLUDE_DIRS}")
+message("after find python, Python3_LIBRARIES = ${Python3_LIBRARIES}")
+set(Python3_INCLUDE_DIRS "/usr/include/python3.11")
+set(Python3_LIBRARIES "/usr/lib/python3.11/config-3.11-x86_64-linux-gnu/libpython3.11.so")
+
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+execute_process(
+        COMMAND python3 -m nanobind --cmake_dir
+        OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
+message("NB_DIR=${NB_DIR}")
+list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+
+find_package(nanobind CONFIG REQUIRED)
+
+set(nanobind_INCLUDE_DIRS "${NB_DIR}/include")
+message("include dir = ${nanobind_INCLUDE_DIRS}")
+set(nanobind_SRC_DIR "${NB_DIR}/src")
+
+find_library(NANOBIND_LIBRARY nanobind)
+message("NANOBIND_LIBRARY = ${NANOBIND_LIBRARY}")
+
+
+add_library(hello src/hello.cpp)
+
+target_sources(hello
+        PUBLIC
+        FILE_SET cxx_modules TYPE CXX_MODULES
+        FILES src/hello.cppm
+)
+
+add_library(embed_infinity MODULE
+        src/embed_infinity.cpp
+)
+
+nanobind_compile_options(embed_infinity)
+nanobind_link_options(embed_infinity)
+
+set_target_properties(embed_infinity PROPERTIES LINKER_LANGUAGE CXX)
+
+set(libname "nanobind")
+
+nanobind_build_library(${libname})
+
+nanobind_extension(embed_infinity)
+
+target_link_libraries(embed_infinity PRIVATE ${libname} hello)
+
+nanobind_set_visibility(embed_infinity)
+
+#nanobind_add_module(embed_infinity src/embed_infinity.cpp)
+install(TARGETS embed_infinity LIBRARY DESTINATION infinity)
+
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
