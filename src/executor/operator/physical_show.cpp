@@ -448,7 +448,9 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             break;
         }
         default: {
-            UnrecoverableError("Invalid chunk scan type");
+            String error_message = "Invalid chunk scan type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     operator_state->SetComplete();
@@ -989,7 +991,9 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
                     break;
                 }
                 default: {
-                    UnrecoverableError("Invalid table type");
+                    String error_message = "Invalid table type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
         }
@@ -1006,7 +1010,9 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
                     break;
                 }
                 default: {
-                    UnrecoverableError("Invalid table type");
+                    String error_message = "Invalid table type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
         }
@@ -1023,7 +1029,9 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
                     break;
                 }
                 default: {
-                    UnrecoverableError("Invalid table type");
+                    String error_message = "Invalid table type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
         }
@@ -1690,7 +1698,9 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
     auto column_block_entry = block_entry->GetColumnBlockEntry(table_column_id);
     if (!column_block_entry) {
-        UnrecoverableError(fmt::format("Attempt to get column {} from block {}", table_column_id, *block_id_));
+        String error_message = fmt::format("Attempt to get column {} from block {}", table_column_id, *block_id_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return;
     }
 
@@ -3617,7 +3627,9 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
             break;
         }
         default: {
-            UnrecoverableError("Invalid option data type.");
+            String error_message = "Invalid option data type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }

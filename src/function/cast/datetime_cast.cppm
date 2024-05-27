@@ -26,6 +26,7 @@ import logical_type;
 import infinity_exception;
 import third_party;
 import internal_types;
+import logger;
 
 namespace infinity {
 
@@ -73,25 +74,33 @@ struct DateTimeTryCastToVarlen {
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, DateT &) {
-    UnrecoverableError("Not implemented");
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimeT &) {
-    UnrecoverableError("Not implemented");
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimestampT &) {
-    UnrecoverableError("Not implemented");
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DateTimeTryCastToVarlen::Run(DateTimeT, VarcharT &, ColumnVector*) {
-    UnrecoverableError("Not implemented");
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

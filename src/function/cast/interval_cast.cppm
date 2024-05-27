@@ -24,7 +24,7 @@ import column_vector_cast;
 import logical_type;
 import infinity_exception;
 import third_party;
-// import logger;
+import logger;
 import internal_types;
 import data_type;
 
@@ -55,7 +55,9 @@ struct IntervalTryCastToVarlen {
 
 template <>
 inline bool IntervalTryCastToVarlen::Run(IntervalT, VarcharT &, ColumnVector*) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

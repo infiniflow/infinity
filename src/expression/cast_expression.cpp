@@ -47,8 +47,11 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
 bool CastExpression::CanCast(const DataType &source, const DataType &target) {
     switch (target.type()) {
         case LogicalType::kNull:
-        case LogicalType::kInvalid:
-            UnrecoverableError("Invalid data type");
+        case LogicalType::kInvalid: {
+            String error_message = "Invalid data type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
         default:;
     }
 
@@ -143,7 +146,9 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
             }
         }
         default: {
-            UnrecoverableError("Invalid data type");
+            String error_message = "Invalid data type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return false;

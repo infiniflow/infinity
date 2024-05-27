@@ -209,7 +209,9 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT, DecimalT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -281,7 +283,9 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT, DecimalT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -356,7 +360,9 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT, DecimalT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -377,7 +383,9 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, Column
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer. ");
+            String error_message = "Varchar column vector should use MemoryVectorBuffer.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;
@@ -390,51 +398,67 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, Column
 // TODO: Cast HugeInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, TinyIntT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, SmallIntT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, IntegerT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, BigIntT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, FloatT &) {
-    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DoubleT &) {
-    UnrecoverableError("Not implemented");
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DecimalT &) {
-    UnrecoverableError("Not implemented");
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 // Cast integer to varlen type
 template <>
 inline bool IntegerTryCastToVarlen::Run(HugeIntT, VarcharT &, ColumnVector*) {
-    UnrecoverableError("Not implemented");
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
