@@ -2,7 +2,7 @@ module;
 #include <cassert>
 
 import stl;
-import memory_pool;
+
 import position_list_decoder;
 import posting_byte_slice_reader;
 import in_doc_pos_state;
@@ -15,17 +15,11 @@ module inmem_position_list_decoder;
 
 namespace infinity {
 
-InMemPositionListDecoder::InMemPositionListDecoder(const PostingFormatOption &option, MemoryPool *session_pool)
-    : PositionListDecoder(option, session_pool), pos_list_buffer_(nullptr) {}
+InMemPositionListDecoder::InMemPositionListDecoder(const PostingFormatOption &option) : PositionListDecoder(option), pos_list_buffer_(nullptr) {}
 
 InMemPositionListDecoder::~InMemPositionListDecoder() {
-    if (session_pool_) {
-        pos_list_buffer_->~PostingByteSlice();
-        session_pool_->Deallocate((void *)pos_list_buffer_, sizeof(PostingByteSlice));
-    } else {
-        delete pos_list_buffer_;
-        pos_list_buffer_ = nullptr;
-    }
+    delete pos_list_buffer_;
+    pos_list_buffer_ = nullptr;
 }
 
 void InMemPositionListDecoder::Init(ttf_t total_tf,

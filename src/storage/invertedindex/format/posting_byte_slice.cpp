@@ -2,7 +2,7 @@ module;
 
 module posting_byte_slice;
 import stl;
-import memory_pool;
+
 import posting_field;
 import flush_info;
 import file_writer;
@@ -10,7 +10,7 @@ import file_reader;
 
 namespace infinity {
 
-PostingByteSlice::PostingByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool) : buffer_(byte_slice_pool), posting_writer_(buffer_pool) {}
+PostingByteSlice::PostingByteSlice() : buffer_(), posting_writer_() {}
 
 void PostingByteSlice::Init(const PostingFields *value) { buffer_.Init(value); }
 

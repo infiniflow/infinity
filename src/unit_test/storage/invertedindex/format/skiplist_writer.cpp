@@ -1,7 +1,7 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import memory_pool;
+
 import skiplist_writer;
 import posting_byte_slice_reader;
 import posting_byte_slice;
@@ -15,15 +15,9 @@ using namespace infinity;
 
 class SkipListWriterTest : public BaseTest {
 public:
-    SkipListWriterTest() {
-        byte_slice_pool_ = new MemoryPool(BUFFER_SIZE_);
-        buffer_pool_ = new RecyclePool(BUFFER_SIZE_);
-    }
-    ~SkipListWriterTest() {
-        delete byte_slice_pool_;
-        delete buffer_pool_;
-    }
-    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(byte_slice_pool_, buffer_pool_); }
+    SkipListWriterTest() {}
+    ~SkipListWriterTest() {}
+    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(); }
 
     void TearDown() override { skiplist_writer_.reset(); }
 
@@ -31,8 +25,6 @@ protected:
     SharedPtr<FileWriter> CreateFileWriter(String file_name);
 
 protected:
-    MemoryPool *byte_slice_pool_;
-    RecyclePool *buffer_pool_;
     SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };

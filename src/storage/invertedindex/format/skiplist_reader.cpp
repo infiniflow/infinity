@@ -155,19 +155,12 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
 }
 
 SkipListReaderPostingByteSlice::~SkipListReaderPostingByteSlice() {
-    if (session_pool_) {
-        skiplist_buffer_->~PostingByteSlice();
-        session_pool_->Deallocate((void *)skiplist_buffer_, sizeof(PostingByteSlice));
-    } else {
-        delete skiplist_buffer_;
-    }
+    delete skiplist_buffer_;
     skiplist_buffer_ = nullptr;
 }
 
 void SkipListReaderPostingByteSlice::Load(const PostingByteSlice *posting_buffer) {
-    PostingByteSlice *skiplist_buffer = session_pool_ ? new (session_pool_->Allocate(sizeof(PostingByteSlice)))
-                                                            PostingByteSlice(session_pool_, session_pool_)
-                                                      : new PostingByteSlice(session_pool_, session_pool_);
+    PostingByteSlice *skiplist_buffer = new PostingByteSlice();
     posting_buffer->SnapShot(skiplist_buffer);
 
     skiplist_buffer_ = skiplist_buffer;

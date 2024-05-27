@@ -87,6 +87,9 @@ export {
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
+    constexpr SizeT DEFAULT_CHUNK_SIZE = 10 * 1024 * 1024;
+    constexpr SizeT DEFAULT_ALIGN_SIZE = sizeof(char *);
+
     constexpr SizeT MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds

@@ -4,7 +4,7 @@ export module multi_posting_decoder;
 
 import stl;
 import byte_slice_reader;
-import memory_pool;
+
 import index_decoder;
 import in_doc_pos_iterator;
 import in_doc_pos_state;
@@ -18,8 +18,8 @@ import posting_writer;
 namespace infinity {
 export class MultiPostingDecoder {
 public:
-    MultiPostingDecoder(const PostingFormatOption &format_option, InDocPositionState *state, MemoryPool *pool)
-        : format_option_(format_option), session_pool_(pool), in_doc_state_keeper_(state, pool) {}
+    MultiPostingDecoder(const PostingFormatOption &format_option, InDocPositionState *state)
+        : format_option_(format_option), in_doc_state_keeper_(state) {}
 
     ~MultiPostingDecoder();
 
@@ -90,7 +90,6 @@ private:
 
     SharedPtr<Vector<SegmentPosting>> seg_postings_;
     ByteSliceReader doc_list_reader_;
-    MemoryPool *session_pool_;
     InDocPositionIterator *in_doc_pos_iterator_ = nullptr;
     InDocStateKeeper in_doc_state_keeper_;
 private:

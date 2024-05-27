@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import byte_slice_reader;
 import posting_list_format;
 import term_meta;
@@ -19,7 +19,7 @@ export module posting_iterator;
 namespace infinity {
 export class PostingIterator {
 public:
-    PostingIterator(optionflag_t flag, MemoryPool *session_pool);
+    PostingIterator(optionflag_t flag);
 
     ~PostingIterator();
 
@@ -118,7 +118,6 @@ private:
 private:
     SharedPtr<Vector<SegmentPosting>> segment_postings_;
     PostingFormatOption posting_option_;
-    MemoryPool *session_pool_ = nullptr;
     u32 doc_freq_ = 0;
 
     // info for skiplist, block max

@@ -2,7 +2,7 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import memory_pool;
+
 import index_defines;
 import posting_field;
 import posting_buffer;

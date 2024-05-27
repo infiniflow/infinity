@@ -7,7 +7,6 @@ module;
 module column_index_merger;
 
 import stl;
-import memory_pool;
 import byte_slice;
 import byte_slice_reader;
 import file_reader;
@@ -29,14 +28,11 @@ import infinity_exception;
 import vector_with_lock;
 
 namespace infinity {
-ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool)
-    : index_dir_(index_dir), flag_(flag), memory_pool_(memory_pool), buffer_pool_(buffer_pool) {}
+ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}
 
 ColumnIndexMerger::~ColumnIndexMerger() {}
 
-SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() {
-    return MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_lengths_);
-}
+SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() { return MakeShared<PostingMerger>(flag_, column_lengths_); }
 
 void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name) {
     assert(base_names.size() == base_rowids.size());
@@ -117,8 +113,6 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     fst_builder.Finish();
     fs_.AppendFile(dict_file, fst_file);
     fs_.DeleteFile(fst_file);
-    memory_pool_->Release();
-    buffer_pool_->Release();
 }
 
 void ColumnIndexMerger::MergeTerm(const String &term,
@@ -129,8 +123,6 @@ void ColumnIndexMerger::MergeTerm(const String &term,
     posting_merger->Merge(merging_term_postings, merge_base_rowid);
 
     posting_merger->Dump(posting_file_writer_, term_meta);
-//    memory_pool_->Reset();
-//    buffer_pool_->Reset();
 }
 
 } // namespace infinity

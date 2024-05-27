@@ -3,7 +3,6 @@ module;
 #include <cassert>
 
 import stl;
-import memory_pool;
 import posting_field;
 import file_writer;
 import file_reader;
@@ -17,7 +16,7 @@ namespace infinity {
 // column allocate strategy: 2->16->128
 export class PostingBuffer {
 public:
-    PostingBuffer(MemoryPool *pool = nullptr);
+    PostingBuffer();
 
     ~PostingBuffer();
 
@@ -57,8 +56,6 @@ public:
 
     bool SnapShot(PostingBuffer &buffer) const;
 
-    MemoryPool *GetPool() const { return pool_; }
-
     const PostingFields *GetPostingFields() const { return posting_fields_; }
 
     static u8 AllocatePlan(u8 curCapacity);
@@ -68,9 +65,6 @@ public:
     void Load(const SharedPtr<FileReader> &file);
 
 private:
-    void *Allocate(SizeT size) { return pool_->Allocate(size); }
-    void Deallocate(void *buf, SizeT size) { pool_->Deallocate(buf, size); }
-
     bool Reallocate();
 
     static void BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingFields *posting_fields, u8 srcSize);
@@ -90,8 +84,6 @@ private:
     u8 volatile size_;     // number of columns (maximum of 128)
 
     bool volatile is_buffer_valid_;
-    bool has_pool_;
-    MemoryPool *pool_;
     const PostingFields *posting_fields_;
 };
 

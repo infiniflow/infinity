@@ -4,7 +4,7 @@ module;
 module skiplist_writer;
 import stl;
 import byte_slice;
-import memory_pool;
+
 import file_writer;
 import file_reader;
 import index_defines;
@@ -14,8 +14,7 @@ import short_list_optimize_util;
 
 namespace infinity {
 
-SkipListWriter::SkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool)
-    : PostingByteSlice(byte_slice_pool, buffer_pool), last_key_(-1), last_value1_(-1) {}
+SkipListWriter::SkipListWriter() : PostingByteSlice(), last_key_(-1), last_value1_(-1) {}
 
 void SkipListWriter::AddItem(u32 last_doc_id, u32 total_tf, u32 block_max_tf, u16 block_max_percentage, u32 item_size) {
     assert(static_cast<u32>(-1) == last_key_ || last_doc_id > last_key_);

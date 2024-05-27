@@ -2,7 +2,7 @@
 #include <cassert>
 
 import stl;
-import memory_pool;
+
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import term_meta;

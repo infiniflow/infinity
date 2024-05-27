@@ -19,7 +19,7 @@ module;
 module disk_index_segment_reader;
 
 import stl;
-import memory_pool;
+
 import segment_posting;
 import index_defines;
 import index_segment_reader;
@@ -65,14 +65,14 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     }
 }
 
-bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool, bool fetch_position) const {
+bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, bool fetch_position) const {
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta)) {
         return false;
     }
     u64 file_length = fetch_position ? (term_meta.pos_end_ - term_meta.doc_start_) : (term_meta.pos_start_ - term_meta.doc_start_);
     ByteSlice *slice = ByteSlice::NewSlice(data_ptr_ + term_meta.doc_start_, file_length);
-    SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
+    SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice);
     seg_posting.Init(std::move(byte_slice_list), base_row_id_, term_meta.doc_freq_, term_meta);
     return true;
 }

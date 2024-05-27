@@ -1,8 +1,9 @@
 module;
 
+#include <cstdlib>
 module posting_buffer;
 import stl;
-import memory_pool;
+
 import index_defines;
 import posting_field;
 import file_writer;
@@ -10,20 +11,9 @@ import file_reader;
 
 namespace infinity {
 
-PostingBuffer::PostingBuffer(MemoryPool *pool)
-    : buffer_(nullptr), capacity_(0), size_(0), is_buffer_valid_(true), has_pool_(false), pool_(pool), posting_fields_(nullptr) {
-    if (!pool) {
-        pool_ = new MemoryPool(1024);
-        has_pool_ = true;
-    }
-}
+PostingBuffer::PostingBuffer() : buffer_(nullptr), capacity_(0), size_(0), is_buffer_valid_(true), posting_fields_(nullptr) {}
 
-PostingBuffer::~PostingBuffer() {
-    if (has_pool_) {
-        delete pool_;
-        pool_ = nullptr;
-    }
-}
+PostingBuffer::~PostingBuffer() { ReleaseBuffer(buffer_, capacity_); }
 
 bool PostingBuffer::Reallocate() {
     u8 old_capacity = capacity_;
@@ -33,7 +23,7 @@ bool PostingBuffer::Reallocate() {
         return false;
     }
     SizeT doc_item_size = new_capacity * posting_fields_->GetTotalSize();
-    u8 *new_buffer = (u8 *)Allocate(doc_item_size);
+    u8 *new_buffer = (u8 *)malloc(doc_item_size);
 
     BufferMemoryCopy(new_buffer, new_capacity, (u8 *)buffer_, capacity_, posting_fields_, size_);
 
@@ -54,8 +44,7 @@ void PostingBuffer::ReleaseBuffer(u8 *buffer, u8 capacity) {
     if (buffer == nullptr || capacity == 0) {
         return;
     }
-    SizeT bufferSize = capacity * posting_fields_->GetTotalSize();
-    Deallocate((void *)buffer, bufferSize);
+    free((void *)buffer);
 }
 
 void PostingBuffer::BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingFields *posting_fields, u8 src_size) {
@@ -101,7 +90,7 @@ bool PostingBuffer::SnapShot(PostingBuffer &posting_buffer) const {
     if (posting_buffer.GetRowCount() != posting_fields_->GetSize()) {
         return false;
     }
-    if (buffer_ == nullptr) {
+    if (buffer_ == nullptr || size_ == 0) {
         return true;
     }
 
@@ -130,14 +119,13 @@ bool PostingBuffer::SnapShot(PostingBuffer &posting_buffer) const {
 }
 
 void PostingBuffer::Reserve(u8 capacity) {
-    if (buffer_ != nullptr) {
-        if (capacity_ >= capacity)
-            return;
+    if (capacity <= 0 || (buffer_ != nullptr && capacity_ >= capacity)) {
+        return;
     }
 
     SizeT doc_item_size = capacity * posting_fields_->GetTotalSize();
 
-    u8 *new_buffer = (u8 *)Allocate(doc_item_size);
+    u8 *new_buffer = (u8 *)malloc(doc_item_size);
 
     if (buffer_ != nullptr) {
         BufferMemoryCopy(new_buffer, capacity, (u8 *)buffer_, capacity_, posting_fields_, size_);

@@ -5,7 +5,7 @@ export module position_list_decoder;
 import stl;
 import byte_slice;
 import byte_slice_reader;
-import memory_pool;
+
 import skiplist_reader;
 import posting_list_format;
 import position_list_format_option;
@@ -17,7 +17,7 @@ namespace infinity {
 class InDocPositionState;
 export class PositionListDecoder {
 public:
-    PositionListDecoder(const PostingFormatOption &option, MemoryPool *sessionPool);
+    PositionListDecoder(const PostingFormatOption &option);
     virtual ~PositionListDecoder();
 
     void Init(ByteSlice *pos_list, tf_t total_tf, u32 pos_list_begin, InDocPositionState *state);
@@ -44,7 +44,6 @@ private:
 protected:
     SkipListReader *pos_skiplist_reader_;
     u32 skiplist_reader_real_size_ = 0;
-    MemoryPool *session_pool_;
     const Int32Encoder *pos_encoder_;
     u32 total_tf_;
 
