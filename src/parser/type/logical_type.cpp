@@ -16,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include "complex/sparse_type.h"
  
 namespace infinity {
 
@@ -198,6 +199,9 @@ static int64_t type_size[] = {
     // tensor type
     8, // Tensor
     8, // TensorArray
+
+    // sparse type
+    sizeof(SparseType),
 
     0, // Invalid
 };

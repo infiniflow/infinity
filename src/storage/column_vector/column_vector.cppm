@@ -34,6 +34,7 @@ import fix_heap;
 import internal_types;
 import data_type;
 import embedding_info;
+import sparse_info;
 import constant_expr;
 import logger;
 
@@ -368,6 +369,12 @@ void CopyTensorArray(TensorArrayT &dst_ref,
                      const VectorBuffer *src_buffer,
                      u32 unit_embedding_bytes);
 
+void CopySparse(SparseT &dst_sparse,
+                FixHeapManager *dst_fix_heap_mgr,
+                const SparseT &src_sparse,
+                FixHeapManager *src_fix_heap_mgr,
+                SizeT sparse_bytes);
+
 template <>
 void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
     auto dst_tail = dst.tail_index_;
@@ -451,6 +458,26 @@ inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict 
         TensorArrayT *dst_ptr = &(((TensorArrayT *)dst)[idx]);
         const TensorArrayT *src_ptr = &(((const TensorArrayT *)src)[row_id]);
         CopyTensorArray(*dst_ptr, dst_buf, *src_ptr, src_buf, unit_embedding_bytes);
+    }
+}
+
+template <>
+inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT count,
+                                            const Selection &input_select) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+
+    for (SizeT idx = 0; idx < count; ++idx) {
+        SizeT dest_idx = input_select[idx];
+
+        auto *dst_sparse = reinterpret_cast<SparseT *>(dst) + dest_idx;
+        const auto *src_sparse = reinterpret_cast<const SparseT *>(src) + idx;
+
+        SizeT sparse_bytes = sparse_info->SparseSize(src_sparse->nnz_);
+        CopySparse(*dst_sparse, dst_buf->fix_heap_mgr_.get(), *src_sparse, src_buf->fix_heap_mgr_.get(), sparse_bytes);
     }
 }
 
@@ -642,6 +669,26 @@ inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict 
     }
 }
 
+template <>
+inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT source_start_idx,
+                                            SizeT dest_start_idx,
+                                            SizeT count) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+
+    SizeT source_end_idx = source_start_idx + count;
+    for (SizeT idx = source_start_idx, dst_idx = dest_start_idx; idx < source_end_idx; ++idx, ++dst_idx) {
+        const auto *src_sparse = reinterpret_cast<const SparseT *>(src) + idx;
+        auto *dst_sparse = reinterpret_cast<SparseT *>(dst) + dst_idx;
+
+        SizeT sparse_bytes = sparse_info->SparseSize(src_sparse->nnz_);
+        CopySparse(*dst_sparse, dst_buf->fix_heap_mgr_.get(), *src_sparse, src_buf->fix_heap_mgr_.get(), sparse_bytes);
+    }
+}
+
 #if 0
 template <>
 inline void ColumnVector::CopyFrom<PathT>(const VectorBuffer *__restrict src_buf,
@@ -807,6 +854,20 @@ ColumnVector::CopyRowFrom<TensorArrayT>(const VectorBuffer *__restrict src_buf, 
     TensorArrayT &dst_ref = ((TensorArrayT *)dst)[dst_idx];
     const u32 unit_embedding_bytes = data_type()->type_info()->Size();
     CopyTensorArray(dst_ref, dst_buf, src_ref, src_buf, unit_embedding_bytes);
+}
+
+template <>
+inline void
+ColumnVector::CopyRowFrom<SparseT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+
+    const auto *src_sparse = reinterpret_cast<const SparseT *>(src) + src_idx;
+    auto *dst_sparse = reinterpret_cast<SparseT *>(dst) + dst_idx;
+
+    SizeT sparse_bytes = sparse_info->SparseSize(src_sparse->nnz_);
+    CopySparse(*dst_sparse, dst_buf->fix_heap_mgr_.get(), *src_sparse, src_buf->fix_heap_mgr_.get(), sparse_bytes);
 }
 
 #if 0

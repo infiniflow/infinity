@@ -258,6 +258,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             break;
         }
         case kTensor:
+        case kSparse:
         case kTensorArray:
         case kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
@@ -276,11 +277,6 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
                     outline_buffer->Save();
                 }
             }
-            break;
-        }
-        case kSparse: {
-            // TODO:
-            UnrecoverableError("Not implemented");
             break;
         }
         case kArray:

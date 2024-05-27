@@ -37,6 +37,7 @@ import session_manager;
 import type_info;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import data_type;
 
 namespace infinity {
@@ -297,6 +298,31 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                     }
                     case kElemInvalid: {
                         UnrecoverableError("Invalid embedding data type");
+                    }
+                }
+                break;
+            }
+            case LogicalType::kSparse: {
+                if (column_type->type_info()->type() != TypeInfoType::kSparse) {
+                    UnrecoverableError("Not sparse type");
+                }
+                const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
+                switch (sparse_info->DataType()) {
+                    case kElemBit:
+                    case kElemInt8:
+                    case kElemInt16:
+                    case kElemInt32:
+                    case kElemInt64:
+                    case kElemFloat: {
+                        UnrecoverableError("Not implemented");
+                    }
+                    case kElemDouble: {
+                        object_id = 1022;
+                        object_width = 8;
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError("Should not reach here");
                     }
                 }
                 break;

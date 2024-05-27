@@ -16,6 +16,7 @@
 
 #include "embedding_info.h"
 #include "type/complex/embedding_type.h"
+#include "type/complex/sparse_type.h"
 #include "type/type_info.h"
 #include <limits>
 
@@ -42,15 +43,26 @@ public:
         return std::make_shared<SparseInfo>(data_type, index_type, dimension);
     }
 
+    static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, EmbeddingDataType idx_type, size_t dimension) {
+        if (dimension == 0) {
+            ParserError("dimension of sparse should not be 0");
+        }
+        return std::make_shared<SparseInfo>(data_type, idx_type, dimension);
+    }
+
 public:
     explicit SparseInfo(EmbeddingDataType data_type, EmbeddingDataType index_type, size_t dim)
         : TypeInfo(TypeInfoType::kSparse), data_type_(data_type), index_type_(index_type), dimension_(dim) {}
 
     bool operator==(const TypeInfo &other) const override;
 
-    [[nodiscard]] inline size_t Size() const override {
-        return EmbeddingType::EmbeddingSize(data_type_, dimension_) + EmbeddingType::EmbeddingSize(index_type_, dimension_);
-    }
+    [[nodiscard]] inline size_t Size() const override { return sizeof(SparseType); }
+
+    inline size_t SparseSize(size_t nnz) const { return IndiceSize(nnz) + DataSize(nnz); }
+
+    inline size_t IndiceSize(size_t nnz) const { return EmbeddingType::EmbeddingSize(index_type_, nnz); }
+
+    inline size_t DataSize(size_t nnz) const { return EmbeddingType::EmbeddingSize(data_type_, nnz); }
 
     [[nodiscard]] inline std::string ToString() const override {
         return EmbeddingInfo::EmbeddingDataTypeToString(data_type_) + "," + EmbeddingInfo::EmbeddingDataTypeToString(index_type_) + "," +

@@ -379,7 +379,10 @@ union SQLSTYPE
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
 
-#line 383 "parser.h"
+    std::pair<int64_t, int64_t>*    int_sparse_ele_t;
+    std::pair<int64_t, double>*     float_sparse_ele_t;
+
+#line 386 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

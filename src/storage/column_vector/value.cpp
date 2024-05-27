@@ -682,13 +682,9 @@ void Value::CopyUnionValue(const Value &other) {
         case kVarchar:
         case kTensor:
         case kTensorArray:
-        case kEmbedding: {
-            this->value_info_ = other.value_info_;
-            break;
-        }
+        case kEmbedding:
         case kSparse: {
-            // TODO
-            UnrecoverableError("Not implemented yet.");
+            this->value_info_ = other.value_info_;
             break;
         }
         case kArray:
@@ -796,13 +792,9 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case kVarchar:
         case kTensor:
         case kTensorArray:
-        case kEmbedding: {
-            this->value_info_ = std::move(other.value_info_);
-            break;
-        }
+        case kEmbedding: 
         case kSparse: {
-            // TODO
-            UnrecoverableError("Not implemented yet.");
+            this->value_info_ = std::move(other.value_info_);
             break;
         }
         case kArray:
@@ -1000,20 +992,7 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
             // TODO
             UnrecoverableError("Not implemented yet.");
         }
-        case LogicalType::kHugeInt:
-        case LogicalType::kDecimal:
-        case LogicalType::kArray:
-        case LogicalType::kTuple:
-        case LogicalType::kPoint:
-        case LogicalType::kLine:
-        case LogicalType::kLineSeg:
-        case LogicalType::kBox:
-        case LogicalType::kCircle:
-        case LogicalType::kUuid:
-        case LogicalType::kMixed:
-        case LogicalType::kNull:
-        case LogicalType::kMissing:
-        case LogicalType::kInvalid: {
+        default: {
             UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
         }
     }

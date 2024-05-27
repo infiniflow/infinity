@@ -172,6 +172,9 @@ struct SQL_LTYPE {
 
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
+
+    std::pair<int64_t, int64_t>*    int_sparse_ele_t;
+    std::pair<int64_t, double>*     float_sparse_ele_t;
 }
 
 %destructor {
@@ -358,6 +361,14 @@ struct SQL_LTYPE {
     }
 } <case_check_array_t>
 
+%destructor {
+    delete ($$);
+} <int_sparse_ele_t>
+
+%destructor {
+    delete ($$);
+} <float_sparse_ele_t>
+
 %token <str_value>              IDENTIFIER STRING
 %token <double_value>           DOUBLE_VALUE
 %token <long_value>             LONG_VALUE
@@ -426,6 +437,9 @@ struct SQL_LTYPE {
 %type <const_expr_t>            constant_expr interval_expr default_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
+%type <const_expr_t>            sparse_array_expr long_sparse_array_expr unclosed_long_sparse_array_expr double_sparse_array_expr unclosed_double_sparse_array_expr
+%type <int_sparse_ele_t>        int_sparse_ele
+%type <float_sparse_ele_t>      float_sparse_ele
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
 %type <expr_array_list_t>       expr_array_list
 %type <update_expr_t>           update_expr;
@@ -807,6 +821,12 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt64}; }
 | VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat}; }
 | VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemDouble}; }
+| SPARSE '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemBit}; }
+| SPARSE '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt8}; }
+| SPARSE '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt16}; }
+| SPARSE '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt32}; }
+| SPARSE '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt32}; }
+| SPARSE '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt64}; }
 | SPARSE '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemFloat}; }
 | SPARSE '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemDouble}; }
 /*
@@ -2648,6 +2668,9 @@ common_array_expr: array_expr {
 | subarray_array_expr {
     $$ = $1;
 }
+| sparse_array_expr {
+    $$ = $1;
+}
 
 subarray_array_expr: unclosed_subarray_array_expr ']' {
     $$ = $1;
@@ -2661,6 +2684,53 @@ unclosed_subarray_array_expr: '[' common_array_expr {
 | unclosed_subarray_array_expr ',' common_array_expr {
     $1->sub_array_array_.emplace_back($3);
     $$ = $1;
+}
+
+sparse_array_expr: long_sparse_array_expr {
+    $$ = $1;
+}
+| double_sparse_array_expr {
+    $$ = $1;
+}
+
+long_sparse_array_expr: unclosed_long_sparse_array_expr ']' {
+    $$ = $1;
+};
+
+unclosed_long_sparse_array_expr: '[' int_sparse_ele {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
+    const_expr->long_sparse_array_.first.emplace_back($2->first);
+    const_expr->long_sparse_array_.second.emplace_back($2->second);
+    $$ = const_expr;
+}
+| unclosed_long_sparse_array_expr ',' int_sparse_ele {
+    $1->long_sparse_array_.first.emplace_back($3->first);
+    $1->long_sparse_array_.second.emplace_back($3->second);
+    $$ = $1;
+}
+
+double_sparse_array_expr: unclosed_double_sparse_array_expr ']' {
+    $$ = $1;
+};
+
+unclosed_double_sparse_array_expr: '[' float_sparse_ele {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);
+    const_expr->double_sparse_array_.first.emplace_back($2->first);
+    const_expr->double_sparse_array_.second.emplace_back($2->second);
+    $$ = const_expr;
+}
+| unclosed_double_sparse_array_expr ',' float_sparse_ele {
+    $1->double_sparse_array_.first.emplace_back($3->first);
+    $1->double_sparse_array_.second.emplace_back($3->second);
+    $$ = $1;
+}
+
+int_sparse_ele: LONG_VALUE ':' LONG_VALUE {
+    $$ = new std::pair<int64_t, int64_t>{$1, $3};
+}
+
+float_sparse_ele: LONG_VALUE ':' DOUBLE_VALUE {
+    $$ = new std::pair<int64_t, double>{$1, $3};
 }
 
 array_expr: long_array_expr {
