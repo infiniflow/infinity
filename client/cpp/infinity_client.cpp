@@ -24,7 +24,9 @@ Client Client::Connect(const std::string &ip_address, uint16_t port) {
     std::unique_ptr<InfinityServiceClient> client = std::make_unique<InfinityServiceClient>(protocol);
     transport->open();
     CommonResponse response;
-    client->Connect(response);
+    ConnectRequest request;
+    request.__set_client_version(1); // 0.2.0-dev2
+    client->Connect(response, request);
     return {socket, transport, protocol, std::move(client), response.session_id};
 }
 
