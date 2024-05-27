@@ -22,7 +22,7 @@ from numpy import dtype
 from common import common_values
 import infinity
 import infinity.index as index
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 from utils import start_infinity_service_in_subporcess
 from test_sdkbase import TestSdk
@@ -342,8 +342,11 @@ class TestInsert(TestSdk):
         # insert
         values = [{"c1": 1, "c2": 1}]
         # check whether throw exception TABLE_NOT_EXIST
-        with pytest.raises(Exception, match="ERROR:3022*"):
+        with pytest.raises(InfinityException) as e:
             table_obj.insert(values)
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -360,9 +363,13 @@ class TestInsert(TestSdk):
                                         {"c1": {"type": "int"}, "c2": {"type": types}}, ConflictType.Error)
 
         # insert
-        with pytest.raises(Exception, match=".*input value count mismatch*"):
+        with pytest.raises(InfinityException) as e:
             values = [{}]
             table_obj.insert(values)
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
+
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
@@ -575,8 +582,11 @@ class TestInsert(TestSdk):
         for i in range(5):
             values = [{"c1": 1, "c2": types[0]} for _ in range(batch)]
             if not types[1]:
-                with pytest.raises(Exception, match=".*ERROR:3032*"):
+                with pytest.raises(InfinityException) as e:
                     table_obj.insert(values)
+
+                assert e.type == InfinityException
+                assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
             else:
                 table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
@@ -700,10 +710,13 @@ class TestInsert(TestSdk):
         table_obj = db_obj.create_table("test_insert_zero_column", {
             "c1": {"type": "int"}}, ConflictType.Error)
 
-        with pytest.raises(Exception, match="ERROR:3065*"):
+        with pytest.raises(InfinityException) as e:
             table_obj.insert([])
             insert_res = table_obj.output(["*"]).to_df()
             print(insert_res)
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.INSERT_WITHOUT_VALUES
 
         res = db_obj.drop_table("test_insert_zero_column", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -729,10 +742,13 @@ class TestInsert(TestSdk):
         table_obj = db_obj.create_table("test_insert_no_match_column", {
             "c1": {"type": "int"}}, ConflictType.Error)
 
-        with pytest.raises(Exception, match="ERROR:3024*"):
+        with pytest.raises(InfinityException) as e:
             table_obj.insert([{column_name: 1}])
             insert_res = table_obj.output(["*"]).to_df()
             print(insert_res)
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.COLUMN_NOT_EXIST
 
         res = db_obj.drop_table(
             "test_insert_no_match_column", ConflictType.Error)

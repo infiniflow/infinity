@@ -259,6 +259,8 @@ class ColumnField;
 
 class ImportOption;
 
+class ConnectRequest;
+
 class CommonRequest;
 
 class CommonResponse;
@@ -1861,6 +1863,49 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 void swap(ImportOption &a, ImportOption &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
+
+typedef struct _ConnectRequest__isset {
+  _ConnectRequest__isset() : client_version(false) {}
+  bool client_version :1;
+} _ConnectRequest__isset;
+
+class ConnectRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ConnectRequest(const ConnectRequest&) noexcept;
+  ConnectRequest& operator=(const ConnectRequest&) noexcept;
+  ConnectRequest() noexcept
+                 : client_version(0) {
+  }
+
+  virtual ~ConnectRequest() noexcept;
+  int64_t client_version;
+
+  _ConnectRequest__isset __isset;
+
+  void __set_client_version(const int64_t val);
+
+  bool operator == (const ConnectRequest & rhs) const
+  {
+    if (!(client_version == rhs.client_version))
+      return false;
+    return true;
+  }
+  bool operator != (const ConnectRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ConnectRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ConnectRequest &a, ConnectRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ConnectRequest& obj);
 
 typedef struct _CommonRequest__isset {
   _CommonRequest__isset() : session_id(false) {}

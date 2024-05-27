@@ -110,6 +110,17 @@ Status Status::InsufficientPrivilege(const String &user_name, const String &deta
     return Status(ErrorCode::kInsufficientPrivilege, MakeUnique<String>(fmt::format("{} do not have permission to {}", user_name, detailed_error)));
 }
 
+Status Status::UnsupportedVersionIndex(i64 given_index) {
+    return Status(ErrorCode::kUnsupportedVersionIndex,
+                  MakeUnique<String>(fmt::format("Index: {} isn't supported, you are using a deprecated version of Python SDK. Please install the corresponding version Python SDK.",
+                                                 given_index)));
+}
+
+Status Status::ClientVersionMismatch(const char* expected_version, const char* given_version) {
+    return Status(ErrorCode::kClientVersionMismatch, MakeUnique<String>(fmt::format("Expected version index: {}, connecting version: {}",
+                                                                                    expected_version, given_version)));
+}
+
 // 3. Syntax error or access rule violation
 Status Status::InvalidUserName(const String &user_name) {
     return Status(ErrorCode::kInvalidUsername, MakeUnique<String>(fmt::format("{} is a invalid user name", user_name)));
@@ -117,8 +128,8 @@ Status Status::InvalidUserName(const String &user_name) {
 
 Status Status::InvalidPasswd() { return Status(ErrorCode::kInvalidPasswd, MakeUnique<String>(fmt::format("Invalid password"))); }
 
-Status Status::InvalidDBName(const String &db_name) {
-    return Status(ErrorCode::kInvalidDbName, MakeUnique<String>(fmt::format("{} is a invalid database name", db_name)));
+Status Status::InvalidIdentifierName(const String &db_name) {
+    return Status(ErrorCode::kInvalidIdentifierName, MakeUnique<String>(fmt::format("{} is a invalid identifier name", db_name)));
 }
 
 Status Status::InvalidTableName(const String &table_name) {
@@ -380,7 +391,7 @@ Status Status::InvalidAnalyzerName(const String& name) {
 }
 
 Status Status::InvalidAnalyzerFile(const String& detailed_info) {
-    return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(fmt::format("Invalid analyzer file: {}", detailed_info)));
+    return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(fmt::format("Invalid analyzer file path: {}", detailed_info)));
 }
 
 // 4. TXN fail

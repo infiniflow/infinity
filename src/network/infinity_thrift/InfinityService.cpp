@@ -32,7 +32,20 @@ uint32_t InfinityService_Connect_args::read(::apache::thrift::protocol::TProtoco
     if (ftype == ::apache::thrift::protocol::T_STOP) {
       break;
     }
-    xfer += iprot->skip(ftype);
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
     xfer += iprot->readFieldEnd();
   }
 
@@ -45,6 +58,10 @@ uint32_t InfinityService_Connect_args::write(::apache::thrift::protocol::TProtoc
   uint32_t xfer = 0;
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("InfinityService_Connect_args");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
@@ -60,6 +77,10 @@ uint32_t InfinityService_Connect_pargs::write(::apache::thrift::protocol::TProto
   uint32_t xfer = 0;
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("InfinityService_Connect_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
@@ -5410,18 +5431,19 @@ uint32_t InfinityService_ShowIndex_presult::read(::apache::thrift::protocol::TPr
   return xfer;
 }
 
-void InfinityServiceClient::Connect(CommonResponse& _return)
+void InfinityServiceClient::Connect(CommonResponse& _return, const ConnectRequest& request)
 {
-  send_Connect();
+  send_Connect(request);
   recv_Connect(_return);
 }
 
-void InfinityServiceClient::send_Connect()
+void InfinityServiceClient::send_Connect(const ConnectRequest& request)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("Connect", ::apache::thrift::protocol::T_CALL, cseqid);
 
   InfinityService_Connect_pargs args;
+  args.request = &request;
   args.write(oprot_);
 
   oprot_->writeMessageEnd();
@@ -7133,7 +7155,7 @@ void InfinityServiceProcessor::process_Connect(int32_t seqid, ::apache::thrift::
 
   InfinityService_Connect_result result;
   try {
-    iface_->Connect(result.success);
+    iface_->Connect(result.success, args.request);
     result.__isset.success = true;
   } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
@@ -8683,19 +8705,20 @@ void InfinityServiceProcessor::process_ShowIndex(int32_t seqid, ::apache::thrift
   return processor;
 }
 
-void InfinityServiceConcurrentClient::Connect(CommonResponse& _return)
+void InfinityServiceConcurrentClient::Connect(CommonResponse& _return, const ConnectRequest& request)
 {
-  int32_t seqid = send_Connect();
+  int32_t seqid = send_Connect(request);
   recv_Connect(_return, seqid);
 }
 
-int32_t InfinityServiceConcurrentClient::send_Connect()
+int32_t InfinityServiceConcurrentClient::send_Connect(const ConnectRequest& request)
 {
   int32_t cseqid = this->sync_->generateSeqId();
   ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
   oprot_->writeMessageBegin("Connect", ::apache::thrift::protocol::T_CALL, cseqid);
 
   InfinityService_Connect_pargs args;
+  args.request = &request;
   args.write(oprot_);
 
   oprot_->writeMessageEnd();

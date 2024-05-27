@@ -20,7 +20,7 @@ from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.utils import name_validity_check, select_res_to_polars
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 
 
 class RemoteThriftInfinityConnection(InfinityConnection, ABC):
@@ -44,20 +44,20 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Replace:
             create_database_conflict = ttypes.CreateConflict.Replace
         else:
-            raise Exception(f"ERROR:3066, Invalid conflict type")
+            raise InfinityException(3066, "Invalid conflict type")
 
         res = self._client.create_database(db_name=db_name, conflict_type=create_database_conflict)
         if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def list_databases(self):
         res = self._client.list_databases()
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("db_name", "DB")
     def show_database(self, db_name: str):
@@ -65,7 +65,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("db_name", "DB")
     def drop_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error):
@@ -75,13 +75,13 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_database_conflict = ttypes.DropConflict.Ignore
         else:
-            raise Exception(f"ERROR:3066, invalid conflict type")
+            raise InfinityException(3066, "Invalid conflict type")
 
         res = self._client.drop_database(db_name=db_name, conflict_type = drop_database_conflict)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("db_name", "DB")
     def get_database(self, db_name: str):
@@ -89,7 +89,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def disconnect(self):
         res = self._client.disconnect()
@@ -97,7 +97,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             self._is_connected = False
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @property
     def client(self):

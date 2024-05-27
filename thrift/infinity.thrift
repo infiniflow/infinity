@@ -238,6 +238,10 @@ struct ImportOption {
 4:  CopyFileType copy_file_type,
 }
 
+struct ConnectRequest {
+1: i64 client_version,
+}
+
 struct CommonRequest {
 1:  i64 session_id,
 }
@@ -572,7 +576,7 @@ struct ShowBlockColumnResponse {
 
 // Service
 service InfinityService {
-CommonResponse Connect(),
+CommonResponse Connect(1:ConnectRequest request),
 CommonResponse Disconnect(1:CommonRequest request),
 
 CommonResponse CreateDatabase(1:CreateDatabaseRequest request),

@@ -1,12 +1,19 @@
 # python-infinity
 
-# build
+# update python client
+
+- Update "version" field of [project] chapter and client_version field of ConnectRequest message.
+- build new python SDK
+- upload to pypi.org
+- install new python SDK
+
+# build python SDK
 
 ```shell
 rm -f dist/* && python setup.py sdist bdist_wheel
 ```
 
-# install
+# install python SDK
 ```shell
 pip uninstall -y infinity-sdk && pip install dist/*.whl
 ```

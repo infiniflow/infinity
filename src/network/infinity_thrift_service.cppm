@@ -44,14 +44,28 @@ import query_result;
 
 namespace infinity {
 
+struct ClientVersions {
+    ClientVersions();
+
+    HashMap<i64, String> client_version_map_;
+
+    Pair<const char*, Status> GetVersionByIndex(i64);
+};
+
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
+    static constexpr i64 current_version_index_{1};
+
+    static std::mutex infinity_session_map_mutex_;
+    static HashMap<u64, SharedPtr<Infinity>> infinity_session_map_;
+
+    static ClientVersions client_version_;
 
 public:
     InfinityThriftService() = default;
 
-    void Connect(infinity_thrift_rpc::CommonResponse &response) final;
+    void Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest& request) final;
 
     void Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) final;
 
@@ -112,8 +126,7 @@ public:
     void ShowIndex(infinity_thrift_rpc::ShowIndexResponse &response, const infinity_thrift_rpc::ShowIndexRequest &request) final;
 
 private:
-    std::mutex infinity_session_map_mutex_{};
-    HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
+
 
     // SizeT count_ = 0;
     // std::chrono::duration<double> phase_1_duration_{};

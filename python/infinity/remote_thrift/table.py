@@ -21,7 +21,7 @@ from typing import Optional, Union, List, Any
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.common import INSERT_DATA, VEC
+from infinity.common import INSERT_DATA, VEC, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
@@ -78,7 +78,7 @@ class RemoteTable(Table, ABC):
         elif conflict_type == ConflictType.Replace:
             create_index_conflict = ttypes.CreateConflict.Replace
         else:
-            raise Exception(f"ERROR:3066, Invalid conflict type")
+            raise InfinityException(3066, f"Invalid conflict type")
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
@@ -89,7 +89,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("index_name", "Index")
     def drop_index(self, index_name: str, conflict_type: ConflictType = ConflictType.Error):
@@ -99,14 +99,14 @@ class RemoteTable(Table, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_index_conflict = ttypes.DropConflict.Ignore
         else:
-            raise Exception(f"ERROR:3066, invalid conflict type")
+            raise InfinityException(3066, f"Invalid conflict type")
 
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("index_name", "Index")
     def show_index(self, index_name: str):
@@ -115,35 +115,35 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def list_indexes(self):
         res = self._conn.list_indexes(db_name=self._db_name, table_name=self._table_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_segments(self):
         res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_segment(self, segment_id: int):
         res = self._conn.show_segment(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_blocks(self, segment_id: int):
         res = self._conn.show_blocks(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_block(self, segment_id: int, block_id: int):
         res = self._conn.show_block(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
@@ -151,7 +151,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_block_column(self, segment_id: int, block_id: int, column_id: int):
         res = self._conn.show_block_column(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
@@ -159,7 +159,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
@@ -195,7 +195,7 @@ class RemoteTable(Table, ABC):
                         constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                   f64_array_value=value)
                 else:
-                    raise Exception("Invalid constant expression")
+                    raise InfinityException(3069, "Invalid constant expression")
 
                 expr_type = ttypes.ParsedExprType(
                     constant_expr=constant_expression)
@@ -211,7 +211,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def import_data(self, file_path: str, import_options: {} = None):
         options = ttypes.ImportOption()
@@ -232,19 +232,19 @@ class RemoteTable(Table, ABC):
                     elif file_type == 'fvecs':
                         options.copy_file_type = ttypes.CopyFileType.FVECS
                     else:
-                        raise Exception("Unrecognized import file type")
+                        raise InfinityException(3037, "Unrecognized import file type")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise Exception("Unrecognized import file delimiter")
+                        raise InfinityException(3037, "Unrecognized import file delimiter")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.has_header = v
                     else:
-                        raise Exception("Boolean value is expected in header field")
+                        raise InfinityException(3037, "Boolean value is expected in header field")
                 else:
-                    raise Exception("Unknown import parameter")
+                    raise InfinityException(3037, "Unknown import parameter")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
@@ -253,7 +253,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def delete(self, cond: Optional[str] = None):
         match cond:
@@ -266,7 +266,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def update(self, cond: Optional[str],
                data: Optional[list[dict[str, Union[str, int, float, list[Union[int, float]]]]]]):
@@ -301,7 +301,7 @@ class RemoteTable(Table, ABC):
                                 constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                           f64_array_value=value)
                         else:
-                            raise Exception("Invalid constant expression")
+                            raise InfinityException(3069, "Invalid constant expression")
 
                         expr_type = ttypes.ParsedExprType(
                             constant_expr=constant_expression)
@@ -316,7 +316,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
             topn: int, knn_params: {} = None):
@@ -381,7 +381,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return build_result(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def _explain_query(self, query: ExplainQuery) -> Any:
         res = self._conn.explain(db_name=self._db_name,
@@ -396,4 +396,4 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)

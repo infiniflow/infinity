@@ -40,7 +40,10 @@ class ThriftInfinityClient:
         # self.protocol = TCompactProtocol.TCompactProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()
-        res = self.client.Connect()
+
+        # version: 0.2.0.dev2, client_version: 1
+        # version: 0.2.0.dev3, client_version: 2
+        res = self.client.Connect(ConnectRequest(client_version=1))
         self.session_id = res.session_id
 
     def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error):

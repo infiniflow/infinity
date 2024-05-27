@@ -61,7 +61,46 @@ import query_result;
 
 namespace infinity {
 
-void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response) {
+ClientVersions::ClientVersions() {
+    client_version_map_[1] = String("0.2.0.dev2");
+}
+
+Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
+    auto iter = client_version_map_.find(version_index);
+    if(iter == client_version_map_.end()) {
+        return {nullptr, Status::UnsupportedVersionIndex(version_index)};
+    }
+    return {iter->second.c_str(), Status::OK()};
+}
+
+std::mutex InfinityThriftService::infinity_session_map_mutex_;
+HashMap<u64, SharedPtr<Infinity>> InfinityThriftService::infinity_session_map_;
+ClientVersions InfinityThriftService::client_version_;
+
+void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest& request) {
+    i64 request_client_version = request.client_version;
+    if(request_client_version != current_version_index_) {
+        auto [request_version_ptr, status1] = client_version_.GetVersionByIndex(request_client_version);
+        if(!status1.ok()) {
+            response.__set_error_code((i64)(status1.code()));
+            response.__set_error_msg(status1.message());
+            LOG_ERROR(status1.message());
+            return ;
+        }
+
+        auto [expected_version_ptr, status2] = client_version_.GetVersionByIndex(current_version_index_);
+        if(!status2.ok()) {
+            LOG_ERROR(status2.message());
+            UnrecoverableError(status2.message());
+        }
+
+        Status status3 = Status::ClientVersionMismatch(expected_version_ptr, request_version_ptr);
+        response.__set_error_code((i64)(status3.code()));
+        response.__set_error_msg(status3.message());
+        LOG_ERROR(status3.message());
+        return ;
+    }
+
     auto infinity = Infinity::RemoteConnect();
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     infinity_session_map_.emplace(infinity->GetSessionId(), infinity);

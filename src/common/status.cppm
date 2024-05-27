@@ -39,11 +39,13 @@ export enum class ErrorCode : long {
     // 2. Auth error
     kWrongPasswd = 2001,
     kInsufficientPrivilege = 2002,
+    kUnsupportedVersionIndex = 2003,
+    kClientVersionMismatch = 2004,
 
     // 3. syntax error or access rule violation
     kInvalidUsername = 3001,
     kInvalidPasswd = 3002,
-    kInvalidDbName = 3003,
+    kInvalidIdentifierName = 3003,
     kInvalidTableName = 3004,
     kInvalidColumnName = 3005,
     kInvalidIndexName = 3006,
@@ -121,6 +123,7 @@ export enum class ErrorCode : long {
     kNotSupportedAnalyzer = 3078,
     kInvalidAnalyzerName = 3079,
     kInvalidAnalyzerFile = 3080,
+    kInvalidExplainType = 3081,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -154,6 +157,7 @@ export enum class ErrorCode : long {
     kMmapFileError = 7013,
     kMunmapFileError = 7014,
     kInvalidFileFlag = 7015,
+    kInvalidServerAddress = 7016,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -171,10 +175,6 @@ public:
     // 1. Config error
     static Status InvalidTimeInfo(const String &time_info);
     static Status EmptyConfigParameter();
-
-    // 2. Auth error
-    static Status WrongPasswd(const String &user_name);
-    static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
     static Status MismatchVersion(const String &current_version, const String &expected_version);
     static Status InvalidTimezone(const String &timezone);
     static Status InvalidByteSize(const String &byte_size);
@@ -182,10 +182,16 @@ public:
     static Status InvalidLogLevel(const String &log_level);
     static Status InvalidConfig(const String &detailed_info);
 
+    // 2. Auth error
+    static Status WrongPasswd(const String &user_name);
+    static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
+    static Status UnsupportedVersionIndex(i64 given_index);
+    static Status ClientVersionMismatch(const char* expected_version, const char* given_version);
+
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);
     static Status InvalidPasswd();
-    static Status InvalidDBName(const String &db_name);
+    static Status InvalidIdentifierName(const String &db_name);
     static Status InvalidTableName(const String &table_name);
     static Status InvalidColumnName(const String &column_name);
     static Status InvalidIndexName(const String &index_name);

@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from infinity.common import InfinityException
+from infinity.errors import ErrorCode
+
+
 def binary_exp_to_paser_exp(binary_expr_key) -> str:
     if binary_expr_key == "eq":
         return "="
@@ -38,4 +42,4 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
     elif binary_expr_key == "div":
         return "/"
     else:
-        raise Exception(f"unknown binary expression: {binary_expr_key}")
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")

@@ -19,7 +19,12 @@ all_structs = []
 
 
 class Iface(object):
-    def Connect(self):
+    def Connect(self, request):
+        """
+        Parameters:
+         - request
+
+        """
         pass
 
     def Disconnect(self, request):
@@ -254,13 +259,19 @@ class Client(Iface):
             self._oprot = oprot
         self._seqid = 0
 
-    def Connect(self):
-        self.send_Connect()
+    def Connect(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        self.send_Connect(request)
         return self.recv_Connect()
 
-    def send_Connect(self):
+    def send_Connect(self, request):
         self._oprot.writeMessageBegin('Connect', TMessageType.CALL, self._seqid)
         args = Connect_args()
+        args.request = request
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -1238,7 +1249,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = Connect_result()
         try:
-            result.success = self._handler.Connect()
+            result.success = self._handler.Connect(args.request)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -1903,7 +1914,15 @@ class Processor(Iface, TProcessor):
 
 
 class Connect_args(object):
+    """
+    Attributes:
+     - request
 
+    """
+
+
+    def __init__(self, request=None,):
+        self.request = request
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1914,6 +1933,12 @@ class Connect_args(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
+            if fid == 1:
+                if ftype == TType.STRUCT:
+                    self.request = ConnectRequest()
+                    self.request.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1924,6 +1949,10 @@ class Connect_args(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('Connect_args')
+        if self.request is not None:
+            oprot.writeFieldBegin('request', TType.STRUCT, 1)
+            self.request.write(oprot)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1942,6 +1971,8 @@ class Connect_args(object):
         return not (self == other)
 all_structs.append(Connect_args)
 Connect_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRUCT, 'request', [ConnectRequest, None], None, ),  # 1
 )
 
 

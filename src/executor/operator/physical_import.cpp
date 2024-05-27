@@ -474,11 +474,10 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // if column count is larger than columns defined from schema, extra columns are abandoned
     if (column_count > table_entry->ColumnCount()) {
         UniquePtr<String> err_msg = MakeUnique<String>(
-            fmt::format("CSV file row count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.",
+            fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.",
                         parser_context->row_count_,
                         column_count,
                         table_entry->ColumnCount()));
-        LOG_ERROR(*err_msg);
         for (SizeT i = 0; i < column_count; ++i) {
             ZsvCell cell = parser_context->parser_.GetCell(i);
             LOG_ERROR(fmt::format("Column {}: {}", i, std::string_view((char *)cell.str, cell.len)));

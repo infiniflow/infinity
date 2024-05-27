@@ -2527,6 +2527,63 @@ class ImportOption(object):
         return not (self == other)
 
 
+class ConnectRequest(object):
+    """
+    Attributes:
+     - client_version
+
+    """
+
+
+    def __init__(self, client_version=None,):
+        self.client_version = client_version
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.client_version = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ConnectRequest')
+        if self.client_version is not None:
+            oprot.writeFieldBegin('client_version', TType.I64, 1)
+            oprot.writeI64(self.client_version)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
 class CommonRequest(object):
     """
     Attributes:
@@ -6968,6 +7025,11 @@ ImportOption.thrift_spec = (
     (2, TType.BOOL, 'copy_from', None, None, ),  # 2
     (3, TType.BOOL, 'has_header', None, None, ),  # 3
     (4, TType.I32, 'copy_file_type', None, None, ),  # 4
+)
+all_structs.append(ConnectRequest)
+ConnectRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'client_version', None, None, ),  # 1
 )
 all_structs.append(CommonRequest)
 CommonRequest.thrift_spec = (

@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC
+from infinity.common import VEC, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import logic_type_to_dtype
 from infinity.remote_thrift.utils import traverse_conditions, parse_expr
@@ -75,7 +75,7 @@ class InfinityThriftQueryBuilder(ABC):
         column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
         if not isinstance(topn, int):
-            raise Exception(f"Invalid topn, type should be embedded, but get {type(topn)}")
+            raise InfinityException(3073, f"Invalid topn, type should be embedded, but get {type(topn)}")
 
         # type casting
         if isinstance(embedding_data, list):
@@ -85,7 +85,7 @@ class InfinityThriftQueryBuilder(ABC):
         elif isinstance(embedding_data, np.ndarray):
             embedding_data = embedding_data.tolist()
         else:
-            raise Exception(f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
+            raise InfinityException(3051, f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
 
         if (embedding_data_type == 'tinyint' or
             embedding_data_type == 'smallint' or
@@ -97,7 +97,7 @@ class InfinityThriftQueryBuilder(ABC):
         elem_type = ElementType.ElementFloat32
         if embedding_data_type == 'bit':
             elem_type = ElementType.ElementBit
-            raise Exception(f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
         elif embedding_data_type == 'tinyint':
             elem_type = ElementType.ElementInt8
             data.i8_array_value = embedding_data
@@ -117,7 +117,7 @@ class InfinityThriftQueryBuilder(ABC):
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
         else:
-            raise Exception(f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.L2
         if distance_type == 'l2':
@@ -129,7 +129,7 @@ class InfinityThriftQueryBuilder(ABC):
         elif distance_type == 'hamming':
             dist_type = KnnDistanceType.Hamming
         else:
-            raise Exception(f"Invalid distance type {distance_type}")
+            raise InfinityException(3056, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
         if knn_params != None:
