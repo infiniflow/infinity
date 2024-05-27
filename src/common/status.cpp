@@ -111,7 +111,9 @@ Status Status::InsufficientPrivilege(const String &user_name, const String &deta
 }
 
 Status Status::UnsupportedVersionIndex(i64 given_index) {
-    return Status(ErrorCode::kUnsupportedVersionIndex, MakeUnique<String>(fmt::format("Index: {} isn't supported, you are using deprecated version of python sdk.", given_index)));
+    return Status(ErrorCode::kUnsupportedVersionIndex,
+                  MakeUnique<String>(fmt::format("Index: {} isn't supported, you are using a deprecated version of Python SDK. Please install the corresponding version Python SDK.",
+                                                 given_index)));
 }
 
 Status Status::ClientVersionMismatch(const char* expected_version, const char* given_version) {
