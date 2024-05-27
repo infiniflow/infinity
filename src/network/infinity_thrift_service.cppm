@@ -29,6 +29,7 @@ import constant_expr;
 import column_expr;
 import function_expr;
 import knn_expr;
+import match_tensor_expr;
 import match_expr;
 import fusion_expr;
 import parsed_expr;
@@ -157,6 +158,8 @@ private:
 
     static Tuple<KnnExpr *, Status> GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr);
 
+    static Pair<MatchTensorExpr *, Status> GetMatchTensorExprFromProto(const infinity_thrift_rpc::MatchTensorExpr &expr);
+
     static MatchExpr *GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr);
 
     static FusionExpr *GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr);
@@ -195,6 +198,10 @@ private:
     void HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
     void HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+
+    void HandleTensorType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+
+    void HandleTensorArrayType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
     void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 

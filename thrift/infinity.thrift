@@ -15,6 +15,8 @@ Float,
 Double,
 Varchar,
 Embedding,
+Tensor,
+TensorArray,
 Invalid
 }
 
@@ -133,6 +135,16 @@ struct InitParameter {
 2: string param_value,
 }
 
+struct ConstantExpr {
+1: LiteralType literal_type,
+2: optional bool bool_value,
+3: optional i64 i64_value,
+4: optional double f64_value,
+5: optional string str_value,
+6: optional list<i64> i64_array_value,
+7: optional list<double> f64_array_value,
+}
+
 struct KnnExpr {
 1: ColumnExpr  column_expr,
 2: EmbeddingData embedding_data,
@@ -140,6 +152,14 @@ struct KnnExpr {
 4: KnnDistanceType distance_type,
 5: i64 topn,
 6: list<InitParameter> opt_params = [],
+}
+
+struct MatchTensorExpr {
+1: string search_method,
+2: ColumnExpr column_expr,
+3: ElementType embedding_data_type,
+4: EmbeddingData embedding_data,
+5: string extra_options,
 }
 
 struct MatchExpr {
@@ -151,22 +171,14 @@ struct MatchExpr {
 struct FusionExpr {
 	1: string method,
 	2: string options_text,
+	3: optional MatchTensorExpr optional_match_tensor_expr,
 }
 
 struct SearchExpr {
 	1: optional list<MatchExpr> match_exprs,
 	2: optional list<KnnExpr> knn_exprs,
-	3: optional FusionExpr fusion_expr,
-}
-
-struct ConstantExpr {
-1: LiteralType literal_type,
-2: optional bool bool_value,
-3: optional i64 i64_value,
-4: optional double f64_value,
-5: optional string str_value,
-6: optional list<i64> i64_array_value,
-7: optional list<double> f64_array_value,
+	3: optional list<MatchTensorExpr> match_tensor_exprs,
+	4: optional list<FusionExpr> fusion_exprs,
 }
 
 struct FunctionExpr {
@@ -221,6 +233,8 @@ ColumnFloat32,
 ColumnFloat64,
 ColumnVarchar,
 ColumnEmbedding,
+ColumnTensor,
+ColumnTensorArray,
 ColumnRowID,
 ColumnInvalid,
 }

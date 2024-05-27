@@ -20,6 +20,7 @@ import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
+from infinity.remote_thrift.types import make_match_tensor_expr
 
 from utils import copy_data, generate_commas_enwiki
 from test_sdkbase import TestSdk
@@ -151,7 +152,7 @@ class TestKnn(TestSdk):
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id", "_row_id"]).knn(
+        res = table_obj.output(["variant_id", "_row_id", "_distance"]).knn(
             column_name, [1.0] * 4, "float", "ip", 2).to_pl()
         print(res)
 
@@ -849,4 +850,55 @@ class TestKnn(TestSdk):
 
         res = db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_options", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_tensor_scan(self, get_infinity_db, check_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_tensor_scan",
+                                        {"title": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "t": {"type": "tensor, 4, float"},
+                                         "body": {"type": "varchar"}})
+        if not check_data:
+            copy_data("tensor_maxsim.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*", "_row_id", "_score"])
+               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=2')
+               .to_pl())
+        print(res)
+
+        res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_multiple_fusion(self, get_infinity_db, check_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_multiple_fusion", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_multiple_fusion",
+                                        {"title": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "t": {"type": "tensor, 4, float"},
+                                         "body": {"type": "varchar"}})
+        if not check_data:
+            copy_data("tensor_maxsim.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*", "_row_id", "_score"])
+               .match('body', 'off', 'topn=4')
+               .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2')
+               .fusion('rrf')
+               .fusion('match_tensor', 'topn=2',
+                       make_match_tensor_expr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float',
+                                              'maxsim'))
+               .to_pl())
+        print(res)
+
+        res = db_obj.drop_table("test_with_multiple_fusion", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

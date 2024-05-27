@@ -196,6 +196,57 @@ class TestInsert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    def test_insert_tensor(self):
+        """
+        target: test insert tensor column
+        method: create table with tensor column
+        expected: ok
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_tensor", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_tensor", {"c1": {"type": "tensor,3,int"}}, ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": [1, 2, 3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [4, 5, 6]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [7, 8, 9, -7, -8, -9]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
+        res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
+            "c1": [7, 8, 9, -7, -8, -9]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]],
+                                                                [[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
+
+        res = db_obj.drop_table("test_insert_tensor", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table("test_insert_tensor_2", ConflictType.Ignore)
+        db_obj.create_table("test_insert_tensor_2", {"c1": {"type": "tensor,3,float"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_tensor_2")
+        assert table_obj
+        res = table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [4.4, 5.5, 6.6]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [7.7, 8.8, 9.9, -7.7, -8.8, -9.9]}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1.1, 2.2, 3.3]], [[4.4, 5.5, 6.6]], [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]])}))
+
+        res = db_obj.drop_table("test_insert_tensor_2", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     def test_insert_big_embedding(self):
         """
         target: test insert embedding with big dimension

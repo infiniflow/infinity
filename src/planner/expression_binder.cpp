@@ -80,6 +80,9 @@ import table_entry;
 
 namespace infinity {
 
+template <typename T>
+ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension);
+
 SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     // Call implemented BuildExpression
 
@@ -192,9 +195,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
     ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
     return MakeShared<FunctionExpression>(scalar_function, arguments);
 }
-
-template <typename T>
-ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension);
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &expr, BindContext *, i64, bool) {
     switch (expr.literal_type_) {
@@ -611,6 +611,158 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     return bound_knn_expr;
 }
 
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
+    // Bind query column
+    if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
+        UnrecoverableError("MatchTensor expression expect a column expression");
+    }
+    auto expr_ptr = BuildColExpr((ColumnExpr &)*expr.column_expr_.get(), bind_context_ptr, depth, false);
+    auto column_data_type = expr_ptr->Type();
+    TypeInfo *type_info = column_data_type.type_info().get();
+    u32 tensor_column_basic_embedding_dim = 0;
+    if ((column_data_type.type() == LogicalType::kTensor or column_data_type.type() == LogicalType::kTensorArray) and type_info != nullptr and
+        type_info->type() == TypeInfoType::kEmbedding) {
+        // valid search column
+        EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
+        tensor_column_basic_embedding_dim = embedding_info->Dimension();
+        if (tensor_column_basic_embedding_dim == 0) {
+            UnrecoverableError("The tensor column basic embedding dimension should be greater than 0");
+        }
+    } else {
+        const auto error_info = fmt::format("Expect the column search is an tensor column, but got: {}", column_data_type.ToString());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+    Vector<SharedPtr<BaseExpression>> arguments;
+    arguments.emplace_back(std::move(expr_ptr));
+    // Create query embedding
+    EmbeddingT query_embedding(expr.query_tensor_data_ptr_.get(), false);
+    auto bound_match_tensor_expr = MakeShared<MatchTensorExpression>(std::move(arguments),
+                                                                     expr.search_method_enum_,
+                                                                     expr.embedding_data_type_,
+                                                                     expr.dimension_,
+                                                                     std::move(query_embedding),
+                                                                     tensor_column_basic_embedding_dim,
+                                                                     expr.options_text_);
+    return bound_match_tensor_expr;
+}
+
+SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
+    Vector<SharedPtr<MatchExpression>> match_exprs;
+    Vector<SharedPtr<KnnExpression>> knn_exprs;
+    Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
+    Vector<SharedPtr<FusionExpression>> fusion_exprs;
+    for (MatchExpr *match_expr : expr.match_exprs_) {
+        match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
+    }
+    for (KnnExpr *knn_expr : expr.knn_exprs_) {
+        knn_exprs.push_back(static_pointer_cast<KnnExpression>(BuildKnnExpr(*knn_expr, bind_context_ptr, depth, false)));
+    }
+    for (MatchTensorExpr *match_tensor_expr : expr.match_tensor_exprs_) {
+        match_tensor_exprs.push_back(
+            static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
+    }
+    for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
+        auto output_expr = MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_);
+        if (fusion_expr->match_tensor_expr_) {
+            output_expr->match_tensor_expr_ =
+                static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*fusion_expr->match_tensor_expr_, bind_context_ptr, depth, false));
+        }
+        fusion_exprs.push_back(std::move(output_expr));
+    }
+    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, fusion_exprs);
+    return bound_search_expr;
+}
+
+// Bind subquery expression.
+SharedPtr<SubqueryExpression>
+ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool) {
+
+    switch (subquery_type) {
+
+        case SubqueryType::kIn:
+        case SubqueryType::kNotIn: {
+            auto bound_left_expr = BuildExpression(*expr.left_, bind_context_ptr, depth, false);
+
+            SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
+            QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
+            UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
+
+            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
+            in_subquery_expr->left_ = bound_left_expr;
+            in_subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
+            return in_subquery_expr;
+        }
+        case SubqueryType::kExists:
+        case SubqueryType::kNotExists:
+        case SubqueryType::kScalar: {
+            SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
+            QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
+            UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
+
+            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
+
+            subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
+            return subquery_expr;
+        }
+        case SubqueryType::kAny: {
+            UnrecoverableError("Not implement: Any");
+        }
+    }
+
+    UnrecoverableError("Unreachable");
+    return nullptr;
+}
+
+Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
+    auto [special_function_ptr, status] = Catalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
+    if (status.ok()) {
+        switch (special_function_ptr->special_type()) {
+            case SpecialType::kDistance: {
+                if (!bind_context_ptr->allow_distance) {
+                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
+                }
+                break;
+            }
+            case SpecialType::kScore: {
+                if (!bind_context_ptr->allow_score) {
+                    Status status = Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+
+        String &table_name = bind_context_ptr->table_names_[0];
+        String column_name = special_function_ptr->name();
+
+        TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function_ptr->data_type(),
+                                                                               table_name,
+                                                                               bind_context_ptr->table_name2table_index_[table_name],
+                                                                               column_name,
+                                                                               table_entry->ColumnCount() + special_function_ptr->extra_idx(),
+                                                                               depth,
+                                                                               special_function_ptr->special_type());
+        return bound_column_expr;
+    } else {
+        return None;
+    }
+}
+
+//
+//// Bind window function.
+// SharedPtr<BaseExpression>
+// ExpressionBinder::BuildWindow(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
+//     PlannerError("ExpressionBinder::BuildWindow");
+// }
+
 template <typename T, typename U>
 void FillConcatenatedTensorData(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {
     if (data_array.size() != expect_dim) {
@@ -678,8 +830,8 @@ ptr_t GetConcatenatedTensorDataFromSubArray<bool>(const Vector<SharedPtr<Constan
                                                   u32 &query_total_dimension) {
     // expect children to be embedding of dimension tensor_column_basic_embedding_dim
     query_total_dimension = sub_array_array.size() * tensor_column_basic_embedding_dim;
-    auto output_data = MakeUnique<u8[]>(query_total_dimension);
-    u32 basic_u8_dim = tensor_column_basic_embedding_dim / 8;
+    auto output_data = MakeUnique<u8[]>(query_total_dimension / 8);
+    const u32 basic_u8_dim = tensor_column_basic_embedding_dim / 8;
     for (u32 i = 0; i < sub_array_array.size(); ++i) {
         switch (sub_array_array[i]->literal_type_) {
             case LiteralType::kIntegerArray: {
@@ -760,229 +912,5 @@ ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tens
         }
     }
 }
-
-SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    // Bind query column
-    Vector<SharedPtr<BaseExpression>> arguments;
-    if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
-        String error_message = "MatchTensor expression expect a column expression";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-    // 1. parse search method
-    // TODO: now only support MaxSim search method
-    MatchTensorMethod search_method = MatchTensorMethod::kInvalid;
-    if (expr.search_method_ == "maxsim") {
-        search_method = MatchTensorMethod::kMaxSim;
-    } else {
-        const auto error_info = fmt::format("Unrecognized search method: {}", expr.search_method_);
-        LOG_ERROR(error_info);
-        RecoverableError(Status::NotSupport(error_info));
-    }
-    // 2. parse search column
-    auto expr_ptr = BuildColExpr((ColumnExpr &)*expr.column_expr_, bind_context_ptr, depth, false);
-    auto column_data_type = expr_ptr->Type();
-    TypeInfo *type_info = column_data_type.type_info().get();
-    u32 tensor_column_basic_embedding_dim = 0;
-    if (column_data_type.type() != LogicalType::kTensor or type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
-        const auto error_info = fmt::format("Expect the column search is an tensor column, but got: {}", column_data_type.ToString());
-        LOG_ERROR(error_info);
-        RecoverableError(Status::SyntaxError(error_info));
-    } else {
-        EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
-        tensor_column_basic_embedding_dim = embedding_info->Dimension();
-        if (tensor_column_basic_embedding_dim == 0) {
-            String error_message = "The tensor column basic embedding dimension should be greater than 0";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
-        }
-    }
-    arguments.emplace_back(std::move(expr_ptr));
-    // 3. parse query tensor data type
-    EmbeddingDataType embedding_data_type = EmbeddingDataType::kElemInvalid;
-    if (expr.embedding_data_type_ == "float") {
-        embedding_data_type = EmbeddingDataType::kElemFloat;
-    } else if (expr.embedding_data_type_ == "double") {
-        embedding_data_type = EmbeddingDataType::kElemDouble;
-    } else if (expr.embedding_data_type_ == "bit") {
-        embedding_data_type = EmbeddingDataType::kElemBit;
-    } else if (expr.embedding_data_type_ == "tinyint") {
-        embedding_data_type = EmbeddingDataType::kElemInt8;
-    } else if (expr.embedding_data_type_ == "smallint") {
-        embedding_data_type = EmbeddingDataType::kElemInt16;
-    } else if (expr.embedding_data_type_ == "integer" or expr.embedding_data_type_ == "int") {
-        embedding_data_type = EmbeddingDataType::kElemInt32;
-    } else if (expr.embedding_data_type_ == "bigint") {
-        embedding_data_type = EmbeddingDataType::kElemInt64;
-    } else {
-        const auto error_info = fmt::format("Unexpected query tensor data type: {}", expr.embedding_data_type_);
-        LOG_ERROR(error_info);
-        RecoverableError(Status::NotSupport(error_info));
-    }
-    // 4. parse query tensor
-    u32 query_total_dimension = 0;
-    ptr_t embedding_data_ptr = nullptr;
-    switch (embedding_data_type) {
-        case EmbeddingDataType::kElemBit: {
-            embedding_data_ptr = GetConcatenatedTensorData<bool>(expr.tensor_expr_.get(), tensor_column_basic_embedding_dim, query_total_dimension);
-            break;
-        }
-        case EmbeddingDataType::kElemInt8: {
-            embedding_data_ptr = GetConcatenatedTensorData<i8>(expr.tensor_expr_.get(), tensor_column_basic_embedding_dim, query_total_dimension);
-            break;
-        }
-        case EmbeddingDataType::kElemInt16: {
-            embedding_data_ptr = GetConcatenatedTensorData<i16>(expr.tensor_expr_.get(), tensor_column_basic_embedding_dim, query_total_dimension);
-            break;
-        }
-        case EmbeddingDataType::kElemInt32: {
-            embedding_data_ptr = GetConcatenatedTensorData<i32>(expr.tensor_expr_.get(), tensor_column_basic_embedding_dim, query_total_dimension);
-            break;
-        }
-        case EmbeddingDataType::kElemInt64: {
-            embedding_data_ptr = GetConcatenatedTensorData<i64>(expr.tensor_expr_.get(), tensor_column_basic_embedding_dim, query_total_dimension);
-            break;
-        }
-        case EmbeddingDataType::kElemFloat: {
-            embedding_data_ptr = GetConcatenatedTensorData<float>(expr.tensor_expr_.get(), tensor_column_basic_embedding_dim, query_total_dimension);
-            break;
-        }
-        case EmbeddingDataType::kElemDouble: {
-            embedding_data_ptr = GetConcatenatedTensorData<double>(expr.tensor_expr_.get(), tensor_column_basic_embedding_dim, query_total_dimension);
-            break;
-        }
-        case EmbeddingDataType::kElemInvalid: {
-            String error_message = "Unreachable";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
-            break;
-        }
-    }
-    // Create query embedding
-    EmbeddingT query_embedding(std::move(embedding_data_ptr), true);
-    auto bound_match_tensor_expr = MakeShared<MatchTensorExpression>(std::move(arguments),
-                                                                     search_method,
-                                                                     embedding_data_type,
-                                                                     query_total_dimension,
-                                                                     std::move(query_embedding),
-                                                                     tensor_column_basic_embedding_dim,
-                                                                     expr.options_text_);
-    return bound_match_tensor_expr;
-}
-
-SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    Vector<SharedPtr<MatchExpression>> match_exprs;
-    Vector<SharedPtr<KnnExpression>> knn_exprs;
-    Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
-    Vector<SharedPtr<FusionExpression>> fusion_exprs;
-    for (MatchExpr *match_expr : expr.match_exprs_) {
-        match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
-    }
-    for (KnnExpr *knn_expr : expr.knn_exprs_) {
-        knn_exprs.push_back(static_pointer_cast<KnnExpression>(BuildKnnExpr(*knn_expr, bind_context_ptr, depth, false)));
-    }
-    for (MatchTensorExpr *match_tensor_expr : expr.match_tensor_exprs_) {
-        match_tensor_exprs.push_back(
-            static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
-    }
-    for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
-        fusion_exprs.push_back(MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_));
-    }
-    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, fusion_exprs);
-    return bound_search_expr;
-}
-
-// Bind subquery expression.
-SharedPtr<SubqueryExpression>
-ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool) {
-
-    switch (subquery_type) {
-
-        case SubqueryType::kIn:
-        case SubqueryType::kNotIn: {
-            auto bound_left_expr = BuildExpression(*expr.left_, bind_context_ptr, depth, false);
-
-            SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
-            QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
-            UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
-
-            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
-            in_subquery_expr->left_ = bound_left_expr;
-            in_subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
-            return in_subquery_expr;
-        }
-        case SubqueryType::kExists:
-        case SubqueryType::kNotExists:
-        case SubqueryType::kScalar: {
-            SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
-            QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
-            UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
-
-            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
-
-            subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
-            return subquery_expr;
-        }
-        case SubqueryType::kAny: {
-            String error_message = "Not implement: Any";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
-        }
-    }
-
-    String error_message = "Unreachable";
-    LOG_CRITICAL(error_message);
-    UnrecoverableError(error_message);
-    return nullptr;
-}
-
-Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
-    auto [special_function_ptr, status] = Catalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
-    if (status.ok()) {
-        switch (special_function_ptr->special_type()) {
-            case SpecialType::kDistance: {
-                if (!bind_context_ptr->allow_distance) {
-                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR");
-                    LOG_ERROR(status.message());
-                    RecoverableError(status);
-                }
-                break;
-            }
-            case SpecialType::kScore: {
-                if (!bind_context_ptr->allow_score) {
-                    Status status = Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR");
-                    LOG_ERROR(status.message());
-                    RecoverableError(status);
-                }
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-
-        String &table_name = bind_context_ptr->table_names_[0];
-        String column_name = special_function_ptr->name();
-
-        TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function_ptr->data_type(),
-                                                                               table_name,
-                                                                               bind_context_ptr->table_name2table_index_[table_name],
-                                                                               column_name,
-                                                                               table_entry->ColumnCount() + special_function_ptr->extra_idx(),
-                                                                               depth,
-                                                                               special_function_ptr->special_type());
-        return bound_column_expr;
-    } else {
-        return None;
-    }
-}
-
-//
-//// Bind window function.
-// SharedPtr<BaseExpression>
-// ExpressionBinder::BuildWindow(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
-//     PlannerError("ExpressionBinder::BuildWindow");
-// }
 
 } // namespace infinity

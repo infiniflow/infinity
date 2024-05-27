@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import struct
+import numpy as np
+from infinity.common import VEC, InfinityException
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from collections import defaultdict
 from typing import Any, Tuple, Dict, List
 
@@ -79,6 +82,10 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
                         return object
                     case _:
                         raise NotImplementedError(f"Unsupported type {ttype}")
+        case ttypes.LogicType.Tensor:
+            return object
+        case ttypes.LogicType.TensorArray:
+            return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
 
@@ -174,6 +181,10 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             else:
                 raise NotImplementedError(
                     f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
+        case ttypes.ColumnType.ColumnTensor:
+            return parse_tensor_bytes(column_data_type, column_vector)
+        case ttypes.ColumnType.ColumnTensorArray:
+            return parse_tensorarray_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
@@ -188,6 +199,66 @@ def parse_bytes(bytes_data):
         results.append(string_data)
         offset += length
     return results
+
+
+def parse_tensor_bytes(column_data_type: ttypes.DataType, bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+        offset += 4
+        tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
+        results.append(tensor_data)
+        offset += length
+    return results
+
+
+def parse_tensorarray_bytes(column_data_type: ttypes.DataType, bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        tensor_n = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+        offset += 4
+        tensorarray_data = []
+        for _ in range(tensor_n):
+            length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+            offset += 4
+            tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
+            offset += length
+            tensorarray_data.append(tensor_data)
+        results.append(tensorarray_data)
+    return results
+
+
+def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[Any]]:
+    dimension = column_data_type.physical_type.embedding_type.dimension
+    if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
+        all_list = list(struct.unpack(
+            '<{}b'.format(len(binary_data)), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt16:
+        all_list = list(struct.unpack('<{}h'.format(
+            len(binary_data) // 2), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt32:
+        all_list = list(struct.unpack('<{}i'.format(
+            len(binary_data) // 4), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat32:
+        all_list = list(struct.unpack('<{}f'.format(
+            len(binary_data) // 4), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
+        all_list = list(struct.unpack('<{}d'.format(
+            len(binary_data) // 8), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
+        all_list = list(struct.unpack(
+            '<{}?'.format(len(binary_data)), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    else:
+        raise NotImplementedError(
+            f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
 
 
 def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> ttypes.DataType:
@@ -218,3 +289,38 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
         data_type_dict[column_name] = column_data_type
 
     return data_dict, data_type_dict
+
+
+def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embedding_data_type: str,
+                           method_type: str, extra_option: str = None) -> MatchTensorExpr:
+    match_tensor_expr = MatchTensorExpr()
+    match_tensor_expr.column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
+    match_tensor_expr.search_method = method_type
+    match_tensor_expr.extra_options = extra_option
+    data = EmbeddingData()
+    if embedding_data_type == 'bit':
+        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+    elif embedding_data_type == 'tinyint' or embedding_data_type == 'int8' or embedding_data_type == 'i8':
+        elem_type = ElementType.ElementInt8
+        data.i8_array_value = np.asarray(embedding_data, dtype=np.int8).flatten()
+    elif embedding_data_type == 'smallint' or embedding_data_type == 'int16' or embedding_data_type == 'i16':
+        elem_type = ElementType.ElementInt16
+        data.i16_array_value = np.asarray(embedding_data, dtype=np.int16).flatten()
+    elif embedding_data_type == 'int' or embedding_data_type == 'int32' or embedding_data_type == 'i32':
+        elem_type = ElementType.ElementInt32
+        data.i32_array_value = np.asarray(embedding_data, dtype=np.int32).flatten()
+    elif embedding_data_type == 'bigint' or embedding_data_type == 'int64' or embedding_data_type == 'i64':
+        elem_type = ElementType.ElementInt64
+        data.i64_array_value = np.asarray(embedding_data, dtype=np.int64).flatten()
+    elif embedding_data_type == 'float' or embedding_data_type == 'float32' or embedding_data_type == 'f32':
+        elem_type = ElementType.ElementFloat32
+        data.f32_array_value = np.asarray(embedding_data, dtype=np.float32).flatten()
+    elif embedding_data_type == 'double' or embedding_data_type == 'float64' or embedding_data_type == 'f64':
+        elem_type = ElementType.ElementFloat64
+        data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
+    else:
+        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+
+    match_tensor_expr.embedding_data_type = elem_type
+    match_tensor_expr.embedding_data = data
+    return match_tensor_expr

@@ -25,6 +25,7 @@ import physical_operator_type;
 import third_party;
 import txn;
 import txn_store;
+import constant_expr;
 import table_entry;
 import segment_entry;
 import block_entry;
@@ -132,5 +133,7 @@ private:
     bool header_{false};
     char delimiter_{','};
 };
+
+export SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object);
 
 } // namespace infinity

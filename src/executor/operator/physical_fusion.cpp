@@ -41,6 +41,7 @@ import internal_types;
 import logger;
 import logical_type;
 import knn_expr;
+import match_tensor_expr;
 import txn;
 import buffer_manager;
 import table_entry;
@@ -222,54 +223,41 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
                                         Vector<UniquePtr<DataBlock>> &output_data_block_array) const {
     const TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     const BlockIndex *block_index = base_table_ref_->block_index_.get();
-    u32 topn = 10;
+    u32 topn = 10; // default topn
     ColumnID column_id = std::numeric_limits<ColumnID>::max();
-    const DataType *column_data_type = nullptr;
-    const EmbeddingInfo *column_embedding_info = nullptr;
-    u32 column_unit_embedding_dimension = 0;
-    u32 column_unit_embedding_bytes = 0;
-    UniquePtr<char[]> query_tensor;
-    u32 query_tensor_data_num = 0;
-    u32 query_tensor_embedding_num = 0;
-    EmbeddingDataType query_tensor_data_type = EmbeddingDataType::kElemInvalid;
+    const char *query_tensor_ptr = fusion_expr_->match_tensor_expr_->query_embedding_.ptr;
+    const u32 column_unit_embedding_dimension = fusion_expr_->match_tensor_expr_->tensor_basic_embedding_dimension_;
+    const u32 query_tensor_embedding_num = fusion_expr_->match_tensor_expr_->num_of_embedding_in_query_tensor_;
+    const EmbeddingDataType query_tensor_data_type = fusion_expr_->match_tensor_expr_->embedding_data_type_;
     // prepare query info
     {
-        String column_name;
-        String search_tensor;
-        String tensor_data_type;
-        String match_method;
-        // find parameters
+        // find topn
         if (fusion_expr_->options_.get() != nullptr) {
             const auto &options = fusion_expr_->options_->options_;
-            if (const auto it = options.find("column_name"); it != options.end()) {
-                column_name = it->second;
+            auto topn_it = options.end();
+            if (topn_it = options.find("topn"); topn_it == options.end()) {
+                if (topn_it = options.find("top_n"); topn_it == options.end()) {
+                    if (topn_it = options.find("topk"); topn_it == options.end()) {
+                        if (topn_it = options.find("top_k"); topn_it == options.end()) {
+                            if (topn_it = options.find("topN"); topn_it == options.end()) {
+                                topn_it = options.find("top_N");
+                            }
+                        }
+                    }
+                }
             }
-            if (const auto it = options.find("search_tensor"); it != options.end()) {
-                search_tensor = it->second;
-            }
-            if (const auto it = options.find("tensor_data_type"); it != options.end()) {
-                tensor_data_type = it->second;
-                // to_lower
-                std::transform(tensor_data_type.begin(), tensor_data_type.end(), tensor_data_type.begin(), [](unsigned char c) {
-                    return std::tolower(c);
-                });
-            }
-            if (const auto it = options.find("match_method"); it != options.end()) {
-                match_method = it->second;
-                // to_lower
-                std::transform(match_method.begin(), match_method.end(), match_method.begin(), [](unsigned char c) { return std::tolower(c); });
-            }
-            if (const auto it = options.find("topn"); it != options.end()) {
-                if (const int topn_int = std::stoi(it->second); topn_int > 0) {
+            if (topn_it != options.end()) {
+                if (const int topn_int = std::stoi(topn_it->second); topn_int > 0) {
                     topn = topn_int;
                 }
             }
         }
         // validate column_name
         {
-            column_id = table_entry->GetColumnIdByName(column_name);
+            column_id = fusion_expr_->match_tensor_expr_->column_expr_->binding().column_idx;
             const ColumnDef *column_def = table_entry->GetColumnDefByID(column_id);
-            column_data_type = column_def->type().get();
+            const DataType *column_data_type = column_def->type().get();
+            const EmbeddingInfo *column_embedding_info = nullptr;
             switch (column_data_type->type()) {
                 case LogicalType::kTensor:
                 case LogicalType::kTensorArray: {
@@ -279,15 +267,16 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
                 default: {
                     const auto error_info =
                         fmt::format("Fusion MatchTensor column_name {} is not a Tensor or TensorArray column. column type is : {}.",
-                                    column_name,
+                                    fusion_expr_->match_tensor_expr_->column_expr_->column_name(),
                                     column_data_type->ToString());
                     LOG_ERROR(error_info);
                     RecoverableError(Status::NotSupport(error_info));
                     break;
                 }
             }
-            column_unit_embedding_dimension = column_embedding_info->Dimension();
-            column_unit_embedding_bytes = column_embedding_info->Size();
+            if (column_unit_embedding_dimension != column_embedding_info->Dimension()) {
+                UnrecoverableError("Dimension of column and query tensor mismatch!");
+            }
             switch (column_embedding_info->Type()) {
                 case EmbeddingDataType::kElemFloat: {
                     break;
@@ -295,7 +284,7 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
                 // TODO: support bit type
                 default: {
                     const auto error_info = fmt::format("Fusion MatchTensor target column {} basic element type is unsupported: {}.",
-                                                        column_name,
+                                                        fusion_expr_->match_tensor_expr_->column_expr_->column_name(),
                                                         EmbeddingT::EmbeddingDataType2String(column_embedding_info->Type()));
                     LOG_ERROR(error_info);
                     RecoverableError(Status::NotSupport(error_info));
@@ -305,37 +294,13 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         }
         // validate tensor_data_type
         // TODO: now only support float32 query tensor
-        if (tensor_data_type == "float32" or tensor_data_type == "float" or tensor_data_type == "f32") {
-            query_tensor_data_type = EmbeddingDataType::kElemFloat;
-        } else {
+        if (query_tensor_data_type != EmbeddingDataType::kElemFloat) {
             const auto error_info = "Fusion MatchTensor tensor_data_type option is invalid. Now only support float32.";
             LOG_ERROR(error_info);
             RecoverableError(Status::NotSupport(error_info));
         }
-        // validate search_tensor
-        {
-            const auto split_view = SplitTensorElement(search_tensor, ',', column_unit_embedding_dimension);
-            query_tensor_data_num = split_view.size();
-            query_tensor_embedding_num = query_tensor_data_num / column_unit_embedding_dimension;
-            query_tensor = MakeUnique<char[]>(query_tensor_embedding_num * column_unit_embedding_bytes);
-            switch (query_tensor_data_type) {
-                case EmbeddingDataType::kElemFloat: {
-                    auto *query_tensor_ptr = reinterpret_cast<float *>(query_tensor.get());
-                    for (u32 i = 0; i < query_tensor_data_num; i++) {
-                        query_tensor_ptr[i] = DataType::StringToValue<float>(split_view[i]);
-                    }
-                    break;
-                }
-                default: {
-                    const auto error_info = "Fusion MatchTensor query tensor data type is invalid. Now only support float32.";
-                    LOG_ERROR(error_info);
-                    RecoverableError(Status::NotSupport(error_info));
-                    break;
-                }
-            }
-        }
         // validate match_method
-        if (match_method != "maxsim") {
+        if (fusion_expr_->match_tensor_expr_->search_method_ != MatchTensorSearchMethod::kMaxSim) {
             const auto error_info = "Fusion MatchTensor match_method option is invalid. Now only support MaxSim.";
             LOG_ERROR(error_info);
             RecoverableError(Status::NotSupport(error_info));
@@ -388,7 +353,7 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         const char *tensor_data_ptr = column_vec.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
         // use mlas
         auto output_ptr = MakeUniqueForOverwrite<float[]>(query_tensor_embedding_num * embedding_num);
-        matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor.get()),
+        matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
                                                        reinterpret_cast<const float *>(tensor_data_ptr),
                                                        query_tensor_embedding_num,
                                                        embedding_num,

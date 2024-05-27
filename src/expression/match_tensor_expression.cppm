@@ -27,15 +27,10 @@ import match_tensor_expr;
 
 namespace infinity {
 
-export enum class MatchTensorMethod : u8 {
-    kInvalid,
-    kMaxSim,
-};
-
 export class MatchTensorExpression final : public BaseExpression {
 public:
     MatchTensorExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                          MatchTensorMethod search_method,
+                          MatchTensorSearchMethod search_method,
                           EmbeddingDataType embedding_data_type,
                           u32 dimension,
                           EmbeddingT query_embedding,
@@ -46,16 +41,16 @@ public:
 
     String ToString() const override;
 
-    static String MethodToString(MatchTensorMethod method);
+    static String MethodToString(MatchTensorSearchMethod method);
 
-    MatchTensorMethod search_method_;
+    const MatchTensorSearchMethod search_method_;
     const ColumnExpression *column_expr_ = nullptr;
-    const EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
-    const u32 dimension_ = 0;                        // num of total elements in the tensor (num of embedding * dimension of single embedding)
-    const EmbeddingT query_embedding_;               // treat the query tensor as an embedding here
-    const u32 tensor_basic_embedding_dimension_ = 0; // dimension of single embedding in the tensor column
+    const EmbeddingDataType embedding_data_type_;
+    const u32 dimension_;                        // num of total elements in the tensor (num of embedding * dimension of single embedding)
+    const EmbeddingT query_embedding_;           // treat the query tensor as an embedding here
+    const u32 tensor_basic_embedding_dimension_; // dimension of single embedding in the tensor column
     const u32 num_of_embedding_in_query_tensor_ = dimension_ / tensor_basic_embedding_dimension_;
-    String options_text_;
+    const String options_text_;
 };
 
 } // namespace infinity
