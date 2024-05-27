@@ -589,7 +589,7 @@ Status LogicalPlanner::BuildCreateDatabase(const CreateStatement *statement, Sha
         case IdentifierValidationStatus::kExceedLimit:
             return Status::ExceedDBNameLength(create_schema_info->schema_name_.length());
         case IdentifierValidationStatus::kInvalidName: {
-            return Status::InvalidDBName(create_schema_info->schema_name_);
+            return Status::InvalidIdentifierName(create_schema_info->schema_name_);
         }
     }
 
@@ -789,7 +789,7 @@ Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr
         case IdentifierValidationStatus::kExceedLimit:
             return Status::ExceedDBNameLength(drop_schema_info->schema_name_.length());
         case IdentifierValidationStatus::kInvalidName: {
-            return Status::InvalidDBName(drop_schema_info->schema_name_);
+            return Status::InvalidIdentifierName(drop_schema_info->schema_name_);
         }
     }
 

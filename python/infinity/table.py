@@ -18,6 +18,7 @@ from typing import Optional, Union
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
+from infinity.common import InfinityException
 
 
 class ExplainType(Enum):
@@ -45,7 +46,7 @@ class ExplainType(Enum):
         elif self is ExplainType.Fragment:
             return ttypes.ExplainType.Fragment
         else:
-            raise Exception("Unknown explain type")
+            raise InfinityException(3081, "Unknown explain type")
 
 
 class Table(ABC):

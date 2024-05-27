@@ -126,8 +126,8 @@ Status Status::InvalidUserName(const String &user_name) {
 
 Status Status::InvalidPasswd() { return Status(ErrorCode::kInvalidPasswd, MakeUnique<String>(fmt::format("Invalid password"))); }
 
-Status Status::InvalidDBName(const String &db_name) {
-    return Status(ErrorCode::kInvalidDbName, MakeUnique<String>(fmt::format("{} is a invalid database name", db_name)));
+Status Status::InvalidIdentifierName(const String &db_name) {
+    return Status(ErrorCode::kInvalidIdentifierName, MakeUnique<String>(fmt::format("{} is a invalid identifier name", db_name)));
 }
 
 Status Status::InvalidTableName(const String &table_name) {

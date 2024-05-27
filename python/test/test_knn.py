@@ -19,7 +19,7 @@ from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 
 from utils import copy_data, generate_commas_enwiki
 from test_sdkbase import TestSdk
@@ -187,10 +187,11 @@ class TestKnn(TestSdk):
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        with pytest.raises(Exception, match="ERROR:3013, Expect the column search is an embedding column*"):
-            res = table_obj.output(["variant_id", "_row_id"]).knn(
-                column_name, [1.0] * 4, "float", "ip", 2).to_pl()
-            print(res)
+        with pytest.raises(InfinityException) as e:
+            table_obj.output(["variant_id", "_row_id"]).knn(column_name, [1.0] * 4, "float", "ip", 2).to_pl()
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 
         res = db_obj.drop_table(
             "test_knn_on_non_vector_column", ConflictType.Error)
@@ -402,10 +403,14 @@ class TestKnn(TestSdk):
                                                        2).to_pl()
             print(res)
         else:
-            with pytest.raises(Exception, match="ERROR:3032*"):
-                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
-                                                           distance_type[0],
-                                                           2).to_pl()
+            with pytest.raises(InfinityException) as e:
+                table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                     distance_type[0],
+                                                     2).to_pl()
+
+            assert e.type == InfinityException
+            assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
+
         res = db_obj.drop_table(
             "test_various_distance_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -415,13 +420,13 @@ class TestKnn(TestSdk):
     @pytest.mark.parametrize("topn", [
         (2, True),
         (10, True),
-        (0, False, "ERROR:3014*"),
-        (-1, False, "ERROR:3014*"),
-        (1.1, False, "Invalid topn"),
-        ("test", False, "Invalid topn"),
-        ({}, False, "Invalid topn"),
-        ((), False, "Invalid topn"),
-        ([1] * 4, False, "Invalid topn"),
+        (0, False, ErrorCode.INVALID_PARAMETER_VALUE),
+        (-1, False, ErrorCode.INVALID_PARAMETER_VALUE),
+        (1.1, False, ErrorCode.INVALID_TOPK_TYPE),
+        ("test", False, ErrorCode.INVALID_TOPK_TYPE),
+        ({}, False, ErrorCode.INVALID_TOPK_TYPE),
+        ((), False, ErrorCode.INVALID_TOPK_TYPE),
+        ([1] * 4, False, ErrorCode.INVALID_TOPK_TYPE),
     ])
     def test_various_topn(self, get_infinity_db, check_data, topn):
         db_obj = get_infinity_db
@@ -448,9 +453,13 @@ class TestKnn(TestSdk):
                 "gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
             print(res)
         else:
-            with pytest.raises(Exception, match=topn[2]):
-                res = table_obj.output(["variant_id"]).knn(
+            with pytest.raises(InfinityException) as e:
+                table_obj.output(["variant_id"]).knn(
                     "gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
+
+            assert e.type == InfinityException
+            assert e.value.args[0] == topn[2]
+
         res = db_obj.drop_table("test_various_topn", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 

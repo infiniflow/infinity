@@ -20,7 +20,7 @@ from numpy import dtype
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 from utils import trace_expected_exceptions
 from test_sdkbase import TestSdk
 
@@ -123,8 +123,11 @@ class TestDelete(TestSdk):
         table_obj = db_obj.drop_table("test_delete_non_existent_table", ConflictType.Ignore)
         assert table_obj
 
-        with pytest.raises(Exception, match="ERROR:3022*"):
+        with pytest.raises(InfinityException) as e:
             db_obj.get_table("test_delete_non_existent_table").delete()
+
+        assert e.type == infinity.common.InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     # delete table, all rows are met the condition
     @trace_expected_exceptions
@@ -284,12 +287,16 @@ class TestDelete(TestSdk):
         # connect
         db_obj = get_infinity_db
 
-        with pytest.raises(Exception, match="ERROR:3022*"):
+        with pytest.raises(InfinityException) as e:
             db_obj.drop_table("test_delete_dropped_table")
             table_obj = db_obj.get_table("test_delete_dropped_table")
             table_obj.delete("c1 = 0")
             assert table_obj
             db_obj.drop_table("test_delete_dropped_table")
+
+        assert e.type == infinity.common.InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
+
 
     # various expression will be given in where clause, and check result correctness
     @trace_expected_exceptions
