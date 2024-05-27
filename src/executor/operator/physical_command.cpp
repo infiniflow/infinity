@@ -169,8 +169,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     RecoverableError(status);
                 }
             }
-
-            { UnrecoverableError(fmt::format("Unknown command: {}", set_command->var_name())); }
             break;
         }
         case CommandType::kExport: {
@@ -193,9 +191,19 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         default: {
-            UnrecoverableError("Invalid command type.");
+            String error_message = fmt::format("Invalid command type: {}", command_info_->ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return true;
 }
+
+SizeT PhysicalCommand::TaskletCount() {
+    String error_message = "Not implement: TaskletCount not Implement";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
+    return 0;
+}
+
 } // namespace infinity
