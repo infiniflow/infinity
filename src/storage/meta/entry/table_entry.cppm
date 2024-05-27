@@ -39,7 +39,7 @@ import meta_map;
 import meta_entry_interface;
 import cleanup_scanner;
 import random;
-import memory_pool;
+
 import meta_info;
 import block_entry;
 import column_index_reader;

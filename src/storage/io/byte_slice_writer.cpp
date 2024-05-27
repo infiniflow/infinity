@@ -2,7 +2,6 @@ module;
 
 import stl;
 import byte_slice;
-import memory_pool;
 import file_writer;
 import file_reader;
 import infinity_exception;
@@ -11,8 +10,8 @@ module byte_slice_writer;
 
 namespace infinity {
 
-ByteSliceWriter::ByteSliceWriter(MemoryPool *pool, u32 min_slice_size)
-    : pool_(pool), last_slice_size_(min_slice_size - ByteSlice::GetHeadSize()), is_own_slice_list_(true), allocated_size_(0) {
+ByteSliceWriter::ByteSliceWriter(u32 min_slice_size)
+    : last_slice_size_(min_slice_size - ByteSlice::GetHeadSize()), is_own_slice_list_(true), allocated_size_(0) {
     slice_list_ = AllocateByteSliceList();
     slice_list_->Add(CreateSlice(last_slice_size_));
 }
@@ -20,7 +19,7 @@ ByteSliceWriter::ByteSliceWriter(MemoryPool *pool, u32 min_slice_size)
 ByteSliceWriter::~ByteSliceWriter() { Close(); }
 
 ByteSlice *ByteSliceWriter::CreateSlice(u32 size) {
-    ByteSlice *slice = ByteSlice::CreateSlice(size, pool_);
+    ByteSlice *slice = ByteSlice::CreateSlice(size);
     allocated_size_ += size + ByteSlice::GetHeadSize();
     last_slice_size_ = slice->size_;
     slice->size_ = 0;
@@ -40,14 +39,14 @@ void ByteSliceWriter::Dump(const SharedPtr<FileWriter> &file) {
 void ByteSliceWriter::Load(const SharedPtr<FileReader> &file, u32 size) {
     ByteSlice *slice = CreateSlice(size);
     file->Read((char *)slice->data_, size);
-    slice_list_->Clear(pool_);
+    slice_list_->Clear();
     slice_list_->Add(slice);
 }
 
 void ByteSliceWriter::Reset() {
     last_slice_size_ = MIN_SLICE_SIZE - ByteSlice::GetHeadSize();
     if (is_own_slice_list_ && slice_list_) {
-        slice_list_->Clear(pool_);
+        slice_list_->Clear();
         DeAllocateByteSliceList(slice_list_);
     }
     slice_list_ = AllocateByteSliceList();
@@ -56,7 +55,7 @@ void ByteSliceWriter::Reset() {
 
 void ByteSliceWriter::Close() {
     if (is_own_slice_list_ && slice_list_) {
-        slice_list_->Clear(pool_);
+        slice_list_->Clear();
         DeAllocateByteSliceList(slice_list_);
     }
 }

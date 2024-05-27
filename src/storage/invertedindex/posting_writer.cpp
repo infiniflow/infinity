@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import file_writer;
 import file_reader;
 import doc_list_encoder;
@@ -18,17 +18,12 @@ module posting_writer;
 
 namespace infinity {
 
-PostingWriter::PostingWriter(MemoryPool *byte_slice_pool,
-                             RecyclePool *buffer_pool,
-                             PostingFormatOption posting_option,
-                             VectorWithLock<u32> &column_lengths)
-    : byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), posting_option_(posting_option),
-      posting_format_(new PostingFormat(posting_option)), column_lengths_(column_lengths) {
+PostingWriter::PostingWriter(PostingFormatOption posting_option, VectorWithLock<u32> &column_lengths)
+    : posting_option_(posting_option), posting_format_(new PostingFormat(posting_option)), column_lengths_(column_lengths) {
     if (posting_option.HasPositionList()) {
-        position_list_encoder_ = new PositionListEncoder(posting_option_, byte_slice_pool_, buffer_pool_, posting_format_->GetPositionListFormat());
+        position_list_encoder_ = new PositionListEncoder(posting_option_, posting_format_->GetPositionListFormat());
     }
-    doc_list_encoder_ =
-        new DocListEncoder(posting_option_.GetDocListFormatOption(), byte_slice_pool_, buffer_pool_, posting_format_->GetDocListFormat());
+    doc_list_encoder_ = new DocListEncoder(posting_option_.GetDocListFormatOption(), posting_format_->GetDocListFormat());
 }
 
 PostingWriter::~PostingWriter() {
@@ -101,15 +96,14 @@ void PostingWriter::AddPosition(pos_t pos) {
     }
 }
 
-InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder(MemoryPool *session_pool) const {
-    InMemPostingDecoder *posting_decoder =
-        session_pool ? (new ((session_pool)->Allocate(sizeof(InMemPostingDecoder))) InMemPostingDecoder()) : new InMemPostingDecoder();
+InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder() const {
+    InMemPostingDecoder *posting_decoder = new InMemPostingDecoder();
 
-    InMemDocListDecoder *doc_list_decoder = doc_list_encoder_->GetInMemDocListDecoder(session_pool);
+    InMemDocListDecoder *doc_list_decoder = doc_list_encoder_->GetInMemDocListDecoder();
     posting_decoder->SetDocListDecoder(doc_list_decoder);
 
     if (position_list_encoder_ != nullptr) {
-        InMemPositionListDecoder *position_list_decoder = position_list_encoder_->GetInMemPositionListDecoder(session_pool);
+        InMemPositionListDecoder *position_list_decoder = position_list_encoder_->GetInMemPositionListDecoder();
         posting_decoder->SetPositionListDecoder(position_list_decoder);
     }
 

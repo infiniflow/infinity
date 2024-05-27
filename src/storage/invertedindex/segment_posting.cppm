@@ -22,7 +22,7 @@ import term_meta;
 import index_defines;
 import internal_types;
 import file_reader;
-import memory_pool;
+
 import file_system;
 
 export module segment_posting;
@@ -43,8 +43,7 @@ public:
               TermMeta &term_meta,
               u64 pos_begin,
               u64 pos_size,
-              const SharedPtr<FileReader> &posting_reader,
-              MemoryPool *session_pool);
+              const SharedPtr<FileReader> &posting_reader);
     // for in memory segment posting
     void Init(RowID base_row_id, const SharedPtr<PostingWriter> &posting_writer);
 
@@ -86,6 +85,5 @@ private:
     u64 pos_begin_ = 0;
     u64 pos_size_ = 0;
     u64 doc_start_ = 0;
-    MemoryPool *session_pool_;
 };
 } // namespace infinity

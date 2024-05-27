@@ -249,8 +249,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                                                 begin_row_id,
                                                                 index_fulltext->flag_,
                                                                 index_fulltext->analyzer_,
-                                                                table_index_entry_->GetFulltextByteSlicePool(),
-                                                                table_index_entry_->GetFulltextBufferPool(),
                                                                 table_index_entry_->GetFulltextInvertingThreadPool(),
                                                                 table_index_entry_->GetFulltextCommitingThreadPool());
                 }
@@ -394,8 +392,6 @@ void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id)
                                                 base_row_id,
                                                 index_fulltext->flag_,
                                                 index_fulltext->analyzer_,
-                                                table_index_entry_->GetFulltextByteSlicePool(),
-                                                table_index_entry_->GetFulltextBufferPool(),
                                                 table_index_entry_->GetFulltextInvertingThreadPool(),
                                                 table_index_entry_->GetFulltextCommitingThreadPool());
     memory_indexer_->Load();
@@ -435,8 +431,6 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                                                         base_row_id,
                                                         index_fulltext->flag_,
                                                         index_fulltext->analyzer_,
-                                                        table_index_entry_->GetFulltextByteSlicePool(),
-                                                        table_index_entry_->GetFulltextBufferPool(),
                                                         table_index_entry_->GetFulltextInvertingThreadPool(),
                                                         table_index_entry_->GetFulltextCommitingThreadPool());
             u64 column_id = column_def->id();

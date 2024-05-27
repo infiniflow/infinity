@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import byte_slice;
 import byte_slice_writer;
 import file_writer;
@@ -17,7 +17,7 @@ namespace infinity {
 
 export class PostingByteSlice {
 public:
-    PostingByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
+    PostingByteSlice();
 
     virtual ~PostingByteSlice() = default;
 
@@ -34,8 +34,6 @@ public:
     bool NeedFlush(u8 need_flush_count = MAX_DOC_PER_RECORD) const { return buffer_.Size() == need_flush_count; }
 
     const ByteSliceList *GetByteSliceList() const { return posting_writer_.GetByteSliceList(); }
-
-    MemoryPool *GetBufferPool() const { return buffer_.GetPool(); }
 
     const PostingFields *GetPostingFields() const { return buffer_.GetPostingFields(); }
 

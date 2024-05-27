@@ -6,7 +6,7 @@ import byte_slice;
 import byte_slice_reader;
 import index_defines;
 import doc_list_format_option;
-import memory_pool;
+
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import position_list_format_option;
@@ -106,8 +106,8 @@ protected:
 
 export class SkipListReaderPostingByteSlice final : public SkipListReader {
 public:
-    SkipListReaderPostingByteSlice(const DocListFormatOption &doc_list_format_option, MemoryPool *session_pool)
-        : SkipListReader(doc_list_format_option), session_pool_(session_pool) {}
+    SkipListReaderPostingByteSlice(const DocListFormatOption &doc_list_format_option)
+        : SkipListReader(doc_list_format_option) {}
 
     ~SkipListReaderPostingByteSlice() override;
 
@@ -117,7 +117,6 @@ protected:
     Pair<int, bool> LoadBuffer() override;
 
 private:
-    MemoryPool *session_pool_;
     PostingByteSlice *skiplist_buffer_ = nullptr;
     PostingByteSliceReader skiplist_reader_;
 };

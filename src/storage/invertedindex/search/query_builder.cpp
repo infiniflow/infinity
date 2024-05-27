@@ -19,7 +19,7 @@ module;
 module query_builder;
 
 import stl;
-import memory_pool;
+
 import doc_iterator;
 import column_index_reader;
 import match_data;

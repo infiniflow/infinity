@@ -3,7 +3,7 @@ module;
 #include <cassert>
 module inmem_doc_list_decoder;
 import stl;
-import memory_pool;
+
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import index_decoder;
@@ -11,28 +11,15 @@ import index_defines;
 
 namespace infinity {
 
-InMemDocListDecoder::InMemDocListDecoder(MemoryPool *session_pool, const DocListFormatOption &doc_list_format_option)
-    : IndexDecoder(doc_list_format_option), session_pool_(session_pool) {}
+InMemDocListDecoder::InMemDocListDecoder(const DocListFormatOption &doc_list_format_option) : IndexDecoder(doc_list_format_option) {}
 
 InMemDocListDecoder::~InMemDocListDecoder() {
-    if (session_pool_) {
-        if (skiplist_reader_) {
-            skiplist_reader_->~SkipListReaderPostingByteSlice();
-            session_pool_->Deallocate((void *)skiplist_reader_, sizeof(SkipListReaderPostingByteSlice));
-        }
-        doc_list_buffer_->~PostingByteSlice();
-        session_pool_->Deallocate((void *)doc_list_buffer_, sizeof(PostingByteSlice));
-        if (doc_buffer_to_copy_) {
-            session_pool_->Deallocate((void *)doc_buffer_to_copy_, sizeof(docid_t) * MAX_DOC_PER_RECORD);
-        }
-    } else {
-        if (skiplist_reader_) {
-            delete skiplist_reader_;
-        }
-        delete doc_list_buffer_;
-        if (doc_buffer_to_copy_) {
-            delete[] doc_buffer_to_copy_;
-        }
+    if (skiplist_reader_) {
+        delete skiplist_reader_;
+    }
+    delete doc_list_buffer_;
+    if (doc_buffer_to_copy_) {
+        delete[] doc_buffer_to_copy_;
     }
 }
 
@@ -70,11 +57,8 @@ bool InMemDocListDecoder::DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_p
         return false;
     }
     // allocate space
-    if (session_pool_) {
-        doc_buffer_to_copy_ = static_cast<docid_t *>(session_pool_->Allocate(sizeof(docid_t) * MAX_DOC_PER_RECORD));
-    } else {
-        doc_buffer_to_copy_ = new docid_t[MAX_DOC_PER_RECORD];
-    }
+    doc_buffer_to_copy_ = new docid_t[MAX_DOC_PER_RECORD];
+
     doc_list_reader_.Seek(offset);
     if (!doc_list_reader_.Decode(doc_buffer_to_copy_, MAX_DOC_PER_RECORD, decode_count_)) {
         return false;

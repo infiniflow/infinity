@@ -15,7 +15,7 @@ module;
 export module skiplist;
 
 import stl;
-import memory_pool;
+
 
 namespace infinity {
 constexpr i32 MAX_NUM = 2147483647;
@@ -75,7 +75,7 @@ class SkipList {
     typedef SkipListNode<KeyType, ValueType> Node;
 
 public:
-    SkipList(Comparator cmp, MemoryPool *arena = nullptr, u32 sz = 1 << 30) : comparator_(cmp), height_(1), buf_size_(sz) {
+    SkipList(Comparator cmp, u32 sz = 1 << 30) : comparator_(cmp), height_(1), buf_size_(sz) {
         arena_ = new Arena<KeyType, ValueType>(buf_size_);
         auto head = NewNode(KeyType(), ValueType(), MAX_LEVEL);
         head_offset_ = arena_->GetNodeOffset(head);

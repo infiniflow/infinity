@@ -1,7 +1,7 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import memory_pool;
+
 import posting_byte_slice;
 import in_doc_pos_state;
 import byte_slice;
@@ -22,26 +22,15 @@ using namespace infinity;
 
 class SkiplistReaderTest : public BaseTest {
 public:
-    SkiplistReaderTest() {
-        byte_slice_pool_ = new MemoryPool(BUFFER_SIZE_);
-        buffer_pool_ = new RecyclePool(BUFFER_SIZE_);
-        session_pool_ = new MemoryPool(BUFFER_SIZE_);
-    }
-    ~SkiplistReaderTest() {
-        delete byte_slice_pool_;
-        delete buffer_pool_;
-        delete session_pool_;
-    }
-    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(byte_slice_pool_, buffer_pool_); }
+    SkiplistReaderTest() {}
+    ~SkiplistReaderTest() {}
+    void SetUp() override { skiplist_writer_ = MakeShared<SkipListWriter>(); }
     void TearDown() override { skiplist_writer_.reset(); }
 
 protected:
     void InitSkiplistWriter(PostingFields& posting_fields, SizeT doc_num, Vector<u32>& doc_ids, Vector<u32>& tfs, Vector<u32>& deltas, Vector<u32>& offsets);
 
 protected:
-    MemoryPool *byte_slice_pool_;
-    RecyclePool *buffer_pool_;
-    MemoryPool *session_pool_;
     SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -161,7 +150,7 @@ TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     u32 res_offset = -1;
     u32 res_delta = -1;
     {
-        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option, session_pool_);
+        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option);
         skiplist_reader->Load(skiplist_writer_.get());
         for (SizeT query_doc_id = 0; query_doc_id < doc_num; ++query_doc_id) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
@@ -172,7 +161,7 @@ TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     }
 
     {
-        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option, session_pool_);
+        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option);
         skiplist_reader->Load(skiplist_writer_.get());
         for (SizeT query_doc_id = 0; query_doc_id < doc_num; query_doc_id += 3) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
@@ -183,7 +172,7 @@ TEST_F(SkiplistReaderTest, SkipListReaderPostingByteSliceTest) {
     }
 
     {
-        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option, session_pool_);
+        auto skiplist_reader = MakeShared<SkipListReaderPostingByteSlice>(doc_list_format_option);
         skiplist_reader->Load(skiplist_writer_.get());
         for (SizeT query_doc_id = 0; query_doc_id < doc_num; query_doc_id += random() % doc_num + 1) {
             skiplist_reader->SkipTo(query_doc_id, res_doc_id, res_prev_doc_id, res_offset, res_delta);
