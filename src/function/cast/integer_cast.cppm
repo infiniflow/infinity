@@ -28,6 +28,7 @@ import vector_buffer;
 import internal_types;
 import data_type;
 import status;
+import logger;
 
 namespace infinity {
 
@@ -37,7 +38,9 @@ export struct IntegerTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &target) {
     if (source.type() == target.type()) {
-        UnrecoverableError("Can't cast from the same type");
+        String error_message = "Can't cast from the same type";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
@@ -77,8 +80,9 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
 struct IntegerTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        UnrecoverableError(
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
@@ -86,8 +90,9 @@ struct IntegerTryCastToFixlen {
 struct IntegerTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector*) {
-        UnrecoverableError(
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
@@ -133,7 +138,9 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT, DecimalT &) {
-    UnrecoverableError(fmt::format("Not implemented"));
+    String error_message = "Not implemented";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -150,7 +157,9 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, Colum
     String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
-        UnrecoverableError("Integer digits number should less than 14.");
+        String error_message = "Integer digits number should less than 14.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
@@ -217,7 +226,9 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, Colu
     String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
-        UnrecoverableError("Integer digits number should less than 14.");
+        String error_message = "Integer digits number should less than 14.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
@@ -287,7 +298,9 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, Colum
     String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
-        UnrecoverableError("Integer digits number should less than 14.");
+        String error_message = "Integer digits number should less than 14.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
