@@ -179,12 +179,16 @@ void TxnManager::SendToWAL(Txn *txn) {
 
     std::lock_guard guard(rw_locker_);
     if (wait_conflict_ck_.empty()) {
-        UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS()));
+        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
-        UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
-                                       wait_conflict_ck_.begin()->first,
-                                       txn->CommitTS()));
+        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
+                                           wait_conflict_ck_.begin()->first,
+                                           txn->CommitTS());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     if (wal_entry) {
         wait_conflict_ck_.at(commit_ts) = wal_entry;
@@ -328,7 +332,9 @@ void TxnManager::FinishTxn(Txn *txn) {
         // LOG_INFO(fmt::format("Txn: {} is erased", finished_txn_id));
         SizeT remove_n = txn_map_.erase(finished_txn_id);
         if (remove_n == 0) {
-            UnrecoverableError(fmt::format("Txn: {} not found in txn map", finished_txn_id));
+            String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
         }
         finished_txns_.pop_front();
     }

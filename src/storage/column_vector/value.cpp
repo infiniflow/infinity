@@ -209,7 +209,9 @@ Value Value::MakeVarchar(const VarcharT &input) {
 
 Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        UnrecoverableError(fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+        String error_message = fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     SizeT len = embedding_info->Size();
@@ -223,7 +225,9 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
 
 Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+        String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
@@ -238,7 +242,9 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
 
 Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        UnrecoverableError(fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+        String error_message = fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0) {
@@ -253,7 +259,9 @@ Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
 
 void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
-        UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
+        String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
