@@ -238,7 +238,6 @@ else()
         target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
 endif()
 
-
 add_executable(infinity
         ${main_cpp}
         ${network_cpp}
@@ -298,15 +297,10 @@ target_sources(embedded_infinity
 
 nanobind_compile_options(embedded_infinity)
 nanobind_link_options(embedded_infinity)
-
 set_target_properties(embedded_infinity PROPERTIES LINKER_LANGUAGE CXX)
-
 set(libname "nanobind")
-
 nanobind_build_library(${libname})
-
 nanobind_extension(embedded_infinity)
-
 add_dependencies(embedded_infinity oatpp)
 
 target_link_libraries(embedded_infinity PRIVATE

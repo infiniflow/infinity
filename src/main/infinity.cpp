@@ -58,6 +58,7 @@ import drop_index_info;
 import drop_table_info;
 
 import infinity_exception;
+import third_party;
 
 namespace infinity {
 
@@ -106,7 +107,9 @@ void Infinity::RemoteDisconnect() {
 }
 
 QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &create_db_options) {
+    std::cout << "Infinity::CreateDatabase begin" << std::endl;
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    std::cout << "Infinity::CreateDatabase query_context_ptr create success" << std::endl;
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
@@ -116,9 +119,11 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
     create_schema_info->schema_name_ = db_name;
     create_statement->create_info_ = create_schema_info;
-
+    std::cout << "Infinity::CreateDatabase before use create_db_options" << std::endl;
     create_statement->create_info_->conflict_type_ = create_db_options.conflict_type_;
     QueryResult query_result = query_context_ptr->QueryStatement(create_statement.get());
+    std::cout << "Infinity::CreateDatabase query result = " << query_result.ToString() << "is ok = " << query_result.IsOk() << std::endl;
+    std::cout << "Infinity::CreateDatabase finish" << std::endl;
     return query_result;
 }
 
@@ -152,15 +157,19 @@ QueryResult Infinity::ListDatabases() {
 }
 
 QueryResult Infinity::GetDatabase(const String &db_name) {
+    std::cout << "GetDatabase " << db_name << std::endl;
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    std::cout << "success after QueryContext" << std::endl;
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
                             InfinityContext::instance().session_manager());
+    std::cout << "success after init" << std::endl;
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<UseCmd>(db_name.c_str());
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    std::cout << "end GetDataBase" << std::endl;
     return result;
 }
 
