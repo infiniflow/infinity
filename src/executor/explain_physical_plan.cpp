@@ -295,7 +295,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         default: {
-            UnrecoverableError("Unexpected physical operator type");
+            String error_message = "Unexpected physical operator type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -371,7 +373,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node, Shared
     {
         SizeT column_count = create_node->table_definition()->column_count();
         if (column_count == 0) {
-            UnrecoverableError("No columns in the table");
+            String error_message = "No columns in the table";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         const Vector<SharedPtr<ColumnDef>> &columns = create_node->table_definition()->columns();
 
@@ -615,7 +619,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node, SharedPtr<V
         insert_str = " - values ";
         SizeT value_count = insert_node->value_list().size();
         if (value_count == 0) {
-            UnrecoverableError("No value list in insert statement");
+            String error_message = "No value list in insert statement";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < value_count; ++idx) {
             if (idx != 0)
@@ -662,7 +668,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node, SharedPtr
         String expression_str = String(intent_size, ' ') + " - expressions: [";
         SizeT expr_count = project_node->expressions_.size();
         if (expr_count == 0) {
-            UnrecoverableError("No expression list in projection node.");
+            String error_message = "No expression list in projection node.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < expr_count - 1; ++idx) {
             ExplainLogicalPlan::Explain(project_node->expressions_[idx].get(), expression_str);
@@ -843,7 +851,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     result->emplace_back(MakeShared<String>(output_columns));
 
     if (knn_scan_node->left() != nullptr) {
-        UnrecoverableError("Knn scan node have children nodes.");
+        String error_message = "Knn scan node have children nodes.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -851,7 +861,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node, Share
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregates_count == 0) {
-        UnrecoverableError("Both groups and aggregates are empty.");
+        String error_message = "Both groups and aggregates are empty.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     {
@@ -921,7 +933,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, SharedPtr<Vecto
         String sort_expression_str = String(intent_size, ' ') + " - expressions: [";
         SizeT order_by_count = sort_node->expressions_.size();
         if (order_by_count == 0) {
-            UnrecoverableError("ORDER BY without any expression.");
+            String error_message = "ORDER BY without any expression.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
@@ -1002,7 +1016,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTop *top_node, SharedPtr<Vector<
         auto &sort_expressions = top_node->GetSortExpressions();
         SizeT order_by_count = sort_expressions.size();
         if (order_by_count == 0) {
-            UnrecoverableError("TOP without any sort expression.");
+            String error_message = "TOP without any sort expression.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto &order_by_types = top_node->GetOrderbyTypes();
         for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
@@ -1021,7 +1037,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTop *top_node, SharedPtr<Vector<
         static_assert(std::is_same_v<decltype(offset), u32>);
         auto limit_after_offset = limit - offset;
         if (limit_after_offset < 0) {
-            UnrecoverableError("TOP with limit < 0.");
+            String error_message = "TOP with limit < 0.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         String limit_value_str = String(intent_size, ' ') + " - limit: " + std::to_string(limit_after_offset);
         result->emplace_back(MakeShared<String>(limit_value_str));
@@ -1086,7 +1104,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node, Share
 
         SizeT conditions_count = join_node->conditions().size();
         if (conditions_count == 0) {
-            UnrecoverableError("JOIN without any condition.");
+            String error_message = "JOIN without any condition.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         for (SizeT idx = 0; idx < conditions_count - 1; ++idx) {
@@ -1476,7 +1496,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             break;
         }
         case ShowType::kInvalid: {
-            UnrecoverableError("Invalid show type");
+            String error_message = "Invalid show type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -1593,12 +1615,16 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid show type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
     if (import_node->left() != nullptr or import_node->right() != nullptr) {
-        UnrecoverableError("IMPORT node have children nodes.");
+        String error_message = "IMPORT node have children nodes.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -1658,12 +1684,16 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<V
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
     if (export_node->left() != nullptr or export_node->right() != nullptr) {
-        UnrecoverableError("EXPORT node have children nodes.");
+        String error_message = "EXPORT node have children nodes.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -1702,7 +1732,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node, SharedP
     {
         SizeT column_count = create_node->GetOutputNames()->size();
         if (column_count == 0) {
-            UnrecoverableError("No column in the table");
+            String error_message = "No column in the table";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         String columns_str = String(intent_size, ' ') + " - columns: [";
         for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -1916,7 +1948,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node, Shared
         auto &sort_expressions = merge_top_node->GetSortExpressions();
         SizeT order_by_count = sort_expressions.size();
         if (order_by_count == 0) {
-            UnrecoverableError("MERGE TOP without any sort expression.");
+            String error_message = "MERGE TOP without any sort expression.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto &order_by_types = merge_top_node->GetOrderbyTypes();
         for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
@@ -1934,7 +1968,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node, Shared
         auto offset = merge_top_node->GetOffset();
         static_assert(std::is_same_v<decltype(offset), u32>);
         if (limit < offset) {
-            UnrecoverableError("MERGE TOP with limit < 0.");
+            String error_message = "MERGE TOP with limit < 0.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto limit_after_offset = limit - offset;
         String limit_value_str = String(intent_size, ' ') + " - limit: " + std::to_string(limit_after_offset);
@@ -1993,7 +2029,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = merge_knn_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in merge knn node.");
+        String error_message = "No column in merge knn node.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += merge_knn_node->GetOutputNames()->at(idx) + ", ";
@@ -2053,7 +2091,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = match_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in Match node.");
+        String error_message = "No column in Match node.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += match_node->GetOutputNames()->at(idx) + ", ";
@@ -2063,7 +2103,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     result->emplace_back(MakeShared<String>(output_columns));
 
     if (match_node->left() != nullptr) {
-        UnrecoverableError("Match node have children nodes.");
+        String error_message = "Match node have children nodes.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -2120,7 +2162,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_no
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = match_tensor_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in PhysicalMatchTensorScan node.");
+        String error_message = "No column in PhysicalMatchTensorScan node.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += match_tensor_node->GetOutputNames()->at(idx) + ", ";
@@ -2130,7 +2174,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatchTensorScan *match_tensor_no
     result->emplace_back(MakeShared<String>(output_columns));
 
     if (match_tensor_node->left() != nullptr) {
-        UnrecoverableError("PhysicalMatchTensorScan node should not have children nodes.");
+        String error_message = "PhysicalMatchTensorScan node should not have children nodes.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -2168,7 +2214,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeMatchTensor *merge_match_te
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = merge_match_tensor_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in PhysicalMergeMatchTensor node.");
+        String error_message = "No column in PhysicalMergeMatchTensor node.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += merge_match_tensor_node->GetOutputNames()->at(idx) + ", ";
@@ -2178,7 +2226,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeMatchTensor *merge_match_te
     result->emplace_back(MakeShared<String>(output_columns));
 
     if (merge_match_tensor_node->left() == nullptr) {
-        UnrecoverableError("PhysicalMergeMatchTensor should have child node!");
+        String error_message = "PhysicalMergeMatchTensor should have child node!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -2200,7 +2250,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node, SharedPtr<V
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = fusion_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in fusion node.");
+        String error_message = "No column in fusion node.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += fusion_node->GetOutputNames()->at(idx) + ", ";

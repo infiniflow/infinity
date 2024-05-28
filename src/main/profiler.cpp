@@ -15,16 +15,16 @@ module;
 
 #include "magic_enum.hpp"
 
+module profiler;
+
 import stl;
 import third_party;
 import physical_operator;
 import plan_fragment;
 import operator_state;
 import data_block;
-
+import logger;
 import infinity_exception;
-
-module profiler;
 
 namespace infinity {
 
@@ -88,7 +88,9 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
         return;
     }
     if (active_operator_ != nullptr) {
-        UnrecoverableError("Attempting to call StartOperator while another operator is active.");
+        String error_message = "Attempting to call StartOperator while another operator is active.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     active_operator_ = op;
     profiler_.Begin();
@@ -98,7 +100,9 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
         return;
     }
     if (active_operator_ == nullptr) {
-        UnrecoverableError("Attempting to call StopOperator while another operator is active.");
+        String error_message = "Attempting to call StartOperator while another operator is active.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     profiler_.End();
 
@@ -156,7 +160,9 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             return "Rollback";
         }
         default: {
-            UnrecoverableError("Invalid query phase in query profiler");
+            String error_message = "Invalid query phase in query profiler";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return {};
@@ -187,7 +193,9 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
-        UnrecoverableError("Query phase isn't started, yet");
+        String error_message = "Query phase isn't started, yet";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     current_phase_ = QueryPhase::kInvalid;

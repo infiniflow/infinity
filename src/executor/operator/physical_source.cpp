@@ -39,7 +39,9 @@ bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }
 bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
     switch (source_state->state_type_) {
         case SourceStateType::kInvalid: {
-            UnrecoverableError("Unsupported source state type.");
+            String error_message = "Unsupported source state type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case SourceStateType::kMatchTensorScan:

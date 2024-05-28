@@ -182,7 +182,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     SizeT column_index = expr->column_index();
 
     if (input_data_block_ == nullptr) {
-        UnrecoverableError("Input data block is NULL");
+        String error_message = "Input data block is NULL";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (column_index >= input_data_block_->column_count()) {
         UnrecoverableError("Invalid column index");

@@ -42,7 +42,9 @@ bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }
 bool PhysicalSink::Execute(QueryContext *, FragmentContext *fragment_context, SinkState *sink_state) {
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
-            UnrecoverableError("Invalid sinker type");
+            String error_message = "Invalid sinker type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case SinkStateType::kMaterialize: {
@@ -81,7 +83,9 @@ bool PhysicalSink::Execute(QueryContext *, FragmentContext *fragment_context, Si
 void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *materialize_sink_state, OperatorState *task_op_state) {
     switch (task_op_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
-            UnrecoverableError("Invalid operator");
+            String error_message = "Invalid operator";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case PhysicalOperatorType::kShow: {
             ShowOperatorState *show_output_state = static_cast<ShowOperatorState *>(task_op_state);
@@ -94,7 +98,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         case PhysicalOperatorType::kExplain: {
             ExplainOperatorState *explain_output_state = static_cast<ExplainOperatorState *>(task_op_state);
             if (explain_output_state->data_block_array_.empty()) {
-                UnrecoverableError("Empty explain output");
+                String error_message = "Empty explain output";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (auto &data_block : explain_output_state->data_block_array_) {
@@ -121,7 +127,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    UnrecoverableError("Empty sort output");
+                    String error_message = "Empty sort output";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             } else {
                 for (auto &data_block : top_output_state->data_block_array_) {
@@ -137,7 +145,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    UnrecoverableError("Empty sort output");
+                    String error_message = "Empty sort output";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             } else {
                 for (auto &data_block : sort_output_state->data_block_array_) {
@@ -153,7 +163,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    UnrecoverableError("Empty agg output");
+                    String error_message = "Empty agg output";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             } else {
                 for (auto &data_block : agg_output_state->data_block_array_) {
@@ -174,7 +186,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
 void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_sink_state, OperatorState *task_operator_state) {
     switch (task_operator_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
-            UnrecoverableError("Invalid operator");
+            String error_message = "Invalid operator";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case PhysicalOperatorType::kDelete: {
@@ -199,7 +213,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
     switch (task_operator_state->operator_type_) {
 
         case PhysicalOperatorType::kInvalid: {
-            UnrecoverableError("Invalid operator");
+            String error_message = "Invalid operator";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case PhysicalOperatorType::kCreateTable: {
             auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);

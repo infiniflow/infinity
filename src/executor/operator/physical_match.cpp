@@ -191,7 +191,9 @@ protected:
                     break;
                 }
                 default: {
-                    UnrecoverableError("Error variant status!");
+                    String error_message = "Error variant status!";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     break;
                 }
             }
@@ -273,7 +275,9 @@ protected:
                 break;
             }
             default: {
-                UnrecoverableError("Error variant status!");
+                String error_message = "Error variant status!";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 break;
             }
         }
@@ -351,7 +355,9 @@ public:
     }
 
     u32 GetDF() const override {
-        UnrecoverableError("Unreachable code!");
+        String error_message = "Unreachable code!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 };
@@ -462,7 +468,9 @@ public:
     float BlockMaxBM25Score() override { return query_iterator_->BlockMaxBM25Score(); }
     float BM25Score() override { return query_iterator_->BM25Score(); }
     Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
-        UnrecoverableError("Unreachable code!");
+        String error_message = "Unreachable code!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return {false, INVALID_ROWID};
     }
     Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, const RowID doc_id_no_beyond, const float threshold) override {
@@ -489,11 +497,15 @@ public:
         }
     }
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
-        UnrecoverableError("Unreachable code!");
+        String error_message = "Unreachable code!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return {false, INVALID_ROWID};
     }
     bool NotPartCheckExist(RowID doc_id) override {
-        UnrecoverableError("Unreachable code!");
+        String error_message = "Unreachable code!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };

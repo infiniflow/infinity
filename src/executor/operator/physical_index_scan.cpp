@@ -637,7 +637,9 @@ FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &fil
                                             result_stack[v_size - 2].MergeAnd(right);
                                             result_stack.pop_back();
                                         } else {
-                                            UnrecoverableError("SolveSecondaryIndexFilterInner(): filter result stack error.");
+                                            String error_message = "SolveSecondaryIndexFilterInner(): filter result stack error.";
+                                            LOG_CRITICAL(error_message);
+                                            UnrecoverableError(error_message);
                                         }
                                         break;
                                     }
@@ -651,7 +653,9 @@ FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &fil
     }
     // check if result is valid
     if (result_stack.size() != 1) {
-        UnrecoverableError("SolveSecondaryIndexFilterInner(): filter result stack error.");
+        String error_message = "SolveSecondaryIndexFilterInner(): filter result stack error.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return std::move(result_stack[0]);
 }
@@ -679,7 +683,9 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     auto &segment_ids = *(index_scan_operator_state->segment_ids_);
     auto &next_idx = index_scan_operator_state->next_idx_;
     if (!output_data_blocks.empty()) {
-        UnrecoverableError("Index scan output data block array should be empty");
+        String error_message = "Index scan output data block array should be empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // check before execute
     if (next_idx >= segment_ids.size()) {
