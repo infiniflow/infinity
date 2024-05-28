@@ -49,13 +49,7 @@ public:
         PostingTableStore store_;
     };
 
-    MemoryIndexer(const String &index_dir,
-                  const String &base_name,
-                  RowID base_row_id,
-                  optionflag_t flag,
-                  const String &analyzer,
-                  ThreadPool &inverting_thread_pool,
-                  ThreadPool &commiting_thread_pool);
+    MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer);
 
     ~MemoryIndexer();
 

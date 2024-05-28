@@ -72,8 +72,6 @@ protected:
     String GetTerm(u32 n);
 
 protected:
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{2};
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -97,7 +95,7 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(index_dir);
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
-        MemoryIndexer indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard", inverting_thread_pool_, commiting_thread_pool_);
+        MemoryIndexer indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard");
         indexer.Insert(column, row_offsets[i], row_counts[i]);
         indexer.Dump();
     }

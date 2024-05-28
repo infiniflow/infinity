@@ -125,8 +125,6 @@ public:
 
     Status CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
 
-    ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
-    ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     TxnTimeStamp GetFulltexSegmentUpdateTs() {
         std::shared_lock lock(segment_update_ts_mutex_);
         return segment_update_ts_;
@@ -148,8 +146,6 @@ private:
 
 private:
     // For fulltext index
-    ThreadPool inverting_thread_pool_{};
-    ThreadPool commiting_thread_pool_{};
     std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 
