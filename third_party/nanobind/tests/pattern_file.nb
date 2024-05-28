@@ -1,0 +1,19 @@
+# This is a pattern file used to rewrite generated stubs
+
+# Remove an entry
+remove_me:
+
+# Change a function signature, keep the documentation
+tweak_me:
+    def tweak_me(arg: int):
+        \doc
+
+# Apply a pattern to multiple places
+__(lt|gt)__:
+    def __\1__(self, arg: int, /) -> bool: ...
+
+test_typing_ext.__prefix__:
+    # a prefix
+
+test_typing_ext.__suffix__:
+    # a suffix

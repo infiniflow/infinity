@@ -1,0 +1,5 @@
+furo==2022.12.7
+sphinx==6.1.3
+sphinx-copybutton==0.5.1
+sphinxcontrib-moderncmakedomain==3.25.0
+sphinxcontrib-svg2pdfconverter==1.2.2
