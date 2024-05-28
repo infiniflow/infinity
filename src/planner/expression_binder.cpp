@@ -260,6 +260,14 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             Value value = Value::MakeEmbedding(expr.double_array_);
             return MakeShared<ValueExpression>(value);
         }
+        case LiteralType::kLongSparseArray: {
+            Value value = Value::MakeSparse(expr.long_sparse_array_);
+            return MakeShared<ValueExpression>(value);
+        }
+        case LiteralType::kDoubleSparseArray: {
+            Value value = Value::MakeSparse(expr.double_sparse_array_);
+            return MakeShared<ValueExpression>(value);
+        }
         case LiteralType::kSubArrayArray: {
             if (expr.sub_array_array_.size() == 0) {
                 UnrecoverableError("Empty subarray array");

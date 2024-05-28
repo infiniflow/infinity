@@ -64,6 +64,9 @@ export using infinity::TensorT;
 // tensor-array
 export using infinity::TensorArrayT;
 
+// sparse
+export using infinity::SparseT;
+
 export using infinity::RowID;
 export using infinity::TimeUnit;
 

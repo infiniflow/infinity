@@ -46,6 +46,7 @@ import bound_cast_func;
 import cast_expression;
 import expression_evaluator;
 import expression_state;
+import sparse_info;
 
 import block_column_entry;
 
@@ -87,6 +88,7 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
             vector_buffer_type = VectorBufferType::kCompactBit;
             break;
         }
+        case LogicalType::kSparse:
         case LogicalType::kVarchar: {
             vector_buffer_type = VectorBufferType::kHeap;
             break;
@@ -217,6 +219,10 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             }
             case kTensorArray: {
                 CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+            }
+            case kSparse: {
+                CopyFrom<SparseT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
             }
             case kDate: {
                 CopyFrom<DateT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
@@ -366,6 +372,10 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case kTensorArray: {
                 CopyFrom<TensorArrayT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kSparse: {
+                CopyFrom<SparseT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kDate: {
@@ -539,6 +549,10 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
         }
         case kTensorArray: {
             CopyRowFrom<TensorArrayT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case kSparse: {
+            CopyRowFrom<SparseT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
         case kDate: {
@@ -801,6 +815,21 @@ String ColumnVector::ToString(SizeT row_index) const {
             }
             return std::move(oss).str();
         }
+        case kSparse: {
+            if (data_type_->type_info()->type() != TypeInfoType::kSparse) {
+                UnrecoverableError("Sparse type mismatch with unexpected sparse_info");
+            }
+            const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
+            const auto &[nnz, chunk_id, chunk_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[row_index];
+            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
+            const char *indice_ptr = raw_data_ptr;
+            const char *data_ptr = indice_ptr + nnz * EmbeddingType::EmbeddingDataWidth(sparse_info->IndexType());
+            auto res = SparseT::Sparse2String(data_ptr, indice_ptr, sparse_info->DataType(), sparse_info->IndexType(), nnz);
+            if (res.empty()) {
+                UnrecoverableError("Cannot convert sparse to string");
+            }
+            return res;
+        }
         case kRowID: {
             return (((RowID *)data_ptr_)[row_index]).ToString();
         }
@@ -942,6 +971,11 @@ Value ColumnVector::GetValue(SizeT index) const {
                 value.AppendToTensorArray(raw_data_ptr, embedding_num * unit_embedding_bytes);
             }
             return value;
+        }
+        case kSparse: {
+            const auto &[nnz, chunk_id, chunk_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[index];
+            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
+            return Value::MakeSparse(raw_data_ptr, nnz, data_type_->type_info());
         }
         case kRowID: {
             return Value::MakeRow(((RowID *)data_ptr_)[index]);
@@ -1126,6 +1160,16 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             }
             std::tie(tensor_array_chunk_id, tensor_array_chunk_offset) =
                 this->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensor_array_data.data()), tensor_num * sizeof(TensorT));
+            break;
+        }
+        case kSparse: {
+            auto &[target_nnz, target_chunk_id, target_chunk_offset] = reinterpret_cast<SparseT *>(data_ptr_)[index];
+            auto [source_nnz, source_indice_ptr, source_data_ptr, indice_bytes, data_bytes] = value.GetSparse();
+            target_nnz = source_nnz;
+
+            // Warning: has bug here when has across chunk. fix it.
+            std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(source_indice_ptr, indice_bytes);
+            buffer_->fix_heap_mgr_->AppendToHeap(source_data_ptr, data_bytes);
             break;
         }
         case kEmbedding: {
@@ -1586,6 +1630,20 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             }
             break;
         }
+        case kSparse: {
+            const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
+            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
+            switch(sparse_info->DataType()) {
+                case kElemDouble: {
+                    AppendSparse<DoubleT>(ele_str_views, index);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid sparse type");
+                }
+            }
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented");
             LOG_ERROR(status.message());
@@ -1695,6 +1753,18 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
                 const TensorArrayT &src_ref = base_src_ptr[from + idx];
                 TensorArrayT &dst_ref = base_dst_ptr[idx];
                 CopyTensorArray(dst_ref, buffer_.get(), src_ref, other.buffer_.get(), data_type_->type_info()->Size());
+            }
+            break;
+        }
+        case kSparse: {
+            const auto *base_src_ptr = reinterpret_cast<const SparseT *>(other.data_ptr_);
+            auto *base_dst_ptr = reinterpret_cast<SparseT *>(data_ptr_) + this->tail_index_;
+            const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+            for (SizeT idx = 0; idx < count; ++idx) {
+                const SparseT &src_sparse = base_src_ptr[from + idx];
+                SparseT &dst_sparse = base_dst_ptr[idx];
+                SizeT sparse_bytes = sparse_info->SparseSize(src_sparse.nnz_);
+                CopySparse(dst_sparse, buffer_->fix_heap_mgr_.get(), src_sparse, other.buffer_->fix_heap_mgr_.get(), sparse_bytes);
             }
             break;
         }
@@ -1916,7 +1986,7 @@ i32 ColumnVector::GetSizeInBytes() const {
     } else {
         size += this->tail_index_ * this->data_type_size_;
     }
-    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
     }
     if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
@@ -1950,7 +2020,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         ptr += this->tail_index_ * this->data_type_size_;
     }
     // write variable part
-    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         i32 heap_len = buffer_->fix_heap_mgr_->total_size();
         WriteBufAdv<i32>(ptr, heap_len);
         buffer_->fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
@@ -1985,7 +2055,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         ptr += tail_index * data_type_size;
     }
     // read variable part
-    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
         if (heap_len > 0) {
             column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
@@ -2060,6 +2130,16 @@ void CopyTensorArray(TensorArrayT &dst_ref,
     }
     std::tie(dst_ref.chunk_id_, dst_ref.chunk_offset_) =
         dst_buffer->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(dst_tensor_data.data()), tensor_num * sizeof(TensorT));
+}
+
+void CopySparse(SparseT &dst_sparse,
+                FixHeapManager *dst_fix_heap_mgr,
+                const SparseT &src_sparse,
+                FixHeapManager *src_fix_heap_mgr,
+                SizeT sparse_bytes) {
+    dst_sparse.nnz_ = src_sparse.nnz_;
+    std::tie(dst_sparse.chunk_id_, dst_sparse.chunk_offset_) =
+        dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_sparse.chunk_id_, src_sparse.chunk_offset_, sparse_bytes);
 }
 
 Vector<std::string_view> SplitTensorElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {

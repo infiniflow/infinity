@@ -470,7 +470,8 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             case LogicalType::kDateTime:
             case LogicalType::kEmbedding:
             case LogicalType::kTensor:
-            case LogicalType::kTensorArray: {
+            case LogicalType::kTensorArray:
+            case LogicalType::kSparse: {
                 break;
             }
             default: {

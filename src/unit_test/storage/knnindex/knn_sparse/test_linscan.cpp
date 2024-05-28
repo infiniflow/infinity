@@ -150,11 +150,12 @@ protected:
     };
 
     void TestAccurateScan(const TestOption &option = TestOption()) {
-        u32 gt_size = std::min(option.nrow_, option.topk_);
+        const auto &[nrow, ncol, sparsity, query_n, topk, error_bound] = option;
+        u32 gt_size = std::min(nrow, topk);
 
-        const SparseMatrix dataset = GenerateDataset(option.nrow_, option.ncol_, option.sparsity_);
-        const SparseMatrix query = GenerateDataset(option.query_n_, option.ncol_, option.sparsity_);
-        const auto [gt_indices_list, gt_scores_list] = GenerateGroundtruth(dataset, query, option.topk_, false);
+        const SparseMatrix dataset = GenerateDataset(nrow, ncol, sparsity);
+        const SparseMatrix query = GenerateDataset(query_n, ncol, sparsity);
+        const auto [gt_indices_list, gt_scores_list] = GenerateGroundtruth(dataset, query, topk, false);
 
         LinScan index;
         for (auto iter = SparseMatrixIter(dataset); iter.HasNext(); iter.Next()) {
@@ -165,11 +166,11 @@ protected:
 
         for (auto iter = SparseMatrixIter(query); iter.HasNext(); iter.Next()) {
             SparseVecRef query = iter.val();
-            auto [indices, scores] = index.Query(query, option.topk_);
+            auto [indices, scores] = index.Query(query, topk);
             u32 query_id = iter.row_id();
-            const u32 *gt_indices = gt_indices_list.get() + query_id * option.topk_;
-            const f32 *gt_scores = gt_scores_list.get() + query_id * option.topk_;
-            bool ck = CheckAccurateKnn(gt_indices, gt_scores, gt_size, indices, scores, option.error_bound_);
+            const u32 *gt_indices = gt_indices_list.get() + query_id * topk;
+            const f32 *gt_scores = gt_scores_list.get() + query_id * topk;
+            bool ck = CheckAccurateKnn(gt_indices, gt_scores, gt_size, indices, scores, error_bound);
             if (!ck) {
                 PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
             }

@@ -258,6 +258,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             break;
         }
         case kTensor:
+        case kSparse:
         case kTensorArray:
         case kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
