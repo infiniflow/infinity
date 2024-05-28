@@ -27,6 +27,7 @@ import ring_buffer_iterator;
 
 import infinity_exception;
 import default_values;
+import logger;
 
 namespace infinity {
 
@@ -108,7 +109,9 @@ void BufferWriter::send_value_u32(u32 host_value) {
 
 void BufferWriter::flush(SizeT bytes) {
     if (bytes > size()) {
-        UnrecoverableError("Can't flush more bytes than available");
+        String error_message = "Can't flush more bytes than available";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     const auto bytes_to_send = bytes ? bytes : size();
     SizeT bytes_sent{0};

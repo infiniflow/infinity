@@ -940,7 +940,9 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregate_node == 0) {
-        UnrecoverableError("Both groups and aggregates are empty.");
+        String error_message = "Both groups and aggregates are empty.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     {
@@ -1022,7 +1024,9 @@ void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<
         sort_expression_str += " - expressions: [";
         SizeT order_by_count = sort_node->expressions_.size();
         if (order_by_count == 0) {
-            UnrecoverableError("ORDER BY without any expression.");
+            String error_message = "ORDER BY without any expression.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
@@ -1118,7 +1122,9 @@ void ExplainLogicalPlan::Explain(const LogicalTop *top_node, SharedPtr<Vector<Sh
         auto &sort_expressions = top_node->sort_expressions_;
         SizeT order_by_count = sort_expressions.size();
         if (order_by_count == 0) {
-            UnrecoverableError("TOP without any sort expression.");
+            String error_message = "TOP without any sort expression.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         auto &order_by_types = top_node->order_by_types_;
@@ -1208,7 +1214,9 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
 
         SizeT conditions_count = join_node->conditions_.size();
         if (conditions_count == 0) {
-            UnrecoverableError("JOIN without any condition.");
+            String error_message = "JOIN without any condition.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         for (SizeT idx = 0; idx < conditions_count - 1; ++idx) {
@@ -1640,7 +1648,9 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             break;
         }
         case ShowType::kInvalid: {
-            UnrecoverableError("Invalid show type");
+            String error_message = "Invalid show type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -1650,7 +1660,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kAggregate: {
             AggregateExpression *aggregate_expression = (AggregateExpression *)base_expression;
             if (aggregate_expression->arguments().size() != 1) {
-                UnrecoverableError("More than one argument in aggregate function");
+                String error_message = "More than one argument in aggregate function";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             expr_str += aggregate_expression->aggregate_function_.name();
             expr_str += "(";
@@ -1661,7 +1673,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kCast: {
             CastExpression *cast_expression = (CastExpression *)base_expression;
             if (cast_expression->arguments().size() != 1) {
-                UnrecoverableError("More than one argument in cast function");
+                String error_message = "More than one argument in cast function";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             expr_str += "CAST(";
             Explain(cast_expression->arguments()[0].get(), expr_str);
@@ -1749,7 +1763,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kBetween: {
             BetweenExpression *between_expression = (BetweenExpression *)base_expression;
             if (between_expression->arguments().size() != 3) {
-                UnrecoverableError("Between expression should have three arguments.");
+                String error_message = "Between expression should have three arguments.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             Explain(between_expression->arguments()[0].get(), expr_str);
             expr_str += " BETWEEN ";
@@ -1785,9 +1801,10 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         }
         case ExpressionType::kSubQuery:
         case ExpressionType::kCorrelatedColumn:
-
         default: {
-            UnrecoverableError("Unsupported expression type");
+            String error_message = "Unsupported expression type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -1855,12 +1872,16 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
     if (import_node->left_node().get() != nullptr or import_node->right_node().get() != nullptr) {
-        UnrecoverableError("Import node have children nodes.");
+        String error_message = "Import node have children nodes.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -1925,12 +1946,16 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
     if (export_node->left_node().get() != nullptr or export_node->right_node().get() != nullptr) {
-        UnrecoverableError("EXPORT node have children nodes.");
+        String error_message = "EXPORT node have children nodes.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

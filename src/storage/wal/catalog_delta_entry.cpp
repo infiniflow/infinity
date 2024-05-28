@@ -74,10 +74,14 @@ CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry 
     } else if (commit_ts == base_entry->commit_ts_) {
         merge_flag_ = MergeFlag::kNew;
     } else if (!base_entry->Committed()) {
-        UnrecoverableError("Entry not committed.");
+        String error_message = "Entry not committed.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     } else {
         if (commit_ts < base_entry->commit_ts_) {
-            UnrecoverableError(fmt::format("Invalid commit_ts: {} < {}", commit_ts, base_entry->commit_ts_));
+            String error_message = fmt::format("Invalid commit_ts: {} < {}", commit_ts, base_entry->commit_ts_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         merge_flag_ = MergeFlag::kUpdate;
     }
@@ -121,16 +125,23 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             operation = AddChunkIndexEntryOp::ReadAdv(ptr);
             break;
         }
-        default:
-            UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
+        default: {
+            String error_message = fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
     }
 
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading CatalogDeltaOperation");
+        String error_message = "ptr goes out of range when reading CatalogDeltaOperation";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (operation.get() == nullptr) {
-        UnrecoverableError("operation is nullptr");
+        String error_message = "operation is nullptr";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return operation;
 }
@@ -213,7 +224,9 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
         case MergeFlag::kNew: {
             switch (new_merge_flag) {
                 case MergeFlag::kDelete: {
-                    UnrecoverableError("Should prune before reach this.");
+                    String error_message = "Should prune before reach this.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     break;
                 }
                 case MergeFlag::kUpdate:
@@ -221,7 +234,9 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
                     return MergeFlag::kNew;
                 }
                 default: {
-                    UnrecoverableError(fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag)));
+                    String error_message = fmt::format("Invalid MergeFlag from {} to {}", u8(this->merge_flag_), u8(new_merge_flag));
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
             break;
@@ -324,7 +339,9 @@ UniquePtr<AddTableEntryOp> AddTableEntryOp::ReadAdv(char *&ptr, char *ptr_end) {
         i64 id = ReadBufAdv<i64>(ptr);
         SizeT max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
-            UnrecoverableError("ptr goes out of range when reading TableDef");
+            String error_message = "ptr goes out of range when reading TableDef";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, max_bytes);
         String column_name = ReadBufAdv<String>(ptr);
@@ -767,7 +784,9 @@ void AddSegmentEntryOp::Merge(CatalogDeltaOperation &other) {
     this->merge_flag_ = flag;
     if (!segment_filter_binary_data.empty()) {
         if (!segment_filter_binary_data_.empty()) {
-            UnrecoverableError("Serialize segment filter binary twice");
+            String error_message = "Serialize segment filter binary twice";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         segment_filter_binary_data_ = std::move(segment_filter_binary_data);
     }
@@ -784,7 +803,9 @@ void AddBlockEntryOp::Merge(CatalogDeltaOperation &other) {
     this->merge_flag_ = flag;
     if (!block_filter_binary_data.empty()) {
         if (!block_filter_binary_data_.empty()) {
-            UnrecoverableError("Serialize block filter binary twice");
+            String error_message = "Serialize block filter binary twice";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         block_filter_binary_data_ = std::move(block_filter_binary_data);
     }
@@ -847,7 +868,9 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     char *const ptr_start = ptr;
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
-        UnrecoverableError("ptr goes out of range when reading WalEntry");
+        String error_message = "ptr goes out of range when reading WalEntry";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     CatalogDeltaEntryHeader header;
     header.size_ = ReadBufAdv<i32>(ptr);
@@ -872,7 +895,9 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
-            UnrecoverableError("ptr goes out of range when reading WalEntry");
+            String error_message = "ptr goes out of range when reading WalEntry";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         UniquePtr<CatalogDeltaOperation> operation = CatalogDeltaOperation::ReadAdv(ptr, max_bytes);
         entry->operations_.push_back(std::move(operation));
@@ -880,7 +905,9 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading WalEntry");
+        String error_message = "ptr goes out of range when reading WalEntry";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     {
         for (const auto &operation : entry->operations_) {
@@ -1044,10 +1071,14 @@ SizeT GlobalCatalogDeltaEntry::OpSize() const {
 void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry) {
     TxnTimeStamp max_commit_ts = delta_entry->commit_ts();
     if (max_commit_ts == UNCOMMIT_TS) {
-        UnrecoverableError("max_commit_ts == UNCOMMIT_TS");
+        String error_message = "max_commit_ts == UNCOMMIT_TS";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (max_commit_ts_ > max_commit_ts) {
-        UnrecoverableError(fmt::format("max_commit_ts_ {} > max_commit_ts {}", max_commit_ts_, max_commit_ts));
+        String error_message = fmt::format("max_commit_ts_ {} > max_commit_ts {}", max_commit_ts_, max_commit_ts);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     max_commit_ts_ = max_commit_ts;
 
@@ -1060,7 +1091,9 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
         }
         const String &encode = *new_op->encode_;
         if (encode.empty()) {
-            UnrecoverableError("encode is empty");
+            String error_message = "encode is empty";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto iter = delta_ops_.find(encode);
         bool found = iter != delta_ops_.end();

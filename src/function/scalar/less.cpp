@@ -29,6 +29,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -55,7 +56,9 @@ struct ColumnValueReaderTypeLessFunction {
 
 template <>
 inline void LessFunction::Run(MixedT, BigIntT, bool &) {
-    UnrecoverableError("Not implement: LessFunction::Run");
+    String error_message = "Not implement: LessFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>
@@ -65,7 +68,9 @@ inline void LessFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, DoubleT, bool &) {
-    UnrecoverableError("Not implement: LessFunction::Run");
+    String error_message = "Not implement: LessFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>
@@ -75,7 +80,9 @@ inline void LessFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, VarcharT, bool &) {
-    UnrecoverableError("Not implement: LessFunction::Run");
+    String error_message = "Not implement: LessFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>

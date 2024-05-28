@@ -1129,7 +1129,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
             break;
         }
         case ExplainType::kInvalid: {
-            UnrecoverableError("Invalid explain type");
+            String error_message = "Invalid explain type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }

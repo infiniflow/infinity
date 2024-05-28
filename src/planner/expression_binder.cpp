@@ -560,7 +560,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 
     // Bind query column
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
-        UnrecoverableError("Knn expression expect a column expression");
+        String error_message = "Knn expression expect a column expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (parsed_knn_expr.topn_ <= 0) {
         String topn = std::to_string(parsed_knn_expr.topn_);
@@ -727,7 +729,9 @@ template <typename T>
 ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
     if constexpr (std::is_same_v<T, bool>) {
         if (tensor_column_basic_embedding_dim % 8 != 0) {
-            UnrecoverableError("The tensor column basic embedding dimension should be multiple of 8");
+            String error_message = "The tensor column basic embedding dimension should be multiple of 8";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     switch (tensor_expr_->literal_type_) {
@@ -741,7 +745,9 @@ ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tens
             return GetConcatenatedTensorDataFromSubArray<T>(tensor_expr_->sub_array_array_, tensor_column_basic_embedding_dim, query_total_dimension);
         }
         default: {
-            UnrecoverableError("Unexpected case!");
+            String error_message = "Unexpected case!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return nullptr;
         }
     }
@@ -751,7 +757,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     // Bind query column
     Vector<SharedPtr<BaseExpression>> arguments;
     if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
-        UnrecoverableError("MatchTensor expression expect a column expression");
+        String error_message = "MatchTensor expression expect a column expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // 1. parse search method
     // TODO: now only support MaxSim search method
@@ -776,7 +784,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         tensor_column_basic_embedding_dim = embedding_info->Dimension();
         if (tensor_column_basic_embedding_dim == 0) {
-            UnrecoverableError("The tensor column basic embedding dimension should be greater than 0");
+            String error_message = "The tensor column basic embedding dimension should be greater than 0";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     arguments.emplace_back(std::move(expr_ptr));
@@ -834,7 +844,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
             break;
         }
         case EmbeddingDataType::kElemInvalid: {
-            UnrecoverableError("Unreachable");
+            String error_message = "Unreachable";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -908,7 +920,9 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
         }
     }
 
-    UnrecoverableError("Unreachable");
+    String error_message = "Unreachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 

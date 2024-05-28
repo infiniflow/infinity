@@ -407,7 +407,9 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             RecoverableError(status);
         }
     }
-    UnrecoverableError("Unreachable");
+    String error_message = "Unreachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 

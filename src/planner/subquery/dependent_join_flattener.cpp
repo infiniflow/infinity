@@ -299,7 +299,9 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
             UnrecoverableError("Unsupported logical operator node");
         }
     }
-    UnrecoverableError("Unreachable");
+    String error_message = "Unreachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 

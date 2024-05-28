@@ -268,7 +268,9 @@ void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
 template <>
 BooleanT Value::GetValue() const {
     if (type_.type() != LogicalType::kBoolean) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.boolean;
 }
@@ -276,7 +278,9 @@ BooleanT Value::GetValue() const {
 template <>
 TinyIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kTinyInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.tiny_int;
 }
@@ -284,7 +288,9 @@ TinyIntT Value::GetValue() const {
 template <>
 SmallIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kSmallInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.small_int;
 }
@@ -292,7 +298,9 @@ SmallIntT Value::GetValue() const {
 template <>
 IntegerT Value::GetValue() const {
     if (type_.type() != LogicalType::kInteger) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.integer;
 }
@@ -300,7 +308,9 @@ IntegerT Value::GetValue() const {
 template <>
 BigIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kBigInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.big_int;
 }
@@ -308,7 +318,9 @@ BigIntT Value::GetValue() const {
 template <>
 HugeIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kHugeInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.huge_int;
 }
@@ -316,7 +328,9 @@ HugeIntT Value::GetValue() const {
 template <>
 FloatT Value::GetValue() const {
     if (type_.type() != LogicalType::kFloat) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.float32;
 }
@@ -324,7 +338,9 @@ FloatT Value::GetValue() const {
 template <>
 DoubleT Value::GetValue() const {
     if (type_.type() != LogicalType::kDouble) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.float64;
 }
@@ -332,7 +348,9 @@ DoubleT Value::GetValue() const {
 template <>
 DecimalT Value::GetValue() const {
     if (type_.type() != LogicalType::kDecimal) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.decimal;
 }
@@ -340,7 +358,9 @@ DecimalT Value::GetValue() const {
 template <>
 DateT Value::GetValue() const {
     if (type_.type() != LogicalType::kDate) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.date;
 }
@@ -348,7 +368,9 @@ DateT Value::GetValue() const {
 template <>
 TimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kTime) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.time;
 }
@@ -356,7 +378,9 @@ TimeT Value::GetValue() const {
 template <>
 DateTimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kDateTime) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.datetime;
 }
@@ -364,7 +388,9 @@ DateTimeT Value::GetValue() const {
 template <>
 TimestampT Value::GetValue() const {
     if (type_.type() != LogicalType::kTimestamp) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.timestamp;
 }
@@ -372,7 +398,9 @@ TimestampT Value::GetValue() const {
 template <>
 IntervalT Value::GetValue() const {
     if (type_.type() != LogicalType::kInterval) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.interval;
 }
@@ -380,7 +408,9 @@ IntervalT Value::GetValue() const {
 template <>
 PointT Value::GetValue() const {
     if (type_.type() != LogicalType::kPoint) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.point;
 }
@@ -388,7 +418,9 @@ PointT Value::GetValue() const {
 template <>
 LineT Value::GetValue() const {
     if (type_.type() != LogicalType::kLine) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.line;
 }
@@ -396,7 +428,9 @@ LineT Value::GetValue() const {
 template <>
 LineSegT Value::GetValue() const {
     if (type_.type() != LogicalType::kLineSeg) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.line_segment;
 }
@@ -404,7 +438,9 @@ LineSegT Value::GetValue() const {
 template <>
 BoxT Value::GetValue() const {
     if (type_.type() != LogicalType::kBox) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.box;
 }
@@ -412,7 +448,9 @@ BoxT Value::GetValue() const {
 template <>
 CircleT Value::GetValue() const {
     if (type_.type() != LogicalType::kCircle) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.circle;
 }
@@ -420,7 +458,9 @@ CircleT Value::GetValue() const {
 template <>
 UuidT Value::GetValue() const {
     if (type_.type() != LogicalType::kUuid) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.uuid;
 }
@@ -428,7 +468,9 @@ UuidT Value::GetValue() const {
 template <>
 RowID Value::GetValue() const {
     if (type_.type() != LogicalType::kRowID) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.row;
 }

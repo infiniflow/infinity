@@ -642,7 +642,9 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
                                                bool task_completed) {
     SizeT aggregates_count = aggregates_.size();
     if (aggregates_count <= 0) {
-        UnrecoverableError("Simple Aggregate without aggregate expression.");
+        String error_message = "Simple Aggregate without aggregate expression.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     SizeT input_block_count = input_blocks.size();

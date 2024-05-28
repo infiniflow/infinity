@@ -763,7 +763,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
 
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             // Partition the hash range to each source state
@@ -809,7 +811,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
 
             if (tasks_.size() != 1) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             tasks_[0]->source_state_ = MakeUnique<QueueSourceState>();
@@ -853,7 +857,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kTableScan: {
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             // Partition the hash range to each source state
@@ -870,7 +876,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                     fmt::format("{} should in parallel/serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             // Partition the hash range to each source state
             auto *match_tensor_scan_operator = (PhysicalMatchTensorScan *)first_operator;
@@ -882,7 +890,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kIndexScan: {
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             // Partition the hash range to each source state
@@ -900,7 +910,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
 
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (SizeT task_id = 0; (i64)task_id < parallel_count; ++task_id) {
@@ -937,7 +949,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
 
             if (tasks_.size() != 1) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             tasks_[0]->source_state_ = MakeUnique<EmptySourceState>();
@@ -1387,7 +1401,9 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             UnrecoverableError("Can't get result from Queue sink type.");
         }
     }
-    UnrecoverableError("Unreachable");
+    String error_message = "Unreachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 

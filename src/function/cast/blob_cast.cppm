@@ -64,7 +64,9 @@ inline bool BlobTryCastToVarlen::Run(const BlobT &source, VarcharT &target, cons
         std::memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
         if(vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer.");
+            String error_message = "Simple Aggregate without aggregate expression.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         // Set varchar prefix
