@@ -12,5 +12,5 @@ int mul(int a, int b) {
 NB_MODULE(embedded_infinity, m) {
     m.def("add", &add);
     m.def("mul", &mul);
-//    m.def("hello", &infinity::Infinity::Hello);
+    m.def("hello", &infinity::Infinity::Hello);
 }

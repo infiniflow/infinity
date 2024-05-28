@@ -168,9 +168,6 @@ file(GLOB_RECURSE
 #        CONFIGURE_DEPENDS
 #        third_party_modules/std_modules/*.cppm
 #)
-#nanobind_build_library(nanobind SHARED)
-#find_library(NANOBIND_LIBRARY nanobind)
-#message("after nanobind_build_library, NANOBIND_LIBRARY = ${NANOBIND_LIBRARY}")
 
 add_library(infinity_core
         ${infinity_cpp}
@@ -184,7 +181,7 @@ add_library(infinity_core
 )
 
 target_sources(infinity_core
-        PRIVATE
+        PUBLIC
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${main_cppm}
         ${infinity_cppm}
@@ -197,7 +194,6 @@ target_sources(infinity_core
         ${expression_cppm}
         ${executor_cppm}
 )
-
 
 add_dependencies(infinity_core thrift thriftnb)
 
@@ -223,11 +219,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
-
-#target_include_directories(infinity_core PUBLIC "${Python3_INCLUDE_DIRS}")
-#target_include_directories(infinity_core PUBLIC "${nanobind_INCLUDE_DIRS}")
-#message("in src, python3 include dir = ${Python3_INCLUDE_DIRS}")
-#message("in src, nanobind_INCLUDE_DIRS = ${nanobind_INCLUDE_DIRS}")
 
 if (NOT SUPPORT_FMA EQUAL 0)
         message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -265,9 +256,6 @@ target_sources(infinity
         ${network_cppm}
 )
 
-#target_include_directories(infinity_core PUBLIC "${Python3_INCLUDE_DIRS}")
-#target_include_directories(infinity_core PUBLIC "${nanobind_INCLUDE_DIRS}")
-
 add_dependencies(infinity oatpp)
 
 message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
@@ -286,14 +274,11 @@ target_link_libraries(infinity
         event.a
         oatpp.a
         jma
-        nanobind
-#        ${Python3_LIBRARIES}
 )
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(infinity jemalloc.a)
 endif()
-# target_link_libraries(infinity PRIVATE nanobind)
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -301,51 +286,15 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/s
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
-target_include_directories(infinity PUBLIC "${nanobind_INCLUDE_DIRS}")
-set(nanobind_SRC_DIR, "/home/weilongma/Project/infinity/build/src/CMakeFiles/nanobind-static.dir/__/python-env/infinity-env/lib/python3.11/site-packages/nanobind/src")
-target_link_directories(infinity PUBLIC "${nanobind_SRC_DIR}")
-nanobind_opt_size(infinity)
-nanobind_lto(infinity)
-nanobind_strip(infinity)
-nanobind_disable_stack_protector(infinity)
-nanobind_extension(infinity)
-nanobind_compile_options(infinity)
-nanobind_link_options(infinity)
-nanobind_musl_static_libcpp(infinity)
-
 
 add_library(embedded_infinity MODULE
         embedded_infinity.cpp
-#        ${infinity_cpp}
-#        ${planner_cpp}
-#        ${scheduler_cpp}
-#        ${storage_cpp}
-#        ${function_cpp}
-#        ${expression_cpp}
-#        ${executor_cpp}
-#        ${common_cpp}
 )
 
-#target_sources(embedded_infinity
-#        PRIVATE
-#        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-#        ${main_cppm}
-#        ${infinity_cppm}
-#        ${common_cppm}
-#        ${planner_cppm}
-#        ${scheduler_cppm}
-#        ${storage_cppm}
-#        ${parser_cppm}
-#        ${function_cppm}
-#        ${expression_cppm}
-#        ${executor_cppm}
-#)
-
-#target_sources(embedded_infinity
-#        PUBLIC
-#        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-#        ${network_cppm}
-#)
+target_sources(embedded_infinity
+        PRIVATE
+        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+)
 
 nanobind_compile_options(embedded_infinity)
 nanobind_link_options(embedded_infinity)
@@ -379,7 +328,7 @@ target_link_libraries(embedded_infinity PRIVATE
 target_link_directories(embedded_infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
-nanobind_set_visibility(embedded_infinity)
+#nanobind_set_visibility(embedded_infinity)
 
 #nanobind_add_module(embed_infinity src/embed_infinity.cpp)
 install(TARGETS embedded_infinity LIBRARY DESTINATION infinity)

@@ -184,6 +184,11 @@ add_library(embed_infinity MODULE
         src/embed_infinity.cpp
 )
 
+target_sources(embed_infinity
+        PRIVATE
+        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+)
+
 nanobind_compile_options(embed_infinity)
 nanobind_link_options(embed_infinity)
 
@@ -197,7 +202,7 @@ nanobind_extension(embed_infinity)
 
 target_link_libraries(embed_infinity PRIVATE ${libname} hello)
 
-nanobind_set_visibility(embed_infinity)
+#nanobind_set_visibility(embed_infinity)
 
 #nanobind_add_module(embed_infinity src/embed_infinity.cpp)
 install(TARGETS embed_infinity LIBRARY DESTINATION infinity)
