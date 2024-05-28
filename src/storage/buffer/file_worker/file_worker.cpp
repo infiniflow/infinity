@@ -131,7 +131,9 @@ void FileWorker::CleanupTempFile() const {
         fs.DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
-        UnrecoverableError(fmt::format("Cleanup: File {} not found for deletion", path));
+        String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

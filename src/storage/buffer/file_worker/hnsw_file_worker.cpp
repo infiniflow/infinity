@@ -94,8 +94,10 @@ void HnswFileWorker::FreeInMemory() {
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Index should be created on float embedding column now, type: {}",
-                                           EmbeddingType::EmbeddingDataType2String(embedding_type)));
+            String error_message = fmt::format("Index should be created on float embedding column now, type: {}",
+                                               EmbeddingType::EmbeddingDataType2String(embedding_type));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     data_ = nullptr;
@@ -136,7 +138,9 @@ void HnswFileWorker::ReadFromFileImpl() {
             break;
         }
         default: {
-            UnrecoverableError("Index should be created on float embedding column now.");
+            String error_message = "Index should be created on float embedding column now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

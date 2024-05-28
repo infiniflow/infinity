@@ -81,7 +81,9 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
 
 Pair<ChunkId, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
-        UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes));
+        String error_message = fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     SizeT rest_nbytes = nbytes;
@@ -92,7 +94,9 @@ Pair<ChunkId, u64> FixHeapManager::Allocate(SizeT nbytes) {
     }
     if (!allow_storage_across_chunks_) {
         if (nbytes > current_chunk_size_) {
-            UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the tensor heap", nbytes));
+            String error_message = fmt::format("Attempt to allocate memory with size: {} as the tensor heap", nbytes);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (current_chunk_offset_ + nbytes <= current_chunk_size_) {
             // use current chunk
