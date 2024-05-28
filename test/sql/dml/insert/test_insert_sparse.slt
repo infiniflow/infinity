@@ -7,11 +7,11 @@ CREATE TABLE test_insert_sparse (col1 INT, col2 SPARSE(DOUBLE, 30000));
 statement ok
 INSERT INTO test_insert_sparse VALUES (1, [10000:1.0, 20000:2.0]);
 
-# statement error
-# INSERT INTO test_insert_sparse VALUES (3, [30000:3.0]);
+statement error
+INSERT INTO test_insert_sparse VALUES (3, [30000:3.0]);
 
-# statement error
-# INSERT INTO test_insert_sparse VALUES (3, [3000:3.0, 3000:4.0]);
+statement error
+INSERT INTO test_insert_sparse VALUES (3, [3000:3.0, 3000:4.0]);
 
 statement ok
 INSERT INTO test_insert_sparse VALUES (4, [4000:4.0]);

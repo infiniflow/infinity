@@ -25,6 +25,7 @@ import sparse_info;
 import data_type;
 import knn_expr;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -261,16 +262,23 @@ public:
 
     template <typename Idx, typename T>
     static Value MakeSparse(const Pair<Vector<Idx>, Vector<T>> &vec) {
-        if (vec.first.size() != vec.second.size()) {
+        const auto &[indice_vec, data_vec] = vec;
+        {
+            HashSet<Idx> indice_set(indice_vec.begin(), indice_vec.end());
+            if (indice_set.size() != indice_vec.size()) {
+                RecoverableError(Status::InvalidDataType());
+            }
+        }
+        if (indice_vec.size() != data_vec.size()) {
             UnrecoverableError("Sparse data size mismatch.");
         }
         SizeT sparse_dim = 0;
-        if (!vec.first.empty()) {
-            sparse_dim = *std::max_element(vec.first.begin(), vec.first.end()) + 1;
+        if (!indice_vec.empty()) {
+            sparse_dim = *std::max_element(indice_vec.begin(), indice_vec.end()) + 1;
         }
         auto sparse_info_ptr = SparseInfo::Make(ToEmbeddingDataType<T>(), ToEmbeddingDataType<Idx>(), sparse_dim);
         Value value(LogicalType::kSparse, sparse_info_ptr);
-        value.value_info_ = MakeShared<SparseValueInfo>(vec.first, vec.second);
+        value.value_info_ = MakeShared<SparseValueInfo>(indice_vec, data_vec);
 
         return value;
     }

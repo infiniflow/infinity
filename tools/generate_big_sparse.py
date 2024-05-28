@@ -1,4 +1,4 @@
-# generate 'test/sql/dml/import/test_import_big_sparse.slt' & 'test/sql/dml/import/test_insert_big_sparse.slt' & 'test/data/csv/big_sparse.csv'
+# generate 'test/sql/dml/import/test_import_big_sparse.slt' & 'test/sql/dml/import/test_insert_big_sparse.slt' & 'test/data/csv/test_sparse/big_sparse.csv'
 
 import argparse
 import os
@@ -11,7 +11,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
     max_dim = 30000
     sparsity = 0.01
 
-    csv_dir = "./test/data/csv"
+    csv_dir = "./test/data/csv/test_sparse"
     import_slt_dir = "./test/sql/dml/import"
     insert_slt_dir = "./test/sql/dml/insert"
 

@@ -79,7 +79,7 @@ parser.output
 test/sql/**/*big*.slt
 test/sql/**/*fvecs*.slt
 test/sql/**/*csr*.slt
-test/data/csv/*big*.csv
+test/data/csv/**/*big*.csv
 test/data/csv/*9_commas.csv
 test/data/fvecs/*big*.fvecs
 test/data/fvecs/test.fvecs

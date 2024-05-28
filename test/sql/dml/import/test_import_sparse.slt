@@ -7,6 +7,9 @@ CREATE TABLE test_import_sparse (col1 INT, col2 SPARSE(DOUBLE, 30000));
 statement ok
 COPY test_import_sparse FROM '/var/infinity/test_data/sparse_float.csv' WITH (FORMAT CSV);
 
+statement error
+COPY test_import_sparse FROM '/var/infinity/test_data/invalid_sparse_float.csv' WITH (FORMAT CSV);
+
 query I
 SELECT * FROM test_import_sparse;
 ----
