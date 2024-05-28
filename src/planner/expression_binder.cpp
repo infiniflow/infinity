@@ -137,7 +137,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
             return BuildSearchExpr((const SearchExpr &)expr, bind_context_ptr, depth, root);
         }
         default: {
-            UnrecoverableError("Unexpected expression type.");
+            String error_message = "Unexpected expression type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -242,7 +244,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             // It will be bound into a ValueExpression here.
             IntervalT interval_value(expr.integer_value_);
             if (expr.interval_type_ == TimeUnit::kInvalidUnit) {
-                UnrecoverableError("Invalid time unit");
+                String error_message = "Invalid time unit";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             interval_value.unit = expr.interval_type_;
             Value value = Value::MakeInterval(interval_value);
@@ -262,7 +266,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
         case LiteralType::kSubArrayArray: {
             if (expr.sub_array_array_.size() == 0) {
-                UnrecoverableError("Empty subarray array");
+                String error_message = "Empty subarray array";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             switch (expr.sub_array_array_[0]->literal_type_) {
                 case LiteralType::kIntegerArray:
@@ -343,7 +349,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
                     }
                 }
                 default: {
-                    UnrecoverableError("Unexpected subarray type");
+                    String error_message = "Unexpected subarray type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return nullptr;
                 }
             }
@@ -354,7 +362,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
     }
 
-    UnrecoverableError("Unreachable.");
+    String error_message = "Unreachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
@@ -431,10 +441,15 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             auto aggregate_function_ptr = MakeShared<AggregateExpression>(aggregate_function, arguments);
             return aggregate_function_ptr;
         }
-        case FunctionType::kTable:
-            UnrecoverableError("Table function shouldn't be bound here.");
+        case FunctionType::kTable: {
+            String error_message = "Table function shouldn't be bound here.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
         default: {
-            UnrecoverableError(fmt::format("Unknown function type: {}", function_set_ptr->name()));
+            String error_message = fmt::format("Unknown function type: {}", function_set_ptr->name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return nullptr;
@@ -447,10 +462,14 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, 
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     if (!expr.case_check_array_) {
-        UnrecoverableError("No when and then expression");
+        String error_message = "No when and then expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (expr.case_check_array_->empty()) {
-        UnrecoverableError("No when and then expression");
+        String error_message = "No when and then expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     SharedPtr<CaseExpression> case_expression_ptr = MakeShared<CaseExpression>();

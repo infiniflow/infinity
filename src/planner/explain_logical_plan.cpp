@@ -77,6 +77,7 @@ import join_reference;
 import statement_common;
 import flush_statement;
 import optimize_statement;
+import logger;
 
 namespace infinity {
 
@@ -221,7 +222,9 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         case LogicalNodeType::kPrepare:
             break;
         default: {
-            UnrecoverableError("Unexpected logical node type");
+            String error_message = "Unexpected logical node type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     if (statement->left_node().get() != nullptr) {
@@ -293,7 +296,9 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
     {
         SizeT column_count = create_node->table_definitions()->column_count();
         if (column_count == 0) {
-            UnrecoverableError("No columns in the table");
+            String error_message = "No columns in the table";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         const Vector<SharedPtr<ColumnDef>> &columns = create_node->table_definitions()->columns();
 
@@ -425,7 +430,9 @@ void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr
     {
         SizeT column_count = create_node->names_ptr()->size();
         if (column_count == 0) {
-            UnrecoverableError("No columns in the table");
+            String error_message = "No columns in the table";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         String columns_str;
         columns_str.append(String(intent_size, ' ')).append(" - columns: [");
@@ -636,7 +643,9 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
         insert_str = " - values ";
         SizeT value_count = insert_node->value_list().size();
         if (value_count == 0) {
-            UnrecoverableError("No value list in insert statement");
+            String error_message = "No value list in insert statement";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < value_count; ++idx) {
             if (idx != 0)
@@ -694,7 +703,9 @@ void ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<V
         expression_str.append(String(intent_size, ' ')).append(" - expressions: [");
         SizeT expr_count = project_node->expressions_.size();
         if (expr_count == 0) {
-            UnrecoverableError("No expression list in projection node.");
+            String error_message = "No expression list in projection node.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < expr_count - 1; ++idx) {
             Explain(project_node->expressions_[idx].get(), expression_str);
@@ -775,7 +786,9 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     output_columns += " - output columns: [";
     SizeT column_count = table_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError(fmt::format("No column in table: {}.", table_scan_node->TableAlias()));
+        String error_message = fmt::format("No column in table: {}.", table_scan_node->TableAlias());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += table_scan_node->GetOutputNames()->at(idx);
