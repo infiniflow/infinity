@@ -88,7 +88,10 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
             vector_buffer_type = VectorBufferType::kCompactBit;
             break;
         }
-        case LogicalType::kSparse:
+        case LogicalType::kSparse: {
+            vector_buffer_type = VectorBufferType::kSparseHeap;
+            break;
+        }
         case LogicalType::kVarchar: {
             vector_buffer_type = VectorBufferType::kHeap;
             break;
@@ -1167,9 +1170,10 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             auto [source_nnz, source_indice_ptr, source_data_ptr, indice_bytes, data_bytes] = value.GetSparse();
             target_nnz = source_nnz;
 
-            // Warning: has bug here when has across chunk. fix it.
-            std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(source_indice_ptr, indice_bytes);
-            buffer_->fix_heap_mgr_->AppendToHeap(source_data_ptr, data_bytes);
+            Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
+            data_ptrs.emplace_back(source_indice_ptr, indice_bytes);
+            data_ptrs.emplace_back(source_data_ptr, data_bytes);
+            std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
             break;
         }
         case kEmbedding: {
@@ -1320,6 +1324,9 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         }
         case kTensorArray: {
             UnrecoverableError("Cannot SetByRawPtr to TensorArray.");
+        }
+        case kSparse: {
+            UnrecoverableError("Cannot SetByRawPtr to sparse");
         }
         case kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);

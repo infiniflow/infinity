@@ -323,9 +323,10 @@ private:
             tmp_indices[i] = index;
             tmp_data[i] = value;
         }
-        std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) =
-            buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_indices.get()), total_element_count * sizeof(IdxT));
-        buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), total_element_count * sizeof(T));
+        Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
+        data_ptrs.emplace_back(reinterpret_cast<const char *>(tmp_indices.get()), total_element_count * sizeof(IdxT));
+        data_ptrs.emplace_back(reinterpret_cast<const char *>(tmp_data.get()), total_element_count * sizeof(T));
+        std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
     }
 
     // Used by Append by Ptr

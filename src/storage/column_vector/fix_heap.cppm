@@ -34,14 +34,16 @@ export struct FixHeapManager {
     static constexpr u64 INVALID_CHUNK_OFFSET = std::numeric_limits<u64>::max();
 
 public:
-    explicit FixHeapManager(u32 heap_id, u64 chunk_size);
+    explicit FixHeapManager(u32 heap_id, u64 chunk_size, bool allow_cross_chunk);
 
-    FixHeapManager(u32 heap_id, BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size);
+    FixHeapManager(u32 heap_id, BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size, bool allow_cross_chunk);
 
     ~FixHeapManager();
 
     // return value: start chunk id & chunk offset
     Pair<ChunkId, u64> AppendToHeap(const char *data_ptr, SizeT nbytes);
+
+    Pair<ChunkID, u64> AppendToHeap(const Vector<Pair<const char *, SizeT>> &data_ptrs);
 
     // return value: start chunk id & chunk offset
     Pair<ChunkId, u64> AppendToHeap(FixHeapManager *src_heap_mgr, ChunkId src_chunk_id, u64 src_chunk_offset, SizeT nbytes);

@@ -22,6 +22,7 @@ from generate_many_import import generate as generate11
 from generate_big_point_query_test_fastroughfilter import generate as generate12
 from generate_many_import_drop import generate as generate13
 from generate_mem_hnsw import generate as generate14
+from generate_big_sparse import generate as generate15
 
 class SpinnerThread(threading.Thread):
     def __init__(self):
@@ -96,7 +97,7 @@ if __name__ == "__main__":
         "-g",
         "--generate",
         type=bool,
-        default=True,
+        default=False,
         dest="generate_if_exists",
     )
     parser.add_argument(
@@ -154,6 +155,7 @@ if __name__ == "__main__":
     generate12(args.generate_if_exists, args.copy)
     generate13(args.generate_if_exists, args.copy)
     generate14(args.generate_if_exists, args.copy)
+    generate15(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
     print("Start copying data...")

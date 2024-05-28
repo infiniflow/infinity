@@ -20,7 +20,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(slt_path1) and os.path.exists(slt_path2) and generate_if_exists:
+    if os.path.exists(slt_path1) and os.path.exists(slt_path2) and not generate_if_exists:
         print("File {} and {} already existed exists. Skip Generating.".format(
             slt_path1, slt_path2))
         return
