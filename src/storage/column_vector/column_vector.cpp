@@ -1634,6 +1634,10 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             switch(sparse_info->DataType()) {
+                case kElemFloat: {
+                    AppendSparse<FloatT>(ele_str_views, index);
+                    break;
+                }
                 case kElemDouble: {
                     AppendSparse<DoubleT>(ele_str_views, index);
                     break;

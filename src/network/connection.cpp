@@ -312,9 +312,13 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                     case kElemInt8:
                     case kElemInt16:
                     case kElemInt32:
-                    case kElemInt64:
-                    case kElemFloat: {
+                    case kElemInt64: {
                         UnrecoverableError("Not implemented");
+                    }
+                    case kElemFloat: {
+                        object_id = 1021;
+                        object_width = 4;
+                        break;
                     }
                     case kElemDouble: {
                         object_id = 1022;
