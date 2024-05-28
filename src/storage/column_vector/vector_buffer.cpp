@@ -148,7 +148,9 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
         UnrecoverableError(error_message);
     }
     if (buffer_obj->GetBufferSize() != data_size) {
-        UnrecoverableError("Buffer object size is not equal to data size.");
+        String error_message = "Buffer object size is not equal to data size.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kHeap) {
@@ -159,7 +161,9 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
     if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
         fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, buffer_mgr, block_column_entry, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
     } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
-        UnrecoverableError("Unexpected buffer type for fix_heap_mgr_1_.");
+        String error_message = "Unexpected buffer type for fix_heap_mgr_1_.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -175,13 +179,17 @@ void VectorBuffer::ResetToInit() {
     if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
         fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
     } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
-        UnrecoverableError("Unexpected buffer type for fix_heap_mgr_1_.");
+        String error_message = "Unexpected buffer type for fix_heap_mgr_1_.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
 void VectorBuffer::Copy(ptr_t input, SizeT size) {
     if (data_size_ < size) {
-        UnrecoverableError("Attempt to copy an amount of data that cannot currently be accommodated");
+        String error_message = "Attempt to copy an amount of data that cannot currently be accommodated";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // std::memcpy(data_.get(), input, size);
     std::memcpy(GetDataMut(), input, size);
@@ -195,7 +203,9 @@ bool VectorBuffer::RawPointerGetCompactBit(const u8 *src_ptr_u8, SizeT idx) {
 
 bool VectorBuffer::GetCompactBit(SizeT idx) const {
     if (idx >= capacity_) {
-        UnrecoverableError("Index out of range.");
+        String error_message = "Index out of range.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return VectorBuffer::RawPointerGetCompactBit(reinterpret_cast<const u8 *>(GetData()), idx);
 }
@@ -212,7 +222,9 @@ void VectorBuffer::RawPointerSetCompactBit(u8 *dst_ptr_u8, SizeT idx, bool val) 
 
 void VectorBuffer::SetCompactBit(SizeT idx, bool val) {
     if (idx >= capacity_) {
-        UnrecoverableError("Index out of range.");
+        String error_message = "Index out of range.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(GetDataMut()), idx, val);
 }

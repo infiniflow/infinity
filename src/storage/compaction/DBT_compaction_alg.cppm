@@ -25,6 +25,7 @@ import infinity_exception;
 import txn;
 import compaction_alg;
 import table_entry;
+import logger;
 
 namespace infinity {
 
@@ -32,7 +33,9 @@ class DBTConfig {
 public:
     DBTConfig(SizeT m, SizeT c, SizeT s) : m_(m), c_(c), s_(s) {
         if (m <= 0 || c < m || s <= 0) {
-            UnrecoverableError("Invalid compaction parameters");
+            String error_message = "Invalid compaction parameters";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

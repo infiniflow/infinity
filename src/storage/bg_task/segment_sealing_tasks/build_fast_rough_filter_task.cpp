@@ -499,7 +499,9 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentEntry *segment_entry, BufferM
                 break;
             }
             default: {
-                UnrecoverableError("BUG: BuildFastRoughFilterTask: unsupported data type");
+                String error_message = "BuildFastRoughFilterTask: unsupported data type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
         // step 2.3. check total_row_count

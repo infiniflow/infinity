@@ -611,7 +611,9 @@ bool Value::operator==(const Value &other) const {
         }
         case kTensorArray: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case kInterval:
@@ -620,7 +622,9 @@ bool Value::operator==(const Value &other) const {
         case kMixed:
         case kMissing:
         case kInvalid: {
-            UnrecoverableError("Unhandled cases.");
+            String error_message = "Unhandled cases.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return false;
         }
     }
@@ -730,7 +734,9 @@ void Value::CopyUnionValue(const Value &other) {
         case kMixed:
         case kMissing:
         case kInvalid: {
-            UnrecoverableError("Unhandled case!");
+            String error_message = "Unhandled cases.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -839,7 +845,9 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case kMixed:
         case kMissing:
         case kInvalid: {
-            UnrecoverableError("Unhandled case!");
+            String error_message = "Unhandled cases.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -901,7 +909,9 @@ String Value::ToString() const {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
             const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
             if (data_bytes != embedding_info->Size()) {
-                UnrecoverableError("Embedding data size mismatch.");
+                String error_message = "Embedding data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());

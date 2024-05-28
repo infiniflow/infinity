@@ -14,6 +14,8 @@
 
 module;
 
+export module embedding_unary_operator;
+
 import stl;
 import bitmask;
 import column_vector;
@@ -21,8 +23,7 @@ import infinity_exception;
 
 import bitmask_buffer;
 import embedding_info;
-
-export module embedding_unary_operator;
+import logger;
 
 namespace infinity {
 
@@ -41,11 +42,17 @@ public:
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                UnrecoverableError("Invalid column vector type.");
+                String error_message = "Invalid column vector type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+                break;
             }
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
-                    UnrecoverableError("Target vector type isn't flat.");
+                    String error_message = "Target vector type isn't flat.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 if (nullable) {
                     ExecuteFlatWithNull<InputElemType, OutputElemType, Operator>(input_ptr,
@@ -64,7 +71,9 @@ public:
             }
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
-                    UnrecoverableError("Attempting to execute more than one row of the constant column vector.");
+                    String error_message = "Attempting to execute more than one row of the constant column vector.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 if (nullable) {
                     result_null->SetAllTrue();
@@ -76,11 +85,15 @@ public:
                 return;
             }
             case ColumnVectorType::kHeterogeneous: {
-                UnrecoverableError("Heterogeneous embedding is not implemented yet.");
+                String error_message = "Heterogeneous embedding is not implemented yet.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                UnrecoverableError("Compact Bit embedding is not implemented yet.");
+                String error_message = "Compact Bit embedding is not implemented yet.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
         }

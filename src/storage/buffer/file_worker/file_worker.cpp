@@ -33,7 +33,9 @@ FileWorker::~FileWorker() = default;
 
 void FileWorker::WriteToFile(bool to_spill) {
     if (data_ == nullptr) {
-        UnrecoverableError("No data will be written.");
+        String error_message = "No data will be written.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LocalFileSystem fs;
 

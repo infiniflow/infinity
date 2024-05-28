@@ -225,7 +225,9 @@ public:
         } else if constexpr (std::is_same_v<T, double>) {
             value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, vec.size()));
         } else {
-            UnrecoverableError("Not supported embedding data type.");
+            String error_message = "Not supported embedding data type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         return value;
@@ -244,7 +246,9 @@ public:
     // Value getter template for all types in union
     template <class T>
     T GetValue() const {
-        UnrecoverableError("Not implemented value getter.");
+        String error_message = "Not implemented value getter.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return T();
     }
 
