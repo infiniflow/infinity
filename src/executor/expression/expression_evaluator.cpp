@@ -134,11 +134,15 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    UnrecoverableError("Case execution");
+    String error_message = "Case execution";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    UnrecoverableError("Column expression");
+    String error_message = "Column expression";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,

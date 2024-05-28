@@ -51,7 +51,9 @@ public:
             return vector_type == ColumnVectorType::kFlat || vector_type == ColumnVectorType::kConstant;
         };
         if (!check_vector_type_valid(left_vector_type) || !check_vector_type_valid(right_vector_type)) {
-            UnrecoverableError("Invalid input ColumnVectorType. Support only kFlat and kConstant.");
+            String error_message = "Invalid input ColumnVectorType. Support only kFlat and kConstant.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         const SharedPtr<Bitmask> &left_null = left->nulls_ptr_;
         const SharedPtr<Bitmask> &right_null = right->nulls_ptr_;
@@ -354,7 +356,9 @@ public:
             }
             result->Finalize(count);
         } else {
-            UnrecoverableError("Wrong boolean operation.");
+            String error_message = "Wrong boolean operation.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -532,7 +536,9 @@ public:
                                SizeT count,
                                void *state_ptr,
                                bool nullable) {
-        UnrecoverableError("MixedType needs to be specialized.");
+        String error_message = "MixedType needs to be specialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     // case for BinaryOperator which returns BooleanT result
@@ -556,10 +562,14 @@ public:
                                bool nullable) {
         switch (left->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                UnrecoverableError("Invalid column vector type.");
+                String error_message = "Invalid column vector type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             case ColumnVectorType::kCompactBit: {
-                UnrecoverableError("kCompactBit should not be in this branch.");
+                String error_message = "kCompactBit should not be in this branch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
@@ -584,8 +594,11 @@ private:
                                    bool nullable) {
 
         switch (right->vector_type()) {
-            case ColumnVectorType::kInvalid:
-                UnrecoverableError("Invalid column vector type.");
+            case ColumnVectorType::kInvalid:{
+                String error_message = "Invalid column vector type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -596,7 +609,9 @@ private:
                 return ExecuteFlatHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                UnrecoverableError("CompactBit isn't implemented.");
+                String error_message = "CompactBit isn't implemented.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -610,8 +625,11 @@ private:
                                        bool nullable) {
 
         switch (right->vector_type()) {
-            case ColumnVectorType::kInvalid:
-                UnrecoverableError("Invalid column vector type.");
+            case ColumnVectorType::kInvalid: {
+                String error_message = "Invalid column vector type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
             case ColumnVectorType::kFlat: {
                 return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -622,7 +640,10 @@ private:
                 return ExecuteConstantHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                UnrecoverableError("CompactBit isn't implemented.");
+                String error_message = "CompactBit isn't implemented.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+                return ;
             }
         }
     }
@@ -636,8 +657,12 @@ private:
                                             bool nullable) {
 
         switch (right->vector_type()) {
-            case ColumnVectorType::kInvalid:
-                UnrecoverableError("Invalid column vector type.");
+            case ColumnVectorType::kInvalid: {
+                String error_message = "Invalid column vector type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+                break;
+            }
             case ColumnVectorType::kFlat: {
                 return ExecuteHeterogeneousFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -648,7 +673,10 @@ private:
                 return ExecuteHeterogeneousHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                UnrecoverableError("CompactBit isn't implemented.");
+                String error_message = "CompactBit isn't implemented.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+                break;
             }
         }
     }

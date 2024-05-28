@@ -289,10 +289,15 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kDecimal: {
-                            UnrecoverableError("Not implement: Decimal data shuffle.");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                         case kVarchar: {
-                            UnrecoverableError("Not implement: Varchar data shuffle.");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
                             //                            VarcharT &dst_ref = ((VarcharT
                             //                            *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]; VarcharT &src_ref
                             //                            = ((VarcharT
@@ -315,22 +320,40 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kTime: {
-                            UnrecoverableError("Not implement: Time data shuffle.");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                         case kDateTime: {
-                            UnrecoverableError("Not implement: Datetime data shuffle.");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                         case kTimestamp: {
-                            UnrecoverableError("Not implement: Timestamp data shuffle.");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                         case kInterval: {
-                            UnrecoverableError("Not implement: Interval data shuffle.");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                         case kMixed: {
-                            UnrecoverableError("Not implement: Heterogeneous data shuffle.");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                         default: {
-                            UnrecoverableError("Not implement: Unexpected data type");
+                            String error_message = "Not implement: data shuffle.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                     }
                 }
@@ -340,8 +363,10 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         }
 
         if (output_row_idx != datablock_size) {
-            UnrecoverableError("Expected block size: " + std::to_string(datablock_size) +
-                               ", but only copied data size: " + std::to_string(output_row_idx));
+            String error_message = fmt::format("Expected block size: {}, but only copied data size: {}", datablock_size, output_row_idx);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
@@ -411,7 +436,10 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kHugeInt: {
-                    UnrecoverableError("Not implement: HugeInt data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 case kFloat: {
                     ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
@@ -424,10 +452,16 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kDecimal: {
-                    UnrecoverableError("Not implement: Decimal data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 case kVarchar: {
-                    UnrecoverableError("Not implement: Varchar data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                     //                    VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
                     //                    VarcharT &src_ref = ((VarcharT
                     //                    *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
@@ -441,7 +475,6 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     //                        output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
                     //                        std::memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
                     //                    }
-                    break;
                 }
                 case kDate: {
                     ((DateT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
@@ -449,22 +482,40 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kTime: {
-                    UnrecoverableError("Not implement: Time data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 case kDateTime: {
-                    UnrecoverableError("Not implement: Datetime data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 case kTimestamp: {
-                    UnrecoverableError("Not implement: Timestamp data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 case kInterval: {
-                    UnrecoverableError("Not implement: Interval data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 case kMixed: {
-                    UnrecoverableError("Not implement: Heterogeneous data shuffle.");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 default: {
-                    UnrecoverableError("Not implement: Unexpected data type");
+                    String error_message = "Not implement: data shuffle.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
             }
 

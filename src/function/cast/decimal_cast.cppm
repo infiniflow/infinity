@@ -132,37 +132,49 @@ inline bool DecimalTryCastToFixlen::Run(DecimalT, SmallIntT &) {
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, IntegerT &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, BigIntT &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, HugeIntT &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, FloatT &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, DoubleT &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToVarlen::Run(DecimalT, VarcharT &, const SharedPtr<ColumnVector> &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

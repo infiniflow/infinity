@@ -708,7 +708,10 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                             break;
                         }
                         default: {
-                            UnrecoverableError("Not implement: Embedding type.");
+                            String error_message = "Not implement: Embedding type.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                     }
                     break;
@@ -721,7 +724,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implement: Invalid data type.");
+                    String error_message = "Not implement: Invalid data type.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
         } else if (column_def->has_default_value()) {

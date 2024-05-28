@@ -66,7 +66,9 @@ PhysicalMergeMatchTensor::PhysicalMergeMatchTensor(const u64 id,
 void PhysicalMergeMatchTensor::Init() { left()->Init(); }
 
 SizeT PhysicalMergeMatchTensor::TaskletCount() {
-    UnrecoverableError("Not Expected: TaskletCount of PhysicalMergeMatchTensor?");
+    String error_message = "Not Expected: TaskletCount of PhysicalMergeMatchTensor?";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return 0;
 }
 
