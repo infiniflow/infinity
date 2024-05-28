@@ -43,11 +43,15 @@ String FastRoughFilter::SerializeToString() const {
         probabilistic_data_filter_->SerializeToStringStream(os, probabilistic_data_filter_binary_bytes);
         min_max_data_filter_->SerializeToStringStream(os, min_max_data_filter_binary_bytes);
         if (os.view().size() != total_binary_bytes) {
-            UnrecoverableError("BUG: FastRoughFilter::SerializeToString(): save size error");
+            String error_message = "FastRoughFilter::SerializeToString(): save size error";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return std::move(os).str();
     } else {
-        UnrecoverableError("FastRoughFilter::SerializeToString(): No FastRoughFilter data.");
+        String error_message = "FastRoughFilter::SerializeToString(): No FastRoughFilter data.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return {};
     }
 }
@@ -58,7 +62,9 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
     u32 total_binary_bytes;
     is.read(reinterpret_cast<char *>(&total_binary_bytes), sizeof(total_binary_bytes));
     if (total_binary_bytes != is.view().size()) {
-        UnrecoverableError("FastRoughFilter::DeserializeFromString(): load size error");
+        String error_message = "FastRoughFilter::DeserializeToString(): load size error";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     is.read(reinterpret_cast<char *>(&build_time_), sizeof(build_time_));
     if (!probabilistic_data_filter_) {
@@ -71,7 +77,9 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
     min_max_data_filter_->DeserializeFromStringStream(is);
     // check position
     if (!is or u32(is.tellg()) != is.view().size()) {
-        UnrecoverableError("FastRoughFilter::DeserializeFromString(): load size error");
+        String error_message = "FastRoughFilter::DeserializeToString(): load size error";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     FinishBuildMinMaxFilterTask();
 }
@@ -91,12 +99,16 @@ void FastRoughFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
 // called in deserialize, remove unnecessary lock
 bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
     if (HaveMinMaxFilter()) [[unlikely]] {
-        UnrecoverableError("BUG: FastRoughFilter::LoadFromJsonFile(): Already have data.");
+        String error_message = "FastRoughFilter::LoadFromJsonFile(): Already have data.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): try to load filter data from json.");
     // try load JsonTagBuildTime first
     if (!entry_json.contains(JsonTagBuildTime)) {
-        LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): found no save data in json, stop loading.");
+        String error_message = "FastRoughFilter::LoadFromJsonFile(): found no save data in json, stop loading.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
     // can load from json
@@ -128,7 +140,9 @@ bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
         FinishBuildMinMaxFilterTask();
         // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): successfully load FastRoughFilter data from json.");
     } else {
-        UnrecoverableError("FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.");
+        String error_message = "FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return load_success;
 }

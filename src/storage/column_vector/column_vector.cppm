@@ -138,11 +138,15 @@ public:
 
     void AppendValue(const Value &value) {
         if (!initialized) {
-            UnrecoverableError("Column vector isn't initialized.");
+            String error_message = "Column vector isn't initialized.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (vector_type_ == ColumnVectorType::kConstant) {
             if (tail_index_ >= 1) {
-                UnrecoverableError("Constant column vector will only have 1 value.");
+                String error_message = "Constant column vector will only have 1 value.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
 
@@ -154,10 +158,14 @@ public:
 
     void SetVectorType(ColumnVectorType vector_type) {
         if (initialized) {
-            UnrecoverableError("Column vector is initialized");
+            String error_message = "Column vector isn't initialized.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (vector_type == ColumnVectorType::kInvalid) {
-            UnrecoverableError("Invalid column vector type.");
+            String error_message = "Invalid column vector type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (vector_type_ == vector_type) {
             return;

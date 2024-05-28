@@ -577,7 +577,9 @@ void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
 void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data) {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kUnsealed) {
-        UnrecoverableError("should not call LoadFilterBinaryData from Unsealed segment");
+        String error_message = "Should not call LoadFilterBinaryData from Unsealed segment";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
 }

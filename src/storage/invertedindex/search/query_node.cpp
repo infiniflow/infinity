@@ -680,7 +680,9 @@ OrQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRead
 }
 
 std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
-    UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
+    String error_message = "NOT query node should be optimized into AND_NOT query node";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 
@@ -688,7 +690,9 @@ std::unique_ptr<EarlyTerminateIterator> NotQueryNode::CreateEarlyTerminateSearch
                                                                                  IndexReader &index_reader,
                                                                                  Scorer *scorer,
                                                                                  EarlyTermAlg early_term_alg) const {
-    UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
+    String error_message = "NOT query node should be optimized into AND_NOT query node";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 

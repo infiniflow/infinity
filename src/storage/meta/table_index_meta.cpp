@@ -174,7 +174,9 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
         table_index_entry_candidates.reserve(this->index_entry_list().size());
         for (const auto &base_entry : this->index_entry_list()) {
             if (base_entry->entry_type_ != EntryType::kTableIndex) {
-                UnrecoverableError("Unexpected entry type during serialize table index meta");
+                String error_message = "Unexpected entry type during serialize table index meta";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             if (base_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list

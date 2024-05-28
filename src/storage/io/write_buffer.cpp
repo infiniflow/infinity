@@ -14,14 +14,14 @@
 
 module;
 
-import stl;
-import buffer_base;
-
-import infinity_exception;
-
 #include <iterator>
 
 module write_buffer;
+
+import stl;
+import buffer_base;
+import logger;
+import infinity_exception;
 
 namespace infinity {
 SizeT WriteBuffer::WriteTo(char *to, SizeT n) {
@@ -40,11 +40,15 @@ SizeT WriteBuffer::WriteTo(char *to, SizeT n) {
 }
 
 void WriteBuffer::Write(const char *from, SizeT n) {
-    UnrecoverableError("Cannot write to finalized buffer");
+    String error_message = "Cannot write to finalized buffer";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     SizeT bytes_copied = 0;
 
     if (working_buffer_.Empty()) {
-        UnrecoverableError("working_buffer empty");
+        String error_message = "working_buffer empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     while (bytes_copied < n) {

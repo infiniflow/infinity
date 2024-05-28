@@ -53,14 +53,20 @@ namespace infinity {
 
 Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
     if (initialized) {
-        UnrecoverableError("Column vector is already initialized.");
+        String error_message = "Column vector is already initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     initialized = true;
     if (data_type_->type() == LogicalType::kInvalid) {
-        UnrecoverableError("Data type isn't assigned.");
+        String error_message = "Attempt to initialize column vector to invalid type.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (vector_type == ColumnVectorType::kInvalid) {
-        UnrecoverableError("Attempt to initialize column vector to invalid type.");
+        String error_message = "Attempt to initialize column vector to invalid type.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
@@ -103,7 +109,9 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
-            UnrecoverableError("Unexpected data type for column vector.");
+            String error_message = "Unexpected data type for column vector.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         default: {
             vector_buffer_type = VectorBufferType::kStandard;
@@ -128,7 +136,9 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         // Initialize after reset will come to this branch
         if (vector_buffer_types.first == VectorBufferType::kHeap or vector_buffer_types.first == VectorBufferType::kTensorHeap) {
             if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
-                UnrecoverableError("Vector heap should be null.");
+                String error_message = "Vector heap should be null.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             buffer_->ResetToInit();
         }
@@ -143,7 +153,9 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
     Pair<VectorBufferType, VectorBufferType> vector_buffer_types = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() != nullptr) {
-        UnrecoverableError("Column vector is already initialized.");
+        String error_message = "Column vector is already initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (vector_type_ == ColumnVectorType::kConstant) {
@@ -301,7 +313,9 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 RecoverableError(status);
             }
             case kInvalid: {
-                UnrecoverableError("Invalid data type");
+                String error_message = "Invalid data type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -309,7 +323,9 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx) {
     if (end_idx <= start_idx) {
-        UnrecoverableError("End index should larger than start index.");
+        String error_message = "End index should larger than start index.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     Initialize(vector_type, end_idx - start_idx);
 
@@ -458,7 +474,9 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 RecoverableError(status);
             }
             case kInvalid: {
-                UnrecoverableError("Invalid data type");
+                String error_message = "Invalid data type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -466,22 +484,32 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
 
 void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx) {
     if (!initialized) {
-        UnrecoverableError("Column vector isn't initialized.");
+        String error_message = "Column vector isn't initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (data_type_->type() == LogicalType::kInvalid) {
-        UnrecoverableError("Data type isn't assigned.");
+        String error_message = "Data type isn't assigned.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (*data_type_ != *other.data_type_) {
-        UnrecoverableError("Data type isn't assigned.");
+        String error_message = "Data type isn't assigned.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (vector_type_ == ColumnVectorType::kConstant) {
         if (dst_idx != 0) {
-            UnrecoverableError("Attempting to access non-zero position of constant vector");
+            String error_message = "Attempting to access non-zero position of constant vector";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         tail_index_ = 1;
     } else {
         if (dst_idx >= tail_index_) {
-            UnrecoverableError("Attempting to access invalid position of target column vector");
+            String error_message = "Attempting to access invalid position of target column vector";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     if (other.vector_type_ == ColumnVectorType::kConstant) {
@@ -490,7 +518,9 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
     }
 
     if (src_idx >= other.tail_index_) {
-        UnrecoverableError("Attempting to access invalid position of source column vector");
+        String error_message = "Attempting to access invalid position of target column vector";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (data_type_->type()) {
         case kBoolean: {
@@ -633,7 +663,9 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
 
 String ColumnVector::ToString(SizeT row_index) const {
     if (!initialized) {
-        UnrecoverableError("Column vector isn't initialized.");
+        String error_message = "Column vector isn't initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     // Not valid, make a same data type with null indicator

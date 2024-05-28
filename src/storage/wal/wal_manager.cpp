@@ -789,10 +789,14 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
     for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
         auto segment_entry = table_entry->GetSegmentByID(segment_id, commit_ts);
         if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
-            UnrecoverableError("Assert: Replay segment should be compactable.");
+            String error_message = "Assert: Replay segment should be compactable.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (!segment_entry->SetNoDelete()) {
-            UnrecoverableError("Assert: Replay segment should be compactable.");
+            String error_message = "Assert: Replay segment should be compactable.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         segment_entry->SetDeprecated(commit_ts);
     }
