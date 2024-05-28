@@ -53,10 +53,11 @@ import status;
 import column_vector;
 import default_values;
 import embedding_info;
+import sparse_info;
 import column_def;
 import constant_expr;
 import wal_entry;
-
+import knn_expr;
 import value;
 import catalog;
 import catalog_delta_entry;
@@ -89,6 +90,10 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
         case CopyFileType::kFVECS: {
             ImportFVECS(query_context, import_op_state);
+            break;
+        }
+        case CopyFileType::kCSR: {
+            ImportCSR(query_context, import_op_state);
             break;
         }
         case CopyFileType::kInvalid: {
@@ -158,7 +163,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     Txn *txn = query_context->GetTxn();
 
     SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
     BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
     SizeT row_idx = 0;
@@ -197,6 +202,139 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         }
     }
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
+    import_op_state->result_msg_ = std::move(result_msg);
+}
+
+template <typename IdxT>
+UniquePtr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, SizeT nnz) {
+    auto res = MakeUnique<char []>(sizeof(IdxT) * nnz);
+    auto *ptr = reinterpret_cast<IdxT *>(res.get());
+    for (SizeT i = 0; i < nnz; ++i) {
+        if (tmp_indice_ptr[i] < 0 || tmp_indice_ptr[i] > std::numeric_limits<IdxT>::max()) {
+            UnrecoverableError(fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]));
+        }
+        ptr[i] = tmp_indice_ptr[i];
+    }
+    return res;
+}
+
+UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo *sparse_info, SizeT nnz) {
+    switch (sparse_info->IndexType()) {
+        case EmbeddingDataType::kElemInt8: {
+            return ConvertCSRIndice<TinyIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return ConvertCSRIndice<SmallIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return tmp_indice_ptr;
+        }
+        case EmbeddingDataType::kElemInt64: {
+            return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
+        }
+        default: {
+            UnrecoverableError(fmt::format("Unsupported index type {}.", sparse_info->IndexType()));
+        }
+    }
+    return {};
+}
+
+void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    if (table_entry_->ColumnCount() != 1) {
+        Status status = Status::ImportFileFormatError("CSR file must have only one column.");
+        RecoverableError(status);
+    }
+    auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
+    if (column_type->type() != kSparse) {
+        Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
+        RecoverableError(status);
+    }
+    auto sparse_info = std::static_pointer_cast<SparseInfo>(column_type->type_info());
+    if (sparse_info->DataType() != kElemFloat) {
+        Status status = Status::ImportFileFormatError("FVECS file must has only one sparse column with float element");
+        RecoverableError(status);
+    }
+
+    LocalFileSystem fs;
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    i64 nrow = 0;
+    i64 ncol = 0;
+    i64 nnz = 0;
+    file_handler->Read(&nrow, sizeof(nrow));
+    file_handler->Read(&ncol, sizeof(ncol));
+    file_handler->Read(&nnz, sizeof(nnz));
+
+    SizeT file_size = fs.GetFileSize(*file_handler);
+    if (file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
+        UnrecoverableError("Invalid CSR file format.");
+    }
+    i64 prev_off = 0;
+    file_handler->Read(&prev_off, sizeof(i64));
+    if (prev_off != 0) {
+        UnrecoverableError("Invalid CSR file format.");
+    }
+    auto [idx_reader, idx_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if (!idx_status.ok()) {
+        UnrecoverableError(idx_status.message());
+    }
+    fs.Seek(*idx_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
+    auto [data_reader, data_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if (!data_status.ok()) {
+        UnrecoverableError(data_status.message());
+    }
+    fs.Seek(*data_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
+
+    //------------------------------------------------------------------------------------------------------------------------
+
+    Txn *txn = query_context->GetTxn();
+    auto *buffer_mgr = txn->buffer_mgr();
+
+    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    auto column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+
+    i64 row_id = 0;
+    while (true) {
+        i64 off = 0;
+        file_handler->Read(&off, sizeof(i64));
+        i64 nnz = off - prev_off;
+        SizeT data_len = sparse_info->DataSize(nnz);
+        SizeT indice_len = sparse_info->IndiceSize(nnz);
+        auto tmp_indice_ptr = MakeUnique<char[]>(sizeof(i32) * nnz);
+        auto data_ptr = MakeUnique<char[]>(data_len);
+        idx_reader->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
+        data_reader->Read(data_ptr.get(), data_len);
+        auto indice_ptr = ConvertCSRIndice(std::move(tmp_indice_ptr), sparse_info.get(), nnz);
+
+        auto value = Value::MakeSparse(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len, sparse_info);
+        column_vector->AppendValue(value);
+
+        block_entry->IncreaseRowCount(1);
+        prev_off = off;
+        ++row_id;
+        if (row_id == nrow) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            SaveSegmentData(table_entry_, txn, segment_entry);
+            break;
+        }
+        if (block_entry->GetAvailableCapacity() <= 0) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            if (segment_entry->Room() <= 0) {
+                SaveSegmentData(table_entry_, txn, segment_entry);
+
+                segment_id = Catalog::GetNextSegmentID(table_entry_);
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+            }
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+            column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+        }
+    }
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", nrow));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 

@@ -1841,6 +1841,11 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kCSR: {
+            auto file_type = MakeShared<String>(fmt::format("{} - type: CSR", String(intent_size, ' ')));
+            result->emplace_back(file_type);
+            break;
+        }
         case CopyFileType::kInvalid: {
             UnrecoverableError("Invalid file type");
         }
@@ -1908,6 +1913,11 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
         }
         case CopyFileType::kFVECS: {
             SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: FVECS", String(intent_size, ' ')));
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kCSR: {
+            auto file_type = MakeShared<String>(fmt::format("{} - type: CSR", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }

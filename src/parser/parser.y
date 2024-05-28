@@ -2869,6 +2869,9 @@ copy_option : FORMAT IDENTIFIER {
     } else if (strcasecmp($2, "fvecs") == 0) {
         $$->file_type_ = infinity::CopyFileType::kFVECS;
         free($2);
+    } else if (strcasecmp($2, "csr") == 0) {
+        $$->file_type_ = infinity::CopyFileType::kCSR;
+        free($2);
     } else {
         free($2);
         delete $$;

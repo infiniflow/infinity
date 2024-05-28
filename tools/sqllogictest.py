@@ -23,6 +23,7 @@ from generate_big_point_query_test_fastroughfilter import generate as generate12
 from generate_many_import_drop import generate as generate13
 from generate_mem_hnsw import generate as generate14
 from generate_big_sparse import generate as generate15
+from generate_csr import generate as generate15
 
 class SpinnerThread(threading.Thread):
     def __init__(self):
