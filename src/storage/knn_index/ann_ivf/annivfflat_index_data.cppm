@@ -249,6 +249,7 @@ struct AnnIVFFlatIndexData {
         u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
         auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
         if(!status.ok()) {
+            LOG_CRITICAL(status.message());
             UnrecoverableError(status.message());
         }
         SaveIndexInner(*file_handler);
@@ -285,6 +286,7 @@ struct AnnIVFFlatIndexData {
         u8 file_flags = FileFlags::READ_FLAG;
         auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
         if(!status.ok()) {
+            LOG_CRITICAL(status.message());
             UnrecoverableError(status.message());
         }
         auto index_data = LoadIndexInner(*file_handler);

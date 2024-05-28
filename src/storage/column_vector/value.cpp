@@ -200,7 +200,9 @@ Value Value::MakeVarchar(const VarcharT &input) {
         String tmp_str(input.short_.data_, input.length_);
         value.value_info_ = MakeShared<StringValueInfo>(std::move(tmp_str));
     } else {
-        UnrecoverableError("Value::MakeVarchar(VectorVarchar) is unsupported!");
+        String error_message = "Value::MakeVarchar(VectorVarchar) is unsupported!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value;
 }

@@ -61,7 +61,9 @@ namespace infinity {
 Vector<std::string_view> TableEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid table entry encode: {}", encode));
+        String error_message = fmt::format("Invalid table entry encode: {}", encode);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = DBEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));
@@ -160,7 +162,9 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
                                                          TxnManager *txn_mgr) {
     if (index_base->index_name_->empty()) {
         // Index name shouldn't be empty
-        UnrecoverableError("Attempt to create no name index.");
+        String error_message = "Attempt to create no name index.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
@@ -200,6 +204,7 @@ Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const Str
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
@@ -228,6 +233,7 @@ TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_na
 void TableEntry::UpdateIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     index_meta->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
@@ -239,6 +245,7 @@ void TableEntry::DropIndexReplay(const String &index_name,
                                  TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
@@ -247,6 +254,7 @@ void TableEntry::DropIndexReplay(const String &index_name,
 TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return index_meta->GetEntryReplay(txn_id, begin_ts);

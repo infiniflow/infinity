@@ -15,6 +15,7 @@
 module;
 
 module vector_buffer;
+
 import stl;
 import fix_heap;
 import buffer_obj;
@@ -23,6 +24,7 @@ import buffer_handle;
 import infinity_exception;
 import block_column_entry;
 import default_values;
+import logger;
 
 namespace infinity {
 
@@ -67,7 +69,9 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
 
 void VectorBuffer::InitializeCompactBit(SizeT capacity) {
     if (initialized_) {
-        UnrecoverableError("Vector buffer is already initialized.");
+        String error_message = "Vector buffer is already initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT data_size = (capacity + 7) / 8;
     if (data_size > 0) {
@@ -80,7 +84,9 @@ void VectorBuffer::InitializeCompactBit(SizeT capacity) {
 
 void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     if (initialized_) {
-        UnrecoverableError("Vector buffer is already initialized.");
+        String error_message = "Vector buffer is already initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT data_size = type_size * capacity;
     if (data_size > 0) {
@@ -94,7 +100,9 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
         fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE);
     } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
-        UnrecoverableError("Unexpected buffer type for fix_heap_mgr_1_.");
+        String error_message = "Unexpected buffer type for fix_heap_mgr_1_.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -104,15 +112,21 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
 void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity) {
     // UnrecoverableError("Not implemented.");
     if (initialized_) {
-        UnrecoverableError("Vector buffer is already initialized.");
+        String error_message = "Vector buffer is already initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT data_size = (capacity + 7) / 8;
     auto *buffer_obj = block_column_entry->buffer();
     if (buffer_obj == nullptr) {
-        UnrecoverableError("Buffer object is nullptr.");
+        String error_message = "Buffer object is nullptr.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (buffer_obj->GetBufferSize() != data_size) {
-        UnrecoverableError("Buffer object size is not equal to data size.");
+        String error_message = "Buffer object size is not equal to data size.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     ptr_ = buffer_obj->Load();
     initialized_ = true;
@@ -122,12 +136,16 @@ void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEn
 
 void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity) {
     if (initialized_) {
-        UnrecoverableError("Vector buffer is already initialized.");
+        String error_message = "Vector buffer is already initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT data_size = type_size * capacity;
     auto *buffer_obj = block_column_entry->buffer();
     if (buffer_obj == nullptr) {
-        UnrecoverableError("Buffer object is nullptr.");
+        String error_message = "Buffer object is nullptr.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (buffer_obj->GetBufferSize() != data_size) {
         UnrecoverableError("Buffer object size is not equal to data size.");

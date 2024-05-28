@@ -21,6 +21,7 @@ import segment_entry;
 import buffer_manager;
 import infinity_exception;
 import filter_value_type_classification;
+import logger;
 
 namespace infinity {
 
@@ -98,7 +99,9 @@ private:
     template <CanOnlyBuildMinMaxFilter ValueType, bool CheckTS>
     static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
         if (build_bloom_filter) [[unlikely]] {
-            UnrecoverableError("BuildFilter: build_bloom_filter is true, but ValueType can only build min-max filter");
+            String error_message = "BuildFilter: build_bloom_filter is true, but ValueType can only build min-max filter";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (build_min_max_filter) {
             // TODO: now only use this branch
@@ -109,7 +112,9 @@ private:
     template <CanOnlyBuildBloomFilter ValueType, bool CheckTS>
     static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
         if (build_min_max_filter) [[unlikely]] {
-            UnrecoverableError("BuildFilter: build_min_max_filter is true, but ValueType can only build bloom filter");
+            String error_message = "BuildFilter: build_min_max_filter is true, but ValueType can only build bloom filter";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (build_bloom_filter) {
             BuildOnlyBloomFilter<ValueType, CheckTS>(arg);

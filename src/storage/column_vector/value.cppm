@@ -24,6 +24,7 @@ import embedding_info;
 import data_type;
 import knn_expr;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -57,7 +58,9 @@ public:
     template <class T>
     T &Get() {
         if (type_ != T::TYPE) {
-            UnrecoverableError("ExtraValueInfo type mismatch");
+            String error_message = "ExtraValueInfo type mismatch";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return (T &)*this;
     }

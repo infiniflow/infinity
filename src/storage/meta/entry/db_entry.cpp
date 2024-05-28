@@ -147,6 +147,7 @@ void DBEntry::UpdateTableReplay(const SharedPtr<String> &table_name,
                                 TxnTimeStamp begin_ts) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(*table_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     table_meta->UpdateEntryReplay(
@@ -164,6 +165,7 @@ void DBEntry::DropTableReplay(const String &table_name,
                               TxnTimeStamp begin_ts) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     table_meta->DropEntryReplay(
@@ -175,6 +177,7 @@ void DBEntry::DropTableReplay(const String &table_name,
 TableEntry *DBEntry::GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return table_meta->GetEntryReplay(txn_id, begin_ts);

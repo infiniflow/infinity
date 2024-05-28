@@ -124,6 +124,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            TxnTimeStamp commit_ts) {
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     String column_name = table_index_entry->index_base()->column_name();
@@ -973,6 +974,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
         return nullptr;
     }

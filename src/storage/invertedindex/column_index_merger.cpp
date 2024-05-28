@@ -75,6 +75,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             u32 id_offset = base_row_id - merge_base_rowid;
             auto [file_handler, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
             if(!status.ok()) {
+                LOG_CRITICAL(status.message());
                 UnrecoverableError(status.message());
             }
 
@@ -94,6 +95,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
         auto [file_handler, status] =
             fs_.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
         if(!status.ok()) {
+            LOG_CRITICAL(status.message());
             UnrecoverableError(status.message());
         }
         fs_.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());

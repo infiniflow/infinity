@@ -181,6 +181,7 @@ void Catalog::DropDatabaseReplay(const String &db_name,
                                  TxnTimeStamp begin_ts) {
     auto [db_meta, status] = db_meta_map_.GetExistMetaNoLock(db_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     db_meta->DropEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(db_meta, db_meta->db_name(), txn_id, begin_ts); },
@@ -191,6 +192,7 @@ void Catalog::DropDatabaseReplay(const String &db_name,
 DBEntry *Catalog::GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [db_meta, status] = db_meta_map_.GetExistMetaNoLock(db_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return db_meta->GetEntryReplay(txn_id, begin_ts);
@@ -513,6 +515,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     LocalFileSystem fs;
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     i32 file_size = fs.GetFileSize(*catalog_file_handler);
@@ -882,6 +885,7 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     LocalFileSystem fs;
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     SizeT file_size = fs.GetFileSize(*catalog_file_handler);
@@ -930,6 +934,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 

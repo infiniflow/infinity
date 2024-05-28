@@ -131,7 +131,9 @@ void UpdateMax(InnerMinMaxDataFilterVarcharType &max, const String &input_str) {
 
 inline void Advance(TotalRowCount &total_row_count_handler) {
     if (++total_row_count_handler.total_row_count_read_ > total_row_count_handler.total_row_count_in_segment_) {
-        UnrecoverableError("BUG: BuildFastRoughFilterArg: total_row_count overflow");
+        String error_message = "BuildFastRoughFilterArg: total_row_count overflow";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

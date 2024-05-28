@@ -27,6 +27,7 @@ import global_resource_usage;
 import block_column_entry;
 import buffer_manager;
 import data_file_worker;
+import logger;
 
 namespace infinity {
 
@@ -131,7 +132,9 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
         return iter->second;
     }
     if (buffer_mgr_ == nullptr || chunk_id >= (ChunkId)block_column_entry_->OutlineBufferCount(heap_id_)) {
-        UnrecoverableError("No such chunk in heap");
+        String error_message = "No such chunk in heap";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *outline_buffer = block_column_entry_->GetOutlineBuffer(heap_id_, chunk_id);
     if (outline_buffer == nullptr) {
@@ -141,7 +144,9 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
         outline_buffer = buffer_mgr_->GetBufferObject(std::move(file_worker));
 
         if (outline_buffer == nullptr) {
-            UnrecoverableError("No such chunk in heap");
+            String error_message = "No such chunk in heap";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

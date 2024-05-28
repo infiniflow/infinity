@@ -83,6 +83,7 @@ TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(Table
                                          txn_id,
                                          begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return entry;
@@ -91,6 +92,7 @@ TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(Table
 void TableIndexMeta::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto [entry, status] = index_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     entry->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
@@ -104,6 +106,7 @@ void TableIndexMeta::DropEntryReplay(std::function<SharedPtr<TableIndexEntry>(Ta
                                           txn_id,
                                           begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -111,6 +114,7 @@ void TableIndexMeta::DropEntryReplay(std::function<SharedPtr<TableIndexEntry>(Ta
 TableIndexEntry *TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [entry, status] = index_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return entry;
