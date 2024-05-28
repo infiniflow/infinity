@@ -308,12 +308,28 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 }
                 const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
                 switch (sparse_info->DataType()) {
-                    case kElemBit:
-                    case kElemInt8:
-                    case kElemInt16:
-                    case kElemInt32:
-                    case kElemInt64: {
+                    case kElemBit: {
                         UnrecoverableError("Not implemented");
+                    }
+                    case kElemInt8: {
+                        object_id = 1002;
+                        object_width = 1;
+                        break;
+                    }
+                    case kElemInt16: {
+                        object_id = 1005;
+                        object_width = 2;
+                        break;
+                    }
+                    case kElemInt32: {
+                        object_id = 1007;
+                        object_width = 4;
+                        break;
+                    }
+                    case kElemInt64: {
+                        object_id = 1016;
+                        object_width = 8;
+                        break;
                     }
                     case kElemFloat: {
                         object_id = 1021;

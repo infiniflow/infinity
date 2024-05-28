@@ -195,13 +195,44 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                 SparseT &target,
                                 ColumnVector *target_vector_ptr) {
     switch (source_info->DataType()) {
-        case kElemBit:
-        case kElemInt8:
-        case kElemInt16:
-        case kElemInt32:
-        case kElemInt64:
-        case kElemInvalid: {
+        case kElemBit: {
             UnrecoverableError("Unimplemented");
+        }
+        case kElemInt8: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, TinyIntT>(source_info,
+                                                                                   source,
+                                                                                   source_vector_ptr,
+                                                                                   target_info,
+                                                                                   target,
+                                                                                   target_vector_ptr);
+            break;  
+        }
+        case kElemInt16: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, SmallIntT>(source_info,
+                                                                                    source,
+                                                                                    source_vector_ptr,
+                                                                                    target_info,
+                                                                                    target,
+                                                                                    target_vector_ptr);
+            break;
+        }
+        case kElemInt32: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, IntegerT>(source_info,
+                                                                                   source,
+                                                                                   source_vector_ptr,
+                                                                                   target_info,
+                                                                                   target,
+                                                                                   target_vector_ptr);
+            break;
+        }
+        case kElemInt64: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, BigIntT>(source_info,
+                                                                                  source,
+                                                                                  source_vector_ptr,
+                                                                                  target_info,
+                                                                                  target,
+                                                                                  target_vector_ptr);
+            break;
         }
         case kElemFloat: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, FloatT>(source_info,
@@ -264,13 +295,24 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
                               SparseT &target,
                               ColumnVector *target_vector_ptr) {
     switch (target_info->DataType()) {
-        case kElemBit:
-        case kElemInt8:
-        case kElemInt16:
-        case kElemInt32:
-        case kElemInt64:
-        case kElemInvalid: {
-            UnrecoverableError("Unimplemented");
+        case kElemBit: {
+            UnrecoverableError("Unimplemented type");
+        }
+        case kElemInt8: {
+            SparseTryCastToSparseFunT1<TinyIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
+        case kElemInt16: {
+            SparseTryCastToSparseFunT1<SmallIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
+        case kElemInt32: {
+            SparseTryCastToSparseFunT1<IntegerT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
+        case kElemInt64: {
+            SparseTryCastToSparseFunT1<BigIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
         }
         case kElemFloat: {
             SparseTryCastToSparseFunT1<FloatT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);

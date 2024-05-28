@@ -1645,6 +1645,25 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             switch(sparse_info->DataType()) {
+                case kElemBit: {
+                    UnrecoverableError("Unimplemented yet");
+                }
+                case kElemInt8: {
+                    AppendSparse<TinyIntT>(ele_str_views, index);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendSparse<SmallIntT>(ele_str_views, index);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendSparse<IntegerT>(ele_str_views, index);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendSparse<BigIntT>(ele_str_views, index);
+                    break;
+                }
                 case kElemFloat: {
                     AppendSparse<FloatT>(ele_str_views, index);
                     break;
