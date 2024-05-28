@@ -40,6 +40,7 @@ import index_full_text;
 import third_party;
 import blockmax_term_doc_iterator;
 import default_values;
+import logger;
 
 namespace infinity {
 void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment) {
@@ -115,7 +116,9 @@ float ColumnIndexReader::GetAvgColumnLength() const {
         column_len_cnt += cnt;
     }
     if (column_len_cnt == 0) {
-        UnrecoverableError("column_len_cnt is 0");
+        String error_message = "column_len_cnt is 0";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return static_cast<float>(column_len_sum) / column_len_cnt;
 }

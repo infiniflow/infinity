@@ -916,7 +916,9 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             return subquery_expr;
         }
         case SubqueryType::kAny: {
-            UnrecoverableError("Not implement: Any");
+            String error_message = "Not implement: Any";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

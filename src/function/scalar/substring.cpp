@@ -27,20 +27,26 @@ import third_party;
 import column_vector;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
 struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
     static inline bool Run(TA, TB, TC, TD &, ColumnVector *) {
-        UnrecoverableError("Not implement: SubstrFunction::Run");
+        String error_message = "Not implement: SubstrFunction::Run";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 };
 
 template <>
 inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVector *) {
     // Validate the input before slice the string
-    UnrecoverableError("Not implement: SubstrFunction::Run");
+    String error_message = "Not implement: SubstrFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
+
 
 //    if (second < 0) {
 //        Error<UnrecoverableException>(fmt::format("substring start offset should >= 0, currently it is {}", second));

@@ -164,7 +164,9 @@ bool SegmentEntry::TrySetCompacting(CompactStateData *compact_state_data) {
 bool SegmentEntry::SetNoDelete() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: kNoDelete is only allowed to set on compacting segment.");
+        String error_message = "Assert: kNoDelete is only allowed to set on compacting segment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     status_ = SegmentStatus::kNoDelete;
     if (!delete_txns_.empty()) {
@@ -182,7 +184,9 @@ bool SegmentEntry::SetNoDelete() {
 void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: kDeprecated is only allowed to set on kNoDelete segment.");
+        String error_message = "Assert: kDeprecated is only allowed to set on compacting segment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     status_ = SegmentStatus::kDeprecated;
     deprecate_ts_ = deprecate_ts;
@@ -191,7 +195,9 @@ void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
 void SegmentEntry::RollbackCompact() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: Rollbacked segment should be in No Delete state.");
+        String error_message = "Assert: Rollbacked segment should be in No Delete state.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     status_ = SegmentStatus::kSealed;
     deprecate_ts_ = UNCOMMIT_TS;
@@ -284,7 +290,9 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
 
     std::unique_lock lck(this->rw_locker_); // FIXME: lock scope too large
     if (this->status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("AppendData to sealed/compacting/no_delete/deprecated segment");
+        String error_message = "AppendData to sealed/compacting/no_delete/deprecated segment";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (this->row_capacity_ <= this->row_count_) {
@@ -335,7 +343,9 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             }
 
             if (this->row_count_ > this->row_capacity_) {
-                UnrecoverableError("Not implemented: append data exceed segment row capacity");
+                String error_message = "Not implemented: append data exceed segment row capacity";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
         if (to_append_rows == 0) {
@@ -368,7 +378,9 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
         delete_row_n += block_entry->DeleteData(txn_id, commit_ts, delete_rows);
         txn_store->AddBlockStore(this, block_entry);
         if (delete_rows.size() > block_entry->row_capacity()) {
-            UnrecoverableError("Delete rows exceed block capacity");
+            String error_message = "Delete rows exceed block capacity";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     this->DecreaseRemainRow(delete_row_n);
@@ -387,7 +399,9 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
                                  const DeleteState *delete_state) {
     std::unique_lock w_lock(rw_locker_);
     if (status_ == SegmentStatus::kDeprecated) {
-        UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
+        String error_message = "Assert: Should not commit delete to deprecated segment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (delete_state != nullptr) {
@@ -401,7 +415,9 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
 
             if (compact_state_data_ != nullptr) {
                 if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
-                    UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
+                    String error_message = "Assert: compact_task is not nullptr means segment is being compacted";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 Vector<SegmentOffset> segment_offsets;
                 for (const auto &[block_id, block_offsets] : block_row_hashmap) {
@@ -436,7 +452,9 @@ void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID,
     for (auto [block_id, block_entry] : rollback_blocks) {
         if (!block_entry->Committed()) {
             if (block_entries_.empty() || block_entries_.back()->block_id() != block_entry->block_id()) {
-                UnrecoverableError("BlockEntry rollback order is not correct");
+                String error_message = "BlockEntry rollback order is not correct";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto &rollback_block = block_entries_.back();
             rollback_block->Cleanup();

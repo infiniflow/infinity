@@ -24,6 +24,7 @@ import column_vector;
 import value;
 import internal_types;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -93,7 +94,9 @@ public:
             if (row_count_ == 0) {
                 return 0;
             }
-            UnrecoverableError("Not finalized data block");
+            String error_message = "Not finalized data block";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return row_count_;
     }

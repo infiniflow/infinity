@@ -499,7 +499,9 @@ i64 WalManager::ReplayWalFile() {
 
     for (SizeT replay_count = 0; replay_count < replay_entries.size(); ++replay_count) {
         if (replay_entries[replay_count]->commit_ts_ < max_commit_ts) {
-            UnrecoverableError("Wal Replay: Commit ts should be greater than max commit ts");
+            String error_message = "Wal Replay: Commit ts should be greater than max commit ts";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
@@ -579,7 +581,9 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 break;
             }
             default: {
-                UnrecoverableError("WalManager::ReplayWalEntry unknown wal command type");
+                String error_message = "WalManager::ReplayWalEntry unknown wal command type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

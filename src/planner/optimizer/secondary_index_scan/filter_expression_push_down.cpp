@@ -83,7 +83,9 @@ protected:
 public:
     static inline bool HaveLeftColumnAndRightValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
         if (expression->arguments().size() != 2) {
-            UnrecoverableError("HaveLeftColumnAndRightValue: argument size != 2");
+            String error_message = "HaveLeftColumnAndRightValue: argument size != 2";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_valid_column) and
                IsValueResultExpression(expression->arguments()[1], sub_expr_depth + 1);
@@ -91,7 +93,9 @@ public:
 
     static inline bool HaveRightColumnAndLeftValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
         if (expression->arguments().size() != 2) {
-            UnrecoverableError("HaveRightColumnAndLeftValue: argument size != 2");
+            String error_message = "HaveRightColumnAndRightValue: argument size != 2";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return IsValidColumnExpression(expression->arguments()[1], sub_expr_depth + 1, is_valid_column) and
                IsValueResultExpression(expression->arguments()[0], sub_expr_depth + 1);
@@ -473,7 +477,9 @@ private:
                 return AddIndexForBooleanExpression(expression->arguments()[0]) and AddIndexForBooleanExpression(expression->arguments()[1]);
             } else if (f_name == "NOT") {
                 // recursive check
-                UnrecoverableError("Error when trying to apply index scan on \"NOT\" expression: need to be excluded early.");
+                String error_message = "Error when trying to apply index scan on \"NOT\" expression: need to be excluded early.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 return false;
             } else {
                 // compare function "[cast] x compare value_expr"
@@ -649,7 +655,9 @@ public:
                             }
                             default: {
                                 // error
-                                UnrecoverableError("Wrong compare type!");
+                                String error_message = "Wrong compare type!";
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
                                 return ReturnAlwaysTrue();
                             }
                         }
@@ -726,7 +734,9 @@ public:
                             }
                             default: {
                                 // error
-                                UnrecoverableError("Wrong compare type!");
+                                String error_message = "Wrong compare type!";
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
                                 return ReturnAlwaysTrue();
                             }
                         }

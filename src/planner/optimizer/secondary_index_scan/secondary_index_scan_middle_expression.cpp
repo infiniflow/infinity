@@ -33,6 +33,7 @@ import internal_types;
 import data_type;
 import logical_type;
 import filter_expression_push_down_helper;
+import logger;
 
 namespace infinity {
 
@@ -143,7 +144,9 @@ Vector<FilterEvaluatorElem> BuildSecondaryIndexScanMiddleCommand(SharedPtr<BaseE
     if (filter_builder.Solve()) {
         filter_evaluator = std::move(filter_builder.GetResult());
     } else {
-        UnrecoverableError("PhysicalIndexScan::Init(): filter solver error.");
+        String error_message = "PhysicalIndexScan::Init(): filter solver error.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return filter_evaluator;
 }

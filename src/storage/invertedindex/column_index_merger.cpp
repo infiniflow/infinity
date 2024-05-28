@@ -26,6 +26,7 @@ import file_system;
 import file_system_type;
 import infinity_exception;
 import vector_with_lock;
+import logger;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}
@@ -83,7 +84,9 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             const i64 read_count = fs_.Read(*file_handler, unsafe_column_lengths.data() + id_offset, file_size);
             file_handler->Close();
             if (read_count != file_size) {
-                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
+                String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
 

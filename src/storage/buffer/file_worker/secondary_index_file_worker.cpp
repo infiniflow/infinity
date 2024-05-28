@@ -39,12 +39,16 @@ SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
 
 void SecondaryIndexFileWorker::AllocateInMemory() {
     if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
+        String error_message = "AllocateInMemory: Already allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
         LOG_TRACE("Finished AllocateInMemory().");
     } else {
-        UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
+        String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -55,7 +59,9 @@ void SecondaryIndexFileWorker::FreeInMemory() {
         data_ = nullptr;
         LOG_TRACE("Finished FreeInMemory(), deleted data_ ptr.");
     } else {
-        UnrecoverableError("FreeInMemory: Data is not allocated.");
+        String error_message = "FreeInMemory: Data is not allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -66,7 +72,9 @@ void SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
-        UnrecoverableError("WriteToFileImpl: data_ is nullptr");
+        String error_message = "WriteToFileImpl: data_ is nullptr";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -77,7 +85,9 @@ void SecondaryIndexFileWorker::ReadFromFileImpl() {
         data_ = static_cast<void *>(index);
         LOG_TRACE("Finished ReadFromFileImpl().");
     } else {
-        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
+        String error_message = "ReadFromFileImpl: data_ is not nullptr";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -103,7 +113,9 @@ void SecondaryIndexFileWorkerParts::AllocateInMemory() {
         UnrecoverableError(fmt::format("AllocateInMemory: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192));
     }
     if (data_) [[unlikely]] {
-        UnrecoverableError("AllocateInMemory: Already allocated.");
+        String error_message = "AllocateInMemory: Already allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         data_ = static_cast<void *>(new char[part_row_count_ * data_pair_size_]);
         LOG_TRACE("Finished AllocateInMemory().");
@@ -118,7 +130,9 @@ void SecondaryIndexFileWorkerParts::FreeInMemory() {
         data_ = nullptr;
         LOG_TRACE("Finished FreeInMemory(), deleted data_ ptr.");
     } else {
-        UnrecoverableError("FreeInMemory: Data is not allocated.");
+        String error_message = "FreeInMemory: Data is not allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -128,7 +142,9 @@ void SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
-        UnrecoverableError("WriteToFileImpl: data_ is nullptr");
+        String error_message = "WriteToFileImpl: data_ is nullptr";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -142,7 +158,9 @@ void SecondaryIndexFileWorkerParts::ReadFromFileImpl() {
         file_handler_->Read(data_, read_bytes);
         LOG_TRACE("Finished ReadFromFileImpl().");
     } else {
-        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
+        String error_message = "ReadFromFileImpl: data_ is not nullptr";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

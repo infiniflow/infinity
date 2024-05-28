@@ -515,17 +515,23 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kVersion) == nullptr) {
                     // Version
-                    UnrecoverableError("Missing version field");
+                    String error_message = "Missing version field";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone) == nullptr) {
                     // Time zone
-                    UnrecoverableError("Missing time zone field");
+                    String error_message = "Missing time zone field";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZoneBias) == nullptr) {
                     // Time zone bias
-                    UnrecoverableError("Missing time zone field");
+                    String error_message = "Missing time zone field";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kWorkerCPULimit) == nullptr) {
@@ -1573,7 +1579,9 @@ void Config::SetLogLevel(LogLevel level) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
-        UnrecoverableError("Attempt to fetch log level value from log level data type option");
+        String error_message = "Attempt to fetch log level value from log level data type option";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
     log_level_option->value_ = level;
@@ -1584,7 +1592,9 @@ LogLevel Config::GetLogLevel() {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
-        UnrecoverableError("Attempt to fetch log level value from log level data type option");
+        String error_message = "Attempt to fetch log level value from log level data type option";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
     return log_level_option->value_;
@@ -1657,7 +1667,9 @@ FlushOptionType Config::FlushMethodAtCommit() {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit);
     if (base_option->data_type_ != BaseOptionDataType::kFlush) {
-        UnrecoverableError("Attempt to fetch flush option value from flush option data type option");
+        String error_message = "Attempt to fetch flush option value from flush option data type option";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     FlushOption *flush_option = static_cast<FlushOption *>(base_option);
     return flush_option->value_;

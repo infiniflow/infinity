@@ -109,7 +109,9 @@ private:
                 return original_value <= max_;
             }
             default: {
-                UnrecoverableError("InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!");
+                String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 // cannot decide, return true
                 return true;
             }
@@ -129,7 +131,9 @@ private:
                 return compare_str <= max_.GetStringView();
             }
             default: {
-                UnrecoverableError("InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!");
+                String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 // cannot decide, return true
                 return true;
             }

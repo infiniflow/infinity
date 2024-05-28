@@ -29,6 +29,7 @@ import embedding_info;
 import create_index_info;
 import knn_expr;
 import column_def;
+import logger;
 
 namespace infinity {
 
@@ -81,14 +82,20 @@ AnnIVFFlatIndexFileWorker<DataType>::~AnnIVFFlatIndexFileWorker() {
 template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     if (data_) {
-        UnrecoverableError("Data is already allocated.");
+        String error_message = "Data is already allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (index_base_->index_type_ != IndexType::kIVFFlat) {
-        UnrecoverableError("Index type is mismatched");
+        String error_message = "Index type is mismatched";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto data_type = column_def_->type();
     if (data_type->type() != LogicalType::kEmbedding) {
-        UnrecoverableError("Index should be created on embedding column now.");
+        String error_message = "Index should be created on embedding column now.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT dimension = GetDimension();
 
@@ -103,7 +110,9 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
             break;
         }
         default: {
-            UnrecoverableError("Index should be created on float embedding column now.");
+            String error_message = "Index should be created on float embedding column now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -111,7 +120,9 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
 template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
     if (!data_) {
-        UnrecoverableError("Data is not allocated.");
+        String error_message = "Data is not allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     delete index;

@@ -82,7 +82,9 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
         result.emplace_back(std::move(segment_ids));
     }
     if (next_segment_id != total_segment_num) {
-        UnrecoverableError("PhysicalIndexScan::PlanSegments(): segment number error.");
+        String error_message = "PhysicalIndexScan::PlanSegments(): segment number error.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return result;
 }
@@ -90,7 +92,9 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
 void PhysicalIndexScan::Init() {
     // check add_row_id_
     if (!add_row_id_) {
-        UnrecoverableError("ExecuteInternal(): add_row_id_ should be true.");
+        String error_message = "ExecuteInternal(): add_row_id_ should be true.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -314,7 +318,11 @@ struct TrunkReaderM final : public TrunkReader<ColumnValueType> {
         std::visit(Overload{[&](Vector<u32> &selected_rows, const Vector<u32> &result) {
                                 selected_rows.insert(selected_rows.end(), result.begin(), result.end());
                             },
-                            [](Vector<u32> &, const Bitmask &) { UnrecoverableError("TrunkReaderM::OutPut(): result count error."); },
+                            [](Vector<u32> &, const Bitmask &) {
+                                String error_message = "TrunkReaderM::OutPut(): result count error.";
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
+                            },
                             [&](Bitmask &bitmask, const Vector<u32> &result) {
                                 for (const auto offset : result) {
                                     bitmask.SetTrue(offset);
@@ -506,7 +514,9 @@ struct FilterResult {
                                 ExecuteSingleRangeT(interval_range, index_entry, txn);
                             },
                             [](const std::monostate &empty) {
-                                UnrecoverableError("FilterResult::ExecuteSingleRange(): class member interval_range_ not initialized!");
+                                String error_message = "FilterResult::ExecuteSingleRange(): class member interval_range_ not initialized!";
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
                             }},
                    interval_range_variant);
     }
@@ -518,7 +528,9 @@ struct FilterResult {
         u32 invalid_rows = 0;
         // check if output_data_blocks is empty
         if (!output_data_blocks.empty()) {
-            UnrecoverableError("FilterResult::Output(): output data block array should be empty.");
+            String error_message = "FilterResult::Output(): output data block array should be empty.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         Vector<SharedPtr<DataType>> output_types;
         output_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
@@ -559,7 +571,9 @@ struct FilterResult {
                                 }
                                 output_block_ptr->Finalize();
                                 if (output_rows + invalid_rows != selected_row_num) {
-                                    UnrecoverableError("FilterResult::Output(): output row num error.");
+                                    String error_message = "FilterResult::Output(): output row num error.";
+                                    LOG_CRITICAL(error_message);
+                                    UnrecoverableError(error_message);
                                 }
                             },
                             [&](const Vector<u32> &selected_rows) {
@@ -584,7 +598,9 @@ struct FilterResult {
                                 }
                                 output_block_ptr->Finalize();
                                 if (output_rows + invalid_rows != selected_row_num) {
-                                    UnrecoverableError("FilterResult::Output(): output row num error.");
+                                    String error_message = "FilterResult::Output(): output row num error.";
+                                    LOG_CRITICAL(error_message);
+                                    UnrecoverableError(error_message);
                                 }
                             }},
                    selected_rows_);
@@ -609,7 +625,9 @@ FilterResult SolveSecondaryIndexFilterInner(const Vector<FilterExecuteElem> &fil
                                             result_stack[v_size - 2].MergeOr(right);
                                             result_stack.pop_back();
                                         } else {
-                                            UnrecoverableError("SolveSecondaryIndexFilterInner(): filter result stack error.");
+                                            String error_message = "SolveSecondaryIndexFilterInner(): filter result stack error.";
+                                            LOG_CRITICAL(error_message);
+                                            UnrecoverableError(error_message);
                                         }
                                         break;
                                     }

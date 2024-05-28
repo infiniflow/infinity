@@ -14,12 +14,12 @@
 
 module;
 
+module bitmask_buffer;
+
 import stl;
 import global_resource_usage;
-
+import logger;
 import infinity_exception;
-
-module bitmask_buffer;
 
 namespace infinity {
 
@@ -49,7 +49,9 @@ BitmaskBuffer::~BitmaskBuffer() {
 
 void BitmaskBuffer::Initialize(SizeT count) {
     if ((count & (count - 1)) != 0) {
-        UnrecoverableError("Capacity need to be N power of 2.");
+        String error_message = "Capacity need to be N power of 2.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     count_ = count;
     SizeT unit_count = UnitCount(count); // u64 array length
@@ -61,7 +63,9 @@ void BitmaskBuffer::Initialize(SizeT count) {
 
 void BitmaskBuffer::Initialize(const u64 *input_ptr, SizeT count) {
     if ((count & (count - 1)) != 0) {
-        UnrecoverableError("Capacity need to be N power of 2.");
+        String error_message = "Capacity need to be N power of 2.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     count_ = count;
     SizeT unit_count = UnitCount(count); // u64 array length

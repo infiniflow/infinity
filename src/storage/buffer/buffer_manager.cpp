@@ -135,7 +135,9 @@ void BufferManager::RequestSpace(SizeT need_size) {
         }
     }
     if (current_memory_size_ + need_size > memory_limit_) {
-        UnrecoverableError("Out of memory.");
+        String error_message = "Out of memory.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     current_memory_size_ += need_size;
 }

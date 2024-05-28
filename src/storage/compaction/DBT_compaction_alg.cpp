@@ -127,7 +127,9 @@ void DBTCompactionAlg::DeleteInSegment(SegmentID segment_id) {
         return;
     }
     if (new_layer > old_layer) {
-        UnrecoverableError("Shrink segment should has less rows than before");
+        String error_message = "Shrink segment should has less rows than before";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     segment_layers_[old_layer].RemoveSegment(shrink_segment);
     segment_layers_[new_layer].AddSegment(shrink_segment);

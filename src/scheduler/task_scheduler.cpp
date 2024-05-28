@@ -69,7 +69,9 @@ void TaskScheduler::Init(Config *config_ptr) {
     }
 
     if (worker_array_.empty()) {
-        UnrecoverableError("No cpu is used in scheduler");
+        String error_message = "No cpu is used in scheduler";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     initialized_ = true;
@@ -100,7 +102,9 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
 
 void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
-        UnrecoverableError("Scheduler isn't initialized");
+        String error_message = "Scheduler isn't initialized";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // DumpPlanFragment(plan_fragment);
     bool use_scheduler = false;
@@ -133,10 +137,14 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
                 RunTask(task);
                 return ;
             } else {
-                UnrecoverableError("Oops! None select and create idnex statement has multiple fragments.");
+                String error_message = "Oops! None select and create idnex statement has multiple fragments.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         } else {
-            UnrecoverableError("None select statement has multiple fragments.");
+            String error_message = "None select statement has multiple fragments.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -148,7 +156,9 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
         for (auto &task : tasks) {
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
-                UnrecoverableError("Task can't be scheduled");
+                String error_message = "Task can't be scheduled";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             u64 worker_id = FindLeastWorkloadWorker();
             ScheduleTask(task.get(), worker_id);

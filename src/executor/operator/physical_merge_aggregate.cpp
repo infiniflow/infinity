@@ -98,8 +98,11 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
                     HandleAggregateFunction<DoubleT>(function_name, op_state, col_idx);
                     break;
                 }
-                default:
-                    UnrecoverableError("Input value type not Implement");
+                default: {
+                    String error_message = "Input value type not Implement";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                }
             }
         }
     }

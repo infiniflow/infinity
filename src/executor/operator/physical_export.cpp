@@ -50,7 +50,9 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
             break;
         }
         default: {
-            UnrecoverableError("Not supported file type");
+            String error_message = "Not supported file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -102,7 +104,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
             for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
                 column_vectors.emplace_back(block_entry->GetColumnBlockEntry(column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
                 if(column_vectors[column_idx].Size() != block_row_count) {
-                    UnrecoverableError("Unmatched row_count between block and block_column");
+                    String error_message = "Unmatched row_count between block and block_column";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
 
@@ -153,7 +157,9 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
             for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
                 column_vectors.emplace_back(block_entry->GetColumnBlockEntry(column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
                 if(column_vectors[column_idx].Size() != block_row_count) {
-                    UnrecoverableError("Unmatched row_count between block and block_column");
+                    String error_message = "Unmatched row_count between block and block_column";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
 

@@ -577,7 +577,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         txn_id,
                         begin_ts);
                 } else if (merge_flag == MergeFlag::kUpdate) {
-                    UnrecoverableError("Update database entry is not supported.");
+                    String error_message = "Update database entry is not supported.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 break;
             }

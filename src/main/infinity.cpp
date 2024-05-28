@@ -275,7 +275,9 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
             break;
         }
         default: {
-            UnrecoverableError("Invalid set scope.");
+            String error_message = "Invalid set scope.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -302,7 +304,9 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
             break;
         }
         default: {
-            UnrecoverableError("Invalid set scope.");
+            String error_message = "Invalid set scope.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

@@ -276,7 +276,9 @@ void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
     auto block_version_handle = block_version_->Load();
     auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
     if (!block_version->created_.empty()) {
-        UnrecoverableError("BlockEntry::CommitFlushed: block_version->created_ is not empty");
+        String error_message = "BlockEntry::CommitFlushed: block_version->created_ is not empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     block_version->created_.emplace_back(commit_ts, this->row_count_);
 
@@ -460,7 +462,9 @@ void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, Colum
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {
     if (read_size + row_count_ > row_capacity_) {
-        UnrecoverableError("BlockEntry::AppendBlock: read_size + row_count_ > row_capacity_");
+        String error_message = "BlockEntry::AppendBlock: read_size + row_count_ > row_capacity_";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (ColumnID column_id = 0; column_id < columns_.size(); ++column_id) {
         columns_[column_id]->Append(&column_vectors[column_id], row_begin, read_size, buffer_mgr);

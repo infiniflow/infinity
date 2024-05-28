@@ -44,7 +44,9 @@ export inline BoundCastFunc BindBitmapCast(DataType &target) {
 struct BitmapTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
-        UnrecoverableError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
+        String error_message = "Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>();
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
