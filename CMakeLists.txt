@@ -146,31 +146,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 find_package(Python 3.8
         REQUIRED COMPONENTS Interpreter Development.Module
         OPTIONAL_COMPONENTS Development.SABIModule)
-message("after find python, Python3_INCLUDE_DIRS = ${Python3_INCLUDE_DIRS}")
-message("after find python, Python3_LIBRARIES = ${Python3_LIBRARIES}")
-set(Python3_INCLUDE_DIRS "/usr/include/python3.11")
-set(Python3_LIBRARIES "/usr/lib/python3.11/config-3.11-x86_64-linux-gnu/libpython3.11.so")
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-execute_process(
-        COMMAND python3 -m nanobind --cmake_dir
-        OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
-message("NB_DIR=${NB_DIR}")
-list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
-
-find_package(nanobind CONFIG REQUIRED)
-
-set(nanobind_INCLUDE_DIRS "${NB_DIR}/include")
-message("include dir = ${nanobind_INCLUDE_DIRS}")
-set(nanobind_SRC_DIR "${NB_DIR}/src")
-
-find_library(NANOBIND_LIBRARY nanobind)
-message("NANOBIND_LIBRARY = ${NANOBIND_LIBRARY}")
-
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanobind)
 
 add_library(hello src/hello.cpp)
 
