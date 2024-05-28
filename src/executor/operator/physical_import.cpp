@@ -92,7 +92,9 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     import_op_state->SetComplete();
@@ -151,7 +153,9 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
-        UnrecoverableError("Weird file size.");
+        String error_message = "Weird file size.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT vector_n = file_size / row_size;
 

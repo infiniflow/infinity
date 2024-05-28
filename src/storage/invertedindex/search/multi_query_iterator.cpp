@@ -15,10 +15,12 @@
 module;
 
 #include <iostream>
+
 module multi_query_iterator;
 
 import stl;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -32,7 +34,9 @@ void MultiQueryDocIterator::PrintTree(std::ostream &os, const String &prefix, bo
     } else if (IsOr()) {
         os << "OrIterator";
     } else {
-        UnrecoverableError("Unknown query type");
+        String error_message = "Unknown query type";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     os << " (children count: " << children_.size() << ")";
     os << " (doc_freq: " << GetDF() << ")";

@@ -25,6 +25,7 @@ import logical_node_type;
 import logical_type;
 import infinity_exception;
 import internal_types;
+import logger;
 
 namespace infinity {
 
@@ -92,7 +93,9 @@ String LogicalCommand::ToString(i64 &space) const {
                     break;
                 }
                 case SetVarType::kInvalid: {
-                    UnrecoverableError("Invalid variable type.");
+                    String error_message = "Invalid variable type.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
             break;
@@ -103,7 +106,9 @@ String LogicalCommand::ToString(i64 &space) const {
             break;
         }
         case CommandType::kInvalid: {
-            UnrecoverableError("Invalid command type.");
+            String error_message = "Invalid command type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

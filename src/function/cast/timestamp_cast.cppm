@@ -25,6 +25,7 @@ import column_vector;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -72,25 +73,33 @@ struct TimestampTryCastToVarlen {
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, ColumnVector*) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

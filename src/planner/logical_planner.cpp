@@ -183,7 +183,9 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
         }
         default: {
-            UnrecoverableError("Invalid statement type.");
+            String error_message = "Invalid statement type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return Status::OK();
@@ -214,7 +216,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     // Get table name
     if (table_name.empty()) {
-        UnrecoverableError("Insert statement missing table table_name.");
+        String error_message = "Insert statement missing table table_name.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
@@ -424,7 +428,9 @@ Status LogicalPlanner::BuildCreate(CreateStatement *statement, SharedPtr<BindCon
             return BuildCreateDatabase(statement, bind_context_ptr);
         }
         default: {
-            UnrecoverableError("Not supported");
+            String error_message = "Not supported";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return Status::OK();
@@ -621,7 +627,9 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     } else {
         // Specify the view column
         if (column_count != bound_statement_ptr->names_ptr_->size()) {
-            UnrecoverableError("Create view column count isn't matched.");
+            String error_message = "Create view column count isn't matched.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         columns_ptr = MakeShared<Vector<String>>(*(create_view_info->view_columns_));
     }
@@ -699,7 +707,9 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             break;
         }
         case IndexType::kInvalid: {
-            UnrecoverableError("Invalid index type.");
+            String error_message = "Invalid index type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -732,7 +742,9 @@ Status LogicalPlanner::BuildDrop(DropStatement *statement, SharedPtr<BindContext
             return BuildDropView(statement, bind_context_ptr);
         }
         case DDLType::kInvalid: {
-            UnrecoverableError("Invalid drop statement type.");
+            String error_message = "Invalid drop statement type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return Status::OK();
@@ -997,7 +1009,9 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             break;
         }
         default: {
-            UnrecoverableError("Invalid command type.");
+            String error_message = "Invalid command type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return Status::OK();
@@ -1075,7 +1089,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
             return BuildShowConfig(statement, bind_context_ptr);
         }
         default: {
-            UnrecoverableError("Unexpected show statement type.");
+            String error_message = "Unexpected show statement type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return Status::OK();

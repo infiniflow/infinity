@@ -19,6 +19,7 @@ module;
 import infinity_exception;
 import stl;
 import expression_type;
+import logger;
 
 module in_expression;
 
@@ -43,7 +44,10 @@ String InExpression::ToString() const {
             break;
         }
         default: {
-            UnrecoverableError("Unknown In operator type.");
+            String error_message = "Unknown IN operator type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
     }
 

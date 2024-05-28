@@ -273,7 +273,10 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kHugeInt: {
-                            UnrecoverableError("Not implement: HugeInt data shuffle.");
+                            String error_message = "Not implement: HugeInt data shuffle";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                         case kFloat: {
                             ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =

@@ -178,7 +178,9 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
     for (auto *segment_index_entry : segment_index_entries) {
         auto [iter, insert_ok] = txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
         if (!insert_ok) {
-            UnrecoverableError(fmt::format("Attempt to add segment index of segment {} store twice", segment_index_entry->segment_id()));
+            String error_message = fmt::format("Attempt to add segment index of segment {} store twice", segment_index_entry->segment_id());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -218,7 +220,9 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
         auto &block_vec = seg_map[block_id];
         block_vec.emplace_back(block_offset);
         if (block_vec.size() > DEFAULT_BLOCK_CAPACITY) {
-            UnrecoverableError("Delete row exceed block capacity");
+            String error_message = "Delete row exceed block capacity";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -228,7 +232,9 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
 Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
                                                         CompactStatementType type) {
     if (compact_state_.type_ != CompactStatementType::kInvalid) {
-        UnrecoverableError("Attempt to compact table store twice");
+        String error_message = "Attempt to compact table store twice";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     compact_state_ = TxnCompactStore(type);
     for (auto &[new_segment, old_segments] : segment_data) {
@@ -340,7 +346,9 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
 
     for (auto *sealed_segment : set_sealed_segments_) {
         if (!sealed_segment->SetSealed()) {
-            UnrecoverableError(fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id()));
+            String error_message = fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -373,7 +381,9 @@ void TxnTableStore::MaintainCompactionAlg() const {
 void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {
     auto [iter, insert_ok] = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry));
     if (!insert_ok) {
-        UnrecoverableError(fmt::format("Attempt to add segment store twice"));
+        String error_message = fmt::format("Attempt to add segment store twice");
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

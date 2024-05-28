@@ -26,6 +26,7 @@ import logical_type;
 import infinity_exception;
 import third_party;
 import internal_types;
+import logger;
 
 namespace infinity {
 
@@ -35,38 +36,60 @@ export struct DecimalTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
     if (source.type() == target.type()) {
-        UnrecoverableError("Can't cast from the same type");
+        String error_message = "Can't cast from the same type";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kSmallInt: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kInteger: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kBigInt: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kHugeInt: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kFloat: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kDouble: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kDecimal: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kVarchar: {
-            UnrecoverableError("Not implemented");
+            String error_message = "Not implemented";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast from Decimal type to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast from Decimal type to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return BoundCastFunc(nullptr);
@@ -93,13 +116,17 @@ struct DecimalTryCastToVarlen {
 // Cast DecimalT to TinyIntT
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, TinyIntT &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, SmallIntT &) {
-    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
+    String error_message = "Not implement: DecimalTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
