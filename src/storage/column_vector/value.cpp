@@ -921,14 +921,18 @@ String Value::ToString() const {
             const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
-                UnrecoverableError("Tensor data size mismatch.");
+                String error_message = "Tensor data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
             return TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
         case LogicalType::kTensorArray: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return {};
         }
         case LogicalType::kDecimal:
@@ -1013,7 +1017,9 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
             const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
             if (data_bytes != embedding_info->Size()) {
-                UnrecoverableError("Embedding data size mismatch.");
+                String error_message = "Embedding data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
             json[name] = EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
@@ -1024,7 +1030,9 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
             const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
-                UnrecoverableError("Tensor data size mismatch.");
+                String error_message = "Tensor data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
             json[name] = TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
@@ -1032,7 +1040,9 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
         }
         case LogicalType::kTensorArray: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kHugeInt:
         case LogicalType::kDecimal:
@@ -1055,7 +1065,9 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
 
 SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes) {
     if (bytes == 0) {
-        UnrecoverableError("EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.");
+        String error_message = "EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         Status status = Status::SyntaxError(fmt::format("EmbeddingValueInfo::MakeTensorValueInfo(bytes={}) is larger than the maximum tensor size={}",

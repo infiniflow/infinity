@@ -87,10 +87,14 @@ u32 SkipListReader::GetLastKeyInBuffer() const {
 
 void SkipListReaderByteSlice::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end) {
     if (start > byte_slice_list->GetTotalSize()) {
-        UnrecoverableError("start > byte_slice_list->GetTotalSize().");
+        String error_message = "start > byte_slice_list->GetTotalSize().";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (end > byte_slice_list->GetTotalSize()) {
-        UnrecoverableError("end > byte_slice_list->GetTotalSize().");
+        String error_message = "end > byte_slice_list->GetTotalSize().";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     start_ = start;
     end_ = end;
@@ -100,10 +104,14 @@ void SkipListReaderByteSlice::Load(const ByteSliceList *byte_slice_list, u32 sta
 
 void SkipListReaderByteSlice::Load(ByteSlice *byte_slice, u32 start, u32 end) {
     if (start > byte_slice->size_) {
-        UnrecoverableError("start > byte_slice->size_.");
+        String error_message = "start > byte_slice->size_.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (end > byte_slice->size_) {
-        UnrecoverableError("end > byte_slice->size_.");
+        String error_message = "end > byte_slice->size_.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     start_ = start;

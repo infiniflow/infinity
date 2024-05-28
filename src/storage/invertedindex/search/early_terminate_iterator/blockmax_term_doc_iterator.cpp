@@ -53,7 +53,10 @@ bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPostin
         doc_freq_ = iter_.GetDocFreq();
         return true;
     }
-    UnrecoverableError("Unexpected case: Init PostingIterator failed");
+
+    String error_message = "Unexpected case: Init PostingIterator failed";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
