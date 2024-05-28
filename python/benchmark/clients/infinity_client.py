@@ -45,6 +45,11 @@ class InfinityClient(BaseClient):
         db_obj.drop_table(self.table_name)
         db_obj.create_table(self.table_name, self.data["schema"])
         table_obj = db_obj.get_table(self.table_name)
+        # create index
+        # indexs = self._parse_index_schema(self.data["index"])
+        # for i, idx in enumerate(indexs):
+        #     table_obj.create_index(f"index{i}", [idx])
+
         dataset_path = os.path.join(self.path_prefix, self.data["data_path"])
         if not os.path.exists(dataset_path):
             self.download_data(self.data["data_link"], dataset_path)
@@ -109,11 +114,6 @@ class InfinityClient(BaseClient):
 
                     if current_batch:
                         table_obj.insert(current_batch)
-
-        # create index
-        indexs = self._parse_index_schema(self.data["index"])
-        for i, idx in enumerate(indexs):
-            table_obj.create_index(f"index{i}", [idx])
 
     def setup_clients(self, num_threads=1):
         host, port = self.data["host"].split(":")
