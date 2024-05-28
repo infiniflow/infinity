@@ -389,9 +389,11 @@ void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentEntry *segment_e
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("BuildFastRoughFilterTask: segment {} status {} cannot build filter",
-                                           segment_entry->segment_id(),
-                                           static_cast<std::underlying_type_t<SegmentStatus>>(status)));
+            String error_message = fmt::format("BuildFastRoughFilterTask: segment {} status {} cannot build filter",
+                                               segment_entry->segment_id(),
+                                               static_cast<std::underlying_type_t<SegmentStatus>>(status));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return;
         }
     }

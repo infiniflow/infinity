@@ -151,7 +151,9 @@ public:
         }
 
         if (tail_index_ >= capacity_) {
-            UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+            String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         SetValue(tail_index_++, value);
     }

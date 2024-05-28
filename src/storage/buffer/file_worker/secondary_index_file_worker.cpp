@@ -110,7 +110,9 @@ SecondaryIndexFileWorkerParts::~SecondaryIndexFileWorkerParts() {
 
 void SecondaryIndexFileWorkerParts::AllocateInMemory() {
     if (row_count_ < part_id_ * 8192) {
-        UnrecoverableError(fmt::format("AllocateInMemory: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192));
+        String error_message = fmt::format("AllocateInMemory: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (data_) [[unlikely]] {
         String error_message = "AllocateInMemory: Already allocated.";
@@ -120,7 +122,9 @@ void SecondaryIndexFileWorkerParts::AllocateInMemory() {
         data_ = static_cast<void *>(new char[part_row_count_ * data_pair_size_]);
         LOG_TRACE("Finished AllocateInMemory().");
     } else {
-        UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
+        String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -150,7 +154,9 @@ void SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare
 
 void SecondaryIndexFileWorkerParts::ReadFromFileImpl() {
     if (row_count_ < part_id_ * 8192) {
-        UnrecoverableError(fmt::format("ReadFromFileImpl: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192));
+        String error_message = fmt::format("ReadFromFileImpl: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (!data_) [[likely]] {
         const u32 read_bytes = part_row_count_ * data_pair_size_;
