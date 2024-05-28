@@ -211,9 +211,7 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     }
     EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     SizeT len = embedding_info->Size();
-    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>();
-    embedding_value_info->data_.resize(len);
-    std::memcpy(embedding_value_info->data_.data(), ptr, len);
+    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>(ptr, len);
     Value value(LogicalType::kEmbedding, type_info_ptr);
     value.value_info_ = embedding_value_info;
     return value;
@@ -553,17 +551,11 @@ bool Value::operator==(const Value &other) const {
             const String &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
-        case kEmbedding: {
-            const Vector<char> &data1 = this->value_info_->Get<EmbeddingValueInfo>().data_;
-            const Vector<char> &data2 = other.value_info_->Get<EmbeddingValueInfo>().data_;
-            return std::ranges::equal(data1, data2);
-            break;
-        }
+        case kEmbedding:
         case kTensor: {
-            const Vector<char> &data1 = this->value_info_->Get<EmbeddingValueInfo>().data_;
-            const Vector<char> &data2 = other.value_info_->Get<EmbeddingValueInfo>().data_;
+            const Span<char> &data1 = this->GetEmbedding();
+            const Span<char> &data2 = other.GetEmbedding();
             return std::ranges::equal(data1, data2);
-            break;
         }
         case kTensorArray: {
             // TODO
@@ -862,22 +854,23 @@ String Value::ToString() const {
         }
         case LogicalType::kEmbedding: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
-            if (data_bytes != embedding_info->Size()) {
+            Span<char> data_span = this->GetEmbedding();
+            if (data_span.size() != embedding_info->Size()) {
                 UnrecoverableError("Embedding data size mismatch.");
             }
-            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
+            const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
         }
         case LogicalType::kTensor: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            Span<char> data_span = this->GetEmbedding();
+            SizeT data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
                 UnrecoverableError("Tensor data size mismatch.");
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
-            return TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            return TensorT::Tensor2String(const_cast<char *>(data_span.data()), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
         case LogicalType::kTensorArray: {
             // TODO
@@ -969,23 +962,25 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
         }
         case LogicalType::kEmbedding: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
-            if (data_bytes != embedding_info->Size()) {
+            Span<char> data_span = this->GetEmbedding();
+            if (data_span.size() != embedding_info->Size()) {
                 UnrecoverableError("Embedding data size mismatch.");
             }
-            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
+            const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
             json[name] = EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
             return;
         }
         case LogicalType::kTensor: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            Span<char> data_span = this->GetEmbedding();
+            SizeT data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
                 UnrecoverableError("Tensor data size mismatch.");
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
-            json[name] = TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            json[name] =
+                TensorT::Tensor2String(const_cast<char *>(data_span.data()), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
             return;
         }
         case LogicalType::kTensorArray: {
@@ -1009,10 +1004,7 @@ SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
-    auto tensor_info_ptr = MakeShared<EmbeddingValueInfo>();
-    tensor_info_ptr->data_.resize(bytes);
-    std::memcpy(tensor_info_ptr->data_.data(), ptr, bytes);
-    return tensor_info_ptr;
+    return MakeShared<EmbeddingValueInfo>(ptr, bytes);
 }
 
 } // namespace infinity

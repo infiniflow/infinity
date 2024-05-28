@@ -1133,7 +1133,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         }
         case kTensor: {
             const auto embedding_size_unit = data_type_->type_info()->Size();
-            const auto [src_ptr, src_size] = value.GetEmbedding();
+            Span<char> data_span = value.GetEmbedding();
+            const_ptr_t src_ptr = data_span.data();
+            SizeT src_size = data_span.size();
             if (src_size == 0 or (src_size % embedding_size_unit) != 0) {
                 UnrecoverableError(fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
                                                src_size,
@@ -1152,7 +1154,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             Vector<TensorT> tensor_array_data(tensor_num);
             for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
                 auto &[embedding_num, tensor_chunk_id, tensor_chunk_offset] = tensor_array_data[tensor_id];
-                const auto [tensor_data_ptr, tensor_data_bytes] = value_tensor_array[tensor_id]->GetData();
+                Span<char> tensor_data_span = value_tensor_array[tensor_id]->GetData();
+                const_ptr_t tensor_data_ptr = tensor_data_span.data();
+                SizeT tensor_data_bytes = tensor_data_span.size();
                 if (tensor_data_bytes == 0 or (tensor_data_bytes % embedding_size_unit) != 0) {
                     UnrecoverableError(fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
                                                    tensor_data_bytes,
@@ -1177,9 +1181,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kEmbedding: {
-            const_ptr_t src_ptr;
-            SizeT src_size;
-            std::tie(src_ptr, src_size) = value.GetEmbedding();
+            Span<char> data_span = value.GetEmbedding();
+            const_ptr_t src_ptr = data_span.data();
+            SizeT src_size = data_span.size();
             if (src_size != data_type_->Size()) {
                 UnrecoverableError(fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}",
                                                data_type_->Size(),
