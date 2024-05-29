@@ -41,6 +41,7 @@ import data_type;
 import data_block;
 import segment_entry;
 import block_entry;
+import logger;
 
 using namespace infinity;
 

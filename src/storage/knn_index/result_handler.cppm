@@ -19,7 +19,7 @@ module;
 export module knn_result_handler;
 
 import stl;
-import logger;
+
 import infinity_exception;
 import bitmask;
 import internal_types;
@@ -382,18 +382,14 @@ class ReservoirResultHandler : public ResultHandlerBase {
             }
         }
         if (n_eq != 0) {
-            String error_message = "compress_array error: n_eq != 0";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
+            UnrecoverableError("compress_array error: n_eq != 0");
         }
         return wp;
     }
 
     static DistType partition_median3(DistType *vals, ID *ids, SizeT n, SizeT q_min, SizeT q_max, SizeT &q_out) {
         if (n < 3) {
-            String error_message = "partition_median3 error: n < 3";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
+            UnrecoverableError("partition_median3 error: n < 3");
         }
         DistType thresh_inf = Compare::CompareReverse::InitialValue();
         DistType thresh_sup = Compare::InitialValue();
@@ -417,23 +413,17 @@ class ReservoirResultHandler : public ResultHandlerBase {
             }
             DistType new_thresh = sample_threshold_median3(vals, n, thresh_inf, thresh_sup);
             if (new_thresh == thresh_inf) {
-                String error_message = "partition_median3 error: new_thresh == thresh_inf";
-                LOG_CRITICAL(error_message);
-                UnrecoverableError(error_message);
+                UnrecoverableError("partition_median3 error: new_thresh == thresh_inf");
             }
             thresh = new_thresh;
         }
         if (q < n_lt) {
-            String error_message = "partition_median3 error: q < n_lt";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
+            UnrecoverableError("partition_median3 error: q < n_lt");
         }
         SizeT n_eq_extra = q - n_lt;
         auto wp = compress_array(vals, ids, n, thresh, n_eq_extra);
         if (wp != q) {
-            String error_message = "partition_median3 error: wp != q";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
+            UnrecoverableError("partition_median3 error: wp != q");
         }
         q_out = q;
         return thresh;

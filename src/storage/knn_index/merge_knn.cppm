@@ -19,7 +19,7 @@ export module merge_knn;
 import stl;
 
 import knn_result_handler;
-import logger;
+
 import infinity_exception;
 import bitmask;
 import default_values;
@@ -190,9 +190,7 @@ RowID *MergeKnn<DataType, C>::GetIDs() const {
 template <typename DataType, template <typename, typename> typename C>
 DataType *MergeKnn<DataType, C>::GetDistancesByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
-        String error_message = "Query index exceeds the limit";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
+        UnrecoverableError("Query index exceeds the limit");
     }
     return distance_array_.get() + idx * this->topk_;
 }
@@ -200,9 +198,7 @@ DataType *MergeKnn<DataType, C>::GetDistancesByIdx(u64 idx) const {
 template <typename DataType, template <typename, typename> typename C>
 RowID *MergeKnn<DataType, C>::GetIDsByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
-        String error_message = "Query index exceeds the limit";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
+        UnrecoverableError("Query index exceeds the limit");
     }
     return idx_array_.get() + idx * this->topk_;
 }

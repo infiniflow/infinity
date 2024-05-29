@@ -27,6 +27,7 @@ import internal_types;
 import logical_type;
 import infinity_exception;
 import vector_with_lock;
+import logger;
 
 using namespace infinity;
 

@@ -33,7 +33,26 @@ import embedding_info;
 import knn_expr;
 import data_type;
 
-class ColumnVectorEmbeddingTest : public BaseTest {};
+class ColumnVectorEmbeddingTest : public BaseTest {
+    void SetUp() override {
+        RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+};
 
 TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     using namespace infinity;
