@@ -1619,6 +1619,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kCSR: {
+            auto file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSR");
+            result->emplace_back(file_type);
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid show type";
             LOG_CRITICAL(error_message);
@@ -1685,6 +1690,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<V
         }
         case CopyFileType::kFVECS: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: FVECS");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kCSR: {
+            auto file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSR");
             result->emplace_back(file_type);
             break;
         }

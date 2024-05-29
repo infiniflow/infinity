@@ -21,10 +21,12 @@ import logical_type;
 import infinity_exception;
 import internal_types;
 import embedding_info;
+import sparse_info;
 import data_type;
 import knn_expr;
 import third_party;
 import logger;
+import status;
 
 namespace infinity {
 
@@ -33,6 +35,7 @@ enum class ExtraValueInfoType : u8 {
     STRING_VALUE_INFO = 1,
     EMBEDDING_VALUE_INFO = 2,
     TENSORARRAY_VALUE_INFO = 3,
+    SPARSE_VALUE_INFO = 4,
 };
 
 //===--------------------------------------------------------------------===//
@@ -93,23 +96,28 @@ protected:
 //===--------------------------------------------------------------------===//
 export struct EmbeddingValueInfo : public ExtraValueInfo {
     static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::EMBEDDING_VALUE_INFO;
-    friend struct Value;
 
 public:
     EmbeddingValueInfo() : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {}
 
+    EmbeddingValueInfo(const char *data_ptr, SizeT bytes) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+        len_ = bytes;
+        data_ = MakeUnique<char[]>(bytes);
+        std::memcpy(data_.get(), data_ptr, bytes);
+    }
+
     template <typename T>
     explicit EmbeddingValueInfo(const Vector<T> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
-        SizeT len = values_p.size() * sizeof(T);
-        data_.resize(len);
-        std::memcpy(data_.data(), values_p.data(), len);
+        len_ = values_p.size() * sizeof(T);
+        data_ = MakeUnique<char[]>(len_);
+        std::memcpy(data_.get(), values_p.data(), len_);
     }
 
     template <>
     explicit EmbeddingValueInfo(const Vector<bool> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
-        SizeT len = values_p.size() / 8;
-        data_.resize(len);
-        auto *data_ptr = reinterpret_cast<u8 *>(data_.data());
+        len_ = values_p.size() / 8;
+        data_ = MakeUnique<char[]>(len_);
+        auto *data_ptr = reinterpret_cast<u8 *>(data_.get());
         for (SizeT i = 0; i < values_p.size(); i++) {
             if (values_p[i]) {
                 data_ptr[i / 8] |= (1u << (i % 8));
@@ -117,13 +125,17 @@ public:
         }
     }
 
+    EmbeddingValueInfo(UniquePtr<char[]> data, SizeT len)
+        : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO), data_(std::move(data)), len_(len) {}
+
     // Also used for tensor info
     static SharedPtr<EmbeddingValueInfo> MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes);
 
-    Pair<const_ptr_t, SizeT> GetData() const { return MakePair<const_ptr_t, SizeT>(data_.data(), data_.size()); }
+    Span<char> GetData() const { return {data_.get(), len_}; }
 
-protected:
-    Vector<char> data_;
+private:
+    UniquePtr<char[]> data_;
+    SizeT len_;
 };
 
 //===--------------------------------------------------------------------===//
@@ -135,6 +147,37 @@ export struct TensorArrayValueInfo : public ExtraValueInfo {
     TensorArrayValueInfo() : ExtraValueInfo(ExtraValueInfoType::TENSORARRAY_VALUE_INFO) {}
     void AppendTensor(const_ptr_t ptr, SizeT bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
     Vector<SharedPtr<EmbeddingValueInfo>> member_tensor_data_;
+};
+
+//===--------------------------------------------------------------------===//
+// TensorArray Value Info
+//===--------------------------------------------------------------------===//
+
+export struct SparseValueInfo : public ExtraValueInfo {
+    static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::SPARSE_VALUE_INFO;
+    friend struct Value;
+
+    template <typename Idx, typename T>
+    SparseValueInfo(const Vector<Idx> &indices_vec, const Vector<T> data_vec)
+        : ExtraValueInfo(ExtraValueInfoType::SPARSE_VALUE_INFO), nnz_(data_vec.size()), indices_(indices_vec), data_(data_vec) {}
+
+    SparseValueInfo(SizeT nnz, const char *raw_indice_ptr, SizeT raw_indice_len, const char *raw_data_ptr, SizeT raw_data_len)
+        : ExtraValueInfo(ExtraValueInfoType::SPARSE_VALUE_INFO), nnz_(nnz), indices_(EmbeddingValueInfo(raw_indice_ptr, raw_indice_len)),
+          data_(EmbeddingValueInfo(raw_data_ptr, raw_data_len)) {}
+
+    SparseValueInfo(SizeT nnz, UniquePtr<char[]> indice_ptr, SizeT indice_len, UniquePtr<char[]> data_ptr, SizeT data_len)
+        : ExtraValueInfo(ExtraValueInfoType::SPARSE_VALUE_INFO), nnz_(nnz), indices_(EmbeddingValueInfo(std::move(indice_ptr), indice_len)),
+          data_(EmbeddingValueInfo(std::move(data_ptr), data_len)) {}
+
+    Tuple<SizeT, const_ptr_t, const_ptr_t, SizeT, SizeT> GetData() const {
+        Span<char> indice_span = indices_.GetData();
+        Span<char> data_span = data_.GetData();
+        return {nnz_, indice_span.data(), data_span.data(), indice_span.size(), data_span.size()};
+    }
+
+    SizeT nnz_{};
+    EmbeddingValueInfo indices_;
+    EmbeddingValueInfo data_;
 };
 
 export struct Value {
@@ -210,26 +253,6 @@ public:
         auto embedding_info_ptr = EmbeddingInfo::Make(ToEmbeddingDataType<T>(), vec.size());
         Value value(LogicalType::kEmbedding, embedding_info_ptr);
         value.value_info_ = MakeShared<EmbeddingValueInfo>(vec);
-        if constexpr (std::is_same_v<T, bool>) {
-            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemBit, vec.size()));
-        } else if constexpr (std::is_same_v<T, i8>) {
-            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt8, vec.size()));
-        } else if constexpr (std::is_same_v<T, i16>) {
-            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt16, vec.size()));
-        } else if constexpr (std::is_same_v<T, i32>) {
-            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt32, vec.size()));
-        } else if constexpr (std::is_same_v<T, i64>) {
-            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, vec.size()));
-        } else if constexpr (std::is_same_v<T, float>) {
-            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, vec.size()));
-        } else if constexpr (std::is_same_v<T, double>) {
-            value.type_ = DataType(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, vec.size()));
-        } else {
-            String error_message = "Not supported embedding data type.";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
-        }
-
         return value;
     }
 
@@ -238,6 +261,52 @@ public:
     static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
 
     static Value MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr);
+
+    template <typename Idx, typename T>
+    static Value MakeSparse(const Pair<Vector<Idx>, Vector<T>> &vec) {
+        const auto &[indice_vec, data_vec] = vec;
+        {
+            HashSet<Idx> indice_set(indice_vec.begin(), indice_vec.end());
+            if (indice_set.size() != indice_vec.size()) {
+                RecoverableError(Status::InvalidDataType());
+            }
+        }
+        if (indice_vec.size() != data_vec.size()) {
+            UnrecoverableError("Sparse data size mismatch.");
+        }
+        SizeT sparse_dim = 0;
+        if (!indice_vec.empty()) {
+            sparse_dim = *std::max_element(indice_vec.begin(), indice_vec.end()) + 1;
+        }
+        auto sparse_info_ptr = SparseInfo::Make(ToEmbeddingDataType<T>(), ToEmbeddingDataType<Idx>(), sparse_dim);
+        Value value(LogicalType::kSparse, sparse_info_ptr);
+        value.value_info_ = MakeShared<SparseValueInfo>(indice_vec, data_vec);
+
+        return value;
+    }
+
+    static Value MakeSparse(const char *raw_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info) {
+        const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
+
+        const char *raw_indice_ptr = raw_ptr;
+        SizeT raw_indice_len = sparse_info->IndiceSize(nnz);
+        const char *raw_data_ptr = raw_ptr + raw_indice_len;
+        SizeT raw_data_len = sparse_info->DataSize(nnz);
+        Value value(LogicalType::kSparse, type_info);
+        value.value_info_ = MakeShared<SparseValueInfo>(nnz, raw_indice_ptr, raw_indice_len, raw_data_ptr, raw_data_len);
+        return value;
+    }
+
+    static Value MakeSparse(SizeT nnz,
+                            UniquePtr<char[]> indice_ptr,
+                            SizeT indice_len,
+                            UniquePtr<char[]> data_ptr,
+                            SizeT data_len,
+                            const SharedPtr<TypeInfo> type_info) {
+        Value value(LogicalType::kSparse, type_info);
+        value.value_info_ = MakeShared<SparseValueInfo>(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len);
+        return value;
+    }
 
     void AppendToTensorArray(const_ptr_t ptr, SizeT bytes);
 
@@ -255,9 +324,11 @@ public:
     // Value getter for each type outside union
     const String &GetVarchar() const { return this->value_info_->Get<StringValueInfo>().GetString(); }
 
-    Pair<const_ptr_t, SizeT> GetEmbedding() const { return this->value_info_->Get<EmbeddingValueInfo>().GetData(); }
+    Span<char> GetEmbedding() const { return this->value_info_->Get<EmbeddingValueInfo>().GetData(); }
 
     const Vector<SharedPtr<EmbeddingValueInfo>> &GetTensorArray() const { return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_; }
+
+    Tuple<SizeT, const_ptr_t, const_ptr_t, SizeT, SizeT> GetSparse() const { return this->value_info_->Get<SparseValueInfo>().GetData(); }
 
     [[nodiscard]] const DataType &type() const { return type_; }
 

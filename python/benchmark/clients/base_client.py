@@ -28,6 +28,7 @@ class BaseClient:
         self.clients = list()
         # Following are for multithreading
         self.mt_lock = threading.Lock()
+        self.mt_query_batch = 10
         self.mt_next_begin = 0
         self.mt_done_queries = 0
         self.mt_active_workers = 0
@@ -35,6 +36,7 @@ class BaseClient:
         # Following are for multiprocessing
         self.mp_manager = multiprocessing.Manager()
         self.mp_lock = multiprocessing.Lock()
+        self.mp_query_batch = multiprocessing.Value("i", 10, lock=False)
         self.mp_next_begin = multiprocessing.Value("i", 0, lock=False)
         self.mp_done_queries = multiprocessing.Value("i", 0, lock=False)
         self.mp_active_workers = multiprocessing.Value("i", 0, lock=False)
@@ -136,14 +138,22 @@ class BaseClient:
                     f"average QPS since {start_str}: {avg_start}, average QPS of last interval: {avg_interval}"
                 )
             else:
+                query_batch = 10
                 with self.mt_lock:
+                    # how many queries a single worker can do in 10ms
+                    query_batch = self.mt_done_queries / (
+                        num_workers * report_qps_sec * 100
+                    )
+                    query_batch = min(100, query_batch)
+                    query_batch = max(query_batch, 1)
+                    self.mt_query_batch = query_batch
                     self.mt_done_queries = 0
                 start = now
                 start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start))
                 report_prev = now
                 done_warm_up = True
                 logging.info(
-                    "Collecting statistics for 30 minutes. Print statistics so far every minute. Type Ctrl+C to quit."
+                    f"Collecting statistics for 30 minutes and print QPS so far every minute. Workers will report every {query_batch} queries. Type Ctrl+C to quit."
                 )
 
         for i in range(num_workers):
@@ -152,9 +162,11 @@ class BaseClient:
             self.save_and_check_results(self.mt_results)
 
     def search_thread_mainloop(self, is_express: bool, client_id: int):
-        query_batch = 100
         num_queries = len(self.queries)
         if is_express:
+            query_batch = 10
+            with self.mt_lock:
+                query_batch = self.mt_query_batch
             local_rng = random.Random()  # random number generator per thread
             deadline = time.time() + 30 * 60  # 30 minutes
             while time.time() < deadline:
@@ -163,6 +175,7 @@ class BaseClient:
                     _ = self.do_single_query(query_id, client_id)
                 with self.mt_lock:
                     self.mt_done_queries += query_batch
+                    query_batch = self.mt_query_batch
         else:
             begin = 0
             end = 0
@@ -171,7 +184,7 @@ class BaseClient:
                 with self.mt_lock:
                     self.mt_done_queries += end - begin
                     begin = self.mt_next_begin
-                    end = begin + query_batch
+                    end = begin + self.mt_query_batch
                     if end > num_queries:
                         end = num_queries
                     self.mt_next_begin = end
@@ -257,14 +270,22 @@ class BaseClient:
                     f"average QPS since {start_str}: {avg_start}, average QPS of last interval: {avg_interval}"
                 )
             else:
+                query_batch = 10
                 with self.mp_lock:
+                    # how many queries a single worker can do in 10ms
+                    query_batch = self.mp_done_queries.value / (
+                        num_workers * report_qps_sec * 100
+                    )
+                    query_batch = min(100, query_batch)
+                    query_batch = max(query_batch, 1)
+                    self.mp_query_batch.value = query_batch
                     self.mp_done_queries.value = 0
                 start = now
                 start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start))
                 report_prev = now
                 done_warm_up = True
                 logging.info(
-                    "Collecting statistics for 30 minutes. Print statistics so far every minute. Type Ctrl+C to quit."
+                    f"Collecting statistics for 30 minutes and print QPS so far every minute. Workers will report every {query_batch} queries. Type Ctrl+C to quit."
                 )
 
         for i in range(num_workers):
@@ -274,9 +295,11 @@ class BaseClient:
 
     def search_process_mainloop(self, is_express: bool):
         self.setup_clients(1)  # socket is unsafe to share among workers
-        query_batch = 100
         num_queries = len(self.queries)
         if is_express:
+            query_batch = 10
+            with self.mp_lock:
+                query_batch = self.mp_query_batch.value
             local_rng = random.Random()  # random number generator per thread
             deadline = time.time() + 30 * 60  # 30 minutes
             while time.time() < deadline:
@@ -285,6 +308,7 @@ class BaseClient:
                     _ = self.do_single_query(query_id, 0)
                 with self.mp_lock:
                     self.mp_done_queries.value += query_batch
+                    query_batch = self.mp_query_batch.value
         else:
             begin = 0
             end = 0
@@ -293,7 +317,7 @@ class BaseClient:
                 with self.mp_lock:
                     self.mp_done_queries.value += end - begin
                     begin = self.mp_next_begin.value
-                    end = begin + query_batch
+                    end = begin + self.mp_query_batch.value
                     if end > num_queries:
                         end = num_queries
                     self.mp_next_begin.value = end

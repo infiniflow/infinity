@@ -687,10 +687,8 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
         txn_id,
         begin_ts);
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
-
-    auto txn = MakeUnique<Txn>(nullptr /*buffer_mgr*/, nullptr /*txn_mgr*/, nullptr /*catalog*/, txn_id, begin_ts);
-    auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(txn.get()));
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(fake_txn.get()));
     table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
@@ -786,10 +784,9 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
     auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Delete(cmd.row_ids_);
-    fake_txn->FakeCommit(commit_ts);
     Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->delete_state_);
     Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), &table_store->delete_state_);
 }
@@ -831,14 +828,13 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
     auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Append(cmd.block_);
 
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
     table_store->append_state_ = std::move(append_state);
 
-    fake_txn->FakeCommit(commit_ts);
     Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager(), true);
     Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments(), nullptr);
 }

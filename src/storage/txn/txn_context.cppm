@@ -32,10 +32,7 @@ public:
 
     TxnContext(TxnTimeStamp begin_ts) : begin_ts_(begin_ts) {}
 
-    inline TxnTimeStamp GetBeginTS() {
-        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-        return begin_ts_;
-    }
+    inline TxnTimeStamp GetBeginTS() const { return begin_ts_; }
 
     inline TxnTimeStamp GetCommitTS() {
         std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
@@ -99,7 +96,7 @@ public:
 
 private:
     std::shared_mutex rw_locker_{};
-    TxnTimeStamp begin_ts_{};
+    const TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnTimeStamp committed_ts_{};
     TxnState state_{TxnState::kStarted};

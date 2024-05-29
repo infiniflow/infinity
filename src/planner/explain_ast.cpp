@@ -658,6 +658,11 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kCSR: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: CSR");
+            result->emplace_back(file_type);
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
             LOG_CRITICAL(error_message);

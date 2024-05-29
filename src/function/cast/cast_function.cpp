@@ -27,6 +27,8 @@ import tensor_cast;
 import tensor_array_cast;
 import logger;
 import stl;
+import sparse_cast;
+import third_party;
 
 module cast_function;
 
@@ -225,6 +227,9 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         }
         case kTensorArray: {
             return BindTensorArrayCast(source, target);
+        }
+        case kSparse: {
+            return BindSparseCast(source, target);
         }
         case kRowID: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());

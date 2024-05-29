@@ -33,6 +33,7 @@ export enum class VectorBufferType {
     kHeap, // varchar, can be stored across multiple chunks
     kCompactBit,
     kTensorHeap, // tensor, should be stored in one chunk
+    kSparseHeap, // sparse, should be stored in one chunk
 };
 
 export class VectorBuffer {

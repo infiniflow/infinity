@@ -59,6 +59,10 @@ String LogicalExport::ToString(i64 &space) const {
             ss << "(JSONL) ";
             break;
         }
+        case CopyFileType::kCSR: {
+            ss << "(CSR) ";
+            break;
+        }
         case CopyFileType::kInvalid: {
             ss << "(Invalid) ";
             break;

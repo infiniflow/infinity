@@ -37,6 +37,7 @@ import session_manager;
 import type_info;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import data_type;
 
 namespace infinity {
@@ -303,6 +304,51 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         String error_message = "Invalid embedding data type";
                         LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
+                    }
+                }
+                break;
+            }
+            case LogicalType::kSparse: {
+                if (column_type->type_info()->type() != TypeInfoType::kSparse) {
+                    UnrecoverableError("Not sparse type");
+                }
+                const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
+                switch (sparse_info->DataType()) {
+                    case kElemBit: {
+                        UnrecoverableError("Not implemented");
+                    }
+                    case kElemInt8: {
+                        object_id = 1002;
+                        object_width = 1;
+                        break;
+                    }
+                    case kElemInt16: {
+                        object_id = 1005;
+                        object_width = 2;
+                        break;
+                    }
+                    case kElemInt32: {
+                        object_id = 1007;
+                        object_width = 4;
+                        break;
+                    }
+                    case kElemInt64: {
+                        object_id = 1016;
+                        object_width = 8;
+                        break;
+                    }
+                    case kElemFloat: {
+                        object_id = 1021;
+                        object_width = 4;
+                        break;
+                    }
+                    case kElemDouble: {
+                        object_id = 1022;
+                        object_width = 8;
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError("Should not reach here");
                     }
                 }
                 break;

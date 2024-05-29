@@ -48,6 +48,10 @@ std::string CopyStatement::ToString() const {
             file_format = "Invalid";
             break;
         }
+        case CopyFileType::kCSR: {
+            file_format = "CSR";
+            break;
+        }
     }
 
     ss << "COPY: " << schema_name_ << "." << table_name_ << copy_direction << file_path_ << " WITH " << file_format << " delimiter: " << delimiter_;

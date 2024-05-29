@@ -16,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include "complex/sparse_type.h"
  
 namespace infinity {
 
@@ -74,6 +75,9 @@ static const char *type2name[] = {
     "Tensor",
     "TensorArray",
 
+    // sparse
+    "Sparse",
+
     "Invalid",
 };
 
@@ -130,6 +134,9 @@ std::unordered_map<std::string, LogicalType> name2type = {
     // tensor
     { "tensor" , LogicalType::kTensor },
     { "tensorarray" , LogicalType::kTensorArray },
+
+    // sparse
+    { "sparse" , LogicalType::kSparse},
 
     { "invalid" , LogicalType::kInvalid },
 };
@@ -192,6 +199,9 @@ static int64_t type_size[] = {
     // tensor type
     8, // Tensor
     8, // TensorArray
+
+    // sparse type
+    sizeof(SparseType),
 
     0, // Invalid
 };

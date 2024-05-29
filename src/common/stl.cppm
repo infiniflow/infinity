@@ -131,6 +131,8 @@ export namespace std {
     using std::remove_if;
     using std::reverse;
     using std::sort;
+    using std::max_element;
+    using std::min_element;
     using std::unique;
     using std::reduce;
     using std::accumulate;
@@ -269,6 +271,9 @@ namespace infinity {
 
     template<typename T, typename Allocator = std::allocator<T>>
     using Vector = std::vector<T, Allocator>;
+
+    template<typename T>
+    using Span = std::span<T>;
 
     template<typename T>
     using Deque = std::deque<T>;

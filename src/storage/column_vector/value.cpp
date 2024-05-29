@@ -215,9 +215,7 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     }
     EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     SizeT len = embedding_info->Size();
-    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>();
-    embedding_value_info->data_.resize(len);
-    std::memcpy(embedding_value_info->data_.data(), ptr, len);
+    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>(ptr, len);
     Value value(LogicalType::kEmbedding, type_info_ptr);
     value.value_info_ = embedding_value_info;
     return value;
@@ -605,23 +603,22 @@ bool Value::operator==(const Value &other) const {
             const String &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
-        case kEmbedding: {
-            const Vector<char> &data1 = this->value_info_->Get<EmbeddingValueInfo>().data_;
-            const Vector<char> &data2 = other.value_info_->Get<EmbeddingValueInfo>().data_;
-            return std::ranges::equal(data1, data2);
-            break;
-        }
+        case kEmbedding:
         case kTensor: {
-            const Vector<char> &data1 = this->value_info_->Get<EmbeddingValueInfo>().data_;
-            const Vector<char> &data2 = other.value_info_->Get<EmbeddingValueInfo>().data_;
+            const Span<char> &data1 = this->GetEmbedding();
+            const Span<char> &data2 = other.GetEmbedding();
             return std::ranges::equal(data1, data2);
-            break;
         }
         case kTensorArray: {
             // TODO
             String error_message = "Not implemented yet.";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
+            break;
+        }
+        case kSparse: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
             break;
         }
         case kInterval:
@@ -733,7 +730,8 @@ void Value::CopyUnionValue(const Value &other) {
         case kVarchar:
         case kTensor:
         case kTensorArray:
-        case kEmbedding: {
+        case kEmbedding:
+        case kSparse: {
             this->value_info_ = other.value_info_;
             break;
         }
@@ -844,7 +842,8 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case kVarchar:
         case kTensor:
         case kTensorArray:
-        case kEmbedding: {
+        case kEmbedding: 
+        case kSparse: {
             this->value_info_ = std::move(other.value_info_);
             break;
         }
@@ -915,18 +914,19 @@ String Value::ToString() const {
         }
         case LogicalType::kEmbedding: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
-            if (data_bytes != embedding_info->Size()) {
+            Span<char> data_span = this->GetEmbedding();
+            if (data_span.size() != embedding_info->Size()) {
                 String error_message = "Embedding data size mismatch.";
                 LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
-            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
+            const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
         }
         case LogicalType::kTensor: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            Span<char> data_span = this->GetEmbedding();
+            SizeT data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
                 String error_message = "Tensor data size mismatch.";
@@ -934,7 +934,7 @@ String Value::ToString() const {
                 UnrecoverableError(error_message);
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
-            return TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            return TensorT::Tensor2String(const_cast<char *>(data_span.data()), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
         case LogicalType::kTensorArray: {
             // TODO
@@ -942,6 +942,11 @@ String Value::ToString() const {
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return {};
+        }
+        case LogicalType::kSparse: {
+            // TODO
+            UnrecoverableError("Not implemented yet.");
+            break;
         }
         case LogicalType::kDecimal:
         case LogicalType::kArray:
@@ -1025,19 +1030,20 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
         }
         case LogicalType::kEmbedding: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
-            if (data_bytes != embedding_info->Size()) {
+            Span<char> data_span = this->GetEmbedding();
+            if (data_span.size() != embedding_info->Size()) {
                 String error_message = "Embedding data size mismatch.";
                 LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
-            const EmbeddingT embedding(const_cast<char *>(data_ptr), false);
+            const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
             json[name] = EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
             return;
         }
         case LogicalType::kTensor: {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            const auto [data_ptr, data_bytes] = value_info_->Get<EmbeddingValueInfo>().GetData();
+            Span<char> data_span = this->GetEmbedding();
+            SizeT data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
                 String error_message = "Tensor data size mismatch.";
@@ -1045,7 +1051,8 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
                 UnrecoverableError(error_message);
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
-            json[name] = TensorT::Tensor2String(const_cast<char *>(data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            json[name] =
+                TensorT::Tensor2String(const_cast<char *>(data_span.data()), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
             return;
         }
         case LogicalType::kTensorArray: {
@@ -1054,20 +1061,7 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
-        case LogicalType::kHugeInt:
-        case LogicalType::kDecimal:
-        case LogicalType::kArray:
-        case LogicalType::kTuple:
-        case LogicalType::kPoint:
-        case LogicalType::kLine:
-        case LogicalType::kLineSeg:
-        case LogicalType::kBox:
-        case LogicalType::kCircle:
-        case LogicalType::kUuid:
-        case LogicalType::kMixed:
-        case LogicalType::kNull:
-        case LogicalType::kMissing:
-        case LogicalType::kInvalid: {
+        default: {
             String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
             LOG_ERROR(error_message);
             UnrecoverableError(error_message);
@@ -1088,10 +1082,7 @@ SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
-    auto tensor_info_ptr = MakeShared<EmbeddingValueInfo>();
-    tensor_info_ptr->data_.resize(bytes);
-    std::memcpy(tensor_info_ptr->data_.data(), ptr, bytes);
-    return tensor_info_ptr;
+    return MakeShared<EmbeddingValueInfo>(ptr, bytes);
 }
 
 } // namespace infinity

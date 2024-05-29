@@ -14,9 +14,9 @@
 
 #pragma once
 
+#include "internal_types.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include "internal_types.h"
 
 #include <memory>
 #include <vector>
@@ -183,6 +183,9 @@ public:
     template <typename T>
     static T StringToValue(const std::string_view &str_view);
 
+    template <typename T, typename IdxT>
+    static std::pair<IdxT, T> StringToSparseValue(const std::string_view &sv);
+
     void MaxDataType(const DataType &right);
 };
 
@@ -196,6 +199,19 @@ template <typename T>
 T DataType::StringToValue(const std::string_view &) {
     ParserError("Unexpected data type.");
     return T();
+}
+
+template <typename T, typename IdxT>
+std::pair<IdxT, T> DataType::StringToSparseValue(const std::string_view &sv) {
+    size_t i = sv.find(':');
+    if (i == std::string::npos) {
+        ParserError("Sparse value format: index:value");
+    }
+    std::string_view idx_str = sv.substr(0, i);
+    std::string_view val_str = sv.substr(i + 1);
+    IdxT idx = StringToValue<IdxT>(idx_str);
+    T val = StringToValue<T>(val_str);
+    return std::make_pair(idx, val);
 }
 
 template <>
@@ -259,23 +275,23 @@ std::string DataType::TypeToString<LineSegT>();
 template <>
 std::string DataType::TypeToString<BoxT>();
 
-//template <>
-//std::string DataType::TypeToString<PathT>();
+// template <>
+// std::string DataType::TypeToString<PathT>();
 //
-//template <>
-//std::string DataType::TypeToString<PolygonT>();
+// template <>
+// std::string DataType::TypeToString<PolygonT>();
 
 template <>
 std::string DataType::TypeToString<CircleT>();
 
-//template <>
-//std::string DataType::TypeToString<BitmapT>();
+// template <>
+// std::string DataType::TypeToString<BitmapT>();
 
 template <>
 std::string DataType::TypeToString<UuidT>();
 
-//template <>
-//std::string DataType::TypeToString<BlobT>();
+// template <>
+// std::string DataType::TypeToString<BlobT>();
 
 template <>
 std::string DataType::TypeToString<EmbeddingT>();

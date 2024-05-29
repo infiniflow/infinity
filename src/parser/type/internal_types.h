@@ -28,6 +28,7 @@
 #include "type/geo/circle_type.h"
 #include "type/complex/embedding_type.h"
 #include "type/complex/tensor_type.h"
+#include "type/complex/sparse_type.h"
 #include "type/complex/tensor_array_type.h"
 #include "type/complex/row_id.h"
 #include "type/complex/varchar.h"
@@ -91,6 +92,9 @@ using MixedT = MixedType;
 
 // tensor
 using TensorT = TensorType;
+
+// sparse
+using SparseT = SparseType;
 
 // tensor-array
 using TensorArrayT = TensorArrayType;
