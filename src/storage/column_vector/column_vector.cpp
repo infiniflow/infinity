@@ -2038,11 +2038,15 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        UnrecoverableError(fmt::format("Not supported vector_type {}", int(vector_type_)));
+        String error_message = fmt::format("Not supported vector_type {}", int(vector_type_));
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (data_type_->type() == LogicalType::kHugeInt) {
-        UnrecoverableError(fmt::format("Attempt to serialize huge integer type"));
+        String error_message = "Attempt to serialize huge integer type";
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);

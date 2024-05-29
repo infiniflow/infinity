@@ -42,7 +42,9 @@ namespace infinity {
 Vector<std::string_view> BlockColumnEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid block column entry encode: {}", encode));
+        String error_message = fmt::format("Invalid block column entry encode: {}", encode);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = BlockEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));

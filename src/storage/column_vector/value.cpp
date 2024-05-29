@@ -956,7 +956,9 @@ String Value::ToString() const {
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
+            String error_message = fmt::format("Value::ToString() not implemented for type {}", type_.ToString());
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
             return {};
         }
     }
@@ -1066,7 +1068,9 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
+            String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
