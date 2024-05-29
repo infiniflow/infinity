@@ -204,7 +204,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
+            String error_message = fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

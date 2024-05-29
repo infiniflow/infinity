@@ -736,7 +736,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node, Shar
     String output_columns = String(intent_size, ' ') + " - output_columns: [";
     SizeT column_count = table_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError(fmt::format("No column in table: {}.", table_scan_node->table_alias()));
+        String error_message = fmt::format("No column in table: {}.", table_scan_node->table_alias());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += table_scan_node->GetOutputNames()->at(idx) + ", ";
@@ -747,7 +749,6 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node, Shar
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *index_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
-    // UnrecoverableError("Not implement: Explain Physical Index Scan");
     String index_scan_header;
     if (intent_size != 0) {
         index_scan_header = String(intent_size - 2, ' ') + "-> INDEX SCAN ";
@@ -777,7 +778,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *index_scan_node, Shar
     String output_columns = String(intent_size, ' ') + " - output_columns: [";
     SizeT column_count = index_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError(fmt::format("No column in table: {}.", index_scan_node->table_alias()));
+        String error_message = fmt::format("No column in table: {}.", index_scan_node->table_alias());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += index_scan_node->GetOutputNames()->at(idx) + ", ";
@@ -841,7 +844,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = knn_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
+        String error_message = fmt::format("No column in table: {}.", knn_scan_node->TableAlias());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += knn_scan_node->GetOutputNames()->at(idx) + ", ";
@@ -2276,7 +2281,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeAggregate *merge_aggregate_
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = merge_aggregate_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError("No column in merge aggregate node.");
+        String error_message = "No column in merge aggregate node.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += merge_aggregate_node->GetOutputNames()->at(idx) + ", ";

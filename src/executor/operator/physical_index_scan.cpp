@@ -699,7 +699,9 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     SegmentEntry *segment_entry = nullptr;
     const auto &segment_block_index_ = base_table_ref_->block_index_->segment_block_index_;
     if (auto iter = segment_block_index_.find(segment_id); iter == segment_block_index_.end()) {
-        UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
+        String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     } else {
         segment_entry = iter->second.segment_entry_;
     }

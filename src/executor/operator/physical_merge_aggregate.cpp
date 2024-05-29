@@ -123,7 +123,9 @@ void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name
     } else if (function_name == "COUNT_STAR") {
         // no action for "COUNT_STAR"
     } else {
-        UnrecoverableError(fmt::format("Function type {} not Implement.", function_name));
+        String error_message = fmt::format("Function type {} not Implement.", function_name);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

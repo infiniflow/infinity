@@ -292,7 +292,9 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     String jsonl_str(file_size + 1, 0);
     SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
     if (read_n != file_size) {
-        UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (read_n == 0) {
@@ -375,7 +377,9 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
         String json_str(file_size, 0);
         SizeT read_n = file_handler->Read(json_str.data(), file_size);
         if (read_n != file_size) {
-            UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+            String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         if (read_n == 0) {

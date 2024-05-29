@@ -80,27 +80,39 @@ void PhysicalMatchTensorScan::Init() {
     const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
     const auto &column_type_ptr = column_def->type();
     if (column_type_ptr->type() != LogicalType::kTensor) {
-        UnrecoverableError(fmt::format("Column {} is not a tensor column", column_def->name()));
+        String error_message = fmt::format("Column {} is not a tensor column", column_def->name());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     const auto &type_info = column_type_ptr->type_info();
     if (type_info->type() != TypeInfoType::kEmbedding) {
-        UnrecoverableError(fmt::format("Column {} is not a tensor column", column_def->name()));
+        String error_message = fmt::format("Column {} is not a tensor column", column_def->name());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
     if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
-        UnrecoverableError(fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString()));
+        String error_message = fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // TODO: now only support MaxSim
     if (match_tensor_expr_->search_method_ != MatchTensorMethod::kMaxSim) {
-        UnrecoverableError("Now only support MaxSim search.");
+        String error_message = "Now only support MaxSim search.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // TODO: now only support search on float32 tensor column
     if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-        UnrecoverableError("Now only support tensor search on float column.");
+        String error_message = "Now only support tensor search on float column.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // TODO: now only support float32 tensor query
     if (match_tensor_expr_->embedding_data_type_ != EmbeddingDataType::kElemFloat) {
-        UnrecoverableError("Now only support float32 tensor query.");
+        String error_message = "Now only support float32 tensor query.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -132,7 +144,9 @@ BlockIndex *PhysicalMatchTensorScan::GetBlockIndex() const { return base_table_r
 
 ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
     if (search_column_id_ == std::numeric_limits<ColumnID>::max()) {
-        UnrecoverableError("Search column id is not set. Init() error.");
+        String error_message = "Search column id is not set. Init() error.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return search_column_id_;
 }
@@ -172,7 +186,9 @@ bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState
 
 void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const {
     if (!operator_state->data_block_array_.empty()) {
-        UnrecoverableError("TensorScan output data block array should be empty");
+        String error_message = "TensorScan output data block array should be empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     Txn *txn = query_context->GetTxn();
     const TxnTimeStamp begin_ts = txn->BeginTS();
@@ -183,7 +199,9 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     }
     MatchTensorScanFunctionData &function_data = *(operator_state->match_tensor_scan_function_data_);
     if (function_data.finished_) [[unlikely]] {
-        UnrecoverableError("MatchTensorScanFunctionData is finished");
+        String error_message = "MatchTensorScanFunctionData is finished";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     const auto search_column_id = SearchColumnID();
     const BlockIndex *block_index = function_data.block_index_;
@@ -286,7 +304,9 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
             BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
             if (block_entry == nullptr) {
-                UnrecoverableError(fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id));
+                String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
                 output_block_ptr->Finalize();

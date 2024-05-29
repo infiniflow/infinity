@@ -60,7 +60,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default: {
-            UnrecoverableError(fmt::format("Unknown expression type: {}", expr->Name()));
+            String error_message = fmt::format("Unknown expression type: {}", expr->Name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -187,7 +189,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
         UnrecoverableError(error_message);
     }
     if (column_index >= input_data_block_->column_count()) {
-        UnrecoverableError("Invalid column index");
+        String error_message = "Invalid column index";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];

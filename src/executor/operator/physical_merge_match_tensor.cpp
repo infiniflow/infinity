@@ -84,11 +84,16 @@ bool PhysicalMergeMatchTensor::Execute(QueryContext *query_context, OperatorStat
 void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMatchTensorOperatorState *operator_state) const {
     auto &output_data_block_array = operator_state->data_block_array_;
     if (!output_data_block_array.empty()) {
-        UnrecoverableError("output data_block_array_ is not empty");
+        String error_message = "output data_block_array_ is not empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto &input_data_block_array = operator_state->input_data_blocks_;
     if (input_data_block_array.empty()) {
-        UnrecoverableError("PhysicalMergeMatchTensor: empty input");
+
+        String error_message = "PhysicalMergeMatchTensor: empty input";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return;
     }
     const auto output_type_ptr = GetOutputTypes();

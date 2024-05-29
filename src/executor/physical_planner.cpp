@@ -322,7 +322,9 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Unknown logical node type: {}", logical_operator->name()));
+            String error_message = fmt::format("Unknown logical node type: {}", logical_operator->name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             //            result = MakeShared<PhysicalDummyOperator>(numeric_limits<uint64_t>::max());
         }
     }
