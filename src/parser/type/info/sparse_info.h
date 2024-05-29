@@ -45,7 +45,7 @@ public:
 
     static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, EmbeddingDataType idx_type, size_t dimension) {
         if (dimension == 0) {
-            ParserError("dimension of sparse should not be 0");
+            ParserError("Dimension of sparse should not be 0 and should not be negative.");
         }
         return std::make_shared<SparseInfo>(data_type, idx_type, dimension);
     }
@@ -62,7 +62,12 @@ public:
 
     inline size_t IndiceSize(size_t nnz) const { return EmbeddingType::EmbeddingSize(index_type_, nnz); }
 
-    inline size_t DataSize(size_t nnz) const { return EmbeddingType::EmbeddingSize(data_type_, nnz); }
+    inline size_t DataSize(size_t nnz) const {
+        if (data_type_ == EmbeddingDataType::kElemBit) {
+            return 0;
+        }
+        return EmbeddingType::EmbeddingSize(data_type_, nnz);
+    }
 
     [[nodiscard]] inline std::string ToString() const override {
         return EmbeddingInfo::EmbeddingDataTypeToString(data_type_) + "," + EmbeddingInfo::EmbeddingDataTypeToString(index_type_) + "," +

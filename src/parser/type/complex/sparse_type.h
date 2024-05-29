@@ -24,10 +24,19 @@ namespace infinity {
 template <typename DataType, typename IndiceType>
 std::string Sparse2StringT2(const DataType *data_ptr, const IndiceType *indice_ptr, size_t nnz) {
     std::stringstream ss;
-    for (size_t i = 0; i < nnz; ++i) {
-        ss << std::to_string(indice_ptr[i]) << ": " << std::to_string(data_ptr[i]);
-        if (i < nnz - 1) {
-            ss << ", ";
+    if constexpr (std::is_same_v<DataType, bool>) {
+        for (size_t i = 0; i < nnz; ++i) {
+            ss << std::to_string(indice_ptr[i]);
+            if (i < nnz - 1) {
+                ss << ", ";
+            }
+        }
+    } else {
+        for (size_t i = 0; i < nnz; ++i) {
+            ss << std::to_string(indice_ptr[i]) << ": " << std::to_string(data_ptr[i]);
+            if (i < nnz - 1) {
+                ss << ", ";
+            }
         }
     }
     return std::move(ss).str();
@@ -65,7 +74,7 @@ struct SparseType {
     Sparse2String(const char *data_ptr, const char *indice_ptr, EmbeddingDataType data_type, EmbeddingDataType indice_type, size_t nnz) {
         switch (data_type) {
             case EmbeddingDataType::kElemBit: {
-                return {};
+                return Sparse2StringT1(reinterpret_cast<const bool *>(data_ptr), indice_ptr, indice_type, nnz);
             }
             case EmbeddingDataType::kElemInt8: {
                 return Sparse2StringT1(reinterpret_cast<const int8_t *>(data_ptr), indice_ptr, indice_type, nnz);

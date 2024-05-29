@@ -1646,7 +1646,8 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             switch(sparse_info->DataType()) {
                 case kElemBit: {
-                    UnrecoverableError("Unimplemented yet");
+                    AppendSparse<BooleanT>(ele_str_views, index);
+                    break;
                 }
                 case kElemInt8: {
                     AppendSparse<TinyIntT>(ele_str_views, index);

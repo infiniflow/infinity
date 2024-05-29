@@ -754,6 +754,7 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
         }
         case nlohmann::json::value_t::object: {
             SharedPtr<ConstantExpr> res = nullptr;
+            HashSet<i64> key_set;
             for (auto iter = json_object.begin(); iter != json_object.end(); ++iter) {
                 i64 key = std::stoll(iter.key());
                 const auto &value_obj = iter.value();
@@ -776,6 +777,12 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
                             res = MakeShared<ConstantExpr>(LiteralType::kDoubleSparseArray);
                         } else if (res->literal_type_ != LiteralType::kDoubleSparseArray) {
                             const auto error_info = "Invalid json object type in sparse array!";
+                            RecoverableError(Status::ImportFileFormatError(error_info));
+                            return nullptr;
+                        }
+                        auto [_, insert_ok] = key_set.insert(key);
+                        if (!insert_ok) {
+                            const auto error_info = fmt::format("Duplicate key {} in sparse array!", key);
                             RecoverableError(Status::ImportFileFormatError(error_info));
                             return nullptr;
                         }
