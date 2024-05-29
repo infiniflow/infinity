@@ -7,11 +7,9 @@ module;
 #include <unistd.h>
 #include <cstring>
 
-export module mmap;
-
 import stl;
 import infinity_exception;
-import logger;
+export module mmap;
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -54,9 +52,7 @@ export struct MmapReader {
         idx_ = 0;
         data_len_ = len;
         if (rc < 0) {
-            String error_message = "MmapFile failed";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
+            UnrecoverableError("MmapFile failed");
         }
     }
 
