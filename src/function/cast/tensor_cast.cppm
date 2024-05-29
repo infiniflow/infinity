@@ -143,7 +143,9 @@ void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
             break;
         }
         default: {
-            UnrecoverableError("Unreachable code");
+            String error_message = "Unreachable code";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -198,7 +200,9 @@ struct TensorTryCastToTensor {
                     TargetT &target,
                     const DataType &target_type,
                     ColumnVector *target_vector_ptr) {
-        UnrecoverableError("Unexpected case");
+        String error_message = "Unreachable case";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };

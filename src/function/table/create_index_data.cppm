@@ -21,6 +21,7 @@ import segment_entry;
 import block_index;
 import third_party;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -33,7 +34,9 @@ export struct CreateIndexSharedData {
         for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
             auto [iter, insert_ok] = create_index_idxes_.emplace(segment_id, 0);
             if (!insert_ok) {
-                UnrecoverableError(fmt::format("Duplicate segment id: %u", segment_id));
+                String error_message = fmt::format("Duplicate segment id: %u", segment_id);
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

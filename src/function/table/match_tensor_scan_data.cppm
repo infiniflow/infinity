@@ -24,6 +24,7 @@ import block_index;
 import internal_types;
 import knn_result_handler;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -44,7 +45,9 @@ public:
 
     u32 End() {
         if (finished_) {
-            UnrecoverableError("End() is called twice!");
+            String error_message = "End() is called twice!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return 0;
         }
         finished_ = true;
