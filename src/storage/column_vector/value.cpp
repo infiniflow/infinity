@@ -618,7 +618,9 @@ bool Value::operator==(const Value &other) const {
         }
         case kSparse: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case kInterval:
@@ -945,7 +947,9 @@ String Value::ToString() const {
         }
         case LogicalType::kSparse: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case LogicalType::kDecimal:

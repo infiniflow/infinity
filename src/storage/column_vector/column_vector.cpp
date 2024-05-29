@@ -856,7 +856,9 @@ String ColumnVector::ToString(SizeT row_index) const {
         }
         case kSparse: {
             if (data_type_->type_info()->type() != TypeInfoType::kSparse) {
-                UnrecoverableError("Sparse type mismatch with unexpected sparse_info");
+                String error_message = "Sparse type mismatch with unexpected sparse_info";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             const auto &[nnz, chunk_id, chunk_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[row_index];
@@ -868,7 +870,9 @@ String ColumnVector::ToString(SizeT row_index) const {
             const char *data_ptr = indice_ptr + nnz * EmbeddingType::EmbeddingDataWidth(sparse_info->IndexType());
             auto res = SparseT::Sparse2String(data_ptr, indice_ptr, sparse_info->DataType(), sparse_info->IndexType(), nnz);
             if (res.empty()) {
-                UnrecoverableError("Cannot convert sparse to string");
+                String error_message = "Cannot convert sparse to string";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             return res;
         }
@@ -1415,7 +1419,9 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             UnrecoverableError(error_message);
         }
         case kSparse: {
-            UnrecoverableError("Cannot SetByRawPtr to sparse");
+            String error_message = "Cannot SetByRawPtr to sparse";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
@@ -1774,7 +1780,9 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
                     break;
                 }
                 default: {
-                    UnrecoverableError("Invalid sparse type");
+                    String error_message = "Invalid sparse type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
             break;

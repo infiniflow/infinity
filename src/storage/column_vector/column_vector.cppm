@@ -315,7 +315,9 @@ private:
                 break;
             }
             default: {
-                UnrecoverableError("Unsupported sparse index type.");
+                String error_message = "Unsupported sparse index type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

@@ -840,7 +840,9 @@ void ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, Shared
     output_columns += " - output columns: [";
     SizeT column_count = index_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError(fmt::format("No column in table: {}.", index_scan_node->TableAlias()));
+        String error_message = fmt::format("No column in table: {}.", index_scan_node->TableAlias());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += index_scan_node->GetOutputNames()->at(idx);
@@ -925,7 +927,9 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     output_columns += " - output columns: [";
     SizeT column_count = knn_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        UnrecoverableError(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
+        String error_message = fmt::format("No column in table: {}.", knn_scan_node->TableAlias());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += knn_scan_node->GetOutputNames()->at(idx);

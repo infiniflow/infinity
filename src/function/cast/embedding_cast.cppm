@@ -436,9 +436,11 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
         SizeT target_size = source_dim * sizeof(IdxT);
         auto target_tmp_ptr = MakeUniqueForOverwrite<IdxT[]>(source_dim);
         if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceType *>(source.ptr), target_tmp_ptr.get(), source_dim)) {
-            UnrecoverableError(fmt::format("Failed to cast from embedding with type {} to sparse with type {}",
-                                           DataType::TypeToString<SourceType>(),
-                                           DataType::TypeToString<IdxT>()));
+            String error_message = fmt::format("Failed to cast from embedding with type {} to sparse with type {}",
+                                               DataType::TypeToString<SourceType>(),
+                                               DataType::TypeToString<IdxT>());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto [chunk_id, chunk_offset] =
             target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
@@ -484,13 +486,17 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &target_type,
                                           ColumnVector *target_vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
-        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
+        String error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     const auto *source_info = static_cast<EmbeddingInfo *>(source_type.type_info().get());
     const auto *target_info = static_cast<SparseInfo *>(target_type.type_info().get());
 
     if (target_info->DataType() != EmbeddingDataType::kElemBit) {
-        UnrecoverableError(fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType())));
+        String error_message = fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType()));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (target_info->IndexType()) {
         case EmbeddingDataType::kElemInt8: {
@@ -510,7 +516,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType())));
+            String error_message = fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType()));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return true;

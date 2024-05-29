@@ -36,7 +36,9 @@ export inline BoundCastFunc BindBlobCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BlobT, VarcharT, BlobTryCastToVarlen>);
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast from Blob type to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast from Blob type to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return BoundCastFunc(nullptr);

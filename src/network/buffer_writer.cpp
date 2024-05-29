@@ -132,7 +132,9 @@ void BufferWriter::flush(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
-        UnrecoverableError(fmt::format("Can't flush more bytes than available: {}", boost_error.message()));
+        String error_message = fmt::format("Can't flush more bytes than available: {}", boost_error.message());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (boost_error) {

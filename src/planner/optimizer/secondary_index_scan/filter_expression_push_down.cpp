@@ -178,10 +178,12 @@ public:
             }
             case ExpressionType::kCast: {
                 if (expression->arguments().size() != 1) {
-                    UnrecoverableError(fmt::format("Expression depth: {}. Unsupported expression type: In IsValueResultExpression(), the cast "
-                                                   "expression {} has more than 1 argument.",
-                                                   sub_expr_depth,
-                                                   expression->Name()));
+                    String error_message = fmt::format("Expression depth: {}. Unsupported expression type: In IsValueResultExpression(), the cast "
+                                                       "expression {} has more than 1 argument.",
+                                                       sub_expr_depth,
+                                                       expression->Name());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
                 return IsValueResultExpression(expression->arguments()[0], sub_expr_depth + 1);
@@ -351,10 +353,12 @@ private:
                     name_iter != IndexScanSupportedCompareFunctionNames.end()) {
                     // supported compare function
                     if (expression->arguments().size() != 2) {
-                        UnrecoverableError(fmt::format("Expression depth: {}. Unsupported expression type: In CheckExprIndexState(), the compare "
-                                                       "expression {} argument size != 2.",
-                                                       sub_expr_depth,
-                                                       expression->Name()));
+                        String error_message = fmt::format("Expression depth: {}. Unsupported expression type: In CheckExprIndexState(), the compare "
+                                                           "expression {} argument size != 2.",
+                                                           sub_expr_depth,
+                                                           expression->Name());
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                         return nullptr;
                     }
                     auto is_column_index = [&m = candidate_column_index_map_](const SharedPtr<BaseExpression> &expr, u32 depth) -> bool {
@@ -432,7 +436,9 @@ private:
         for (auto &expression : index_filter_candidates_) {
             if (!AddIndexForBooleanExpression(expression)) {
                 // cannot apply index scan
-                UnrecoverableError(fmt::format("Error when trying to apply index scan on expression {}.", expression->Name()));
+                String error_message = fmt::format("Error when trying to apply index scan on expression {}.", expression->Name());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
         // 2. build index_filter_qualified_

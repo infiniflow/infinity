@@ -471,7 +471,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeTaskStateTemplate<FusionOperatorState>(physical_ops[operator_id]);
         }
         default: {
-            UnrecoverableError(fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type())));
+            String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type()));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return nullptr;
@@ -906,7 +908,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
         case PhysicalOperatorType::kPreparedPlan: {
-            UnrecoverableError(fmt::format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())));
+            String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type()));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case PhysicalOperatorType::kTableScan: {
@@ -1013,7 +1017,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         }
 
         default: {
-            UnrecoverableError(fmt::format("Unexpected operator type: {}", PhysicalOperatorToString(first_operator->operator_type())));
+            String error_message = fmt::format("Unexpected operator type: {}", PhysicalOperatorToString(first_operator->operator_type()));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -1030,7 +1036,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kAggregate: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
-                UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -1049,7 +1057,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kHash: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -1069,7 +1079,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kLimit: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -1214,7 +1226,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kCrossProduct:
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kPreparedPlan: {
-            UnrecoverableError(fmt::format("Not support {} now", PhysicalOperatorToString(last_operator->operator_type())));
+            String error_message = fmt::format("Not support {} now", PhysicalOperatorToString(last_operator->operator_type()));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case PhysicalOperatorType::kDelete:
         case PhysicalOperatorType::kUpdate: {
@@ -1289,7 +1303,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Unexpected operator type: {}", PhysicalOperatorToString(last_operator->operator_type())));
+            String error_message = fmt::format("Unexpected operator type: {}", PhysicalOperatorToString(last_operator->operator_type()));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

@@ -309,7 +309,9 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Unexpected expression type: {}", expression->Name()));
+            String error_message = fmt::format("Unexpected expression type: {}", expression->Name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

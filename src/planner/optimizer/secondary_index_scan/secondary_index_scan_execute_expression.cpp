@@ -83,7 +83,9 @@ private:
                 break;
             }
             default: {
-                UnrecoverableError(fmt::format("SaveToResult(): type error: {}.", value.type().ToString()));
+                String error_message = fmt::format("SaveToResult(): type error: {}.", value.type().ToString());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

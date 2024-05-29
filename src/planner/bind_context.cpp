@@ -203,7 +203,9 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (const auto &table_name2index_pair : other_ptr->table_name2table_index_) {
         const String &table_name = table_name2index_pair.first;
         if (table_name2table_index_.contains(table_name)) {
-            UnrecoverableError(fmt::format("{} was bound before", table_name));
+            String error_message = fmt::format("{} was bound before", table_name);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         table_name2table_index_[table_name] = table_name2index_pair.second;
     }
@@ -211,7 +213,9 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (const auto &table_index2name_pair : other_ptr->table_table_index2table_name_) {
         u64 table_index = table_index2name_pair.first;
         if (table_table_index2table_name_.contains(table_index)) {
-            UnrecoverableError(fmt::format("Table index: {} is bound before", table_index));
+            String error_message = fmt::format("Table index: {} is bound before", table_index);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         table_table_index2table_name_[table_index] = table_index2name_pair.second;
     }
@@ -219,7 +223,9 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (auto &name_binding_pair : other_ptr->binding_by_name_) {
         auto &binding_name = name_binding_pair.first;
         if (binding_by_name_.contains(binding_name)) {
-            UnrecoverableError(fmt::format("Table: {} was bound before", binding_name));
+            String error_message = fmt::format("Table: {} was bound before", binding_name);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->binding_by_name_.emplace(name_binding_pair);
     }

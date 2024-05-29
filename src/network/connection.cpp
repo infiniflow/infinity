@@ -310,7 +310,9 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             case LogicalType::kSparse: {
                 if (column_type->type_info()->type() != TypeInfoType::kSparse) {
-                    UnrecoverableError("Not sparse type");
+                    String error_message = "Not sparse type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
                 switch (sparse_info->DataType()) {
@@ -350,7 +352,9 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     default: {
-                        UnrecoverableError("Should not reach here");
+                        String error_message = "Should not reach here";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;

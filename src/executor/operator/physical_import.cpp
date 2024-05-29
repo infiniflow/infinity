@@ -215,7 +215,9 @@ UniquePtr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, SizeT nnz) {
     auto *ptr = reinterpret_cast<IdxT *>(res.get());
     for (SizeT i = 0; i < nnz; ++i) {
         if (tmp_indice_ptr[i] < 0 || tmp_indice_ptr[i] > std::numeric_limits<IdxT>::max()) {
-            UnrecoverableError(fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]));
+            String error_message = fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         ptr[i] = tmp_indice_ptr[i];
     }
@@ -237,7 +239,9 @@ UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo 
             return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
         }
         default: {
-            UnrecoverableError(fmt::format("Unsupported index type {}.", sparse_info->IndexType()));
+            String error_message = fmt::format("Unsupported index type {}.", sparse_info->IndexType());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return {};
@@ -274,20 +278,26 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
 
     SizeT file_size = fs.GetFileSize(*file_handler);
     if (file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
-        UnrecoverableError("Invalid CSR file format.");
+        String error_message = "Invalid CSR file format.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     i64 prev_off = 0;
     file_handler->Read(&prev_off, sizeof(i64));
     if (prev_off != 0) {
-        UnrecoverableError("Invalid CSR file format.");
+        String error_message = "Invalid CSR file format.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto [idx_reader, idx_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if (!idx_status.ok()) {
+        LOG_CRITICAL(idx_status.message());
         UnrecoverableError(idx_status.message());
     }
     fs.Seek(*idx_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
     auto [data_reader, data_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if (!data_status.ok()) {
+        LOG_CRITICAL(data_status.message());
         UnrecoverableError(data_status.message());
     }
     fs.Seek(*data_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
