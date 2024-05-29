@@ -106,9 +106,7 @@ bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
     // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): try to load filter data from json.");
     // try load JsonTagBuildTime first
     if (!entry_json.contains(JsonTagBuildTime)) {
-        String error_message = "FastRoughFilter::LoadFromJsonFile(): found no save data in json, stop loading.";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
+        LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): found no save data in json, stop loading.");
         return false;
     }
     // can load from json

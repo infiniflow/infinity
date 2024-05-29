@@ -26,6 +26,7 @@ import buffer_manager;
 import default_values;
 import infinity_exception;
 import block_entry;
+import logger;
 
 namespace infinity {
 
@@ -48,7 +49,9 @@ public:
         : entry_(entry), buffer_mgr_(buffer_mgr), column_ids_(std::move(column_ids)), iterate_ts_(iterate_ts), block_entry_iter_(entry) {
         auto *block_entry = block_entry_iter_.Next();
         if (block_entry->block_id() != 0) {
-            UnrecoverableError("First block id is not 0");
+            String error_message = "First block id is not 0";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (block_entry == nullptr) {
             block_iter_ = None;
@@ -73,7 +76,9 @@ public:
             return None;
         }
         if (block_entry->block_id() != block_idx_) {
-            UnrecoverableError("Block id is not continuous");
+            String error_message = "Block id is not continuous";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         block_iter_ = BlockIter<CheckTS>(block_entry, buffer_mgr_, column_ids_, iterate_ts_);
         return Next();

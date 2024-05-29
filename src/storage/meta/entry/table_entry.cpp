@@ -281,7 +281,9 @@ void TableEntry::AddSegmentReplay(SharedPtr<SegmentEntry> new_segment) {
 
     auto [iter, insert_ok] = segment_map_.emplace(segment_id, new_segment);
     if (!insert_ok) {
-        UnrecoverableError(fmt::format("Segment {} already exists.", segment_id));
+        String error_message = fmt::format("Segment {} already exists.", segment_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (compaction_alg_.get() != nullptr) {
         compaction_alg_->AddSegment(new_segment.get());
@@ -296,7 +298,9 @@ void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String
 
     auto iter = segment_map_.find(segment_id);
     if (iter == segment_map_.end()) {
-        UnrecoverableError(fmt::format("Segment {} not found.", segment_id));
+        String error_message = fmt::format("Segment {} not found.", segment_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
 }
@@ -324,7 +328,9 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         SegmentID segment_id = segment_entry->segment_id();
         auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
         if (!insert_ok) {
-            UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+            String error_message = fmt::format("Insert segment {} failed.", segment_id);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     // Populate index entirely for the segment
@@ -368,7 +374,9 @@ void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
     SegmentID segment_id = segment_entry->segment_id();
     auto [_, insert_ok] = this->segment_map_.emplace(segment_id, std::move(segment_entry));
     if (!insert_ok) {
-        UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+        String error_message = fmt::format("Insert segment {} failed.", segment_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -377,7 +385,9 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
 
     // Read-only no lock needed.
     if (this->Deleted()) {
-        UnrecoverableError("table is deleted");
+        String error_message = "Table is deleted";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return;
     }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
@@ -452,11 +462,15 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
 void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
     //    auto *txn_store_ptr = (TxnTableStore *)txn_store;
     //    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
-    UnrecoverableError("TableEntry::RollbackAppend");
+    String error_message = "TableEntry::RollbackAppend";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferManager *) {
-    UnrecoverableError("TableEntry::RollbackDelete");
+    String error_message = "TableEntry::RollbackDelete";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return Status::OK();
 }
 
@@ -525,7 +539,9 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
             break;
         }
         default: {
-            UnrecoverableError("Invalid compact task type");
+            String error_message = "Invalid compact task type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return Status::OK();
@@ -542,7 +558,9 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
             auto *segment_entry = segment_store.segment_entry_;
             segment_entry->RollbackBlocks(commit_ts, segment_store.block_entries_);
             if (segment_entry->Committed()) {
-                UnrecoverableError(fmt::format("RollbackCompact: segment {} is committed", segment_entry->segment_id()));
+                String error_message = fmt::format("RollbackCompact: segment {} is committed", segment_entry->segment_id());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             {
                 std::unique_lock lock(this->rw_locker_);
@@ -550,7 +568,9 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                     segment = std::move(iter->second);
                     segment_map_.erase(iter);
                 } else {
-                    UnrecoverableError(fmt::format("RollbackCompact: segment {} not found", segment_entry->segment_id()));
+                    String error_message = fmt::format("RollbackCompact: segment {} not found", segment_entry->segment_id());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 for (auto *old_segment : old_segments) {
@@ -575,7 +595,9 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                 break;
             }
             default: {
-                UnrecoverableError("Invalid compact task type");
+                String error_message = "Invalid compact task type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -607,7 +629,9 @@ Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegment
                     segment = std::move(iter->second);
                     segment_map_.erase(iter);
                 } else {
-                    UnrecoverableError(fmt::format("RollbackWrite: segment {} not found", segment_entry->segment_id()));
+                    String error_message = fmt::format("RollbackWrite: segment {} not found", segment_entry->segment_id());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
             segment->Cleanup();
@@ -1085,7 +1109,9 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
     if (table_entry->deleted_) {
         if (!table_entry->segment_map_.empty()) {
-            UnrecoverableError("deleted table should have no segment");
+            String error_message = "deleted table should have no segment";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

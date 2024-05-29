@@ -313,8 +313,11 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
                 MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(deprecated_segment_ids));
             break;
         }
-        default:
-            UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
+        default: {
+            String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
     }
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {

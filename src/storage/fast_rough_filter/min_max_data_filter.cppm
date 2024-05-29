@@ -174,7 +174,11 @@ public:
 
     [[nodiscard]] inline bool MayInRange(ColumnID column_id, const Value &value, FilterCompareType compare_type) const {
         return std::visit(Overload{[column_id](const std::monostate &empty) -> bool {
-                                       UnrecoverableError(fmt::format("BUG: No InnerMinMaxDataFilter for column_id: {}", column_id));
+
+                                       String error_message = fmt::format("No InnerMinMaxDataFilter for column_id: {}", column_id);
+                                       LOG_CRITICAL(error_message);
+                                       UnrecoverableError(error_message);
+
                                        // Should always have minmax filter for sealed segment
                                        return true;
                                    },
@@ -191,7 +195,9 @@ public:
         if (std::holds_alternative<std::monostate>(filter)) {
             CreateInnerMinMaxDataFilter<OriginalValueType>(filter, std::forward<MinMaxInnerValT>(min), std::forward<MinMaxInnerValT>(max));
         } else {
-            UnrecoverableError(fmt::format("In MinMaxDataFilter::Build(), InnerMinMaxDataFilter already exist for column_id: {}", column_id));
+            String error_message = fmt::format("In MinMaxDataFilter::Build(), InnerMinMaxDataFilter already exist for column_id: {}", column_id);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

@@ -40,7 +40,9 @@ namespace infinity {
 
 Vector<std::string_view> DBEntry::DecodeIndex(std::string_view encode) {
     if (encode.empty() || encode[0] != '#') {
-        UnrecoverableError(fmt::format("Invalid db entry encode: {}", encode));
+        String error_message = fmt::format("Invalid db entry encode: {}", encode);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return {encode.substr(1)};
 }
@@ -124,7 +126,9 @@ Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String &table_na
 void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
     auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
     if (!status.ok()) {
-        UnrecoverableError(fmt::format("error when get table/collection entry: {}", status.message()));
+        String error_message = fmt::format("error when get table/collection entry: {}", status.message());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LOG_TRACE(fmt::format("Remove a db entry: {}", table_name));
     table_meta->DeleteEntry(txn_id);

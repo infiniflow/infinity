@@ -2035,7 +2035,9 @@ i32 ColumnVector::GetSizeInBytes() const {
 
 void ColumnVector::WriteAdv(char *&ptr) const {
     if (!initialized) {
-        UnrecoverableError("Column vector isn't initialized.");
+        String error_message = "Column vector isn't initialized.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
         String error_message = fmt::format("Not supported vector_type {}", int(vector_type_));
@@ -2113,12 +2115,16 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
 
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading ColumnVector");
+        String error_message = "ptr goes out of range when reading ColumnVector";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     column_vector->nulls_ptr_ = Bitmask::ReadAdv(ptr, maxbytes);
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading ColumnVector");
+        String error_message = "ptr goes out of range when reading ColumnVector";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return column_vector;
 }
