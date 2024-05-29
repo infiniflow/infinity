@@ -20,7 +20,7 @@ import pandas as pds
 
 def test_english():
     try:
-        infinity_obj = infinity.connect(NetworkAddress("192.168.200.197", 23817))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db = infinity_obj.get_database("default_db")
         # Drop my_table if it already exists
         db.drop_table("my_table", ConflictType.Ignore)
