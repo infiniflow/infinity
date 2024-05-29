@@ -252,6 +252,10 @@ export namespace std {
     using std::construct_at;
 
     using std::set;
+
+    using std::all_of;
+    using std::any_of;
+    using std::none_of;
 } // namespace std
 
 namespace infinity {

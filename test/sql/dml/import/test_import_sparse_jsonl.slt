@@ -5,11 +5,38 @@ statement ok
 CREATE TABLE test_import_sparse_jsonl (col1 INT, col2 SPARSE(FLOAT, 30000));
 
 statement ok
-COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/test_sparse.jsonl' WITH (FORMAT JSONL);
+COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/sparse_float.jsonl' WITH (FORMAT JSONL);
+
+statement error
+COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/invalid_sparse_float.jsonl' WITH (FORMAT JSONL);
 
 query I
 SELECT * FROM test_import_sparse_jsonl;
 ----
 1 10000: 1.000000, 20000: 2.000000
 3 3000: 3.000000
-4 4000: 4.000000
+0 (empty)
+
+#######################################
+
+statement ok
+DROP TABLE test_import_sparse_jsonl;
+
+statement ok
+CREATE TABLE test_import_sparse_jsonl (col1 INT, col2 SPARSE(BIT, 30000));
+
+statement ok
+COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/sparse_bit.jsonl' WITH (FORMAT JSONL);
+
+statement error
+COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/invalid_sparse_bit.jsonl' WITH (FORMAT JSONL);
+
+statement error
+COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/invalid_sparse_bit2.jsonl' WITH (FORMAT JSONL);
+
+query I
+SELECT * FROM test_import_sparse_jsonl;
+----
+1 10000, 20000
+3 3000
+0 (empty)
